@@ -47,3 +47,6 @@
 # Local captured website response fixtures
 /scripts/fixtures/home-api.json
 /scripts/fixtures/category-api.json
+
+# Project documentation kept locally, excluded from GitHub
+/docs/
