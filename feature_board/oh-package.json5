@@ -1,0 +1,9 @@
+{
+  "name": "feature_board",
+  "version": "1.0.0",
+  "description": "PinWeb feature_board",
+  "main": "Index.ets",
+  "dependencies": {
+    "common_ui": "file:../common_ui"
+  }
+}

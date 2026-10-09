@@ -1,0 +1,49 @@
+/node_modules
+/oh_modules
+**/oh_modules
+**/.hvigor
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+
+# Local caches and generated output
+**/.hvigor-user/
+**/node_modules/
+*.log
+*.hap
+*.app
+*.har
+
+# Local snapshots, diagnostics and scratch files
+/backups/
+/diagnostics/
+/%SystemDrive%/
+/.search-audit.txt
+/PinWeb只读代码审计.txt
+
+# Credentials and local signing material
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+*.keystore
+*.jks
+*.p7b
+*.cer
+
+# Hvigor generated module profiles
+**/BuildProfile.ets
+
+# Local captured website response fixtures
+/scripts/fixtures/home-api.json
+/scripts/fixtures/category-api.json

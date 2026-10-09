@@ -1,0 +1,104 @@
+const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+function script(name) {
+  const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/' + name + '.ets'), 'utf8');
+  return Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
+}
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const pin = id => ({ id, type: 'pin', pinner: { id: '123' }, images: { '736x': { url: 'https://i.pinimg.com/p.jpg', width: 736, height: 1000 } } });
+const board = (id, access = 'write delete') => ({ id, type: 'board', name: 'Board ' + id, access, privacy: 'secret', image_cover_url: 'https://i.pinimg.com/b.jpg' });
+async function harness(own = true) {
+  let current = true, updates = 0;
+  const requests = [], window = { PinWebProfileApiEnabled: true, PinWebProfileOrganizeEnabled: true }; window.top = window;
+  const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/sample/' };
+  const context = vm.createContext({ window, location, URL, AbortController, setTimeout, clearTimeout, console,
+    document: { cookie: 'csrftoken=test' }, fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })) });
+  vm.runInContext(script('PinWebProfileApiScript'), context);
+  vm.runInContext(script('PinWebProfileOrganizeScript'), context);
+  const api = window.PinWebProfileApi, profile = 'https://www.pinterest.com/sample/';
+  const changed = () => updates++, valid = () => current;
+  api.read(profile, changed, valid);
+  requests[0].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: { id: '123', type: 'user', username: 'sample' } },
+    client_context: { user: { id: own ? '123' : '999' } } }) });
+  await flush();
+  const read = section => api.readUnorganized(profile, section || 'saved', changed, valid);
+  const respond = async (index, data, bookmark = '-end-', endpoint = '', status = 'success', code = 0) => {
+    requests[index].resolve({ ok: true, json: async () => ({ resource_response: { status, code, data, bookmark, endpoint_name: endpoint, message: status === 'failure' ? '拒绝操作' : '' } }) });
+    await flush();
+  };
+  return { api, read, requests, respond, invalidate: () => { current = false; }, updates: () => updates };
+}
+async function main() {
+  const h = await harness();
+  assert.equal(h.read().loading, true); h.read();
+  assert.equal(h.requests.length, 2, 'polling never repeats a feed request');
+  const options = JSON.parse(new URL(h.requests[1].url, 'https://www.pinterest.com').searchParams.get('data')).options;
+  assert.equal(options.userId, '123'); assert.equal(options.field_set_key, 'mobile');
+  await h.respond(1, [pin('1'), pin('2')], 'next');
+  h.api.organizeAction('morePins');
+  assert.equal(JSON.parse(new URL(h.requests[2].url, 'https://www.pinterest.com').searchParams.get('data')).options.bookmarks[0], 'next');
+  h.requests[2].reject(new TypeError('network')); await flush();
+  assert.equal(h.read().pins.length, 2); assert.ok(h.read().error);
+  h.api.organizeAction('retryPins'); await h.respond(3, [pin('2'), pin('3')]);
+  assert.equal(h.read().pins.length, 3, 'pagination deduplicates saved Pin IDs');
+  assert.equal(h.api.organizeAction('open'), true);
+  assert.equal(h.api.organizeAction('next'), false, 'empty selection cannot advance');
+  h.api.organizeAction('all'); assert.equal(h.read().organize.selectedIds.length, 3);
+  h.api.organizeAction('toggle', '2'); h.api.organizeAction('next');
+  assert.match(h.requests[4].url, /BoardsResource/);
+  await h.respond(4, [board('10', ['write', 'delete']), board('11', ['read'])]);
+  assert.equal(h.read().organize.boards[0].secret, true);
+  assert.equal(h.api.organizeAction('move', '11'), false, 'read-only board cannot receive pins');
+  assert.equal(h.api.organizeAction('move', '10'), true);
+  assert.equal(h.api.organizeAction('move', '10'), false, 'double submission blocked');
+  assert.equal(h.api.organizeAction('close'), false, 'pending write cannot be dismissed');
+  const body = JSON.parse(new URLSearchParams(h.requests[5].options.body).get('data')).options;
+  assert.equal(body.url, '/v3/pins/bulk/move/'); assert.deepEqual(body.data.pin_ids, ['1', '3']); assert.equal(body.data.board_id, '10');
+  assert.equal(h.requests[5].options.headers['X-CSRFToken'], 'test');
+  await h.respond(5, null, '', 'v3_move_pins');
+  assert.equal(h.read().organize, null); assert.equal(h.read().pins.length, 1); assert.equal(h.read().feedback, '');
+  await h.respond(6, [pin('2')]);
+  h.api.organizeAction('open'); h.api.organizeAction('all'); h.api.organizeAction('next'); await h.respond(7, [board('10')]);
+  h.api.organizeAction('createForm'); h.api.organizeAction('create', 'New', true);
+  const create = JSON.parse(new URLSearchParams(h.requests[8].options.body).get('data')).options;
+  assert.equal(create.privacy, 'secret'); assert.equal(create.name, 'New');
+  await h.respond(8, { ...board('12'), name: 'New' }, '', 'v3_create_board');
+  assert.equal(h.read().organize.phase, 'boards'); assert.equal(h.read().organize.boards.length, 2);
+  assert.equal(h.read().organize.busy, true, 'creation and automatic move share one write lock');
+  const automatic = JSON.parse(new URLSearchParams(h.requests[9].options.body).get('data')).options;
+  assert.equal(automatic.url, '/v3/pins/bulk/move/');
+  assert.deepEqual(automatic.data, { board_id: '12', pin_ids: ['2'] }, 'newly created board receives the selected saved copy');
+  assert.equal(h.api.organizeAction('create', 'New', true), false, 'automatic move blocks a second create');
+  await h.respond(9, null, '', 'v3_move_pins');
+  assert.equal(h.read().organize, null, 'close organizer only after confirmed move');
+  assert.equal(h.read().feedback, ''); await h.respond(10, []);
+  const ambiguous = await harness(); ambiguous.read(); await ambiguous.respond(1, [pin('1')]);
+  ambiguous.api.organizeAction('open'); ambiguous.api.organizeAction('all'); ambiguous.api.organizeAction('next');
+  await ambiguous.respond(2, [board('10')]);
+  ambiguous.api.organizeAction('createForm'); ambiguous.api.organizeAction('create', 'New', true);
+  await ambiguous.respond(3, { ...board('12'), name: 'New' }, '', 'v3_create_board');
+  ambiguous.requests[4].reject(new TypeError('network')); await flush();
+  assert.equal(ambiguous.read().organize.uncertain, true);
+  assert.equal(ambiguous.read().pins.length, 1, 'failed automatic move preserves unorganized pins');
+  assert.equal(ambiguous.api.organizeAction('move', '12'), false, 'ambiguous automatic move cannot be replayed');
+  ambiguous.api.organizeAction('close'); assert.equal(ambiguous.read().loading, true, 'ambiguous result forces fresh feed');
+  await ambiguous.respond(5, []);
+  const lateCreate = await harness(); lateCreate.read(); await lateCreate.respond(1, [pin('1')]);
+  lateCreate.api.organizeAction('open'); lateCreate.api.organizeAction('all'); lateCreate.api.organizeAction('next');
+  await lateCreate.respond(2, [board('10')]);
+  lateCreate.api.organizeAction('createForm'); lateCreate.api.organizeAction('create', 'New', true);
+  lateCreate.invalidate(); await lateCreate.respond(3, { ...board('12'), name: 'New' }, '', 'v3_create_board');
+  assert.equal(lateCreate.requests.length, 4, 'leaving the page before creation returns prevents automatic move');
+  const other = await harness(false); assert.equal(other.read(), null, 'never organize another user profile');
+  const stale = await harness(); stale.read(); const before = stale.updates(); stale.invalidate(); await stale.respond(1, [pin('1')]);
+  assert.equal(stale.updates(), before, 'late feed response does not notify');
+  const switched = await harness(); switched.read(); switched.read('created'); await switched.respond(1, [pin('1')]);
+  assert.equal(switched.api.organizeAction('open'), false, 'changing tabs drops selection and targets');
+  const mismatch = await harness(); mismatch.read(); await mismatch.respond(1, [{ ...pin('1'), pinner: { id: '999' } }]);
+  assert.equal(mismatch.read().pins.length, 0, 'wrong owner Pin rejected');
+  console.log('Profile organize API checks passed');
+}
+main().catch(e => { console.error(e); process.exitCode = 1; });

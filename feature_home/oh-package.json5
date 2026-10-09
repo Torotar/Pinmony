@@ -1,0 +1,9 @@
+{
+  "name": "feature_home",
+  "version": "1.0.0",
+  "description": "PinWeb feature_home",
+  "main": "Index.ets",
+  "dependencies": {
+    "common_ui": "file:../common_ui"
+  }
+}

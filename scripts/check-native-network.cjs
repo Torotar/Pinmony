@@ -1,0 +1,304 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const ts = require(process.argv[2] || 'typescript');
+const flush = () => new Promise(resolve => setImmediate(resolve));
+async function until(predicate) {
+  const deadline = Date.now() + 2000;
+  while (!predicate()) {
+    assert(Date.now() < deadline, 'asynchronous body stream did not complete');
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
+function compiled(file, requireFn) {
+  const exports = {};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
+  }).outputText, { exports, require: requireFn, console, Promise, setTimeout, clearTimeout, Math });
+  return exports;
+}
+const requests = [], writes = [], sessions = [], requestSessions = [];
+const runtimeLogs = [];
+let response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ resource_response: { status: 'success', data: [] } }) };
+let readCookie = async () => 'session=synthetic; csrftoken=synthetic';
+class Credentials {
+  read(url) { return readCookie(url); }
+  async update(url, cookies, current) { for(const cookie of cookies) { assert(current()); writes.push({url,cookie}); } }
+}
+const rcp = {
+  Request: class { constructor(url,method,headers,content) { Object.assign(this,{url,method,headers,content}); } },
+  createSession(config) {
+    const session = { cancelled:false, closed:false, config,
+      async fetch(req) { requests.push(req); requestSessions.push(session); return typeof response === 'function' ? response(req) : response; },
+      cancel() { session.cancelled=true; }, close() { session.closed=true; } };
+    sessions.push(session); return session;
+  }
+};
+const { PinWebNativeNetwork, NetworkManager, RequestScheduler, Priority, acceptsNetworkJob } = compiled('common_network/src/main/ets/PinWebNativeNetwork.ets', name =>
+  name === 'common_session' ? {PinWebSessionCredentials:Credentials} : name === 'common_foundation' ?
+    {PinWebRuntimeLog:{info(message){runtimeLogs.push({level:'info',message});},warn(message){runtimeLogs.push({level:'warn',message});}}} : {rcp});
+const {PIN_NATIVE_NETWORK_SCRIPT,useNativeTransport} = compiled('common_network/src/main/ets/PinWebNetworkScript.ets',()=>({}));
+const native = new PinWebNativeNetwork();
+const state = { authenticated:true,epoch:3,page:'https://www.pinterest.com/',userAgent:'synthetic-agent' };
+const base = { id:'test',epoch:3,page:state.page,url:'https://www.pinterest.com/resource/UserHomefeedResource/get/?data=synthetic',method:'GET',headers:{Accept:'application/json'},body:'' };
+async function main() {
+  const scheduler = new RequestScheduler(1), order = [];
+  let releaseBlocker;
+  const blocker = scheduler.enqueue(Priority.NORMAL, () => new Promise(resolve => { releaseBlocker = resolve; order.push('blocker'); }));
+  await flush();
+  const low = scheduler.enqueue(Priority.LOW, async () => { order.push('low'); return 'low'; });
+  const high = scheduler.enqueue(Priority.HIGH, async () => { order.push('high'); return 'high'; });
+  releaseBlocker();
+  await Promise.all([blocker, low, high]);
+  assert.deepEqual(order, ['blocker', 'high', 'low'], 'queued requests are drained by priority');
+  let helperRetryCalls = 0;
+  const retryResponse = await NetworkManager.requestWithRetry(
+    { fetch: async () => ({ statusCode: ++helperRetryCalls < 3 ? 500 : 200 }) },
+    { method: 'GET' }, 2, 0);
+  assert.equal(retryResponse.statusCode,200); assert.equal(helperRetryCalls,3,'GET 5xx uses bounded retries');
+  let postCalls = 0;
+  const postResponse = await NetworkManager.requestWithRetry(
+    { fetch: async () => ({ statusCode: ++postCalls < 2 ? 500 : 200 }) },
+    { method: 'POST' }, 2, 0);
+  assert.equal(postResponse.statusCode,500); assert.equal(postCalls,1,'POST responses are never replayed');
+  await assert.rejects(NetworkManager.requestWithRetry(
+    { fetch: async () => ({ statusCode: 503 }) }, { method: 'GET' }, 1, 0), 'retry exhaustion is an exception');
+  assert(acceptsNetworkJob({...base, url:'https://www.pinterest.com/resource/VisualSearchFlashlightUnifiedResource/get/?data=synthetic'}, state), 'captured visual-search resource is allowed by native transport');
+  assert(acceptsNetworkJob({...base, method:'POST', url:'https://www.pinterest.com/resource/ConversationMessagesResource/create/'}, state), 'confirmed chat send reaches native transport');
+  assert(!acceptsNetworkJob({...base, method:'POST', url:'https://www.pinterest.com/resource/ConversationMessagesResource/delete/'}, state), 'unconfirmed message resource operations stay blocked');
+  const cookieCalls=[];
+  const {PinWebSessionCredentials:ActualCredentials}=compiled('common_session/src/main/ets/services/PinWebSessionCredentials.ets',()=>({webview:{WebCookieManager:{
+    fetchCookie:async url=>{cookieCalls.push({url,read:true});return 'session=synthetic';},
+    configCookie:async (...args)=>cookieCalls.push({args})
+  }}}));
+  const actualCredentials=new ActualCredentials();
+  await assert.rejects(actualCredentials.read('https://evil.example/'));
+  const expires='session=synthetic; Expires=Wed, 21 Oct 2037 07:28:00 GMT; Path=/; Secure; HttpOnly';
+  await actualCredentials.update(base.url,[expires],()=>true);
+  assert.deepEqual(Array.from(cookieCalls[0].args),[base.url,expires,false,true],'Set-Cookie attributes and HttpOnly survive synchronization');
+  await assert.rejects(actualCredentials.update(base.url,['session=stale'],()=>false));
+  assert.equal(cookieCalls.length,1,'invalidated cookie updates are not dispatched');
+  for (const bad of [ {...base,url:'https://evil.example/resource/UserHomefeedResource/get/'},
+    {...base,url:'https://www.pinterest.com.evil.example/resource/UserHomefeedResource/get/'},
+    {...base,url:'https://www.pinterest.com/resource/UnknownResource/create/',method:'POST'},
+    {...base,epoch:2}, {...base,page:state.page+'search/'}, {...base,body:'x'.repeat(262145)} ]) {
+    assert.equal(acceptsNetworkJob(bad,state),false); await native.request(bad,()=>state);
+  }
+  assert.equal(requests.length,0,'invalid jobs never reach the network');
+  await native.request(base,()=>state);
+  assert.equal(requests[0].headers.Cookie,'session=synthetic; csrftoken=synthetic');
+  assert.equal(requests[0].headers['User-Agent'],'synthetic-agent');
+  assert.equal(sessions[0].config.requestConfiguration.transfer.autoRedirect,false);
+  assert.equal(sessions.length,1,'all requests reuse one application session');
+  assert.equal(sessions[0].closed,false,'request completion does not close the shared session');
+  assert.equal(sessions[0].config.requestConfiguration.tracing.collectTimeInfo,true,'Session timing collection is enabled');
+  const beforePreConnect = requests.length;
+  await NetworkManager.preConnect('https://www.pinterest.com');
+  assert.equal(requests[beforePreConnect].connectOnly,true,'startup pre-connect uses connectOnly');
+  assert.equal(requestSessions[beforePreConnect],requestSessions[0],'preconnect and business calls use the same Session object');
+  response = { statusCode:200,headers:{'set-cookie':['session=new-synthetic; Path=/; Secure; HttpOnly']},toString:()=>'{"ok":true}' };
+  const write = await native.request({...base,id:'write',url:'https://www.pinterest.com/resource/RepinResource/create/',method:'POST',body:'data=synthetic'},()=>state);
+  assert.equal(requests.at(-1).headers['X-CSRFToken'],'synthetic');
+  assert.equal(requestSessions.at(-1),requestSessions[beforePreConnect]);
+  assert(runtimeLogs.some(log => log.message.includes('connection-context sharedSession=true') && log.message.includes('preconnect=ok')));
+  assert.equal(writes.length,1); assert.equal(write.body,'{"ok":true}');
+  const suspendCalls = requests.length;
+  const suspendedResolvers = {};
+  response = req => new Promise(resolve => { suspendedResolvers[req.url.includes('RepinResource') ? 'POST' : 'GET'] = resolve; });
+  const pendingRead = native.request({...base,id:'background-read',method:'POST'},()=>state);
+  const pendingWrite = native.request({...base,id:'background-write',url:'https://www.pinterest.com/resource/RepinResource/create/',method:'POST',body:'data=synthetic'},()=>state);
+  await until(()=>suspendedResolvers.GET && suspendedResolvers.POST);
+  native.setForeground(false);
+  const blocked = await native.request({...base,id:'background-new'},()=>state);
+  assert.equal(blocked.error,'background');assert.equal(requests.length,suspendCalls+2,'background requests do not dispatch');
+  suspendedResolvers.GET({statusCode:200,headers:{},toString:()=>'{"read":true}'});
+  suspendedResolvers.POST({statusCode:200,headers:{},toString:()=>'{"write":true}'});
+  assert.equal((await pendingRead).error,'cancelled');assert.equal((await pendingWrite).status,200,'already sent write can finish once');
+  assert.equal(native.setForeground(true),true);assert.equal(requests.length,suspendCalls+2,'resume never replays writes');
+  let suspendedCookieReady; const oldReadCookie = readCookie; const beforeUnsent = requests.length;
+  readCookie = () => new Promise(resolve => { suspendedCookieReady = resolve; });
+  const unsentWrite = native.request({...base,id:'unsent-write',url:'https://www.pinterest.com/resource/RepinResource/create/',method:'POST',body:'data=synthetic'},()=>state);
+  await flush();native.setForeground(false);suspendedCookieReady('session=synthetic; csrftoken=synthetic');
+  assert.equal((await unsentWrite).error,'cancelled');assert.equal(requests.length,beforeUnsent,'unsent write is revoked on background');
+  native.setForeground(true);readCookie=oldReadCookie;
+  let done;
+  response = () => new Promise(resolve=>done=resolve);
+  const late = native.request({...base,id:'late'},()=>state); await flush();
+  native.invalidate(); done({ statusCode:200,headers:{'set-cookie':['session=stale']},toString:()=>'{"stale":true}' });
+  assert.equal((await late).error,'cancelled'); assert.equal(writes.length,1,'stale responses cannot replace cookies');
+  let cookieReady;
+  readCookie=()=>new Promise(resolve=>cookieReady=resolve);
+  const waiting=native.request({...base,id:'waiting'},()=>state);
+  native.cancel('waiting'); cookieReady('session=synthetic');
+  const before=requests.length; assert.equal((await waiting).error,'cancelled'); assert.equal(requests.length,before);
+  readCookie=async ()=>'session=synthetic; csrftoken=synthetic';
+  const guarded = new PinWebNativeNetwork();
+  const guardedJob=guarded.request({...base,id:'cleanup-exception'},()=>state);await flush();
+  const cleanupSession=sessions.at(-1);
+  cleanupSession.cancel=()=>{throw new Error('synthetic cancel failure');};
+  cleanupSession.close=()=>{cleanupSession.closed=true;throw new Error('synthetic close failure');};
+  assert.doesNotThrow(()=>guarded.invalidate(),'SDK cleanup errors must not escape navigation callbacks');
+  assert.equal(cleanupSession.closed,false,'per-request invalidation does not close the shared session');
+  done({statusCode:200,headers:{},toString:()=>'{"late":true}'});
+  assert.equal((await guardedJob).error,'cancelled');
+  NetworkManager.destroy();
+  const create=rcp.createSession;rcp.createSession=()=>{throw new Error('synthetic create failure');};
+  assert.equal((await guarded.request({...base,id:'create-exception'},()=>state)).error,'network-unavailable');
+  rcp.createSession=create;
+
+  let webRequests=0, messages=[], cancelled=[];
+  const location={ origin:'https://www.pinterest.com',hostname:'www.pinterest.com',href:state.page };
+  const window={ addEventListener() {}, PinWebNativeNetworkEnabled:true,fetch:()=>{webRequests++;return Promise.resolve(new Response('{}'));},
+    PinWebShareBridge:{ networkRequest(raw) {
+      const job=JSON.parse(raw);messages.push(job);
+      native.request(job,()=>state).then(reply=>window.PinWebNetwork.complete(reply));
+    },cancelNetwork(id){cancelled.push(id);native.cancel(id);} } };
+  window.top=window;
+  vm.runInNewContext(PIN_NATIVE_NETWORK_SCRIPT,{window,location,URL,Headers,Response,Map,Promise,setTimeout,clearTimeout,console});
+  // Put an observer outside the transport, as the production auth/contract scripts do.
+  let observed=0;const wrapped=window.fetch;
+  window.fetch=(url,init)=>wrapped(url,init).then(async res=>{
+    assert(res instanceof Response, 'website fetch observers require a real Response');
+    assert(res.headers instanceof Headers);
+    const copy=res.clone(); assert.notEqual(copy,res); assert.equal(copy.url,res.url);
+    await copy.arrayBuffer(); assert.equal(copy.bodyUsed,true); assert.equal(res.bodyUsed,false);
+    observed++;return res;
+  });
+  response={statusCode:200,headers:{'content-type':'application/json','set-cookie':'session=synthetic; Secure'},toString:()=>'{"value":1}'};
+  const waitingJS=window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/',{headers:{Cookie:'must-not-cross',Authorization:'must-not-cross','X-CSRFToken':'must-not-cross'}});
+  assert.equal(messages.length,0,'requests wait for current login confirmation');
+  window.PinWebNetwork.bind(3,state.page);
+  const result=await waitingJS;assert.equal((await result.json()).value,1);
+  assert.equal(result.headers.get('content-type'),'application/json');
+  assert.equal(result.headers.get('set-cookie'),null,'credentials never cross into the synthetic response');
+  assert.equal(result.bodyUsed,true);
+  await assert.rejects(result.json(),'a Response body can only be consumed once');
+  assert.equal(observed,1,'native response reaches existing observers');
+  assert.equal(webRequests,0);assert.deepEqual(messages[0].headers,{});
+  const controller=new AbortController();response=()=>new Promise(resolve=>done=resolve);
+  const abort=window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/',{signal:controller.signal});
+  await flush();controller.abort();await assert.rejects(abort,e=>e.name==='AbortError');
+  done({statusCode:200,headers:{},toString:()=>'{"late":1}'});await flush();
+  assert.equal(cancelled.length,1);assert.equal(webRequests,0,'cancelled requests never replay in Web');
+  response={statusCode:403,headers:{},toString:()=>'<html>denied</html>'};
+  const denied=await window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/');
+  assert.equal(denied.status,403);await assert.rejects(denied.json());assert(state.authenticated,'HTTP 403 is not logout evidence');
+  assert.equal(webRequests,0);
+  // A transient TLS/peer receive failure retries one GET, while writes never replay.
+  let transient = true, retryCalls = 0;
+  response = () => { retryCalls++; if (transient) { transient = false; const error = new Error('tls'); error.code = 1007900035; throw error; } return {statusCode:200,headers:{},toString:()=>'{"ok":true}'}; };
+  const retried = await native.request(base,()=>state);
+  assert.equal(retryCalls,2); assert.equal(retried.status,200);
+  let detailRetryCalls = 0;
+  response = () => { detailRetryCalls++; return { statusCode: 503, headers: {}, toString: () => '{}' }; };
+  const detailFailure = await native.request({ ...base, id: 'detail-retry-bound',
+    url: 'https://www.pinterest.com/resource/PinResource/get/?data=synthetic' }, () => state);
+  assert.equal(detailRetryCalls, 2, 'detail GET retries at most once');
+  assert.equal(detailFailure.error, 'network-unavailable');
+  // A retry notification may invalidate the page synchronously; the stale
+  // request must not be dispatched a second time after that callback.
+  const retryGuard = new PinWebNativeNetwork();
+  let guardedCalls = 0;
+  response = () => { guardedCalls++; const error = new Error('tls'); error.code = 1007900035; throw error; };
+  retryGuard.onTransientRetry = () => retryGuard.invalidate();
+  const skipped = await retryGuard.request({...base,id:'retry-context-change'},()=>state);
+  assert.equal(guardedCalls,1,'stale retry is not dispatched after the retry callback invalidates the context');
+  assert.equal(skipped.error,'cancelled');
+  const logMessages = runtimeLogs.map(entry => entry.message);
+  assert(logMessages.some(message => message.includes('NetworkTrace: session-created generation=')), 'shared Session creation is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: session-reused generation=')), 'shared Session reuse is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: session-destroy generation=')), 'shared Session destruction is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: preconnect-start')), 'pre-connect start is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: preconnect-ok connectOnly=true')), 'pre-connect success is logged');
+  assert(logMessages.some(message => message.includes('protocol=unknown dnsMs=-1 connectMs=-1 tlsMs=-1 preTransferMs=-1 firstByteMs=-1 totalTransferMs=-1 redirectMs=-1')), 'protocol and timing fields are logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: retry kind=http method=GET')), 'HTTP retry is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: retry kind=transport method=GET')), 'transport retry is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: retry-skip method=POST')), 'POST retry suppression is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: queue-start priority=HIGH')), 'HIGH queue dispatch is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: queue-start priority=LOW')), 'LOW queue dispatch is logged');
+  assert(logMessages.some(message => message.includes('NetworkTrace: queue-finish')), 'queue completion is logged');
+  const authMessages=[];
+  window.PinWebShareBridge.authState=value=>authMessages.push(JSON.parse(value));
+  const authSource=fs.readFileSync('common_session/src/main/ets/services/PinWebAuthScript.ets','utf8');
+  const authScript=Function('return `'+authSource.match(/= `([\s\S]*?)`;/)[1]+'`')();
+  vm.runInNewContext(authScript,{window,location,URL,document:{getElementById:()=>null,addEventListener(){}},console});
+  window.PinWebAuthSync(3);
+  response={statusCode:200,headers:{},toString:()=>'{"client_context":{"is_authenticated":false}}'};
+  await window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/');await until(()=>authMessages.length > 0);
+  assert.equal(authMessages.at(-1).status,'unauthenticated','native response remains a source of explicit session evidence');
+  window.PinWebNativeNetworkEnabled=false;
+  await window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/');
+  assert.equal(webRequests,1,'explicit manual transport rollback uses the original Web path');
+  window.PinWebNativeNetworkEnabled=true;webRequests=0;
+  // Exercise an actual business API script through the native adapter, including mapping.
+  const homeSource=fs.readFileSync('feature_home/src/main/ets/services/PinWebHomeApiScript.ets','utf8');
+  const homeScript=Function('return `'+homeSource.match(/`([\s\S]*?)`;/)[1]+'`')();
+  const fixture=JSON.parse(fs.readFileSync('scripts/fixtures/home-api.json','utf8'));
+  window.PinWebHomeApiEnabled=true;
+  response={statusCode:200,headers:{},toString:()=>JSON.stringify(fixture)};
+  vm.runInNewContext(useNativeTransport(homeScript),{window,location,document:{getElementById:()=>null},AbortController,setTimeout,clearTimeout,console});
+  window.PinWebHomeApi.read('home',true,()=>{},()=>true);
+  await until(()=>window.PinWebHomeApi.read('home',true,()=>{},()=>true).pins.length > 0);
+  assert(window.PinWebHomeApi.read('home',true,()=>{},()=>true).pins.length>0,'native JSON still maps through the current business contract');
+  assert.equal(webRequests,0);
+  // Exercise the real search scripts through JS transport, native admission and RCP.
+  state.page = 'https://www.pinterest.com/search/';
+  location.href = state.page; location.pathname = '/search/'; location.search = '';
+  window.PinWebNetwork.bind(state.epoch, state.page);
+  window.PinWebSearchDiscoveryApiEnabled = true; window.PinWebSearchUiApiEnabled = true;
+  const searchSource = name => {
+    const source = fs.readFileSync('feature_search/src/main/ets/services/' + name + '.ets', 'utf8');
+    return Function('return ' + source.match(/SCRIPT: string = (\x60[\s\S]*\x60);/)[1])();
+  };
+  const searchContext = { window, location, URL, URLSearchParams, AbortController,
+    document: { cookie: '' }, setTimeout, clearTimeout, console };
+  response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ resource_response: {
+    status: 'success', bookmark: '-end-', data: [{ id: 'synthetic-topic', story_type: 'slp_search_recommendation',
+      title: { format: '测试主题' }, action: { url: '/search/pins/?q=test' },
+      objects: [{ image_medium_url: 'https://i.pinimg.com/236x/synthetic.jpg' }] }]
+  } }) };
+  vm.runInNewContext(useNativeTransport(searchSource('PinWebSearchDiscoveryApiScript')), searchContext);
+  const discovery = () => window.PinWebSearchDiscoveryApi.read(state.page, () => {});
+  discovery(); await until(() => discovery().active);
+  assert.equal(discovery().sections[0].title, '测试主题');
+  assert(requests.some(req => req.url.includes('/resource/SearchTabResource/get/')), 'discovery reaches RCP');
+  response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ resource_response: {
+    status: 'success', data: { items: [{ query: '测试联想', type: 'recent_query' }] }
+  } }) };
+  vm.runInNewContext(useNativeTransport(searchSource('PinWebSearchUiApiScript')), searchContext);
+  const suggestions = () => window.PinWebSearchUiApi.readSuggestions(state.page, '测试', true, () => {});
+  suggestions(); await until(() => suggestions().items.length > 0);
+  assert.equal(suggestions().items[0].label, '测试联想');
+  assert(requests.some(req => req.url.includes('/resource/AdvancedTypeaheadResource/get/')), 'typeahead reaches RCP');
+  for (const resource of ['SearchTabResource', 'AdvancedTypeaheadResource']) {
+    const accepted = messages.find(job => job.url.includes('/resource/' + resource + '/get/'));
+    assert(accepted && acceptsNetworkJob(accepted, state), resource + ' real request is admitted');
+    const rejected = [
+      [{ ...accepted, epoch: state.epoch - 1 }, state],
+      [{ ...accepted, page: state.page + '?q=old' }, state],
+      [accepted, { ...state, authenticated: false }],
+      [{ ...accepted, url: accepted.url.replace('www.pinterest.com', 'evil.example') }, state],
+      [{ ...accepted, method: 'POST' }, state],
+      [{ ...accepted, body: 'unexpected' }, state],
+      ...['create', 'update', 'delete'].map(operation => [{ ...accepted, method: 'POST',
+        url: 'https://www.pinterest.com/resource/' + resource + '/' + operation + '/' }, state])
+    ];
+    const before = requests.length;
+    for (const [job, context] of rejected) {
+      assert.equal(acceptsNetworkJob(job, context), false, resource + ' rejects invalid context or operation');
+      assert.equal((await native.request(job, () => context)).error, 'request-unavailable');
+    }
+    assert.equal(requests.length, before, 'rejected search requests never reach RCP');
+  }
+  window.PinWebSearchUiApi.reset(); window.PinWebSearchDiscoveryApi.reset();
+  assert.equal(webRequests, 0, 'search integration never falls back to webpage fetch');
+  for(const module of ['feature_home','feature_pin','feature_search','feature_inbox','feature_profile','feature_board']) {
+    for(const file of fs.readdirSync(module+'/src/main/ets/services').filter(n=>n.endsWith('Script.ets'))) {
+      const s=fs.readFileSync(module+'/src/main/ets/services/'+file,'utf8');const match=s.match(/= `([\s\S]*?)`;/);
+      if(match) new Function(useNativeTransport(Function('return `'+match[1]+'`')()));
+    }
+  }
+  native.invalidate();
+  console.log('Native transport, credential isolation, observers, cancellation, stale cookies and actual home/search mapping passed');
+}
+main().catch(e=>{console.error(e);process.exitCode=1;});

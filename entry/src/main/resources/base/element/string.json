@@ -1,0 +1,28 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "PinWeb"
+    },
+    {
+      "name": "load_failed",
+      "value": "主页面加载失败，请稍后重试"
+    },
+    {
+      "name": "retry",
+      "value": "重试"
+    },
+    {
+      "name": "open_in_browser",
+      "value": "在浏览器打开"
+    }
+  ]
+}

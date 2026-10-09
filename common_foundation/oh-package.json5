@@ -1,0 +1,7 @@
+{
+  "name": "common_foundation",
+  "version": "1.0.0",
+  "description": "PinWeb common_foundation",
+  "main": "Index.ets",
+  "dependencies": {}
+}

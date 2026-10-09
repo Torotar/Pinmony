@@ -1,0 +1,2 @@
+{ "module": { "name": "common_network", "type": "har", "deviceTypes": ["phone"],
+  "requestPermissions": [{ "name": "ohos.permission.INTERNET" }] } }

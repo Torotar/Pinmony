@@ -1,0 +1,21 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "common_foundation": "file:../common_foundation",
+    "common_session": "file:../common_session",
+    "common_ui": "file:../common_ui",
+    "feature_home": "file:../feature_home",
+    "feature_search": "file:../feature_search",
+    "feature_inbox": "file:../feature_inbox",
+    "feature_profile": "file:../feature_profile",
+    "feature_pin": "file:../feature_pin",
+    "feature_board": "file:../feature_board",
+    "feature_settings": "file:../feature_settings",
+    "common_network": "file:../common_network"
+  }
+}

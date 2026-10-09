@@ -1,0 +1,9 @@
+{
+  "module": {
+    "name": "feature_pin",
+    "type": "har",
+    "deviceTypes": [
+      "phone"
+    ]
+  }
+}

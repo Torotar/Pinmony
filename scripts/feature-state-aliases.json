@@ -1,0 +1,558 @@
+{
+  "confirmedSaves": {
+    "store": "pinStore",
+    "field": "confirmedSaves"
+  },
+  "shareSession": {
+    "store": "pinStore",
+    "field": "shareSession"
+  },
+  "commentResult": {
+    "store": "pinStore",
+    "field": "commentResult"
+  },
+  "commentToken": {
+    "store": "pinStore",
+    "field": "commentToken"
+  },
+  "saveResult": {
+    "store": "pinStore",
+    "field": "saveResult"
+  },
+  "saveToken": {
+    "store": "pinStore",
+    "field": "saveToken"
+  },
+  "editToken": {
+    "store": "pinStore",
+    "field": "editToken"
+  },
+  "editResult": {
+    "store": "pinStore",
+    "field": "editResult"
+  },
+  "shareSnackKey": {
+    "store": "pinStore",
+    "field": "shareSnackKey"
+  },
+  "shareBackHandledUntil": {
+    "store": "pinStore",
+    "field": "shareBackHandledUntil"
+  },
+  "shareFeedbackSnackKey": {
+    "store": "pinStore",
+    "field": "shareFeedbackSnackKey"
+  },
+  "saveUndoPin": {
+    "store": "pinStore",
+    "field": "saveUndoPin"
+  },
+  "saveUndoId": {
+    "store": "pinStore",
+    "field": "saveUndoId"
+  },
+  "saveCreating": {
+    "store": "pinStore",
+    "field": "saveCreating"
+  },
+  "feedbackUndoPin": {
+    "store": "pinStore",
+    "field": "feedbackUndoPin"
+  },
+  "feedbackUndoSession": {
+    "store": "pinStore",
+    "field": "feedbackUndoSession"
+  },
+  "feedbackUndoBusy": {
+    "store": "pinStore",
+    "field": "feedbackUndoBusy"
+  },
+  "ignoredShareSession": {
+    "store": "pinStore",
+    "field": "ignoredShareSession"
+  },
+  "shareOpenRequestedSession": {
+    "store": "pinStore",
+    "field": "shareOpenRequestedSession"
+  },
+  "sharePin": {
+    "store": "pinStore",
+    "field": "sharePin"
+  },
+  "moreSession": {
+    "store": "pinStore",
+    "field": "moreSession"
+  },
+  "ignoredMoreSession": {
+    "store": "pinStore",
+    "field": "ignoredMoreSession"
+  },
+  "morePin": {
+    "store": "pinStore",
+    "field": "morePin"
+  },
+  "detailSession": {
+    "store": "pinStore",
+    "field": "detailSession"
+  },
+  "detailPin": {
+    "store": "pinStore",
+    "field": "detailPin"
+  },
+  "detailImageFailedPin": {
+    "store": "pinStore",
+    "field": "detailImageFailedPin"
+  },
+  "detailCache": {
+    "store": "pinStore",
+    "field": "detailCache"
+  },
+  "detailScrollOffset": {
+    "store": "pinStore",
+    "field": "detailScrollOffset"
+  },
+  "profileSession": {
+    "store": "profileStore",
+    "field": "profileSession"
+  },
+  "profileUrl": {
+    "store": "profileStore",
+    "field": "profileUrl"
+  },
+  "profileRequestToken": {
+    "store": "profileStore",
+    "field": "profileRequestToken"
+  },
+  "homeRequestToken": {
+    "store": "homeStore",
+    "field": "homeRequestToken"
+  },
+  "homeMoreRequestToken": {
+    "store": "homeStore",
+    "field": "homeMoreRequestToken"
+  },
+  "pendingHomeTab": {
+    "store": "homeStore",
+    "field": "pendingHomeTab"
+  },
+  "homeMoreLoadingId": {
+    "store": "homeStore",
+    "field": "homeMoreLoadingId"
+  },
+  "homeTabNeedsRedispatch": {
+    "store": "homeStore",
+    "field": "homeTabNeedsRedispatch"
+  },
+  "homeMenuPin": {
+    "store": "homeStore",
+    "field": "homeMenuPin"
+  },
+  "customHomeMenu": {
+    "store": "homeStore",
+    "field": "customHomeMenu"
+  },
+  "customHomeMenuToken": {
+    "store": "homeStore",
+    "field": "customHomeMenuToken"
+  },
+  "pendingHomeMorePin": {
+    "store": "homeStore",
+    "field": "pendingHomeMorePin"
+  },
+  "homeDetailMoreToken": {
+    "store": "homeStore",
+    "field": "homeDetailMoreToken"
+  },
+  "inboxSession": {
+    "store": "inboxStore",
+    "field": "inboxSession"
+  },
+  "inboxFlow": {
+    "store": "inboxStore",
+    "field": "inboxFlow"
+  },
+  "inboxUrl": {
+    "store": "inboxStore",
+    "field": "inboxUrl"
+  },
+  "inboxRequestToken": {
+    "store": "inboxStore",
+    "field": "inboxRequestToken"
+  },
+  "pendingInboxSection": {
+    "store": "inboxStore",
+    "field": "pendingInboxSection"
+  },
+  "shareOptions": {
+    "store": "pinStore",
+    "field": "shareOptions"
+  },
+  "shareActions": {
+    "store": "pinStore",
+    "field": "shareActions"
+  },
+  "shareContacts": {
+    "store": "pinStore",
+    "field": "shareContacts"
+  },
+  "shareOnPinDetail": {
+    "store": "pinStore",
+    "field": "shareOnPinDetail"
+  },
+  "shareTitle": {
+    "store": "pinStore",
+    "field": "shareTitle"
+  },
+  "shareSectionLabel": {
+    "store": "pinStore",
+    "field": "shareSectionLabel"
+  },
+  "shareSearchId": {
+    "store": "pinStore",
+    "field": "shareSearchId"
+  },
+  "shareSearchLabel": {
+    "store": "pinStore",
+    "field": "shareSearchLabel"
+  },
+  "shareSendId": {
+    "store": "pinStore",
+    "field": "shareSendId"
+  },
+  "shareSendLabel": {
+    "store": "pinStore",
+    "field": "shareSendLabel"
+  },
+  "shareSearchActive": {
+    "store": "pinStore",
+    "field": "shareSearchActive"
+  },
+  "shareQuery": {
+    "store": "pinStore",
+    "field": "shareQuery"
+  },
+  "shareError": {
+    "store": "pinStore",
+    "field": "shareError"
+  },
+  "shareFeedback": {
+    "store": "pinStore",
+    "field": "shareFeedback"
+  },
+  "shareLoading": {
+    "store": "pinStore",
+    "field": "shareLoading"
+  },
+  "moreTitle": {
+    "store": "pinStore",
+    "field": "moreTitle"
+  },
+  "moreOptions": {
+    "store": "pinStore",
+    "field": "moreOptions"
+  },
+  "moreError": {
+    "store": "pinStore",
+    "field": "moreError"
+  },
+  "moreLoading": {
+    "store": "pinStore",
+    "field": "moreLoading"
+  },
+  "detail": {
+    "store": "pinStore",
+    "field": "detail"
+  },
+  "detailOpeningPin": {
+    "store": "pinStore",
+    "field": "detailOpeningPin"
+  },
+  "detailApiError": {
+    "store": "pinStore",
+    "field": "detailApiError"
+  },
+  "detailApiRetryable": {
+    "store": "pinStore",
+    "field": "detailApiRetryable"
+  },
+  "detailMediaUnsupported": {
+    "store": "pinStore",
+    "field": "detailMediaUnsupported"
+  },
+  "detailOpeningToken": {
+    "store": "pinStore",
+    "field": "detailOpeningToken"
+  },
+  "detailActionsReady": {
+    "store": "pinStore",
+    "field": "detailActionsReady"
+  },
+  "detailWebFlow": {
+    "store": "pinStore",
+    "field": "detailWebFlow"
+  },
+  "profile": {
+    "store": "profileStore",
+    "field": "profile"
+  },
+  "profileCache": {
+    "store": "profileStore",
+    "field": "profileCache"
+  },
+  "profileActionsReady": {
+    "store": "profileStore",
+    "field": "profileActionsReady"
+  },
+  "inboxCache": {
+    "store": "inboxStore",
+    "field": "inboxCache"
+  },
+  "inboxActionsReady": {
+    "store": "inboxStore",
+    "field": "inboxActionsReady"
+  },
+  "inboxSectionReady": {
+    "store": "inboxStore",
+    "field": "inboxSectionReady"
+  },
+  "inboxRetainedContent": {
+    "store": "inboxStore",
+    "field": "inboxRetainedContent"
+  },
+  "inboxScrollOffset": {
+    "store": "inboxStore",
+    "field": "inboxScrollOffset"
+  },
+  "restoringInboxSection": {
+    "store": "inboxStore",
+    "field": "restoringInboxSection"
+  },
+  "profilePullRefreshing": {
+    "store": "profileStore",
+    "field": "profilePullRefreshing"
+  },
+  "profilePullToken": {
+    "store": "profileStore",
+    "field": "profilePullToken"
+  },
+  "profileScrollOffset": {
+    "store": "profileStore",
+    "field": "profileScrollOffset"
+  },
+  "boardDetail": {
+    "store": "boardStore",
+    "field": "boardDetail"
+  },
+  "pendingBoardUrl": {
+    "store": "boardStore",
+    "field": "pendingBoardUrl"
+  },
+  "pendingBoardSource": {
+    "store": "boardStore",
+    "field": "pendingBoardSource"
+  },
+  "boardReturnUrl": {
+    "store": "boardStore",
+    "field": "boardReturnUrl"
+  },
+  "boardReturnPage": {
+    "store": "boardStore",
+    "field": "boardReturnPage"
+  },
+  "boardOpeningToken": {
+    "store": "boardStore",
+    "field": "boardOpeningToken"
+  },
+  "profileLoading": {
+    "store": "profileStore",
+    "field": "profileLoading"
+  },
+  "profileError": {
+    "store": "profileStore",
+    "field": "profileError"
+  },
+  "profileWebFlow": {
+    "store": "profileStore",
+    "field": "profileWebFlow"
+  },
+  "profileFlowLeftPage": {
+    "store": "profileStore",
+    "field": "profileFlowLeftPage"
+  },
+  "profileSwitching": {
+    "store": "profileStore",
+    "field": "profileSwitching"
+  },
+  "home": {
+    "store": "homeStore",
+    "field": "home"
+  },
+  "cachedHome": {
+    "store": "homeStore",
+    "field": "cachedHome"
+  },
+  "cachedHomeScrollOffset": {
+    "store": "homeStore",
+    "field": "cachedHomeScrollOffset"
+  },
+  "homeSourceWarning": {
+    "store": "homeStore",
+    "field": "homeSourceWarning"
+  },
+  "retainingHomeFeed": {
+    "store": "homeStore",
+    "field": "retainingHomeFeed"
+  },
+  "homeAppendRequested": {
+    "store": "homeStore",
+    "field": "homeAppendRequested"
+  },
+  "homeRefreshing": {
+    "store": "homeStore",
+    "field": "homeRefreshing"
+  },
+  "homeRefreshToken": {
+    "store": "homeStore",
+    "field": "homeRefreshToken"
+  },
+  "homeRefreshAwaitingPage": {
+    "store": "homeStore",
+    "field": "homeRefreshAwaitingPage"
+  },
+  "homeActionsReady": {
+    "store": "homeStore",
+    "field": "homeActionsReady"
+  },
+  "homeLoading": {
+    "store": "homeStore",
+    "field": "homeLoading"
+  },
+  "homeError": {
+    "store": "homeStore",
+    "field": "homeError"
+  },
+  "inbox": {
+    "store": "inboxStore",
+    "field": "inbox"
+  },
+  "inboxLoading": {
+    "store": "inboxStore",
+    "field": "inboxLoading"
+  },
+  "inboxError": {
+    "store": "inboxStore",
+    "field": "inboxError"
+  },
+  "inboxWebFlow": {
+    "store": "inboxStore",
+    "field": "inboxWebFlow"
+  },
+  "search": {
+    "store": "searchStore",
+    "field": "search"
+  },
+  "searchLoading": {
+    "store": "searchStore",
+    "field": "searchLoading"
+  },
+  "searchError": {
+    "store": "searchStore",
+    "field": "searchError"
+  },
+  "searchFilterOptions": {
+    "store": "searchStore",
+    "field": "searchFilterOptions"
+  },
+  "searchFilterLoading": {
+    "store": "searchStore",
+    "field": "searchFilterLoading"
+  },
+  "searchFilterError": {
+    "store": "searchStore",
+    "field": "searchFilterError"
+  },
+  "searchFilterToken": {
+    "store": "searchStore",
+    "field": "searchFilterToken"
+  },
+  "searchInputFocused": {
+    "store": "searchStore",
+    "field": "searchInputFocused"
+  },
+  "searchInputStopEditing": {
+    "store": "searchStore",
+    "field": "searchInputStopEditing"
+  },
+  "searchRequestToken": {
+    "store": "searchStore",
+    "field": "searchRequestToken"
+  },
+  "searchQueryToken": {
+    "store": "searchStore",
+    "field": "searchQueryToken"
+  },
+  "searchQueryClearPage": {
+    "store": "searchStore",
+    "field": "searchQueryClearPage"
+  },
+  "searchReturnPageKey": {
+    "store": "searchStore",
+    "field": "searchReturnPageKey"
+  },
+  "retainedSearch": {
+    "store": "searchStore",
+    "field": "retainedSearch"
+  },
+  "searchQuizReturnPage": {
+    "store": "searchStore",
+    "field": "searchQuizReturnPage"
+  },
+  "searchCache": {
+    "store": "searchStore",
+    "field": "searchCache"
+  },
+  "knownSearchPinTitles": {
+    "store": "searchStore",
+    "field": "knownSearchPinTitles"
+  },
+  "searchScrollOffset": {
+    "store": "searchStore",
+    "field": "searchScrollOffset"
+  },
+  "retainedSearchScrollOffset": {
+    "store": "searchStore",
+    "field": "retainedSearchScrollOffset"
+  },
+  "searchResultsResetPending": {
+    "store": "searchStore",
+    "field": "searchResultsResetPending"
+  },
+  "searchActionsReady": {
+    "store": "searchStore",
+    "field": "searchActionsReady"
+  },
+  "detailReturnUrl": {
+    "store": "pinStore",
+    "field": "detailReturnUrl"
+  },
+  "videoForeground": {
+    "store": "pinStore",
+    "field": "videoForeground"
+  },
+  "publishOptions": {
+    "store": "profileStore",
+    "field": "publishOptions"
+  },
+  "publishTitle": {
+    "store": "profileStore",
+    "field": "publishTitle"
+  },
+  "publishLoading": {
+    "store": "profileStore",
+    "field": "publishLoading"
+  },
+  "publishRequestToken": {
+    "store": "profileStore",
+    "field": "publishRequestToken"
+  }
+}

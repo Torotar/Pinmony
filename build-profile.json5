@@ -1,0 +1,163 @@
+{
+  "app": {
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "6.1.1(24)",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+{"name":"common_network","srcPath":"./common_network","targets":[{"name":"default","applyToProducts":["default"]}]},
+{
+  "name": "common_foundation",
+  "srcPath": "./common_foundation",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "common_session",
+  "srcPath": "./common_session",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "common_ui",
+  "srcPath": "./common_ui",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_home",
+  "srcPath": "./feature_home",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_search",
+  "srcPath": "./feature_search",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_inbox",
+  "srcPath": "./feature_inbox",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_profile",
+  "srcPath": "./feature_profile",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_pin",
+  "srcPath": "./feature_pin",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_board",
+  "srcPath": "./feature_board",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+{
+  "name": "feature_settings",
+  "srcPath": "./feature_settings",
+  "targets": [
+    {
+      "name": "default",
+      "applyToProducts": [
+        "default"
+      ]
+    }
+  ]
+},
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

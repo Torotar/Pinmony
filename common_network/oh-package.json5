@@ -1,0 +1,6 @@
+{
+  "name": "common_network",
+  "version": "1.0.0",
+  "main": "Index.ets",
+  "dependencies": { "common_session": "file:../common_session", "common_foundation": "file:../common_foundation" }
+}

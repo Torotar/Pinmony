@@ -1,0 +1,9 @@
+{
+  "module": {
+    "name": "feature_board",
+    "type": "har",
+    "deviceTypes": [
+      "phone"
+    ]
+  }
+}

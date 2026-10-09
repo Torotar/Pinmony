@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="bubble" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#0084FF"/><stop offset="1" stop-color="#A855F7"/></linearGradient></defs>
+  <circle cx="32" cy="32" r="31" fill="url(#bubble)"/>
+  <path d="M13 31c0-11 8-19 19-19s19 8 19 19-8 19-19 19c-3 0-6-1-8-2l-8 5v-10c-2-3-3-7-3-12z" fill="#fff"/>
+  <path d="M20 37l11-12 8 6 8-6-11 13-8-6z" fill="#7556EF"/>
+</svg>

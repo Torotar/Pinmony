@@ -1,0 +1,9 @@
+{
+  "name": "feature_inbox",
+  "version": "1.0.0",
+  "description": "PinWeb feature_inbox",
+  "main": "Index.ets",
+  "dependencies": {
+    "common_ui": "file:../common_ui"
+  }
+}
