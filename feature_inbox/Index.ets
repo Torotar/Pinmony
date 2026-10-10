@@ -8,3 +8,8 @@ export { PIN_INBOX_CONTACTS_API_ENABLED, PIN_INBOX_CONTACTS_API_SCRIPT } from '.
 export { PIN_INBOX_CONVERSATIONS_API_ENABLED, PIN_INBOX_CONVERSATION_SCRIPT } from './src/main/ets/services/PinmonyInboxConversationScript';
 export { PIN_INBOX_BRIDGE_SCRIPT } from './src/main/ets/services/PinmonyInboxScript';
 export { PinmonyInboxStore } from './src/main/ets/stores/PinmonyInboxStore';
+export { PinmonyBoardInvitation, PinmonyBoardInvitations } from './src/main/ets/models/PinmonyBoardInvitation';
+export { PIN_BOARD_INVITATION_SCRIPT } from './src/main/ets/services/PinmonyBoardInvitationScript';
+export { PinmonyBoardInvitationList } from './src/main/ets/components/PinmonyBoardInvitationList';
+
+export { PinmonyBoardInvitationController, PinmonyBoardInvitationPorts } from './src/main/ets/controllers/PinmonyBoardInvitationController';

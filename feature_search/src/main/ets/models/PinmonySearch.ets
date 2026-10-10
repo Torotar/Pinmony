@@ -48,6 +48,7 @@ export interface PinmonySearchResult {
 }
 
 export interface PinmonySearchHero {
+  targetUrl?: string;
   id: string;
   title: string;
   subtitle: string;

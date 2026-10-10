@@ -78,9 +78,11 @@ const rcpFiles = [];
 for (const { file, source } of [...sourcesFor('entry'), ...modules.flatMap(sourcesFor)]) {
   if (source.includes('@kit.RemoteCommunicationKit') || /\brcp\./.test(source)) rcpFiles.push(file);
 }
-assert.equal(rcpFiles.length, 1, 'RemoteCommunicationKit must be owned by common_network');
-assert(rcpFiles[0].endsWith(path.join('common_network', 'src', 'main', 'ets', 'PinmonyNativeNetwork.ets')),
-  'RCP ownership must stay in PinmonyNativeNetwork');
+const rcpOwners = ['PinmonyNativeNetwork.ets', 'PinmonyMediaFile.ets'].map(name =>
+  path.join('common_network', 'src', 'main', 'ets', name));
+assert(rcpFiles.some(file => file.endsWith(rcpOwners[0])), 'RCP business transport must stay in PinmonyNativeNetwork');
+for (const file of rcpFiles) assert(rcpOwners.some(owner => file.endsWith(owner)),
+  'RemoteCommunicationKit must stay in the declared common_network transports: ' + file);
 
 const architecture = read('docs/ARCHITECTURE.md');
 for (const heading of ['## 工程边界', '## Ability 与生命周期', '## ArkUI 页面与状态管理',

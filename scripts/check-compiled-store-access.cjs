@@ -1,6 +1,8 @@
 const fs = require('node:fs'), assert = require('node:assert/strict'), path = require('node:path');
 const aliases = require('./feature-state-aliases.json');
-const base = 'entry/build/default/cache/default/default@CompileArkTS/esmodule/debug/';
+const buildMode = process.argv[2] || 'debug';
+assert(['debug', 'release'].includes(buildMode), 'Build mode must be debug or release');
+const base = 'entry/build/default/cache/default/default@CompileArkTS/esmodule/' + buildMode + '/';
 const indexPath = 'entry/src/main/ets/pages/Index';
 const homePath = 'feature_home/src/main/ets/controllers/PinmonyHomeController';
 const searchPath = 'feature_search/src/main/ets/controllers/PinmonySearchController';
@@ -10,13 +12,22 @@ function currentCompiled(relative) {
   assert(fs.statSync(compiled).mtimeMs >= fs.statSync(source).mtimeMs, 'Compiled output is older than source: ' + relative);
   return fs.readFileSync(compiled, 'utf8');
 }
+const panels = currentCompiled('feature_pin/src/main/ets/controllers/PinmonyPostPanelsController').replace(/this\.store\./g, 'this.pinStore.');
+const board = currentCompiled('feature_board/src/main/ets/controllers/PinmonyBoardStateController');
+const invitation = currentCompiled('feature_inbox/src/main/ets/controllers/PinmonyBoardInvitationController').replace(/this\.store\./g, 'this.inboxStore.');
+const publish = currentCompiled('feature_profile/src/main/ets/controllers/PinmonyPublishController').replace(/this\.store\./g, 'this.profileStore.');
 const index = currentCompiled(indexPath), search = currentCompiled(searchPath), home = currentCompiled(homePath);
 for (const [name, state] of Object.entries(aliases)) {
   assert(!new RegExp('\\bthis\\.' + name + '\\b').test(index), 'Compiled ArkUI references a missing page field: ' + name);
-  const owner = state.store === 'searchStore' ? index + '\n' + search : state.store === 'homeStore' ? index + '\n' + home : index;
+  const owner = state.store === 'searchStore' ? index + '\n' + search : state.store === 'homeStore' ? index + '\n' + home : state.store === 'profileStore' ? index + '\n' + publish : state.store === 'inboxStore' ? index + '\n' + invitation : state.store === 'pinStore' ? index + '\n' + panels : index;
   assert(owner.includes('this.' + state.store + '.' + state.field), 'Missing compiled Store access: ' + name);
 }
 assert.match(index, /this\.profileStore\.profileCache\.clear\(\)/);
+assert.match(index, /this\.boardStateController = new PinmonyBoardStateController\(this\.boardStore,/);
+assert(index.indexOf('this.__boardStore =') < index.indexOf('this.boardStateController ='), 'Board Store initializes before controller');
+assert.match(board, /this\.store = store/);
+assert.match(index, /this\.postPanelsController = new PinmonyPostPanelsController\(this\.pinStore,/);
+assert(index.indexOf('this.__pinStore =') < index.indexOf('this.postPanelsController ='));
 assert.match(index, /this\.__searchStore = new ObservedPropertyObjectPU\(new PinmonySearchStore\(\)/);
 assert.match(index, /this\.searchController = new PinmonySearchController\(this\.searchStore,/);
 assert.equal((index.match(/new PinmonySearchStore\(\)/g) || []).length, 1);

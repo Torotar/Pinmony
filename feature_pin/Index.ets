@@ -34,3 +34,5 @@ export { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from './src/
 export { PIN_VISUAL_SEARCH_API_ENABLED, PIN_VISUAL_SEARCH_API_SCRIPT } from './src/main/ets/services/PinmonyVisualSearchApiScript';
 
 export { readRelatedPresentation, RelatedPresentation } from './src/main/ets/services/PinmonyRelatedPresentation';
+
+export { PinmonyPostPanelsController, PinmonyPostPanelsPorts } from './src/main/ets/controllers/PinmonyPostPanelsController';

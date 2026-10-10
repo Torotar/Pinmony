@@ -28,6 +28,7 @@ function harness() {
     pinStore: { detail: { pinUrl: pin }, detailPin: pin, detailCache: { get() {} }, detailPrefetch: { pause() {} } },
     boardStore: { boardDetail: snapshot, rootTab: 3 }, homeStore: { homeRefreshToken: 0 },
     profileStore: {}, searchStore: {}, inboxStore: {}, pageBackToken: 0,
+    detailReadCache: { setPin() {} }, cancelledBoardPins: new Set(),
     extractPinUrl: value => /\/pin\/\d+\//.test(value) ? value : '',
     pinIdentity: value => String(value || '').match(/\/pin\/(\d+)\//)?.[1] || '',
     nativeDisplayAddress() { return this.nativeBackTarget || address; }, rootTabIndexFromAddress: () => -1,
@@ -40,6 +41,12 @@ function harness() {
     controller: { getUrl: () => address, runJavaScript: async () => 'true', loadUrl: value => loads.push(value) },
     showMessage() {}, isCurrentPageFailure: value => value === address, effectiveRootDocumentTarget: () => 3,
     showNetworkNotice() {}, describeFailure: () => 'failure' });
+  const invitationRuntime = require('./return-coordinator-harness.cjs').runtime(ts);
+  const { PinmonyBoardInvitationController } = invitationRuntime.compile('feature_inbox/src/main/ets/controllers/PinmonyBoardInvitationController.ets', () => invitationRuntime.foundation);
+  n.inboxStore.boardInvitationToken = 0;
+  n.boardInvitationController = new PinmonyBoardInvitationController(n.inboxStore, { authenticated: () => true, foreground: () => true, page: () => address });
+  require('./board-state-controller-harness.cjs').bind(n, ts, { setTimeout: fn => timers.push(fn), clearTimeout() {} });
+  require('./return-coordinator-harness.cjs').bind(n, ts, { setTimeout: fn => timers.push(fn), clearTimeout() {} });
   return { n, snapshot, loads, navigate: value => { address = value; } };
 }
 const h = harness();
@@ -99,3 +106,58 @@ assert.equal(dispatch.n.nativeBoardVisible(), true);
 assert.match(dispatch.snapshot.error, /无法同步/);
 assert(source.includes('this.nativeBackTarget && this.pageHistory.key(address) !== this.pageHistory.key(this.nativeBackTarget)'));
 console.log('Board detail return: continuous presentation, root ownership, one navigation, failure/retry, current session, empty and stale guards passed');
+
+for (const cached of [true, false]) {
+  const r = harness(), profile = home + 'sample/';
+  r.n.pinStore.detail = undefined; r.n.pinStore.detailPin = '';
+  r.n.boardStore.presentationPage = board;
+  r.n.profileStore = { origins: [], profileWebFlow: true, profileFlowLeftPage: true, profileScrollOffset: 0 };
+  r.n.profileUrlFromAddress = value => value === profile ? profile : '';
+  r.n.rootTabIndexFromAddress = value => value === profile ? 3 : -1;
+  r.n.waitForWebTabConfirmation = () => {};
+  r.n.inboxUrlFromAddress = () => '';
+  r.n.restoreProfile = () => {
+    if (cached) { r.n.profileStore.profile = { profileUrl: profile }; r.n.profileStore.profileScrollOffset = 520; }
+    return cached;
+  };
+  r.n.returnToHistoryEntry = () => false;
+  assert.equal(r.n.backOnePage(profile, profile), true);
+  assert.equal(r.n.nativeBackTarget, profile);
+  assert.equal(r.n.nativeBoardVisible(), false, 'board overlay closes before Web confirmation');
+  assert.equal(r.n.profileStore.profileWebFlow, false);
+  assert.equal(r.n.profileStore.profileActionsReady, false, 'cached display cannot enable stale actions');
+  assert.equal(r.n.profileStore.profileScrollOffset, cached ? 520 : 0);
+  assert.equal(!!r.n.profileStore.profileLoading, !cached);
+  assert.deepEqual(r.loads, [profile]);
+  for (const timer of timers.splice(0)) timer();
+  assert.deepEqual(r.loads, [profile], 'history miss and fallback cannot duplicate navigation');
+}
+console.log('Board to profile return: immediate cached/loading presentation, retained scroll, gated actions and single navigation passed');
+
+for (const tab of [1, 2]) for (const cached of [true, false]) {
+  const r = harness(), target = home + (tab === 1 ? 'search/' : 'inbox/');
+  r.n.pinStore.detail = undefined; r.n.pinStore.detailPin = '';
+  r.n.boardStore.presentationPage = board;
+  r.n.profileStore.profileWebFlow = true;
+  r.n.rootTabIndexFromAddress = () => tab;
+  r.n.waitForWebTabConfirmation = () => {};
+  r.n.inboxUrlFromAddress = value => tab === 2 && value === target ? target : '';
+  r.n.searchUrlFromAddress = value => tab === 1 && value === target ? target : '';
+  const store = tab === 1 ? r.n.searchStore : r.n.inboxStore;
+  const prefix = tab === 1 ? 'search' : 'inbox';
+  const restore = () => {
+    if (cached) { store[prefix] = { pageKey: target }; store[prefix + 'ScrollOffset'] = 420; }
+    return cached;
+  };
+  r.n.restoreInbox = restore; r.n.restoreRetainedSearch = restore;
+  r.n.returnToHistoryEntry = () => false;
+  assert.equal(r.n.backOnePage(target, target), true);
+  assert.equal(r.n.nativeBoardVisible(), false);
+  assert.equal(r.n.activeTab, tab);
+  assert.equal(store[prefix + 'ActionsReady'], false);
+  assert.equal(store[prefix + 'ScrollOffset'], cached ? 420 : 0);
+  assert.equal(!!store[prefix + 'Loading'], !cached);
+  for (const timer of timers.splice(0)) timer();
+  assert.deepEqual(r.loads, [target]);
+}
+console.log('Board/root returns: search and inbox cached/loading states, overlay cleanup and one navigation passed');

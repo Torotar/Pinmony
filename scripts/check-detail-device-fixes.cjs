@@ -37,8 +37,8 @@ assert.equal(api.detailActions(pin, [], () => {}).find(item => item.kind === 'sa
 assert.equal(window.PinmonyNativeShareApiOpen(pin), true);
 const first = messages.at(-1);
 assert.equal(first.kind, 'state', 'First share publication is ready, with no DOM opening phase');
-assert.deepEqual(first.options.map(item => item.label), ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X']);
-assert.equal(first.actions[0].label, '复制链接');
+assert.deepEqual(first.options, [], 'contact-only share has no platform row');
+assert.deepEqual(first.actions, [], 'contact-only share has no extra actions');
 assert.match(first.feedback, /加载联系人/);
 assert.equal(window.PinmonyNativeShareApiOpen(pin.replace('101', '999')), false);
 assert.equal(window.PinmonyNativeShareClose(first.session), true);
@@ -63,18 +63,20 @@ async function main() {
     const Native = vm.runInNewContext(compiled, { PIN_POST_API_ENABLED: true,
       JSON, setTimeout: callback => timers.push(callback), console });
     const native = new Native();
-    Object.assign(native, { detail: { pinUrl: pin }, commentToken: 0, saveToken: 0,
+    Object.assign(native, { authStatus: 'authenticated', pinStore: { detail: { pinUrl: pin }, commentToken: 0, saveToken: 0, editToken: 0, saveResult: { busy: false } },
       currentPinUrl: () => pin, pinIdentity: url => url.match(/\/pin\/(\d+)/)?.[1] || '',
       showMessage: message => { throw new Error(message); } });
     const comments = { pin, loading: false, error: '', items: [{ id: '301', text: '真实评论' }] };
-    const boards = { pin, loading: false, busy: false, error: '', items: [{ id: '401', name: '风景' }], shortlist: [] };
+    const boards = { pin, loading: false, busy: false, error: '', items: [{ id: '401', name: '风景', enabled: true, imageUrl: '' }], shortlist: [] };
     let responsePin = pin;
-    native.controller = { runJavaScript: async script => {
+    native.controller = { getUrl: () => pin, runJavaScript: async script => {
       if (!script.startsWith('JSON.stringify')) return 'true';
       const result = script.includes('commentsRead') ? comments : boards;
       const text = JSON.stringify({ ...result, pin: responsePin });
       return wrapped ? JSON.stringify(text) : text;
     } };
+    for (const name of ['commentResult','saveResult','commentToken','saveToken']) { if (!Object.getOwnPropertyDescriptor(native, name)) Object.defineProperty(native, name, { get() { return this.pinStore[name]; }, set(value) { this.pinStore[name] = value; } }); }
+    require('./post-panels-controller-harness.cjs').bind(native, ts, { setTimeout: callback => timers.push(callback), clearTimeout() {} });
     await native.openApiComments(); await flush();
     assert.equal(native.commentResult.items[0].text, '真实评论', 'Both ArkWeb return encodings reach native comments');
     await native.openApiBoards(); await flush();
@@ -85,7 +87,7 @@ async function main() {
     responsePin = pin.replace('101', '999');
     await native.openApiComments(); await flush();
     assert.equal(native.commentResult.items.length, 0, 'A response for another Pin is rejected');
-    assert.match(native.commentResult.error, /加载失败/);
+    assert.match(native.commentResult.error, /读取失败/);
   }
   console.log('detail fixes: absent DOM save, immediate share, late response, ArkWeb JSON encodings and Pin guards OK');
 }

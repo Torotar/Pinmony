@@ -175,9 +175,17 @@ export class PinmonySearchController {
   }
 
   async openSearchFilters(): Promise<void> {
+    this.ports.traceAction('search.filters');
     const generation: number = this.generation;
-    if (!await this.ports.ensureContext(true) || generation !== this.generation) return;
-    if (!this.searchStore.searchActionsReady) return;
+    if (!await this.ports.ensureContext(true) || generation !== this.generation) {
+      PinmonyRuntimeLog.warn('SearchFilter: entry rejected reason=context-or-cancelled');
+      return;
+    }
+    if (!this.searchStore.searchActionsReady) {
+      PinmonyRuntimeLog.warn('SearchFilter: entry rejected reason=actions-not-ready');
+      this.ports.showMessage('搜索操作尚未就绪，请稍后重试');
+      return;
+    }
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
     if (!search || !search.query.trim() || search.pageKey !== this.ports.currentPageKey() || this.ports.sheetKind()) return;
     if (this.searchStore.searchInputFocused && this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();
@@ -188,6 +196,7 @@ export class PinmonySearchController {
     this.searchStore.searchFilterError = '';
     this.searchStore.searchFilterLoading = true;
     this.ports.setFilterVisible(true);
+    PinmonyRuntimeLog.info('SearchFilter: panel opened');
     try {
       if (PIN_SEARCH_UI_API_ENABLED) {
         await this.ports.runScript('window.PinmonySearchUiApi && window.PinmonySearchUiApi.prepareFilters()');
@@ -227,6 +236,7 @@ export class PinmonySearchController {
         return;
       }
       if (snapshot && snapshot.loading) {
+        if (attempt === 0) PinmonyRuntimeLog.info('SearchFilter: waiting status=' + (snapshot.status || 'loading'));
         if (attempt >= 60) {
           this.searchStore.searchFilterError = snapshot.status === 'session-sync' ? '搜索会话尚未同步，请重新打开筛选器' :
             '筛选接口尚未取得当前搜索数据，请重试';
@@ -241,6 +251,7 @@ export class PinmonySearchController {
         Array.isArray(parsed) ? parsed as PinmonySearchFilterOption[] : [];
       this.searchStore.searchFilterOptions = options.filter(
         (item: PinmonySearchFilterOption): boolean => !!item.id && !!item.label);
+      PinmonyRuntimeLog.info('SearchFilter: options received count=' + this.searchStore.searchFilterOptions.length.toString());
       this.searchStore.searchFilterError = snapshot && snapshot.error ? snapshot.error :
         this.searchStore.searchFilterOptions.length ? '' : PIN_SEARCH_UI_API_ENABLED ?
           '筛选接口返回空列表，请重试' : '当前网页没有可用的筛选选项';
@@ -344,7 +355,10 @@ export class PinmonySearchController {
         if (!activePage && !preservingPinSearch) this.clearSearch();
         return;
       }
-      if (message.pageKey !== activePage) return;
+      if (message.pageKey !== activePage) {
+        PinmonyRuntimeLog.info('SearchSnapshot: rejected reason=page-mismatch kind=' + message.kind);
+        return;
+      }
       if (this.searchStore.searchQueryClearPage === activePage) {
         if ((message.query || '').trim()) {
           if (message.kind === 'state') {
@@ -465,6 +479,8 @@ export class PinmonySearchController {
         selectedCategory: message.selectedCategory || '', categories: categories,
         suggestions: suggestions, heroes: heroes, ideaSections: ideaSections, results: results };
       this.searchStore.searchActionsReady = message.kind === 'state' && !retainingApiResults;
+      PinmonyRuntimeLog.info('SearchSnapshot: accepted kind=' + message.kind + ' results=' + results.length.toString() +
+        ' sections=' + ideaSections.length.toString() + ' actionsReady=' + this.searchStore.searchActionsReady.toString());
       this.searchStore.searchInputReady = message.inputReady === true;
       if (this.searchStore.searchInputReady) this.ports.recordPageKey(message.pageKey);
       if (!!message.apiError || !!message.discoveryError || message.kind === 'state' &&

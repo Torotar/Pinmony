@@ -8,6 +8,7 @@ export { PinmonyProfileCacheEntry, PinmonyProfileCache } from './src/main/ets/se
 export { PIN_PROFILE_ORGANIZE_ENABLED, PIN_PROFILE_ORGANIZE_SCRIPT } from './src/main/ets/services/PinmonyProfileOrganizeScript';
 export { PIN_PROFILE_BRIDGE_SCRIPT } from './src/main/ets/services/PinmonyProfileScript';
 export { PinmonyProfileStore } from './src/main/ets/stores/PinmonyProfileStore';
+export { PinmonyPublishController, PinmonyPublishPorts } from './src/main/ets/controllers/PinmonyPublishController';
 
 export { PinmonyProfilePanel } from './src/main/ets/models/PinmonyProfilePanel';
 export { PinmonyProfilePanelPage } from './src/main/ets/components/PinmonyProfilePanelPage';

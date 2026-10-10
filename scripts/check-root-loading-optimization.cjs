@@ -39,6 +39,7 @@ function native() {
   const n = new context.Native(), loads = [];
   let document = root, ready = false;
   Object.assign(n, { authStatus: 'authenticated', activeTab: 1, tabRequestToken: 1,
+    webPageLoading: false,
     pendingWebTab: -1, rootReadToken: -1, rootTabAddresses: new Map([[1, root + 'search/']]), searchStore: {}, pinStore: {},
     pageHistory: { key: value => value || '' }, rootPresentationAddress: index => n.rootTabAddresses.get(index),
     rootTabIndexFromAddress: value => value.startsWith(root + 'search/') ? 1 : -1,
@@ -100,6 +101,9 @@ function native() {
   read.n.pendingWebTab = -1; read.n.requestRootPage(1);
   assert.equal(read.loads.length, 1, 'prepare callers join even after navigation clears pending tab');
   assert.equal(read.n.tabRequestToken, token, 'joining preserves the waiting intent generation');
+  read.n.pendingWebTab = -1; read.n.retainedRootTabPending = -1;
+  assert.equal(read.n.rootReadInFlight(1, root + 'search/'), false, 'released intent cannot reuse a different live document');
+  read.n.retainedRootTabPending = 1;
   read.n.rootTabAddresses.set(1, root + 'search/pins/?q=latest'); read.n.requestRootPage(1);
   assert.equal(read.loads.length, 2, 'different complete query address starts a new read');
   read.n.tabRequestToken++; read.n.requestRootPage(1);

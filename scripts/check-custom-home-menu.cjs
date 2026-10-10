@@ -146,7 +146,16 @@ async function main() {
   assert.equal(api.homeMenuAction(7, pin, 'home-download'), false);
   assert.equal(api.homeMenuOpen(8, pin, boardPage), false, 'stale page cannot open menu');
   location.pathname = '/search/pins/';
-  assert.equal(api.homeMenuOpen(8, pin, location.origin + location.pathname), false, 'unrelated route remains rejected');
+  location.href = location.origin + location.pathname + '?q=flowers';
+  assert.equal(api.homeMenuOpen(8, pin, location.origin + location.pathname), false, 'queryless stale search is rejected');
+  const searchRequest = requests.length;
+  assert.equal(api.homeMenuOpen(8, pin, location.href), true, 'current search results reuse home menu');
+  await reply(searchRequest, { data: { id: '101', images: { orig: { url: 'https://i.pinimg.com/search.jpg' } } } });
+  assert.equal(api.homeMenuRead(8, pin).actions.length, 4);
+  assert.equal(api.homeMenuAction(8, pin, 'home-download'), true);
+  location.href = location.origin + location.pathname + '?q=trees';
+  assert.equal(api.homeMenuRead(8, pin), null, 'changed search query invalidates old menu');
+  assert.equal(api.homeMenuAction(8, pin, 'home-download'), false);
   console.log('custom home menu API: exact options, raw image, sharing, feedback, busy, late results and route gating OK');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

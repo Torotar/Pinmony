@@ -329,6 +329,7 @@ export struct PinmonyProfilePage {
   private boardCard(board: PinmonyBoard) {
     Column({ space: 7 }) {
       this.boardCover(board)
+      Row() {
       Text(board.title)
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
@@ -336,6 +337,13 @@ export struct PinmonyProfilePage {
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
+        .layoutWeight(1)
+      Row() {
+        ForEach(board.collaboratorAvatars || [], (avatar: string, index: number) => {
+          Image(avatar).width(18).height(18).borderRadius(9).margin({ left: index > 0 ? -6 : 0 })
+        }, (avatar: string) => avatar)
+      }
+      }.width('100%')
       Row({ space: 6 }) {
         if (board.pinCount.length > 0) {
           Text(board.pinCount)

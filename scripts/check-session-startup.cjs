@@ -36,6 +36,13 @@ function harness() {
 assert.ok(source.includes('Web({ src: PINTEREST_URL, controller: this.controller })'), 'cold start requests home, not login');
 assert.ok(!source.includes('Web({ src: PINTEREST_LOGIN_URL'), 'no unconditional login document at startup');
 const existing = harness();
+const failedAck = harness();
+failedAck.native.controller.runJavaScript = script => {
+  if (script.includes('PinmonyAuthAcknowledge')) throw Error('synthetic bridge unavailable');
+  return Promise.resolve(true);
+};
+failedAck.emit('authenticated');
+assert.equal(failedAck.native.authStatus, 'authenticated', 'optional acknowledgement failure does not reject valid session evidence');
 assert.equal(existing.native.authWebVisible(), false, 'unknown startup never exposes the business website');
 assert.equal(existing.native.authStatus, 'checking', 'home URL alone does not authenticate');
 existing.emit('authenticated');

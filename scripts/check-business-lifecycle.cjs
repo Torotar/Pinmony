@@ -3,6 +3,7 @@ const searchRuntime=require('./search-controller-harness.cjs').createSearchRunti
 const src=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8'),a=src.indexOf('  private businessSuspended:'),b=src.indexOf('  private pageBackToken:',a);
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+src.slice(a,b)+'}\nHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info(){}}});
 const h=new Host(),events=[];Object.assign(h,{activeTab:1,authStatus:'authenticated',activeSheetKind:'',tabRequestToken:1,pendingWebTab:1,rootReadToken:1,homeRecoveryToken:0,pinStore:{videoForeground:true,detailPrefetch:{pause(){events.push('pause')}}},nativeNetwork:{setForeground(v){events.push(['network',v]);return v}},detailReadNetwork:{setForeground(v){events.push(['detail',v]);return false},invalidate(){}},controller:{runJavaScript:async()=>true},logPageLifecycle(){},rootActionContextReady(){return false},requestRootPage(i){events.push(['root',i])},scheduleInterruptedHomeRecovery(){},retryDetailApi(){events.push('retry')}});
+h.postPanelsController={pause(){},resume(){}};h.boardStateController={pause(){},resume(){}};h.boardInvitationController={pause(){},resume(){},reset(){},clearPreview(){}};h.publishController={pause(){},resume(){}};h.boardStore={};h.returnCoordinator={cancel(){}};h.boardCollaboratorsController={pause(){}};
 h.searchStore=new searchRuntime.Store();searchRuntime.bindIndex(h);require('./home-controller-harness.cjs').createHomeRuntime(ts).bindIndex(h);
 h.onPageHide();assert.equal(h.businessSuspended,true);assert.equal(h.pendingWebTab,-1);assert.equal(h.tabRequestToken,2);h.onPageShow();assert.equal(h.businessSuspended,false);assert.equal(events.filter(e=>Array.isArray(e)&&e[0]==='root').length,1);h.onPageShow();assert.equal(events.filter(e=>Array.isArray(e)&&e[0]==='root').length,1,'duplicate foreground never repeats root preparation');
 h.activeSheetKind='save';h.onPageHide();h.onPageShow();assert.equal(events.filter(e=>Array.isArray(e)&&e[0]==='root').length,1,'write panel cannot trigger implicit reload/replay');
@@ -16,11 +17,15 @@ const ReturnHost=vm.runInNewContext(ts.transpileModule('class ReturnHost {'+
   {Date:{now:()=>now},setTimeout:cb=>timers.push(cb),PinmonyRuntimeLog:{info(){},warn(){}}});
 const r=new ReturnHost(),home='https://www.pinterest.com/';
 Object.assign(r,{pinStore:{detail:{}},tabRequestToken:0,profileStore:{origins:[]},homeStore:{},inboxStore:{},searchStore:{},
+  detailReadCache:{setPin(){}},
   extractPinUrl(){return ''},pinIdentity(v){return v},clearRootTabGuard(){},rootTabIndexFromAddress(){return 0},
   clearDetail(){this.pinStore.detail=undefined},profileUrlFromAddress(){return ''},inboxUrlFromAddress(){return ''},
   searchUrlFromAddress(){return ''},isHomeRootAddress(){return true},prepareHomeForPageBegin(){},tabsController:{changeIndex(){}},
+  boardUrlFromAddress(){return ''},
+  controller:{getUrl(){return home}},
   rootActionContextReady(){return false},pageHistory:{key:v=>v},loadFailed:false,webPageLoading:true,
   showMessage(v){notices.push(v)}});
+r.boardStore = {};
 r.presentNativeBackTarget(home);
 assert.equal(r.rootReadInFlight(0,home),true,'return preparation is shared with root content demand');
 assert.equal(r.rootReadInFlight(0,home+'search/'),false,'a different target cannot join return preparation');

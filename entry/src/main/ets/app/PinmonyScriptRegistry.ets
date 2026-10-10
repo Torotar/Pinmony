@@ -1,5 +1,6 @@
 import { PIN_PROFILE_PANEL_SCRIPT } from 'feature_profile';
-import { PIN_NATIVE_NETWORK_SCRIPT, PIN_NATIVE_NETWORK_ENABLED, useNativeTransport } from 'common_network';
+import { allowsSpeculativeReads } from 'common_foundation';
+import { PIN_NATIVE_NETWORK_SCRIPT, PIN_NATIVE_NETWORK_ENABLED, PIN_READ_MERGING_ENABLED, useNativeTransport } from 'common_network';
 import { BOTTOM_BAR_SCRIPT } from '../app/PinmonyBottomBarScript';
 import { PIN_MORE_MENU_BRIDGE_SCRIPT } from 'feature_pin';
 import { SHARE_PANEL_BRIDGE_SCRIPT } from 'feature_pin';
@@ -32,7 +33,9 @@ import { PIN_SEARCH_UI_API_ENABLED, PIN_SEARCH_UI_API_SCRIPT } from 'feature_sea
 // Order is part of the existing bridge contract. Keep the Web host mounted in Index.
 export function pinWebDocumentStartScripts(): ScriptItem[] {
   return [
-              { script: 'window.PinmonyNativeNetworkEnabled = ' + PIN_NATIVE_NETWORK_ENABLED.toString() + ';' + PIN_NATIVE_NETWORK_SCRIPT, scriptRules: ['*'] },
+              { script: 'window.PinmonySpeculativeReadsEnabled = ' + allowsSpeculativeReads().toString() + ';' +
+                'window.PinmonyReadMergingEnabled = ' + PIN_READ_MERGING_ENABLED.toString() + ';' +
+                'window.PinmonyNativeNetworkEnabled = ' + PIN_NATIVE_NETWORK_ENABLED.toString() + ';' + PIN_NATIVE_NETWORK_SCRIPT, scriptRules: ['*'] },
               { script: PIN_AUTH_BRIDGE_SCRIPT, scriptRules: ['*'] },
               { script: PIN_NAVIGATION_BRIDGE_SCRIPT, scriptRules: ['*'] },
               { script: SHARE_LINK_SCRIPT, scriptRules: ['*'] },

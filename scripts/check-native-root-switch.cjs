@@ -48,6 +48,7 @@ function harness() {
     traceAction() {}, logPageLifecycle() {}, syncFloatingTabsMotion() {}, cancelHomeDetailMore() {},
     detailRequestOwners: new Map(), detailJourney: { close() {} }, detailImageTimer: -1,
     pageTasks: { cancelTimeout() {} }, detailReadNetwork: { invalidate() {} }, dismissPostSnack() {},
+    detailDocumentBindingService: { reset() {} }, detailImageStage: { reset() {} },
     restoreRetainedSearch() {}, restoreInbox() {}, restoreProfile() {},
     expectHome() {}, expectSearch() {}, expectInbox() {}, expectProfile() {}, showMessage() {},
     rootActionContextReady: () => false,
@@ -60,6 +61,7 @@ function harness() {
     controller: { getUrl: () => document, loadUrl: url => requests.push(['load', url]),
       runJavaScript: code => { requests.push(['js', code]); return Promise.resolve('true'); },
       backOrForward: delta => requests.push(['history', delta]) } });
+  require('./board-state-controller-harness.cjs').bind(native, ts, context); native.postPanelsController = { pause() {}, resume() {} }; native.boardInvitationController = { pause() {}, resume() {}, reset() {}, clearPreview() {} }; native.publishController = { pause() {}, resume() {} }; native.returnCoordinator = { cancel() {} }; native.boardCollaboratorsController = { pause() {} };
   native.pinStore.detailPrefetch = { pause() {} };
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
@@ -119,7 +121,8 @@ assert(!/runJavaScript|loadUrl|backOrForward|expectHome|expectSearch|expectInbox
 assert.match(source, /\.animationDuration\(0\)/);
 const search = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
 assert.match(search, /if \(!this\.automaticLoadingEnabled\) return/);
-assert.equal((search.match(/onReachEnd\([\s\S]*?automaticLoadingEnabled/g) || []).length, 3);
+assert.equal((search.match(/onReachEnd\(\(\) => this\.resultsReachEnd\(\)\)/g) || []).length, 2);
+assert.match(search, /private resultsReachEnd\(\): void \{\s*if \(!this\.automaticLoadingEnabled/);
 const profileSource = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets', 'utf8');
 for (const component of [search, profileSource]) {
   for (const match of component.matchAll(/\.onReachEnd\((\(\) => \{[^{}]*\})\)/g)) {

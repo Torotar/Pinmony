@@ -67,6 +67,7 @@ async function main() {
   assert.equal(h.read().results.length, 2);
   assert.equal(h.read().ended, true, 'repeated cursor ends pagination');
   assert.equal(h.api.loadMore(), false);
+  assert(h.api.context().filterBookmark && h.api.context().filterBookmark !== '-end-', 'filters retain a usable current-query cursor after pagination ends');
   h.api.refresh(); await h.respond(2, []);
   assert.equal(h.read().active, true); assert.equal(h.read().results.length, 0, 'valid empty search');
   h.api.refresh(); await h.respond(3, [], '', 403);

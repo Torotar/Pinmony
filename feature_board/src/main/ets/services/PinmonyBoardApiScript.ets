@@ -16,6 +16,7 @@ export const PIN_BOARD_API_SCRIPT: string = `
   var nextPage = '';
   var revision = 0;
   var recoveryRequired = false;
+  var cancelPinState = null;
   var selectedIds = [];
   function route() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -42,17 +43,28 @@ export const PIN_BOARD_API_SCRIPT: string = `
     if (!key || route() !== key || !window.PinmonyShareBridge || !window.PinmonyShareBridge.boardState) return;
     var owner = board && board.owner || {};
     var own = board && (board.isOwn === true || viewerId && String(owner.id || '') === viewerId);
-    var showOwner = board && !own && (board.isOwn === false || viewerId && String(owner.id || '') !== '' &&
+    var member = board && board.collaborated_by_me === true;
+    var avatars = board && board.is_collaborative === true ? [owner].concat(board.collaborating_users || []).filter(function (u, i, all) { return u && all.findIndex(function (v) { return v && String(v.id) === String(u.id); }) === i; }).slice(0, 6).map(function (u) { return image(u.image_medium_url || u.image_small_url); }).filter(Boolean) : [];
+    var members = board && board.is_collaborative === true ? [owner].concat(board.collaborating_users || []).filter(function (u, i, all) { return u && digits(String(u.id)) && all.findIndex(function (v) { return v && String(v.id) === String(u.id); }) === i; }) : [];
+    var peer = members.length === 2 && members.some(function (u) { return String(u.id) === viewerId; }) ? members.find(function (u) { return String(u.id) !== viewerId; }) : null;
+    var showOwner = board && !member && !own && (board.isOwn === false || viewerId && String(owner.id || '') !== '' &&
       String(owner.id) !== viewerId);
     var value = JSON.stringify({ kind: 'state', session: session, pageKey: key,
       boardId: board ? String(board.id) : '', title: board ? clean(board.name) : '',
       pinCount: board && typeof board.pin_count === 'number' && isFinite(board.pin_count) && board.pin_count >= 0 ? board.pin_count + ' 张 Pin 图' : '',
+      featured: !!(board && board.featured_board_metadata),
+      subtitle: board && board.featured_board_metadata ? clean(board.featured_board_metadata.board_subtitle) : '',
+      description: board && typeof board.description === 'string' ? board.description.slice(0, 2000) : '',
+      headerImage: board && board.header ? image(board.header.large_image_url || board.header.small_image_url) : '',
       privacy: !collection() && board && ['public', 'secret'].indexOf(board.privacy) >= 0 ? board.privacy : undefined,
       ownerUrl: /^[a-zA-Z0-9_]+$/.test(owner.username || '') ? location.origin + '/' + owner.username + '/' : '',
       ownerName: showOwner ? clean(owner.full_name || owner.username) : '', ownerAvatar: showOwner ? image(owner.image_medium_url) : '',
       loading: !ready && (boardBusy || feedBusy || !attempted), loadingMore: ready && feedBusy && !refreshing,
       refreshing: refreshing,
       ready: ready, error: error, hasMore: !ended, pins: pins, flow: flow,
+      chatMemberCount: Math.max(members.length, board && typeof board.collaborator_count === 'number' ? board.collaborator_count + 1 : 0),
+      chatPeer: peer ? { id: String(peer.id), name: clean(peer.full_name || peer.username), avatar: image(peer.image_medium_url || peer.image_small_url), username: clean(peer.username) } : undefined,
+      collaborator: !!member, canContribute: !!contributes(), collaboratorAvatars: avatars,
       memberAvatar: image(owner.image_medium_url || owner.image_small_url), nextPage: nextPage, revision: revision,
       editable: !!own && !collection() && !recoveryRequired && !boardBusy });
     if (value === lastMessage) return;
@@ -186,6 +198,8 @@ export const PIN_BOARD_API_SCRIPT: string = `
   }
   function digits(value) { return typeof value === 'string' && value.length > 0 && value.length <= 30 &&
     value.split('').every(function (c) { return c >= '0' && c <= '9'; }); }
+  function participates() { return ownsBoard() || board && !collection() && !recoveryRequired && !boardBusy && viewerId && board.collaborated_by_me === true; }
+  function contributes() { return ownsBoard() || board && !collection() && !recoveryRequired && !boardBusy && viewerId && board.collaborated_by_me === true && Array.isArray(board.access) && board.access.indexOf('write') >= 0; }
   function ownsBoard() { return board && !collection() && !recoveryRequired && !boardBusy && viewerId && String((board.owner || {}).id) === viewerId; }
   async function readFlow(phase, append) {
     if (!board || flow.loading || flow.busy || append && !flow.hasMore) return;
@@ -228,6 +242,11 @@ export const PIN_BOARD_API_SCRIPT: string = `
         targetBookmark = typeof next === 'string' ? next : '';
       } else {
         if (!validBoard(data) || String(data.id) !== String(board.id)) throw new Error('wrong-board');
+        if (!data.owner || String(data.owner.id) !== String((board.owner || {}).id)) throw new Error('wrong-owner');
+        if (typeof data.collaborated_by_me !== 'boolean') data.collaborated_by_me = board.collaborated_by_me;
+        if (!Array.isArray(data.collaborating_users)) data.collaborating_users = board.collaborating_users;
+        if (typeof data.is_collaborative !== 'boolean') data.is_collaborative = board.is_collaborative;
+        if (!Array.isArray(data.access)) data.access = board.access;
         board = data;
         flow.description = typeof data.description === 'string' ? data.description.slice(0, 500) : ''; flow.privacy = data.privacy;
         flow.recommend = data.allow_homefeed_recommendations === true;
@@ -239,9 +258,17 @@ export const PIN_BOARD_API_SCRIPT: string = `
     } finally { if (epoch === flowEpoch && token === generation) { flow.loading = false; notify(); } }
   }
   async function writeFlow(action, value) {
-    if (!ownsBoard() || flow.busy || flow.loading || flow.uncertain) return;
+    if (!(action === 'move' || action === 'save' ? contributes() : action === 'archive' ? participates() : action === 'leave' || action === 'unfollow' ? participates() && !ownsBoard() : ownsBoard()) || flow.busy || flow.loading || flow.uncertain) return;
     var name, options, endpoint, verb;
-    if (action === 'move') {
+    if (action === 'unfollow') {
+      if (flow.phase || board.collaborated_by_me !== true || ownsBoard() || board.followed_by_me === false) return;
+      name = 'ApiResource'; verb = 'delete'; endpoint = 'v3_unfollow_board';
+      options = { url: '/v3/boards/' + board.id + '/follow/' };
+    } else if (action === 'leave') {
+      if (flow.phase !== 'edit' || board.collaborated_by_me !== true || ownsBoard()) return;
+      name = 'ApiResource'; verb = 'delete'; endpoint = 'v3_remove_board_collaborators';
+      options = { url: '/v3/boards/' + board.id + '/collaborators/' + viewerId + '/', data: {} };
+    } else if (action === 'move') {
       var target = flow.targets.filter(function (item) { return item.id === value && item.enabled; })[0];
       if (flow.phase !== 'targets' || !target || !selectedIds.length || selectedIds.length > 500 ||
           !selectedIds.every(function (id) { return pins.some(function (pin) { return pin.id === id; }); })) return;
@@ -278,7 +305,13 @@ export const PIN_BOARD_API_SCRIPT: string = `
       if (!payload || epoch !== flowEpoch || token !== generation) return;
       var response = payload.resource_response, data = response.data;
       if (response.code !== 0 || response.endpoint_name !== endpoint) throw new Error('unconfirmed-write');
-      if (action === 'delete') {
+      if (action === 'unfollow') {
+        if (data !== null) throw new Error('unconfirmed-unfollow');
+        board.followed_by_me = false; flow.phase = 'unfollowed';
+      } else if (action === 'leave') {
+        if (!data || data.type !== 'board' || String(data.id) !== destination || data.collaborated_by_me !== false) throw new Error('unconfirmed-leave');
+        board.collaborated_by_me = false; flow.phase = 'left';
+      } else if (action === 'delete') {
         if (data !== null) throw new Error('unconfirmed-delete');
         pins = []; ended = true; flow.phase = 'deleted';
         aborts.forEach(function (abort) { abort.abort(); }); aborts = [];
@@ -319,7 +352,149 @@ export const PIN_BOARD_API_SCRIPT: string = `
       }
     } finally { if (epoch === flowEpoch && token === generation) { flow.busy = false; notify(); } }
   }
+  var collaborators = null;
+  function collabCurrent(state) { return collaborators === state && state.page === key && route() === key && state.generation === generation; }
+  function collabUser(user, status) {
+    if (!user || !digits(String(user.id))) throw new Error('invalid-user');
+    return { id: String(user.id), name: clean(user.full_name || user.username), username: clean(user.username),
+      avatar: image(user.image_medium_url || user.image_small_url) ? user.image_medium_url || user.image_small_url : '', status: status || '' };
+  }
+  async function collabLoad(state) {
+    state.loading = true; state.error = '';
+    try {
+      var values = await Promise.all([
+        request('BoardResource', { board_id: board.id, field_set_key: 'boardEdit' }, generation, key),
+        request('BoardInvitesResource', { board_id: board.id, sort: 'viewer_first', field_set_key: 'boardEdit',
+          status_filters: 'new,accepted,contact_request_not_approved,pending_approval', include_inactive: true }, generation, key),
+        request('ShareSuggestionsResource', { suggestion_type: 'group_board', board: board.id }, generation, key)
+      ]);
+      if (!collabCurrent(state)) return;
+      var detail = values[0] && values[0].resource_response.data, invitations = values[1] && values[1].resource_response.data,
+        suggested = values[2] && values[2].resource_response.data;
+      if (!detail || String(detail.id) !== String(board.id) || !detail.owner || !(String(detail.owner.id) === viewerId || detail.collaborated_by_me === true || typeof detail.collaborated_by_me !== 'boolean' && board.collaborated_by_me === true && String(detail.owner.id) === String((board.owner || {}).id)) ||
+          !Array.isArray(invitations) || !Array.isArray(suggested)) throw new Error('invalid-collaborators');
+      state.owner = String(detail.owner.id) === viewerId;
+      state.permission = detail.collaborator_permissions_setting;
+      state.invites = detail.collaborator_invites_enabled === true;
+      state.canInvite = state.owner || (detail.collaborated_by_me === true || typeof detail.collaborated_by_me !== 'boolean' && board.collaborated_by_me === true) && state.invites;
+      state.users = [collabUser(detail.owner, 'owner')];
+      invitations.forEach(function (item) {
+        if (!item.board || String(item.board.id) !== String(board.id) || !item.invited_user) throw new Error('wrong-board-invite');
+        var user = collabUser(item.invited_user, item.status);
+        if (!state.users.some(function (old) { return old.id === user.id; })) state.users.push(user);
+      });
+      state.suggestions = suggested.slice(0, 100).map(function (user) {
+        var old = state.users.find(function (item) { return item.id === String(user.id); });
+        return collabUser(user, old ? old.status : '');
+      }).filter(function (user) { return user.id !== viewerId; });
+    } catch (_) { if (collabCurrent(state)) state.error = '合作用户读取失败，请重试'; }
+    finally { if (collabCurrent(state)) state.loading = false; }
+  }
+  async function collabWrite(state, action, value) {
+    if (action === 'invite' ? state.canInvite !== true : !ownsBoard()) return;
+    state.busy = true; state.error = ''; state.feedback = '';
+    var sent = false;
+    try {
+      if (action === 'invite') {
+        var user = state.suggestions.find(function (item) { return item.id === value && !item.status; });
+        if (!user) throw new Error('invalid-user');
+        sent = true;
+        var response = await fetch('/_/graphql/', { method: 'POST', credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
+            'X-Pinterest-Source-Url': new URL(state.page).pathname },
+          body: JSON.stringify({ queryHash: '42ceaa3423a096a27613e5738f83aaadcee449c55d4dd03624d2f08a6b6dca04',
+            variables: { collaboratorIds: [user.id], boardId: String(board.id), message: '' } }) });
+        if (!collabCurrent(state)) return;
+        var payload = await response.json();
+        if (!collabCurrent(state)) return;
+        if (!response.ok || payload.errors || !payload.data || !payload.data.v3InviteBoardCollaboratorsMutation ||
+            payload.data.v3InviteBoardCollaboratorsMutation.__typename !== 'V3InviteBoardCollaborators') throw new Error('unconfirmed-invite');
+        user.status = 'new'; state.users.push(collabUser({ id: user.id, full_name: user.name, username: user.username,
+          image_medium_url: user.avatar }, 'new')); state.feedback = '已发送 1 个邀请！';
+      } else {
+        if (!value || [0, 1].indexOf(value.permission) < 0 || typeof value.invites !== 'boolean') throw new Error('unsupported-permission');
+        sent = true;
+        var result = await request('BoardResource', { board_id: board.id, collaborator_permissions_setting: value.permission,
+          collaborator_invites_enabled: value.invites, sensitivity: null }, generation, key, 'update');
+        result = result && result.resource_response;
+        if (!collabCurrent(state)) return;
+        if (!result || result.code !== 0 || result.endpoint_name !== 'v3_edit_board' || !result.data ||
+            String(result.data.id) !== String(board.id) || result.data.collaborator_permissions_setting !== value.permission ||
+            result.data.collaborator_invites_enabled !== value.invites) throw new Error('unconfirmed-permissions');
+        state.permission = value.permission; state.invites = value.invites; state.phase = 'members'; state.feedback = '权限已更新';
+      }
+    } catch (_) {
+      if (collabCurrent(state)) { state.uncertain = sent; state.error = sent ? '操作结果未确认，请关闭后重新查看，勿重复提交' : '当前操作不可用'; }
+    } finally { if (collabCurrent(state)) state.busy = false; }
+  }
   window.PinmonyBoardApi = {
+    shareInfo: function (page) { return page === key && route() === key && board && ready ? { userId: String(board.id), board: true } : null; },
+    collaboratorsOpen: function (s, page, token) {
+      if (s !== session || page !== key || route() !== key || !(ownsBoard() || board && board.collaborated_by_me === true) || (flow.phase && flow.phase !== 'edit') || flow.loading || flow.busy || flow.uncertain || boardBusy || feedBusy) return false;
+      collaborators = { token: token, page: page, generation: generation, phase: 'members', loading: true, busy: false,
+        uncertain: false, error: '', feedback: '', permission: 1, invites: false, users: [], suggestions: [] };
+      collabLoad(collaborators); return true;
+    },
+    collaboratorsRead: function (token) { return collaborators && collaborators.token === token && collabCurrent(collaborators) ? collaborators : null; },
+    collaboratorsAction: function (token, action, value) {
+      var state = collaborators;
+      if (state && state.token === token && action === 'close' && !state.busy) { collaborators = null; return true; }
+      if (!state || state.token !== token || !collabCurrent(state) || state.busy || state.uncertain) return false;
+      state.feedback = '';
+      if (action === 'close') { collaborators = null; return true; }
+      if (action === 'retry') { collabLoad(state); return true; }
+      if (state.loading || state.error) return false;
+      if ((action === 'permissions' || action === 'save') && !ownsBoard()) return false;
+      if ((action === 'invite' || action === 'send') && state.canInvite !== true) return false;
+      if (['members', 'invite', 'permissions'].indexOf(action) >= 0) { state.phase = action; return true; }
+      if (action === 'send' && state.phase === 'invite' && state.suggestions.some(function (item) { return item.id === value && !item.status; })) {
+        collabWrite(state, 'invite', value); return true;
+      }
+      if (action === 'save' && state.phase === 'permissions') { collabWrite(state, 'permissions', value); return true; }
+      return false;
+    },
+    cancelPinStart: function (requestedSession, page, pinId) {
+      var api = window.PinmonyPostApi;
+      if (requestedSession !== session || page !== key || route() !== key || !ownsBoard() ||
+          flow.phase || flow.busy || feedBusy || !api || cancelPinState && cancelPinState.busy ||
+          !pins.some(function (pin) { return pin.id === pinId; })) return false;
+      var pinUrl = location.origin + '/pin/' + pinId + '/';
+      var state = cancelPinState = { session: session, page: page, pinUrl: pinUrl, busy: true, error: '', feedback: '', sent: false };
+      var user = viewerId, boardId = String(board.id), token = generation;
+      function current() { return cancelPinState === state && session === requestedSession &&
+        generation === token && key === page && route() === page && viewerId === user && ownsBoard(); }
+      (async function () {
+        try {
+          var read = await api.resourceRequest(pinUrl, 'PinResource', 'get',
+            { id: pinId, field_set_key: 'auth_web_main_pin' }, current);
+          var copy = read.data;
+          if (!current()) return;
+          if (!copy || String(copy.id) !== pinId || copy.is_repin !== true ||
+              String((copy.pinner || {}).id) !== user || String((copy.board || {}).id) !== boardId)
+            throw new Error('当前账号的图板收藏未能确认，未执行取消收藏');
+          var options = { id: pinId };
+          if (typeof copy.tracking_params === 'string' && copy.tracking_params) options.client_tracking_params = copy.tracking_params + '~0';
+          state.sent = true;
+          var result = await api.resourceRequest(pinUrl, 'PinResource', 'delete', options, current);
+          if (!current()) return;
+          if (result.code !== 0 || result.endpoint_name !== 'v3_delete_pin_handler') throw new Error('unconfirmed-delete');
+          generation++; aborts.forEach(function (abort) { abort.abort(); }); aborts = [];
+          boardBusy = false; feedBusy = false; revision++;
+          state.feedback = '已取消收藏';
+          notify();
+        } catch (e) {
+          if (cancelPinState === state && session === requestedSession && key === page && route() === page) {
+            state.error = state.sent ? '取消收藏结果未确认，请关闭后刷新核对；不会重复提交' : '收藏校验失败，未执行取消收藏';
+            if (state.sent) { recoveryRequired = true; revision++; notify(); }
+          }
+        } finally { if (cancelPinState === state) state.busy = false; }
+      })();
+      return true;
+    },
+    cancelPinRead: function (requestedSession, page, pinUrl) {
+      return cancelPinState && cancelPinState.session === requestedSession && cancelPinState.page === page &&
+        cancelPinState.pinUrl === pinUrl && session === requestedSession && key === page && route() === page ? cancelPinState : null;
+    },
     flow: function (requestedSession, page, encoded) {
       if (requestedSession !== session || page !== key || route() !== key || !board) return false;
       var value; try { value = JSON.parse(encoded); } catch (_) { return false; }
@@ -328,17 +503,17 @@ export const PIN_BOARD_API_SCRIPT: string = `
         var reload = flow.uncertain || flow.phase === 'archived';
         flowEpoch++; flow = emptyFlow(); targetBookmark = ''; sourcePins = {}; pendingSave = {}; selectedIds = []; notify();
         if (reload) { generation++; loadBoard(true); }
-      } else if (value.action === 'ideas' && ownsBoard()) readFlow('ideas', false);
-      else if (value.action === 'select' && ownsBoard()) { flowEpoch++; flow.phase = 'select'; flow.loading = false; flow.error = ''; notify(); }
-      else if (value.action === 'targets' && ownsBoard()) {
+      } else if (value.action === 'ideas' && contributes()) readFlow('ideas', false);
+      else if (value.action === 'select' && contributes()) { flowEpoch++; flow.phase = 'select'; flow.loading = false; flow.error = ''; notify(); }
+      else if (value.action === 'targets' && contributes()) {
         if (!Array.isArray(value.value) || !value.value.length || value.value.length > 500 ||
             !value.value.every(function (id, index, all) { return digits(id) && all.indexOf(id) === index &&
               pins.some(function (pin) { return pin.id === id; }); })) return false;
         selectedIds = value.value.slice(); targetBookmark = ''; readFlow('targets', false);
       }
       else if (value.action === 'targetsMore' && flow.phase === 'targets') readFlow('targets', true);
-      else if (value.action === 'edit' && ownsBoard()) readFlow('edit', false);
-      else if (value.action === 'archiveConfirm' && ownsBoard()) { flow.phase = 'archive'; notify(); }
+      else if (value.action === 'edit' && participates()) readFlow('edit', false);
+      else if (value.action === 'archiveConfirm' && participates()) { flow.phase = 'archive'; notify(); }
       else if (value.action === 'retry' && !flow.uncertain) readFlow(flow.phase, flow.phase === 'targets' && !!targetBookmark);
       else writeFlow(value.action, value.value);
       return true;

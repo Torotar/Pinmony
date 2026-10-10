@@ -5,12 +5,12 @@ export const PINTEREST_LOGIN_URL: string = 'https://www.pinterest.com/login/';
 export const PIN_AUTH_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
-  var epoch = -1, evidence = null, initialNode = null, last = '', responseEvidence = false;
+  var epoch = -1, evidence = null, initialNode = null, last = '', acknowledged = '', responseEvidence = false;
   var evidencePage = location.href.split('#')[0];
   function syncRoute() {
     var page = location.href.split('#')[0];
     if (page === evidencePage) return;
-    evidencePage = page; evidence = null; responseEvidence = false; last = '';
+    evidencePage = page; evidence = null; responseEvidence = false; last = ''; acknowledged = '';
     // The old initial-props node belongs to the previous SPA route: do not read it again.
   }
   function read(context) {
@@ -30,11 +30,12 @@ export const PIN_AUTH_BRIDGE_SCRIPT: string = `
     var message = { status: evidence.status, profileUrl: evidence.profileUrl, epoch: epoch, pageUrl: location.href };
     var value = JSON.stringify(message);
     if (value === last) return;
+    var previous = last;
     try {
       if (window.PinmonyShareBridge && window.PinmonyShareBridge.authState) {
-        window.PinmonyShareBridge.authState(value); last = value;
+        last = value; window.PinmonyShareBridge.authState(value);
       }
-    } catch (_) {}
+    } catch (_) { last = previous; }
   }
   function scanInitial() {
     syncRoute();
@@ -94,9 +95,14 @@ export const PIN_AUTH_BRIDGE_SCRIPT: string = `
       return originalSend.apply(this, arguments);
     };
   }
+  window.PinmonyAuthAcknowledge = function (value) {
+    if (typeof value === 'string' && value === last) acknowledged = value;
+  };
   window.PinmonyAuthSync = function (requestedEpoch) {
     if (typeof requestedEpoch !== 'number' || requestedEpoch < 0) return false;
-    epoch = requestedEpoch; last = '';
+    if (epoch !== requestedEpoch) { last = ''; acknowledged = ''; }
+    else if (last && acknowledged !== last) last = '';
+    epoch = requestedEpoch;
     scanInitial();
     if (!evidence && /^\\/(?:login|signup|logout)(?:\\/|$)/i.test(location.pathname)) {
       evidence = { status: 'unauthenticated', profileUrl: '' };

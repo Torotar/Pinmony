@@ -56,4 +56,5 @@ export class PinmonyProfileStore {
   publishTitle: string = '';
   publishLoading: boolean = false;
   publishRequestToken: number = 0;
+  publishPreparing: boolean = false;
 }

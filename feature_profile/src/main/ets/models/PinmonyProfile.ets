@@ -10,6 +10,7 @@ export interface PinmonyBoard {
   targetUrl?: string;
   title: string;
   covers: string[];
+  collaboratorAvatars?: string[];
   pinCount: string;
   updated: string;
 }

@@ -1,5 +1,6 @@
 // Manual rollback only. Failed native requests never replay through ArkWeb.
 export const PIN_NATIVE_NETWORK_ENABLED: boolean = true;
+export const PIN_READ_MERGING_ENABLED: boolean = true;
 
 // Transforms only our injected API scripts, not Pinterest's own fetch calls.
 export function useNativeTransport(script: string): string {
@@ -40,7 +41,8 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
       if (!job) return 'no-job';
       if (reply.epoch !== job.epoch || reply.page !== job.page || job.page !== location.href) return 'stale';
       if (reply.error) {
-        var failure = new TypeError('原生网络请求未完成');
+        var failure = new TypeError(reply.error === 'rate-limited' ? '请求过于频繁，请稍后重试' : '原生网络请求未完成');
+        if (reply.error === 'rate-limited') failure.pinmonyRateLimited = true;
         if (/^(cancelled|stale|current=false|background)$/.test(reply.error)) failure.name = 'AbortError';
         job.fail(failure); return;
       }
@@ -96,12 +98,60 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
   };
   window.addEventListener('visibilitychange', function () { window.PinmonyNetwork.setForeground(typeof document === 'undefined' || !document.hidden); });
   // Retain the existing auth/contract observers around fetch without changing website requests.
-  window.PinmonyNetwork.fetchObserved = function (input, init) {
+  var readGroups = new Map();
+  function observed(input, init) {
     init = Object.assign({}, init || {}, { pinWebNativeRequest: true });
     return window.fetch(input, init).catch(function (error) {
       var name = error && ['TypeError', 'SyntaxError', 'AbortError', 'Error'].indexOf(error.name) >= 0 ? error.name : 'UnknownError';
       console.warn('PinmonyNetworkDiagnostic: fetch observer failed ' + name);
       throw error;
+    });
+  }
+  // Share only in-flight resource reads within one complete page and epoch.
+  // Each subscriber owns its abort; the native request is cancelled only when all leave.
+  window.PinmonyNetwork.fetchObserved = function (input, init) {
+    init = init || {};
+    var method = String(init.method || 'GET').toUpperCase(), target;
+    try { target = new URL(String(input), location.href); } catch (_) { return observed(input, init); }
+    if (window.PinmonyReadMergingEnabled === false || window.PinmonyNativeNetworkEnabled !== true || typeof AbortController !== 'function' || epoch < 0 ||
+        !window.PinmonyNetwork.isForeground() || target.origin !== location.origin ||
+        !/^\\/resource\\/[A-Za-z]+Resource\\/get\\/$/.test(target.pathname) ||
+        ['GET', 'POST'].indexOf(method) < 0 || (init.body !== undefined && typeof init.body !== 'string')) return observed(input, init);
+    var signal = init.signal;
+    if (signal && signal.aborted) { var aborted = new Error('请求已取消'); aborted.name = 'AbortError'; return Promise.reject(aborted); }
+    var headers = [], supplied = new Headers(init.headers || {});
+    supplied.forEach(function (value, key) { if (!/^(cookie|authorization|x-csrftoken)$/i.test(key)) headers.push([key, value]); });
+    headers.sort(function (a, b) { return a[0].localeCompare(b[0]); });
+    var key = JSON.stringify([epoch, location.href, target.href, method, init.body || '', headers]);
+    var group = readGroups.get(key);
+    if (!group) {
+      if (readGroups.size >= 12) return observed(input, init);
+      group = { controller: new AbortController(), subscribers: new Set() };
+      readGroups.set(key, group);
+      var sharedInit = Object.assign({}, init, { signal: group.controller.signal });
+      group.promise = observed(input, sharedInit);
+      group.promise.then(function () { if (readGroups.get(key) === group) readGroups.delete(key); },
+        function () { if (readGroups.get(key) === group) readGroups.delete(key); });
+    } else console.info('RequestPolicy: read-merged');
+    return new Promise(function (resolve, reject) {
+      var subscriber = {}, settled = false;
+      group.subscribers.add(subscriber);
+      function clean() { group.subscribers.delete(subscriber); if (signal) signal.removeEventListener('abort', abort); }
+      function abort() {
+        if (settled) return;
+        settled = true; clean();
+        var failure = new Error('请求已取消'); failure.name = 'AbortError'; reject(failure);
+        if (!group.subscribers.size) {
+          if (readGroups.get(key) === group) readGroups.delete(key);
+          group.controller.abort();
+        }
+      }
+      if (signal) signal.addEventListener('abort', abort, { once: true });
+      group.promise.then(function (response) {
+        if (settled) return;
+        settled = true; clean();
+        try { resolve(response.clone()); } catch (_) { reject(new TypeError('原生响应转换失败')); }
+      }, function (error) { if (!settled) { settled = true; clean(); reject(error); } });
     });
   };
   var nativeFetch = window.PinmonyNetwork.fetch;

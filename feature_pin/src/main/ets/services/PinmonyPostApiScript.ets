@@ -10,7 +10,9 @@ export const PIN_POST_API_SCRIPT: string = `
   var sessionUserId = '';
   function pinId(url) { var m = String(url || '').match(/\\/pin\\/(\\d+)/); return m ? m[1] : ''; }
   function current(pin) { return !!pinId(pin) && (pinId(location.pathname) === pinId(pin) ||
-    homeMenu && homeMenu.pin === pin && homeMenu.pageKey === location.origin + location.pathname); }
+    homeMenu && homeMenu.pin === pin && homeMenu.pageKey === menuPageKey()); }
+  function searchMenuPage() { return location.pathname === '/search/' || location.pathname.indexOf('/search/') === 0; }
+  function menuPageKey() { return searchMenuPage() ? location.href.split('#')[0] : location.origin + location.pathname; }
   function raw(pin) { return homeMenu && homeMenu.pin === pin && current(pin) ? homeMenu.raw :
     window.PinmonyDetailApi && window.PinmonyDetailApi.raw(pin); }
   function csrf() { var m = document.cookie.match(/(?:^|;\\s*)csrftoken=([^;]+)/); return m ? decodeURIComponent(m[1]) : ''; }
@@ -325,8 +327,8 @@ export const PIN_POST_API_SCRIPT: string = `
     reset: function () { homeMenu = null; routeVersion++; graph = null; siteHeaders = {}; detailReadHandler = ''; nextToken++; shares = null; more = null; comments = null; reaction = null; likeBusy = false; feedbackContext = {}; aggregated = {}; },
     homeMenuOpen: function (session, pin, pageKey) {
       if (!Number.isInteger(session) || session < 1 || !pinId(pin) ||
-          new URL(pin, location.href).origin !== location.origin || pageKey !== location.origin + location.pathname ||
-          !/^(?:\\/|\\/(?:ideas|today)(?:\\/.*)?|\\/(?:inbox|messages|updates|notifications)\\/?|\\/(?!_|(?:pin|users|search|ideas|today|settings|messages|inbox|login|signup|business|explore)\\/)[^/]+\\/(?!_|(?:followers|following)(?:\\/|$))[^/]+\\/?)$/i.test(location.pathname)) return false;
+          new URL(pin, location.href).origin !== location.origin || pageKey !== menuPageKey() ||
+          !searchMenuPage() && !/^(?:\\/|\\/(?:ideas|today)(?:\\/.*)?|\\/(?:inbox|messages|updates|notifications)\\/?|\\/(?!_|(?:pin|users|search|ideas|today|settings|messages|inbox|login|signup|business|explore)\\/)[^/]+\\/(?!_|(?:followers|following)(?:\\/|$))[^/]+\\/?)$/i.test(location.pathname)) return false;
       var state = homeMenu = { session: session, pin: pin, pageKey: pageKey, raw: null, loading: true, error: '' };
       shares = { session: session, pin: pin, changed: function () {}, token: 0, query: '', items: [],
         loading: false, feedback: '', sending: '', options: [] };
@@ -505,7 +507,7 @@ export const PIN_POST_API_SCRIPT: string = `
     moreSnapshot: function (snapshot) {
       more = more && more.session === snapshot.session && more.pin === snapshot.pin ? more : { session: snapshot.session, pin: snapshot.pin, busy: false };
       more.options = snapshot.options.filter(function (item) { return !/举报|report|在应用中打开|open in app|拼贴|collage/i.test(item.label); })
-        .map(function (item) { var download = /下载|download/i.test(item.label), feedback = /^(?:查看更多|查看更少|see more|see less)$/i.test(item.label), share = /^分享$|^share$/i.test(item.label), help = /详细了解.*AI|learn more.*AI/i.test(item.label), edit = /编辑.*Pin|edit pin/i.test(item.label) && !!window.PinmonyEditApiEnabled;
+        .map(function (item) { var download = /下载|download/i.test(item.label), feedback = /^(?:查看更多|查看更少|see more|see less)$/i.test(item.label), share = /^分享(?:链接)?$|^share$/i.test(item.label), help = /详细了解.*AI|learn more.*AI/i.test(item.label), edit = /编辑.*Pin|edit pin/i.test(item.label) && !!window.PinmonyEditApiEnabled;
           return Object.assign({}, item, { enabled: item.enabled && !more.busy && (download && !!window.PinmonyPostApi.downloadUrl(snapshot.pin) || feedback && !!feedbackData(snapshot.pin) || share && !!current(snapshot.pin) || help || edit),
             subtitle: download || feedback || help || edit || share ? item.subtitle : '此操作接口尚未确认' }); });
       snapshot.options = more.options; return snapshot;
@@ -522,7 +524,7 @@ export const PIN_POST_API_SCRIPT: string = `
       if (feedbackData(pin)) {
         options.push({ id: 'detail-see-more', label: '查看更多', enabled: true });
         options.push({ id: 'detail-see-less', label: '查看更少', enabled: true });
-        options.push({ id: 'detail-share', label: '分享', enabled: true });
+        options.push({ id: 'detail-share', label: '分享链接', enabled: true });
       }
       if (p && Array.isArray(p.ai_disclosures) && p.ai_disclosures.indexOf(1) >= 0)
         options.push({ id: 'detail-ai-help', label: '详细了解 AI 标签', enabled: true });
@@ -539,7 +541,7 @@ export const PIN_POST_API_SCRIPT: string = `
       var state = more, item = state && state.options.find(function (option) { return option.id === id && option.enabled; });
       if (!item || state.session !== session || state.pin !== pin || !current(pin) || state.busy) return false;
       if (/编辑.*Pin|edit pin/i.test(item.label) && window.PinmonyEditApiEnabled) { event('editOpen', pin, '', session, 'more'); return true; }
-      if (/^分享$|^share$/i.test(item.label)) { event('share', pin, pin, session, 'more'); return true; }
+      if (/^分享(?:链接)?$|^share$/i.test(item.label)) { event('share', pin, pin, session, 'more'); return true; }
       if (/下载|download/i.test(item.label)) { event('download', pin, this.downloadUrl(pin), session, 'more'); return true; }
       if (/详细了解.*AI|learn more.*AI/i.test(item.label)) { event('help', pin, 'https://help.pinterest.com/en/article/gen-ai-labels', session, 'more'); return true; }
       var less = /查看更少|see less/i.test(item.label), data = feedbackData(pin); if (!data) return false;

@@ -24,7 +24,7 @@ function harness(index) {
   const n = new context.Native(), requests = [];
   Object.assign(n, { authStatus: 'authenticated', activeTab: index, activeSheetKind: '', tabRequestToken: 1,
     pendingWebTab: -1, showNativeSheet: false, profileSettingsVisible: true, rootTabAddresses: new Map(),
-    profileStore: { origins: [], profileActionsReady: false, profileSession: 1, publishRequestToken: 0,
+    profileStore: { profileCache: { put() {}, clear() {} }, origins: [], profileActionsReady: false, profileSession: 1, publishRequestToken: 0,
       profile: { session: 1, profileUrl: roots[3], section: 'created',
         createdPins: [{ id: '123', targetUrl: pin }], boards: [{ id: 'b', targetUrl: board, title: 'board', pinCount: '1' }] } },
     searchStore: { searchActionsReady: false, search: { session: 1, pageKey: roots[1] } },
@@ -50,6 +50,7 @@ function harness(index) {
     } } });
   n.searchStore = Object.assign(new searchRuntime.Store(), n.searchStore);
   searchRuntime.bindIndex(n);
+  require('./publish-controller-harness.cjs').bind(n, ts, context);
   return { n, requests, ready() {
     document = roots[index];
     if (index === 3) { n.profileStore.profileActionsReady = true; n.profileStore.profileSession = n.profileStore.profile.session = 22; }
@@ -103,6 +104,6 @@ function harness(index) {
   const filter = fs.readFileSync('feature_search/src/main/ets/controllers/PinmonySearchController.ets', 'utf8');
   const open = filter.slice(filter.indexOf('  async openSearchFilters()'), filter.indexOf('  refreshSearchFilters('));
   assert(open.indexOf('ensureContext(true)') < open.indexOf('searchActionsReady')); 
-  assert.match(source, /keepPublish: boolean = this\.profilePublishPreparing/);
+  assert.match(source, /keepPublish: boolean = this\.profileStore\.publishPreparing/);
   console.log('Secondary root context: Profile navigation/origins, fresh tabs, contact retry, quiz, publish readiness/close and settings read/write cancellation passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

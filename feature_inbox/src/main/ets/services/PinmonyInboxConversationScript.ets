@@ -119,6 +119,14 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
       if (!list || list.kind !== 'ready') list = null;
       flow = null; stack = [];
     },
+    direct: function (peer, session) {
+      if (!root() || !peer || peer.id === selfId || !/^\\d+$/.test(peer.id || '') || typeof peer.name !== 'string' || peer.name.length > 300 || !list || list.kind !== 'ready') return false;
+      var existing = list.conversations.find(function (c) { return c.users.some(function (u) { return u.id === peer.id; }) && c.users.length <= 2; });
+      stack = [];
+      if (existing) openChat(existing.id, session, []);
+      else { var s = newFlow('compose', session); s.loading = false; s.directContact = true; s.users = [{ profileUrl: /^[a-zA-Z0-9_]+$/.test(peer.username || '') ? location.origin + '/' + peer.username + '/' : '', id: peer.id, name: peer.name, avatar: peer.avatar || '' }]; s.selectedIds = [peer.id]; publish(); this.action('next', '', session); }
+      return true;
+    },
     read: function (key, changed, current) {
       if (listKey !== key) { list = null; listKey = key; listGeneration++; }
       if (list) return list;

@@ -1,5 +1,7 @@
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
+import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
+import { PinmonyBoardInvitationList } from './PinmonyBoardInvitationList';
 
 @Component
 export struct PinmonyInboxPage {
@@ -28,6 +30,9 @@ export struct PinmonyInboxPage {
   onRetry?: () => void;
   onLoadMore?: () => void;
   onContactsRetry?: () => void;
+  @Prop invitations: PinmonyBoardInvitations | undefined = undefined;
+  onInvitationPreview: (item: PinmonyBoardInvitation) => void = () => {};
+  onInvitationAll: () => void = () => {};
 
   aboutToAppear(): void {
     this.activeSection = this.snapshot.section;
@@ -283,6 +288,9 @@ export struct PinmonyInboxPage {
         }
         Scroll(this.scroller) {
           Column() {
+            if (this.invitations) {
+              PinmonyBoardInvitationList({ snapshot: this.invitations, onPreview: this.onInvitationPreview, onAll: this.onInvitationAll })
+            }
             if (this.snapshot.section === 'messages') {
               Row({ space: 12 }) {
                 Text('✎')

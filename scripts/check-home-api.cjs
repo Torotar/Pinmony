@@ -101,6 +101,8 @@ async function main() {
   refresh.read(); await refresh.respond(0, fixture);
   refresh.api.loadMore();
   assert.equal(refresh.api.refresh(), true);
+  assert.equal(refresh.api.refresh(), false, 'repeated refresh joins existing work without restarting');
+  assert.equal(refresh.requests.length, 3, 'repeated refresh does not send another request');
   assert.equal(refresh.requests[1].options.signal.aborted, true, 'refresh cancels old pagination');
   assert.equal(refresh.read().pins.length, 21, 'refresh retains API cards while waiting');
   assert.equal(refresh.read().refreshing, true);

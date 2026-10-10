@@ -13,7 +13,7 @@ function createSearchRuntime(ts, globals = {}) {
   function bindIndex(native) {
     const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
     const begin = source.indexOf('  private readonly searchController:');
-    const end = source.indexOf('\n  private readonly systemActions:', begin);
+    const end = source.indexOf('\n  private ', begin + 1);
     if (begin < 0 || end < 0) throw Error('Missing actual product search bindings');
     const initializer = source.slice(begin, end);
     const body = 'this.searchController ' + initializer.slice(initializer.indexOf('='));

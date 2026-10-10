@@ -180,6 +180,14 @@ async function main() {
   assert.equal(requestHarness.api.readSearch(requestHarness.page()).version,initialVersion,'empty pagination is not treated as an empty first page');
   h.env.PinmonySearchUiApiEnabled = false; assert.equal(h.filters(), null); assert.equal(h.hint(), null);
   const suggestions = harness();
+  const endedSearch = harness();
+  endedSearch.env.PinmonySearchApi = { context: () => ({ page: endedSearch.page(), bookmark: '-end-', filterBookmark: 'current-session-cursor' }) };
+  assert.equal(endedSearch.filters().loading, true);
+  assert.equal(endedSearch.requests.length, 1, 'finished pagination can still request filters');
+  assert.equal(JSON.parse(new URLSearchParams(endedSearch.requests[0].init.body).get('data')).options.data.bookmark_string,
+    'current-session-cursor');
+  await endedSearch.respond(0, filterData);
+  assert.equal(endedSearch.filters().options.length, 3);
   const getSuggestions = term => suggestions.api.readSuggestions(suggestions.page(), term, true, () => {});
   getSuggestions('海'); getSuggestions('海报');
   await new Promise(resolve => setTimeout(resolve, 280));

@@ -125,6 +125,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
         var covers = (item.images && item.images['236x'] || []).map(function (img) { return image(img.url); }).filter(Boolean);
         if (!covers.length && image(item.image_cover_hd_url || item.image_cover_url)) covers.push(item.image_cover_hd_url || item.image_cover_url);
         card = { title: clean(item.name, 300), covers: covers.slice(0, 3),
+          collaboratorAvatars: item.is_collaborative === true ? [item.owner].concat(item.collaborating_users || []).filter(function (u, i, all) { return u && all.findIndex(function (v) { return v && String(v.id) === String(u.id); }) === i; }).slice(0, 6).map(function (u) { return image(u.image_small_url || u.image_medium_url); }).filter(Boolean) : [],
           pinCount: typeof item.pin_count === 'number' && item.pin_count >= 0 ? item.pin_count + ' 张 Pin 图' : '',
           updated: relativeTime(item.board_order_modified_at) };
       } else if (item.type === 'story' && item.story_type === 'all_pins') {
@@ -157,6 +158,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     return card;
   }
   function prefetchSaved(profile, section, current) {
+    if (window.PinmonySpeculativeReadsEnabled === false) { cancelSavedPrefetch(); return false; }
     if (section !== 'saved') { cancelSavedPrefetch(); return false; }
     if (info || failed || savedPrefetch || key !== profile || !current()) return false;
     var username = decodeURIComponent(new URL(profile).pathname.split('/')[1]);

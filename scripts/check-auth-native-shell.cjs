@@ -12,7 +12,7 @@ function moduleFrom(path) {
 }
 const { PIN_AUTH_BRIDGE_SCRIPT } = moduleFrom('entry/src/main/ets/services/PinmonyAuthScript.ets');
 const { acceptsAuthMessage } = moduleFrom('entry/src/main/ets/models/PinmonyAuth.ets');
-function harness(url, initial) {
+function harness(url, initial, acknowledge = true) {
   const location = new URL(url), messages = [];
   const node = initial ? { textContent: JSON.stringify(initial) } : null;
   let nextBody = {}, nextUrl = location.origin + '/resource/UserResource/get/';
@@ -22,7 +22,10 @@ function harness(url, initial) {
   }
   const context = { URL, location, XMLHttpRequest: XHR,
     document: { getElementById: () => node, addEventListener() {} },
-    PinmonyShareBridge: { authState(value) { messages.push(JSON.parse(value)); } },
+    PinmonyShareBridge: { authState(value) {
+      messages.push(JSON.parse(value));
+      if (acknowledge) context.PinmonyAuthAcknowledge(value);
+    } },
     fetch: async () => ({ url: nextUrl, clone() { return { json: async () => nextBody }; } }) };
   context.window = context; context.top = context;
   vm.runInNewContext(PIN_AUTH_BRIDGE_SCRIPT, context);
@@ -31,6 +34,18 @@ function harness(url, initial) {
 }
 async function flush() { await new Promise(resolve => setImmediate(resolve)); }
 async function check() {
+  const unacknowledged = harness('https://www.pinterest.com/', {client_context: {is_authenticated: true}}, false);
+  unacknowledged.context.PinmonyAuthSync(1);
+  unacknowledged.context.PinmonyAuthSync(1);
+  assert.equal(unacknowledged.messages.length, 2, 'native rejection or missing acknowledgement permits explicit resync');
+  const oldEvidence = JSON.stringify(unacknowledged.messages.at(-1));
+  unacknowledged.context.PinmonyAuthAcknowledge(oldEvidence);
+  unacknowledged.context.PinmonyAuthSync(1);
+  assert.equal(unacknowledged.messages.length, 2, 'acknowledged identical evidence is coalesced');
+  unacknowledged.context.PinmonyAuthSync(2);
+  unacknowledged.context.PinmonyAuthAcknowledge(oldEvidence);
+  unacknowledged.context.PinmonyAuthSync(2);
+  assert.equal(unacknowledged.messages.length, 4, 'late acknowledgement cannot accept a newer epoch');
   const guest = harness('https://www.pinterest.com/login/', { initialReduxState: { session: { isAuthenticated: false } } });
   guest.context.PinmonyAuthSync(1);
   assert.equal(guest.messages.at(-1).status, 'unauthenticated');
@@ -39,6 +54,11 @@ async function check() {
   assert.equal(guest.messages.at(-1).status, 'authenticated');
   guest.context.PinmonyAuthSync(1);
   assert.equal(guest.messages.at(-1).status, 'authenticated', 'old login-page initial data cannot undo successful login');
+  const syncCount = guest.messages.length;
+  guest.context.PinmonyAuthSync(1);
+  assert.equal(guest.messages.length, syncCount, 'same epoch and evidence are published only once');
+  guest.context.PinmonyAuthSync(2);
+  assert.equal(guest.messages.length, syncCount + 1, 'new document epoch still gets current evidence');
   assert.equal(guest.messages.at(-1).profileUrl, 'https://www.pinterest.com/sample/');
 
   const unknown = harness('https://www.pinterest.com/', null);
@@ -80,7 +100,7 @@ async function check() {
     return source.slice(start, source.indexOf('\n  private ', start + 1));
   }
   const names = ['selectSearchFilter', 'selectProfilePublish', 'performProfileAction', 'performInboxAction',
-    'performSearchAction', 'performDetailAction', 'authWebVisible', 'updateAuthState'];
+    'performSearchAction', 'performDetailAction', 'authWebVisible', 'updateAuthState', 'retryLogin'];
   const context = { PIN_PROFILE_API_ENABLED: true, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
     PinmonyRuntimeLog: { info() {}, warn() {} },
     PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
@@ -93,20 +113,25 @@ async function check() {
   const native = new context.Native();
   let effects = 0;
   native.rejectOfflineAction = () => false;
-  Object.assign(native, { traceAction() {}, traceAuth() {}, profileStore: { profileActionsReady: true, profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] } }, pinStore: { detailActionsReady: true, detail: { pinUrl: 'https://www.pinterest.com/pin/123/' } }, searchStore: { search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false } }, inboxStore: {}, controller: { runJavaScript() { effects++; return Promise.resolve('true'); } },
+  Object.assign(native, { traceAction() {}, traceAuth() {}, profileStore: { profileActionsReady: true, profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] } }, pinStore: { detailActionsReady: true, detail: { pinUrl: 'https://www.pinterest.com/pin/123/' } }, searchStore: { search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false, heroes: [] } }, inboxStore: {}, controller: { runJavaScript() { effects++; return Promise.resolve('true'); } },
     showMessage() { effects++; }, profileActionsReady: true,
     profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] },
     currentProfileUrl: () => 'https://www.pinterest.com/sample/',
     detail: { pinUrl: 'https://www.pinterest.com/pin/123/' }, detailActionsReady: true,
     currentPinUrl: () => 'https://www.pinterest.com/pin/123/', pinIdentity: value => value,
-    search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false },
-    currentSearchPageKey: () => 'https://www.pinterest.com/search/' });
+    search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false, heroes: [] },
+    boardUrlFromAddress: () => '', currentSearchPageKey: () => 'https://www.pinterest.com/search/' });
   const searchRuntime = require('./search-controller-harness.cjs').createSearchRuntime(ts);
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
+  require('./publish-controller-harness.cjs').bind(native, ts);
+  const { PinmonyDetailController } = moduleFrom('feature_pin/src/main/ets/controllers/PinmonyDetailController.ets');
+  native.detailController = new PinmonyDetailController({ store: native.pinStore, traceAction() {},
+    isOffline: () => false, isAuthenticated: () => true, pinIdentity: value => value,
+    currentPinUrl: native.currentPinUrl, postApiEnabled: () => true, postExtensionsEnabled: () => true });
   await native.selectSearchFilter('filter'); await native.selectProfilePublish('publish');
   await native.performProfileAction('settings'); await native.performInboxAction('dom-update');
-  await native.performSearchAction('hero', 'hero'); await native.performDetailAction('source', 'source');
+  await native.performSearchAction('hero', 'hero'); await native.performDetailAction('unsupported', 'unsupported');
   assert.equal(effects, 0, 'unintegrated controls cause no request, navigation or feedback');
   Object.assign(native, { authStatus: 'authenticated', navigationAddress: 'https://www.pinterest.com/login/' });
   assert.equal(native.authWebVisible(), false, 'authenticated state never exposes website UI');
@@ -140,6 +165,10 @@ async function check() {
   assert.equal(clearedDetails, 1, 'account switch discards old detail state and pending intentions');
   assert.equal(clearedCache, 1, 'account switch discards old cached presentation');
   assert.equal(clearedPrefetch, 1, 'account switch discards old prefetch data');
+  Object.assign(native, { authStatus: 'error', webPageLoading: false, lastLoginRetryAt: -1, showNetworkNotice() {} });
+  const beforeRetry = loaded.length;
+  native.retryLogin(); native.retryLogin();
+  assert.equal(loaded.length, beforeRetry + 1, 'rapid manual retry loads the session page once');
   assert.match(source, /\.hitTestBehavior\(this.authWebVisible\(\) \? HitTestMode.Default : HitTestMode.None\)/);
   const tabsStart = source.indexOf('  private buildRootTabs()');
   const tabsEnd = source.indexOf('  build()', tabsStart);

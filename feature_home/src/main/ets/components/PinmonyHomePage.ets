@@ -1,4 +1,5 @@
 import { PinmonyVideoCard } from 'common_ui';
+import { allowsSpeculativeReads } from 'common_foundation';
 import { Chip, ChipSize } from '@kit.ArkUI';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab } from '../models/PinmonyHome';
 import { PinmonyHomeSkeleton } from './PinmonyHomeSkeleton';
@@ -42,6 +43,7 @@ export struct PinmonyHomePage {
   private prefetchTimer: number = -1;
   private lastHomePinCount: number = 0;
   onTab?: (id: string) => void;
+  onPrefetchMore?: () => void;
   onPin?: (id: string) => void;
   onMore?: (id: string) => void;
   onLoadMore?: () => void;
@@ -132,6 +134,7 @@ export struct PinmonyHomePage {
   }
 
   private prefetchNextScreen(): void {
+    if (!allowsSpeculativeReads()) return;
     if (this.prefetchNotBefore > Date.now()) {
       if (this.prefetchTimer === -1) {
         const delay: number = Math.max(0, this.prefetchNotBefore - Date.now());
@@ -153,14 +156,22 @@ export struct PinmonyHomePage {
       count.toString() + ':' + (this.home.pins[0]?.id || '');
     if (key === this.prefetchKey) return;
     this.prefetchKey = key;
-    this.onLoadMore();
+    if (this.onPrefetchMore) this.onPrefetchMore();
+    else this.onLoadMore();
   }
 
   private onPrefetchAvailabilityChanged(): void {
     setTimeout(() => { this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
   }
 
+  private loadNextPageAtEnd(): void {
+    if (this.home.dataSource !== 'api' || !this.feedActive || !this.actionsReady || this.loading || this.refreshing ||
+      this.pendingTabId || this.home.loadingMore || this.home.refreshing || this.home.endReached || this.home.sourceError) return;
+    if (this.onLoadMore) this.onLoadMore();
+  }
+
   private prefetchVisibleDetails(): void {
+    if (!allowsSpeculativeReads()) return;
     if (!this.feedActive || !this.actionsReady || this.loading || this.refreshing || this.pendingTabId ||
       this.home.refreshing || this.visibleLast < 0 || !this.onPrefetchPins) return;
     this.onPrefetchPins(this.visibleFirst, this.visibleLast);
@@ -489,7 +500,7 @@ export struct PinmonyHomePage {
             .rowsGap(12)
             .width('100%')
             .height('100%')
-            .padding({ left: 12, right: 12 })
+            .padding({ left: 12, right: 12, top: 16 })
             .scrollBar(BarState.Off)
             .onAppear(() => this.restoreScrollPosition())
             .onDidScroll((offset: number, state: ScrollState) => {
@@ -506,7 +517,7 @@ export struct PinmonyHomePage {
             })
             .onScrollStop(() => this.reportScrollPosition(true))
             .onReachEnd(() => {
-              if (this.home.dataSource === 'api') this.prefetchNextScreen();
+              this.loadNextPageAtEnd();
             })
             .onAreaChange((_oldArea: Area, newArea: Area) => {
               const width: number = Number(newArea.width);

@@ -33,14 +33,14 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
     shareCurrent: function (page) { return !!sharing && sharing.page === page && sharing.address === location.href && current(page); },
     shareLink: function (page, session) { return this.shareCurrent(page) && sharing.session === session ? sharing.link : ''; },
     shareOpen: function (page, session, changed) {
-      var info = window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page);
+      var info = window.PinmonyBoardApi && window.PinmonyBoardApi.shareInfo(page) || window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page);
       if (!current(page) || !info || !/^\\d+$/.test(info.userId)) return false;
       this.shareClose(); var g = shareGeneration;
       var controller = new AbortController();
       var s = sharing = { page: page, address: location.href, session: session, link: '', abort: controller,
-        kind: 'state', pinUrl: page, pinDetail: false, title: '分享', sectionLabel: '发送给',
-        options: ['Messenger','WhatsApp','短信','Facebook','X'].map(function (name) { return { id: 'profile-share:' + name, label: name, enabled: false }; }),
-        actions: [{ id: 'profile-copy', label: '复制链接', enabled: false }], contacts: [], searchActive: true, searchLabel: '搜索用户', feedback: '正在加载…', error: '' };
+        kind: 'state', pinUrl: page, pinDetail: false, title: '分享', sectionLabel: info.board ? '发送给联系人' : '发送给',
+        options: (info.board ? [] : ['Messenger','WhatsApp','短信','Facebook','X']).map(function (name) { return { id: 'profile-share:' + name, label: name, enabled: false }; }),
+        actions: info.board ? [] : [{ id: 'profile-copy', label: '复制链接', enabled: false }], contacts: [], searchActive: true, searchLabel: '搜索用户', feedback: '正在加载…', error: '' };
       function publish() {
         if (g !== shareGeneration || sharing !== s || s.address !== location.href || !current(page)) return;
         changed({ kind: s.kind, session: session, pinUrl: page, pinDetail: false, title: s.title, sectionLabel: s.sectionLabel,
@@ -50,7 +50,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
       var timer = setTimeout(function () { controller.abort(); }, 15000);
       Promise.allSettled([
         graph(page, '6312848b4bb08588587683a04a42e4d0333e2e986fcab0cef4ed200786d3f5d9',
-          { objectId: info.userId, inviteType: JSON.stringify({ invite_category: 3, invite_object: 3, invite_channel: 12 }) }, controller.signal),
+          { objectId: info.userId, inviteType: JSON.stringify({ invite_category: 3, invite_object: info.board ? 2 : 3, invite_channel: 12 }) }, controller.signal),
         fetch('/resource/ShareSuggestionsResource/get/?source_url=' + encodeURIComponent(location.pathname) + '&data=' + encodeURIComponent(JSON.stringify({ options: { suggestion_type: 'share', hide_group_conversations: false }, context: {} })),
           { credentials: 'same-origin', signal: controller.signal, headers: requestHeaders() }).then(async function (r) {
             var j = await r.json(), resource = j.resource_response;
@@ -62,7 +62,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
         var link = results[0].status === 'fulfilled' && results[0].value.v3InviteUserExternalQuery;
         var data = link && link.data;
         if (data && /^https:\\/\\/pin\\.it\\/[A-Za-z0-9]+\\/?$/.test(data.inviteUrl) && typeof data.inviteCode === 'string' && typeof data.title === 'string' && typeof data.message === 'string') {
-          s.link = data.inviteUrl; s.actions[0].enabled = true;
+          s.link = data.inviteUrl; if (s.actions.length) s.actions[0].enabled = true;
           s.options.forEach(function (option) { option.enabled = true; });
         } else s.error = '分享链接读取失败，请关闭后重试';
         if (results[1].status === 'fulfilled') s.contacts = results[1].value.slice(0,100).filter(function (u) { return /^\\d+$/.test(u.id) && typeof u.username === 'string'; }).map(function (u) {
@@ -88,7 +88,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
     },
     shareContact: function (page, session, id, changed) {
       if (!sharing || sharing.page !== page || sharing.session !== session || !current(page) || !/^profile-contact:\\d+$/.test(id)) return false;
-      var target = id.slice('profile-contact:'.length), info = window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page), g = shareGeneration, s = sharing;
+      var target = id.slice('profile-contact:'.length), info = window.PinmonyBoardApi && window.PinmonyBoardApi.shareInfo(page) || window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page), g = shareGeneration, s = sharing;
       if (!info || !/^\\d+$/.test(info.userId)) return false;
       s.feedback = '正在发送…'; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, feedback: s.feedback, error: '' });
       var headers = requestHeaders(); headers['Content-Type'] = 'application/x-www-form-urlencoded';

@@ -4,6 +4,17 @@ import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
   HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType } from '@kit.UIDesignKit';
 
+interface BoardTitleMenuItem {
+  content: BoardTitleMenuContent;
+}
+
+interface BoardTitleMenuContent {
+  icon: Resource;
+  label: string;
+  isEnabled: boolean;
+  action: () => void;
+}
+
 interface BoardEditValues {
   name: string;
   description: string;
@@ -35,7 +46,17 @@ export struct PinmonyBoardPage {
   onBack?: () => void;
   onPin?: (id: string) => void;
   onMore?: (id: string) => void;
+  onCollaborators?: () => void;
+  onMessage?: () => void;
+  @Prop invitationName: string = '';
+  @Prop invitationAvatar: string = '';
+  @Prop invitationVisible: boolean = false;
+  @Prop invitationBusy: boolean = false;
+  @Prop joinedAvatar: string = '';
+  onAcceptInvitation: () => void = () => {};
+  onDismissInvitation: () => void = () => {};
   onShare?: () => void;
+  onPublish?: () => void;
   onLoadMore?: () => void;
   onRetry?: () => void;
   onRefresh?: () => void;
@@ -135,7 +156,7 @@ export struct PinmonyBoardPage {
       },
       content: {
         title: { mainTitle: this.phase() === 'select' ? '选择 Pin 图' : this.phase() === 'targets' ? '选择图板区块' :
-          this.phase() === 'ideas' ? '更多点子' : this.phase() === 'edit' ? '编辑图板' : this.snapshot.title || '图板' },
+          this.phase() === 'ideas' ? '更多点子' : this.phase() === 'edit' ? '编辑图板' : this.snapshot.featured ? '图板' : this.snapshot.title || '图板' },
         backIcon: this.phase() === 'select' || this.phase() === 'edit' ? {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           label: this.phase() === 'edit' ? '关闭编辑' : '关闭整理', isEnabled: !this.snapshot.flow?.busy, action: () => this.back()
@@ -147,14 +168,17 @@ export struct PinmonyBoardPage {
             if (this.selectedIds.length > 0 && !this.snapshot.loadingMore && !this.snapshot.flow?.busy && this.onAction)
               this.onAction(JSON.stringify({ action: 'targets', value: this.selectedIds }));
           }
-        } }] : this.phase() === 'edit' ? [{ content: {
+        } }] : this.phase() === 'edit' && this.snapshot.editable ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),
           label: '完成', isEnabled: !!this.editName.trim() && !this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain,
           action: () => this.saveEdit()
-        } }] : !this.phase() && this.snapshot.editable ? [{ content: {
+        } }] : !this.phase() && (this.snapshot.collaborator && !this.snapshot.editable || this.snapshot.featured) ? [{ content: {
           icon: $r('app.media.lucide_share_2'), label: '分享图板', isEnabled: this.snapshot.ready,
           action: () => { if (this.onShare) this.onShare(); }
         } }, { content: {
+          icon: $r('app.media.lucide_ellipsis'), label: '图板选项', isEnabled: this.snapshot.ready,
+          action: () => { this.archiveOpen = false; this.menuOpen = true; }
+        } }] as BoardTitleMenuItem[] : !this.phase() && this.snapshot.editable ? [{ content: {
           icon: $r('app.media.lucide_ellipsis'),
           label: '图板选项', isEnabled: this.snapshot.ready,
           action: () => { this.archiveOpen = false; this.menuOpen = true; }
@@ -187,6 +211,14 @@ export struct PinmonyBoardPage {
         }.width('100%').aspectRatio(pin.imageWidth / pin.imageHeight).backgroundColor('#55000000')
           .hitTestBehavior(HitTestMode.None)
       }
+      if (pin.cancelled) {
+        Column() {
+          Text('已取消收藏，重新进入图板后移除').fontSize(14).fontWeight(FontWeight.Medium)
+            .fontColor(Color.White).width('100%').padding({ left: 14, right: 14, top: 16 })
+          Blank()
+        }.width('100%').aspectRatio(pin.imageWidth / pin.imageHeight).backgroundColor('#88000000')
+          .hitTestBehavior(HitTestMode.None)
+      }
       if (this.phase() === 'select' && this.selectedIds.includes(pin.id)) {
         SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([$r('app.color.detail_on_accent')])
           .padding(6).backgroundColor($r('app.color.accent')).borderRadius(15).margin(6)
@@ -205,6 +237,7 @@ export struct PinmonyBoardPage {
       .border({ width: this.phase() === 'select' && this.selectedIds.includes(pin.id) ? 2 : 0,
         color: $r('app.color.primary_text') })
       .onClick(() => {
+        if (pin.cancelled) return;
         if (this.phase() === 'select') this.toggle(pin.id);
         else if (!this.phase() && this.onPin) this.onPin(pin.id);
       })
@@ -215,7 +248,7 @@ export struct PinmonyBoardPage {
             Image($r('app.media.lucide_ellipsis')).width(20).height(20).objectFit(ImageFit.Contain)
               .fillColor($r('app.color.primary_text'))
           }.width(32).height(32).backgroundColor(Color.Transparent)
-            .enabled(this.snapshot.ready && !this.snapshot.flow?.busy)
+            .enabled(!pin.cancelled && this.snapshot.ready && !this.snapshot.flow?.busy)
             .onClick(() => { if (this.onMore) this.onMore(pin.id); })
             .accessibilityText('更多选项')
         }.width('100%')
@@ -286,8 +319,31 @@ export struct PinmonyBoardPage {
   }
 
   @Builder
+  private messageTile() {
+    Column({ space: 6 }) {
+      Button({ type: ButtonType.Normal }) {
+        SymbolGlyph($r('sys.symbol.message')).fontColor([$r('app.color.primary_text')]).fontSize(28)
+      }.width(72).height(72).borderRadius(20).backgroundColor($r('app.color.surface_muted'))
+        .onClick(() => { if (this.onMessage) this.onMessage(); })
+      Text('消息').fontSize(14).fontColor($r('app.color.primary_text'))
+    }
+  }
+
+  private confirmLeave(): void {
+    if (!this.snapshot.collaborator || this.snapshot.editable || this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
+    const session: number = this.snapshot.session;
+    const page: string = this.snapshot.pageKey;
+    this.getUIContext().showAlertDialog({ title: '离开图板？', message: '此图板将从你的个人资料中移除，你将无法继续向此图板收藏 Pin 图。',
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '离开', action: () => {
+        if (this.snapshot.session === session && this.snapshot.pageKey === page && this.phase() === 'edit' && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain) this.act('leave');
+      } } });
+  }
+
+  @Builder
   private editContent() {
     Column({ space: 20 }) {
+      if (this.snapshot.editable) {
       Column({ space: 10 }) {
         this.editLabel('名称')
         TextInput({ text: this.editName }).maxLength(100).height(48).borderRadius(16)
@@ -303,18 +359,27 @@ export struct PinmonyBoardPage {
           .enabled(!this.snapshot.flow?.loading && !this.snapshot.flow?.busy)
         this.setting('将此图板设为私密图板', '此内容仅对你和你的合作用户可见', this.secret, (value: boolean) => { this.secret = value; })
       }.width('100%')
+      }
       Column({ space: 10 }) {
         this.editLabel('合作用户')
         Row() {
-          if (this.snapshot.memberAvatar || this.snapshot.ownerAvatar) {
+          if (this.snapshot.collaboratorAvatars?.length) {
+            Row() {
+              ForEach(this.snapshot.collaboratorAvatars || [], (avatar: string, index: number) => {
+                Image(avatar).width(48).height(48).borderRadius(24).margin({ left: index > 0 ? -16 : 0 })
+              }, (avatar: string) => avatar)
+            }
+          } else if (this.snapshot.memberAvatar || this.snapshot.ownerAvatar) {
             Image(this.snapshot.memberAvatar || this.snapshot.ownerAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(48).height(48).borderRadius(24)
           }
           Blank()
           Button('+').fontSize(26).width(48).height(48).borderRadius(10)
             .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
-            .onClick(() => {}).accessibilityText('添加合作用户')
+            .enabled(!this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain)
+            .onClick(() => { if (this.onCollaborators) this.onCollaborators(); }).accessibilityText('添加合作用户')
         }.width('100%')
       }.width('100%')
+      if (this.snapshot.editable) {
       Column({ space: 24 }) {
         this.editLabel('设置')
         this.setting('个性化', '在主页中显示灵感来自此图板的 Pin 图', this.recommend, (value: boolean) => { this.recommend = value; })
@@ -325,6 +390,15 @@ export struct PinmonyBoardPage {
         Text('删除图板').fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).onClick(() => this.confirmDelete())
         Text('永久删除此图板和其中的所有 Pin 图。此操作无法撤销！').fontSize(15).fontColor($r('app.color.secondary_text'))
       }.width('100%').alignItems(HorizontalAlign.Start).margin({ top: 16 })
+      } else {
+        Column({ space: 8 }) {
+          this.editLabel('操作')
+          Text('离开图板').fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+            .enabled(!this.snapshot.flow?.busy && !this.snapshot.flow?.loading && !this.snapshot.flow?.uncertain)
+            .onClick(() => this.confirmLeave())
+          Text('离开此群组图板并将其从个人资料中移除。你将无法将新的 Pin 图收藏到此图板。').fontSize(15).fontColor($r('app.color.secondary_text'))
+        }.width('100%').alignItems(HorizontalAlign.Start).margin({ top: 16 })
+      }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
@@ -362,8 +436,16 @@ export struct PinmonyBoardPage {
   private optionsSheet() {
     Column() {
         Column() {
-          this.optionRow('编辑信息和设置', 'edit')
-          this.optionRow('存档', 'archiveConfirm')
+          if (this.snapshot.featured && !this.snapshot.editable && !this.snapshot.collaborator) {
+            Row() { Text('分享').fontSize(17).fontColor($r('app.color.primary_text')) }.width('100%').padding(20)
+              .onClick(() => { this.menuOpen = false; if (this.onShare) this.onShare(); })
+          } else {
+            this.optionRow('编辑信息和设置', 'edit')
+            this.optionRow('存档', 'archiveConfirm')
+          }
+          if (this.snapshot.collaborator && !this.snapshot.editable) {
+            this.optionRow('取消关注', 'unfollow')
+          }
         }.width('100%')
     }.width('100%').padding({ bottom: 20 }).backgroundColor($r('app.color.page_background'))
   }
@@ -469,6 +551,27 @@ export struct PinmonyBoardPage {
               Button('取消').enabled(!this.snapshot.flow.busy).onClick(() => { this.archiveOpen = false; this.act('close'); })
             }
           }
+          if (!this.phase() && this.invitationVisible) {
+            Row({ space: 12 }) {
+              Image(this.invitationAvatar).width(44).height(44).borderRadius(22)
+              Column({ space: 12 }) {
+                Text(this.invitationName + ' 邀请你在此图板上进行合作').fontSize(16).fontColor($r('app.color.primary_text'))
+                Row({ space: 8 }) {
+                  Button('拒绝').backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text')).enabled(false)
+                  Button('接受').backgroundColor($r('app.color.accent')).fontColor(Color.White)
+                    .enabled(!this.invitationBusy).onClick(() => this.onAcceptInvitation())
+                }
+              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+            }.padding(16).width('100%').borderRadius(20).backgroundColor($r('app.color.surface_muted'))
+              .gesture(PanGesture({ direction: PanDirection.Up }).onActionEnd(() => { if (!this.invitationBusy) this.onDismissInvitation(); }))
+          }
+          if (!this.phase() && this.snapshot.featured) {
+            if (this.snapshot.headerImage) {
+              Image(this.snapshot.headerImage).width('100%').height(200).objectFit(ImageFit.Cover).borderRadius(16)
+            }
+            if (this.snapshot.subtitle) { Text(this.snapshot.subtitle).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).width('100%') }
+            Text(this.snapshot.title).fontSize(26).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).width('100%')
+          }
           if (!this.phase() && this.snapshot.pinCount) {
             Row({ space: 8 }) {
               if (this.snapshot.privacy === 'secret') {
@@ -482,7 +585,10 @@ export struct PinmonyBoardPage {
               Text(this.snapshot.pinCount).fontSize(14).fontColor($r('app.color.secondary_text'))
             }.width('100%')
           }
-          if (!this.phase() && this.snapshot.ownerName) {
+          if (!this.phase() && this.snapshot.featured && this.snapshot.description) {
+            Text(this.snapshot.description).fontSize(16).fontColor($r('app.color.primary_text')).width('100%')
+          }
+          if (!this.phase() && this.snapshot.ownerName && !this.joinedAvatar) {
             Row({ space: 8 }) {
               if (this.snapshot.ownerAvatar) {
                 Image(this.snapshot.ownerAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(32).height(32).borderRadius(16)
@@ -490,15 +596,43 @@ export struct PinmonyBoardPage {
               Text('来自 ' + this.snapshot.ownerName).fontSize(15).fontColor($r('app.color.primary_text'))
             }.width('100%')
           }
+          if (!this.phase() && this.joinedAvatar) {
+            Row({ space: 8 }) {
+              Image(this.snapshot.memberAvatar || this.snapshot.ownerAvatar).width(36).height(36).borderRadius(18)
+              Image(this.joinedAvatar).width(36).height(36).borderRadius(18)
+            }.width('100%')
+          }
+          if (!this.phase() && this.snapshot.collaborator && !this.snapshot.editable) {
+            Row() {
+              ForEach(this.snapshot.collaboratorAvatars || [], (avatar: string, index: number) => {
+                Image(avatar).width(36).height(36).borderRadius(18).margin({ left: index > 0 ? -12 : 0 })
+              }, (avatar: string) => avatar)
+              Button({ type: ButtonType.Circle }) { Image($r('app.media.lucide_user_round_plus')).width(20).height(20) }
+                .width(36).height(36).backgroundColor($r('app.color.surface_muted')).onClick(() => { if (this.onCollaborators) this.onCollaborators(); })
+            }.width('100%')
+            if (this.snapshot.canContribute) {
+              Row({ space: 12 }) {
+                this.actionTile('整理', $r('sys.symbol.pin'), 'select')
+                this.actionTile('更多点子', $r('sys.symbol.square_grid_2x2'), 'ideas')
+                this.messageTile()
+              }.width('100%')
+            }
+          }
           if (!this.phase() && this.snapshot.editable) {
             Row({ space: 8 }) {
-              if (this.snapshot.memberAvatar) {
+              if (this.snapshot.collaboratorAvatars?.length) {
+                Row() {
+                  ForEach(this.snapshot.collaboratorAvatars || [], (avatar: string, index: number) => {
+                    Image(avatar).width(36).height(36).borderRadius(18).margin({ left: index > 0 ? -12 : 0 })
+                  }, (avatar: string) => avatar)
+                }
+              } else if (this.snapshot.memberAvatar) {
                 Image(this.snapshot.memberAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(36).height(36).borderRadius(18)
               }
               Button({ type: ButtonType.Circle }) {
-                Image($r('app.media.lucide_user_round')).width(20).height(20).fillColor($r('app.color.primary_text'))
+                Image($r('app.media.lucide_user_round_plus')).width(20).height(20)
               }.width(36).height(36).backgroundColor($r('app.color.surface_muted'))
-                .onClick(() => {}).accessibilityText('邀请协作者')
+                .onClick(() => { if (this.onCollaborators) this.onCollaborators(); }).accessibilityText('邀请协作者')
             }.width('100%')
             Row({ space: 12 }) {
               this.actionTile('整理', $r('sys.symbol.pin'), 'select')
@@ -559,7 +693,7 @@ export struct PinmonyBoardPage {
       if (!this.phase()) {
         Button('+').width(56).height(56).fontSize(32)
           .backgroundColor($r('app.color.page_background')).fontColor($r('app.color.primary_text'))
-          .margin({ bottom: 20 }).onClick(() => {}).accessibilityText('添加到图板')
+          .margin({ bottom: 20 }).onClick(() => { if (this.onPublish) this.onPublish(); }).accessibilityText('发布')
       }
       }.width('100%').height('100%')
       }

@@ -31,7 +31,8 @@ function harness(destination = target, failNavigation = false) {
   const backTargets = [];
   Object.assign(native, { loadFailed: false, pendingBoardUrl: '', pendingBoardSource: '', boardOpeningToken: 0,
     authStatus: 'authenticated', activeTab: 3, tabRequestToken: 0, rootTabAddresses: new Map(),
-    profileStore: { origins: [] }, clearRootTabGuard() {},
+    profileStore: { origins: [], profileCache: { put() {} } }, clearRootTabGuard() {},
+    cancelledBoardPins: new Set(),
     boardReturnUrl: '', boardReturnPage: '', backOnePage: (fallback, override) => backTargets.push(override || fallback),
     pageHistory: { key: url => url.split(/[?#]/)[0], visit() {}, cancelBack() {} }, controller: { getUrl: () => address, loadUrl: url => {
       assert.equal(native.nativeBoardVisible(), true, 'native cover exists before opening the board');
@@ -48,6 +49,11 @@ function harness(destination = target, failNavigation = false) {
   // Returning to the source clears the opening cover before dispatch.
   const loadUrl = native.controller.loadUrl;
   native.controller.loadUrl = url => url === from ? navigations.push(url) : loadUrl(url);
+  require('./board-state-controller-harness.cjs').bind(native, ts, { setTimeout: () => 0, clearTimeout() {} });
+  const r = require('./return-coordinator-harness.cjs').runtime(ts);
+  const { PinmonyBoardInvitationController } = r.compile('feature_inbox/src/main/ets/controllers/PinmonyBoardInvitationController.ets', () => r.foundation);
+  native.inboxStore.boardInvitationToken = 0;
+  native.boardInvitationController = new PinmonyBoardInvitationController(native.inboxStore, {});
   return { native, backTargets, navigations, navigate: url => { address = url; } };
 }
 async function main() {

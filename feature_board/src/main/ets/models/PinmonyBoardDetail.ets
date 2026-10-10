@@ -5,11 +5,21 @@ export interface PinmonyBoardPin {
   imageWidth: number;
   imageHeight: number;
   title: string;
+  cancelled?: boolean;
 }
 
 export interface PinmonyBoardDetail {
   flow?: PinmonyBoardFlow;
   editable?: boolean;
+  featured?: boolean;
+  subtitle?: string;
+  description?: string;
+  headerImage?: string;
+  collaborator?: boolean;
+  chatMemberCount?: number;
+  chatPeer?: PinmonyBoardChatPeer;
+  canContribute?: boolean;
+  collaboratorAvatars?: string[];
   memberAvatar?: string;
   nextPage?: string;
   revision?: number;
@@ -55,3 +65,5 @@ export interface PinmonyBoardFlow {
   saved: string[];
   hasMore: boolean;
 }
+
+export interface PinmonyBoardChatPeer { id: string; name: string; avatar: string; username: string; }

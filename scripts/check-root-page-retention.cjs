@@ -70,7 +70,8 @@ async function main() {
   require('node:child_process').execFileSync(process.execPath,
     ['scripts/check-native-root-switch.cjs', process.argv[2]], { stdio: 'inherit' });
   Object.assign(native, { clearHome() {}, clearSearch() {}, clearProfile() {}, clearInbox() {},
-    clearRootTabGuard() {}, clearOfflineHomeMarker() {}, detailReturnReads: new Map(),
+    clearRootTabGuard() {}, clearOfflineHomeMarker() {}, detailReturnReads: new Map(), detailReadCache: { clear() {} },
+    postPanelsController: { pause() {}, resume() {} }, boardStateController: { pause() {}, resume() {} }, boardInvitationController: { pause() {}, resume() {}, reset() {}, clearPreview() {} }, publishController: { pause() {}, resume() {} }, cancelledBoardPins: new Set(), boardCollaboratorsController: { pause() {} },
     homeStore: new (require('./home-controller-harness.cjs').createHomeRuntime(ts).Store)() });
   native.cachedHome = {}; native.retainedSearch = {};
   native.clearRootTabCaches();

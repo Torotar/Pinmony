@@ -9,6 +9,7 @@ const board = { type: 'board', id: '123', url: '/sample/board/', name: 'Board', 
 const pin = id => ({ type: 'pin', id, images: { '736x': { url: 'https://i.pinimg.com/test.jpg', width: 736, height: 900 } } });
 function harness(pinIds = ['111']) {
   const requests = [], messages = [];
+  let initialBoard = true, initialFeed = true;
   const location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/sample/board/' };
   const initial = { initialReduxState: { session: { user: { id: '700' } }, boards: { 123: board },
     resources: { BoardFeedResource: { [JSON.stringify([['board_id','123'],['field_set_key','react_grid_pin']])]:
@@ -17,7 +18,19 @@ function harness(pinIds = ['111']) {
     PinmonyShareBridge: { boardState: value => messages.push(JSON.parse(value)) } }; window.top = window;
   vm.runInNewContext(script, { window, location, URL, AbortController, setTimeout, clearTimeout,
     document: { readyState: 'complete', getElementById: () => ({ textContent: JSON.stringify(initial) }) },
-    fetch: (url, init) => new Promise(resolve => requests.push({ url, init, resolve })) });
+    fetch: (url, init) => {
+      if (initialBoard && url.includes('/BoardResource/get/')) {
+        initialBoard = false;
+        return Promise.resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: board },
+          client_context: { user: { id: '700' } } }) });
+      }
+      if (initialFeed && url.includes('/BoardFeedResource/get/')) {
+        initialFeed = false;
+        return Promise.resolve({ ok: true, json: async () => ({ resource_response: { status: 'success',
+          data: pinIds.map(id => ({ ...pin(id), board: { id: '123' } })), bookmark: '-end-' } }) });
+      }
+      return new Promise(resolve => requests.push({ url, init, resolve }));
+    } });
   const state = () => messages.at(-1);
   const act = (action, value) => window.PinmonyBoardApi.flow(state().session, state().pageKey, JSON.stringify({ action, value }));
   const respond = async (index, data, endpoint, code = 0) => {
@@ -36,8 +49,8 @@ async function main() {
     const job = { id: 'test', epoch: 1, page: context.page, url: 'https://www.pinterest.com/resource/BoardResource/update/',
       method: 'POST', headers: {}, body: '' };
     assert.equal(exports.acceptsNetworkJob(job,context), true, 'board editing admitted by native transport');
-    assert.equal(exports.acceptsNetworkJob({...job, url: job.url.replace('update','delete')}, context), false,
-      'unrequested board deletion stays excluded');
+    assert.equal(exports.acceptsNetworkJob({...job, url: job.url.replace('update','delete')}, context), true,
+      'confirmed board deletion admitted by native transport');
     assert.equal(exports.acceptsNetworkJob({...job,method:'GET'},context), false);
   }
   const h = harness(); await flush(); assert.equal(h.state().editable, true);

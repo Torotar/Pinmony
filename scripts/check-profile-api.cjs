@@ -26,6 +26,12 @@ function harness() {
   return { window, requests, read, respond, invalidate: () => { current = false; }, updates: () => updates };
 }
 async function main() {
+  const testing = harness();
+  testing.window.PinmonySpeculativeReadsEnabled = false;
+  testing.read();
+  assert.equal(testing.window.PinmonyProfileApi.prefetchSaved('https://www.pinterest.com/sample/', 'saved', () => true), false);
+  assert.equal(testing.requests.length, 1, 'debug mode keeps required profile read but skips saved prefetch');
+  testing.invalidate();
   const user = { type: 'user', username: 'sample', full_name: 'Sample', follower_count: 0,
     following_count: 12, image_large_url: 'https://i.pinimg.com/avatar.jpg' };
   const h = harness();

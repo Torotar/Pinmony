@@ -296,6 +296,8 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
       }
       if (websiteFilters === null && !filterReplay && window.PinmonySearchApi && window.PinmonySearchApi.context) {
         var resultContext = window.PinmonySearchApi.context();
+        if ((!resultContext.bookmark || resultContext.bookmark === '-end-') && resultContext.filterBookmark)
+          resultContext.bookmark = resultContext.filterBookmark;
         if (resultContext.page === page && resultContext.bookmark && resultContext.bookmark !== '-end-' &&
             cursor !== resultContext.bookmark) {
           invalidateFilters(); cursor = resultContext.bookmark;

@@ -4,7 +4,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname)) return;
   var key = '', generation = 0, abort = null, busy = false, attempted = false;
-  var results = [], categories = [], bookmark = '', ended = false, error = '', active = false;
+  var results = [], categories = [], bookmark = '', filterBookmark = '', ended = false, error = '', active = false;
   var changed = function () {}, current = function () { return false; };
   var suspendedPage = '';
   var capturedOptions = null, observedVersion = 0, waitingSince = 0;
@@ -13,7 +13,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
     generation++;
     if (abort) abort.abort();
     key = ''; abort = null; busy = false; attempted = false;
-    results = []; categories = []; bookmark = ''; ended = false; error = ''; active = false;
+    results = []; categories = []; bookmark = ''; filterBookmark = ''; ended = false; error = ''; active = false;
     capturedOptions = null; observedVersion = 0; waitingSince = 0;
     needsObserved = false;
   }
@@ -127,6 +127,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
         if (!merged.some(function (saved) { return saved.id === item.id; })) merged.push(item);
       });
       results = merged; bookmark = next; active = true;
+      if (next && next !== '-end-') filterBookmark = next;
       ended = !next || next === '-end-' || (append && previous === next) || !items.length;
     } catch (_) {
       if (token !== generation || key !== requestedKey || !current()) return;
@@ -140,7 +141,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
     }
   }
   window.PinmonySearchApi = {
-    context: function () { return { page: key, bookmark: bookmark }; },
+    context: function () { return { page: key, bookmark: bookmark, filterBookmark: filterBookmark }; },
     reset: reset,
     pause: function () {
       generation++; if (abort) abort.abort(); abort = null; busy = false;
@@ -169,6 +170,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
             categories = mapGuides(observed.resource.data, page);
             results = incoming; active = true; error = ''; capturedOptions = observed.options;
             bookmark = typeof observed.resource.bookmark === 'string' ? observed.resource.bookmark : '';
+            if (bookmark && bookmark !== '-end-') filterBookmark = bookmark;
             ended = !bookmark || bookmark === '-end-' || !items.length;
           }
         }
@@ -200,7 +202,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
       if (!attempted || (needsObserved && !capturedOptions)) return false;
       generation++;
       if (abort) abort.abort();
-      abort = null; busy = false; results = []; active = false; bookmark = ''; ended = false;
+      abort = null; busy = false; results = []; active = false; bookmark = ''; filterBookmark = ''; ended = false;
       request(false); return true;
     }
   };

@@ -4,6 +4,7 @@
   "description": "Pinmony feature_profile",
   "main": "Index.ets",
   "dependencies": {
+    "common_foundation": "file:../common_foundation",
     "common_ui": "file:../common_ui"
   }
 }

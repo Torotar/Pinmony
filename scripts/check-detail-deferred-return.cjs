@@ -39,6 +39,16 @@ async function main() {
     controller: { runJavaScript: async value => { calls.push(value); return 'true'; },
       loadUrl: value => { throw Error('cached return attempted navigation: ' + value); } },
     traceAction() {}, rejectOfflineAction: () => false, showMessage() {} });
+  require('./return-coordinator-harness.cjs').bind(native, ts);
+  const { PinmonyDetailController } = compile('feature_pin/src/main/ets/controllers/PinmonyDetailController.ets', () => ({}), { setTimeout });
+  native.detailController = new PinmonyDetailController({
+    store: native.pinStore, postApiEnabled: () => true, postExtensionsEnabled: () => true,
+    isAuthenticated: () => native.authStatus === 'authenticated', isForeground: () => native.pinStore.videoForeground,
+    isOffline: value => native.rejectOfflineAction(value), currentPinUrl: () => native.currentPinUrl(),
+    pinIdentity: value => native.pinIdentity(value), beginDetailOpening: value => native.beginDetailOpening(value),
+    loadDetailUrl: value => native.controller.loadUrl(value), runScript: value => native.controller.runJavaScript(value),
+    markJourney: value => marks.push(value), traceAction() {}, showMessage() {}
+  });
   assert.equal(native.backOnePage('', pin), true);
   assert.equal(native.pinStore.detailPresentationOnly, true);
   assert.equal(native.pinStore.detailActionsReady, false);

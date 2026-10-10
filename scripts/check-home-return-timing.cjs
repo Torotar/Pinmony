@@ -27,6 +27,7 @@ function harness(result = 'true') {
       runJavaScript: async () => result, loadUrl: url => events.push('load:' + url) },
     recordPageNavigation(url) { pageHistory.visit(url, 'load'); this.nativeBackTarget = ''; },
     syncAuthentication() { events.push('auth'); }, showMessage(message) { events.push('notice'); } });
+  require('./return-coordinator-harness.cjs').bind(native, ts, { setTimeout: fn => timers.push(fn), clearTimeout() {} });
   return { native, events };
 }
 async function main() {
@@ -99,7 +100,8 @@ async function main() {
     const end = rest.slice(1).search(/\n  (?:private |@Builder)/) + 1;
     return rest.slice(0, end);
   }).join('\n');
-  const pageCtx = { setTimeout: callback => callback() };
+  const allowsSpeculativeReads = () => true;
+  const pageCtx = { allowsSpeculativeReads, setTimeout: callback => callback() };
   vm.runInNewContext(ts.transpile('class Feed { ' + pageMethods + '} globalThis.Feed = Feed;', { target: ts.ScriptTarget.ES2020 }), pageCtx);
   const feed = new pageCtx.Feed(), ranges = [];
   Object.assign(feed, { activeSession: 1, activePageKey: home, activeTab: 'all', visibleFirst: 10, visibleLast: 15,

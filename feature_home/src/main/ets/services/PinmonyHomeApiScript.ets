@@ -263,6 +263,7 @@ export const PIN_HOME_API_SCRIPT: string = `
     pause: pause,
     isActive: function () { return active && current(); },
     refresh: function () {
+      if (busy && refreshing) return false;
       if (!key || !current()) return retrySavedTabs();
       generation++;
       if (abort) abort.abort();

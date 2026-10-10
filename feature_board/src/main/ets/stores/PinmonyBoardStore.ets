@@ -1,7 +1,10 @@
 import { PinmonyBoardDetail } from '../models/PinmonyBoardDetail';
+import { PinmonyBoardCollaborators } from '../models/PinmonyBoardCollaborators';
 
 @Observed
 export class PinmonyBoardStore {
+  collaborators: PinmonyBoardCollaborators | undefined = undefined;
+  collaboratorsToken: number = 0;
   onNavigationChange: (() => void) | undefined = undefined;
   boardDetail: PinmonyBoardDetail | undefined = undefined;
   presentationPage: string = '';

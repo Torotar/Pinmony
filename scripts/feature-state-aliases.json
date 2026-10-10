@@ -1,4 +1,16 @@
 {
+  "profilePublishPreparing": {
+    "store": "profileStore",
+    "field": "publishPreparing"
+  },
+  "boardCollaborators": {
+    "store": "boardStore",
+    "field": "collaborators"
+  },
+  "boardCollaboratorsToken": {
+    "store": "boardStore",
+    "field": "collaboratorsToken"
+  },
   "confirmedSaves": {
     "store": "pinStore",
     "field": "confirmedSaves"
@@ -554,5 +566,37 @@
   "publishRequestToken": {
     "store": "profileStore",
     "field": "publishRequestToken"
+  },
+  "boardInvitations": {
+    "store": "inboxStore",
+    "field": "boardInvitations"
+  },
+  "boardInvitationPreview": {
+    "store": "inboxStore",
+    "field": "boardInvitationPreview"
+  },
+  "invitationBannerVisible": {
+    "store": "inboxStore",
+    "field": "invitationBannerVisible"
+  },
+  "invitationAllVisible": {
+    "store": "inboxStore",
+    "field": "invitationAllVisible"
+  },
+  "invitationBusy": {
+    "store": "inboxStore",
+    "field": "invitationBusy"
+  },
+  "joinedBoardAvatar": {
+    "store": "inboxStore",
+    "field": "joinedBoardAvatar"
+  },
+  "boardInvitationToken": {
+    "store": "inboxStore",
+    "field": "boardInvitationToken"
+  },
+  "invitationReadPage": {
+    "store": "inboxStore",
+    "field": "invitationReadPage"
   }
 }

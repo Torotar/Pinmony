@@ -2,6 +2,7 @@ import { rcp } from '@kit.RemoteCommunicationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { PinmonySessionCredentials } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyRequestPolicy, PinmonyRequestPermit } from './PinmonyRequestPolicy';
 
 export interface PinmonyNetworkContext {
   authenticated: boolean;
@@ -264,6 +265,7 @@ export class NetworkManager {
   private preconnectState: string = 'idle';
   private preconnectStartedAt: number = 0;
   private readonly scheduler: RequestScheduler = new RequestScheduler(8);
+  private readonly requestPolicy: PinmonyRequestPolicy = new PinmonyRequestPolicy();
 
   private constructor() {}
 
@@ -326,6 +328,27 @@ export class NetworkManager {
   static async requestWithRetry(session: rcp.Session, request: rcp.Request,
     maxRetries: number = 2, baseDelay: number = 300,
     onRetry?: (attempt: number, status: number) => void,
+    shouldContinue?: () => boolean, speculative: boolean = false): Promise<rcp.Response> {
+    if (shouldContinue && !shouldContinue()) throw new Error('stale');
+    const policy: PinmonyRequestPolicy = NetworkManager.instance().requestPolicy;
+    const permit = policy.acquire(String(request.method).toUpperCase() === 'GET', speculative);
+    if (!permit.allowed) throw new Error('rate-limited');
+    let status: number = 0;
+    try {
+      const response: rcp.Response = await NetworkManager.performRequestWithRetry(session, request,
+        maxRetries, baseDelay, permit, onRetry, shouldContinue);
+      if (shouldContinue && !shouldContinue()) throw new Error('stale');
+      status = response.statusCode;
+      return response;
+    } finally { policy.finish(permit, status); }
+  }
+
+  static requestRemainingMs(): number { return NetworkManager.instance().requestPolicy.remainingMs(); }
+  static allowsSpeculativeRequests(): boolean { return NetworkManager.instance().requestPolicy.allowsSpeculativeRequests(); }
+
+  private static async performRequestWithRetry(session: rcp.Session, request: rcp.Request,
+    maxRetries: number, baseDelay: number, permit: PinmonyRequestPermit,
+    onRetry?: (attempt: number, status: number) => void,
     shouldContinue?: () => boolean): Promise<rcp.Response> {
     const retries: number = Math.max(0, Math.floor(maxRetries));
     const delayBase: number = Math.max(0, baseDelay);
@@ -336,10 +359,15 @@ export class NetworkManager {
     let attempt: number = 0;
     while (true) {
       try {
+        if (shouldContinue && !shouldContinue()) throw new Error('stale');
+        if (!manager.requestPolicy.canSend(permit)) throw new Error('rate-limited');
         const response: rcp.Response = await session.fetch(request);
         const method: string = String(request.method).toUpperCase();
-        const transientStatus: boolean = response.statusCode === 429 ||
-          (response.statusCode >= 500 && response.statusCode <= 599);
+        if (response.statusCode === 429) {
+          manager.requestPolicy.rateLimited(response.headers || {});
+          return response;
+        }
+        const transientStatus: boolean = response.statusCode >= 500 && response.statusCode <= 599;
         if (!transientStatus) return response;
         if (method !== 'GET') {
           PinmonyRuntimeLog.info('NetworkTrace: retry-skip method=' + method +
@@ -434,6 +462,7 @@ function responseMetrics(response: rcp.Response): string {
 
 export class PinmonyNativeNetwork {
   onTransientRetry?: (resource: string, speculative: boolean) => void;
+  onRateLimited?: (remainingMs: number) => void;
   onReadTrace?: (id: string, resource: string, event: string, duration: number, attempt: number) => void;
   private readonly credentials: PinmonySessionCredentials = new PinmonySessionCredentials();
   private readonly jobs: Map<string, rcp.Request> = new Map<string, rcp.Request>();
@@ -624,6 +653,12 @@ export class PinmonyNativeNetwork {
       trace('rejected');
       result.error = 'request-unavailable'; return result;
     }
+    if (NetworkManager.requestRemainingMs() > 0) {
+      result.error = 'rate-limited'; result.status = 429;
+      if (this.onRateLimited && job.id.indexOf('detail_prefetch_') !== 0)
+        this.onRateLimited(NetworkManager.requestRemainingMs());
+      return result;
+    }
     this.pending.add(job.id);
     if (job.method === 'GET' || /\/resource\/[A-Za-z]+Resource\/get\//.test(job.url)) this.readJobs.add(job.id);
     this.cancelled.delete(job.id);
@@ -672,13 +707,23 @@ export class PinmonyNativeNetwork {
             traceAttempt++;
             trace('retry');
             if (this.onTransientRetry) this.onTransientRetry(requestLabel, job.id.indexOf('detail_prefetch_') === 0);
-          }, current);
+          }, current, job.id.indexOf('detail_prefetch_') === 0);
       });
       trace('http' + response.statusCode.toString());
       PinmonyRuntimeLog.info('NativeNetwork: response received, HTTP ' + response.statusCode.toString());
       PinmonyRuntimeLog.info('NetworkTrace: response ' + requestLabel + ' status=' + response.statusCode.toString() +
         ' elapsedMs=' + (Date.now() - startedAt).toString() + ' ' + responseMetrics(response));
       if (!current()) throw new Error('stale');
+      if (response.statusCode === 429) {
+        const limitCookie: string | string[] | undefined = response.headers['set-cookie'];
+        if (limitCookie) await this.credentials.update(job.url,
+          typeof limitCookie === 'string' ? [limitCookie] : limitCookie, current);
+        if (!current()) throw new Error('stale');
+        result.status = 429; result.error = 'rate-limited';
+        if (this.onRateLimited && job.id.indexOf('detail_prefetch_') !== 0)
+          this.onRateLimited(NetworkManager.requestRemainingMs());
+        return result;
+      }
       stage = 'decode-response';
       const body: string = response.toString() || '';
       const resource: RegExpMatchArray | null = job.url.match(/\/resource\/([A-Za-z]+Resource)\//);
@@ -722,7 +767,13 @@ export class PinmonyNativeNetwork {
       PinmonyRuntimeLog.warn('NetworkTrace: failed ' + requestLabel + ' elapsedMs=' + (Date.now() - startedAt).toString());
       const deadlineExpired: boolean = detailRead && Date.now() - startedAt >= 12000 &&
         this.generation === generation && !this.cancelled.has(job.id) && acceptsNetworkJob(job, context());
-      result.error = deadlineExpired ? 'timeout' : current() ? 'network-unavailable' : 'cancelled';
+      const limited: boolean = error instanceof Error && error.message === 'rate-limited';
+      result.error = !current() ? 'cancelled' : limited ? 'rate-limited' : deadlineExpired ? 'timeout' : 'network-unavailable';
+      if (result.error === 'rate-limited') {
+        result.status = 429;
+        if (this.onRateLimited && job.id.indexOf('detail_prefetch_') !== 0)
+          this.onRateLimited(NetworkManager.requestRemainingMs());
+      }
     } finally {
       if (request && this.jobs.get(job.id) === request) this.jobs.delete(job.id);
       this.pending.delete(job.id);

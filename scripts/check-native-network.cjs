@@ -34,7 +34,10 @@ const rcp = {
     sessions.push(session); return session;
   }
 };
+const policy = compiled('common_network/src/main/ets/PinmonyRequestPolicy.ets', () =>
+  ({PinmonyRuntimeLog:{info(message){runtimeLogs.push({level:'info',message});},warn(message){runtimeLogs.push({level:'warn',message});}}}));
 const { PinmonyNativeNetwork, NetworkManager, RequestScheduler, Priority, acceptsNetworkJob } = compiled('common_network/src/main/ets/PinmonyNativeNetwork.ets', name =>
+  name === './PinmonyRequestPolicy' ? policy :
   name === 'common_session' ? {PinmonySessionCredentials:Credentials} : name === 'common_foundation' ?
     {PinmonyRuntimeLog:{info(message){runtimeLogs.push({level:'info',message});},warn(message){runtimeLogs.push({level:'warn',message});}}} : {rcp});
 const {PIN_NATIVE_NETWORK_SCRIPT,useNativeTransport} = compiled('common_network/src/main/ets/PinmonyNetworkScript.ets',()=>({}));
@@ -154,7 +157,7 @@ async function main() {
       native.request(job,()=>state).then(reply=>window.PinmonyNetwork.complete(reply));
     },cancelNetwork(id){cancelled.push(id);native.cancel(id);} } };
   window.top=window;
-  vm.runInNewContext(PIN_NATIVE_NETWORK_SCRIPT,{window,location,URL,Headers,Response,Map,Promise,setTimeout,clearTimeout,console});
+  vm.runInNewContext(PIN_NATIVE_NETWORK_SCRIPT,{window,location,URL,Headers,Response,Map,Set,AbortController,Promise,setTimeout,clearTimeout,console});
   // Put an observer outside the transport, as the production auth/contract scripts do.
   let observed=0;const wrapped=window.fetch;
   window.fetch=(url,init)=>wrapped(url,init).then(async res=>{
@@ -252,16 +255,19 @@ async function main() {
   };
   const searchContext = { window, location, URL, URLSearchParams, AbortController,
     document: { cookie: '' }, setTimeout, clearTimeout, console };
-  response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ resource_response: {
-    status: 'success', bookmark: '-end-', data: [{ id: 'synthetic-topic', story_type: 'slp_search_recommendation',
+  response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ data: {
+    v3SearchTabHandlerQuery: { data: { connection: { edges: [{ node: { storyId: 'synthetic-topic', story_type: 'slp_search_recommendation',
       title: { format: '测试主题' }, action: { url: '/search/pins/?q=test' },
-      objects: [{ image_medium_url: 'https://i.pinimg.com/236x/synthetic.jpg' }] }]
+      objects: [{ imageMediumUrl: 'https://i.pinimg.com/236x/synthetic.jpg' }] } }],
+      pageInfo: { endCursor: null, hasNextPage: false } } } }
   } }) };
   vm.runInNewContext(useNativeTransport(searchSource('PinmonySearchDiscoveryApiScript')), searchContext);
   const discovery = () => window.PinmonySearchDiscoveryApi.read(state.page, () => {});
   discovery(); await until(() => discovery().active);
   assert.equal(discovery().sections[0].title, '测试主题');
-  assert(requests.some(req => req.url.includes('/resource/SearchTabResource/get/')), 'discovery reaches RCP');
+  const discoveryJob = messages.find(job => job.url.includes('/_/graphql/'));
+  assert(discoveryJob && acceptsNetworkJob(discoveryJob, state), 'discovery GraphQL reaches native admission');
+  assert(requests.some(req => req.url.includes('/_/graphql/')), 'discovery reaches RCP');
   response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ resource_response: {
     status: 'success', data: { items: [{ query: '测试联想', type: 'recent_query' }] }
   } }) };
@@ -270,7 +276,7 @@ async function main() {
   suggestions(); await until(() => suggestions().items.length > 0);
   assert.equal(suggestions().items[0].label, '测试联想');
   assert(requests.some(req => req.url.includes('/resource/AdvancedTypeaheadResource/get/')), 'typeahead reaches RCP');
-  for (const resource of ['SearchTabResource', 'AdvancedTypeaheadResource']) {
+  for (const resource of ['AdvancedTypeaheadResource']) {
     const accepted = messages.find(job => job.url.includes('/resource/' + resource + '/get/'));
     assert(accepted && acceptsNetworkJob(accepted, state), resource + ' real request is admitted');
     const rejected = [

@@ -208,6 +208,7 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     return /^https?:\\/\\//i.test(source) || /^data:image\\//i.test(source) ? source.slice(0, 2000) : '';
   }
   function pinUrl() {
+    if (profileSharePage && window.PinmonyProfilePanel) return window.PinmonyProfilePanel.shareContact(profileSharePage, requestedSession, id, function (state) { notify(state); });
     if (homeSharePin && homeSharePage === location.origin + location.pathname) return homeSharePin;
     var selected = window.PinmonySelectedPin ? window.PinmonySelectedPin() : '';
     if (/\\/pin\\/\\d+/.test(location.pathname)) return location.href;
@@ -473,7 +474,7 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     return true;
   };
   window.PinmonyNativeShareApiOpen = function (pin, profile) {
-    if (profile === true) {
+    if (profile === true || window.PinmonyBoardApi && window.PinmonyBoardApi.shareInfo(pin)) {
       if (!window.PinmonyProfilePanel || panel || opening || closing || apiSharePin || profileSharePage) return false;
       session++; var opened = session; profileSharePage = pin;
       var accepted = window.PinmonyProfilePanel.shareOpen(pin, opened, function (state) {
@@ -489,12 +490,7 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     function publish() {
       if (apiSharePin !== pin || session !== openedSession || !window.PinmonyPostApi.currentPin(pin)) return;
       var state = { kind: 'state', session: openedSession, pinUrl: pin, pinDetail: true,
-        title: '分享', sectionLabel: '发送给', options: [], actions: [
-          { id: 'api-copy', label: '复制链接', enabled: true }
-        ] };
-      ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X'].forEach(function (name) {
-        state.options.push({ id: 'api-share:' + name, label: name, enabled: true, targetUrl: '' });
-      });
+        title: '分享', sectionLabel: '发送给联系人', options: [], actions: [] };
       notify(window.PinmonyPostApi.shareSnapshot(state, publish));
     }
     publish(); return true;

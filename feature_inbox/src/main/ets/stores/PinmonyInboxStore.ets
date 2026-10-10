@@ -1,9 +1,18 @@
+import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
 import { PinmonyInboxCache } from '../services/PinmonyInboxCache';
 import { PinmonyInboxSnapshot } from '../models/PinmonyInbox';
 import { PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 
 @Observed
 export class PinmonyInboxStore {
+  boardInvitations: PinmonyBoardInvitations | undefined = undefined;
+  boardInvitationPreview: PinmonyBoardInvitation | undefined = undefined;
+  invitationBannerVisible: boolean = false;
+  invitationAllVisible: boolean = false;
+  invitationBusy: boolean = false;
+  joinedBoardAvatar: string = '';
+  boardInvitationToken: number = 0;
+  invitationReadPage: string = '';
   onNavigationChange: (() => void) | undefined = undefined;
   inboxSession: number = 0;
   private _inboxFlow: PinmonyInboxFlowSnapshot | undefined = undefined;

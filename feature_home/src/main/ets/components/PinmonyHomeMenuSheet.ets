@@ -31,6 +31,7 @@ export struct PinmonyHomeMenuSheet {
 
   build() {
     Column({ space: 16 }) {
+      if (this.menu.options.length > 0) {
       Swiper() {
         ForEach(this.sharePages(), (page: PinmonyHomeMenuOption[]) => {
           Row({ space: 8 }) {
@@ -59,32 +60,45 @@ export struct PinmonyHomeMenuSheet {
         this.shareColumns = Math.max(1, Math.min(5, Math.floor(Number(newSize.width) / 80)));
       })
       Divider().color($r('app.color.input_surface'))
+      }
       if (this.menu.loading) {
         LoadingProgress().width(28).height(28)
       } else if (this.menu.error) {
         Text(this.menu.error).fontSize(14).fontColor($r('app.color.secondary_text'))
-        Button('重试').onClick(() => { if (this.onRetry) this.onRetry(); })
+        if (!/取消收藏|收藏校验/.test(this.menu.error)) {
+          Button('重试').onClick(() => { if (this.onRetry) this.onRetry(); })
+        }
       } else {
+        Column() {
         ForEach(this.menu.actions, (option: PinmonyHomeMenuOption) => {
           Button({ type: ButtonType.Normal }) {
-            Row({ space: 12 }) {
-              Image(option.id === 'home-save' ? $r('app.media.lucide_bookmark') :
+            Row({ space: 14 }) {
+              if (option.id === 'board-menu-move') {
+                SymbolGlyph($r('sys.symbol.arrow_right'))
+                  .fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
+              } else {
+              Image(option.id === 'home-save' || option.id === 'board-menu-cancel-save' ? $r('app.media.lucide_bookmark') :
                 option.id === 'home-download' ? $r('app.media.lucide_download') :
-                option.id === 'home-see-more' ? $r('app.media.lucide_heart') : $r('app.media.lucide_eye_off'))
-                .width(22).height(22).objectFit(ImageFit.Contain)
-              Text(option.label).fontSize(16).fontColor($r('app.color.primary_text')).layoutWeight(1)
-            }.width('100%').height(48)
+                option.id === 'home-see-more' ? $r('app.media.lucide_heart') :
+                option.id === 'home-system-share' ? $r('app.media.lucide_share_2') : $r('app.media.lucide_eye_off'))
+                .width(28).height(28).objectFit(ImageFit.Contain)
+              }
+              Text(option.label).fontSize(17).fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(2)
+            }.width('100%').padding({ left: 24, right: 20, top: 14, bottom: 14 })
           }
-          .width('100%').backgroundColor(Color.Transparent)
+          .width('100%').padding(0).backgroundColor(Color.Transparent)
           .enabled(option.enabled && !this.menu.busy)
           .onClick(() => { if (this.onAction) this.onAction(option.id); })
         }, (option: PinmonyHomeMenuOption) => option.id + ':' + option.enabled.toString())
+        }.width('100%')
       }
       if (this.menu.busy) { LoadingProgress().width(24).height(24) }
       if (this.menu.feedback) {
         Text(this.menu.feedback).fontSize(13).fontColor($r('app.color.secondary_text'))
       }
-    }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 24 })
+    }.width('100%').padding({ left: this.menu.options.length > 0 ? 20 : 0,
+      right: this.menu.options.length > 0 ? 20 : 0, top: this.menu.options.length > 0 ? 16 : 0, bottom: 20 })
     .backgroundColor($r('app.color.page_background'))
   }
 }
