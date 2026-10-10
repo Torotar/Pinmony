@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
-const page = fs.readFileSync('feature_inbox/src/main/ets/components/PinWebInboxPage.ets', 'utf8');
+const page = fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxPage.ets', 'utf8');
 const root = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 function method(source, name) {
   const start = source.search(new RegExp('  (?:private )?' + name + '\\('));

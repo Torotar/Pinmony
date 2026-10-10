@@ -5,16 +5,16 @@ const sourceScript = path => Function('return `' + fs.readFileSync(path, 'utf8')
 const pin = 'https://www.pinterest.com/pin/101/';
 function harness() {
   const requests = [], location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/pin/101/', href: pin };
-  const window = { PinWebPostApiEnabled: true, PinWebPostExtensionsEnabled: true,
-    PinWebDetailApi: { raw: () => ({ id: '101', aggregated_pin_data: { id: '202' } }) } };
+  const window = { PinmonyPostApiEnabled: true, PinmonyPostExtensionsEnabled: true,
+    PinmonyDetailApi: { raw: () => ({ id: '101', aggregated_pin_data: { id: '202' } }) } };
   window.top = window;
   window.fetch = (url, options) => new Promise(resolve => requests.push({ url, options, resolve }));
   class XHR { open() {} send() {} setRequestHeader() {} addEventListener() {} }
   const context = { window, location, document: { cookie: 'csrftoken=synthetic-test', querySelectorAll: () => [] }, URL, URLSearchParams, Headers,
     XMLHttpRequest: XHR, AbortController, setTimeout, clearTimeout, fetch: (...args) => window.fetch(...args) };
-  vm.runInNewContext(sourceScript('feature_pin/src/main/ets/services/PinWebPostApiScript.ets'), context);
-  vm.runInNewContext(sourceScript('feature_pin/src/main/ets/services/PinWebPostExtensionsScript.ets'), context);
-  const api = window.PinWebPostApi;
+  vm.runInNewContext(sourceScript('feature_pin/src/main/ets/services/PinmonyPostApiScript.ets'), context);
+  vm.runInNewContext(sourceScript('feature_pin/src/main/ets/services/PinmonyPostExtensionsScript.ets'), context);
+  const api = window.PinmonyPostApi;
   const reply = async (index, data, endpoint = '') => {
     requests[index].resolve({ ok: true, json: async () => ({ client_context: { user: { id: '77' } },
       resource_response: { status: 'success', code: 0, endpoint_name: endpoint, data }, bookmark: '-end-' }) });

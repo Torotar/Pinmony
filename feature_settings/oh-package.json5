@@ -1,7 +1,7 @@
 {
   "name": "feature_settings",
   "version": "1.0.0",
-  "description": "PinWeb feature_settings",
+  "description": "Pinmony feature_settings",
   "main": "Index.ets",
   "dependencies": {
     "common_foundation": "file:../common_foundation",

@@ -1,15 +1,15 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync('feature_search/src/main/ets/services/PinWebSearchDiscoveryApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_search/src/main/ets/services/PinmonySearchDiscoveryApiScript.ets', 'utf8');
 const script = Function('return ' + source.match(/SCRIPT: string = (\x60[\s\S]*\x60);/)[1])();
 const requests = [], navigations = [];
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/search/', search: '', assign: v => navigations.push(v) };
 Object.defineProperty(location, 'href', {get: () => location.origin + location.pathname + location.search});
-const window = { PinWebSearchDiscoveryApiEnabled: true }; window.top = window;
+const window = { PinmonySearchDiscoveryApiEnabled: true }; window.top = window;
 vm.runInNewContext(script, { window, location, URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
   fetch: (url, init) => new Promise(resolve => requests.push({ url, init, resolve })) });
-const api = window.PinWebSearchDiscoveryApi;
+const api = window.PinmonySearchDiscoveryApi;
 const read = () => api.read(location.origin + location.pathname + location.search, () => {});
 const payload = (bookmark = 'next', title = '海报') => ({ resource_response: { status: 'success', bookmark, data: [
   { id: 'header', story_type: 'slp_immersive_header', title: { format: '今日灵感' }, objects: [

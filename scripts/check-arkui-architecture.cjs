@@ -6,17 +6,17 @@ const root = path.resolve(__dirname, '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const index = read('entry/src/main/ets/pages/Index.ets');
 const uiSources = [index,
-  read('feature_home/src/main/ets/components/PinWebHomePage.ets'),
-  read('feature_search/src/main/ets/components/PinWebSearchPage.ets'),
-  read('feature_pin/src/main/ets/components/PinWebDetailPage.ets'),
+  read('feature_home/src/main/ets/components/PinmonyHomePage.ets'),
+  read('feature_search/src/main/ets/components/PinmonySearchPage.ets'),
+  read('feature_pin/src/main/ets/components/PinmonyDetailPage.ets'),
   read('common_ui/src/main/ets/components/SmartImage.ets')].join('\n');
-const systemActions = read('entry/src/main/ets/app/PinWebSystemActions.ets');
+const systemActions = read('entry/src/main/ets/app/PinmonySystemActions.ets');
 const ability = read('entry/src/main/ets/entryability/EntryAbility.ets');
 const moduleConfig = read('entry/src/main/module.json5');
-const network = read('common_network/src/main/ets/PinWebNativeNetwork.ets');
+const network = read('common_network/src/main/ets/PinmonyNativeNetwork.ets');
 const image = read('common_ui/src/main/ets/components/SmartImage.ets');
-const playback = read('common_ui/src/main/ets/services/PinWebVideoPlayback.ets');
-const tasks = read('common_foundation/src/main/ets/services/PinWebTaskRegistry.ets');
+const playback = read('common_ui/src/main/ets/services/PinmonyVideoPlayback.ets');
+const tasks = read('common_foundation/src/main/ets/services/PinmonyTaskRegistry.ets');
 const architecture = read('docs/ARCHITECTURE.md');
 
 assert.match(moduleConfig, /"type":\s*"entry"/);
@@ -25,7 +25,7 @@ assert.match(index, /@Entry\s+@Component\s+struct Index/);
 assert.equal((index.match(/TabContent\(\)\s*\{/g) || []).length, 4);
 assert.match(index, /HdsTabs\(/);
 assert.match(index, /animationDuration\(0\)/);
-assert.match(index, /PinWebNavigationHistory/);
+assert.match(index, /PinmonyNavigationHistory/);
 assert.match(index, /nativeRootTabsVisible\(\)/);
 
 for (const event of ['create-start', 'window-stage-create', 'content-load-start',
@@ -38,7 +38,7 @@ for (const marker of ['avoidAreaChange', 'setWindowLayoutFullScreen', 'setWindow
   assert(ability.includes(marker), `missing window/lifecycle marker: ${marker}`);
 }
 
-for (const marker of ['@kit.ArkWeb', 'PinWebAuth', 'onPageBegin', 'onPageEnd', 'no-hide-descendants']) {
+for (const marker of ['@kit.ArkWeb', 'PinmonyAuth', 'onPageBegin', 'onPageEnd', 'no-hide-descendants']) {
   assert(index.includes(marker), `missing ArkWeb boundary marker: ${marker}`);
 }
 for (const marker of ['@kit.ShareKit', '@kit.CoreFileKit', '@kit.MediaLibraryKit', '@kit.BasicServicesKit']) {
@@ -52,10 +52,10 @@ assert.match(playback, /media\.AVPlayer/);
 assert.match(image, /FINITE_COVER_TIERS/, 'finite source tiers bound recommendation decoding');
 assert.match(image, /objectFit\(ImageFit\.Cover\)/);
 assert.match(image, /accessibilityText\(/);
-assert.match(tasks, /class PinWebTaskRegistry/);
+assert.match(tasks, /class PinmonyTaskRegistry/);
 assert.match(tasks, /invalidate\(\)/);
 assert.match(tasks, /clearAll\(\)/);
-assert.match(index, /PinWebTaskRegistry/);
+assert.match(index, /PinmonyTaskRegistry/);
 assert.match(index, /pageTasks\.invalidate\(\)/);
 assert.match(index, /pageTasks\.timeout\(/);
 assert.match(index, /tasks-invalidated pendingBefore=/);

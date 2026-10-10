@@ -5,36 +5,36 @@ const ts = require(process.argv[2] || 'typescript');
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const start = index.indexOf('  private tryRestoreAuthenticatedHome(');
 const end = index.indexOf('\n  private restoreHomeDiskCache(', start);
-const context = { PinWebRuntimeLog: { info() {} } };
+const context = { PinmonyRuntimeLog: { info() {} } };
 vm.runInNewContext(ts.transpileModule('class Native {' + index.slice(start, end) +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const native = new context.Native(), restores = [];
-Object.assign(native, { authStatus: 'authenticated', activeTab: 0, pinStore: {}, boardStore: {},
+Object.assign(native, { authStatus: 'authenticated', activeTab: 0, pinStore: {}, boardStore: {}, homeStore: { startupFeedCommitted: false },
   restoreHomeDiskCache: (...args) => restores.push(args) });
 native.tryRestoreAuthenticatedHome('', '/');
 assert.equal(restores.length, 0);
 native.tryRestoreAuthenticatedHome('account-a', '/');
 native.tryRestoreAuthenticatedHome('account-a', '/');
 assert.equal(restores.length, 1, 'late identity restores once per account and page');
-native.homeStartupFeedCommitted = true;
+native.homeStore.startupFeedCommitted = true;
 native.tryRestoreAuthenticatedHome('account-b', '/');
 assert.equal(restores.length, 1, 'new network content cannot be replaced by cache');
-native.homeStartupFeedCommitted = false;
+native.homeStore.startupFeedCommitted = false;
 native.activeTab = 1;
 native.tryRestoreAuthenticatedHome('account-b', '/');
 assert.equal(restores.length, 1, 'another visible root is not replaced');
-const source = fs.readFileSync('feature_profile/src/main/ets/services/PinWebProfileApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_profile/src/main/ets/services/PinmonyProfileApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function profileCase(boardsFirst) {
-  const requests = [], window = { PinWebProfileApiEnabled: true, PinWebHomeUsername: 'sample' };
+  const requests = [], window = { PinmonyProfileApiEnabled: true, PinmonyHomeUsername: 'sample' };
   window.top = window;
   const profile = 'https://www.pinterest.com/sample/';
   vm.runInNewContext(script, { window, URL, AbortController, Date,
     location: { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/sample/' },
     setTimeout: () => 1, clearTimeout() {}, console,
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) });
-  const api = window.PinWebProfileApi, changed = () => {}, current = () => true;
+  const api = window.PinmonyProfileApi, changed = () => {}, current = () => true;
   api.read(profile, changed, current);
   assert.equal(api.prefetchSaved(profile, 'saved', current), true);
   assert.equal(requests.length, 2, 'saved request starts before profile finishes');
@@ -57,7 +57,7 @@ async function profileCase(boardsFirst) {
   assert.equal(api.prefetchSaved(profile, 'saved', current), true);
   api.suspend();
   assert.equal(requests.at(-1).options.signal.aborted, true, 'leaving cancels saved preparation');
-  api.reset(); window.PinWebHomeUsername = 'someone-else'; api.read(profile, changed, current);
+  api.reset(); window.PinmonyHomeUsername = 'someone-else'; api.read(profile, changed, current);
   assert.equal(api.prefetchSaved(profile, 'saved', current), false, 'foreign profiles do not speculate');
   assert.equal(api.prefetchSaved(profile, 'created', current), false, 'created feed waits for confirmed owner');
   api.reset();

@@ -28,7 +28,7 @@ async function main() {
     assert.equal(native.rootPullKind, kind, 'bridge acknowledgement does not finish the refresh');
     await native.pullRefreshRoot(kind);
     assert.equal(requests.length, 1, 'duplicate gestures do not repeat reads');
-    assert.match(requests[0], kind === 'search' ? /PinWebSearchRefresh\(1,/ : /PinWebInboxApiRefresh/);
+    assert.match(requests[0], kind === 'search' ? /PinmonySearchRefresh\(1,/ : /PinmonyInboxApiRefresh/);
     native.finishRootPull(kind); await native.pullRefreshRoot(kind);
     const pullTimers = timers.filter(t => t.ms === 20000);
     pullTimers[0].fn(); assert.equal(native.rootPullKind, kind, 'old timeout cannot stop a newer pull');

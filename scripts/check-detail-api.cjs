@@ -2,15 +2,15 @@ const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = readSourceFileSync('entry/src/main/ets/services/PinWebDetailApiScript.ets', 'utf8');
+const source = readSourceFileSync('entry/src/main/ets/services/PinmonyDetailApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 new Function(script);
 const requests = [];
-const window = { PinWebDetailApiEnabled: true }; window.top = window;
+const window = { PinmonyDetailApiEnabled: true }; window.top = window;
 vm.runInNewContext(script, { window, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com' },
   AbortController, setTimeout, clearTimeout, console: { warn() {} },
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) });
-const api = window.PinWebDetailApi;
+const api = window.PinmonyDetailApi;
 const pin = id => ({ id, type: 'pin', title: '', images: { '474x': { url: 'https://i.pinimg.com/test.jpg', width: 474, height: 700 } } });
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function respond(index, data, bookmark = '') {
@@ -91,7 +91,7 @@ async function main() {
     assert.match(read().detailError, /暂不支持/);
     assert.equal(read().detail, null, 'Do not present a video cover as the full post'); api.reset();
   }
-  const bridgeSource = readSourceFileSync('entry/src/main/ets/services/PinWebDetailScript.ets', 'utf8');
+  const bridgeSource = readSourceFileSync('entry/src/main/ets/services/PinmonyDetailScript.ets', 'utf8');
   const bridge = Function('return `' + bridgeSource.match(/= `([\s\S]*?)`;/)[1] + '`')();
   new Function(bridge);
   const dispatch = bridge.slice(bridge.indexOf('    notify(snapshot(pin));'), bridge.indexOf('  function schedule()'));
@@ -99,10 +99,10 @@ async function main() {
   let previewLoading = true;
   let imageReady = false;
   const dispatchContext = { pin: url, schedule() {}, notify: () => phases.push('detail'), snapshot: () => ({}), window: {
-    PinWebDetailApiEnabled: true,
-    PinWebDetailApi: { raw: () => ({}), read: () => ({ imageStageReady: imageReady }),
+    PinmonyDetailApiEnabled: true,
+    PinmonyDetailApi: { raw: () => ({}), read: () => ({ imageStageReady: imageReady }),
       settleInteractions: () => phases.push('settled'), scheduleRelated: () => phases.push('related') },
-    PinWebPostApi: { previewRead: (_pin, readOnly) => { if (!readOnly) phases.push('preview'); return { loading: previewLoading }; } }
+    PinmonyPostApi: { previewRead: (_pin, readOnly) => { if (!readOnly) phases.push('preview'); return { loading: previewLoading }; } }
   } };
   vm.runInNewContext('function dispatch() {' + dispatch + '; dispatch();', dispatchContext);
   assert.deepEqual(phases, ['detail', 'preview', 'related'], 'Verified Pin starts preview and related reads before image completion');
@@ -113,7 +113,7 @@ async function main() {
   imageReady = false;
   vm.runInNewContext('dispatch();', dispatchContext);
   assert.deepEqual(phases, ['detail', 'preview', 'related', 'settled', 'related']);
-  dispatchContext.window.PinWebDetailApi.raw = () => null; phases.length = 0;
+  dispatchContext.window.PinmonyDetailApi.raw = () => null; phases.length = 0;
   vm.runInNewContext('dispatch();', dispatchContext);
   assert.deepEqual(phases, ['detail'], 'Missing or stale detail must not start secondary requests');
   const snapshotBody = bridge.match(/function apiSnapshot\(pin\) \{([\s\S]*?)\n  function snapshot\(pin\)/)[1];
@@ -121,11 +121,11 @@ async function main() {
   vm.runInNewContext('function apiSnapshot(pin) {' + snapshotBody, pendingContext);
   assert.equal(pendingContext.apiSnapshot(url).kind, 'apiPending');
   assert.equal(pendingContext.apiSnapshot(url).retryable, false);
-  assert.match(bridge, /if \(window.PinWebDetailApiEnabled === true\) return apiSnapshot\(pin\)/);
-  window.PinWebDetailApiEnabled = false;
+  assert.match(bridge, /if \(window.PinmonyDetailApiEnabled === true\) return apiSnapshot\(pin\)/);
+  window.PinmonyDetailApiEnabled = false;
   const disabled = { window, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com' } };
   vm.runInNewContext(script, disabled);
-  assert.equal(window.PinWebDetailApi.read(url), null);
+  assert.equal(window.PinmonyDetailApi.read(url), null);
   console.log('detail API mapping, pagination, stale guards, failure retry, unsupported media and no DOM fallback OK');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

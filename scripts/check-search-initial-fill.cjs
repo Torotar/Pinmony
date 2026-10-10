@@ -1,6 +1,6 @@
 const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),ts=require(process.argv[2]);
-const source=readSourceFileSync('entry/src/main/ets/components/PinWebSearchPage.ets','utf8');
+const source=readSourceFileSync('entry/src/main/ets/components/PinmonySearchPage.ets','utf8');
 const start=source.indexOf('  private fillInitialViewport():');const method=source.slice(start,source.indexOf('\n  private ',start+1)).replace('private ','');
 const pending=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText+'\nHost;',{setTimeout:f=>pending.push(f)});
 const host=new Host();host.initialFillCount=0;host.actionsReady=true;host.automaticLoadingEnabled=true;host.snapshot={pageKey:'search',query:'design',api:true,results:[{}],apiEnded:false};let count=0;host.onLoadMore=()=>count++;

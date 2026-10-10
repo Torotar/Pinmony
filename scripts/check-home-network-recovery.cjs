@@ -14,7 +14,7 @@ function method(name, lifecycle = false) {
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/';
 const timers = [];
 const context = { Date, setTimeout(fn, delay) { timers.push({ fn, delay }); },
-  PinWebRuntimeLog: { info() {}, error() {}, warn() {} }, retainHomePins: (_old, pins) => pins };
+  PinmonyRuntimeLog: { info() {}, error() {}, warn() {} }, retainHomePins: (_old, pins) => pins };
 const methods = ['isCurrentPageFailure', 'protectedDetailAddress', 'handleMainFrameFailure', 'scheduleInterruptedHomeRecovery',
   'homePresentationPageKey', 'expectHome', 'updateHome'].map(name => method(name));
 methods.push(method('onPageShow', true), method('onPageHide', true));
@@ -58,6 +58,7 @@ function harness() {
     controller: { getUrl: () => home, loadUrl(url) { loads.push(url); }, runJavaScript: async () => 'true' } });
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
+  require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
   native.nativeNetwork.setForeground = () => false;
   return { native, cached, loads, effects };
 }

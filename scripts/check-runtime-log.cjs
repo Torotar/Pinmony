@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
-const source = readSourceFileSync('entry/src/main/ets/services/PinWebRuntimeLog.ets', 'utf8').replace(/^import .*;\r?\n/gm, '').replace('export class', 'class');
+const source = readSourceFileSync('entry/src/main/ets/services/PinmonyRuntimeLog.ets', 'utf8').replace(/^import .*;\r?\n/gm, '').replace('export class', 'class');
 const files = new Map(); let destinations = []; let closes = 0;
 const io = { OpenMode: { CREATE: 1, READ_WRITE: 2, TRUNC: 4, APPEND: 8 },
   readTextSync: path => { if (!files.has(path)) throw Error('missing'); return files.get(path); },
@@ -11,7 +11,7 @@ const io = { OpenMode: { CREATE: 1, READ_WRITE: 2, TRUNC: 4, APPEND: 8 },
   openSync: (path,mode) => { if(mode & 4) files.set(path,''); return { fd: {path,mode} }; },
   writeSync: (fd, text) => files.set(fd.path, (fd.mode & 8 ? files.get(fd.path)||'' : '') + text), closeSync: () => closes++ };
 const context = { fs: io, picker: { DocumentViewPicker: class { async save() { return destinations; } } }, console: { info() {}, warn() {} }, Date };
-vm.runInNewContext(ts.transpileModule(source + '\nglobalThis.Log = PinWebRuntimeLog;', {
+vm.runInNewContext(ts.transpileModule(source + '\nglobalThis.Log = PinmonyRuntimeLog;', {
   compilerOptions: { target: ts.ScriptTarget.ES2020 }
 }).outputText, context);
 (async () => {

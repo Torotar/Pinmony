@@ -32,8 +32,8 @@ for (const line of lines) {
   }
   const legacy = line.match(/DetailTrace: (view appeared|image loaded|base ready|current actions ready|comments ready|comments failed|related ready|related failed).*openId=(\d+)/);
   const network = line.match(/NetworkTrace: (start|response|failed) (PinResource|UnifiedCommentsPreviewResource|RelatedModulesResource)\/get(?:.*elapsedMs=(\d+))?/);
-  const back = line.includes('PinWebReturn: detail destination back') ? 'back.clicked' :
-    line.includes('PinWebReturn: native destination presented') ? 'return.native.presented' :
+  const back = line.includes('PinmonyReturn: detail destination back') ? 'back.clicked' :
+    line.includes('PinmonyReturn: native destination presented') ? 'return.native.presented' :
     line.includes('StartupTrace: document begin home') ? 'return.home.document.begin' :
     line.includes('StartupTrace: home cards state committed') ? 'return.home.cards.committed' : '';
   // Old logs omit job IDs: never attribute a pre-click prefetch cancellation to

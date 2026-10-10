@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const detail = fs.readFileSync('feature_pin/src/main/ets/components/PinWebDetailPage.ets', 'utf8');
+const detail = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
 
 const rootMethod = index.match(/  private detailRootIdentity\(\): string \{([\s\S]*?)\n  \}/);
 assert(rootMethod, 'detailRootIdentity must exist');

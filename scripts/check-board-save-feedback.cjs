@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 let ts; try { ts = require('typescript'); } catch (_) { ts = require(process.argv[2]); }
-const source = fs.readFileSync('feature_board/src/main/ets/components/PinWebBoardPage.ets', 'utf8');
+const source = fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets', 'utf8');
 const start = source.indexOf('  private updateSavedFeedback('), end = source.indexOf('\n  private phase(', start);
 const code = ts.transpileModule('class View {' + source.slice(start, end) +
   ' phase() { return this.snapshot.flow.phase; } getUIContext() { return {}; }} globalThis.View = View;',

@@ -1,11 +1,11 @@
-export { PinWebStatusPage } from './src/main/ets/components/PinWebStatusPage';
-export { PinWebBoardPlaceholder } from './src/main/ets/components/PinWebBoardPlaceholder';
+export { PinmonyStatusPage } from './src/main/ets/components/PinmonyStatusPage';
+export { PinmonyBoardPlaceholder } from './src/main/ets/components/PinmonyBoardPlaceholder';
 
-export { PinWebVideo, PinWebVideoSource } from './src/main/ets/models/PinWebVideo';
-export { PinWebPlaybackState, PinWebVideoPlayback } from './src/main/ets/services/PinWebVideoPlayback';
-export { PinWebVideoCard } from './src/main/ets/components/PinWebVideoCard';
+export { PinmonyVideo, PinmonyVideoSource, PinmonyVideoFileLease, PinmonyVideoFileReader } from './src/main/ets/models/PinmonyVideo';
+export { PinmonyPlaybackState, PinmonyVideoPlayback } from './src/main/ets/services/PinmonyVideoPlayback';
+export { PinmonyVideoCard } from './src/main/ets/components/PinmonyVideoCard';
 
-export { PinWebLoadingOverlay } from './src/main/ets/components/PinWebLoadingOverlay';
+export { PinmonyLoadingOverlay } from './src/main/ets/components/PinmonyLoadingOverlay';
 export {
   SmartImage,
   getRecommendCardWidth,

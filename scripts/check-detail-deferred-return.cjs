@@ -17,7 +17,7 @@ function compile(file, deps = () => ({}), globals = {}) {
   return exports;
 }
 const host = { PINTEREST_URL: 'https://www.pinterest.com/', PIN_POST_API_ENABLED: true,
-  PIN_POST_EXTENSIONS_ENABLED: true, PinWebRuntimeLog: { info() {}, warn() {} },
+  PIN_POST_EXTENSIONS_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {} },
   setTimeout, isPinterestAuthRoute: () => false };
 vm.runInNewContext(ts.transpileModule(`class Native {
   ${method('backOnePage')}
@@ -34,7 +34,7 @@ async function main() {
     nativeNetwork: { invalidate() {} }, pageBackToken: 0,
     detailReturnJourney: { mark: value => marks.push(value) }, detailJourney: { mark: value => marks.push(value) },
     pinIdentity: value => String(value || '').match(/\/pin\/(\d+)/)?.[1] || '',
-    restoreRetainedSearch() {}, searchUrlFromAddress: () => '',
+    restoreRetainedSearch() {}, searchUrlFromAddress: () => '', boardUrlFromAddress: () => '',
     presentNativeBackTarget(target) { this.nativeBackTarget = target; this.pinStore.detail = cached; },
     controller: { runJavaScript: async value => { calls.push(value); return 'true'; },
       loadUrl: value => { throw Error('cached return attempted navigation: ' + value); } },
@@ -44,7 +44,7 @@ async function main() {
   assert.equal(native.pinStore.detailActionsReady, false);
   assert.equal(native.nativeBackTarget, '');
   assert(marks.includes('return.cache.presentation.only'));
-  assert(calls.every(value => value.includes('PinWebDetailPause')), 'return only pauses the departed document');
+  assert(calls.every(value => value.includes('PinmonyDetailPause')), 'return only pauses the departed document');
 
   native.beginDetailOpening = value => {
     native.pinStore.detailPresentationOnly = false; native.pinStore.detailOpeningToken++;
@@ -89,7 +89,7 @@ async function main() {
   assert.equal(loads, 2, 'root return loads exactly one explicit native destination');
   assert(marks.includes('return.native.route.direct'));
 
-  const { readRelatedPresentation } = compile('feature_pin/src/main/ets/services/PinWebRelatedPresentation.ets');
+  const { readRelatedPresentation } = compile('feature_pin/src/main/ets/services/PinmonyRelatedPresentation.ets');
   const body = JSON.stringify({ resource_response: { status: 'success', data: [
     { type: 'pin', id: '102', title: 'A', images: { '474x': { url: 'https://i.pinimg.com/2.jpg', width: 474, height: 900 } } },
     { type: 'advertisement', id: '103', images: {} }
@@ -99,8 +99,8 @@ async function main() {
   assert.equal(related.ended, false);
   assert.equal(readRelatedPresentation('{"resource_response":{"status":"failure","data":[]}}', pin), undefined);
   assert.equal(readRelatedPresentation(body, 'https://example.com/pin/101/'), undefined);
-  const { PinWebDetailCache } = compile('feature_pin/src/main/ets/services/PinWebDetailCache.ets', undefined, { Date });
-  const cache = new PinWebDetailCache();
+  const { PinmonyDetailCache } = compile('feature_pin/src/main/ets/services/PinmonyDetailCache.ets', undefined, { Date });
+  const cache = new PinmonyDetailCache();
   cache.put('101', { ...fresh, title: 'A', related: [], description: '', creator: '', creatorAvatar: '', sourceLabel: '' }, 42);
   const entry = cache.get('101');
   assert(entry.expiresAt - Date.now() > 290000);

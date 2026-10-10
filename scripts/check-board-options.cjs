@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync('feature_board/src/main/ets/services/PinWebBoardApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_board/src/main/ets/services/PinmonyBoardApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const board = { type: 'board', id: '123', url: '/sample/board/', name: 'Board', pin_count: 1,
@@ -13,13 +13,13 @@ function harness(pinIds = ['111']) {
   const initial = { initialReduxState: { session: { user: { id: '700' } }, boards: { 123: board },
     resources: { BoardFeedResource: { [JSON.stringify([['board_id','123'],['field_set_key','react_grid_pin']])]:
       { fetching: false, data: pinIds.map(id => ({ ...pin(id), board: { id: '123' } })), nextBookmark: '-end-' } } } } };
-  const window = { PinWebBoardApiEnabled: true, addEventListener() {}, setInterval() {},
-    PinWebShareBridge: { boardState: value => messages.push(JSON.parse(value)) } }; window.top = window;
+  const window = { PinmonyBoardApiEnabled: true, addEventListener() {}, setInterval() {},
+    PinmonyShareBridge: { boardState: value => messages.push(JSON.parse(value)) } }; window.top = window;
   vm.runInNewContext(script, { window, location, URL, AbortController, setTimeout, clearTimeout,
     document: { readyState: 'complete', getElementById: () => ({ textContent: JSON.stringify(initial) }) },
     fetch: (url, init) => new Promise(resolve => requests.push({ url, init, resolve })) });
   const state = () => messages.at(-1);
-  const act = (action, value) => window.PinWebBoardApi.flow(state().session, state().pageKey, JSON.stringify({ action, value }));
+  const act = (action, value) => window.PinmonyBoardApi.flow(state().session, state().pageKey, JSON.stringify({ action, value }));
   const respond = async (index, data, endpoint, code = 0) => {
     requests[index].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data,
       code, endpoint_name: endpoint }, client_context: { user: { id: '700' } } }) }); await flush();
@@ -29,7 +29,7 @@ function harness(pinIds = ['111']) {
 async function main() {
   if (process.argv[2]) {
     const ts = require(process.argv[2]), exports = {};
-    vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_network/src/main/ets/PinWebNativeNetwork.ets','utf8'),
+    vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets','utf8'),
       { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText,
       { exports, require: () => ({}) });
     const context = { authenticated: true, epoch: 1, page: 'https://www.pinterest.com/sample/board/', userAgent: '' };
@@ -84,7 +84,7 @@ async function main() {
   failedDelete.act('delete'); assert.equal(failedDelete.requests.length, 2, 'unknown deletion cannot replay');
   const stale = harness(); await flush(); stale.act('ideas'); stale.act('close');
   await stale.respond(0, [pin('444')]); assert.equal(stale.state().flow.phase, ''); assert.equal(stale.state().flow.pins.length, 0);
-  assert.equal(stale.window.PinWebBoardApi.flow(-1, stale.state().pageKey, '{"action":"archive"}'), false);
+  assert.equal(stale.window.PinmonyBoardApi.flow(-1, stale.state().pageKey, '{"action":"archive"}'), false);
   for (const ids of [['111'], ['111','112','113']]) {
     const moving = harness(ids); await flush(); moving.act('select');
     assert.equal(moving.act('targets', ['999']), false, 'unknown selection rejected');

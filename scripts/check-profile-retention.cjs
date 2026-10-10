@@ -5,16 +5,16 @@ const vm = require('node:vm');
 let ts;
 try { ts = require('typescript'); } catch (_) { ts = require(process.argv[2]); }
 const root = 'entry/src/main/ets/';
-const source = readSourceFileSync(root + 'services/PinWebProfileApiScript.ets', 'utf8');
+const source = readSourceFileSync(root + 'services/PinmonyProfileApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function main() {
-  const window = { PinWebProfileApiEnabled: true }; window.top = window;
+  const window = { PinmonyProfileApiEnabled: true }; window.top = window;
   const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/sample/' };
   const requests = [];
   vm.runInNewContext(script, { window, location, URL, AbortController, setTimeout, clearTimeout, console,
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) });
-  const api = window.PinWebProfileApi, profile = location.origin + '/sample/';
+  const api = window.PinmonyProfileApi, profile = location.origin + '/sample/';
   const current = () => location.pathname === '/sample/';
   const respond = async (index, data, bookmark = '') => {
     requests[index].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data, bookmark } }) });
@@ -52,8 +52,8 @@ async function main() {
   api.reset();
   await respond(4, { type: 'user', username: 'sample' });
 
-  const cacheSource = readSourceFileSync(root + 'services/PinWebProfileCache.ets', 'utf8').replace(/^import .*;\r?\n/m, '');
-  const cacheCode = ts.transpileModule(cacheSource.replace(/export /g, '') + '\nglobalThis.Cache = PinWebProfileCache;',
+  const cacheSource = readSourceFileSync(root + 'services/PinmonyProfileCache.ets', 'utf8').replace(/^import .*;\r?\n/m, '');
+  const cacheCode = ts.transpileModule(cacheSource.replace(/export /g, '') + '\nglobalThis.Cache = PinmonyProfileCache;',
     { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
   const context = {}; vm.runInNewContext(cacheCode, context);
   const cache = new context.Cache();

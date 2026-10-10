@@ -10,12 +10,12 @@ function script(file) {
 const pin = 'https://www.pinterest.com/pin/101/';
 async function main() {
   const jobs = [], cancels = [], location = new URL(pin);
-  const window = { addEventListener() {}, fetch() {}, PinWebNativeNetworkEnabled: true,
-    PinWebShareBridge: { networkRequest: raw => jobs.push(JSON.parse(raw)), cancelNetwork: id => cancels.push(id) } };
+  const window = { addEventListener() {}, fetch() {}, PinmonyNativeNetworkEnabled: true,
+    PinmonyShareBridge: { networkRequest: raw => jobs.push(JSON.parse(raw)), cancelNetwork: id => cancels.push(id) } };
   window.top = window;
-  vm.runInNewContext(script('common_network/src/main/ets/PinWebNetworkScript.ets'), {
+  vm.runInNewContext(script('common_network/src/main/ets/PinmonyNetworkScript.ets'), {
     window, location, URL, Headers, Response, Map, Promise, console, setTimeout() { return 1; }, clearTimeout() {} });
-  const transport = window.PinWebNetwork;
+  const transport = window.PinmonyNetwork;
   transport.bind(1, pin);
   const oldRead = transport.fetch('/resource/PinResource/get/').catch(error => error);
   const write = transport.fetch('/resource/RepinResource/create/', { method: 'POST', body: 'synthetic' });
@@ -30,14 +30,14 @@ async function main() {
   assert.equal(jobs[2].epoch, 2);
   transport.complete({ ...jobs[2], status: 200, headers: {}, body: '{}' }); await freshRead;
 
-  const requests = [], apiTimers = [], apiWindow = { PinWebDetailApiEnabled: true };
+  const requests = [], apiTimers = [], apiWindow = { PinmonyDetailApiEnabled: true };
   apiWindow.top = apiWindow;
   const fetch = (url, init) => new Promise((resolve, reject) => requests.push({ url, init, resolve, reject }));
   apiWindow.fetch = fetch;
-  vm.runInNewContext(script('feature_pin/src/main/ets/services/PinWebDetailApiScript.ets'), {
+  vm.runInNewContext(script('feature_pin/src/main/ets/services/PinmonyDetailApiScript.ets'), {
     window: apiWindow, location: new URL(pin), URL, AbortController, fetch, console: { warn() {} },
     setTimeout(fn, delay) { apiTimers.push({ fn, delay }); return apiTimers.length; }, clearTimeout() {} });
-  const api = apiWindow.PinWebDetailApi;
+  const api = apiWindow.PinmonyDetailApi;
   api.read(pin, () => {}, () => true);
   requests[0].reject(cancelled); await flush();
   apiTimers.findLast(timer => timer.delay === 0).fn(); await flush();
@@ -48,79 +48,75 @@ async function main() {
   requests[2].reject(Object.assign(new Error('timeout'), { name: 'AbortError' })); await flush();
   assert.equal(apiTimers.filter(timer => timer.delay === 0).length, 1, 'ordinary timeout/cancellation does not auto replay the Pin read');
 
-  const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-  function method(name) {
-    const begin = source.indexOf('  private ' + name);
-    return source.slice(begin, source.indexOf('\n  private ', begin + 1));
+  const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailDocumentBinding.ets', 'utf8');
+  const compiled = {};
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: {
+    target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS
+  } }).outputText, { exports: compiled, require: () => ({}) });
+  const PinmonyDetailDocumentBinding = compiled.PinmonyDetailDocumentBinding;
+  function makeHarness(overrides = {}) {
+    const state = { detailPin: pin, detailOpeningPin: pin, detailOpeningToken: 7, videoForeground: true,
+      authenticated: true, page: pin, epoch: 1, rootTabGuardTarget: -1, result: 'true', ...overrides };
+    const calls = [], timers = [], marks = [];
+    const ports = { enabled: () => true, expectedPin: () => state.detailOpeningPin, detailPin: () => state.detailPin,
+      pinIdentity: value => value.match(/\/pin\/(\d+)/)?.[1] || '', detailPresentationOnly: () => !!state.detailPresentationOnly,
+      actionsReady: () => !!state.detailActionsReady, openingToken: () => state.detailOpeningToken,
+      isAuthenticated: () => state.authenticated, isForeground: () => state.videoForeground,
+      hasNativeBackTarget: () => !!state.nativeBackTarget, nativeRootOnly: () => !!state.nativeRootOnly,
+      rootTabGuardTarget: () => state.rootTabGuardTarget, detailReturnedToRoot: () => !!state.detailReturnedToRoot,
+      businessSuspended: () => !!state.businessSuspended,
+      networkContext: () => ({ page: state.page, epoch: state.epoch, authenticated: state.authenticated }),
+      runJavaScript: async value => { calls.push(value); if (state.throwSync) throw new Error('controller not ready'); return state.result; },
+      schedule: (fn, delay) => { timers.push({ fn, delay }); return timers.length; }, cancel: () => {},
+      markJourney: event => marks.push(event), warn: () => {}
+    };
+    return { state, calls, timers, marks, service: new PinmonyDetailDocumentBinding(ports) };
   }
-  const host = { PIN_NATIVE_NETWORK_ENABLED: true, PinWebRuntimeLog: { warn() {} } };
-  vm.runInNewContext(ts.transpileModule(`class Native {
-    ${method('bindCurrentDetailDocument')}
-    ${method('probeDetailDocument')}
-    ${method('refreshDetailDocumentBinding')}
-  } globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, host);
-  const n = new host.Native(), calls = [], timers = [];
-  let epoch = 1;
-  Object.assign(n, { pinStore: { detailPin: pin, detailOpeningPin: pin, detailOpeningToken: 7, videoForeground: true },
-    pinIdentity: value => value.match(/\/pin\/(\d+)/)?.[1] || '', rootTabGuardTarget: -1,
-    nativeNetworkContext: () => ({ page: pin, epoch, authenticated: true }),
-    controller: { runJavaScript: async value => { calls.push(value); return 'true'; } },
-    pageTasks: { timeout: fn => timers.push(fn) }, detailJourney: { mark() {} } });
-  n.bindCurrentDetailDocument(pin); n.bindCurrentDetailDocument(pin); await flush();
-  assert.equal(calls.length, 1, 'same document binding is deduplicated');
-  epoch = 2; n.bindCurrentDetailDocument(pin); await flush();
-  assert.equal(calls.length, 2, 'new epoch creates a current binding');
-  timers[0](); await flush(); assert.equal(calls.length, 2, 'old binding callback cannot refresh a new epoch');
-  n.pinStore.detailActionsReady = true; timers[1](); await flush();
-  assert.equal(calls.length, 2, 'confirmed snapshot stops scheduled refreshes');
-  epoch = 3; n.pinStore.detailActionsReady = false; n.bindCurrentDetailDocument(pin); await flush();
-  for (let index = 2; index < timers.length; index++) { timers[index](); await flush(); }
-  assert.equal(calls.length, 6, 'snapshot refresh has exactly three bounded follow-ups');
-  n.pinStore.detailPresentationOnly = true; epoch = 4; n.bindCurrentDetailDocument(pin);
-  assert.equal(calls.length, 6, 'cached return never binds a hidden document');
+  const first = makeHarness();
+  first.service.bindCurrentDetailDocument(pin); first.service.bindCurrentDetailDocument(pin); await flush();
+  assert.equal(first.calls.length, 1, 'same document binding is deduplicated');
+  first.state.epoch = 2; first.service.bindCurrentDetailDocument(pin); await flush();
+  assert.equal(first.calls.length, 2, 'new epoch creates a current binding');
+  first.timers[0].fn(); await flush(); assert.equal(first.calls.length, 2, 'old binding callback cannot refresh a new epoch');
+  first.state.detailActionsReady = true; first.timers[1].fn(); await flush();
+  assert.equal(first.calls.length, 2, 'confirmed snapshot stops scheduled refreshes');
+  first.state.epoch = 3; first.state.detailActionsReady = false; first.service.bindCurrentDetailDocument(pin); await flush();
+  for (let index = 2; index < first.timers.length; index++) { first.timers[index].fn(); await flush(); }
+  assert.equal(first.calls.length, 6, 'snapshot refresh has exactly three bounded follow-ups');
+  first.state.detailPresentationOnly = true; first.state.epoch = 4; first.service.bindCurrentDetailDocument(pin);
+  assert.equal(first.calls.length, 6, 'cached return never binds a hidden document');
 
-  const probe = new host.Native(), probeTimers = [], probeCalls = [], probeMarks = [];
-  let currentPage = 'https://www.pinterest.com/';
-  Object.assign(probe, { pinStore: { detailPin: pin, detailOpeningPin: pin, detailOpeningToken: 9, videoForeground: true },
-    authStatus: 'authenticated', rootTabGuardTarget: -1, pinIdentity: n.pinIdentity,
-    nativeNetworkContext: () => ({ page: currentPage, epoch: 4, authenticated: true }),
-    controller: { runJavaScript: async value => { probeCalls.push(value); return 'true'; } },
-    pageTasks: { timeout(fn, delay) { probeTimers.push({ fn, delay }); return probeTimers.length; } },
-    detailJourney: { mark: event => probeMarks.push(event) } });
-  probe.probeDetailDocument(pin, 9, 0);
-  assert.equal(probeCalls.length, 0, 'source document cannot bind the target Pin');
-  assert.equal(probeTimers[0].delay, 200);
-  currentPage = pin; probeTimers[0].fn(); await flush();
-  assert.equal(probeCalls.length, 1, 'target binds without waiting for page-end when exact location is available');
-  probe.pinStore.detailActionsReady = true;
-  const previousTimerCount = probeTimers.length;
-  probe.probeDetailDocument(pin, 9, 2);
-  assert.equal(probeTimers.length, previousTimerCount, 'current snapshot stops probing');
-  probe.pinStore.detailActionsReady = false; probe.pinStore.detailPresentationOnly = true;
-  probe.probeDetailDocument(pin, 9, 3);
-  assert.equal(probeTimers.length, previousTimerCount, 'cached return never starts synchronization');
-  probe.pinStore.detailPresentationOnly = false; probe.businessSuspended = true;
-  probe.probeDetailDocument(pin, 9, 3);
-  assert.equal(probeTimers.length, previousTimerCount, 'background cannot probe');
-  probe.businessSuspended = false;
-  probe.probeDetailDocument(pin, 8, 3);
-  assert.equal(probeTimers.length, previousTimerCount, 'stale opening cannot probe');
-  probe.probeDetailDocument(pin, 9, 60);
-  assert(probeMarks.includes('document.transport.wait.timeout'));
-  assert.equal(probeTimers.length, previousTimerCount, 'probe deadline is bounded without reloading a route');
+  const probe = makeHarness({ detailOpeningToken: 9, page: 'https://www.pinterest.com/' });
+  probe.service.probeDetailDocument(pin, 9, 0);
+  assert.equal(probe.calls.length, 0, 'source document cannot bind the target Pin');
+  assert.equal(probe.timers[0].delay, 200);
+  probe.state.page = pin; probe.timers[0].fn(); await flush();
+  assert.equal(probe.calls.length, 1, 'target binds without waiting for page-end when exact location is available');
+  probe.state.detailActionsReady = true;
+  const previousTimerCount = probe.timers.length;
+  probe.service.probeDetailDocument(pin, 9, 2);
+  assert.equal(probe.timers.length, previousTimerCount, 'current snapshot stops probing');
+  probe.state.detailActionsReady = false; probe.state.detailPresentationOnly = true;
+  probe.service.probeDetailDocument(pin, 9, 3);
+  assert.equal(probe.timers.length, previousTimerCount, 'cached return never starts synchronization');
+  probe.state.detailPresentationOnly = false; probe.state.businessSuspended = true;
+  probe.service.probeDetailDocument(pin, 9, 3);
+  assert.equal(probe.timers.length, previousTimerCount, 'background cannot probe');
+  probe.state.businessSuspended = false; probe.service.probeDetailDocument(pin, 8, 3);
+  assert.equal(probe.timers.length, previousTimerCount, 'stale opening cannot probe');
+  probe.service.probeDetailDocument(pin, 9, 60);
+  assert(probe.marks.includes('document.transport.wait.timeout'));
+  assert.equal(probe.timers.length, previousTimerCount, 'probe deadline is bounded without reloading a route');
 
-  probe.detailDocumentBinding = ''; probe.controller.runJavaScript = async () => 'false';
-  probe.bindCurrentDetailDocument(pin); await flush();
-  for (let i = previousTimerCount; i < probeTimers.length; i++) { probeTimers[i].fn(); await flush(); }
-  assert.equal(probe.detailDocumentBinding, '', 'unavailable JS document does not permanently deduplicate later ready events');
-  probe.controller.runJavaScript = async value => { probeCalls.push(value); return 'true'; };
-  probe.bindCurrentDetailDocument(pin); await flush();
-  assert.equal(probeCalls.length, 2, 'a later valid ready event can bind after earlier exhaustion');
-  probe.detailDocumentBinding = ''; probe.controller.runJavaScript = () => { throw new Error('controller not ready'); };
-  assert.doesNotThrow(() => probe.bindCurrentDetailDocument(pin), 'synchronous Web controller failures are handled');
-  const synchronousRetryCount = probeTimers.length;
-  for (let i = synchronousRetryCount - 1; i < probeTimers.length; i++) { probeTimers[i].fn(); await flush(); }
-  assert.equal(probe.detailDocumentBinding, '', 'synchronous failures also release deduplication after bounded retries');
+  const unavailable = makeHarness({ result: 'false' });
+  unavailable.service.bindCurrentDetailDocument(pin); await flush();
+  for (let i = 0; i < unavailable.timers.length; i++) { unavailable.timers[i].fn(); await flush(); }
+  unavailable.service.clearBinding(); unavailable.state.result = 'true';
+  unavailable.service.bindCurrentDetailDocument(pin); await flush();
+  assert.equal(unavailable.calls.length, 5, 'a later valid ready event can bind after bounded false retries');
+  const synchronous = makeHarness({ throwSync: true });
+  assert.doesNotThrow(() => synchronous.service.bindCurrentDetailDocument(pin), 'synchronous Web controller failures are handled');
+  for (let i = 0; i < synchronous.timers.length; i++) { synchronous.timers[i].fn(); await flush(); }
   console.log('Detail document rebind: old reads settle promptly, writes never replay, current Pin recovery once, no timeout replay, bounded snapshot refresh and stale/cache guards passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

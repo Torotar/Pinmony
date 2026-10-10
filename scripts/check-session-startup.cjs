@@ -10,10 +10,10 @@ function method(name) {
 }
 const home = 'https://www.pinterest.com/', login = home + 'login/';
 const auth = {};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinWebAuth.ets', 'utf8'),
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8'),
   { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, { exports: auth });
 const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: login,
-  PinWebRuntimeLog: { info() {}, warn() {} }, clearTimeout() {} };
+  PinmonyRuntimeLog: { info() {}, warn() {} }, clearTimeout() {} };
 vm.runInNewContext(ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure'].map(method).join('\n') +
   '} globalThis.Native=Native;', { target: ts.ScriptTarget.ES2020 }), context);
 function harness() {
@@ -44,7 +44,7 @@ assert.deepEqual(existing.loads, [], 'current authenticated home needs no second
 assert.ok(existing.effects.includes('home')); assert.ok(existing.effects.includes('bind'));
 existing.emit('authenticated');
 assert.deepEqual(existing.loads, [], 'duplicate confirmation cannot reopen login or home');
-assert.equal(existing.scripts.filter(script => script.includes('PinWebHomeRefresh')).length, 1, 'first native home sync is not repeated');
+assert.equal(existing.scripts.filter(script => script.includes('PinmonyHomeRefresh')).length, 1, 'first native home sync is not repeated');
 const guest = harness();
 guest.emit('unauthenticated', 0); assert.deepEqual(guest.loads, [], 'old document evidence cannot open login');
 guest.emit('unauthenticated'); guest.emit('unauthenticated'); guest.emit('unauthenticated');

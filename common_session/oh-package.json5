@@ -1,7 +1,7 @@
 {
   "name": "common_session",
   "version": "1.0.0",
-  "description": "PinWeb common_session",
+  "description": "Pinmony common_session",
   "main": "Index.ets",
   "dependencies": {}
 }

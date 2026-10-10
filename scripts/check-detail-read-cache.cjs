@@ -1,0 +1,16 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const service = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailReadCache.ets', 'utf8');
+const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+assert.match(service, /LruCache<string>\(24, 300000\)/);
+assert.match(service, /RelatedModulesResource\|UnifiedCommentsPreviewResource/);
+assert.match(service, /job\.method !== 'GET'/);
+assert.match(service, /job\.body !== ''/);
+assert.match(service, /isAuthenticated\(\)/);
+assert.match(service, /hasNativeBackTarget\(\)/);
+assert.match(service, /pinIdentity\(this\.ports\.detailPin\(\)\)/);
+assert.match(service, /_=\[0-9\]\+/);
+assert.match(index, /detailReadCache\.store\(job, reply\)/);
+assert.match(index, /detailReadCache\.retained\(job\)/);
+assert.doesNotMatch(index, /detailReturnReads|detailReturnReadPin|retainedDetailRead|detailReturnReadKey/);
+console.log('Detail read cache: bounded retained reads, URL normalization, session/current-Pin/back guards and Index delegation passed');

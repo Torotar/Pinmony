@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinWebDetailApiScript.ets'), 'utf8');
+const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinmonyDetailApiScript.ets'), 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function main() {
-  const requests = [], window = { PinWebDetailApiEnabled: true }; window.top = window;
+  const requests = [], window = { PinmonyDetailApiEnabled: true }; window.top = window;
   window.fetch = (url, args) => new Promise((resolve, reject) => {
     requests.push({ url, args, resolve });
     if (args?.signal) args.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
@@ -15,7 +15,7 @@ async function main() {
   const location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/pin/123/' };
   vm.runInNewContext(script, { window, location, URL, AbortController, setTimeout, clearTimeout, console,
     fetch: (...args) => window.fetch(...args) });
-  const api = window.PinWebDetailApi;
+  const api = window.PinmonyDetailApi;
   let key = location.origin + location.pathname, updates = 0;
   const read = () => api.read(key, () => updates++, () => location.origin + location.pathname === key);
   read();

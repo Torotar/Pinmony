@@ -2,11 +2,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
-const source = fs.readFileSync('feature_pin/src/main/ets/services/PinWebDetailPrefetch.ets', 'utf8')
+const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailPrefetch.ets', 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace(/export /g, '');
 let now = 1000;
-const ctx = { Date: { now: () => now }, PinWebRuntimeLog: { info() {} } };
-vm.runInNewContext(ts.transpile(source + '\nglobalThis.Prefetch = PinWebDetailPrefetch; globalThis.mapDetail = mapPrefetchedDetail;',
+const ctx = { Date: { now: () => now }, PinmonyRuntimeLog: { info() {} } };
+vm.runInNewContext(ts.transpile(source + '\nglobalThis.Prefetch = PinmonyDetailPrefetch; globalThis.mapDetail = mapPrefetchedDetail;',
   { target: ts.ScriptTarget.ES2020 }), ctx);
 const url = id => 'https://www.pinterest.com/pin/' + id + '/';
 const pin = id => ({ id: String(id), type: 'pin', images: { '736x': { url: 'https://i.pinimg.com/736x/' + id + '.jpg', width: 736, height: 900 } },
@@ -69,7 +69,7 @@ async function main() {
   assert.equal(cache.get(url(1)), undefined, 'authentication reset clears completed content');
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
   const method = index.match(/  private restoreCachedDetail\(pinUrl: string\): boolean \{[\s\S]*?(?=\r?\n  private saveDetailScrollPosition)/)[0];
-  const nativeCtx = { PIN_DETAIL_API_ENABLED: true, PinWebRuntimeLog: { info() {} } };
+  const nativeCtx = { PIN_DETAIL_API_ENABLED: true, PinmonyRuntimeLog: { info() {} } };
   vm.runInNewContext(ts.transpile('class Native { ' + method + ' } globalThis.Native = Native;', { target: ts.ScriptTarget.ES2020 }), nativeCtx);
   const native = new nativeCtx.Native();
   Object.assign(native, { pinIdentity: value => value, pinStore: { detailImageFailedPin: '', detailCache: { get() {} },

@@ -11,7 +11,7 @@ function method(name) {
 }
 const timers = [], logs = [];
 const context = { setTimeout: callback => timers.push(callback),
-  PinWebRuntimeLog: { info: message => logs.push(message) } };
+  PinmonyRuntimeLog: { info: message => logs.push(message) } };
 vm.runInNewContext(ts.transpileModule('class Page {' +
   ['rootPageHasReadState', 'onRootPageVisible'].map(method).join('\n') +
   '} globalThis.Page = Page;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);

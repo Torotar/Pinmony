@@ -1,19 +1,19 @@
-export { PinWebProfileAction, PinWebBoard, PinWebCreatedPin, PinWebOrganizeBoard, PinWebOrganizeSnapshot, PinWebProfileSnapshot, PinWebPublishOption, PinWebPublishSnapshot } from './src/main/ets/models/PinWebProfile';
-export { PinWebProfilePage } from './src/main/ets/components/PinWebProfilePage';
-export { PinWebOrganizePage } from './src/main/ets/components/PinWebOrganizePage';
-export { PinWebPublishBoardPage } from './src/main/ets/components/PinWebPublishBoardPage';
-export { PinWebPublishSheet } from './src/main/ets/components/PinWebPublishSheet';
-export { PIN_PROFILE_API_ENABLED, PIN_PROFILE_API_SCRIPT } from './src/main/ets/services/PinWebProfileApiScript';
-export { PinWebProfileCacheEntry, PinWebProfileCache } from './src/main/ets/services/PinWebProfileCache';
-export { PIN_PROFILE_ORGANIZE_ENABLED, PIN_PROFILE_ORGANIZE_SCRIPT } from './src/main/ets/services/PinWebProfileOrganizeScript';
-export { PIN_PROFILE_BRIDGE_SCRIPT } from './src/main/ets/services/PinWebProfileScript';
-export { PinWebProfileStore } from './src/main/ets/stores/PinWebProfileStore';
+export { PinmonyProfileAction, PinmonyBoard, PinmonyCreatedPin, PinmonyOrganizeBoard, PinmonyOrganizeSnapshot, PinmonyProfileSnapshot, PinmonyPublishOption, PinmonyPublishSnapshot } from './src/main/ets/models/PinmonyProfile';
+export { PinmonyProfilePage } from './src/main/ets/components/PinmonyProfilePage';
+export { PinmonyOrganizePage } from './src/main/ets/components/PinmonyOrganizePage';
+export { PinmonyPublishBoardPage } from './src/main/ets/components/PinmonyPublishBoardPage';
+export { PinmonyPublishSheet } from './src/main/ets/components/PinmonyPublishSheet';
+export { PIN_PROFILE_API_ENABLED, PIN_PROFILE_API_SCRIPT } from './src/main/ets/services/PinmonyProfileApiScript';
+export { PinmonyProfileCacheEntry, PinmonyProfileCache } from './src/main/ets/services/PinmonyProfileCache';
+export { PIN_PROFILE_ORGANIZE_ENABLED, PIN_PROFILE_ORGANIZE_SCRIPT } from './src/main/ets/services/PinmonyProfileOrganizeScript';
+export { PIN_PROFILE_BRIDGE_SCRIPT } from './src/main/ets/services/PinmonyProfileScript';
+export { PinmonyProfileStore } from './src/main/ets/stores/PinmonyProfileStore';
 
-export { PinWebProfilePanel } from './src/main/ets/models/PinWebProfilePanel';
-export { PinWebProfilePanelPage } from './src/main/ets/components/PinWebProfilePanelPage';
-export { PIN_PROFILE_PANEL_SCRIPT } from './src/main/ets/services/PinWebProfilePanelScript';
+export { PinmonyProfilePanel } from './src/main/ets/models/PinmonyProfilePanel';
+export { PinmonyProfilePanelPage } from './src/main/ets/components/PinmonyProfilePanelPage';
+export { PIN_PROFILE_PANEL_SCRIPT } from './src/main/ets/services/PinmonyProfilePanelScript';
 
-export { PinWebPublishFlow } from './src/main/ets/models/PinWebPublishFlow';
-export { PinWebPublishPage } from './src/main/ets/components/PinWebPublishPage';
-export { PIN_PUBLISH_API_SCRIPT } from './src/main/ets/services/PinWebPublishApiScript';
-export { PinWebPublishPhoto, pickPublishPhotoUris, readPublishPhoto } from './src/main/ets/services/PinWebPublishPhoto';
+export { PinmonyPublishFlow } from './src/main/ets/models/PinmonyPublishFlow';
+export { PinmonyPublishPage } from './src/main/ets/components/PinmonyPublishPage';
+export { PIN_PUBLISH_API_SCRIPT } from './src/main/ets/services/PinmonyPublishApiScript';
+export { PinmonyPublishPhoto, pickPublishPhotoUris, readPublishPhoto } from './src/main/ets/services/PinmonyPublishPhoto';

@@ -5,7 +5,7 @@ const source=readSourceFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const start=source.indexOf('  private returnFromSearchQuiz():');
 assert.ok(start>=0);const method=source.slice(start,source.indexOf('\n  private ',start+1));
 const js=ts.transpileModule('class Host {'+method.replace('private ','')+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText+'\nHost;';
-const Host=vm.runInNewContext(js,{console,PinWebRuntimeLog:{warn(){}}});
+const Host=vm.runInNewContext(js,{console,PinmonyRuntimeLog:{warn(){}}});
 const host=new Host();const page='https://www.pinterest.com/search/pins/?q=design';
 host.search={kind:'state',session:1,pageKey:page,query:'design',quiz:{mode:'picker',busy:true},results:[{id:'pin'}],categories:[],suggestions:[],heroes:[],ideaSections:[]};
 host.currentSearchPageKey=()=>page;
@@ -15,7 +15,7 @@ assert.equal(host.search.quiz.mode,'entry','native return closes sheet without J
 assert.equal(host.search.quiz.cards.length,0,'selection is cleared on native return');
 assert.equal(host.search.results.length,1,'ordinary search content survives');
 assert.equal(host.searchQuizReturnPage,page,'stale subpage snapshots are suppressed');
-assert.match(command,/PinWebSearchQuizApi.action/);
+assert.match(command,/PinmonySearchQuizApi.action/);
 assert.equal(host.returnFromSearchQuiz(),false,'second return can continue ordinary navigation');
 host.search.quiz={mode:'results'};host.currentSearchPageKey=()=>page+'2';
 assert.equal(host.returnFromSearchQuiz(),false,'foreign route cannot cancel quiz');

@@ -2,9 +2,9 @@
 
 ## 项目范围与能力表述
 
-- PinWeb 是面向 HarmonyOS 手机的 ArkTS 应用。账号登录使用 ArkWeb；登录后所有可见业务界面使用 ArkUI。ArkWeb 保留隐藏会话与桥接上下文，已有业务接口通过 common_network 的原生 RCP 适配执行；网站自身请求、认证探测和标题 HTML 读取保留 Web 路径，详见 docs/NATIVE_NETWORK_NOTES.md。
+- Pinmony 是面向 HarmonyOS 手机的 ArkTS 应用。账号登录使用 ArkWeb；登录后所有可见业务界面使用 ArkUI。ArkWeb 保留隐藏会话与桥接上下文，已有业务接口通过 common_network 的原生 RCP 适配执行；网站自身请求、认证探测和标题 HTML 读取保留 Web 路径，详见 docs/NATIVE_NETWORK_NOTES.md。
 - 当前代码使用若干依赖活动 WebView 会话的 Pinterest 网站内部同源资源。这些资源不是 Pinterest 发布的官方开放 API；项目没有原生 OAuth 流程或独立令牌生命周期。说明功能时必须明确这一界限。
-- 改动原生替换界面或 DOM 桥接前，先读 [`NATIVE_UI_DEVELOPMENT_NOTES.md`](NATIVE_UI_DEVELOPMENT_NOTES.md)；改动同源资源或具体业务流程时，再读 README 对应的业务说明。以当前源码、开关值和该业务说明共同确定现状。
+- 改动原生替换界面或 DOM 桥接前，先读 [`docs/NATIVE_UI_DEVELOPMENT_NOTES.md`](docs/NATIVE_UI_DEVELOPMENT_NOTES.md)；改动同源资源或具体业务流程时，再读 README 对应的业务说明。以当前源码、开关值和该业务说明共同确定现状。
 - 只有完成相应验证后，才能声称网络操作、登录、写入、媒体播放或设备交互已正常。合成测试和 HAP 构建不能证明线上服务或真机行为。
 
 ## 软件框架与模块职责
@@ -21,7 +21,7 @@
 
 ## 分享面板固定规范
 
-- 软件内所有 Pin、图板及其他业务分享入口统一使用 Pin 详情页右上角的分享面板（`PinWebNativeShareApiOpen` → `SHARE_PANEL_BRIDGE_SCRIPT` → 原生分享半模态面板），表现为当前产品分享截图中的“分享”面板：平台横向列表、发送给联系人、联系人搜索和加载提示均由当前网页会话提供。
+- 软件内所有 Pin、图板及其他业务分享入口统一使用 Pin 详情页右上角的分享面板（`PinmonyNativeShareApiOpen` → `SHARE_PANEL_BRIDGE_SCRIPT` → 原生分享半模态面板），表现为当前产品分享截图中的“分享”面板：平台横向列表、发送给联系人、联系人搜索和加载提示均由当前网页会话提供。
 - 禁止将业务分享入口改为系统 ShareKit 面板、另造分享面板或根据截图私自增删平台和操作。分享入口改动前必须先查看本文件和 `README.md`，确认面板合同后再编辑；每次后续文件修改也必须再次查看这两个文件。
 
 ## 数据来源、会话与操作真实性
@@ -35,7 +35,7 @@
 
 ## 登录门禁与未接入操作
 
-- `PinWebAuthScript` 只发送脱敏登录状态、资料地址、当前页面地址和文档 epoch。登录成功必须来自当前网站会话明确证据，不按首页 URL 推断；普通网络失败不作为登出。
+- `PinmonyAuthScript` 只发送脱敏登录状态、资料地址、当前页面地址和文档 epoch。登录成功必须来自当前网站会话明确证据，不按首页 URL 推断；普通网络失败不作为登出。
 - 登录后 Web 容器不可见且不接收触摸。四个根页、详情、图板及所有业务面板必须由 ArkUI 呈现，禁止以 WebFlow、打开浏览器或媒体网页回退绕过这条边界。
 - 没有已接入接口的业务按钮/菜单点击无操作：不发请求、不转发网页控件点击、不跳转、不显示提示或虚假成功。四个根页导航、返回、输入以及已有接口所需的后台路由同步继续正常工作。
 - 会话明确失效时，关闭面板、清理根页和详情缓存及旧操作标识、废弃请求代次，再回到登录页；凭据留在 ArkWeb 自身存储内。

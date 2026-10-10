@@ -29,7 +29,7 @@ const names=['Home','Search','Inbox','Profile','Board','Pin'];
 const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const context={};
 for(const name of names) {
-  const className='PinWeb'+name+'Store',module='feature_'+name.toLowerCase();
+  const className='Pinmony'+name+'Store',module='feature_'+name.toLowerCase();
   const Store=load(module+'/src/main/ets/stores/'+className+'.ets')[className];
   const first=new Store(),second=new Store();
   context[className]=Store;
@@ -41,7 +41,7 @@ for(const name of names) {
 }
 assert.doesNotMatch(source, /private (?:get|set) \w+\(/, 'ArkUI structs must not use the dropped compatibility accessors');
 const host={};
-for(const name of names)host[name.toLowerCase()+'Store']=new context['PinWeb'+name+'Store']();
+for(const name of names)host[name.toLowerCase()+'Store']=new context['Pinmony'+name+'Store']();
 let changes=0;
 for(const name of names) host[name.toLowerCase()+'Store'].onNavigationChange=()=>changes++;
 const snapshot={session:1,pageKey:'synthetic',pins:[]};

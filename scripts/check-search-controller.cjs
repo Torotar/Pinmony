@@ -42,7 +42,7 @@ async function main() {
   preparingQuery.controller.clearSearch();
   preparingQuery.controller.updateSearch(JSON.stringify(snapshot({ session: 22 })));
   readyQuery(true); await freshInput;
-  assert.match(preparingQuery.events.find(e => e[0] === 'js')[1], /PinWebSearchQuery\(22,.*fresh input/,
+  assert.match(preparingQuery.events.find(e => e[0] === 'js')[1], /PinmonySearchQuery\(22,.*fresh input/,
     'document reset during the intended preparation preserves input and uses the fresh session');
   preparingQuery.controller.invalidatePending();
 
@@ -66,7 +66,7 @@ async function main() {
 
   let readCalls = 0;
   const filter = runtime.harness({ runScript: async script => {
-    if (script.includes('PinWebSearchReadFilters')) { readCalls++; return JSON.stringify({ loading: true, error: '', options: [] }); }
+    if (script.includes('PinmonySearchReadFilters')) { readCalls++; return JSON.stringify({ loading: true, error: '', options: [] }); }
     return 'true';
   } });
   filter.store.search = snapshot(); filter.store.searchActionsReady = true;

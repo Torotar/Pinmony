@@ -3,18 +3,48 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
-const source = readSourceFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const start = source.indexOf('  private dismissPostSnack(): void');
+let source = readSourceFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+if (process.argv[3]) source = fs.readFileSync(process.argv[3], 'utf8').replaceAll('this.pinStore.', 'this.').replaceAll('this.inboxStore.', 'this.');
+const releaseStart = source.indexOf('  private releasePostSnack(');
+const start = releaseStart >= 0 ? releaseStart : source.indexOf('  private dismissPostSnack(): void');
 const end = source.indexOf('  private async undoSavedPin()', start);
-const shown = []; const events = [];
+const shown = []; const events = []; const logs = [];
+let now = 1000;
+let reentrantDismiss;
+let failDismiss = false;
 class HdsSnackBar {
-  show(icon, message, operation, style) { shown.push({ operation, style }); }
-  dismiss() { events.push('dismiss'); }
+  show(icon, message, operation, style) {
+    assert(!this.shown, 'each presentation owns a fresh HDS instance');
+    this.shown = true;
+    this.expiresAt = now + style.duration;
+    shown.push({ operation, style, instance: this });
+  }
+  dismiss() {
+    events.push('dismiss');
+    assert(!this.closed, 'must not dismiss an already closed dialog');
+    assert(now < this.expiresAt, 'must not dismiss an automatically expired dialog');
+    this.closed = true;
+    if (reentrantDismiss) reentrantDismiss();
+    if (failDismiss) throw new Error('native close failed');
+  }
 }
 const context = { HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 },
-  PinWebRuntimeLog: { info() {} } };
+  Date: { now: () => now },
+  PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
 vm.runInNewContext(ts.transpileModule('class Native { ' + source.slice(start, end) +
+  source.slice(source.indexOf('  private showInboxBlockSnack('),
+    source.indexOf('\n  @Builder', source.indexOf('  private showInboxBlockSnack('))) +
   ' } globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+// Model native-owned closure before and after its notification callback.
+// Application callbacks must never issue a second dismiss in either order.
+function nativeCallback(presentation, callback, closeBefore = true) {
+  const nativeClose = () => { presentation.instance.closed = true; events.push('native-close'); };
+  if (closeBefore) nativeClose();
+  callback();
+  if (!closeBefore) nativeClose();
+}
+function close(presentation) { nativeCallback(presentation, () => presentation.operation.onCloseButtonClick()); }
+function back(presentation, closeBefore = true) { nativeCallback(presentation, () => presentation.style.pressBackCallback(), closeBefore); }
 const native = new context.Native(); let undo = 0, retry = 0;
 Object.assign(native, { postSnackToken: 0, getUIContext: () => ({}),
   onBackPress: () => { events.push('page-back'); return true; },
@@ -24,21 +54,21 @@ Object.assign(native, { postSnackToken: 0, getUIContext: () => ({}),
 native.showUndoSnack('已收藏', 'pin', () => undo++);
 const first = shown.at(-1);
 events.length = 0;
-first.style.pressBackCallback();
-assert.deepEqual(events, ['dismiss', 'page-back']);
+back(first);
+assert.deepEqual(events, ['native-close', 'page-back']);
 first.style.pressBackCallback();
 first.operation.onContentClick();
 assert.equal(undo, 0);
 assert.equal(events.filter(event => event === 'page-back').length, 1);
 native.showUndoSnack('已收藏', 'pin', () => undo++);
-shown.at(-1).operation.onCloseButtonClick();
+close(shown.at(-1));
 assert.equal(undo, 0);
 native.showUndoSnack('已收藏', 'pin', () => undo++);
 shown.at(-1).operation.onContentClick();
 assert.equal(undo, 1);
 native.showShareLinkSnack();
 assert.equal(shown.at(-1).style.duration, 4000);
-shown.at(-1).style.pressBackCallback();
+back(shown.at(-1));
 assert.equal(retry, 0);
 native.showShareFeedbackSnack();
 shown.at(-1).style.pressBackCallback();
@@ -49,5 +79,91 @@ const old = shown.at(-1);
 native.showUndoSnack('second', 'pin', () => undo++);
 const before = events.length;
 old.style.pressBackCallback();
+old.operation.onCloseButtonClick();
+old.operation.onContentClick();
 assert.equal(events.length, before);
-console.log('Snackbar back: dismiss before page return, duplicate/stale guards, close versus undo and share callbacks passed');
+assert.equal(undo, 1);
+// Closing, switching roots, resetting auth and disposing can all clear the same owner.
+native.dismissPostSnack();
+const cleared = events.length;
+for (let i = 0; i < 8; i++) native.dismissPostSnack();
+assert.equal(events.length, cleared, 'repeated cleanup must not touch HDS');
+assert.equal(native.postSnack, undefined);
+assert.equal(native.postSnackExpiresAt, 0);
+
+// A positive HDS timeout already closes its native dialog. Late callbacks cannot act.
+native.showUndoSnack('expired', 'pin', () => undo++);
+const expired = shown.at(-1);
+now += expired.style.duration;
+const expiredEvents = events.length, expiredUndo = undo;
+expired.operation.onContentClick();
+expired.operation.onCloseButtonClick();
+expired.style.pressBackCallback();
+native.dismissPostSnack();
+assert.equal(events.length, expiredEvents);
+assert.equal(undo, expiredUndo);
+assert.equal(native.postSnack, undefined);
+assert(logs.some(line => line.includes('reason=expired')));
+native.showUndoSnack('fresh', 'pin', () => undo++);
+assert.notEqual(shown.at(-1).instance, expired.instance);
+
+// Release before native close, even if close reenters page cleanup or throws.
+reentrantDismiss = () => native.dismissPostSnack();
+const reentrantEvents = events.length;
+native.dismissPostSnack();
+assert.equal(events.length, reentrantEvents + 1);
+reentrantDismiss = undefined;
+native.showUndoSnack('callback before close', 'pin', () => undo++);
+const callbackBefore = shown.at(-1);
+const callbackEvents = events.length;
+back(callbackBefore, false);
+assert.deepEqual(events.slice(callbackEvents), ['page-back', 'native-close']);
+native.showUndoSnack('close fails', 'pin', () => undo++);
+failDismiss = true;
+assert.doesNotThrow(() => native.dismissPostSnack());
+failDismiss = false;
+assert.equal(native.postSnack, undefined);
+assert(logs.some(line => line.startsWith('PostSnack: dismiss-threw snackSeq=')));
+assert(!logs.some(line => /PostSnack:.*token=/.test(line)));
+const preparedSeqs = logs.filter(line => line.startsWith('PostSnack: prepared ')).map(line => /snackSeq=(\d+)/.exec(line)[1]);
+assert.equal(new Set(preparedSeqs).size, preparedSeqs.length);
+const failedEvents = events.length;
+native.dismissPostSnack();
+assert.equal(events.length, failedEvents);
+
+// Preserve the inbox entry points that share the same cleanup owner.
+let inboxUndo = 0;
+native.inboxFlow = { newsId: 'news', newsHidden: true };
+native.inboxFlowAction = action => { assert.equal(action, 'undoNews'); inboxUndo++; };
+native.showInboxUndoSnack('news');
+assert.equal(shown.at(-1).style.duration, 8000);
+shown.at(-1).operation.onCloseButtonClick();
+assert.equal(inboxUndo, 0);
+native.showInboxUndoSnack('news');
+shown.at(-1).operation.onContentClick();
+shown.at(-1).operation.onContentClick();
+assert.equal(inboxUndo, 1);
+native.showInboxRestoredSnack();
+assert.equal(shown.at(-1).style.duration, 4000);
+shown.at(-1).operation.onCloseButtonClick();
+native.showInboxBlockSnack(true, 'not-for-logs');
+assert.equal(shown.at(-1).style.duration, 4000);
+shown.at(-1).operation.onCloseButtonClick();
+assert(!logs.join('\n').includes('not-for-logs'));
+
+// Retry still dispatches once while the same share context is current.
+native.shareSnackKey = '';
+native.showShareLinkSnack();
+const retrySnack = shown.at(-1);
+retrySnack.operation.onContentClick();
+retrySnack.operation.onContentClick();
+assert.equal(retry, 1);
+native.shareSnackKey = '';
+native.showShareLinkSnack();
+native.shareSession++;
+const otherSessionEvents = events.length;
+shown.at(-1).operation.onContentClick();
+assert.equal(retry, 1);
+assert.equal(events.length, otherSessionEvents);
+native.dismissPostSnack();
+console.log('Snackbar lifecycle: back/close/undo, six entry points, duplicate/reentrant cleanup, automatic expiry, stale callbacks and close failure passed');

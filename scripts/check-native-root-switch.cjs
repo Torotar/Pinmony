@@ -26,7 +26,7 @@ const beginStart = source.indexOf('.onPageBegin((event) => {');
 const beginEnd = source.indexOf('\n            .onPageEnd(', beginStart);
 const begin = source.slice(beginStart, beginEnd).replace(/^\.onPageBegin\(/, 'this.pageBegin = ').replace(/\)\s*$/, ';');
 const context = { PINTEREST_URL: 'https://www.pinterest.com/', isPinterestAuthRoute: url => /\/login\//.test(url),
-  PinWebRuntimeLog: { info() {}, warn() {} } };
+  PinmonyRuntimeLog: { info() {}, warn() {} } };
 const code = 'class Native {' + names.map(method).join('\n') + '\nsetup() {' + setup + begin + '} } globalThis.Native = Native;';
 vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const home = context.PINTEREST_URL, pin = home + 'pin/123/', profile = home + 'sample/';
@@ -63,6 +63,7 @@ function harness() {
   native.pinStore.detailPrefetch = { pause() {} };
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
+  require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
   native.setup();
   return { native, requests, indices, confirmations, visit: url => { document = url; } };
 }
@@ -116,10 +117,10 @@ assert.equal(foreign.native.nativeDisplayAddress(), profile);
 assert.deepEqual(foreign.requests, []);
 assert(!/runJavaScript|loadUrl|backOrForward|expectHome|expectSearch|expectInbox|expectProfile|waitForWebTabConfirmation/.test(method('selectNativeRootTab')));
 assert.match(source, /\.animationDuration\(0\)/);
-const search = fs.readFileSync('feature_search/src/main/ets/components/PinWebSearchPage.ets', 'utf8');
+const search = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
 assert.match(search, /if \(!this\.automaticLoadingEnabled\) return/);
 assert.equal((search.match(/onReachEnd\([\s\S]*?automaticLoadingEnabled/g) || []).length, 3);
-const profileSource = fs.readFileSync('feature_profile/src/main/ets/components/PinWebProfilePage.ets', 'utf8');
+const profileSource = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets', 'utf8');
 for (const component of [search, profileSource]) {
   for (const match of component.matchAll(/\.onReachEnd\((\(\) => \{[^{}]*\})\)/g)) {
     let reads = 0;

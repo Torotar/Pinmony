@@ -1,9 +1,9 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync('feature_pin/src/main/ets/services/PinWebPostApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyPostApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
-const extensionSource = fs.readFileSync('feature_pin/src/main/ets/services/PinWebPostExtensionsScript.ets', 'utf8');
+const extensionSource = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyPostExtensionsScript.ets', 'utf8');
 const extension = Function('return `' + extensionSource.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const pin = 'https://www.pinterest.com/pin/101/';
@@ -13,8 +13,8 @@ function harness() {
   const location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/pin/101/', href: pin };
   const document = { cookie: '', getElementById: () => null, querySelectorAll: () => [] };
   class XHR { open() {} send() {} setRequestHeader() {} addEventListener() {} }
-  const window = { PinWebPostApiEnabled: true, PinWebPostExtensionsEnabled: true,
-    PinWebDetailApi: { raw: () => ({ id: '101', aggregated_pin_id: '202' }) } };
+  const window = { PinmonyPostApiEnabled: true, PinmonyPostExtensionsEnabled: true,
+    PinmonyDetailApi: { raw: () => ({ id: '101', aggregated_pin_id: '202' }) } };
   window.top = window;
   window.fetch = (url, options) => new Promise(resolve => requests.push({ url, options, resolve }));
   const context = vm.createContext({ window, document, location, URL, URLSearchParams, Headers, AbortController,
@@ -34,7 +34,7 @@ function harness() {
     assert(entry, 'metadata wait must be bounded by a short cancellable poll');
     timers.delete(entry[0]); entry[1].fn(); await flush();
   }
-  const api = window.PinWebPostApi;
+  const api = window.PinmonyPostApi;
   const preview = valid => api.resourceRequest(pin, 'UnifiedCommentsPreviewResource', 'get',
     { aggregated_pin_id: '202' }, valid || (() => true));
   const reply = (index, status = 200) => requests[index].resolve({ ok: status === 200, status,

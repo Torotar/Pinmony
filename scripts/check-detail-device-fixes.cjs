@@ -9,12 +9,12 @@ catch (_) {
   ts = require(process.argv[2]);
 }
 const index = readSourceFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const base = readSourceFileSync('entry/src/main/ets/services/PinWebPostApiScript.ets', 'utf8');
+const base = readSourceFileSync('entry/src/main/ets/services/PinmonyPostApiScript.ets', 'utf8');
 const pin = 'https://www.pinterest.com/pin/101/';
 const messages = [], requests = [];
-const window = { PinWebPostApiEnabled: true, PinWebPostExtensionsEnabled: true,
-  PinWebDetailApi: { raw: () => ({ id: '101', reaction_by_me: 1 }) },
-  PinWebShareBridge: { sheetState: value => messages.push(JSON.parse(value)) }, addEventListener() {} };
+const window = { PinmonyPostApiEnabled: true, PinmonyPostExtensionsEnabled: true,
+  PinmonyDetailApi: { raw: () => ({ id: '101', reaction_by_me: 1 }) },
+  PinmonyShareBridge: { sheetState: value => messages.push(JSON.parse(value)) }, addEventListener() {} };
 window.top = window;
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/pin/101/', href: pin };
 const document = { cookie: 'csrftoken=current', addEventListener() {}, querySelectorAll: () => [],
@@ -25,23 +25,23 @@ const context = { window, location, document, URL, URLSearchParams, Headers, Abo
   fetch: (...args) => window.fetch(...args), setTimeout, clearTimeout, console };
 function template(source, pattern) { return Function('return `' + source.match(pattern)[1] + '`')(); }
 vm.runInNewContext(template(base, /= `([\s\S]*?)`;/), context);
-const sharePanel = readSourceFileSync('feature_pin/src/main/ets/services/PinWebSharePanelScript.ets', 'utf8');
+const sharePanel = readSourceFileSync('feature_pin/src/main/ets/services/PinmonySharePanelScript.ets', 'utf8');
 vm.runInNewContext(template(sharePanel, /const SHARE_PANEL_BRIDGE_SCRIPT: string = `([\s\S]*?)`;/), context);
-const api = window.PinWebPostApi;
+const api = window.PinmonyPostApi;
 api.savedRead = () => null;
 const actions = api.detailActions(pin, [], () => {});
 assert.equal(actions.find(item => item.kind === 'save').enabled, true, 'API save exists without any DOM button');
 assert.equal(actions.find(item => item.kind === 'share').enabled, true);
 api.savedRead = () => ({ id: '707' });
 assert.equal(api.detailActions(pin, [], () => {}).find(item => item.kind === 'save').label, '已收藏');
-assert.equal(window.PinWebNativeShareApiOpen(pin), true);
+assert.equal(window.PinmonyNativeShareApiOpen(pin), true);
 const first = messages.at(-1);
 assert.equal(first.kind, 'state', 'First share publication is ready, with no DOM opening phase');
 assert.deepEqual(first.options.map(item => item.label), ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X']);
 assert.equal(first.actions[0].label, '复制链接');
 assert.match(first.feedback, /加载联系人/);
-assert.equal(window.PinWebNativeShareApiOpen(pin.replace('101', '999')), false);
-assert.equal(window.PinWebNativeShareClose(first.session), true);
+assert.equal(window.PinmonyNativeShareApiOpen(pin.replace('101', '999')), false);
+assert.equal(window.PinmonyNativeShareClose(first.session), true);
 assert.equal(messages.at(-1).kind, 'closed');
 const messageCount = messages.length;
 const flush = () => new Promise(resolve => setImmediate(resolve));

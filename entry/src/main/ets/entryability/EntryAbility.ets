@@ -1,4 +1,4 @@
-import { PinWebRuntimeLog } from 'common_foundation';
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
@@ -30,23 +30,23 @@ export default class EntryAbility extends UIAbility {
       /ForEach|duplicate.*key/i.test(message) ? 'node-identity' :
       /Webview|WebView|controller|runJavaScript/i.test(message) ? 'web-controller' :
       /cancel|abort/i.test(message) ? 'cancellation' : 'unknown';
-    PinWebRuntimeLog.error('Runtime: unhandled error ' + name + ' kind=' + kind + ' category=' + category);
+    PinmonyRuntimeLog.error('Runtime: unhandled error ' + name + ' kind=' + kind + ' category=' + category);
     const rawStack: string = typeof reason.stack === 'string' ? reason.stack : '';
     // Keep source basenames/line numbers only, for both Ark and standard stack formats.
     const frames: string[] = rawStack.match(/[A-Za-z][A-Za-z0-9_-]*\.(?:ets|ts|js):[0-9]+(?::[0-9]+)?/g) || [];
-    frames.slice(0, 12).forEach((line: string) => PinWebRuntimeLog.error('Runtime stack: ' + line));
-    if (frames.length === 0) PinWebRuntimeLog.error('Runtime stack: unavailable');
+    frames.slice(0, 12).forEach((line: string) => PinmonyRuntimeLog.error('Runtime stack: ' + line));
+    if (frames.length === 0) PinmonyRuntimeLog.error('Runtime stack: unavailable');
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    PinWebRuntimeLog.initialize(this.context.filesDir);
+    PinmonyRuntimeLog.initialize(this.context.filesDir);
     this.lifecycleStartedAt = Date.now();
     this.lifecycleLastEventAt = this.lifecycleStartedAt;
     this.logLifecycle('create-start', 'windowStage=false content=false');
     NetworkManager.preConnect('https://www.pinterest.com').catch(() => {
       // Startup pre-connect is best effort and never blocks the ability.
     });
-    PinWebRuntimeLog.info('AbilityLifecycle: preconnect-dispatched');
+    PinmonyRuntimeLog.info('AbilityLifecycle: preconnect-dispatched');
     try {
       const features: webview.BackForwardCacheSupportedFeatures = new webview.BackForwardCacheSupportedFeatures();
       // Visible media is native; do not opt hidden Web media or native embeds into retention.
@@ -54,11 +54,11 @@ export default class EntryAbility extends UIAbility {
       features.mediaTakeOver = false;
       webview.WebviewController.enableBackForwardCache(features);
       webview.WebviewController.initializeWebEngine();
-    } catch (_) { PinWebRuntimeLog.warn('PinWebReturn: document retention unavailable'); }
+    } catch (_) { PinmonyRuntimeLog.warn('PinmonyReturn: document retention unavailable'); }
     try {
       errorManager.on('globalErrorOccurred', this.errorObserver);
       errorManager.on('globalUnhandledRejectionDetected', this.rejectionObserver);
-    } catch (_) { PinWebRuntimeLog.warn('Runtime: exception observer unavailable'); }
+    } catch (_) { PinmonyRuntimeLog.warn('Runtime: exception observer unavailable'); }
     PersistentStorage.persistProp('themePreference', 'system');
     try {
       const preference: string = AppStorage.get<string>('themePreference') || 'system';
@@ -80,7 +80,7 @@ export default class EntryAbility extends UIAbility {
     try {
       errorManager.off('globalErrorOccurred', this.errorObserver);
       errorManager.off('globalUnhandledRejectionDetected', this.rejectionObserver);
-    } catch (_) { PinWebRuntimeLog.warn('Runtime: exception observer cleanup unavailable'); }
+    } catch (_) { PinmonyRuntimeLog.warn('Runtime: exception observer cleanup unavailable'); }
     this.windowStageReady = false;
     this.contentLoaded = false;
     this.logLifecycle('destroy-complete', 'windowStage=false content=false');
@@ -104,11 +104,11 @@ export default class EntryAbility extends UIAbility {
       this.mainWindow = windowStage.getMainWindowSync();
       this.mainWindow.on('avoidAreaChange', (data) => {
         if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
-          PinWebRuntimeLog.info('AbilityLifecycle: avoid-area type=system topPx=' +
+          PinmonyRuntimeLog.info('AbilityLifecycle: avoid-area type=system topPx=' +
             data.area.topRect.height.toString());
           this.updateStatusBarHeight(data.area.topRect.height);
         } else if (data.type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
-          PinWebRuntimeLog.info('AbilityLifecycle: avoid-area type=navigation bottomPx=' +
+          PinmonyRuntimeLog.info('AbilityLifecycle: avoid-area type=navigation bottomPx=' +
             data.area.bottomRect.height.toString());
           AppStorage.setOrCreate<number>('gestureBarHeightPx', Math.max(0, data.area.bottomRect.height));
         }
@@ -131,7 +131,7 @@ export default class EntryAbility extends UIAbility {
       if (err.code) {
         this.contentLoaded = false;
         this.logLifecycle('content-load-failed', 'code=' + err.code.toString());
-        PinWebRuntimeLog.error('Ability: loadContent failed, code ' + err.code.toString());
+        PinmonyRuntimeLog.error('Ability: loadContent failed, code ' + err.code.toString());
         hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
         return;
       }
@@ -222,7 +222,7 @@ export default class EntryAbility extends UIAbility {
     const sincePrevious: number = this.lifecycleLastEventAt > 0 ? now - this.lifecycleLastEventAt : -1;
     this.lifecycleLastEventAt = now;
     this.lifecycleSequence++;
-    PinWebRuntimeLog.info('AbilityLifecycle: event=' + event + ' sequence=' + this.lifecycleSequence.toString() +
+    PinmonyRuntimeLog.info('AbilityLifecycle: event=' + event + ' sequence=' + this.lifecycleSequence.toString() +
       ' sinceStartMs=' + sinceStart.toString() + ' sincePreviousMs=' + sincePrevious.toString() + ' ' + state);
   }
 }

@@ -15,7 +15,7 @@ const names = ['nativeDisplayAddress', 'boardUrlFromAddress', 'currentBoardUrl',
 const code = ts.transpileModule('class Native {' + names.map(method).join('\n') + '} globalThis.Native = Native;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
 const timers = [], context = { PIN_BOARD_API_ENABLED: true, PIN_POST_API_ENABLED: true, setTimeout: fn => timers.push(fn),
-  PinWebRuntimeLog: { info() {}, warn() {} } };
+  PinmonyRuntimeLog: { info() {}, warn() {} } };
 vm.runInNewContext(code, context);
 const from = 'https://www.pinterest.com/sample/_saved/', target = 'https://www.pinterest.com/sample/board/';
 function harness(destination = target, failNavigation = false) {
@@ -30,13 +30,18 @@ function harness(destination = target, failNavigation = false) {
   const navigations = [];
   const backTargets = [];
   Object.assign(native, { loadFailed: false, pendingBoardUrl: '', pendingBoardSource: '', boardOpeningToken: 0,
+    authStatus: 'authenticated', activeTab: 3, tabRequestToken: 0, rootTabAddresses: new Map(),
+    profileStore: { origins: [] }, clearRootTabGuard() {},
     boardReturnUrl: '', boardReturnPage: '', backOnePage: (fallback, override) => backTargets.push(override || fallback),
-    pageHistory: { key: url => url.split(/[?#]/)[0] }, controller: { getUrl: () => address, loadUrl: url => {
+    pageHistory: { key: url => url.split(/[?#]/)[0], visit() {}, cancelBack() {} }, controller: { getUrl: () => address, loadUrl: url => {
       assert.equal(native.nativeBoardVisible(), true, 'native cover exists before opening the board');
       if (failNavigation) throw new Error('navigation unavailable');
       navigations.push(url);
     } },
     currentProfileUrl: () => 'https://www.pinterest.com/sample/', showMessage() {}, traceAction() {},
+    extractPinUrl: url => /\/pin\/\d+\//.test(url) ? url : '',
+    profileUrlFromAddress: url => url === from || url === 'https://www.pinterest.com/sample/' ? 'https://www.pinterest.com/sample/' : '',
+    nativeRootPageAddress: () => '',
     boardOperation(method, value) { this.lastBoardAction = JSON.parse(value).action; },
     profile: { profileUrl: 'https://www.pinterest.com/sample/', boards: [{ id: 'card', title: 'Board',
       targetUrl: destination, pinCount: '2 张 Pin 图' }] }, handleBack() { backTargets.push('generic-history'); } });
@@ -56,10 +61,11 @@ async function main() {
   menu.native.openBoardPinMore('101');
   assert.deepEqual(menus, [{ url: pin.pinUrl, page: target }], 'card menu uses its board route');
   const shares = [];
-  menu.native.sharePinUrl = (url, title) => shares.push({ url, title });
+  menu.native.controller.runJavaScript = async script => { shares.push(script); return 'true'; };
   menu.native.boardStore.boardDetail.title = '图板';
-  menu.native.shareCurrentBoard();
-  assert.deepEqual(shares, [{ url: target, title: '图板' }], 'share carries the current board, not a previous Pin');
+  await menu.native.shareCurrentBoard();
+  assert.equal(shares.length, 1);
+  assert(shares[0].includes('PinmonyNativeShareApiOpen(' + JSON.stringify(target) + ')'), 'share opens the existing native panel for the current board');
   menu.native.openBoardPinMore('999');
   assert.equal(menus.length, 1, 'unknown card cannot open a menu');
   menu.native.boardStore.boardDetail.flow = { phase: 'targets', busy: false };
@@ -87,7 +93,9 @@ async function main() {
   assert.deepEqual(h.navigations, [target], 'validated board route uses direct background navigation');
   await opening;
   h.navigate('https://www.pinterest.com/pin/123/'); h.native.syncBoardRoute('https://www.pinterest.com/pin/123/');
-  assert.equal(h.native.nativeBoardVisible(), false, 'board cover does not hide a different destination');
+  assert.equal(h.native.nativeBoardVisible(), true, 'board stays mounted beneath its child Pin');
+  assert.equal(h.native.boardStore.presentationOnly, true);
+  assert.equal(h.native.boardDetail.session, 0, 'departed board controls cannot be reused');
   const failure = harness(target, true); await failure.native.openProfileBoard('card');
   assert.equal(failure.native.pendingBoardUrl, ''); assert.equal(failure.native.boardDetail, undefined);
   const back = harness(); const interrupted = back.native.openProfileBoard('card');
@@ -106,7 +114,8 @@ async function main() {
     returned.navigate(destination); returned.native.syncBoardRoute(destination);
     returned.native.backFromBoard();
     assert.deepEqual(returned.backTargets, [from], 'board and all-pins return to the exact My origin even after a Pin visit');
-    returned.navigate('https://www.pinterest.com/sample/other/'); returned.native.backFromBoard();
+    returned.navigate('https://www.pinterest.com/sample/other/');
+    returned.native.syncBoardRoute('https://www.pinterest.com/sample/other/'); returned.native.backFromBoard();
     assert.equal(returned.backTargets.at(-1), 'generic-history', 'another board cannot reuse the stored origin');
   }
   console.log('Board opening handoff checks passed');

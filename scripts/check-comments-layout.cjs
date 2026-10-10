@@ -8,7 +8,7 @@ catch (_) {
   if (!process.argv[2]) throw new Error('Pass the DevEco TypeScript module path as the first argument');
   ts = require(process.argv[2]);
 }
-const source = readSourceFileSync('entry/src/main/ets/components/PinWebCommentsSheet.ets', 'utf8');
+const source = readSourceFileSync('entry/src/main/ets/components/PinmonyCommentsSheet.ets', 'utf8');
 const methods = source.slice(source.indexOf('  private ageLabel'), source.indexOf('  @Builder'));
 const compiled = ts.transpileModule('class Presentation {' + methods + '} Presentation;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;

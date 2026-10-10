@@ -1,7 +1,7 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const ts = require(process.argv[2]);
-const page = fs.readFileSync('feature_search/src/main/ets/components/PinWebSearchPage.ets', 'utf8');
-const panel = fs.readFileSync('feature_search/src/main/ets/components/PinWebSearchQuizPanel.ets', 'utf8');
+const page = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
+const panel = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchQuizPanel.ets', 'utf8');
 function method(name) {
   const start = page.indexOf('  private ' + name);
   assert(start >= 0);

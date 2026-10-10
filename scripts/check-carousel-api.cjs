@@ -6,11 +6,11 @@ const script = name => Function('return `' + readSourceFileSync('entry/src/main/
 const image = { url: 'https://i.pinimg.com/736x/sample.jpg', width: 736, height: 1308 };
 const graph = id => ({ entityId: id, carouselData: { carouselSlots: Array.from({ length: 7 }, (_, n) => ({ slotId: String(n + 1), images_736x: image })) } });
 function harness() {
-  let cache = []; const requests = []; const window = { PinWebCarouselApiEnabled: true }; window.top = window;
-  vm.runInNewContext(script('PinWebCarouselApiScript'), { window, URL,
+  let cache = []; const requests = []; const window = { PinmonyCarouselApiEnabled: true }; window.top = window;
+  vm.runInNewContext(script('PinmonyCarouselApiScript'), { window, URL,
     document: { cookie: 'csrftoken=current', querySelectorAll: () => cache },
     fetch: (url, args) => new Promise(resolve => requests.push({ url, args, resolve })) });
-  return { api: window.PinWebCarouselApi, requests, cache: pin => {
+  return { api: window.PinmonyCarouselApi, requests, cache: pin => {
     cache = [{ textContent: '__PWS_RELAY_REGISTER_COMPLETED_REQUEST__("x",' + JSON.stringify({ data: { v3GetPinQueryv2: { data: pin } } }) + ');' }];
   } };
 }

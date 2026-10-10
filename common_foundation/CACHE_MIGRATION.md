@@ -12,10 +12,10 @@ remains the presentation state; restored controls are disabled until a current b
 
 ```ts
 import { ApiCache, buildCacheKey, CACHE_TTL } from 'common_foundation';
-import { PinWebHomeSnapshot } from 'feature_home';
+import { PinmonyHomeSnapshot } from 'feature_home';
 
 interface HomeCacheRecord {
-  snapshot: PinWebHomeSnapshot;
+  snapshot: PinmonyHomeSnapshot;
 }
 
 const apiCache: ApiCache = new ApiCache(context.cacheDir);
@@ -37,7 +37,7 @@ before it is written. Cached content is for display; it does not restore actiona
 - `common_foundation/Index.ets` and `common_foundation/src/main/ets/cache/*.ets` provide the shared implementation.
 - `entry/src/main/ets/pages/Index.ets` initializes the cache from the host `UIAbilityContext`, restores account-scoped
   snapshots after explicit login evidence, persists validated home states, and clears data on session invalidation.
-- `feature_home/src/main/ets/stores/PinWebHomeStore.ets` remains the in-memory presentation state; no ArkUI component
+- `feature_home/src/main/ets/stores/PinmonyHomeStore.ets` remains the in-memory presentation state; no ArkUI component
   or layout code needs cache logic.
 
 ## Runtime Audit Events

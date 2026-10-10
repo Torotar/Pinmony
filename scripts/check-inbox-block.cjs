@@ -2,13 +2,13 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 
-const source = fs.readFileSync('feature_inbox/src/main/ets/services/PinWebInboxConversationScript.ets', 'utf8');
+const source = fs.readFileSync('feature_inbox/src/main/ets/services/PinmonyInboxConversationScript.ets', 'utf8');
 const code = vm.runInNewContext(source.slice(source.indexOf('`'), source.lastIndexOf('`') + 1));
 const requests = [];
 const events = [];
-const window = { PinWebInboxConversationsEnabled: true };
+const window = { PinmonyInboxConversationsEnabled: true };
 window.top = window;
-window.PinWebShareBridge = { inboxState: value => events.push(JSON.parse(value)) };
+window.PinmonyShareBridge = { inboxState: value => events.push(JSON.parse(value)) };
 
 vm.runInNewContext(code, {
   window,
@@ -21,7 +21,7 @@ vm.runInNewContext(code, {
   fetch: (url, args) => new Promise(resolve => requests.push({ url, args, resolve }))
 });
 
-const api = window.PinWebInboxConversations;
+const api = window.PinmonyInboxConversations;
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const latest = () => events.at(-1);
 const self = { id: '1', full_name: 'Self' };

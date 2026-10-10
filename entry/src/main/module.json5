@@ -23,9 +23,10 @@
         "name": "EntryAbility",
         "srcEntry": "./ets/entryability/EntryAbility.ets",
         "description": "$string:EntryAbility_desc",
-        "icon": "$media:pinweb_icon",
+        "icon": "$media:pinmony_logo",
         "label": "$string:EntryAbility_label",
-        "startWindowIcon": "$media:startIcon",
+        "startWindow": "$profile:pinmony_start_window",
+        "startWindowIcon": "$media:pinmony_start_icon",
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
         "skills": [

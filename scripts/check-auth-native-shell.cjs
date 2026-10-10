@@ -10,8 +10,8 @@ function moduleFrom(path) {
   }).outputText, { exports });
   return exports;
 }
-const { PIN_AUTH_BRIDGE_SCRIPT } = moduleFrom('entry/src/main/ets/services/PinWebAuthScript.ets');
-const { acceptsAuthMessage } = moduleFrom('entry/src/main/ets/models/PinWebAuth.ets');
+const { PIN_AUTH_BRIDGE_SCRIPT } = moduleFrom('entry/src/main/ets/services/PinmonyAuthScript.ets');
+const { acceptsAuthMessage } = moduleFrom('entry/src/main/ets/models/PinmonyAuth.ets');
 function harness(url, initial) {
   const location = new URL(url), messages = [];
   const node = initial ? { textContent: JSON.stringify(initial) } : null;
@@ -22,7 +22,7 @@ function harness(url, initial) {
   }
   const context = { URL, location, XMLHttpRequest: XHR,
     document: { getElementById: () => node, addEventListener() {} },
-    PinWebShareBridge: { authState(value) { messages.push(JSON.parse(value)); } },
+    PinmonyShareBridge: { authState(value) { messages.push(JSON.parse(value)); } },
     fetch: async () => ({ url: nextUrl, clone() { return { json: async () => nextBody }; } }) };
   context.window = context; context.top = context;
   vm.runInNewContext(PIN_AUTH_BRIDGE_SCRIPT, context);
@@ -32,28 +32,28 @@ function harness(url, initial) {
 async function flush() { await new Promise(resolve => setImmediate(resolve)); }
 async function check() {
   const guest = harness('https://www.pinterest.com/login/', { initialReduxState: { session: { isAuthenticated: false } } });
-  guest.context.PinWebAuthSync(1);
+  guest.context.PinmonyAuthSync(1);
   assert.equal(guest.messages.at(-1).status, 'unauthenticated');
   guest.setResponse({ client_context: { is_authenticated: true, user: { id: '123', username: 'sample' } } });
   await guest.context.fetch('/resource/UserResource/get/'); await flush();
   assert.equal(guest.messages.at(-1).status, 'authenticated');
-  guest.context.PinWebAuthSync(1);
+  guest.context.PinmonyAuthSync(1);
   assert.equal(guest.messages.at(-1).status, 'authenticated', 'old login-page initial data cannot undo successful login');
   assert.equal(guest.messages.at(-1).profileUrl, 'https://www.pinterest.com/sample/');
 
   const unknown = harness('https://www.pinterest.com/', null);
-  unknown.context.PinWebAuthSync(2);
+  unknown.context.PinmonyAuthSync(2);
   assert.equal(unknown.messages.length, 0, 'homepage URL alone is not login evidence');
   const account = harness('https://www.pinterest.com/', { initialReduxState: { session: {
     isAuthenticated: true, user: { id: '123', username: 'sample' }
   } } });
-  account.context.PinWebAuthSync(3);
+  account.context.PinmonyAuthSync(3);
   assert.equal(account.messages.at(-1).status, 'authenticated');
   account.location.href = 'https://www.pinterest.com/login/';
-  account.context.PinWebAuthSync(3);
+  account.context.PinmonyAuthSync(3);
   assert.equal(account.messages.at(-1).status, 'unauthenticated', 'SPA logout cannot reuse old authenticated initial props');
   account.location.href = 'https://www.pinterest.com/';
-  account.context.PinWebAuthSync(3);
+  account.context.PinmonyAuthSync(3);
   account.setResponse({ client_context: { is_authenticated: false, user: { id: '123' } } });
   await account.context.fetch('/resource/ApiResource/get/'); await flush();
   assert.equal(account.messages.at(-1).status, 'unauthenticated', 'explicit logout wins over a user ID');
@@ -82,10 +82,10 @@ async function check() {
   const names = ['selectSearchFilter', 'selectProfilePublish', 'performProfileAction', 'performInboxAction',
     'performSearchAction', 'performDetailAction', 'authWebVisible', 'updateAuthState'];
   const context = { PIN_PROFILE_API_ENABLED: true, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
-    PinWebRuntimeLog: { info() {}, warn() {} },
+    PinmonyRuntimeLog: { info() {}, warn() {} },
     PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
     PINTEREST_LOGIN_URL: 'https://www.pinterest.com/login/',
-    isPinterestAuthRoute: moduleFrom('entry/src/main/ets/models/PinWebAuth.ets').isPinterestAuthRoute };
+    isPinterestAuthRoute: moduleFrom('entry/src/main/ets/models/PinmonyAuth.ets').isPinterestAuthRoute };
   context.acceptsAuthMessage = acceptsAuthMessage;
   context.PINTEREST_URL = 'https://www.pinterest.com/';
   vm.runInNewContext(ts.transpileModule('class Native {' + names.map(method).join('\n') +
@@ -154,7 +154,7 @@ async function check() {
   assert.match(tabs, /\.animationDuration\(0\)/);
   assert.ok(!tabs.includes('HitTestMode.None'), 'collapsed bar must not disable root content touch');
   const build = source.slice(tabsEnd);
-  assert.ok(build.indexOf('this.buildRootTabs()') < build.indexOf('PinWebSettingsPage({'),
+  assert.ok(build.indexOf('this.buildRootTabs()') < build.indexOf('PinmonySettingsPage({'),
     'secondary pages cover Tabs rather than placing an empty overlay above them');
   console.log('Auth gate, session evidence, stale responses, hidden host and unsupported-action checks passed');
 }

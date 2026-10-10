@@ -2,17 +2,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 let ts; try { ts = require('typescript'); } catch (_) { ts = require(process.argv[2]); }
-const text = fs.readFileSync('common_network/src/main/ets/PinWebNativeNetwork.ets', 'utf8').replace(/^import .*;\r?$/gm, '');
+const text = fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets', 'utf8').replace(/^import .*;\r?$/gm, '');
 const code = ts.transpileModule(text, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
 const pin = 'https://www.pinterest.com/pin/101/';
 function harness(uploadHost = 'https://pinterest-media-upload.s3.amazonaws.com/', onUpload = () => {}) {
   const uploads = [], reads = [], context = { authenticated: true, epoch: 1, page: pin, userAgent: 'test' };
-  const scope = { exports: {}, PinWebSessionCredentials: class {}, PinWebRuntimeLog: { info() {}, warn() {} }, setTimeout,
+  const scope = { exports: {}, PinmonySessionCredentials: class {}, PinmonyRuntimeLog: { info() {}, warn() {} }, setTimeout,
     rcp: { MultipartForm: class { constructor(fields) { this.fields = fields; } },
       Request: class { constructor(url, method, headers, body) { Object.assign(this, { url, method, headers, body }); } },
       createSession: () => ({ fetch: async request => { uploads.push(request); onUpload(request); return { statusCode: 204 }; }, close() {}, cancel() {} }) } };
   vm.runInNewContext(code, scope);
-  const network = new scope.exports.PinWebNativeNetwork();
+  const network = new scope.exports.PinmonyNativeNetwork();
   network.request = async job => {
     reads.push(job);
     const registration = job.method === 'POST';

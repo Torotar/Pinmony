@@ -11,7 +11,7 @@ function method(name) {
 const timers = [], logs = [], marks = [], effects = [];
 const context = { Date, setTimeout: fn => timers.push(fn),
   isPinterestAuthRoute: url => url.includes('/login/'),
-  PinWebRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
+  PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
 vm.runInNewContext(ts.transpileModule(`class Native {
   ${['supersedeRootPreparationForDetail', 'protectedDetailAddress', 'ignoreSupersededDetailDocument',
     'isCurrentPageFailure', 'waitForWebTabConfirmation', 'requestRootPage',

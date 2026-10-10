@@ -1,13 +1,13 @@
 const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
-const src=readSourceFileSync('entry/src/main/ets/services/PinWebSearchQuizApiScript.ets','utf8');
+const src=readSourceFileSync('entry/src/main/ets/services/PinmonySearchQuizApiScript.ets','utf8');
 const script=Function('return `'+src.match(/`([\s\S]*)`;/)[1]+'`')();new Function(script);
 const requests=[],location={hostname:'www.pinterest.com',origin:'https://www.pinterest.com',pathname:'/search/pins/',search:'?q=test'};
 const mockFetch=(url,init)=>new Promise(resolve=>requests.push({url,init,resolve}));
-const window={PinWebSearchQuizApiEnabled:true,fetch:mockFetch};window.top=window;
+const window={PinmonySearchQuizApiEnabled:true,fetch:mockFetch};window.top=window;
 vm.runInNewContext(script,{window,location,URL,URLSearchParams,AbortController,setTimeout,clearTimeout,
 fetch:mockFetch});
-const api=window.PinWebSearchQuizApi,key=()=>location.origin+location.pathname+location.search,read=()=>api.read(key(),()=>{});
+const api=window.PinmonySearchQuizApi,key=()=>location.origin+location.pathname+location.search,read=()=>api.read(key(),()=>{});
 async function reply(index,data,status='success',bookmark='-end-'){requests[index].resolve({ok:true,json:async()=>({resource_response:{status,data,bookmark}})});await new Promise(setImmediate)}
 (async()=>{
 assert.equal(read(),null);assert.equal(requests.length,1);
@@ -55,6 +55,6 @@ assert.equal(api.action(key(),'back',''),true,'return works during an in-flight 
 assert.equal(requests[canceled].init.signal.aborted,true);
 assert.equal(read().mode,'entry');assert.equal(read().busy,false);
 await reply(canceled,{results:pins});assert.equal(read().cards.length,0,'canceled response cannot reopen picker');
-window.PinWebSearchQuizApiEnabled=false;assert.equal(read(),null);
+window.PinmonySearchQuizApiEnabled=false;assert.equal(read(),null);
 console.log('Search quiz requests, absence, selection cap, result mapping, errors, retry and stale response checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

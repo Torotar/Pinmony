@@ -3,9 +3,9 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const page = fs.readFileSync('feature_home/src/main/ets/components/PinWebHomePage.ets', 'utf8');
-const store = fs.readFileSync('feature_home/src/main/ets/stores/PinWebHomeStore.ets', 'utf8');
-const auth = fs.readFileSync('common_session/src/main/ets/models/PinWebAuth.ets', 'utf8');
+const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
+const store = fs.readFileSync('feature_home/src/main/ets/stores/PinmonyHomeStore.ets', 'utf8');
+const auth = fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8');
 assert.match(page, /lastHomePinCount: number = 0/, 'home tracks the initial API pin count');
 assert.match(page, /const firstApiSnapshot: boolean = this\.home\.dataSource === 'api'/,
   'home identifies the first non-empty API snapshot');
@@ -29,10 +29,10 @@ const code = auth.replace(/export /g, '') + '\n' +
   '\nclass Native {\n' + ['homePageKeyFromAddress', 'isHomeRootAddress', 'homePresentationPageKey',
     'prepareHomeForPageBegin', 'expectHome', 'clearHome', 'clearRootTabCaches'].map(name => method(index, name)).join('\n') + '\n}\n' +
   'class Feed {\n' + method(page, 'canShowFeed') + '\n}\n' +
-  'globalThis.Store=PinWebHomeStore;globalThis.Native=Native;globalThis.Feed=Feed;';
+  'globalThis.Store=PinmonyHomeStore;globalThis.Native=Native;globalThis.Feed=Feed;';
 const root = 'https://www.pinterest.com/';
 const timers = [];
-const context = { PINTEREST_URL: root, PinWebRuntimeLog: { info() {}, warn() {} },
+const context = { PINTEREST_URL: root, PinmonyRuntimeLog: { info() {}, warn() {} },
   setTimeout: callback => { timers.push(callback); return timers.length; } };
 vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 

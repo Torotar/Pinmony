@@ -1,7 +1,7 @@
 {
   "name": "common_ui",
   "version": "1.0.0",
-  "description": "PinWeb common_ui",
+  "description": "Pinmony common_ui",
   "main": "Index.ets",
   "dependencies": {}
 }

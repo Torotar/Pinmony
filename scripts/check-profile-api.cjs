@@ -3,21 +3,21 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinWebProfileApiScript.ets'), 'utf8');
+const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinmonyProfileApiScript.ets'), 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 new Function(script);
-const bridgeSource = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinWebProfileScript.ets'), 'utf8');
+const bridgeSource = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinmonyProfileScript.ets'), 'utf8');
 new Function(Function('return `' + bridgeSource.match(/`([\s\S]*?)`;/)[1] + '`')());
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function harness() {
   const requests = [];
-  const window = { PinWebProfileApiEnabled: true };
+  const window = { PinmonyProfileApiEnabled: true };
   window.top = window;
   let current = true, updates = 0;
   vm.runInNewContext(script, { window, URL, location: { hostname: 'www.pinterest.com', pathname: '/sample/' },
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
     AbortController, setTimeout, clearTimeout, console: { warn() {} } });
-  const read = (name = 'sample') => window.PinWebProfileApi.read('https://www.pinterest.com/' + name + '/',
+  const read = (name = 'sample') => window.PinmonyProfileApi.read('https://www.pinterest.com/' + name + '/',
     () => updates++, () => current);
   const respond = async (index, user, status = 200) => {
     requests[index].resolve({ ok: status === 200, json: async () => ({ resource_response: { status: 'success', data: user } }) });
@@ -41,7 +41,7 @@ async function main() {
   assert.equal(h.read().info.followers, 0, 'zero is real data');
   assert.equal(h.read().info.name, 'Sample');
   assert.equal(h.updates(), 1);
-  h.window.PinWebProfileApi.reset();
+  h.window.PinmonyProfileApi.reset();
   h.read();
   h.read('other');
   assert.equal(h.requests[1].options.signal.aborted, true, 'navigation cancels old request');
@@ -57,12 +57,12 @@ async function main() {
   failure.read(); await failure.respond(0, null, 403);
   assert.equal(failure.read().kind, 'failed', 'failure reports API error without DOM fallback');
   assert.equal(failure.requests.length, 1);
-  failure.window.PinWebProfileApi.reset(); failure.read();
+  failure.window.PinmonyProfileApi.reset(); failure.read();
   await failure.respond(1, { ...user, follower_count: -1, following_count: 'unknown', image_large_url: 'javascript:bad' });
   assert.equal(failure.read().info.followers, null);
   assert.equal(failure.read().info.following, null);
   assert.equal(failure.read().info.avatar, '');
-  failure.window.PinWebProfileApiEnabled = false;
+  failure.window.PinmonyProfileApiEnabled = false;
   assert.equal(failure.read(), null, 'rollback switch clears API data');
   console.log('Profile API checks passed');
 }

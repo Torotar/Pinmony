@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const source = fs.readFileSync('common_network/src/main/ets/PinWebNativeNetwork.ets', 'utf8');
+const source = fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets', 'utf8');
 const notes = fs.readFileSync('docs/NATIVE_NETWORK_NOTES.md', 'utf8');
 const architecture = fs.readFileSync('docs/ARCHITECTURE.md', 'utf8');
 assert(source.includes('private audit(event: string'), 'network lifecycle audit helper exists');

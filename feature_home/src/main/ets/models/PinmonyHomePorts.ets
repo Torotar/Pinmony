@@ -1,0 +1,31 @@
+import { PinmonyHomeSnapshot } from './PinmonyHome';
+export interface PinmonyHomePorts {
+  canAcceptMessages: () => boolean;
+  currentPageKey: () => string;
+  presentationPageKey: () => string;
+  retainedPageKey: () => string;
+  pageKeyFromAddress: (url: string) => string;
+  isOtherRoot: (url: string) => boolean;
+  isActive: () => boolean;
+  isAuthenticated: () => boolean;
+  runScript: (script: string) => Promise<string>;
+  ensureContext: (requireData: boolean, isCurrent: () => boolean) => Promise<boolean>;
+  rejectOffline: (operation: string) => boolean;
+  recoverOffline: () => boolean;
+  prepareRead: () => boolean;
+  requestRead: () => void;
+  reloadPage: (pageKey: string, refreshCurrent: boolean) => void;
+  pinIdentity: (url: string) => string;
+  knownPinTitle: (identity: string) => string;
+  isSaved: (identity: string) => boolean;
+  hasMeaningfulTitle: (title: string) => boolean;
+  recordPageKey: (pageKey: string) => void;
+  persistSnapshot: (snapshot: PinmonyHomeSnapshot) => void;
+  cardsCommitted: (pageKey: string, count: number, retained: boolean) => void;
+  contentReady: (count: number) => void;
+  markFeedConfirmed: () => void;
+  finishRecovery: () => void;
+  openPin: (pinUrl: string, source: string) => void;
+  traceAction: (name: string, detail: string) => void;
+  showMessage: (message: string) => void;
+}

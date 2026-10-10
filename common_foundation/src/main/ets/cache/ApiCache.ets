@@ -1,6 +1,6 @@
 import { LruCache } from './LruCache';
 import { DiskCache, DiskCacheReadResult } from './DiskCache';
-import { PinWebRuntimeLog } from '../services/PinWebRuntimeLog';
+import { PinmonyRuntimeLog } from '../services/PinmonyRuntimeLog';
 
 export interface ApiCacheReadResult<T> {
   value: T | null;
@@ -31,7 +31,7 @@ export class ApiCache {
 
   constructor(cacheDir: string, maxSize: number = 128) {
     this.memory = new LruCache<Object | string | number | boolean | null>(maxSize, CACHE_TTL.userProfile,
-      (): void => PinWebRuntimeLog.info('CacheAudit: memory lru eviction'));
+      (): void => PinmonyRuntimeLog.info('CacheAudit: memory lru eviction'));
     this.disk = new DiskCache(cacheDir);
   }
 
@@ -120,7 +120,7 @@ export class ApiCache {
     this.memory.put(key, value, ttlMs);
     const writeStartedAt: number = Date.now();
     this.disk.put(key, value);
-    PinWebRuntimeLog.info('CacheAudit: disk write committed elapsedMs=' +
+    PinmonyRuntimeLog.info('CacheAudit: disk write committed elapsedMs=' +
       (Date.now() - writeStartedAt).toString() + ' ttlMs=' + ttlMs.toString());
   }
 }

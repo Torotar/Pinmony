@@ -2,15 +2,15 @@ const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = readSourceFileSync('entry/src/main/ets/services/PinWebPostApiScript.ets', 'utf8');
+const source = process.argv[2] ? fs.readFileSync(process.argv[2], 'utf8') : readSourceFileSync('entry/src/main/ets/services/PinmonyPostApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 new Function(script);
 const requests = [], events = [];
 const pin = 'https://www.pinterest.com/pin/101/';
 let data = { id: '101', tracking_params: 'current-tracking', reaction_by_me: 0,
   aggregated_pin_id: '202', images: { '736x': { url: 'https://i.pinimg.com/current.jpg' } } };
-const window = { PinWebPostApiEnabled: true, PinWebDetailApi: { raw: () => data },
-  PinWebShareBridge: { postState: value => events.push(JSON.parse(value)) } }; window.top = window;
+const window = { PinmonyPostApiEnabled: true, PinmonyDetailApi: { raw: () => data },
+  PinmonyShareBridge: { postState: value => events.push(JSON.parse(value)) } }; window.top = window;
 const document = { cookie: 'csrftoken=current-session' };
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/pin/101/', href: pin };
 class XHR { open() {} send() {} setRequestHeader() {} addEventListener() {} }
@@ -18,7 +18,7 @@ window.fetch = (url, options) => new Promise(resolve => requests.push({ url, opt
 const context = { window, document, location, URL, URLSearchParams, Headers, XMLHttpRequest: XHR,
   AbortController, setTimeout, clearTimeout, fetch: (...args) => window.fetch(...args) };
 vm.runInNewContext(script, context);
-const api = window.PinWebPostApi;
+const api = window.PinmonyPostApi;
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function reply(index, resource, status = 200) {
   requests[index].resolve({ ok: status < 400, status, json: async () => resource, clone: () => ({ json: async () => resource }) }); await flush();
@@ -86,7 +86,7 @@ async function main() {
   assert.equal(api.shareSnapshot(snapshot(), () => {}).error, ''); // Opening does not generate an invitation.
   assert.equal(api.shareAction(1, 'copy'), true);
   await flush();
-  assert.match(api.shareSnapshot(snapshot(), () => {}).error, /尚未就绪/);
+  assert.equal(api.shareSnapshot(snapshot(), () => {}).error, ''); // Validated original-link copy is not an invitation failure.
   assert.equal(events.at(-1).kind, 'copy'); // Original Pin URL remains usable.
   events.length = 0;
   api.shareClose();
@@ -163,16 +163,16 @@ async function main() {
   await reply(start + 4, { resource_response: { status: 'success', code: 0,
     endpoint_name: 'v3_pin_see_more_user_feedback', data: { id: '101' } } });
   assert.equal(events.length, eventCount);
-  window.PinWebEditApiEnabled = true;
+  window.PinmonyEditApiEnabled = true;
   const editMenu = api.moreSnapshot({ session: 8, pin, options: [{ id: 'edit', label: '编辑 Pin 图', enabled: true }] });
   assert.equal(editMenu.options[0].enabled, true);
   assert.equal(api.moreAction(7, pin, 'edit', () => {}), false, 'stale menu session cannot open editor');
   assert.equal(api.moreAction(8, pin, 'edit', () => {}), true);
   assert.equal(events.at(-1).kind, 'editOpen');
-  window.PinWebEditApiEnabled = false;
+  window.PinmonyEditApiEnabled = false;
   assert.equal(api.moreSnapshot({ session: 9, pin, options: [{ id: 'edit', label: '编辑 Pin 图', enabled: true }] }).options[0].enabled, false);
-  const disabled = { ...window, PinWebPostApi: undefined, PinWebPostApiEnabled: false }; disabled.top = disabled;
-  vm.runInNewContext(script, { ...context, window: disabled }); assert.equal(disabled.PinWebPostApi, undefined);
+  const disabled = { ...window, PinmonyPostApi: undefined, PinmonyPostApiEnabled: false }; disabled.top = disabled;
+  vm.runInNewContext(script, { ...context, window: disabled }); assert.equal(disabled.PinmonyPostApi, undefined);
   console.log('post API contracts, writes, privacy errors, stale sessions, missing context, comments and rollback flag OK');
 }
 main().catch(error => { console.error(error); process.exit(1); });

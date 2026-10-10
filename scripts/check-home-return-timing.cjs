@@ -3,13 +3,13 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const history = fs.readFileSync('entry/src/main/ets/app/PinWebNavigationHistory.ets', 'utf8').replace('export class', 'class');
+const history = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationHistory.ets', 'utf8').replace('export class', 'class');
 const method = source.match(/  private backOnePage\([\s\S]*?(?=\r?\n  private async backFromDetail)/)[0];
 const loadMethod = source.match(/  private loadReturnTarget\([\s\S]*?(?=\r?\n  private backOnePage)/)[0];
 const timers = [];
 const context = { PINTEREST_URL: 'https://www.pinterest.com/', setTimeout: callback => timers.push(callback),
-  PinWebRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpile(history + '\nclass Native {' + loadMethod + method + '} globalThis.Native = Native; globalThis.History = PinWebNavigationHistory;',
+  PinmonyRuntimeLog: { info() {}, warn() {} } };
+vm.runInNewContext(ts.transpile(history + '\nclass Native {' + loadMethod + method + '} globalThis.Native = Native; globalThis.History = PinmonyNavigationHistory;',
   { target: ts.ScriptTarget.ES2020 }), context);
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/';
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -19,7 +19,7 @@ function harness(result = 'true') {
   pageHistory.visit(pin); // Native child exists before Web completes its history entry.
   Object.assign(native, { pageHistory, pageBackToken: 0, pinStore: { detail: { pinUrl: pin }, detailPrefetch: { pause() { events.push('pause'); } } },
     pinIdentity: url => url.match(/\/pin\/(\d+)/)?.[1] || '', bindCurrentDetailDocument() {},
-    searchUrlFromAddress: () => '', restoreRetainedSearch() {}, isHomeRootAddress: url => url === home,
+    searchUrlFromAddress: () => '', boardUrlFromAddress: () => '', restoreRetainedSearch() {}, isHomeRootAddress: url => url === home,
     nativeNetwork: { invalidate() { events.push('cancel'); } },
     presentNativeBackTarget(target) { events.push('present'); this.nativeBackTarget = target; this.pinStore.detail = undefined; },
     returnToHistoryEntry() { events.push('history'); return false; },
@@ -62,19 +62,19 @@ async function main() {
   assert.equal(superseded.events.some(value => value.startsWith('load:')), false, 'a new navigation discards old inspection results');
   assert.match(source, /this\.nativeBackTarget &&\s*this\.pageHistory\.key\(event\.url\) !== this\.pageHistory\.key\(this\.nativeBackTarget\)/,
     'late page-begin callbacks cannot reopen the source');
-  const nav = fs.readFileSync('entry/src/main/ets/app/PinWebNavigationScript.ets', 'utf8').match(/`([\s\S]*)`;/)[1];
+  const nav = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationScript.ets', 'utf8').match(/`([\s\S]*)`;/)[1];
   const domListeners = {}, observed = [];
-  const window = { top: null, PinWebShareBridge: { pageNavigation: (_url, mode) => observed.push(mode) }, addEventListener() {} };
+  const window = { top: null, PinmonyShareBridge: { pageNavigation: (_url, mode) => observed.push(mode) }, addEventListener() {} };
   window.top = window;
   vm.runInNewContext(Function('return `' + nav + '`')(), { window, location: { href: home },
     history: { pushState() {}, replaceState() {}, back() {}, go() {} },
     document: { addEventListener(name, fn) { domListeners[name] = fn; }, querySelectorAll: () => [] } });
   domListeners.DOMContentLoaded();
   assert.equal(observed.at(-1), 'ready', 'auth binding can run at DOM readiness before page-end');
-  const auth = fs.readFileSync('common_session/src/main/ets/services/PinWebAuthScript.ets', 'utf8').match(/`([\s\S]*)`;/)[1];
+  const auth = fs.readFileSync('common_session/src/main/ets/services/PinmonyAuthScript.ets', 'utf8').match(/`([\s\S]*)`;/)[1];
   let initial = null, observerCallback, disconnected = false;
   const authMessages = [];
-  const authWindow = { PinWebShareBridge: { authState: value => authMessages.push(JSON.parse(value)) } };
+  const authWindow = { PinmonyShareBridge: { authState: value => authMessages.push(JSON.parse(value)) } };
   authWindow.top = authWindow;
   class Observer {
     constructor(callback) { observerCallback = callback; }
@@ -84,7 +84,7 @@ async function main() {
   vm.runInNewContext(Function('return `' + auth + '`')(), { window: authWindow, URL,
     location: { href: home, origin: home.slice(0, -1), hostname: 'www.pinterest.com', pathname: '/' },
     MutationObserver: Observer, document: { getElementById: () => initial, addEventListener() {} } });
-  authWindow.PinWebAuthSync(7);
+  authWindow.PinmonyAuthSync(7);
   assert.equal(authMessages.length, 0, 'early binding still requires explicit login evidence');
   initial = { textContent: JSON.stringify({ initialReduxState: { session: { isAuthenticated: true,
     user: { id: '123', username: 'sample' } } } }) };
@@ -92,7 +92,7 @@ async function main() {
   assert.equal(authMessages.at(-1).status, 'authenticated', 'streamed initialization evidence can publish before page-end');
   assert.equal(authMessages.at(-1).epoch, 7);
   assert.equal(disconnected, true, 'evidence observation stops after confirmation');
-  const page = fs.readFileSync('feature_home/src/main/ets/components/PinWebHomePage.ets', 'utf8');
+  const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
   const pageMethods = ['onHomeChanged', 'onPrefetchAvailabilityChanged', 'prefetchVisibleDetails', 'feedStatusText'].map(name => {
     const start = page.indexOf('  private ' + name + '(');
     const rest = page.slice(start);

@@ -9,11 +9,11 @@ function method(name) {
 const callback = source.match(/    this.shareBridge.onPageNavigation = [\s\S]*?(?=\r?\n    this.shareBridge.onShare)/)[0];
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/';
 const settings = [], events = [], auth = {};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinWebAuth.ets', 'utf8'),
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8'),
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, { exports: auth });
 const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: home + 'login/',
   webview: { BackForwardCacheOptions: class {} }, clearTimeout() {},
-  PinWebRuntimeLog: { info() {}, warn() {} }, retainHomePins: (_old, pins) => pins };
+  PinmonyRuntimeLog: { info() {}, warn() {} }, retainHomePins: (_old, pins) => pins };
 vm.runInNewContext(ts.transpile('class Native { constructor() { this.shareBridge={};' + callback + '} ' +
   ['configureDocumentRetention', 'updateAuthState', 'updateHome'].map(method).join('\n') + '} globalThis.Native=Native;',
   { target: ts.ScriptTarget.ES2021 }), context);
@@ -33,6 +33,7 @@ Object.assign(native, { authStatus: 'authenticated', authEpoch: 9, authCheckTime
   normalizeHomeBoard: () => undefined, persistHomeDiskCache() {},
   profileUrlFromAddress: () => '', homeCacheAccountIdFromProfileUrl: () => '', tryRestoreAuthenticatedHome() {},
   ignoreSupersededDetailDocument: () => false, bindCurrentDetailDocument() {}, showMessage() {} });
+require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
 native.configureDocumentRetention(true); native.configureDocumentRetention(false);
 assert.deepEqual(settings.map(value => [value.size, value.timeToLive]), [[4, 300], [0, 300]], 'bounded retention is disabled at login/session loss');
 native.shareBridge.onPageNavigation(home, 'restore');
@@ -52,9 +53,9 @@ const reset = method('resetAuthenticatedContent');
 assert.ok(reset.includes('this.configureDocumentRetention(false)') && reset.includes('this.controller.clearHistory()'), 'explicit logout/session loss prevents back into old account documents');
 const ability = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8');
 assert.ok(ability.indexOf('enableBackForwardCache(features)') < ability.indexOf('initializeWebEngine()'), 'platform requires enabling before engine initialization');
-const navTemplate = fs.readFileSync('entry/src/main/ets/app/PinWebNavigationScript.ets', 'utf8').match(/`([\s\S]*?)`;/)[1];
+const navTemplate = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationScript.ets', 'utf8').match(/`([\s\S]*?)`;/)[1];
 const browserEvents = {}, notices = [];
-const window = { top: null, PinWebShareBridge: { pageNavigation: (_url, mode) => notices.push(mode) },
+const window = { top: null, PinmonyShareBridge: { pageNavigation: (_url, mode) => notices.push(mode) },
   addEventListener(name, fn) { browserEvents[name] = fn; } }; window.top = window;
 vm.runInNewContext(Function('return `' + navTemplate + '`')(), { window, location: { href: home },
   history: { pushState() {}, replaceState() {}, back() {}, go() {} }, document: { querySelectorAll: () => [], addEventListener() {} } });

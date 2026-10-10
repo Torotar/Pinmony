@@ -30,9 +30,9 @@ const mocks = {
         release: async () => events.push('packer-release') };
     }
   } },
-  common_foundation: { PinWebRuntimeLog: { info() {}, warn() {}, error() {}, export: async () => true } }
+  common_foundation: { PinmonyRuntimeLog: { info() {}, warn() {}, error() {}, export: async () => true } }
 };
-const Actions = createArktsLoader(ts, mocks).loadFile('entry/src/main/ets/app/PinWebSystemActions.ets').PinWebSystemActions;
+const Actions = createArktsLoader(ts, mocks).loadFile('entry/src/main/ets/app/PinmonySystemActions.ets').PinmonySystemActions;
 const actions = new Actions(() => context, message => notices.push(message));
 function item(guid) {
   return { getGuid: () => guid, getSuggestedFileName: () => 'photo:*?.jpg', getLastErrorCode: () => 1,

@@ -1,10 +1,10 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const source=fs.readFileSync('feature_search/src/main/ets/services/PinWebSearchUiApiScript.ets','utf8');
+const source=fs.readFileSync('feature_search/src/main/ets/services/PinmonySearchUiApiScript.ets','utf8');
 const tick=String.fromCharCode(96),script=Function('return '+source.slice(source.indexOf(tick),source.lastIndexOf(tick)+1))();
 const flush=()=>new Promise(r=>setImmediate(r));
 async function main(){
- const requests=[];const env={URL,URLSearchParams,AbortController,setTimeout,clearTimeout,PinWebSearchUiApiEnabled:true,location:{hostname:'www.pinterest.com',origin:'https://www.pinterest.com',pathname:'/search/',search:'',href:'https://www.pinterest.com/search/'},fetch:(url,init)=>new Promise(resolve=>requests.push({url,init,resolve}))};env.window=env;env.top=env;vm.runInNewContext(script,env);
- const api=env.PinWebSearchUiApi,page=env.location.href,read=()=>api.readSuggestions(page,'',true,()=>{});
+ const requests=[];const env={URL,URLSearchParams,AbortController,setTimeout,clearTimeout,PinmonySearchUiApiEnabled:true,location:{hostname:'www.pinterest.com',origin:'https://www.pinterest.com',pathname:'/search/',search:'',href:'https://www.pinterest.com/search/'},fetch:(url,init)=>new Promise(resolve=>requests.push({url,init,resolve}))};env.window=env;env.top=env;vm.runInNewContext(script,env);
+ const api=env.PinmonySearchUiApi,page=env.location.href,read=()=>api.readSuggestions(page,'',true,()=>{});
  const reply=async(i,resource)=>{requests[i].resolve({ok:true,json:async()=>({resource_response:resource})});await flush();};
  read();await new Promise(r=>setTimeout(r,280));
  const items=[{query:'raw-query',display_query:'Display text',type:'recent_query',vertical:'pins'},{query:'personal',display_query:'Personal',type:'recent_personal_searches',vertical:'personal'}];

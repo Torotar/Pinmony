@@ -13,7 +13,7 @@ const names = ['rootActionContextReady', 'ensureRootActionContext', 'prepareProf
   'performProfileAction', 'openProfileBoard', 'changeProfileTab', 'retryInboxContacts',
   'performSearchQuizAction', 'openProfilePublish', 'readProfilePublishWhenReady', 'requestAccountSettings'];
 const context = { Date, setTimeout: (fn, ms) => ms <= 100 ? setTimeout(fn, ms) : 0,
-  PinWebRuntimeLog: { info() {}, warn() {} }, PIN_PROFILE_API_ENABLED: true, PIN_BOARD_API_ENABLED: true,
+  PinmonyRuntimeLog: { info() {}, warn() {} }, PIN_PROFILE_API_ENABLED: true, PIN_BOARD_API_ENABLED: true,
   PIN_ACCOUNT_SETTINGS_SCRIPT: '', useNativeTransport: () => '' };
 vm.runInNewContext(ts.transpileModule('class Native {' + names.map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
@@ -44,7 +44,7 @@ function harness(index) {
     requestRootPage(i) { n.tabRequestToken++; n.pendingWebTab = i; requests.push(['prepare', i]); },
     controller: { getUrl: () => document, loadUrl: url => requests.push(['load', url]), runJavaScript: async code => {
       requests.push(['js', code]);
-      if (code.includes('PinWebAccountSettings.read()')) return JSON.stringify({ token: n.settingsStore.token,
+      if (code.includes('PinmonyAccountSettings.read()')) return JSON.stringify({ token: n.settingsStore.token,
         page: document, loading: false, countries: [], email: '', birthdate: '', gender: '', customGender: '', error: '' });
       return 'true';
     } } });
@@ -69,18 +69,18 @@ function harness(index) {
   assert.equal(retained.n.boardStore.boardReturnUrl, roots[3] + '_created/?view=test', 'complete retained origin is preserved');
   const profile = harness(3), tab = profile.n.changeProfileTab('saved');
   assert.deepEqual(profile.requests, [['prepare', 3]]); profile.ready(); await tab;
-  assert.match(profile.requests.at(-1)[1], /PinWebProfileTab\(22,/);
+  assert.match(profile.requests.at(-1)[1], /PinmonyProfileTab\(22,/);
   const contacts = harness(2), retry = contacts.n.retryInboxContacts();
   contacts.ready(); await retry;
-  assert.match(contacts.requests.at(-1)[1], /PinWebInboxContactsApiRefresh\(22\)/,
+  assert.match(contacts.requests.at(-1)[1], /PinmonyInboxContactsApiRefresh\(22\)/,
     'failed contacts can retry with confirmed section context');
   const quiz = harness(1), topic = quiz.n.performSearchQuizAction('topic', '0'); quiz.ready(); await topic;
-  assert.match(quiz.requests.at(-1)[1], /PinWebSearchQuizAction\(22,/);
+  assert.match(quiz.requests.at(-1)[1], /PinmonySearchQuizAction\(22,/);
   const publish = harness(3); publish.n.openProfilePublish();
   assert.equal(publish.n.activeSheetKind, 'publish'); assert.equal(publish.n.profileStore.publishLoading, true);
   publish.ready(); await new Promise(resolve => setTimeout(resolve, 130));
-  assert.match(publish.requests.at(-1)[1], /PinWebProfilePublishDiscover\(22,/);
-  const profileScript = fs.readFileSync('feature_profile/src/main/ets/services/PinWebProfileScript.ets', 'utf8');
+  assert.match(publish.requests.at(-1)[1], /PinmonyProfilePublishDiscover\(22,/);
+  const profileScript = fs.readFileSync('feature_profile/src/main/ets/services/PinmonyProfileScript.ets', 'utf8');
   assert.match(profileScript, /function containsPublishOptions\(node\)/,
     'publish discovery validates option contents inside a bounded menu');
   assert.match(profileScript, /found\.website && found\.photo && found\.board/,
@@ -100,7 +100,7 @@ function harness(index) {
   const canceled = harness(3), pending = canceled.n.requestAccountSettings('privateProfile', 'true');
   canceled.n.profileSettingsVisible = false; canceled.n.settingsStore.token++; canceled.ready(); await pending;
   assert.deepEqual(canceled.requests, [['prepare', 3]], 'closed settings never submits a waiting write');
-  const filter = fs.readFileSync('feature_search/src/main/ets/controllers/PinWebSearchController.ets', 'utf8');
+  const filter = fs.readFileSync('feature_search/src/main/ets/controllers/PinmonySearchController.ets', 'utf8');
   const open = filter.slice(filter.indexOf('  async openSearchFilters()'), filter.indexOf('  refreshSearchFilters('));
   assert(open.indexOf('ensureContext(true)') < open.indexOf('searchActionsReady')); 
   assert.match(source, /keepPublish: boolean = this\.profilePublishPreparing/);

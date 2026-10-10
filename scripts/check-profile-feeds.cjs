@@ -3,15 +3,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinWebProfileApiScript.ets'), 'utf8');
+const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinmonyProfileApiScript.ets'), 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function main() {
-  const requests = [], window = { PinWebProfileApiEnabled: true }; window.top = window;
+  const requests = [], window = { PinmonyProfileApiEnabled: true }; window.top = window;
   const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/sample/' };
   vm.runInNewContext(script, { window, location, URL, AbortController, setTimeout, clearTimeout,
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })), console });
-  const api = window.PinWebProfileApi, profile = 'https://www.pinterest.com/sample/';
+  const api = window.PinmonyProfileApi, profile = 'https://www.pinterest.com/sample/';
   const changed = () => {}, current = () => true;
   const respond = async (index, data, bookmark, ok = true) => {
     requests[index].resolve({ ok, json: async () => ({ resource_response: { status: 'success', data, bookmark } }) });

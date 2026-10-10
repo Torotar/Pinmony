@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinWebHomeApiScript.ets'), 'utf8');
+const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinmonyHomeApiScript.ets'), 'utf8');
 const template = source.match(/`([\s\S]*?)`;/)[1];
 const script = Function('return `' + template + '`')();
 new Function(script);
@@ -13,17 +13,17 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 function harness(enabled = true, initial = null) {
   const requests = [];
   let valid = true;
-  const window = { PinWebHomeApiEnabled: enabled };
+  const window = { PinmonyHomeApiEnabled: enabled };
   window.top = window;
   vm.runInNewContext(script, { window, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/' },
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
     AbortController, setTimeout, clearTimeout, console: { warn() {} } });
-  const read = (key = '1:/全部', eligible = true, boardId = '') => window.PinWebHomeApi.read(key, eligible, () => {}, () => valid, boardId);
+  const read = (key = '1:/全部', eligible = true, boardId = '') => window.PinmonyHomeApi.read(key, eligible, () => {}, () => valid, boardId);
   const respond = async (index, value, status = 200) => {
     requests[index].resolve({ ok: status === 200, status, json: async () => value });
     await flush();
   };
-  return { api: window.PinWebHomeApi, requests, read, respond, invalidate: () => { valid = false; } };
+  return { api: window.PinmonyHomeApi, requests, read, respond, invalidate: () => { valid = false; } };
 }
 async function main() {
   const h = harness();

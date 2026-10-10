@@ -2,12 +2,12 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
-const source = fs.readFileSync('feature_pin/src/main/ets/components/PinWebDetailHero.ets', 'utf8');
-const parent = fs.readFileSync('feature_pin/src/main/ets/components/PinWebDetailPage.ets', 'utf8');
+const source = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailHero.ets', 'utf8');
+const parent = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
 const method = name => source.match(new RegExp('  (?:private )?' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0];
 let serial = 0;
 const timers = new Map(), decoded = [], logs = [];
-const context = { Date, PinWebRuntimeLog: { info: line => logs.push(line) },
+const context = { Date, PinmonyRuntimeLog: { info: line => logs.push(line) },
   setTimeout(fn, delay) { const id = ++serial; timers.set(id, { fn, delay }); return id; },
   clearTimeout(id) { timers.delete(id); } };
 vm.runInNewContext(ts.transpileModule(`class Hero {

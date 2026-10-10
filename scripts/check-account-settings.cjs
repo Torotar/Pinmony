@@ -9,9 +9,9 @@ function moduleFrom(file, requireFn = () => ({})) {
   }).outputText, { exports, require: requireFn, console });
   return exports;
 }
-const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinWebAccountSettingsScript.ets');
-const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinWebNativeNetwork.ets');
-const { useNativeTransport } = moduleFrom('common_network/src/main/ets/PinWebNetworkScript.ets');
+const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets');
+const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinmonyNativeNetwork.ets');
+const { useNativeTransport } = moduleFrom('common_network/src/main/ets/PinmonyNetworkScript.ets');
 const page = 'https://www.pinterest.com/synthetic/';
 function harness() {
   const account = { id: '123', username: 'synthetic', email: 'synthetic@example.invalid', has_confirmed_email: true,
@@ -36,7 +36,7 @@ function harness() {
     } };
   context.window = context; context.top = context;
   vm.runInNewContext(PIN_ACCOUNT_SETTINGS_SCRIPT, context);
-  return { context, account, writes, calls, api: context.PinWebAccountSettings,
+  return { context, account, writes, calls, api: context.PinmonyAccountSettings,
     failWrite() { failWrite = true; }, wrongAck() { wrongAck = true; }, delay(fn) { delayed = fn; } };
 }
 async function main() {
@@ -75,7 +75,7 @@ async function main() {
   assert(!accepts({ surface_tag: 'settings', user_id: '123', gender: 'male', country: 'US' }));
   assert(!accepts({ surface_tag: 'settings', user_id: '123', custom_gender: 'x'.repeat(501) }));
   assert(acceptsNetworkJob({ ...job, method: 'GET', url: 'https://www.pinterest.com/resource/CountriesResource/get/' }, state));
-  assert.match(useNativeTransport(PIN_ACCOUNT_SETTINGS_SCRIPT), /window.PinWebNetwork.fetch\(/);
+  assert.match(useNativeTransport(PIN_ACCOUNT_SETTINGS_SCRIPT), /window.PinmonyNetwork.fetch\(/);
   console.log('Account settings: mapping, validated writes, invalid dates, identity, countries, no replay, cancellation and native allowlist passed');
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });

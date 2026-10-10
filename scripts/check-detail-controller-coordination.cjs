@@ -1,0 +1,32 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+
+const controller = fs.readFileSync('feature_pin/src/main/ets/controllers/PinmonyDetailController.ets', 'utf8');
+const ports = fs.readFileSync('feature_pin/src/main/ets/models/PinmonyDetailPorts.ets', 'utf8');
+const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+
+assert.match(ports, /postApiEnabled: \(\) => boolean/);
+assert.match(ports, /postExtensionsEnabled: \(\) => boolean/);
+assert.match(controller, /ensureActionContext\(\)/);
+assert.match(controller, /detailPresentationOnly/);
+assert.match(controller, /detailActionsReady/);
+assert.match(controller, /detailOpeningToken/);
+assert.match(controller, /isForeground\(\)/);
+assert.match(controller, /actionsRetained/);
+assert.match(controller, /kind === 'comment'/);
+assert.match(controller, /kind === 'save'/);
+assert.match(controller, /kind === 'share'/);
+assert.match(controller, /kind === 'more'/);
+assert.match(controller, /kind === 'source'/);
+assert.match(controller, /kind !== 'like'/);
+assert.match(controller, /postApiEnabled\(\)/);
+assert.match(controller, /postExtensionsEnabled\(\)/);
+assert.match(controller, /externalSourceUrl/);
+assert.match(index, /PinmonyNativeShareApiOpen/);
+assert.match(index, /new PinmonyDetailController\(\{/);
+assert.match(index, /postApiEnabled: \(\): boolean => PIN_POST_API_ENABLED/);
+assert.match(index, /postExtensionsEnabled: \(\): boolean => PIN_POST_EXTENSIONS_ENABLED/);
+assert.match(index, /return this\.detailController\.ensureActionContext\(\)/);
+assert.match(index, /await this\.detailController\.performAction\(id, kind\)/);
+assert.doesNotMatch(index, /ensureDetailActionContextLegacy|performDetailActionLegacy/);
+console.log('Detail controller coordination: ports, readiness guards, API gates, action dispatch and Index delegation passed');

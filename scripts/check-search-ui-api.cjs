@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const source = readSourceFileSync(path.join(__dirname,
-  '../entry/src/main/ets/services/PinWebSearchUiApiScript.ets'), 'utf8');
+  '../entry/src/main/ets/services/PinmonySearchUiApiScript.ets'), 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*)`;/)[1] + '`')();
 new Function(script);
 const filterData = [{ type: 'filter', title: null, filter_options: [
@@ -24,7 +24,7 @@ function harness() {
     respond(payload) { this.status = 200; this.responseText = JSON.stringify(payload); this.callback(); }
   }
   let updated = 0;
-  const env = { PinWebSearchUiApiEnabled: true, URL, URLSearchParams, AbortController,
+  const env = { PinmonySearchUiApiEnabled: true, URL, URLSearchParams, AbortController,
     XMLHttpRequest: XHR, setTimeout, clearTimeout,
     location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com',
       pathname: '/search/pins/', search: '?q=garden', href: 'https://www.pinterest.com/search/pins/?q=garden' },
@@ -32,7 +32,7 @@ function harness() {
     fetch: (url, init) => new Promise(resolve => requests.push({ url, init, resolve })) };
   env.window = env; env.top = env;
   vm.runInNewContext(script, env);
-  const api = env.PinWebSearchUiApi;
+  const api = env.PinmonySearchUiApi;
   return { env, api, requests, get updates() { return updated; },
     page: () => env.location.origin + env.location.pathname + env.location.search,
     hint() { return api.readHint(this.page(), () => updated++); },
@@ -115,7 +115,7 @@ async function main() {
   const cursorHarness = harness();
   cursorHarness.hint(); await cursorHarness.respond(0, [{ text: '搜索' }]);
   let latestCursor = 'first';
-  cursorHarness.env.PinWebSearchApi = { context: () => ({ page: cursorHarness.page(), bookmark: latestCursor }) };
+  cursorHarness.env.PinmonySearchApi = { context: () => ({ page: cursorHarness.page(), bookmark: latestCursor }) };
   assert.equal(cursorHarness.filters().status, 'loading');
   latestCursor = 'second'; cursorHarness.filters();
   assert.equal(cursorHarness.requests[1].init.signal.aborted, true, 'a new API cursor cancels old filter request');
@@ -131,7 +131,7 @@ async function main() {
   ] }];
   const websiteHarness = harness();
   websiteHarness.hint(); await websiteHarness.respond(0, [{ text: '搜索' }]);
-  websiteHarness.env.PinWebSearchApi = { context: () => ({ page: websiteHarness.page(), bookmark: 'rebuilt-search-cursor' }) };
+  websiteHarness.env.PinmonySearchApi = { context: () => ({ page: websiteHarness.page(), bookmark: 'rebuilt-search-cursor' }) };
   websiteHarness.filters();
   const websiteRequest = websiteHarness.filterRequest('actual-website-filter-cursor');
   websiteRequest.respond({ resource_response: { status: 'success', data: websiteData } });
@@ -154,7 +154,7 @@ async function main() {
   await websiteHarness.respond(2, websiteData);
   const lateFilterRequest = websiteHarness.filterRequest('late-cursor');
   websiteHarness.api.selectedFilter();
-  websiteHarness.env.PinWebSearchApi = { context: () => ({ page: '', bookmark: '' }) };
+  websiteHarness.env.PinmonySearchApi = { context: () => ({ page: '', bookmark: '' }) };
   lateFilterRequest.respond({ resource_response: { status: 'success', data: websiteData } });
   assert.equal(websiteHarness.filters().status, 'waiting-search', 'pre-selection website filter response is rejected');
   const initialHarness = harness();
@@ -178,7 +178,7 @@ async function main() {
   pagingXhr.send(new URLSearchParams({source_url:'/search/pins/?q=garden',data:JSON.stringify({options:{query:'garden',bookmarks:['next']}})}).toString());
   pagingXhr.respond({resource_response:{status:'success',data:{results:[]},bookmark:'-end-'}});
   assert.equal(requestHarness.api.readSearch(requestHarness.page()).version,initialVersion,'empty pagination is not treated as an empty first page');
-  h.env.PinWebSearchUiApiEnabled = false; assert.equal(h.filters(), null); assert.equal(h.hint(), null);
+  h.env.PinmonySearchUiApiEnabled = false; assert.equal(h.filters(), null); assert.equal(h.hint(), null);
   const suggestions = harness();
   const getSuggestions = term => suggestions.api.readSuggestions(suggestions.page(), term, true, () => {});
   getSuggestions('海'); getSuggestions('海报');

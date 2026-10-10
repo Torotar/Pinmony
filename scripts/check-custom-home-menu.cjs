@@ -2,13 +2,13 @@ const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = readSourceFileSync('entry/src/main/ets/services/PinWebPostApiScript.ets', 'utf8');
+const source = readSourceFileSync('entry/src/main/ets/services/PinmonyPostApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const requests = [], events = [];
 const pin = 'https://www.pinterest.com/pin/101/', page = 'https://www.pinterest.com/';
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/', href: page };
-const window = { PinWebPostApiEnabled: true, PinWebPostExtensionsEnabled: true,
-  PinWebShareBridge: { postState: value => events.push(JSON.parse(value)) } }; window.top = window;
+const window = { PinmonyPostApiEnabled: true, PinmonyPostExtensionsEnabled: true,
+  PinmonyShareBridge: { postState: value => events.push(JSON.parse(value)) } }; window.top = window;
 window.fetch = (url, options) => new Promise(resolve => requests.push({ url, options, resolve }));
 class XHR { open() {} send() {} setRequestHeader() {} addEventListener() {} }
 const context = vm.createContext({ window, document: { cookie: 'csrftoken=current',
@@ -16,9 +16,9 @@ const context = vm.createContext({ window, document: { cookie: 'csrftoken=curren
   Headers, XMLHttpRequest: XHR, AbortController, setTimeout, clearTimeout, btoa: value => Buffer.from(value).toString('base64'),
   fetch: (...args) => window.fetch(...args) });
 vm.runInContext(script, context);
-const extension = readSourceFileSync('entry/src/main/ets/services/PinWebPostExtensionsScript.ets', 'utf8');
+const extension = readSourceFileSync('entry/src/main/ets/services/PinmonyPostExtensionsScript.ets', 'utf8');
 vm.runInContext(Function('return `' + extension.match(/= `([\s\S]*?)`;/)[1] + '`')(), context);
-const api = window.PinWebPostApi;
+const api = window.PinmonyPostApi;
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function reply(index, resource) {
   const json = { resource_response: { status: 'success', code: 0, ...resource } };

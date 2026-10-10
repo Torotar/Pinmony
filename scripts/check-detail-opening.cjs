@@ -17,8 +17,8 @@ function compile(path, deps = () => ({})) {
   }).outputText, { exports, require: deps, console, setTimeout, clearTimeout });
   return exports;
 }
-const { PinWebDetailPrefetch } = compile('feature_pin/src/main/ets/services/PinWebDetailPrefetch.ets',
-  () => ({ PinWebRuntimeLog: log }));
+const { PinmonyDetailPrefetch } = compile('feature_pin/src/main/ets/services/PinmonyDetailPrefetch.ets',
+  () => ({ PinmonyRuntimeLog: log }));
 const requests = [], cookies = [];
 let reply, finish;
 const rcp = { Request: class { constructor(url, method, headers) { Object.assign(this, { url, method, headers }); } },
@@ -26,14 +26,14 @@ const rcp = { Request: class { constructor(url, method, headers) { Object.assign
 class Credentials { async read() { return 'synthetic'; } async update(_url, value, current) {
   assert(current()); cookies.push(value);
 } }
-const { PinWebNativeNetwork, acceptsNetworkJob } = compile('common_network/src/main/ets/PinWebNativeNetwork.ets', name =>
-  name === 'common_session' ? { PinWebSessionCredentials: Credentials } : name === 'common_foundation' ?
-    { PinWebRuntimeLog: log } : { rcp });
+const { PinmonyNativeNetwork, acceptsNetworkJob } = compile('common_network/src/main/ets/PinmonyNativeNetwork.ets', name =>
+  name === 'common_session' ? { PinmonySessionCredentials: Credentials } : name === 'common_foundation' ?
+    { PinmonyRuntimeLog: log } : { rcp });
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 function method(name) { const begin = index.indexOf(`  private ${name}`); const end = index.indexOf('\n  private ', begin + 1); return index.slice(begin, end); }
 const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true,
   PINTEREST_URL: 'https://www.pinterest.com/', acceptsNetworkJob,
-  PinWebRuntimeLog: log, readRelatedPresentation: () => undefined, setTimeout() {}, clearTimeout() {} };
+  PinmonyRuntimeLog: log, readRelatedPresentation: () => undefined, setTimeout() {}, clearTimeout() {} };
 vm.runInNewContext(ts.transpileModule(`class Native {
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}
@@ -45,7 +45,7 @@ vm.runInNewContext(ts.transpileModule(`class Native {
   ${method('async detailNetworkReply', 'showNetworkNotice')}
 } globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 async function main() {
-  const cache = new PinWebDetailPrefetch(), network = new PinWebNativeNetwork();
+  const cache = new PinmonyDetailPrefetch(), network = new PinmonyNativeNetwork();
   const state = { authenticated: true, epoch: 1, page: 'https://www.pinterest.com/', userAgent: 'synthetic' };
   const source = { ...state };
   let homeCurrent = true;
@@ -71,6 +71,8 @@ async function main() {
     closeImageLayer() {}, clearRootTabGuard() {}, pageHistory: { visit() {}, cancelBack() {} },
     clearDetail() { this.pinStore.detail = undefined; this.pinStore.detailActionsReady = false; this.pinStore.detailOpeningToken++; },
     restoreCachedDetail() {}, probeDetailDocument() {}, detailReadNetwork: network,
+    detailReadCache: { retained() { return undefined; }, store() {}, clear() {}, reset() {} },
+    detailImageStage: { reset() {} },
     nativeNetwork: { request() { throw Error('duplicate or unvalidated request reached regular network'); } },
     nativeNetworkContext: () => ({ ...state }), currentPinUrl: () => state.page });
   native.beginDetailOpening(url(1)); homeCurrent = false;
@@ -99,19 +101,14 @@ async function main() {
   assert.equal(native.openingRelated, undefined, 'related handoff is single-use');
   assert.equal(cache.consume(url(1)), undefined, 'only one current document may consume a demand reply');
 
-  native.detailReturnReadPin = '1'; native.pinStore.detailPin = url(1);
-  native.detailReturnReads.set('https://www.pinterest.com/resource/UnifiedCommentsPreviewResource/get/?data=synthetic', response(1));
+  native.pinStore.detailPin = url(1);
   const cachedJob = { ...job, id: 'return_comments', url: 'https://www.pinterest.com/resource/UnifiedCommentsPreviewResource/get/?data=synthetic' };
-  const cachedRead = native.retainedDetailRead(cachedJob);
+  const cachedReply = { ...cachedJob, status: 200, body: response(1), headers: {}, error: '' };
+  native.detailReadCache = { retained: current => current.method === 'GET' && current.url === cachedJob.url ? cachedReply : undefined, store() {}, clear() {}, reset() {} };
+  const cachedRead = native.detailReadCache.retained(cachedJob);
   assert.equal(cachedRead.id, cachedJob.id);
-  assert.equal(native.detailReturnReadKey(cachedJob.url + '&_=123'), cachedJob.url, 'only volatile timestamp is ignored');
-  assert.equal(native.retainedDetailRead({ ...cachedJob, url: cachedJob.url + '&_=456' }).id, cachedJob.id, 'return reuses a reply with a fresh cache-buster');
   assert.equal(Object.keys(cachedRead.headers).length, 0, 'cache never replays response headers or cookies');
-  assert.equal(native.retainedDetailRead({ ...cachedJob, method: 'POST' }), undefined);
-  assert.equal(native.retainedDetailRead({ ...cachedJob, url: cachedJob.url + 'different' }), undefined);
-  native.detailReturnReadPin = '2';
-  assert.equal(native.retainedDetailRead(cachedJob), undefined, 'another Pin cannot reuse the return cache');
-  native.detailReturnReadPin = '';
+  assert.equal(native.detailReadCache.retained({ ...cachedJob, method: 'POST' }), undefined);
   // Returning/cancelling is irrevocable even if the SDK delivers an HTTP 200 later.
   cache.pause(); network.invalidate();
   reply = new Promise(resolve => { finish = resolve; });

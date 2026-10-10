@@ -34,11 +34,11 @@ const rcp = {
     sessions.push(session); return session;
   }
 };
-const { PinWebNativeNetwork, NetworkManager, RequestScheduler, Priority, acceptsNetworkJob } = compiled('common_network/src/main/ets/PinWebNativeNetwork.ets', name =>
-  name === 'common_session' ? {PinWebSessionCredentials:Credentials} : name === 'common_foundation' ?
-    {PinWebRuntimeLog:{info(message){runtimeLogs.push({level:'info',message});},warn(message){runtimeLogs.push({level:'warn',message});}}} : {rcp});
-const {PIN_NATIVE_NETWORK_SCRIPT,useNativeTransport} = compiled('common_network/src/main/ets/PinWebNetworkScript.ets',()=>({}));
-const native = new PinWebNativeNetwork();
+const { PinmonyNativeNetwork, NetworkManager, RequestScheduler, Priority, acceptsNetworkJob } = compiled('common_network/src/main/ets/PinmonyNativeNetwork.ets', name =>
+  name === 'common_session' ? {PinmonySessionCredentials:Credentials} : name === 'common_foundation' ?
+    {PinmonyRuntimeLog:{info(message){runtimeLogs.push({level:'info',message});},warn(message){runtimeLogs.push({level:'warn',message});}}} : {rcp});
+const {PIN_NATIVE_NETWORK_SCRIPT,useNativeTransport} = compiled('common_network/src/main/ets/PinmonyNetworkScript.ets',()=>({}));
+const native = new PinmonyNativeNetwork();
 const state = { authenticated:true,epoch:3,page:'https://www.pinterest.com/',userAgent:'synthetic-agent' };
 const base = { id:'test',epoch:3,page:state.page,url:'https://www.pinterest.com/resource/UserHomefeedResource/get/?data=synthetic',method:'GET',headers:{Accept:'application/json'},body:'' };
 async function main() {
@@ -67,7 +67,7 @@ async function main() {
   assert(acceptsNetworkJob({...base, method:'POST', url:'https://www.pinterest.com/resource/ConversationMessagesResource/create/'}, state), 'confirmed chat send reaches native transport');
   assert(!acceptsNetworkJob({...base, method:'POST', url:'https://www.pinterest.com/resource/ConversationMessagesResource/delete/'}, state), 'unconfirmed message resource operations stay blocked');
   const cookieCalls=[];
-  const {PinWebSessionCredentials:ActualCredentials}=compiled('common_session/src/main/ets/services/PinWebSessionCredentials.ets',()=>({webview:{WebCookieManager:{
+  const {PinmonySessionCredentials:ActualCredentials}=compiled('common_session/src/main/ets/services/PinmonySessionCredentials.ets',()=>({webview:{WebCookieManager:{
     fetchCookie:async url=>{cookieCalls.push({url,read:true});return 'session=synthetic';},
     configCookie:async (...args)=>cookieCalls.push({args})
   }}}));
@@ -132,7 +132,7 @@ async function main() {
   native.cancel('waiting'); cookieReady('session=synthetic');
   const before=requests.length; assert.equal((await waiting).error,'cancelled'); assert.equal(requests.length,before);
   readCookie=async ()=>'session=synthetic; csrftoken=synthetic';
-  const guarded = new PinWebNativeNetwork();
+  const guarded = new PinmonyNativeNetwork();
   const guardedJob=guarded.request({...base,id:'cleanup-exception'},()=>state);await flush();
   const cleanupSession=sessions.at(-1);
   cleanupSession.cancel=()=>{throw new Error('synthetic cancel failure');};
@@ -148,10 +148,10 @@ async function main() {
 
   let webRequests=0, messages=[], cancelled=[];
   const location={ origin:'https://www.pinterest.com',hostname:'www.pinterest.com',href:state.page };
-  const window={ addEventListener() {}, PinWebNativeNetworkEnabled:true,fetch:()=>{webRequests++;return Promise.resolve(new Response('{}'));},
-    PinWebShareBridge:{ networkRequest(raw) {
+  const window={ addEventListener() {}, PinmonyNativeNetworkEnabled:true,fetch:()=>{webRequests++;return Promise.resolve(new Response('{}'));},
+    PinmonyShareBridge:{ networkRequest(raw) {
       const job=JSON.parse(raw);messages.push(job);
-      native.request(job,()=>state).then(reply=>window.PinWebNetwork.complete(reply));
+      native.request(job,()=>state).then(reply=>window.PinmonyNetwork.complete(reply));
     },cancelNetwork(id){cancelled.push(id);native.cancel(id);} } };
   window.top=window;
   vm.runInNewContext(PIN_NATIVE_NETWORK_SCRIPT,{window,location,URL,Headers,Response,Map,Promise,setTimeout,clearTimeout,console});
@@ -165,9 +165,9 @@ async function main() {
     observed++;return res;
   });
   response={statusCode:200,headers:{'content-type':'application/json','set-cookie':'session=synthetic; Secure'},toString:()=>'{"value":1}'};
-  const waitingJS=window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/',{headers:{Cookie:'must-not-cross',Authorization:'must-not-cross','X-CSRFToken':'must-not-cross'}});
+  const waitingJS=window.PinmonyNetwork.fetch('/resource/UserHomefeedResource/get/',{headers:{Cookie:'must-not-cross',Authorization:'must-not-cross','X-CSRFToken':'must-not-cross'}});
   assert.equal(messages.length,0,'requests wait for current login confirmation');
-  window.PinWebNetwork.bind(3,state.page);
+  window.PinmonyNetwork.bind(3,state.page);
   const result=await waitingJS;assert.equal((await result.json()).value,1);
   assert.equal(result.headers.get('content-type'),'application/json');
   assert.equal(result.headers.get('set-cookie'),null,'credentials never cross into the synthetic response');
@@ -176,12 +176,12 @@ async function main() {
   assert.equal(observed,1,'native response reaches existing observers');
   assert.equal(webRequests,0);assert.deepEqual(messages[0].headers,{});
   const controller=new AbortController();response=()=>new Promise(resolve=>done=resolve);
-  const abort=window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/',{signal:controller.signal});
+  const abort=window.PinmonyNetwork.fetch('/resource/UserHomefeedResource/get/',{signal:controller.signal});
   await flush();controller.abort();await assert.rejects(abort,e=>e.name==='AbortError');
   done({statusCode:200,headers:{},toString:()=>'{"late":1}'});await flush();
   assert.equal(cancelled.length,1);assert.equal(webRequests,0,'cancelled requests never replay in Web');
   response={statusCode:403,headers:{},toString:()=>'<html>denied</html>'};
-  const denied=await window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/');
+  const denied=await window.PinmonyNetwork.fetch('/resource/UserHomefeedResource/get/');
   assert.equal(denied.status,403);await assert.rejects(denied.json());assert(state.authenticated,'HTTP 403 is not logout evidence');
   assert.equal(webRequests,0);
   // A transient TLS/peer receive failure retries one GET, while writes never replay.
@@ -197,7 +197,7 @@ async function main() {
   assert.equal(detailFailure.error, 'network-unavailable');
   // A retry notification may invalidate the page synchronously; the stale
   // request must not be dispatched a second time after that callback.
-  const retryGuard = new PinWebNativeNetwork();
+  const retryGuard = new PinmonyNativeNetwork();
   let guardedCalls = 0;
   response = () => { guardedCalls++; const error = new Error('tls'); error.code = 1007900035; throw error; };
   retryGuard.onTransientRetry = () => retryGuard.invalidate();
@@ -218,34 +218,34 @@ async function main() {
   assert(logMessages.some(message => message.includes('NetworkTrace: queue-start priority=LOW')), 'LOW queue dispatch is logged');
   assert(logMessages.some(message => message.includes('NetworkTrace: queue-finish')), 'queue completion is logged');
   const authMessages=[];
-  window.PinWebShareBridge.authState=value=>authMessages.push(JSON.parse(value));
-  const authSource=fs.readFileSync('common_session/src/main/ets/services/PinWebAuthScript.ets','utf8');
+  window.PinmonyShareBridge.authState=value=>authMessages.push(JSON.parse(value));
+  const authSource=fs.readFileSync('common_session/src/main/ets/services/PinmonyAuthScript.ets','utf8');
   const authScript=Function('return `'+authSource.match(/= `([\s\S]*?)`;/)[1]+'`')();
   vm.runInNewContext(authScript,{window,location,URL,document:{getElementById:()=>null,addEventListener(){}},console});
-  window.PinWebAuthSync(3);
+  window.PinmonyAuthSync(3);
   response={statusCode:200,headers:{},toString:()=>'{"client_context":{"is_authenticated":false}}'};
-  await window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/');await until(()=>authMessages.length > 0);
+  await window.PinmonyNetwork.fetch('/resource/UserHomefeedResource/get/');await until(()=>authMessages.length > 0);
   assert.equal(authMessages.at(-1).status,'unauthenticated','native response remains a source of explicit session evidence');
-  window.PinWebNativeNetworkEnabled=false;
-  await window.PinWebNetwork.fetch('/resource/UserHomefeedResource/get/');
+  window.PinmonyNativeNetworkEnabled=false;
+  await window.PinmonyNetwork.fetch('/resource/UserHomefeedResource/get/');
   assert.equal(webRequests,1,'explicit manual transport rollback uses the original Web path');
-  window.PinWebNativeNetworkEnabled=true;webRequests=0;
+  window.PinmonyNativeNetworkEnabled=true;webRequests=0;
   // Exercise an actual business API script through the native adapter, including mapping.
-  const homeSource=fs.readFileSync('feature_home/src/main/ets/services/PinWebHomeApiScript.ets','utf8');
+  const homeSource=fs.readFileSync('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets','utf8');
   const homeScript=Function('return `'+homeSource.match(/`([\s\S]*?)`;/)[1]+'`')();
   const fixture=JSON.parse(fs.readFileSync('scripts/fixtures/home-api.json','utf8'));
-  window.PinWebHomeApiEnabled=true;
+  window.PinmonyHomeApiEnabled=true;
   response={statusCode:200,headers:{},toString:()=>JSON.stringify(fixture)};
   vm.runInNewContext(useNativeTransport(homeScript),{window,location,document:{getElementById:()=>null},AbortController,setTimeout,clearTimeout,console});
-  window.PinWebHomeApi.read('home',true,()=>{},()=>true);
-  await until(()=>window.PinWebHomeApi.read('home',true,()=>{},()=>true).pins.length > 0);
-  assert(window.PinWebHomeApi.read('home',true,()=>{},()=>true).pins.length>0,'native JSON still maps through the current business contract');
+  window.PinmonyHomeApi.read('home',true,()=>{},()=>true);
+  await until(()=>window.PinmonyHomeApi.read('home',true,()=>{},()=>true).pins.length > 0);
+  assert(window.PinmonyHomeApi.read('home',true,()=>{},()=>true).pins.length>0,'native JSON still maps through the current business contract');
   assert.equal(webRequests,0);
   // Exercise the real search scripts through JS transport, native admission and RCP.
   state.page = 'https://www.pinterest.com/search/';
   location.href = state.page; location.pathname = '/search/'; location.search = '';
-  window.PinWebNetwork.bind(state.epoch, state.page);
-  window.PinWebSearchDiscoveryApiEnabled = true; window.PinWebSearchUiApiEnabled = true;
+  window.PinmonyNetwork.bind(state.epoch, state.page);
+  window.PinmonySearchDiscoveryApiEnabled = true; window.PinmonySearchUiApiEnabled = true;
   const searchSource = name => {
     const source = fs.readFileSync('feature_search/src/main/ets/services/' + name + '.ets', 'utf8');
     return Function('return ' + source.match(/SCRIPT: string = (\x60[\s\S]*\x60);/)[1])();
@@ -257,16 +257,16 @@ async function main() {
       title: { format: '测试主题' }, action: { url: '/search/pins/?q=test' },
       objects: [{ image_medium_url: 'https://i.pinimg.com/236x/synthetic.jpg' }] }]
   } }) };
-  vm.runInNewContext(useNativeTransport(searchSource('PinWebSearchDiscoveryApiScript')), searchContext);
-  const discovery = () => window.PinWebSearchDiscoveryApi.read(state.page, () => {});
+  vm.runInNewContext(useNativeTransport(searchSource('PinmonySearchDiscoveryApiScript')), searchContext);
+  const discovery = () => window.PinmonySearchDiscoveryApi.read(state.page, () => {});
   discovery(); await until(() => discovery().active);
   assert.equal(discovery().sections[0].title, '测试主题');
   assert(requests.some(req => req.url.includes('/resource/SearchTabResource/get/')), 'discovery reaches RCP');
   response = { statusCode: 200, headers: {}, toString: () => JSON.stringify({ resource_response: {
     status: 'success', data: { items: [{ query: '测试联想', type: 'recent_query' }] }
   } }) };
-  vm.runInNewContext(useNativeTransport(searchSource('PinWebSearchUiApiScript')), searchContext);
-  const suggestions = () => window.PinWebSearchUiApi.readSuggestions(state.page, '测试', true, () => {});
+  vm.runInNewContext(useNativeTransport(searchSource('PinmonySearchUiApiScript')), searchContext);
+  const suggestions = () => window.PinmonySearchUiApi.readSuggestions(state.page, '测试', true, () => {});
   suggestions(); await until(() => suggestions().items.length > 0);
   assert.equal(suggestions().items[0].label, '测试联想');
   assert(requests.some(req => req.url.includes('/resource/AdvancedTypeaheadResource/get/')), 'typeahead reaches RCP');
@@ -290,7 +290,7 @@ async function main() {
     }
     assert.equal(requests.length, before, 'rejected search requests never reach RCP');
   }
-  window.PinWebSearchUiApi.reset(); window.PinWebSearchDiscoveryApi.reset();
+  window.PinmonySearchUiApi.reset(); window.PinmonySearchDiscoveryApi.reset();
   assert.equal(webRequests, 0, 'search integration never falls back to webpage fetch');
   for(const module of ['feature_home','feature_pin','feature_search','feature_inbox','feature_profile','feature_board']) {
     for(const file of fs.readdirSync(module+'/src/main/ets/services').filter(n=>n.endsWith('Script.ets'))) {

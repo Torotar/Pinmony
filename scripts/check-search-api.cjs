@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const source = readSourceFileSync(path.join(__dirname,
-  '../entry/src/main/ets/services/PinWebSearchApiScript.ets'), 'utf8');
+  '../entry/src/main/ets/services/PinmonySearchApiScript.ets'), 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*)`;/)[1] + '`')();
 new Function(script);
 const fixture = { id: '123', type: 'pin', grid_title: '', title: 'Example',
@@ -13,14 +13,14 @@ const fixture = { id: '123', type: 'pin', grid_title: '', title: 'Example',
   images: { '474x': { url: 'https://i.pinimg.com/474x/sample.jpg', width: 474, height: 700 } } };
 function harness() {
   const requests = [];
-  const window = { PinWebSearchApiEnabled: true }; window.top = window;
+  const window = { PinmonySearchApiEnabled: true }; window.top = window;
   let page = 'https://www.pinterest.com/search/pins/?q=ip%E4%BA%BA%E7%89%A9&source_id=sample';
   let updates = 0;
   vm.runInNewContext(script, { window, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com' },
     document: { cookie: 'irrelevant=value; csrftoken=test-csrf' }, URL, URLSearchParams,
     AbortController, setTimeout, clearTimeout,
     fetch: (url, init) => new Promise(resolve => { requests.push({ url, init, resolve }); }) });
-  const api = window.PinWebSearchApi;
+  const api = window.PinmonySearchApi;
   return { api, window, requests, get updates() { return updates; },
     setPage(value) { page = value; }, read() {
       const expected = page;
@@ -89,7 +89,7 @@ async function main() {
   const observed = { page: 'https://www.pinterest.com/search/pins/?q=another', version: 1,
     options: { query: 'another', scope: 'pins', filter_genai: true, filters: 'verified-filter' },
     resource: { status: 'success', bookmark: 'filtered-next', data: { results: [fixture], rankedGuides: [guide] } } };
-  h.window.PinWebSearchUiApi = { readSearch: page => page === observed.page ? observed : null };
+  h.window.PinmonySearchUiApi = { readSearch: page => page === observed.page ? observed : null };
   assert.equal(h.read().active, true);
   assert.equal(h.read().categories[0].label, '男', 'observed website first page supplies guides');
   assert.equal(h.read().results.length, 1);
@@ -122,13 +122,13 @@ async function main() {
   assert.equal(h.read().results[0].title,'','never invent an unavailable title');
   const recovery=harness();recovery.read();await recovery.respond(0,[]);
   assert.equal(recovery.read().results.length,0);
-  recovery.window.PinWebSearchUiApi={readSearch:()=>({version:1,options:{query:'ip人物',scope:'pins'},resource:{status:'success',data:{results:[fixture]},bookmark:'-end-'}})};
+  recovery.window.PinmonySearchUiApi={readSearch:()=>({version:1,options:{query:'ip人物',scope:'pins'},resource:{status:'success',data:{results:[fixture]},bookmark:'-end-'}})};
   assert.equal(recovery.read().results.length,1,'website first page replaces an early native empty result');
   const race=harness();race.read();
-  race.window.PinWebSearchUiApi={readSearch:()=>({version:1,options:{query:'ip人物',scope:'pins'},resource:{status:'success',data:{results:[fixture]},bookmark:'-end-'}})};
+  race.window.PinmonySearchUiApi={readSearch:()=>({version:1,options:{query:'ip人物',scope:'pins'},resource:{status:'success',data:{results:[fixture]},bookmark:'-end-'}})};
   assert.equal(race.read().results.length,1);assert.equal(race.requests[0].init.signal.aborted,true);
   await race.respond(0,[]);assert.equal(race.read().results.length,1,'late empty native response cannot erase website results');
-  h.window.PinWebSearchApiEnabled = false;
+  h.window.PinmonySearchApiEnabled = false;
   assert.equal(h.read(), null);
   console.log('Search API request, pagination, empty, error, race and filter checks passed');
 }

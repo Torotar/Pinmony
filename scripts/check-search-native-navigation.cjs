@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),ts=requi
 const searchRuntime=require('./search-controller-harness.cjs').createSearchRuntime(ts);
 const src=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function method(name){const a=src.indexOf('  private '+name);assert(a>=0);return src.slice(a,src.indexOf('\n  private ',a+1)).replace('private ','');}
-const logs=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('async submitSearch(')+method('async selectSearchFilter(')+'}\nHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinWebRuntimeLog:{info:m=>logs.push(m)}});
+const logs=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('async submitSearch(')+method('async selectSearchFilter(')+'}\nHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info:m=>logs.push(m)}});
 async function main(){
 const h=new Host(), events=[],page='https://www.pinterest.com/search/pins/?q=art';
 h.searchStore={search:{session:1,pageKey:page},searchActionsReady:true,searchQueryToken:0,searchRequestToken:0,searchFilterToken:1,searchFilterOptions:[{id:'video',enabled:true,selected:false}]};

@@ -10,7 +10,7 @@ function method(name) {
 }
 const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true,
   PINTEREST_URL: 'https://www.pinterest.com/', setTimeout() {},
-  PinWebRuntimeLog: { info() {}, warn() {} } };
+  PinmonyRuntimeLog: { info() {}, warn() {} } };
 vm.runInNewContext(ts.transpileModule(`class Native {
   ${method('async openImageRelated')}
   ${method('beginDetailOpening')}

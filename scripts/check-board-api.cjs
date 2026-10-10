@@ -2,7 +2,7 @@ const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinWebBoardApiScript.ets'), 'utf8');
+const source = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/services/PinmonyBoardApiScript.ets'), 'utf8');
 const script = Function('return `' + source.match(/`([\s\S]*?)`;/)[1] + '`')();
 new Function(script);
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -13,8 +13,8 @@ const pin = id => ({ type: 'pin', id, board: { id: '123' }, title: '', images: {
 function harness(pathname = '/sample/board/') {
   const requests = [], messages = [];
   let tick;
-  const window = { PinWebBoardApiEnabled: true, addEventListener() {}, setInterval(fn) { tick = fn; },
-    PinWebShareBridge: { boardState(value) { messages.push(JSON.parse(value)); } } };
+  const window = { PinmonyBoardApiEnabled: true, addEventListener() {}, setInterval(fn) { tick = fn; },
+    PinmonyShareBridge: { boardState(value) { messages.push(JSON.parse(value)); } } };
   window.top = window;
   const location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname };
   const document = { readyState: 'complete', getElementById() { throw new Error('DOM initial context must not be read'); } };
@@ -29,7 +29,7 @@ function harness(pathname = '/sample/board/') {
     await flush();
   };
   const state = () => messages.at(-1);
-  const call = (method, id) => window.PinWebBoardApi[method](state().session, state().pageKey, id);
+  const call = (method, id) => window.PinmonyBoardApi[method](state().session, state().pageKey, id);
   return { window, location, requests, state, respond, call, tick: () => tick() };
 }
 async function loadBoard(h, value = board, viewerId = '700', feed = [pin('111')]) {

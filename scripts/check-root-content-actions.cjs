@@ -13,7 +13,7 @@ function method(name) {
 const names = ['rootActionContextReady', 'ensureRootActionContext', 'updateSearchQuery', 'submitSearch',
   'openHomePin', 'prepareSearchNavigation', 'performSearchAction', 'performInboxAction'];
 const context = { setTimeout, Date, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
-  PinWebRuntimeLog: { info() {}, warn() {} } };
+  PinmonyRuntimeLog: { info() {}, warn() {} } };
 vm.runInNewContext(ts.transpileModule('class Native {' + names.map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const roots = ['https://www.pinterest.com/', 'https://www.pinterest.com/search/',
@@ -41,6 +41,7 @@ function harness(index) {
       runJavaScript: code => { requests.push(['js', code]); return Promise.resolve('true'); } } });
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
+  require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
   return { native, requests, notices, ready() {
     document = roots[index];
     if (index === 1) { native.searchStore.searchActionsReady = true; native.searchStore.search.session = 22; }
@@ -64,7 +65,7 @@ function harness(index) {
   await Promise.all([first, last]);
   const calls = query.requests.filter(item => item[0] === 'js');
   assert.equal(calls.length, 1, 'only latest query is dispatched');
-  assert.match(calls[0][1], /PinWebSearchQuery\(22,.*"latest"/,
+  assert.match(calls[0][1], /PinmonySearchQuery\(22,.*"latest"/,
     'fresh session replaces the retained session');
   const canceled = harness(2);
   const action = canceled.native.performInboxAction('compose');
@@ -78,7 +79,7 @@ function harness(index) {
   assert.equal(inbox.requests.some(item => item[0] === 'js'), false, 'retained inbox session is never dispatched');
   inbox.ready();
   await compose;
-  assert.match(inbox.requests.at(-1)[1], /PinWebInboxApiAction\("compose",22\)/);
+  assert.match(inbox.requests.at(-1)[1], /PinmonyInboxApiAction\("compose",22\)/);
   const locked = harness(1); locked.native.authStatus = 'checking';
   await locked.native.updateSearchQuery('blocked');
   assert.deepEqual(locked.requests, [], 'login gate remains unchanged');
@@ -92,7 +93,7 @@ function harness(index) {
   assert.equal(loadingInput.native.rootActionContextReady(1), false,
     'input readiness does not enable result operations');
   for (const [feature, component] of [['home', 'Home'], ['search', 'Search'], ['inbox', 'Inbox']]) {
-    const ui = fs.readFileSync(`feature_${feature}/src/main/ets/components/PinWeb${component}Page.ets`, 'utf8');
+    const ui = fs.readFileSync(`feature_${feature}/src/main/ets/components/Pinmony${component}Page.ets`, 'utf8');
     assert.match(ui, /@Prop interactionReady: boolean/);
     assert.match(ui, /this\.interactionReady/, 'content accepts user intent independently of transport readiness');
   }

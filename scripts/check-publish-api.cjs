@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync('feature_profile/src/main/ets/services/PinWebPublishApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_profile/src/main/ets/services/PinmonyPublishApiScript.ets', 'utf8');
 const script = source.slice(source.indexOf('String.raw' + String.fromCharCode(96)) + 11, source.lastIndexOf(String.fromCharCode(96)));
 const flush = async () => { for (let i = 0; i < 12; i++) await new Promise(r => setImmediate(r)); };
 const success = (data, endpoint) => ({ resource_response: { status: 'success', code: 0, endpoint_name: endpoint, data }, client_context: { user: { id: '100' } } });
@@ -23,7 +23,7 @@ function harness() {
     return { ok: true, json: async () => payload };
   } };
   ctx.window = ctx; ctx.top = ctx; vm.runInNewContext(script, ctx);
-  return { api: ctx.PinWebPublishApi, calls, location, setResponder(fn) { const previous = responder; responder = (n, o) => fn(n, o, previous); } };
+  return { api: ctx.PinmonyPublishApi, calls, location, setResponder(fn) { const previous = responder; responder = (n, o) => fn(n, o, previous); } };
 }
 async function open(h, kind, token = 1) { assert(h.api.open(h.location.href, kind, token)); await flush(); assert.equal(h.api.read(token).loading, false); }
 async function selected(h) { await open(h, 'website'); assert(h.api.action(1, 'scrape', 'https://example.org/', false)); await flush(); assert.equal(h.api.read(1).pins.length, 2); assert(h.api.action(1, 'all', '', false)); assert(h.api.action(1, 'next', '', false)); await flush(); assert.equal(h.api.read(1).phase, 'boards'); }

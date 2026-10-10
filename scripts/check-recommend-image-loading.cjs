@@ -2,10 +2,10 @@ const fs = require('fs');
 const assert = require('assert');
 
 const common = fs.readFileSync('common_ui/src/main/ets/components/SmartImage.ets', 'utf8');
-const page = fs.readFileSync('feature_pin/src/main/ets/components/PinWebDetailPage.ets', 'utf8');
-const model = fs.readFileSync('feature_pin/src/main/ets/models/PinWebDetail.ets', 'utf8');
-const api = fs.readFileSync('feature_pin/src/main/ets/services/PinWebDetailApiScript.ets', 'utf8');
-const cache = fs.readFileSync('feature_pin/src/main/ets/services/PinWebDetailCache.ets', 'utf8');
+const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
+const model = fs.readFileSync('feature_pin/src/main/ets/models/PinmonyDetail.ets', 'utf8');
+const api = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailApiScript.ets', 'utf8');
+const cache = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailCache.ets', 'utf8');
 
 assert.match(common, /display\.getDefaultDisplaySync\(\)/);
 assert.match(common, /RECOMMEND_WIDE_THRESHOLD_VP: number = 600/);

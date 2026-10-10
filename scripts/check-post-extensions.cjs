@@ -7,14 +7,14 @@ function script(path) {
   const result = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
   new Function(result); return result;
 }
-const base = script('entry/src/main/ets/services/PinWebPostApiScript.ets');
-const extension = script('entry/src/main/ets/services/PinWebPostExtensionsScript.ets');
+const base = script('entry/src/main/ets/services/PinmonyPostApiScript.ets');
+const extension = script('entry/src/main/ets/services/PinmonyPostExtensionsScript.ets');
 const requests = [], events = [];
 const pin = 'https://www.pinterest.com/pin/101/';
 const raw = { id: '101', tracking_params: 'runtime-only' };
 const relay = { data: { v3GetPinQueryv2: { data: { entityId: '101', aggregatedPinData: { entityId: '202' } } } } };
-const window = { PinWebPostApiEnabled: true, PinWebPostExtensionsEnabled: true, PinWebProfileOrganizeEnabled: true,
-  PinWebDetailApi: { raw: () => raw }, PinWebShareBridge: { postState: value => events.push(JSON.parse(value)) } };
+const window = { PinmonyPostApiEnabled: true, PinmonyPostExtensionsEnabled: true, PinmonyProfileOrganizeEnabled: true,
+  PinmonyDetailApi: { raw: () => raw }, PinmonyShareBridge: { postState: value => events.push(JSON.parse(value)) } };
 window.top = window;
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/pin/101/', href: pin };
 const document = { cookie: 'csrftoken=current', querySelectorAll: () => [{ textContent:
@@ -31,7 +31,7 @@ bootstrap.open('GET', '/resource/PinResource/get/?source_url=%2Fpin%2F101%2F');
 bootstrap.setRequestHeader('X-App-Version', 'synthetic-current');
 bootstrap.setRequestHeader('X-Pinterest-Pws-Handler', 'www/pin/[id].js');
 bootstrap.send();
-const api = window.PinWebPostApi;
+const api = window.PinmonyPostApi;
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function options(index) {
   const request = requests[index];
@@ -100,6 +100,8 @@ async function main() {
   await respond(14, { id: '801', board: { id: '502' } }, 'v3_repin_handler');
   api.boardsRemove(pin); assert.equal(options(15).id, '801', 'Only the returned saved copy ID is deleted');
   await respond(15, null, 'v3_delete_pin_handler'); assert.equal(api.boardsRead(pin).savedId, '');
+  assert.equal(events.at(-1).kind, 'saveUndone', 'sheet cancellation also synchronizes native saved state');
+  assert.equal(events.at(-1).objectId, '801');
   assert.equal(await api.boardsRemove(pin), false);
   api.boardsCreate(pin, 'Landscape', false);
   requests[16].resolve({ ok: false, json: async () => ({ resource_response: { status: 'failure', message: 'Duplicate name' } }) }); await flush();
@@ -146,6 +148,23 @@ async function main() {
   assert.equal(events.at(-1).objectId, '802');
   assert.equal(api.savedRead(pin).id, '');
   assert.equal(api.saveUndo(pin, '802'), false);
+  const beforeRestore = requests.length;
+  assert.equal(await api.savedRestore(pin, '101'), false, 'never restore the original Pin as a saved copy');
+  assert.equal(requests.length, beforeRestore);
+  const wrongOwner = api.savedRestore(pin, '802');
+  await respond(beforeRestore, { id: '802', pinner: { id: '88' } });
+  assert.equal(await wrongOwner, false, 'another account cannot restore delete capability');
+  const restored = api.savedRestore(pin, '802');
+  await respond(beforeRestore + 1, { id: '802', pinner: { id: '77' }, board: { name: 'Synthetic' } });
+  assert.equal(await restored, true);
+  assert.equal(api.saveUndo(pin, '802'), true);
+  assert.equal(options(beforeRestore + 2).id, '802', 'restored capability deletes only the verified copy');
+  assert.equal(api.saveUndo(pin, '802'), false, 'duplicate clicks cannot replay a write');
+  await respond(beforeRestore + 2, null, 'v3_delete_pin_handler');
+  const staleRestore = api.savedRestore(pin, '804');
+  api.reset();
+  await respond(beforeRestore + 3, { id: '804', pinner: { id: '77' } });
+  assert.equal(await staleRestore, false, 'reset rejects late ownership confirmation');
   location.pathname = '/pin/999/'; assert.equal(api.boardsStart(pin), false);
   assert.equal(await api.commentLike(pin, '301'), false);
   console.log('post extensions: Relay ID, preview, comments/photos/pagination/retry/replies/reactions, boards/create/save/delete, undo and stale guards OK');

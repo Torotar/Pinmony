@@ -1,14 +1,14 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync('feature_pin/src/main/ets/services/PinWebVisualSearchApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyVisualSearchApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', href: 'https://www.pinterest.com/pin/123/', pathname: '/pin/123/' };
 const window = {}; window.top = window;
 const jobs = [];
 vm.runInNewContext(script, { window, location, AbortController, setTimeout, clearTimeout, Set,
   fetch: (url, init) => new Promise(resolve => jobs.push({url, init, resolve})) });
-const api = window.PinWebVisualSearchApi;
+const api = window.PinmonyVisualSearchApi;
 const crop = {x: .1, y: .1, w: .8, h: .8};
 const pin = id => ({type: 'pin', id, images: {'736x': {url: 'https://i.pinimg.com/synthetic.jpg', width: 736, height: 1000}}});
 const flush = () => new Promise(resolve => setImmediate(resolve));

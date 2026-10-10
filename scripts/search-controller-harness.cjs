@@ -3,12 +3,12 @@ const vm = require('node:vm');
 const { createArktsLoader } = require('./arkts-module-loader.cjs');
 
 function createSearchRuntime(ts, globals = {}) {
-  const mocks = { common_foundation: { PinWebRuntimeLog: { info() {}, warn() {}, error() {} } } };
+  const mocks = { common_foundation: { PinmonyRuntimeLog: { info() {}, warn() {}, error() {} } } };
   const loader = createArktsLoader(ts, mocks, globals);
-  mocks.common_foundation.PinWebTaskRegistry = loader.loadFile(
-    'common_foundation/src/main/ets/services/PinWebTaskRegistry.ets').PinWebTaskRegistry;
-  const Controller = loader.loadFile('feature_search/src/main/ets/controllers/PinWebSearchController.ets').PinWebSearchController;
-  const Store = loader.loadFile('feature_search/src/main/ets/stores/PinWebSearchStore.ets').PinWebSearchStore;
+  mocks.common_foundation.PinmonyTaskRegistry = loader.loadFile(
+    'common_foundation/src/main/ets/services/PinmonyTaskRegistry.ets').PinmonyTaskRegistry;
+  const Controller = loader.loadFile('feature_search/src/main/ets/controllers/PinmonySearchController.ets').PinmonySearchController;
+  const Store = loader.loadFile('feature_search/src/main/ets/stores/PinmonySearchStore.ets').PinmonySearchStore;
 
   function bindIndex(native) {
     const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
@@ -20,7 +20,7 @@ function createSearchRuntime(ts, globals = {}) {
     const binding = ts.transpileModule('function bind() {' + body + '} bind;', {
       compilerOptions: { target: ts.ScriptTarget.ES2021 }
     }).outputText;
-    vm.runInNewContext(binding, { PinWebSearchController: Controller }).call(native);
+    vm.runInNewContext(binding, { PinmonySearchController: Controller }).call(native);
     return native.searchController;
   }
 

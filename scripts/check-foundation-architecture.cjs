@@ -57,8 +57,8 @@ for (const moduleName of modules) {
 const entrySource = read('entry/src/main/ets/pages/Index.ets');
 assert.equal((entrySource.match(/@Entry\b/g) || []).length, 1, 'entry must have one ArkUI entry component');
 assert.match(entrySource, /@Entry\s+@Component\s+struct Index/);
-for (const store of ['PinWebHomeStore', 'PinWebSearchStore', 'PinWebInboxStore', 'PinWebProfileStore',
-  'PinWebBoardStore', 'PinWebPinStore', 'PinWebSettingsStore']) {
+for (const store of ['PinmonyHomeStore', 'PinmonySearchStore', 'PinmonyInboxStore', 'PinmonyProfileStore',
+  'PinmonyBoardStore', 'PinmonyPinStore', 'PinmonySettingsStore']) {
   assert(entrySource.includes(store), `entry must own ${store}`);
 }
 
@@ -79,8 +79,8 @@ for (const { file, source } of [...sourcesFor('entry'), ...modules.flatMap(sourc
   if (source.includes('@kit.RemoteCommunicationKit') || /\brcp\./.test(source)) rcpFiles.push(file);
 }
 assert.equal(rcpFiles.length, 1, 'RemoteCommunicationKit must be owned by common_network');
-assert(rcpFiles[0].endsWith(path.join('common_network', 'src', 'main', 'ets', 'PinWebNativeNetwork.ets')),
-  'RCP ownership must stay in PinWebNativeNetwork');
+assert(rcpFiles[0].endsWith(path.join('common_network', 'src', 'main', 'ets', 'PinmonyNativeNetwork.ets')),
+  'RCP ownership must stay in PinmonyNativeNetwork');
 
 const architecture = read('docs/ARCHITECTURE.md');
 for (const heading of ['## 工程边界', '## Ability 与生命周期', '## ArkUI 页面与状态管理',

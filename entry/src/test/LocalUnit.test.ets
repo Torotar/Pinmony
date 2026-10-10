@@ -1,26 +1,26 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
-import { PinWebDetailSnapshot } from '../main/ets/models/PinWebDetail';
-import { PinWebDetailCache } from '../main/ets/services/PinWebDetailCache';
-import { PinWebNavigationHistory } from '../main/ets/services/PinWebNavigationHistory';
-import { PinWebSearchCache } from '../main/ets/services/PinWebSearchCache';
-import { PinWebSearchSnapshot } from '../main/ets/models/PinWebSearch';
-import { PinWebSearchResult } from '../main/ets/models/PinWebSearch';
-import { retainSearchResults, mergeSearchFeedResults, findSearchResult } from '../main/ets/services/PinWebSearchRetention';
+import { PinmonyDetailSnapshot } from '../main/ets/models/PinmonyDetail';
+import { PinmonyDetailCache } from '../main/ets/services/PinmonyDetailCache';
+import { PinmonyNavigationHistory } from '../main/ets/services/PinmonyNavigationHistory';
+import { PinmonySearchCache } from '../main/ets/services/PinmonySearchCache';
+import { PinmonySearchSnapshot } from '../main/ets/models/PinmonySearch';
+import { PinmonySearchResult } from '../main/ets/models/PinmonySearch';
+import { retainSearchResults, mergeSearchFeedResults, findSearchResult } from '../main/ets/services/PinmonySearchRetention';
 
-function searchPin(id: string, pinId: string): PinWebSearchResult {
+function searchPin(id: string, pinId: string): PinmonySearchResult {
   return { id: id, kind: 'pin', title: 'Pin ' + pinId, subtitle: '',
     targetUrl: 'https://www.pinterest.com/pin/' + pinId + '/',
     imageUrl: 'https://i.pinimg.com/' + pinId + '.jpg', imageWidth: 640,
     imageHeight: 960, enabled: true };
 }
 
-function searchSnapshot(pageKey: string, query: string): PinWebSearchSnapshot {
+function searchSnapshot(pageKey: string, query: string): PinmonySearchSnapshot {
   return { kind: 'state', session: 1, pageKey: pageKey, query: query, placeholder: '',
     selectedCategory: '', categories: [], suggestions: [], heroes: [], ideaSections: [],
     results: query ? [searchPin('result', '123')] : [] };
 }
 
-function createDetail(pinId: string): PinWebDetailSnapshot {
+function createDetail(pinId: string): PinmonyDetailSnapshot {
   return {
     kind: 'state',
     session: 1,
@@ -72,8 +72,8 @@ export default function localUnitTest() {
     });
 
     it('cachesDisplayDataWithNonExecutableActionIds', 0, () => {
-      const cache: PinWebDetailCache = new PinWebDetailCache();
-      const detail: PinWebDetailSnapshot = createDetail('123');
+      const cache: PinmonyDetailCache = new PinmonyDetailCache();
+      const detail: PinmonyDetailSnapshot = createDetail('123');
       cache.put('123', detail, 48);
       const entry = cache.get('123');
       expect(entry !== undefined).assertTrue();
@@ -88,7 +88,7 @@ export default function localUnitTest() {
     });
 
     it('evictsLeastRecentlyUsedEntryAfterTenPins', 0, () => {
-      const cache: PinWebDetailCache = new PinWebDetailCache();
+      const cache: PinmonyDetailCache = new PinmonyDetailCache();
       for (let index: number = 1; index <= 10; index++) {
         cache.put(index.toString(), createDetail(index.toString()), 0);
       }
@@ -101,17 +101,17 @@ export default function localUnitTest() {
     });
 
     it('updatesScrollPositionAndStartsEmptyForNewRuntime', 0, () => {
-      const cache: PinWebDetailCache = new PinWebDetailCache();
+      const cache: PinmonyDetailCache = new PinmonyDetailCache();
       cache.put('123', createDetail('123'), 0);
       cache.updateScrollOffset('123', 256);
       const entry = cache.get('123');
       expect(entry !== undefined).assertTrue();
       if (entry) expect(entry.scrollOffset).assertEqual(256);
-      expect(new PinWebDetailCache().size()).assertEqual(0);
+      expect(new PinmonyDetailCache().size()).assertEqual(0);
     });
 
     it('returnsThroughSearchProfileBoardAndPinOnePageAtATime', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       const pages: string[] = ['https://www.pinterest.com/',
         'https://www.pinterest.com/search/', 'https://www.pinterest.com/search/pins/?q=art',
         'https://www.pinterest.com/creator/', 'https://www.pinterest.com/creator/art/',
@@ -126,7 +126,7 @@ export default function localUnitTest() {
     });
 
     it('retainsParentUntilBackConfirmsAndRejectsRepeatedBack', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       history.visit('https://www.pinterest.com/inbox/');
       history.visit('https://www.pinterest.com/messages/42/');
       expect(history.prepareBack()).assertEqual('https://www.pinterest.com/inbox/');
@@ -138,7 +138,7 @@ export default function localUnitTest() {
     });
 
     it('doesNotAddReloadsRedirectParametersOrReversedPopRoutes', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       history.visit('https://www.pinterest.com/search/');
       history.visit('https://www.pinterest.com/pin/123/?source=search');
       history.visit('https://www.pinterest.com/pin/123/');
@@ -150,7 +150,7 @@ export default function localUnitTest() {
     });
 
     it('clearsOldChildrenWhenNavigatingToHome', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       history.visit('https://www.pinterest.com/creator/');
       history.visit('https://www.pinterest.com/settings/');
       history.visit('https://www.pinterest.com/');
@@ -160,14 +160,14 @@ export default function localUnitTest() {
     });
 
     it('retainsParentWhenRouterReplacesAPathWithAChildPage', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       history.visit('https://www.pinterest.com/creator/');
       history.visit('https://www.pinterest.com/creator/art/', 'replace');
       expect(history.prepareBack()).assertEqual('https://www.pinterest.com/creator/');
     });
 
     it('ignoresOldPinCallbacksDuringAndAfterReturningToResults', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       const landing: string = 'https://www.pinterest.com/search/';
       const results: string = 'https://www.pinterest.com/search/pins/?q=art';
       const pin: string = 'https://www.pinterest.com/pin/123/';
@@ -190,7 +190,7 @@ export default function localUnitTest() {
     });
 
     it('returnsToSearchLandingWithoutARecordedLandingAncestor', 0, () => {
-      const history: PinWebNavigationHistory = new PinWebNavigationHistory();
+      const history: PinmonyNavigationHistory = new PinmonyNavigationHistory();
       const results: string = 'https://www.pinterest.com/search/pins/?q=art';
       const landing: string = 'https://www.pinterest.com/search/';
       history.visit(results, 'load');
@@ -203,9 +203,9 @@ export default function localUnitTest() {
     });
 
     it('keepsSearchLandingAndResultsAsSeparateRuntimeSnapshots', 0, () => {
-      const cache: PinWebSearchCache = new PinWebSearchCache();
-      const landing: PinWebSearchSnapshot = searchSnapshot('https://www.pinterest.com/search/', '');
-      const results: PinWebSearchSnapshot = searchSnapshot('https://www.pinterest.com/search/pins/?q=art', 'art');
+      const cache: PinmonySearchCache = new PinmonySearchCache();
+      const landing: PinmonySearchSnapshot = searchSnapshot('https://www.pinterest.com/search/', '');
+      const results: PinmonySearchSnapshot = searchSnapshot('https://www.pinterest.com/search/pins/?q=art', 'art');
       cache.put(landing, 128);
       cache.put(results, 640);
       cache.updateScrollOffset(landing.pageKey, 256);
@@ -221,14 +221,14 @@ export default function localUnitTest() {
         expect(cachedResults.snapshot.results[0].targetUrl).assertEqual(results.results[0].targetUrl);
         expect(cachedResults.scrollOffset).assertEqual(640);
       }
-      expect(new PinWebSearchCache().get(landing.pageKey) === undefined).assertTrue();
+      expect(new PinmonySearchCache().get(landing.pageKey) === undefined).assertTrue();
     });
 
     it('doesNotOverwriteSearchCacheWithLoadingAndEvictsOldestRoute', 0, () => {
-      const cache: PinWebSearchCache = new PinWebSearchCache();
-      const landing: PinWebSearchSnapshot = searchSnapshot('https://www.pinterest.com/search/', '');
+      const cache: PinmonySearchCache = new PinmonySearchCache();
+      const landing: PinmonySearchSnapshot = searchSnapshot('https://www.pinterest.com/search/', '');
       cache.put(landing, 128);
-      const loading: PinWebSearchSnapshot = searchSnapshot(landing.pageKey, '');
+      const loading: PinmonySearchSnapshot = searchSnapshot(landing.pageKey, '');
       loading.kind = 'loading';
       cache.put(loading, 0);
       expect(cache.get(landing.pageKey)?.scrollOffset).assertEqual(128);
@@ -239,8 +239,8 @@ export default function localUnitTest() {
     });
 
     it('keepsSearchOrderAndArtworkWhileRebindingFreshControls', 0, () => {
-      const previous: PinWebSearchResult[] = [searchPin('old-a', '1'), searchPin('old-b', '2')];
-      const live: PinWebSearchResult[] = [searchPin('new-b', '2'), searchPin('new-a', '1'), searchPin('new-c', '3')];
+      const previous: PinmonySearchResult[] = [searchPin('old-a', '1'), searchPin('old-b', '2')];
+      const live: PinmonySearchResult[] = [searchPin('new-b', '2'), searchPin('new-a', '1'), searchPin('new-c', '3')];
       live[1].imageUrl = 'https://i.pinimg.com/changed.jpg';
       const retained = retainSearchResults(previous, live);
       expect(retained.length).assertEqual(2);
@@ -259,7 +259,7 @@ export default function localUnitTest() {
     });
 
     it('keepsUpperPostsWhenTheWebpageUnmountsAnEntireWindow', 0, () => {
-      const previous: PinWebSearchResult[] = [searchPin('old-a', '1'), searchPin('old-b', '2')];
+      const previous: PinmonySearchResult[] = [searchPin('old-a', '1'), searchPin('old-b', '2')];
       const nextWindow = mergeSearchFeedResults(previous, [searchPin('new-c', '3'), searchPin('new-d', '4')]);
       expect(nextWindow.length).assertEqual(4);
       expect(nextWindow[0].targetUrl).assertEqual(previous[0].targetUrl);
@@ -274,7 +274,7 @@ export default function localUnitTest() {
     });
 
     it('opensPostsByLinkEvenWhenTheDomControlIsDisabled', 0, () => {
-      const item: PinWebSearchResult = searchPin('not-ready-node', '1');
+      const item: PinmonySearchResult = searchPin('not-ready-node', '1');
       item.enabled = false;
       const merged = mergeSearchFeedResults([], [item]);
       expect(merged[0].enabled).assertTrue();
@@ -282,13 +282,13 @@ export default function localUnitTest() {
     });
 
     it('deduplicatesPinTrackingUrlsAndKeepsDifferentSearchLinks', 0, () => {
-      const original: PinWebSearchResult = searchPin('old', '1');
-      const tracked: PinWebSearchResult = searchPin('new', '1');
+      const original: PinmonySearchResult = searchPin('old', '1');
+      const tracked: PinmonySearchResult = searchPin('new', '1');
       tracked.targetUrl += '?source=search';
-      const firstSearch: PinWebSearchResult = searchPin('query-a', '2');
+      const firstSearch: PinmonySearchResult = searchPin('query-a', '2');
       firstSearch.kind = 'other';
       firstSearch.targetUrl = 'https://www.pinterest.com/search/pins/?q=art';
-      const secondSearch: PinWebSearchResult = searchPin('query-b', '3');
+      const secondSearch: PinmonySearchResult = searchPin('query-b', '3');
       secondSearch.kind = 'other';
       secondSearch.targetUrl = 'https://www.pinterest.com/search/pins/?q=design';
       const merged = mergeSearchFeedResults([original, firstSearch], [tracked, secondSearch]);
@@ -297,8 +297,8 @@ export default function localUnitTest() {
     });
 
     it('resolvesCardClicksByLinkAfterItsControlIdChanges', 0, () => {
-      const original: PinWebSearchResult = searchPin('old-dom-id', '123');
-      const live: PinWebSearchResult = searchPin('new-dom-id', '123');
+      const original: PinmonySearchResult = searchPin('old-dom-id', '123');
+      const live: PinmonySearchResult = searchPin('new-dom-id', '123');
       const merged = mergeSearchFeedResults([original], [live]);
       const target = findSearchResult(merged, original.targetUrl);
       expect(target !== undefined).assertTrue();
@@ -308,9 +308,9 @@ export default function localUnitTest() {
     });
 
     it('correctsCachedTitlesWhileKeepingTheCardPosition', 0, () => {
-      const original: PinWebSearchResult = searchPin('old', '123');
+      const original: PinmonySearchResult = searchPin('old', '123');
       original.title = 'Incorrect neighboring title';
-      const live: PinWebSearchResult = searchPin('new', '123');
+      const live: PinmonySearchResult = searchPin('new', '123');
       live.title = 'Title from this Pin';
       const merged = mergeSearchFeedResults([original, searchPin('other', '456')], [live]);
       expect(merged[0].title).assertEqual('Title from this Pin');

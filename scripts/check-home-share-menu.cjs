@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = readSourceFileSync(path.join(__dirname, '../feature_pin/src/main/ets/services/PinWebSharePanelScript.ets'), 'utf8');
+const source = readSourceFileSync(path.join(__dirname, '../feature_pin/src/main/ets/services/PinmonySharePanelScript.ets'), 'utf8');
 const template = source.match(/const SHARE_PANEL_BRIDGE_SCRIPT: string = `([\s\S]*?)`;/)[1];
 let script = Function('return `' + template + '`')();
 new Function(script);
@@ -44,10 +44,10 @@ const document = { readyState: 'loading', addEventListener: () => {}, getElement
   activeElement: null };
 const pin = 'https://www.pinterest.com/pin/123/';
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/', href: 'https://www.pinterest.com/' };
-const window = { innerWidth: 400, innerHeight: 800, PinWebHomeMenuPin: pin,
+const window = { innerWidth: 400, innerHeight: 800, PinmonyHomeMenuPin: pin,
   getComputedStyle: () => ({ display: 'block', visibility: 'visible', position: 'fixed' }),
-  addEventListener: () => {}, PinWebShareBridge: { sheetState: value => messages.push(JSON.parse(value)) },
-  PinWebPostApi: { shareSnapshot: () => { throw new Error('homepage options must remain DOM sourced'); },
+  addEventListener: () => {}, PinmonyShareBridge: { sheetState: value => messages.push(JSON.parse(value)) },
+  PinmonyPostApi: { shareSnapshot: () => { throw new Error('homepage options must remain DOM sourced'); },
     shareAction: () => { throw new Error('homepage actions must use the actual menu controls'); } } };
 window.top = window;
 vm.runInNewContext(script, { window, document, location, setTimeout: () => 1, clearTimeout: () => {},
@@ -56,12 +56,12 @@ vm.runInNewContext(script, { window, document, location, setTimeout: () => 1, cl
 assert.equal(window.testSharePanel(), panel, 'full-height mobile share mask is recognized');
 const trigger = node('…', 200, 32);
 trigger.scrollIntoView = () => {};
-assert.equal(window.PinWebNativeShareOpenFromHome(trigger, pin.replace('123', '999')), false);
-assert.equal(window.PinWebNativeShareOpenFromHome(trigger, pin), true);
+assert.equal(window.PinmonyNativeShareOpenFromHome(trigger, pin.replace('123', '999')), false);
+assert.equal(window.PinmonyNativeShareOpenFromHome(trigger, pin), true);
 assert.equal(messages[0].pinUrl, pin);
 assert.equal(messages[0].pinDetail, false);
 assert.equal(clicks, 0, 'website click waits until the native loading sheet is opened');
-assert.equal(window.PinWebNativeShareOpen(messages[0].session), true);
+assert.equal(window.PinmonyNativeShareOpen(messages[0].session), true);
 assert.equal(clicks, 1);
 const snapshot = window.testShareSnapshot(panel);
 assert.equal(snapshot.title, '分享');
@@ -70,10 +70,10 @@ assert.deepEqual(Array.from(snapshot.options, item => item.label), ['Messenger',
 assert.deepEqual(Array.from(snapshot.actions, item => item.label), actionNames);
 assert.equal(snapshot.contacts.length, 0, 'options are not misclassified as people');
 assert.equal(snapshot.searchActive, false, 'no invented contact search is added to the homepage menu');
-assert.equal(window.PinWebNativeShareAction(snapshot.session, snapshot.actions[2].id), true);
+assert.equal(window.PinmonyNativeShareAction(snapshot.session, snapshot.actions[2].id), true);
 assert.equal(clicks, 2);
 window.testCloseShare(panel);
 assert.equal(closeClicks, 1, 'the supplied mobile close control is used');
 location.pathname = '/pin/999/';
-assert.equal(window.PinWebNativeShareAction(snapshot.session, snapshot.actions[2].id), false);
+assert.equal(window.PinmonyNativeShareAction(snapshot.session, snapshot.actions[2].id), false);
 console.log('homepage mobile share mask, real options, exact Pin, delayed click, close and route gating OK');

@@ -1,4 +1,4 @@
-export { PinWebBoardPin, PinWebBoardDetail, PinWebBoardFlow, PinWebBoardTarget } from './src/main/ets/models/PinWebBoardDetail';
-export { PinWebBoardPage } from './src/main/ets/components/PinWebBoardPage';
-export { PIN_BOARD_API_ENABLED, PIN_BOARD_API_SCRIPT } from './src/main/ets/services/PinWebBoardApiScript';
-export { PinWebBoardStore } from './src/main/ets/stores/PinWebBoardStore';
+export { PinmonyBoardPin, PinmonyBoardDetail, PinmonyBoardFlow, PinmonyBoardTarget } from './src/main/ets/models/PinmonyBoardDetail';
+export { PinmonyBoardPage } from './src/main/ets/components/PinmonyBoardPage';
+export { PIN_BOARD_API_ENABLED, PIN_BOARD_API_SCRIPT } from './src/main/ets/services/PinmonyBoardApiScript';
+export { PinmonyBoardStore } from './src/main/ets/stores/PinmonyBoardStore';

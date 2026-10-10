@@ -32,13 +32,13 @@ function apiHarness(file, flags) {
   return { requests, window, respond };
 }
 async function main() {
-  const caches = ['PinWebInboxCache', 'PinWebSearchCache', 'PinWebProfileCache'].map(name =>
+  const caches = ['PinmonyInboxCache', 'PinmonySearchCache', 'PinmonyProfileCache'].map(name =>
     readSourceFileSync(root + 'services/' + name + '.ets', 'utf8').replace(/^import .*;\r?\n/m, '').replace(/export /g, '')).join('\n');
   const context = compile(caches + '\n' + 'class Native {' +
     ['inboxUrlFromAddress', 'clearInbox', 'restoreInbox', 'updateInbox', 'clearRootTabCaches']
-      .map(method).join('\n') + '}\nglobalThis.Native=Native; globalThis.InboxCache=PinWebInboxCache;' +
-    'globalThis.SearchCache=PinWebSearchCache;globalThis.ProfileCache=PinWebProfileCache;',
-    { console, PinWebRuntimeLog: { info() {} }, PINTEREST_URL: 'https://www.pinterest.com/', setTimeout: () => 0 });
+      .map(method).join('\n') + '}\nglobalThis.Native=Native; globalThis.InboxCache=PinmonyInboxCache;' +
+    'globalThis.SearchCache=PinmonySearchCache;globalThis.ProfileCache=PinmonyProfileCache;',
+    { console, PinmonyRuntimeLog: { info() {} }, PINTEREST_URL: 'https://www.pinterest.com/', setTimeout: () => 0 });
   const native = new context.Native(), url = 'https://www.pinterest.com/inbox/';
   Object.assign(native, { finishRootPull() {}, inboxCache: new context.InboxCache(), searchCache: new context.SearchCache(),
     profileCache: new context.ProfileCache(), rootTabAddresses: new Map(), inboxRequestToken: 0,
@@ -70,7 +70,8 @@ async function main() {
   require('node:child_process').execFileSync(process.execPath,
     ['scripts/check-native-root-switch.cjs', process.argv[2]], { stdio: 'inherit' });
   Object.assign(native, { clearHome() {}, clearSearch() {}, clearProfile() {}, clearInbox() {},
-    clearRootTabGuard() {}, clearOfflineHomeMarker() {}, detailReturnReads: new Map() });
+    clearRootTabGuard() {}, clearOfflineHomeMarker() {}, detailReturnReads: new Map(),
+    homeStore: new (require('./home-controller-harness.cjs').createHomeRuntime(ts).Store)() });
   native.cachedHome = {}; native.retainedSearch = {};
   native.clearRootTabCaches();
   assert.equal(native.rootTabAddresses.size, 0);
@@ -78,8 +79,8 @@ async function main() {
   assert.equal(native.cachedHome, undefined);
   assert.equal(native.retainedSearch, undefined);
 
-  const news = apiHarness('PinWebInboxApiScript.ets', { PinWebInboxApiEnabled: true });
-  const api = news.window.PinWebInboxApi, read = () => api.read(url, () => {}, () => true);
+  const news = apiHarness('PinmonyInboxApiScript.ets', { PinmonyInboxApiEnabled: true });
+  const api = news.window.PinmonyInboxApi, read = () => api.read(url, () => {}, () => true);
   read(); await news.respond(0, [{ type: 'news', id: 'sample', header_text: 'Sample' }]);
   api.more(() => {}, () => true); api.pause();
   assert.equal(news.requests[1].args.signal.aborted, true);
@@ -90,8 +91,8 @@ async function main() {
   const options = JSON.parse(new URL(news.requests[2].url, 'https://www.pinterest.com').searchParams.get('data')).options;
   assert.equal(options.bookmarks[0], 'next');
   await news.respond(2, [], '-end-'); api.reset();
-  const home = apiHarness('PinWebHomeApiScript.ets', { PinWebHomeApiEnabled: true });
-  const homeApi = home.window.PinWebHomeApi;
+  const home = apiHarness('PinmonyHomeApiScript.ets', { PinmonyHomeApiEnabled: true });
+  const homeApi = home.window.PinmonyHomeApi;
   homeApi.read('home:all', true, () => {}, () => true);
   await home.respond(0, [{ type: 'pin', id: '123', images: { '474x': { url: 'https://i.pinimg.com/sample.jpg', width: 474, height: 700 } } }]);
   homeApi.pause();

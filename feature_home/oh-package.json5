@@ -1,9 +1,10 @@
 {
   "name": "feature_home",
   "version": "1.0.0",
-  "description": "PinWeb feature_home",
+  "description": "Pinmony feature_home",
   "main": "Index.ets",
   "dependencies": {
+    "common_foundation": "file:../common_foundation",
     "common_ui": "file:../common_ui"
   }
 }

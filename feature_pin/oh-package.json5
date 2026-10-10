@@ -1,10 +1,11 @@
 {
   "name": "feature_pin",
   "version": "1.0.0",
-  "description": "PinWeb feature_pin",
+  "description": "Pinmony feature_pin",
   "main": "Index.ets",
   "dependencies": {
     "common_foundation": "file:../common_foundation",
+    "common_network": "file:../common_network",
     "common_ui": "file:../common_ui"
   }
 }

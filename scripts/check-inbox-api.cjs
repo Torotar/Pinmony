@@ -1,12 +1,12 @@
 const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 function script(p){const s=readSourceFileSync(p,'utf8');return vm.runInNewContext(s.slice(s.indexOf('`'),s.lastIndexOf('`')+1));}
-const code=script('entry/src/main/ets/services/PinWebInboxApiScript.ets');
-new vm.Script(script('entry/src/main/ets/services/PinWebInboxScript.ets'));
-let requests=[],resolve;const window={PinWebInboxApiEnabled:true};window.top=window;
+const code=script('entry/src/main/ets/services/PinmonyInboxApiScript.ets');
+new vm.Script(script('entry/src/main/ets/services/PinmonyInboxScript.ets'));
+let requests=[],resolve;const window={PinmonyInboxApiEnabled:true};window.top=window;
 const context={window,location:{hostname:'uk.pinterest.com'},URLSearchParams,AbortController,setTimeout,clearTimeout,fetch:(url,init)=>{requests.push({url,init});return new Promise(r=>resolve=r)}};
 vm.runInNewContext(code,context);
-const api=window.PinWebInboxApi;let changes=0;const changed=()=>changes++,current=()=>true;
+const api=window.PinmonyInboxApi;let changes=0;const changed=()=>changes++,current=()=>true;
 const flush=()=>new Promise(r=>setImmediate(r));
 function response(data,bookmark=''){resolve({ok:true,json:async()=>({resource_response:{status:'success',code:0,endpoint_name:'v3_get_news_hub_feed',data,bookmark}})});}
 (async()=>{
@@ -18,7 +18,7 @@ assert(api.more(changed,current));assert(!api.more(changed,current));assert.deep
 api.reset();state=api.read('other',changed,current);response([{type:'news',id:'2',header_text:'{unknown}'}]);await flush();assert.equal(state.kind,'failed');
 api.reset();state=api.read('empty',changed,current);response([]);await flush();assert.equal(state.kind,'ready');assert.equal(state.items.length,0);
 api.reset();state=api.read('stale',changed,current);api.reset();response([row]);await flush();assert.equal(state.kind,'loading');
-window.PinWebInboxApiEnabled=false;assert.equal(api.read('off',changed,current),null);
+window.PinmonyInboxApiEnabled=false;assert.equal(api.read('off',changed,current),null);
 console.log('PASS inbox API: contract, mapping, pagination, malformed/empty, stale response, feature switch; bridge syntax');
 })().catch(e=>{console.error(e);process.exitCode=1});
 

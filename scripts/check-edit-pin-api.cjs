@@ -1,9 +1,9 @@
 const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const source = readSourceFileSync('entry/src/main/ets/services/PinWebEditPinApiScript.ets', 'utf8');
+const source = readSourceFileSync('entry/src/main/ets/services/PinmonyEditPinApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const pin = 'https://www.pinterest.com/pin/101/';
-const raw = { id: '101', pinner: { id: '1' }, title: 'original title', description: '  original description  ', images: {} };
+const raw = { id: '101', pinner: { id: '1' }, is_repin: false, title: 'original title', description: '  original description  ', images: {} };
 const graphPin = { entityId: '101', pinner: { entityId: '1' }, board: { entityId: '2', name: 'old board' },
   section: { entityId: '8' }, aiDisclosures: [9], trackingParams: 'runtime-track', images: { url: 'https://i.pinimg.com/a.jpg' } };
 function harness(overrides = {}) {
@@ -13,7 +13,7 @@ function harness(overrides = {}) {
       { id: 'profile-quick-saves', enabled: true }], shortlist: [], suggestions: [] }; }, boardsRead: () => picker,
     resourceRequest: (p, name, op, options, valid, query) => new Promise((resolve, reject) => requests.push({
       name, op, options, query, resolve: result => valid() && p === current ? resolve(result) : reject(new Error('stale')), reject })) };
-  const window = { PinWebPostApi: api, PinWebEditApiEnabled: true }; window.top = window;
+  const window = { PinmonyPostApi: api, PinmonyEditApiEnabled: true }; window.top = window;
   vm.runInNewContext(script, { window });
   async function load(r = raw, g = graphPin) {
     const start = api.editStart(pin); const request = requests.at(-1); request.resolve({ data: r });
@@ -28,6 +28,7 @@ async function main() {
   assert.equal(h.api.editRead(pin).ai, false);
   assert.equal(h.api.editRead(pin).title, raw.title);
   assert.equal(h.api.editRead(pin).description, raw.description);
+  assert.equal(h.api.editRead(pin).editableContent, true);
   h.api.editAi(pin, true);
   const commit = h.api.editCommit(pin, false);
   assert.equal(await h.api.editCommit(pin, false), false, 'duplicate write blocked');
@@ -81,6 +82,14 @@ async function main() {
   assert.equal(del.options.client_tracking_params, 'runtime-track~0');
   del.resolve({ code: 0, endpoint_name: 'v3_delete_pin_handler', data: null }); await remove;
   assert.equal(deleted.api.editRead(pin).done, 'deleted');
+  const repin = harness(); await repin.load({ ...raw, is_repin: true });
+  assert.equal(repin.api.editRead(pin).editableContent, false);
+  const repinCommit = repin.api.editCommit(pin, false, 'must-not-send', 'must-not-send');
+  const repinRequest = repin.requests.at(-1);
+  assert.equal(Object.prototype.hasOwnProperty.call(repinRequest.options, 'title'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(repinRequest.options, 'description'), false);
+  repinRequest.resolve({ code: 0, endpoint_name: 'v3_edit_pin', data: { id: '101', board: { id: '2' }, ai_disclosures: [9] } });
+  await repinCommit;
   const other = harness(); await other.load({ ...raw, pinner: { id: '99' } });
   assert.match(other.api.editRead(pin).error, /当前账号/); assert.equal(other.requests.length, 1);
   const stale = harness(); const load = stale.api.editStart(pin); stale.move('https://www.pinterest.com/pin/999/');

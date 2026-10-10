@@ -7,15 +7,15 @@ const fixture = JSON.parse(fs.readFileSync('scripts/fixtures/home-api.json', 'ut
 function script(file) { return Function('return `' + fs.readFileSync(file, 'utf8').match(/`([\s\S]*?)`;/)[1] + '`')(); }
 function home(pathname = '/') {
   const requests = [], messages = [], timers = [];
-  const window = { PinWebHomeApiEnabled: true, addEventListener() {},
-    PinWebShareBridge: { homeState: value => messages.push(JSON.parse(value)) } };
+  const window = { PinmonyHomeApiEnabled: true, addEventListener() {},
+    PinmonyShareBridge: { homeState: value => messages.push(JSON.parse(value)) } };
   window.top = window;
   const location = { origin: root.slice(0, -1), hostname: 'www.pinterest.com', pathname, href: root.slice(0, -1) + pathname };
   const context = { window, location, URL, AbortController, Date, console: { warn() {} },
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {}, setInterval() {},
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) };
-  vm.runInNewContext(script('feature_home/src/main/ets/services/PinWebHomeApiScript.ets') +
-    script('feature_home/src/main/ets/services/PinWebHomeScript.ets'), context);
+  vm.runInNewContext(script('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets') +
+    script('feature_home/src/main/ets/services/PinmonyHomeScript.ets'), context);
   const publish = () => { const pending = timers.splice(0); pending.filter(callback => callback.name === 'publish').forEach(callback => callback()); };
   return { window, requests, messages, publish };
 }
@@ -31,7 +31,7 @@ function method(name) {
   return rest.slice(0, rest.slice(1).search(/\n  (?:private |@Builder)/) + 1);
 }
 let now = 1000;
-const context = { Date: { now: () => now }, PinWebRuntimeLog: { info() {}, warn(message) { assert.fail(message); } } };
+const context = { Date: { now: () => now }, PinmonyRuntimeLog: { info() {}, warn(message) { assert.fail(message); } } };
 vm.runInNewContext(ts.transpileModule('class Native {' +
   ['prepareSearchNavigation', 'rootReadInFlight', 'requestRootPage', 'updateHome'].map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
@@ -50,7 +50,7 @@ function native() {
 (async () => {
   const h = home(); h.publish();
   assert.equal(h.requests.length, 0, 'feed waits for authenticated identity');
-  h.window.PinWebHomeSetUsername('sample'); h.publish();
+  h.window.PinmonyHomeSetUsername('sample'); h.publish();
   assert.equal(h.requests.length, 2, 'categories and All feed start before either response');
   const categories = h.requests.find(item => item.url.includes('BoardsFeedResource'));
   const feed = h.requests.find(item => item.url.includes('UserHomefeedResource'));
@@ -64,6 +64,7 @@ function native() {
     currentHomePageKey: () => root, normalizeHomeBoard: () => undefined,
     pinIdentity: value => /\/pin\/(\d+)/.exec(value)?.[1] || '',
     homeTraceCardsPageKey: root, homeDiskCacheRestoredAt: 0, rootTabAddresses: new Map(), persistHomeDiskCache() {} });
+  require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(presentation);
   presentation.updateHome(JSON.stringify(h.messages.at(-1)));
   assert.equal(presentation.homeStore.home.pins.length, 21, 'native coordinator preserves current feed on category failure');
   assert.equal(presentation.homeStore.home.categorySourceFailure, true);
@@ -72,7 +73,7 @@ function native() {
   assert.equal(h.messages.at(-1).kind, 'state', 'category failure cannot replace successful feed');
   assert.equal(h.messages.at(-1).categorySourceFailure, true);
   assert.equal(h.messages.at(-1).pins.length, 21);
-  assert.equal(h.window.PinWebHomeRetryCategories(root), true); h.publish();
+  assert.equal(h.window.PinmonyHomeRetryCategories(root), true); h.publish();
   assert.equal(h.requests.filter(item => item.url.includes('UserHomefeedResource')).length, 1,
     'category retry does not reload feed');
   await respond(h.requests.at(-1), { resource_response: { status: 'success', data: [{ type: 'board', id: '42', name: 'Design' }] } });
@@ -86,10 +87,10 @@ function native() {
   assert.equal(presentation.homeStore.home.pins.length, 21, 'simultaneous feed/category failures preserve previously displayed cards');
   assert.equal(presentation.homeStore.homeActionsReady, false, 'failed feed disables old operations');
   for (const path of ['/search/', '/inbox/', '/sample/']) {
-    const other = home(path); other.window.PinWebHomeSetUsername('sample'); other.publish();
+    const other = home(path); other.window.PinmonyHomeSetUsername('sample'); other.publish();
     assert.equal(other.requests.length, 0, 'non-home documents never issue home category reads');
   }
-  const h2 = home(); h2.window.PinWebHomeSetUsername('sample'); h2.publish();
+  const h2 = home(); h2.window.PinmonyHomeSetUsername('sample'); h2.publish();
   await respond(h2.requests.find(item => item.url.includes('BoardsFeedResource')),
     { resource_response: { status: 'success', data: [] } }); h2.publish();
   await respond(h2.requests.find(item => item.url.includes('UserHomefeedResource')), {}, false); h2.publish();

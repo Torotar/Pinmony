@@ -3,12 +3,12 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const flush = () => new Promise(resolve => setImmediate(resolve));
-const source = fs.readFileSync('feature_pin/src/main/ets/services/PinWebDetailApiScript.ets', 'utf8');
+const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const requests = [], changes = [], timers = [], delays = [];
 let finishMedia, failMedia;
 const media = () => new Promise((resolve, reject) => { finishMedia = resolve; failMedia = reject; });
-const window = { PinWebDetailApiEnabled: true, PinWebVideoApi: { resolve: media, nativeMode() {} } };
+const window = { PinmonyDetailApiEnabled: true, PinmonyVideoApi: { resolve: media, nativeMode() {} } };
 window.top = window;
 vm.runInNewContext(script, { window, location: { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com' },
   AbortController, console, setTimeout(fn, delay) { timers.push(fn); delays.push(delay); return timers.length; },
@@ -18,7 +18,7 @@ const pinUrl = 'https://www.pinterest.com/pin/101/';
 const raw = { id: '101', type: 'pin', is_video: true, title: 'Base content', images: {
   '736x': { url: 'https://i.pinimg.com/poster.jpg', width: 736, height: 1100 } } };
 const video = { pinId: '101', sources: [{ url: 'https://v1.pinimg.com/videos/example.m3u8', kind: 'hls' }] };
-const api = window.PinWebDetailApi;
+const api = window.PinmonyDetailApi;
 const read = () => api.read(pinUrl, () => changes.push(true), () => true);
 async function main() {
   read();
@@ -41,13 +41,16 @@ async function main() {
   assert.equal(read().detail.title, 'Base content', 'failed media retains base and independent recommendations');
   const count = requests.length;
   const retry = api.retryMedia(); await flush();
-  assert.equal(requests.length, count, 'media retry does not refetch PinResource or recommendations');
-  finishMedia(video); await retry;
+  assert.equal(retry, true, 'media retry returns synchronous acceptance');
+  assert.equal(requests.length, count + 1, 'manual video retry fetches fresh PinResource only');
+  requests.at(-1).resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: raw } }) }); await flush();
+  finishMedia(video); await flush();
   assert.equal(read().video.pinId, '101'); assert.equal(read().videoError, '');
-  const late = api.retryMedia(); await flush(); api.reset();
-  finishMedia(video); await late;
+  const late = api.retryMedia(); await flush();
+  requests.at(-1).resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: raw } }) }); await flush();
+  api.reset(); finishMedia(video); await flush(); assert.equal(late, true);
   assert.equal(api.raw(pinUrl), null, 'late media cannot restore a closed Pin');
-  assert.equal(requests.length, count);
+  assert.equal(requests.length, count + 2);
   // Explicit retry aborts the old base and refuses its late successful response.
   read(); const old = requests.at(-1);
   api.restart(pinUrl); const replacement = requests.at(-1);
@@ -56,10 +59,10 @@ async function main() {
   await flush(); assert.equal(api.raw(pinUrl), null);
   replacement.resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: { ...raw, title: 'Replacement' } } }) });
   await flush(); assert.equal(read().detail.title, 'Replacement'); finishMedia(video); await flush(); api.reset();
-  const dataSource = fs.readFileSync('feature_pin/src/main/ets/models/PinWebRelatedDataSource.ets', 'utf8')
+  const dataSource = fs.readFileSync('feature_pin/src/main/ets/models/PinmonyRelatedDataSource.ets', 'utf8')
     .replace(/^import .*;\r?\n/gm, '').replace('export class', 'class');
   const ctx = {};
-  vm.runInNewContext(ts.transpile(dataSource + '\nglobalThis.Source = PinWebRelatedDataSource;',
+  vm.runInNewContext(ts.transpile(dataSource + '\nglobalThis.Source = PinmonyRelatedDataSource;',
     { target: ts.ScriptTarget.ES2021 }), ctx);
   const feed = new ctx.Source(), events = [];
   feed.registerDataChangeListener({ onDataAdd: index => events.push(index), onDataReloaded: () => events.push('reload') });

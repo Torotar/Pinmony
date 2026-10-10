@@ -6,10 +6,10 @@ function compiled(file, requireFn = () => ({})) {
     target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: requireFn });
   return exports;
 }
-const api = compiled('feature_settings/src/main/ets/services/PinWebLogout.ets');
-const { acceptsNetworkJob, PinWebNativeNetwork } = compiled('common_network/src/main/ets/PinWebNativeNetwork.ets',
-  name => name === 'common_foundation' ? { PinWebRuntimeLog: { info() {}, warn() {} } } :
-    name === 'common_session' ? { PinWebSessionCredentials: class {} } : {});
+const api = compiled('feature_settings/src/main/ets/services/PinmonyLogout.ets');
+const { acceptsNetworkJob, PinmonyNativeNetwork } = compiled('common_network/src/main/ets/PinmonyNativeNetwork.ets',
+  name => name === 'common_foundation' ? { PinmonyRuntimeLog: { info() {}, warn() {} } } :
+    name === 'common_session' ? { PinmonySessionCredentials: class {} } : {});
 const page = 'https://www.pinterest.com/sample/', login = 'https://www.pinterest.com/login/';
 const state = { authenticated: true, epoch: 7, page, userAgent: 'synthetic' };
 const job = { id: 'session_logout_1', epoch: 7, page, method: 'POST',
@@ -34,7 +34,7 @@ for (const [status, body] of [[429, confirmedBody], [200, '{}'], [200, '<html>']
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const method = source.match(/  private async logoutAccount\([\s\S]*?(?=\r?\n  private )/)[0];
 const context = { ...api, Date, PINTEREST_URL: 'https://www.pinterest.com/', PINTEREST_LOGIN_URL: login,
-  PIN_NATIVE_NETWORK_ENABLED: true, PinWebRuntimeLog: { info() {}, warn() {} } };
+  PIN_NATIVE_NETWORK_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {} } };
 vm.runInNewContext(ts.transpile('class Native {' + method + '} globalThis.Native=Native;',
   { target: ts.ScriptTarget.ES2021 }), context);
 function harness() {
@@ -67,7 +67,7 @@ async function main() {
   assert.deepEqual(disabled.calls, []); context.PIN_LOGOUT_API_ENABLED = true;
   const missing = harness(); missing.native.authStatus = 'unauthenticated'; await missing.native.logoutAccount(); assert.deepEqual(missing.calls, []);
   assert.ok(!method.includes('setTimeout'), 'no scheduled write replay');
-  const settingsSource = fs.readFileSync('feature_settings/src/main/ets/components/PinWebSettingsPage.ets', 'utf8');
+  const settingsSource = fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets', 'utf8');
   const confirmMethod = settingsSource.match(/  private confirmLogout\([\s\S]*?(?=\r?\n  private )/)[0];
   const confirmContext = {};
   vm.runInNewContext(ts.transpileModule('class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {

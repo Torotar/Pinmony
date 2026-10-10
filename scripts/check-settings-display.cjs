@@ -8,7 +8,7 @@ function method(source, name, endName) {
   return source.slice(start, end);
 }
 const ability = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8');
-const component = fs.readFileSync('feature_settings/src/main/ets/components/PinWebPreferencesPage.ets', 'utf8');
+const component = fs.readFileSync('feature_settings/src/main/ets/components/PinmonyPreferencesPage.ets', 'utf8');
 const selected = [];
 let preference = 'system', resourceMode = 1;
 const context = { ConfigurationConstant: { ColorMode: { COLOR_MODE_LIGHT: 1, COLOR_MODE_DARK: 0, COLOR_MODE_NOT_SET: -1 } },
@@ -29,10 +29,10 @@ native.selectTheme('dark'); assert.equal(native.themePreference, 'dark'); assert
 native.selectTheme('system'); assert.equal(changes.at(-1), -1);
 native.getUIContext = () => ({ getHostContext: () => ({ getApplicationContext: () => ({ setColorMode() { throw Error('synthetic'); } }) }), getPromptAction: () => ({ showToast: value => errors.push(value) }) });
 native.selectTheme('light'); assert.equal(native.themePreference, 'system'); assert.equal(errors.length, 1);
-const storeSource = fs.readFileSync('feature_settings/src/main/ets/stores/PinWebSettingsStore.ets', 'utf8').replace(/^@Observed\s*$/m, '');
+const storeSource = fs.readFileSync('feature_settings/src/main/ets/stores/PinmonySettingsStore.ets', 'utf8').replace(/^@Observed\s*$/m, '');
 const storeExports = {};
 vm.runInNewContext(ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports: storeExports });
-const store = new storeExports.PinWebSettingsStore(); store.screen = 'visibility'; store.confirmOpen = true;
+const store = new storeExports.PinmonySettingsStore(); store.screen = 'visibility'; store.confirmOpen = true;
 assert(store.back()); assert.equal(store.screen, 'visibility'); assert.equal(store.confirmOpen, false);
 store.confirmOpen = true; store.busy = true; store.back(); assert.equal(store.confirmOpen, true);
 store.busy = false; store.confirmOpen = false; store.back(); assert.equal(store.screen, 'root');

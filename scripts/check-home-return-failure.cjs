@@ -13,7 +13,7 @@ function method(name) {
 }
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/', other = home + 'pin/456/';
 const context = { PIN_HOME_API_ENABLED: true, PINTEREST_URL: home, Date, setTimeout() {},
-  isPinterestAuthRoute: url => /\/login\//.test(url), PinWebRuntimeLog: { info() {}, warn() {}, error() {} } };
+  isPinterestAuthRoute: url => /\/login\//.test(url), PinmonyRuntimeLog: { info() {}, warn() {}, error() {} } };
 vm.runInNewContext(ts.transpile('class Native {' + ['isCurrentPageFailure', 'handleMainFrameFailure',
   'homePresentationPageKey', 'refreshHome', 'selectNativeRootTab', 'rootPresentationAddress',
   'staleRootDocumentTarget', 'effectiveRootDocumentTarget', 'rootTabIndexFromAddress',
@@ -28,6 +28,7 @@ function harness() {
     retainedRootTabPending: -1, rootTabGuardTarget: -1, rootTabAddresses: new Map(),
     homeStore: { home: cached, cachedHome: cached, homeActionsReady: false, homeRequestToken: 1, homeRefreshToken: 1 },
     pinStore: { detailReturnUrl: home }, searchStore: {}, profileStore: { origins: [] }, inboxStore: {}, boardStore: {},
+    boardUrlFromAddress: () => '',
     pageHistory: { key: url => url.split('#')[0], cancelBack() { effects.push('cancel'); } },
     showNetworkNotice() { effects.push('notice'); }, showMessage() {}, clearInbox() { effects.push('inbox'); },
     clearHome() { this.homeStore.home = undefined; effects.push('clearHome'); }, clearSearch() {},
@@ -43,6 +44,7 @@ function harness() {
     controller: { loadUrl(url) { loads.push(url); } } });
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
+  require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
   return { native, cached, effects, loads, setWeb: url => { webUrl = url; } };
 }
 const returned = harness();

@@ -12,13 +12,13 @@ const pin = id => ({ id, type: 'pin', pinner: { id: '123' }, images: { '736x': {
 const board = (id, access = 'write delete') => ({ id, type: 'board', name: 'Board ' + id, access, privacy: 'secret', image_cover_url: 'https://i.pinimg.com/b.jpg' });
 async function harness(own = true) {
   let current = true, updates = 0;
-  const requests = [], window = { PinWebProfileApiEnabled: true, PinWebProfileOrganizeEnabled: true }; window.top = window;
+  const requests = [], window = { PinmonyProfileApiEnabled: true, PinmonyProfileOrganizeEnabled: true }; window.top = window;
   const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/sample/' };
   const context = vm.createContext({ window, location, URL, AbortController, setTimeout, clearTimeout, console,
     document: { cookie: 'csrftoken=test' }, fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })) });
-  vm.runInContext(script('PinWebProfileApiScript'), context);
-  vm.runInContext(script('PinWebProfileOrganizeScript'), context);
-  const api = window.PinWebProfileApi, profile = 'https://www.pinterest.com/sample/';
+  vm.runInContext(script('PinmonyProfileApiScript'), context);
+  vm.runInContext(script('PinmonyProfileOrganizeScript'), context);
+  const api = window.PinmonyProfileApi, profile = 'https://www.pinterest.com/sample/';
   const changed = () => updates++, valid = () => current;
   api.read(profile, changed, valid);
   requests[0].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: { id: '123', type: 'user', username: 'sample' } },

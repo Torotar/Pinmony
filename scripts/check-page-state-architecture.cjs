@@ -6,20 +6,20 @@ const architecture = fs.readFileSync('docs/ARCHITECTURE.md', 'utf8');
 
 assert(/@Entry\s+@Component\s+struct Index/.test(index), 'Index remains the single ArkUI entry component');
 for (const [field, store] of [
-  ['pin', 'PinWebPinStore'], ['board', 'PinWebBoardStore'], ['settings', 'PinWebSettingsStore'],
-  ['profile', 'PinWebProfileStore'], ['inbox', 'PinWebInboxStore'], ['search', 'PinWebSearchStore'],
-  ['home', 'PinWebHomeStore']
+  ['pin', 'PinmonyPinStore'], ['board', 'PinmonyBoardStore'], ['settings', 'PinmonySettingsStore'],
+  ['profile', 'PinmonyProfileStore'], ['inbox', 'PinmonyInboxStore'], ['search', 'PinmonySearchStore'],
+  ['home', 'PinmonyHomeStore']
 ]) {
   assert(index.includes('@State private ' + field + 'Store: ' + store), field + ' Store is owned by Index with @State');
 }
 for (const file of [
-  'feature_pin/src/main/ets/stores/PinWebPinStore.ets',
-  'feature_board/src/main/ets/stores/PinWebBoardStore.ets',
-  'feature_settings/src/main/ets/stores/PinWebSettingsStore.ets',
-  'feature_profile/src/main/ets/stores/PinWebProfileStore.ets',
-  'feature_inbox/src/main/ets/stores/PinWebInboxStore.ets',
-  'feature_search/src/main/ets/stores/PinWebSearchStore.ets',
-  'feature_home/src/main/ets/stores/PinWebHomeStore.ets'
+  'feature_pin/src/main/ets/stores/PinmonyPinStore.ets',
+  'feature_board/src/main/ets/stores/PinmonyBoardStore.ets',
+  'feature_settings/src/main/ets/stores/PinmonySettingsStore.ets',
+  'feature_profile/src/main/ets/stores/PinmonyProfileStore.ets',
+  'feature_inbox/src/main/ets/stores/PinmonyInboxStore.ets',
+  'feature_search/src/main/ets/stores/PinmonySearchStore.ets',
+  'feature_home/src/main/ets/stores/PinmonyHomeStore.ets'
 ]) {
   assert(fs.readFileSync(file, 'utf8').includes('@Observed'), file + ' uses @Observed');
 }

@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 function moduleFrom(file) { const exports = {}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, { exports, require: () => ({}) }); return exports; }
-const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinWebAccountSettingsScript.ets');
-const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinWebNativeNetwork.ets');
+const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets');
+const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinmonyNativeNetwork.ets');
 const page = 'https://www.pinterest.com/synthetic/';
 function harness() {
   const account = { id: '123', username: 'synthetic', allow_switch_between_private_and_public_profile: true, can_edit_search_privacy: true, opt_in_private_account: false, search_privacy_enabled: true, exclude_from_search: true };
@@ -41,7 +41,7 @@ function harness() {
         endpoint_name: options.url && options.url.startsWith('/v3/pfy/') ? 'v3_provide_pfy_pin_feedback' : '' } }) };
     } };
   context.window = context; context.top = context; vm.runInNewContext(PIN_ACCOUNT_SETTINGS_SCRIPT, context);
-  return { api: context.PinWebAccountSettings, writes, account, topics, mismatch() { mismatch = true; }, fail() { rejectWrite = true; } };
+  return { api: context.PinmonyAccountSettings, writes, account, topics, mismatch() { mismatch = true; }, fail() { rejectWrite = true; } };
 }
 async function main() {
   const h = harness();

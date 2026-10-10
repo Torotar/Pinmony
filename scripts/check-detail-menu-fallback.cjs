@@ -5,16 +5,16 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const detailSource = readSourceFileSync(path.join(__dirname,
-  '../entry/src/main/ets/services/PinWebDetailScript.ets'), 'utf8');
+  '../entry/src/main/ets/services/PinmonyDetailScript.ets'), 'utf8');
 const indexSource = readSourceFileSync(path.join(__dirname, '../entry/src/main/ets/pages/Index.ets'), 'utf8');
 const template = detailSource.match(/= `([\s\S]*)`;/)[1];
 const script = Function('return `' + template + '`')();
 new Function(script);
-const moreFunction = script.match(/window\.PinWebDetailMore = function[\s\S]*?\n  };/)[0];
+const moreFunction = script.match(/window\.PinmonyDetailMore = function[\s\S]*?\n  };/)[0];
 const target = { isConnected: true, enabled: true };
 const calls = [];
 const fixture = {
-  window: { PinWebNativeMoreOpenFromHome: (button, pin) => {
+  window: { PinmonyNativeMoreOpenFromHome: (button, pin) => {
     calls.push({ button, pin });
     return true;
   } },
@@ -26,7 +26,7 @@ const fixture = {
   enabled: button => button.enabled
 };
 vm.runInNewContext(moreFunction, fixture);
-const open = fixture.window.PinWebDetailMore;
+const open = fixture.window.PinmonyDetailMore;
 assert.equal(open(6, fixture.activePin, 'more'), false, 'old session cannot open a menu');
 assert.equal(open(7, 'https://www.pinterest.com/pin/456/', 'more'), false, 'another Pin cannot open this menu');
 assert.equal(open(7, fixture.activePin, 'save'), false, 'a non-menu control is never clicked');
@@ -44,9 +44,9 @@ assert.equal(open(7, fixture.activePin, 'more'), true);
 assert.equal(calls.length, 1);
 assert.equal(calls[0].button, target, 'the real detail control is passed to the native menu bridge');
 assert.equal(calls[0].pin, fixture.activePin);
-fixture.window.PinWebNativeMoreOpenFromHome = () => false;
+fixture.window.PinmonyNativeMoreOpenFromHome = () => false;
 assert.equal(open(7, fixture.activePin, 'more'), false, 'busy bridge is reported without a fake menu');
-delete fixture.window.PinWebNativeMoreOpenFromHome;
+delete fixture.window.PinmonyNativeMoreOpenFromHome;
 assert.equal(open(7, fixture.activePin, 'more'), false);
 
 assert.match(indexSource, /reason\.includes\('menu-not-mounted'\)[\s\S]*?openHomeMoreViaDetail\(pin\.pinUrl, home\.pageKey\)/);
@@ -60,8 +60,8 @@ const method = indexSource.match(/  private async openHomeMoreViaDetail\([\s\S]*
   .replace(/\n  private loadMoreHome$/, '')
   .replace('private async', 'async')
   .replace(/: Promise<void>/g, '')
-  .replace(/: PinWebDetail(?:Snapshot|Action) \| undefined/g, '')
-  .replace(/: PinWebDetailAction/g, '')
+  .replace(/: PinmonyDetail(?:Snapshot|Action) \| undefined/g, '')
+  .replace(/: PinmonyDetailAction/g, '')
   .replace(/: \(\) => void/g, '')
   .replace(/: (?:string|number|boolean|void)/g, '')
   .replace('new Promise<void>', 'new Promise');
@@ -83,7 +83,7 @@ async function checkCoordinator(mode) {
     controller: {
       loadUrl: value => assert.equal(value, fixture.activePin),
       runJavaScript: async value => {
-        assert.match(value, /PinWebDetailMore\(7,"https:\/\/www.pinterest.com\/pin\/123\/","more"\)/);
+        assert.match(value, /PinmonyDetailMore\(7,"https:\/\/www.pinterest.com\/pin\/123\/","more"\)/);
         dispatches++;
         return 'true';
       }

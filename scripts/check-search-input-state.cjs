@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),ts=require(process.argv[2]);
-const src=fs.readFileSync('feature_search/src/main/ets/components/PinWebSearchPage.ets','utf8');
+const src=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');
 function method(name){const a=src.indexOf('  private '+name);assert(a>=0);const b=src.indexOf('\n  private ',a+1);return src.slice(a,b<0?src.lastIndexOf('\n}'):b).replace('private ','');}
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('committedQuery(')+method('closeInputPanel(')+method('onInputFocus(')+method('onSnapshotChanged(')+'}\nHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
 const h=new Host(),events=[];h.snapshot={pageKey:'https://www.pinterest.com/search/pins/?q=old+query',query:'draft',session:2,heroes:[]};h.inputController={stopEditing(){events.push('stop')}};h.onQueryChange=(value,refresh)=>events.push([value,refresh]);h.onInputFocusChange=(focus)=>events.push(focus);h.syncQuizPresentation=()=>{};h.fillInitialViewport=()=>{};

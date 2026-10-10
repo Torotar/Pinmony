@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync('feature_profile/src/main/ets/services/PinWebProfilePanelScript.ets', 'utf8');
+const source = fs.readFileSync('feature_profile/src/main/ets/services/PinmonyProfilePanelScript.ets', 'utf8');
 const script = Function('return ' + source.slice(source.indexOf('`'), source.lastIndexOf('`') + 1))();
 new Function(script);
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
@@ -10,11 +10,11 @@ function harness() {
   const location = { href: page, origin: 'https://www.pinterest.com', pathname: '/sample/' };
   const info = { userId: '123', viewerId: '999', isOwn: false, followingUser: false, blocked: false };
   const calls = [], notices = [];
-  const window = { PinWebProfileApi: { currentInfo: p => p === page ? info : null } };
+  const window = { PinmonyProfileApi: { currentInfo: p => p === page ? info : null } };
   vm.runInNewContext(script, { window, location, URL, AbortController, setTimeout, clearTimeout, btoa,
     fetch: (url, options) => new Promise(resolve => calls.push({ url, options, resolve })) });
   const respond = (i, data) => calls[i].resolve({ ok: true, json: async () => data });
-  return { api: window.PinWebProfilePanel, calls, notices, page, info, location, respond };
+  return { api: window.PinmonyProfilePanel, calls, notices, page, info, location, respond };
 }
 (async () => {
   let h = harness();

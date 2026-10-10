@@ -14,9 +14,9 @@ function method(text, name) {
 async function main() {
   const requests = [], timers = new Map(), listeners = {};
   let serial = 0, interval;
-  const window = { PinWebDetailApiEnabled: true, addEventListener: (name, fn) => { listeners[name] = fn; },
-    setInterval: fn => { interval = fn; }, PinWebShareBridge: { detailState() {} },
-    PinWebPostApi: { reset() {}, detailActions: () => [], previewRead: () => ({ loading: false, empty: true }) } };
+  const window = { PinmonyDetailApiEnabled: true, addEventListener: (name, fn) => { listeners[name] = fn; },
+    setInterval: fn => { interval = fn; }, PinmonyShareBridge: { detailState() {} },
+    PinmonyPostApi: { reset() {}, detailActions: () => [], previewRead: () => ({ loading: false, empty: true }) } };
   window.top = window;
   window.fetch = (url, args) => new Promise(resolve => requests.push({ url, args, resolve }));
   const location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/pin/101/', href: pin };
@@ -24,8 +24,8 @@ async function main() {
     document: { documentElement: null, addEventListener() {}, querySelectorAll: () => [] },
     setTimeout(fn, delay) { const id = ++serial; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); }, fetch: (...args) => window.fetch(...args) });
-  vm.runInContext(script('feature_pin/src/main/ets/services/PinWebDetailApiScript.ets'), context);
-  vm.runInContext(script('feature_pin/src/main/ets/services/PinWebDetailScript.ets'), context);
+  vm.runInContext(script('feature_pin/src/main/ets/services/PinmonyDetailApiScript.ets'), context);
+  vm.runInContext(script('feature_pin/src/main/ets/services/PinmonyDetailScript.ets'), context);
   function tick(delay) {
     const entry = [...timers.entries()].find(([, timer]) => timer.delay === delay);
     assert(entry, 'expected timer ' + delay); timers.delete(entry[0]); entry[1].fn();
@@ -34,26 +34,26 @@ async function main() {
   requests[0].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: {
     type: 'pin', id: '101', images: { '736x': { url: 'https://i.pinimg.com/1.jpg', width: 736, height: 1000 } }
   } } }) }); await flush();
-  assert(window.PinWebDetailImageStage(1, pin, 'https://i.pinimg.com/1.jpg', 'loaded'));
+  assert(window.PinmonyDetailImageStage(1, pin, 'https://i.pinimg.com/1.jpg', 'loaded'));
   tick(100);
   const queuedRelated = [...timers.values()].find(timer => timer.delay === 0);
   assert(queuedRelated || requests.length > 1, 'comments settled and recommendations are scheduled or already in flight');
   const requestsBeforePause = requests.length;
-  assert.equal(window.PinWebDetailPause('https://www.pinterest.com/pin/999/'), false);
-  assert.equal(window.PinWebDetailPause(pin), true);
-  if (queuedRelated) queuedRelated.fn(); interval(); window.PinWebDetailRefresh(); await flush();
+  assert.equal(window.PinmonyDetailPause('https://www.pinterest.com/pin/999/'), false);
+  assert.equal(window.PinmonyDetailPause(pin), true);
+  if (queuedRelated) queuedRelated.fn(); interval(); window.PinmonyDetailRefresh(); await flush();
   assert.equal(requests.length, requestsBeforePause, 'paused old document cannot schedule another base/preview/recommendation read');
-  assert.equal(window.PinWebDetailApi.raw(pin), null);
-  window.PinWebDetailRefresh(true); tick(100);
+  assert.equal(window.PinmonyDetailApi.raw(pin), null);
+  window.PinmonyDetailRefresh(true); tick(100);
   assert.equal(requests.length, requestsBeforePause + 1, 'native confirmed refresh explicitly resumes and revalidates the current document');
-  window.PinWebDetailPause(pin);
+  window.PinmonyDetailPause(pin);
   requests[1].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: {
     type: 'pin', id: '101', images: { '736x': { url: 'https://i.pinimg.com/late.jpg', width: 736, height: 1000 } }
   } } }) }); await flush();
-  assert.equal(window.PinWebDetailApi.raw(pin), null, 'late HTTP 200 cannot revive a paused document');
+  assert.equal(window.PinmonyDetailApi.raw(pin), null, 'late HTTP 200 cannot revive a paused document');
 
   const index = source('entry/src/main/ets/pages/Index.ets');
-  const host = { PIN_NATIVE_NETWORK_ENABLED: true, PinWebRuntimeLog: { info() {} } };
+  const host = { PIN_NATIVE_NETWORK_ENABLED: true, PinmonyRuntimeLog: { info() {} } };
   vm.runInNewContext(ts.transpileModule(`class Native { ${method(index, 'requestNativeNetwork')} }
     globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, host);
   const native = new host.Native(), calls = [];
@@ -73,10 +73,10 @@ async function main() {
     url: 'https://www.pinterest.com/resource/RelatedModulesResource/get/', method: 'GET' }));
   assert.equal(calls.length, 3, 'pending return is guarded even without a cached native parent');
   assert(calls.every(value => value.includes('"error":"cancelled"')));
-  assert(index.indexOf('window.PinWebDetailPause(') < index.indexOf('this.presentNativeBackTarget(target);'),
+  assert(index.indexOf('window.PinmonyDetailPause(') < index.indexOf('this.presentNativeBackTarget(target);'),
     'pause is queued before target navigation invalidates the old requests');
 
-  const page = source('feature_pin/src/main/ets/components/PinWebDetailPage.ets');
+  const page = source('feature_pin/src/main/ets/components/PinmonyDetailPage.ets');
   const componentHost = {};
   vm.runInNewContext(ts.transpileModule(`class Page { ${method(page, 'notifyImageLoaded')} }
     globalThis.Page = Page;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, componentHost);
@@ -88,7 +88,7 @@ async function main() {
   component.renderIdentity = 'opening-2'; component.notifyImageLoaded(pin, 'https://i.pinimg.com/1.jpg');
   component.notifyImageLoaded(pin, 'https://i.pinimg.com/2.jpg');
   assert.equal(images.length, 4, 'formal binding, reopening and image changes still each notify');
-  const postScript = script('feature_pin/src/main/ets/services/PinWebPostApiScript.ets');
+  const postScript = script('feature_pin/src/main/ets/services/PinmonyPostApiScript.ets');
   const actionsFunction = postScript.match(/detailActions: function[\s\S]*?(?=\n    like: function)/)[0];
   let base = { reaction_by_me: 0, reaction_counts: { '1': 0 } };
   const actionHost = { window: {}, raw: () => base, current: () => true, aggregate: () => '',
@@ -104,14 +104,14 @@ async function main() {
   assert.equal(actionHost.actions(pin, [], () => {}).find(item => item.kind === 'like').countText, '12',
     'nested selected-state metadata does not hide an authoritative top-level count');
   const jobs = [], netWindow = { addEventListener() {}, fetch: async () => { throw Error('Web replay'); },
-    PinWebNativeNetworkEnabled: true, PinWebShareBridge: { networkRequest: value => jobs.push(JSON.parse(value)) } };
+    PinmonyNativeNetworkEnabled: true, PinmonyShareBridge: { networkRequest: value => jobs.push(JSON.parse(value)) } };
   netWindow.top = netWindow;
   const netContext = vm.createContext({ window: netWindow, location, URL, Headers, Response,
     console: { warn() {} }, setTimeout, clearTimeout });
-  vm.runInContext(script('common_network/src/main/ets/PinWebNetworkScript.ets'), netContext);
-  netWindow.PinWebNetwork.bind(1, pin);
-  const cancelledRead = netWindow.PinWebNetwork.fetch('/resource/RelatedModulesResource/get/');
-  netWindow.PinWebNetwork.complete({ ...jobs[0], error: 'cancelled' });
+  vm.runInContext(script('common_network/src/main/ets/PinmonyNetworkScript.ets'), netContext);
+  netWindow.PinmonyNetwork.bind(1, pin);
+  const cancelledRead = netWindow.PinmonyNetwork.fetch('/resource/RelatedModulesResource/get/');
+  netWindow.PinmonyNetwork.complete({ ...jobs[0], error: 'cancelled' });
   await assert.rejects(cancelledRead, error => error.name === 'AbortError');
   console.log('Detail departure: queued/late reads, paused polling, BFCache resume, native dispatch barrier and identity-scoped image notifications passed');
 }

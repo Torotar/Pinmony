@@ -13,7 +13,7 @@ function method(name) {
 const names = ['nativeDisplayAddress', 'nativeRootPageAddress', 'syncNativeReturnRoute', 'nativeRootTabsVisible', 'profileUrlFromAddress', 'boardUrlFromAddress', 'isHomeRootAddress', 'backFromDetail', 'protectedDetailAddress', 'ignoreSupersededDetailDocument'];
 const code = ts.transpileModule('class Native {' + names.map(method).join('\n') + '} globalThis.Native=Native;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-const context = { PIN_BOARD_API_ENABLED: true, PinWebRuntimeLog: { info() {}, warn() {}, error() {} } }; vm.runInNewContext(code, context);
+const context = { PIN_BOARD_API_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {}, error() {} } }; vm.runInNewContext(code, context);
 const root = 'https://www.pinterest.com/sample/_created/', pin = 'https://www.pinterest.com/pin/123/',
   board = 'https://www.pinterest.com/sample/board/';
 function harness() {
@@ -62,9 +62,9 @@ const sheet = harness(); sheet.visit(root); sheet.native.activeSheetKind = 'shar
 assert.equal(sheet.native.nativeRootTabsVisible(), false, 'an active sheet still hides the tabs');
 console.log('Root tabs after Pin and board return checks passed');
 async function checkReturnOrigin() {
-  const historySource = readSourceFileSync('entry/src/main/ets/services/PinWebNavigationHistory.ets', 'utf8');
+  const historySource = readSourceFileSync('entry/src/main/ets/services/PinmonyNavigationHistory.ets', 'utf8');
   const historyCode = ts.transpileModule(historySource.replace('export class', 'class') +
-    '\nglobalThis.History = PinWebNavigationHistory;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+    '\nglobalThis.History = PinmonyNavigationHistory;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
   vm.runInNewContext(historyCode, context);
   for (const origin of ['https://www.pinterest.com/', root, 'https://www.pinterest.com/sample/', board, allPins, 'https://www.pinterest.com/search/?q=art']) {
     const history = new context.History();

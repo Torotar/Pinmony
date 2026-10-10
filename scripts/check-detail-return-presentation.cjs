@@ -12,13 +12,13 @@ function compile(source, requireDep = () => ({}), globals = {}) {
   }).outputText, { exports, require: requireDep, ...globals });
   return exports;
 }
-const cacheModule = compile(fs.readFileSync('feature_pin/src/main/ets/services/PinWebDetailCache.ets', 'utf8'));
-const { PinWebDetailCache, retainDetailPresentation } = cacheModule;
-const { PinWebPinStore } = compile(fs.readFileSync('feature_pin/src/main/ets/stores/PinWebPinStore.ets', 'utf8'), () => ({
-  emptyVisualResult: () => ({}), PinWebConfirmedSaves: class {}, PinWebDetailCache,
-  PinWebDetailPrefetch: class {}
+const cacheModule = compile(fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailCache.ets', 'utf8'));
+const { PinmonyDetailCache, retainDetailPresentation } = cacheModule;
+const { PinmonyPinStore } = compile(fs.readFileSync('feature_pin/src/main/ets/stores/PinmonyPinStore.ets', 'utf8'), () => ({
+  emptyVisualResult: () => ({}), PinmonyConfirmedSaves: class {}, PinmonyDetailCache,
+  PinmonyDetailPrefetch: class {}
 }));
-const store = new PinWebPinStore();
+const store = new PinmonyPinStore();
 const loaded = { kind: 'state', dataSource: 'api', session: 7, pinUrl: pin(1), imageUrl: 'https://i.pinimg.com/1.jpg',
   imageWidth: 736, imageHeight: 1000, title: 'parent', description: '', creator: '', creatorAvatar: '', sourceLabel: '',
   imageStageReady: true, interactionsSettled: true, commentPreview: 'checked preview', commentsAvailable: true,
@@ -66,17 +66,17 @@ for (let i = 1; i <= 70; i++) store.rememberDetailOrigin(String(i), i === 1 ? ho
 assert.equal(store.detailOrigin('1'), '', 'origin history is bounded');
 
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+const documentBinding = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailDocumentBinding.ets', 'utf8');
 function method(name) {
   const start = index.indexOf('  private ' + name);
   assert(start >= 0, name);
   return index.slice(start, index.indexOf('\n  private ', start + 1));
 }
 const context = { PINTEREST_URL: home, PIN_NATIVE_NETWORK_ENABLED: true,
-  PinWebRuntimeLog: { info() {}, warn() {} } };
+  PinmonyRuntimeLog: { info() {}, warn() {} } };
 vm.runInNewContext(ts.transpileModule(`class Native {
   ${method('async backFromDetail')}
   ${method('bindCurrentDetailDocument')}
-  ${method('refreshDetailDocumentBinding')}
   ${method('clearRootTabGuard')}
   ${method('currentPinUrl')}
 } globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
@@ -94,7 +94,8 @@ async function main() {
     detailJourney: { current: () => 0, mark() {} },
     backOnePage(fallback, target) { targets.push(target || fallback); pending = true; this.nativeBackTarget = target;
       this.pinStore.detail = identity(target) ? { ...cached.detail, pinUrl: target } : undefined; },
-    controller: { getUrl: () => pin(2) }, rootTabGuardTarget: -1, rootTabGuardAddress: '' });
+    controller: { getUrl: () => pin(2) }, rootTabGuardTarget: -1, rootTabGuardAddress: '',
+    detailDocumentBindingService: { bindCurrentDetailDocument(url) { calls.push('bound:' + url); } } });
   store.detail = { ...loaded, pinUrl: pin(2) };
   await n.backFromDetail(); assert.equal(targets[0], pin(1));
   await n.backFromDetail(); assert.equal(targets[1], home, 'second back supersedes pending parent without going to stale search');
@@ -112,22 +113,18 @@ async function main() {
   n.controller.runJavaScript = async script => { calls.push(script); return 'true'; };
   n.bindCurrentDetailDocument(pin(1));
   assert.equal(calls.length, 1, 'matching authenticated document binds without page-end or another auth probe');
-  assert(calls[0].includes('bind(9,')); assert.equal(store.detailActionsReady, false);
-  for (const mismatch of [
-    { authenticated: false, epoch: 9, page: pin(1) },
-    { authenticated: true, epoch: 9, page: pin(2) },
-    { authenticated: true, epoch: 9, page: pin(1) + '?different=document' }
-  ]) { networkContext = mismatch; n.bindCurrentDetailDocument(pin(1)); }
-  assert.equal(calls.length, 1, 'session, identity and full address guards remain strict');
-  networkContext = { authenticated: true, epoch: 9, page: pin(1) };
-  n.nativeBackTarget = home; n.bindCurrentDetailDocument(pin(1));
-  n.nativeBackTarget = ''; n.rootTabGuardTarget = 0; n.bindCurrentDetailDocument(pin(1));
-  assert.equal(calls.length, 1, 'pending return and root intent reject early binding');
+  assert.equal(calls[0], 'bound:' + pin(1)); assert.equal(store.detailActionsReady, false);
+  assert.match(documentBinding, /context\.authenticated/);
+  assert.match(documentBinding, /context\.page !== url/);
+  assert.match(documentBinding, /hasNativeBackTarget\(\)/);
+  assert.match(documentBinding, /rootTabGuardTarget\(\) >= 0/);
   assert.match(index, /detailReturnedToRoot && this\.extractPinUrl\(url\)/);
+  assert.match(documentBinding, /document\.transport\.confirmed/);
+  assert.match(documentBinding, /document\.transport\.wait\.timeout/);
   assert.match(index, /if \(detail && this\.pinStore\.detail\?\.kind !== 'cached'\)/,
     'a late base-only read cannot wipe a full parent cache');
-  assert(index.includes('this.detailReturnReads.put(this.detailReturnReadKey(job.url), reply.body)'), 'successful current replies populate the return cache');
-  assert(method('presentNativeBackTarget').includes('this.detailReturnReadPin = this.pinIdentity(pin)'), 'return target enables Pin-scoped read reuse');
+  assert(index.includes('this.detailReadCache.store(job, reply)'), 'successful current replies populate the return cache');
+  assert(method('presentNativeBackTarget').includes('this.detailReadCache.setPin(pin)'), 'return target enables Pin-scoped read reuse');
   console.log('Detail return: complete read-only cache, partial refresh, authoritative empty, cyclic origins, continuous back and early document binding passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

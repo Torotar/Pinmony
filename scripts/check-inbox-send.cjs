@@ -1,10 +1,10 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
-const source=fs.readFileSync('feature_inbox/src/main/ets/services/PinWebInboxConversationScript.ets','utf8');
+const source=fs.readFileSync('feature_inbox/src/main/ets/services/PinmonyInboxConversationScript.ets','utf8');
 const code=vm.runInNewContext(source.slice(source.indexOf('`'),source.lastIndexOf('`')+1));
-const requests=[],events=[],w={PinWebInboxConversationsEnabled:true};w.top=w;
-w.PinWebShareBridge={inboxState:s=>events.push(JSON.parse(s))};
+const requests=[],events=[],w={PinmonyInboxConversationsEnabled:true};w.top=w;
+w.PinmonyShareBridge={inboxState:s=>events.push(JSON.parse(s))};
 vm.runInNewContext(code,{window:w,location:{hostname:'www.pinterest.com',origin:'https://www.pinterest.com',pathname:'/inbox/'},document:{cookie:'csrftoken=fixture'},URLSearchParams,AbortController,setTimeout,clearTimeout,fetch:(url,args)=>new Promise(resolve=>requests.push({url,args,resolve}))});
-const api=w.PinWebInboxConversations,flush=()=>new Promise(r=>setImmediate(r)),latest=()=>events.at(-1),me={id:'1',full_name:'Self'},other={id:'2',full_name:'Other'};
+const api=w.PinmonyInboxConversations,flush=()=>new Promise(r=>setImmediate(r)),latest=()=>events.at(-1),me={id:'1',full_name:'Self'},other={id:'2',full_name:'Other'};
 function reply(endpoint,data){requests.at(-1).resolve({ok:true,json:async()=>({resource_response:{status:'success',code:0,endpoint_name:endpoint,data},client_context:{user:me}})});}
 async function chat(){api.read('https://www.pinterest.com/inbox/',()=>{},()=>true);reply('v3_get_conversations',[{id:'100',users:[me,other]}]);await flush();api.open('conversation:100',7);reply('v3_get_conversation',{id:'100',users:[me,other]});await flush();reply('v3_get_conversation_messages',[]);await flush();}
 (async()=>{await chat();assert(!api.action('send',' ',7));assert(!api.action('send','hello',8));assert(api.action('send','hello',7));assert(!api.action('send','hello',7));const req=requests.at(-1);assert(req.url.includes('ConversationMessagesResource/create'));assert.equal(req.args.method,'POST');assert.deepEqual(JSON.parse(new URLSearchParams(req.args.body).get('data')).options,{conversation_id:'100',text:'hello',field_set_key:['default_with_reactions']});assert.equal(latest().messages.length,0);
