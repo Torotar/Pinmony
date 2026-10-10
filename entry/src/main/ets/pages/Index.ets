@@ -142,7 +142,6 @@ interface NativeCommentWrite {
 @Component
 struct Index {
   private nativeChildBackUntil: number = 0;
-  @State private exportingRuntimeLog: boolean = false;
 
   private traceAction(name: string, detail: string = ''): void {
     if (name !== 'root.tab') this.rootContentInteracted = true;
@@ -6567,15 +6566,6 @@ struct Index {
     this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => { this.profileSettingsVisible = false; });
   }
 
-  private async exportRuntimeLog(): Promise<void> {
-    if (this.exportingRuntimeLog) return;
-    this.exportingRuntimeLog = true;
-    try {
-      if (await this.systemActions.exportRuntimeLog()) this.showMessage('运行日志已导出到所选位置');
-    } catch (_) { this.showMessage('日志导出失败，请重试'); }
-    finally { this.exportingRuntimeLog = false; }
-  }
-
   onBackPress(): boolean {
     PinmonyRuntimeLog.info('PinmonyReturn: root back sheet=' + this.activeSheetKind +
       ' detail=' + (!!this.pinStore.detail).toString() + ' pending=' + this.pageHistory.isPending().toString());
@@ -6917,10 +6907,6 @@ struct Index {
           Button('重新读取')
             .onClick(() => this.refreshProfile())
         }
-        Text(PinmonyRuntimeLog.savedStatus()).fontSize(13).fontColor($r('app.color.secondary_text'))
-          .textAlign(TextAlign.Center).margin({ left: 24, right: 24 })
-        Button(this.exportingRuntimeLog ? '正在导出…' : '导出运行日志')
-          .enabled(!this.exportingRuntimeLog).onClick(() => { this.exportRuntimeLog(); })
       }
       .layoutWeight(1)
       .width('100%')
@@ -7299,8 +7285,7 @@ struct Index {
               loading: this.nativeRootOnly || this.webPageLoading || this.pendingWebTab !== -1,
               showBack: !this.nativeRootTabsVisible(),
               onRetry: () => this.requestRootPage(index), onBack: () => this.backOnePage(),
-              logStatus: PinmonyRuntimeLog.savedStatus(), exportingLog: this.exportingRuntimeLog,
-              onExportLog: () => { this.exportRuntimeLog(); } })
+            })
     }
 
   }
@@ -7959,8 +7944,6 @@ struct Index {
               this.authStatus === 'error' ? '当前会话加载失败' : '正在读取已有会话…',
             message: this.offlineCacheLoading ? '' : this.authStatus === 'error' ? this.failureDetails : '',
             loading: this.offlineCacheLoading || this.authStatus !== 'error', onRetry: () => this.retryLogin(),
-            logStatus: PinmonyRuntimeLog.savedStatus(), exportingLog: this.exportingRuntimeLog,
-            onExportLog: () => { this.exportRuntimeLog(); }
           })
         }
       }

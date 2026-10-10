@@ -6,9 +6,6 @@ export struct PinmonyStatusPage {
   @Prop showBack: boolean = false;
   onRetry: () => void = () => {};
   onBack: () => void = () => {};
-  onExportLog?: () => void;
-  @Prop logStatus: string = '';
-  @Prop exportingLog: boolean = false;
 
   build() {
     Column({ space: 16 }) {
@@ -25,12 +22,6 @@ export struct PinmonyStatusPage {
       }
       if (this.showBack) {
         Button('返回').onClick(() => this.onBack())
-      }
-      if (this.onExportLog) {
-        Text(this.logStatus).fontSize(13).fontColor($r('app.color.secondary_text'))
-          .textAlign(TextAlign.Center).margin({ left: 24, right: 24 })
-        Button(this.exportingLog ? '正在导出…' : '导出运行日志')
-          .enabled(!this.exportingLog).onClick(() => { if (this.onExportLog) this.onExportLog(); })
       }
     }
     .justifyContent(FlexAlign.Center)
