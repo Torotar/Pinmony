@@ -1,4 +1,8 @@
-# Pinmony
+<p align="center">
+  <img src="./AppScope/resources/base/media/pinmony_logo.jpg" width="160" alt="Pinmony 应用图标">
+</p>
+
+<h1 align="center">Pinmony</h1>
 
 Pinmony 是个人为了兴趣开发的 HarmonyOS 应用，主要用于学习、技术研究、界面探索和移动端体验测试。应用通过当前登录会话读取目标网站公开返回的页面或接口数据，并使用 ArkUI 提供原生界面。
 
