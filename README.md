@@ -20,10 +20,9 @@ Pinmony 是个人为了兴趣开发的 HarmonyOS 应用，主要用于学习、�
 
 | 条件 | 要求 |
 | --- | --- |
-| 设备与系统 | HarmonyOS 6.1.1（API 24）或兼容版本 |
+| 设备与系统 | HarmonyOS 6.1.1（API 24）以上版本 |
 | 开发环境 | DevEco Studio、ArkTS、Hvigor 和 HarmonyOS SDK |
 | 网络与账号 | 可访问目标网站，并在应用内完成当前会话登录 |
-| 真机安装 | 需要有效的 HarmonyOS 签名配置 |
 
 
 ## 技术架构
