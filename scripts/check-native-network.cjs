@@ -45,6 +45,68 @@ const native = new PinmonyNativeNetwork();
 const state = { authenticated:true,epoch:3,page:'https://www.pinterest.com/',userAgent:'synthetic-agent' };
 const base = { id:'test',epoch:3,page:state.page,url:'https://www.pinterest.com/resource/UserHomefeedResource/get/?data=synthetic',method:'GET',headers:{Accept:'application/json'},body:'' };
 async function main() {
+  const regionalState = {...state, page:'https://uk.pinterest.com/'};
+  const regionalJob = {...base, page:regionalState.page, url:base.url.replace('www.pinterest.com','uk.pinterest.com')};
+  assert(acceptsNetworkJob(regionalJob, regionalState), 'regional same-origin resource is allowed');
+  assert(!acceptsNetworkJob(regionalJob, state), 'regional job cannot borrow canonical document ownership');
+  assert(!acceptsNetworkJob({...regionalJob,url:base.url},regionalState), 'cross-region request remains blocked');
+  assert(!acceptsNetworkJob({...regionalJob,url:regionalJob.url.replace('uk.pinterest.com','uk.pinterest.com.evil.example')},regionalState));
+  const regionalLocation = {origin:'https://uk.pinterest.com',hostname:'uk.pinterest.com',href:regionalState.page};
+  const regionalWindow = {addEventListener(){},PinmonyNativeNetworkEnabled:true,
+    fetch(){throw Error('regional Web fallback forbidden');},PinmonyShareBridge:{
+      networkRequest(raw){native.request(JSON.parse(raw),()=>regionalState).then(reply=>regionalWindow.PinmonyNetwork.complete(reply));},
+      cancelNetwork(id){native.cancel(id);}}};
+  regionalWindow.top=regionalWindow;
+  vm.runInNewContext(PIN_NATIVE_NETWORK_SCRIPT,{window:regionalWindow,location:regionalLocation,URL,Headers,Response,Map,Set,AbortController,Promise,setTimeout,clearTimeout,console});
+  assert(regionalWindow.PinmonyNetwork, 'regional document installs native transport');
+  regionalWindow.PinmonyNetwork.setForeground(true);
+  regionalWindow.PinmonyNetwork.bind(regionalState.epoch,regionalState.page);
+  const cookieUrls=[];const savedCookieReader=readCookie;
+  readCookie=async url=>{cookieUrls.push(url);return 'session=synthetic; csrftoken=synthetic';};
+  response={statusCode:200,headers:{'content-type':'application/json','set-cookie':'session=synthetic; Secure'},toString:()=>'{"regional":true}'};
+  const regionalReply=await regionalWindow.PinmonyNetwork.fetch('/resource/UserHomefeedResource/get/');
+  assert.equal((await regionalReply.json()).regional,true);
+  const regionalRequest=requests.at(-1);
+  assert.equal(regionalRequest.url,'https://uk.pinterest.com/resource/UserHomefeedResource/get/');
+  assert.equal(regionalRequest.headers.Origin,'https://uk.pinterest.com');
+  assert.equal(regionalRequest.headers.Referer,regionalState.page);
+  assert.equal(cookieUrls.at(-1),regionalRequest.url);
+  assert.equal(writes.at(-1).url,regionalRequest.url);
+  assert.equal(regionalReply.headers.get('set-cookie'),null);
+  const regionalSnapshots=[];
+  regionalWindow.PinmonyHomeApiEnabled=true;
+  regionalWindow.PinmonyShareBridge.homeState=raw=>regionalSnapshots.push(JSON.parse(raw));
+  regionalLocation.pathname='/';
+  const regionalHomeContext={window:regionalWindow,location:regionalLocation,URL,Headers,Response,Map,Set,AbortController,Promise,setTimeout,clearTimeout,setInterval(){},console};
+  const regionalHomeApi=compiled('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets',()=>({}));
+  const regionalHomeBridge=compiled('feature_home/src/main/ets/services/PinmonyHomeScript.ets',()=>({}));
+  response=req=>({statusCode:200,headers:{'content-type':'application/json'},toString:()=>JSON.stringify({resource_response:{status:'success',data:
+    req.url.includes('BoardsFeedResource') ? [] : [{id:'12345',type:'pin',title:'regional fixture',images:{orig:{url:'https://i.pinimg.com/originals/fixture.jpg',width:600,height:900}}}]}})});
+  vm.runInNewContext(useNativeTransport(regionalHomeApi.PIN_HOME_API_SCRIPT),regionalHomeContext);
+  vm.runInNewContext(regionalHomeBridge.PIN_HOME_BRIDGE_SCRIPT,regionalHomeContext);
+  regionalWindow.PinmonyHomeSetUsername('fixture_owner');
+  regionalWindow.PinmonyHomeDemand(regionalState.page);
+  await until(()=>regionalSnapshots.some(snapshot=>snapshot.pins?.length));
+  assert.equal(regionalSnapshots.at(-1).dataSource,'api');
+  assert.equal(regionalSnapshots.at(-1).pins[0].id,'12345');
+  assert(requests.some(req=>req.url.startsWith('https://uk.pinterest.com/resource/UserHomefeedResource/')));
+  regionalWindow.PinmonyHomePauseForReturn();
+  readCookie=savedCookieReader;
+  response={statusCode:200,headers:{},toString:()=>JSON.stringify({resource_response:{status:'success',data:[]}})};
+  requests.length=0;writes.length=0;sessions.length=0;requestSessions.length=0;NetworkManager.destroy();
+  for (const name of ['BoardInvitesResource', 'BoardInviteResource']) {
+    const invite = {...base, url: 'https://www.pinterest.com/resource/' + name + '/get/?data=synthetic'};
+    assert(acceptsNetworkJob(invite, state), 'documented invitation read is admitted');
+    assert(!acceptsNetworkJob({...invite, method:'POST'}, state));
+    assert(!acceptsNetworkJob({...invite, epoch:2}, state));
+    assert(!acceptsNetworkJob({...invite, url:invite.url.replace('/get/', '/delete/')}, state));
+  }
+  const inviteBody = options => 'source_url=%2F&data=' + encodeURIComponent(JSON.stringify({options, context:{}}));
+  const inviteWrite = {...base, method:'POST', url:'https://www.pinterest.com/resource/BoardInviteResource/update/',
+    body:inviteBody({board_id:'123',invited_user_id:'456'})};
+  assert(acceptsNetworkJob(inviteWrite, state), 'documented acceptance with only the two IDs is admitted');
+  assert(!acceptsNetworkJob({...inviteWrite,body:inviteBody({board_id:'123',invited_user_id:'456',status:'declined'})},state));
+  assert(!acceptsNetworkJob({...inviteWrite,body:inviteBody({board_id:'123'})},state));
   const scheduler = new RequestScheduler(1), order = [];
   let releaseBlocker;
   const blocker = scheduler.enqueue(Priority.NORMAL, () => new Promise(resolve => { releaseBlocker = resolve; order.push('blocker'); }));

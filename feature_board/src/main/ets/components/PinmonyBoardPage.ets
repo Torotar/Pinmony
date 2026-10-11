@@ -26,6 +26,8 @@ interface BoardEditValues {
 
 @Component
 export struct PinmonyBoardPage {
+  @Prop discoveryBoard: boolean = false;
+  @Prop profileBoard: boolean = false;
   @Prop @Watch('snapshotChanged') snapshot: PinmonyBoardDetail;
   @State private menuOpen: boolean = false;
   @State private archiveOpen: boolean = false;
@@ -156,7 +158,7 @@ export struct PinmonyBoardPage {
       },
       content: {
         title: { mainTitle: this.phase() === 'select' ? '选择 Pin 图' : this.phase() === 'targets' ? '选择图板区块' :
-          this.phase() === 'ideas' ? '更多点子' : this.phase() === 'edit' ? '编辑图板' : this.snapshot.featured ? '图板' : this.snapshot.title || '图板' },
+          this.phase() === 'ideas' ? '更多点子' : this.phase() === 'edit' ? '编辑图板' : this.discoveryBoard ? '' : this.snapshot.title || '图板' },
         backIcon: this.phase() === 'select' || this.phase() === 'edit' ? {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           label: this.phase() === 'edit' ? '关闭编辑' : '关闭整理', isEnabled: !this.snapshot.flow?.busy, action: () => this.back()
@@ -172,17 +174,13 @@ export struct PinmonyBoardPage {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),
           label: '完成', isEnabled: !!this.editName.trim() && !this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain,
           action: () => this.saveEdit()
-        } }] : !this.phase() && (this.snapshot.collaborator && !this.snapshot.editable || this.snapshot.featured) ? [{ content: {
+        } }] : !this.phase() ? [{ content: {
           icon: $r('app.media.lucide_share_2'), label: '分享图板', isEnabled: this.snapshot.ready,
           action: () => { if (this.onShare) this.onShare(); }
         } }, { content: {
-          icon: $r('app.media.lucide_ellipsis'), label: '图板选项', isEnabled: this.snapshot.ready,
+          icon: $r('app.media.lucide_ellipsis'), label: this.discoveryBoard ? '关注' : '图板选项', isEnabled: this.snapshot.ready,
           action: () => { this.archiveOpen = false; this.menuOpen = true; }
-        } }] as BoardTitleMenuItem[] : !this.phase() && this.snapshot.editable ? [{ content: {
-          icon: $r('app.media.lucide_ellipsis'),
-          label: '图板选项', isEnabled: this.snapshot.ready,
-          action: () => { this.archiveOpen = false; this.menuOpen = true; }
-        } }] : [] }
+        } }] as BoardTitleMenuItem[] : [] }
       }
     };
   }
@@ -436,14 +434,13 @@ export struct PinmonyBoardPage {
   private optionsSheet() {
     Column() {
         Column() {
-          if (this.snapshot.featured && !this.snapshot.editable && !this.snapshot.collaborator) {
-            Row() { Text('分享').fontSize(17).fontColor($r('app.color.primary_text')) }.width('100%').padding(20)
-              .onClick(() => { this.menuOpen = false; if (this.onShare) this.onShare(); })
+          if (this.discoveryBoard) {
+            this.optionRow('关注', 'follow')
           } else {
             this.optionRow('编辑信息和设置', 'edit')
             this.optionRow('存档', 'archiveConfirm')
           }
-          if (this.snapshot.collaborator && !this.snapshot.editable) {
+          if (!this.discoveryBoard && this.snapshot.collaborator && !this.snapshot.editable) {
             this.optionRow('取消关注', 'unfollow')
           }
         }.width('100%')
@@ -690,7 +687,7 @@ export struct PinmonyBoardPage {
       .width('100%').height('100%')
       .pullToRefresh(!this.phase() && !this.snapshot.loading && !this.snapshot.refreshing && this.snapshot.session > 0)
       .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
-      if (!this.phase()) {
+      if (!this.phase() && !this.discoveryBoard) {
         Button('+').width(56).height(56).fontSize(32)
           .backgroundColor($r('app.color.page_background')).fontColor($r('app.color.primary_text'))
           .margin({ bottom: 20 }).onClick(() => { if (this.onPublish) this.onPublish(); }).accessibilityText('发布')

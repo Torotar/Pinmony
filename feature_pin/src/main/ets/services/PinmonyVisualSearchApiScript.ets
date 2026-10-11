@@ -1,7 +1,7 @@
 export const PIN_VISUAL_SEARCH_API_ENABLED: boolean = true;
 export const PIN_VISUAL_SEARCH_API_SCRIPT: string = `
 (function () {
-  if (window !== window.top || location.hostname !== 'www.pinterest.com' || window.PinmonyVisualSearchApi) return;
+  if (window !== window.top || !/^https:[/][/](?:www|uk)\\.pinterest\\.com$/.test(location.origin) || window.PinmonyVisualSearchApi) return;
   var state = null, abort = null;
   function current(s) { return state === s && s.page === location.href && location.pathname === '/pin/' + s.id + '/'; }
   function validCrop(c) {
@@ -20,8 +20,8 @@ export const PIN_VISUAL_SEARCH_API_SCRIPT: string = `
     read: function (pin) { return state && state.pin === pin && current(state) ?
       { pin: pin, loading: state.loading, error: state.error, ended: state.ended, items: state.items } : null; },
     start: function (pin, crop, append, first) {
-      var m = String(pin).match(/^https:\\/\\/www\\.pinterest\\.com\\/pin\\/(\\d+)\\/$/);
-      if (!m || location.pathname !== '/pin/' + m[1] + '/' || !validCrop(crop)) return false;
+      var m = String(pin).match(/^https:[/][/](?:www|uk)\\.pinterest\\.com[/]pin[/](\\d+)[/]$/);
+      if (!m || String(pin) !== location.origin + '/pin/' + m[1] + '/' || location.pathname !== '/pin/' + m[1] + '/' || !validCrop(crop)) return false;
       if (append && (!state || !current(state) || state.pin !== pin || state.loading || state.ended ||
           JSON.stringify(state.crop) !== JSON.stringify(crop))) return false;
       if (abort) abort.abort();

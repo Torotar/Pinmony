@@ -1,6 +1,11 @@
 export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  var documentActive = true, bridgeWarning = false;
+  if (window.addEventListener) {
+    window.addEventListener('pagehide', function () { documentActive = false; });
+    window.addEventListener('pageshow', function () { documentActive = true; bridgeWarning = false; lastState = ''; schedule(); });
+  }
   var activePin = '';
   var session = 0;
   var nextId = 1;
@@ -40,12 +45,19 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
     var value = node && (node.currentSrc || node.src || node.getAttribute('src')) || '';
     return /^https:\\/\\//i.test(value) ? value.slice(0, 2000) : '';
   }
+  window.PinmonyDetailDemand = function (page) {
+    if (!documentActive || page !== location.href) return false;
+    clearTimeout(scheduled); scheduled = 0; sync(); return true;
+  };
   function notify(value) {
-    if (!window.PinmonyShareBridge || !window.PinmonyShareBridge.detailState) return;
+    if (!documentActive) return;
     var serialized = JSON.stringify(value);
     if (serialized === lastState) return;
-    lastState = serialized;
-    window.PinmonyShareBridge.detailState(serialized);
+    try {
+      var bridge = window.PinmonyShareBridge;
+      if (!bridge || !bridge.detailState) return;
+      bridge.detailState(serialized); lastState = serialized;
+    } catch (_) { if (!bridgeWarning) { bridgeWarning = true; console.warn('BridgeTrace: detail unavailable'); } }
   }
   function register(node, group) {
     var id = ids.get(node);
@@ -484,6 +496,9 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
   }
   function sync() {
     scheduled = 0;
+    if (!documentActive) return;
+    if (window.PinmonyNativeNetworkEnabled === true && window.PinmonyNetwork && typeof window.PinmonyNetwork.isReady === "function" && !window.PinmonyNetwork.isReady()) return;
+    scheduled = 0;
     if (pausedPin) return;
     var pin = pinUrl();
     if (pin !== activePin) {
@@ -537,7 +552,7 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
   }
   function schedule() {
     if (pausedPin || scheduled) return;
-    scheduled = setTimeout(sync, 100);
+    scheduled = setTimeout(sync, 0);
   }
   window.PinmonyDetailImageStage = function (requestedSession, requestedPin, url, outcome) {
     if (requestedSession !== session || requestedPin !== activePin || pinUrl() !== activePin ||

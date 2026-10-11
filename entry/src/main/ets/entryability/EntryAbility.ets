@@ -1,3 +1,4 @@
+import { PINMONY_BUILD_IDENTITY } from '../app/PinmonyBuildIdentity';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -10,6 +11,7 @@ const DOMAIN = 0x0000;
 export default class EntryAbility extends UIAbility {
   private mainWindow: window.Window | undefined = undefined;
   private lifecycleSequence: number = 0;
+  private runtimeErrorSequence: number = 0;
   private lifecycleStartedAt: number = 0;
   private lifecycleLastEventAt: number = 0;
   private windowStageReady: boolean = false;
@@ -30,7 +32,8 @@ export default class EntryAbility extends UIAbility {
       /ForEach|duplicate.*key/i.test(message) ? 'node-identity' :
       /Webview|WebView|controller|runJavaScript/i.test(message) ? 'web-controller' :
       /cancel|abort/i.test(message) ? 'cancellation' : 'unknown';
-    PinmonyRuntimeLog.error('Runtime: unhandled error ' + name + ' kind=' + kind + ' category=' + category);
+    PinmonyRuntimeLog.error('Runtime: unhandled error ' + name + ' kind=' + kind + ' category=' + category + ' sequence=' + (++this.runtimeErrorSequence).toString());
+    PinmonyRuntimeLog.error('Runtime action context: ' + PinmonyRuntimeLog.recentActionContext());
     const rawStack: string = typeof reason.stack === 'string' ? reason.stack : '';
     // Keep source basenames/line numbers only, for both Ark and standard stack formats.
     const frames: string[] = rawStack.match(/[A-Za-z][A-Za-z0-9_-]*\.(?:ets|ts|js):[0-9]+(?::[0-9]+)?/g) || [];
@@ -40,6 +43,7 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     PinmonyRuntimeLog.initialize(this.context.filesDir);
+    PinmonyRuntimeLog.info('RuntimeBuild: ' + PINMONY_BUILD_IDENTITY);
     this.lifecycleStartedAt = Date.now();
     this.lifecycleLastEventAt = this.lifecycleStartedAt;
     this.logLifecycle('create-start', 'windowStage=false content=false');
@@ -85,6 +89,7 @@ export default class EntryAbility extends UIAbility {
     this.contentLoaded = false;
     this.logLifecycle('destroy-complete', 'windowStage=false content=false');
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
+    PinmonyRuntimeLog.flush();
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
@@ -214,6 +219,7 @@ export default class EntryAbility extends UIAbility {
     this.logLifecycle('background', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString());
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+    PinmonyRuntimeLog.flush();
   }
 
   private logLifecycle(event: string, state: string): void {
@@ -226,4 +232,3 @@ export default class EntryAbility extends UIAbility {
       ' sinceStartMs=' + sinceStart.toString() + ' sincePreviousMs=' + sincePrevious.toString() + ' ' + state);
   }
 }
-

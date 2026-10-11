@@ -58,7 +58,7 @@ function imageValid(image: PrefetchImage | undefined): boolean {
 
 // The same PinResource contract as detail, without live controls or playback.
 export function mapPrefetchedDetail(body: string, pinUrl: string): PinmonyDetailSnapshot | undefined {
-  if (body.length > 512 * 1024 || !/^https:\/\/www\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl)) return undefined;
+  if (body.length > 512 * 1024 || !/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl)) return undefined;
   try {
     const payload: PrefetchResponse = JSON.parse(body) as PrefetchResponse;
     const pin: PrefetchPin = payload.resource_response?.data;
@@ -101,7 +101,7 @@ export function mapPrefetchedDetail(body: string, pinUrl: string): PinmonyDetail
       description: clean(pin.closeup_unified_description || pin.description),
       creator: clean(creator.full_name || creator.username, 180),
       creatorAvatar: /^https:\/\/[^\s]+$/i.test(creator.image_medium_url || '') ? clean(creator.image_medium_url, 2000) : '',
-      creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? 'https://www.pinterest.com/' + creator.username + '/' : '',
+      creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? pinUrl.slice(0, pinUrl.indexOf('/', 8)) + '/' + creator.username + '/' : '',
       sourceLabel: clean(pin.link_domain || pin.domain, 180),
       aiLabel: Array.isArray(pin.ai_disclosures) && pin.ai_disclosures.includes(1) ? '由 AI 修改' : '',
       isVideo: isVideo, video: video, actions: [], related: [] };
@@ -172,7 +172,7 @@ export class PinmonyDetailPrefetch {
     const options: string = JSON.stringify({ id: pinId, field_set_key: 'auth_web_main_pin',
       noCache: true, fetch_visual_search_objects: false, get_page_metadata: false,
       add_fields: 'pin.gen_ai_topics,pin.is_eligible_for_image_download,pin.is_eligible_for_ai_comparison,pin.has_hidden_inner_pin' });
-    const url: string = 'https://www.pinterest.com/resource/PinResource/get/?source_url=' +
+    const url: string = pin.slice(0, pin.indexOf('/', 8)) + '/resource/PinResource/get/?source_url=' +
       encodeURIComponent('/pin/' + pinId + '/') + '&data=' + encodeURIComponent('{"options":' + options + ',"context":{}}');
     PinmonyRuntimeLog.info('DetailPrefetch: start');
     const request: Promise<string> = read(url, id, current).then((body: string): string => {
@@ -205,7 +205,7 @@ export class PinmonyDetailPrefetch {
     this.cancelRequest = cancel;
     // Replace waiting work when the viewport moves; at most two reads in flight.
     this.queued = pinUrls.slice(0, 6).filter((pin: string): boolean =>
-      /^https:\/\/www\.pinterest\.com\/pin\/\d+\/$/.test(pin) && !this.get(pin) && !this.attempted.has(pin));
+      /^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pin) && !this.get(pin) && !this.attempted.has(pin));
     const token: number = this.generation;
     const pump = (): void => {
       if (token !== this.generation || !current()) return;

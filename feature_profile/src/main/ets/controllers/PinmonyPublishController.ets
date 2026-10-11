@@ -127,7 +127,8 @@ export class PinmonyPublishController {
   }
 
   dismissMenu(): void {
-    if (!this.ports.menuVisible()) return;
+    // bindSheet may already have cleared its visibility before dismissal arrives.
+    // Always release the logical menu and pending reads as well.
     this.menuGeneration++; this.menuTasks.invalidate(); this.store.publishRequestToken++;
     this.store.publishPreparing = false;
     const session: number = this.store.profileSession, url: string = this.store.profileUrl;

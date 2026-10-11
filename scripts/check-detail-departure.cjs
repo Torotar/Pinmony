@@ -30,12 +30,12 @@ async function main() {
     const entry = [...timers.entries()].find(([, timer]) => timer.delay === delay);
     assert(entry, 'expected timer ' + delay); timers.delete(entry[0]); entry[1].fn();
   }
-  tick(100); assert.equal(requests.length, 1);
+  tick(0); assert.equal(requests.length, 1);
   requests[0].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: {
     type: 'pin', id: '101', images: { '736x': { url: 'https://i.pinimg.com/1.jpg', width: 736, height: 1000 } }
   } } }) }); await flush();
   assert(window.PinmonyDetailImageStage(1, pin, 'https://i.pinimg.com/1.jpg', 'loaded'));
-  tick(100);
+  tick(0);
   const queuedRelated = [...timers.values()].find(timer => timer.delay === 0);
   assert(queuedRelated || requests.length > 1, 'comments settled and recommendations are scheduled or already in flight');
   const requestsBeforePause = requests.length;
@@ -44,7 +44,7 @@ async function main() {
   if (queuedRelated) queuedRelated.fn(); interval(); window.PinmonyDetailRefresh(); await flush();
   assert.equal(requests.length, requestsBeforePause, 'paused old document cannot schedule another base/preview/recommendation read');
   assert.equal(window.PinmonyDetailApi.raw(pin), null);
-  window.PinmonyDetailRefresh(true); tick(100);
+  window.PinmonyDetailRefresh(true); tick(0);
   assert.equal(requests.length, requestsBeforePause + 1, 'native confirmed refresh explicitly resumes and revalidates the current document');
   window.PinmonyDetailPause(pin);
   requests[1].resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', data: {
@@ -54,7 +54,7 @@ async function main() {
 
   const index = source('entry/src/main/ets/pages/Index.ets');
   const host = { PIN_NATIVE_NETWORK_ENABLED: true, PinmonyRuntimeLog: { info() {} } };
-  vm.runInNewContext(ts.transpileModule(`class Native { ${method(index, 'requestNativeNetwork')} }
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native { ${method(index, 'requestNativeNetwork')} }
     globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, host);
   const native = new host.Native(), calls = [];
   Object.assign(native, { nativeBackTarget: 'https://www.pinterest.com/', pinStore: { detailPin: pin, detail: {} },
@@ -78,7 +78,7 @@ async function main() {
 
   const page = source('feature_pin/src/main/ets/components/PinmonyDetailPage.ets');
   const componentHost = {};
-  vm.runInNewContext(ts.transpileModule(`class Page { ${method(page, 'notifyImageLoaded')} }
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page { ${method(page, 'notifyImageLoaded')} }
     globalThis.Page = Page;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, componentHost);
   const component = new componentHost.Page(), images = [];
   component.renderIdentity = 'opening-1'; component.onImageLoaded = (...args) => images.push(args);
@@ -93,7 +93,7 @@ async function main() {
   let base = { reaction_by_me: 0, reaction_counts: { '1': 0 } };
   const actionHost = { window: {}, raw: () => base, current: () => true, aggregate: () => '',
     reaction: null, likeBusy: false };
-  vm.runInNewContext('globalThis.actions = ({' + actionsFunction + '}).detailActions;', actionHost);
+  require('./product-coordination-harness.cjs').run(ts,'globalThis.actions = ({' + actionsFunction + '}).detailActions;', actionHost);
   for (const count of [0, 12, -1, 1.5, Infinity, '2', undefined]) {
     base = { reaction_by_me: 0, reaction_counts: { '1': count } };
     const like = actionHost.actions(pin, [], () => {}).find(item => item.kind === 'like');

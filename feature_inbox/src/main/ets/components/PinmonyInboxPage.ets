@@ -180,9 +180,9 @@ export struct PinmonyInboxPage {
           }
         }.alignItems(HorizontalAlign.End).alignSelf(ItemAlign.Start)
       } else if (contact && item.enabled) {
-        Text('›')
-        .fontSize(26)
-        .fontColor($r('app.color.secondary_text'))
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+        .fontSize(18)
+        .fontColor([$r('app.color.secondary_text')])
         .margin({ left: 8 })
         .onClick(() => { if (item.enabled && this.onAction) this.onAction(item.id); })
       }
@@ -288,7 +288,7 @@ export struct PinmonyInboxPage {
         }
         Scroll(this.scroller) {
           Column() {
-            if (this.invitations) {
+            if (this.snapshot.section === 'messages' && this.invitations && this.invitations.items.length > 0) {
               PinmonyBoardInvitationList({ snapshot: this.invitations, onPreview: this.onInvitationPreview, onAll: this.onInvitationAll })
             }
             if (this.snapshot.section === 'messages') {

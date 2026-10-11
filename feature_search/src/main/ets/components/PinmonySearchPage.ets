@@ -1,5 +1,6 @@
 import { PinmonyVideoCard } from 'common_ui';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonySearchSkeleton } from './PinmonySearchSkeleton';
 import { PinmonySearchQuizPanel } from './PinmonySearchQuizPanel';
 import { Chip, ChipSize } from '@kit.ArkUI';
 import { HdsNavDestination, HdsNavigation } from '@kit.UIDesignKit';
@@ -348,6 +349,8 @@ export struct PinmonySearchPage {
             .padding(0)
             .backgroundColor(this.currentHeroIndex === index ?
               $r('app.color.primary_text') : $r('app.color.secondary_text'))
+            .opacity(this.currentHeroIndex === index ? 1 : 0.52)
+            .animation({ duration: 240, curve: Curve.EaseInOut })
             .onClick(() => {
               this.currentHeroIndex = index;
               this.swiperController.changeIndex(index, true);
@@ -785,10 +788,13 @@ export struct PinmonySearchPage {
         }
         .width('100%')
         .padding(12)
-      } else if (this.snapshot.api && this.snapshot.apiBusy && this.snapshot.results.length > 0) {
-        LoadingProgress().width(24).height(24).margin(12)
       }
-      if ((this.error && !(this.snapshot.api && this.snapshot.results.length > 0)) ||
+      if (!this.error && (this.loading || this.snapshot.kind === 'loading' ||
+          (this.snapshot.api && this.snapshot.apiActive === false && this.snapshot.results.length === 0))) {
+        PinmonySearchSkeleton({ showCategories: this.visibleCategories().length === 0 })
+          .width('100%')
+          .layoutWeight(1)
+      } else if ((this.error && !(this.snapshot.api && this.snapshot.results.length > 0)) ||
           this.loading || this.snapshot.kind === 'loading' || this.snapshot.results.length === 0) {
         this.inspirationEntry()
         this.searchStatus()
@@ -844,6 +850,9 @@ export struct PinmonySearchPage {
         .onScrollStop(() => this.reportResultsScroll())
         .onReachEnd(() => this.resultsReachEnd())
         .onAreaChange((_oldArea: Area, newArea: Area) => this.resultsAreaChanged(newArea))
+      }
+      if (this.snapshot.api && this.snapshot.apiBusy && this.snapshot.results.length > 0 && !this.loading && !this.error) {
+        LoadingProgress().width(24).height(24).margin({ top: 12, bottom: 24 })
       }
     }
     .width('100%')
@@ -903,7 +912,11 @@ export struct PinmonySearchPage {
           if (this.inputEditing) {
             this.inputSuggestionsContent()
           } else if (!this.committedQuery()) {
-            if (this.error || this.loading || this.snapshot.kind === 'loading') {
+            if (!this.error && (this.loading || this.snapshot.kind === 'loading')) {
+              PinmonySearchSkeleton({ showCategories: false, loadingText: '正在加载搜索内容…' })
+                .width('100%')
+                .layoutWeight(1)
+            } else if (this.error) {
               this.searchStatus()
             } else {
               this.discoveryContent()

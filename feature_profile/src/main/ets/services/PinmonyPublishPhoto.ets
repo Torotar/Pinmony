@@ -1,19 +1,23 @@
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { PinmonyRuntimeLog } from 'common_foundation';
 
 export interface PinmonyPublishPhoto { uri: string; data: string; }
 
 export async function pickPublishPhotoUris(): Promise<string[]> {
+  try {
   const options: photoAccessHelper.PhotoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
   options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
   options.maxSelectNumber = 10;
   const result: photoAccessHelper.PhotoSelectResult = await new photoAccessHelper.PhotoViewPicker().select(options);
   return result.photoUris.slice(0, 10);
+  } catch (_) { throw new Error('无法选择照片，请重试'); }
 }
 
 export async function readPublishPhoto(uri: string): Promise<PinmonyPublishPhoto> {
   if (!/^file:\/\/media\//.test(uri)) throw new Error('图片地址不可用');
+  try {
   const file: fileIo.File = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY);
   try {
     const size: number = (await fileIo.stat(file.fd)).size;
@@ -33,4 +37,9 @@ export async function readPublishPhoto(uri: string): Promise<PinmonyPublishPhoto
     if (!mime) throw new Error('目前支持 PNG、JPEG 和 WebP 照片');
     return { uri: uri, data: 'data:image/' + mime + ';base64,' + new util.Base64Helper().encodeToStringSync(head) };
   } finally { await fileIo.close(file); }
+  } catch (error) {
+    // Preserve size/format/partial-read failures for the native publishing UI.
+    PinmonyRuntimeLog.warn('PublishPhoto: read failed');
+    throw error as Error;
+  }
 }

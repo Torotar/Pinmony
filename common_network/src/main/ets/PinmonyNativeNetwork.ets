@@ -36,13 +36,18 @@ const RESOURCES: string[] = ['UserHomefeedResource', 'BoardContentRecommendation
   'BoardFeedResource', 'UserPinsResource', 'UserResource', 'BoardsResource', 'BoardsFeedResource',
   'UserSettingsResource', 'CountriesResource', 'UserRecentActivityResource', 'UserFollowingResource', 'UserActivityPinsResource', 'BoardlessPinsResource', 'PinResource', 'RelatedModulesResource', 'VisualSearchFlashlightUnifiedResource',
   'SearchTabResource', 'AdvancedTypeaheadResource', 'BaseSearchResource', 'UserExperienceResource', 'ApiResource', 'ConversationMessagesResource',
-  'ConversationsResource', 'ShareSuggestionsResource', 'ShareSuggestionsTypeaheadResource',
+  'ConversationsResource', 'BoardInvitesResource', 'BoardInviteResource', 'ShareSuggestionsResource', 'ShareSuggestionsTypeaheadResource',
   'FindPinImagesResource', 'UserSessionResource', 'BoardPickerBoardsResource', 'UnifiedCommentsResource', 'UnifiedCommentsPreviewResource',
   'AggregatedCommentReplyFeedResource', 'AggregatedCommentReplyResource', 'AggregatedCommentResource', 'DidItCommentsResource', 'RepinResource'];
 interface PinmonyGraphQuery {
   queryHash: string;
   variables: Object;
 }
+interface BoardInviteAcceptPayload {
+  options: BoardInviteAcceptOptions;
+  context: Object;
+}
+interface BoardInviteAcceptOptions { board_id: string; invited_user_id: string; }
 interface PinmonyResponseDiagnostic {
   resource_response?: PinmonyResourceDiagnostic;
 }
@@ -83,6 +88,23 @@ interface CommentUploadReadData { upload_ids: string[]; }
 interface CommentUploadItem { upload_id: string; status: string; signature: string; type: string; }
 
 export function acceptsNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetworkContext): boolean {
+  if (!job || typeof job.page !== 'string' || typeof job.url !== 'string' || job.page !== context.page) return false;
+  const pageOrigin: RegExpMatchArray | null = job.page.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
+  const requestOrigin: RegExpMatchArray | null = job.url.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
+  if (!pageOrigin || !requestOrigin || pageOrigin[0] !== requestOrigin[0]) return false;
+  // Validate the existing path/body contracts without changing the actual URL
+  // used for credentials, dispatch, replies or document ownership.
+  const canonicalJob: PinmonyNetworkJob = { id: job.id, epoch: job.epoch,
+    page: job.page.replace(pageOrigin[0], 'https://www.pinterest.com'),
+    url: job.url.replace(requestOrigin[0], 'https://www.pinterest.com'),
+    method: job.method, headers: job.headers, body: job.body };
+  const canonicalContext: PinmonyNetworkContext = { authenticated: context.authenticated,
+    epoch: context.epoch, page: context.page === job.page ? canonicalJob.page : context.page,
+    userAgent: context.userAgent };
+  return acceptsCanonicalNetworkJob(canonicalJob, canonicalContext);
+}
+
+function acceptsCanonicalNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetworkContext): boolean {
   if (!job || !context.authenticated || job.epoch !== context.epoch || job.page !== context.page ||
       !/^https:\/\/www\.pinterest\.com\//.test(job.page) || !/^[a-zA-Z0-9_-]{1,96}$/.test(job.id) ||
       typeof job.url !== 'string' || job.url.length > 65536 || typeof job.body !== 'string' ||
@@ -91,6 +113,23 @@ export function acceptsNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetwor
   const match: RegExpMatchArray | null = job.url.match(/^https:\/\/www\.pinterest\.com\/resource\/([A-Za-z]+Resource)\/(get|create|update|delete)\/(?:\?[^#]*)?$/);
   if (match) {
     if (!RESOURCES.includes(match[1])) return false;
+    if (match[1] === 'BoardInvitesResource' || match[1] === 'BoardInviteResource') {
+      if (match[2] === 'get') return job.method === 'GET' && job.body === '';
+      if (match[1] !== 'BoardInviteResource' || match[2] !== 'update' || job.method !== 'POST') return false;
+      try {
+        const data: RegExpMatchArray | null = job.body.match(/(?:^|&)data=([^&]+)/);
+        if (!data || job.body.split('&').length !== 2 || !/(?:^|&)source_url=/.test(job.body)) return false;
+        const payload: BoardInviteAcceptPayload = JSON.parse(decodeURIComponent(data[1])) as BoardInviteAcceptPayload;
+        return Object.keys(payload).length === 2 && !!payload.options && !Array.isArray(payload.options) &&
+          Object.keys(payload.options).length === 2 && /^\d{1,30}$/.test(String(payload.options.board_id)) &&
+          /^\d{1,30}$/.test(String(payload.options.invited_user_id)) && !!payload.context &&
+          typeof payload.context === 'object' && !Array.isArray(payload.context) && Object.keys(payload.context).length === 0;
+      } catch (_) { return false; }
+    }
+    if (match[1] === 'BoardInvitesResource' || match[1] === 'BoardInviteResource') {
+      // Only documented invitation reads; accepting an invite remains a separate write contract.
+      return match[2] === 'get' && job.method === 'GET' && job.body === '';
+    }
     if (match[1] === 'UserSessionResource') {
       if (job.url !== 'https://www.pinterest.com/resource/UserSessionResource/delete/' || job.method !== 'POST' ||
           (job.headers['X-Pinterest-Pws-Handler'] || job.headers['x-pinterest-pws-handler']) !== 'www/settings.js') return false;
@@ -276,10 +315,13 @@ export class NetworkManager {
 
   private getOrCreateSession(): rcp.Session {
     if (!this.session) {
-      this.session = rcp.createSession({ requestConfiguration: {
+      try { this.session = rcp.createSession({ requestConfiguration: {
         transfer: { autoRedirect: false, timeout: { connectMs: 10000, transferMs: 20000 } },
         tracing: { collectTimeInfo: true }
-      } });
+      } }); } catch (error) {
+        PinmonyRuntimeLog.warn('NetworkTrace: session-create-failed');
+        throw error as Error;
+      }
       this.sessionGeneration++;
       this.sessionAccessCount = 1;
       PinmonyRuntimeLog.info('NetworkTrace: session-created generation=' + this.sessionGeneration.toString());
@@ -528,13 +570,13 @@ export class PinmonyNativeNetwork {
       page: initial.page, userAgent: initial.userAgent };
     let permitted: boolean = false;
     try {
-      const match: RegExpMatchArray | null = pinUrl.match(/^https:\/\/www\.pinterest\.com\/pin\/(\d+)\/$/);
+      const match: RegExpMatchArray | null = pinUrl.match(/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/(\d+)\/$/);
       const encoded: RegExpMatchArray | null = job.url.match(/[?&]data=([^&]+)/);
       const data: PinReadData = encoded ? JSON.parse(decodeURIComponent(encoded[1])) as PinReadData : {} as PinReadData;
       permitted = !!match && acceptsNetworkJob(job, captured) && job.method === 'GET' && job.body === '' &&
-        ((/^https:\/\/www\.pinterest\.com\/resource\/PinResource\/get\/\?/.test(job.url) &&
+        ((/^https:\/\/(?:www|uk)\.pinterest\.com\/resource\/PinResource\/get\/\?/.test(job.url) &&
           data.options?.id === match[1] && data.options?.field_set_key === 'auth_web_main_pin') ||
-         (/^https:\/\/www\.pinterest\.com\/resource\/RelatedModulesResource\/get\/\?/.test(job.url) &&
+         (/^https:\/\/(?:www|uk)\.pinterest\.com\/resource\/RelatedModulesResource\/get\/\?/.test(job.url) &&
           job.id.startsWith('opening_related_') && data.options?.pin_id === match[1] &&
           data.options?.bookmarks === undefined));
     } catch (_) {}
@@ -554,17 +596,18 @@ export class PinmonyNativeNetwork {
     if (!this.foreground) throw new Error('background');
     const captured: PinmonyNetworkContext = context();
     const generation: number = this.generation;
-    if (!captured.authenticated || captured.page.split(/[?#]/)[0] !== pin || !/^https:\/\/www\.pinterest\.com\/pin\/\d+\/$/.test(pin) ||
+    if (!captured.authenticated || captured.page.split(/[?#]/)[0] !== pin || !/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pin) ||
         bytes.byteLength < 1 || bytes.byteLength > 20 * 1024 * 1024) throw new Error('image-unavailable');
     const current = (): boolean => generation === this.generation && context().authenticated &&
       context().epoch === captured.epoch && context().page === captured.page;
     const jobId: string = 'comment_upload_' + Date.now().toString();
+    const origin: string = pin.slice(0, pin.indexOf('/', 8));
     const resource = async (operation: string, options: string): Promise<string> => {
       if (!current()) throw new Error('stale');
-      const body: string = 'source_url=' + encodeURIComponent(pin.replace('https://www.pinterest.com', '')) +
+      const body: string = 'source_url=' + encodeURIComponent(pin.slice(origin.length)) +
         '&data=' + encodeURIComponent('{"options":' + options + ',"context":{}}');
       const job: PinmonyNetworkJob = { id: jobId + '_' + operation, epoch: captured.epoch, page: captured.page,
-        url: 'https://www.pinterest.com/resource/ApiResource/' + operation + '/' + (operation === 'get' ? '?' + body : ''),
+        url: origin + '/resource/ApiResource/' + operation + '/' + (operation === 'get' ? '?' + body : ''),
         method: operation === 'get' ? 'GET' : 'POST', body: operation === 'get' ? '' : body,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Pinterest-Pws-Handler': 'www/pin/[id].js' } };
       const response: PinmonyNetworkReply = await this.request(job, context);
@@ -648,8 +691,11 @@ export class PinmonyNativeNetwork {
       status: 0, body: '', url: job.url, error: '', headers: {} };
     if (!this.foreground) { this.resumeReadNeeded = true; result.error = 'background'; this.audit('deferred'); return result; }
     if (!acceptsNetworkJob(job, context()) || this.pending.has(job.id) || this.pending.size >= 12) {
-      PinmonyRuntimeLog.warn('NativeNetwork: request rejected before dispatch');
-      this.audit('reject', 'label=' + requestLabel);
+      const state: PinmonyNetworkContext = context();
+      const reason: string = !state.authenticated || job.epoch !== state.epoch || job.page !== state.page ? 'stale-context' :
+        this.pending.has(job.id) ? 'duplicate' : this.pending.size >= 12 ? 'capacity' : 'contract';
+      PinmonyRuntimeLog.warn('NativeNetwork: request rejected before dispatch reason=' + reason);
+      this.audit('reject', 'label=' + requestLabel + ' reason=' + reason);
       trace('rejected');
       result.error = 'request-unavailable'; return result;
     }
@@ -683,7 +729,7 @@ export class PinmonyNativeNetwork {
       });
       headers['Cookie'] = cookie;
       headers['Referer'] = job.page;
-      headers['Origin'] = 'https://www.pinterest.com';
+      headers['Origin'] = job.url.slice(0, job.url.indexOf('/', 8));
       headers['User-Agent'] = context().userAgent;
       const csrf: RegExpMatchArray | null = cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
       if (job.method === 'POST' && !csrf) throw new Error('missing-session');
@@ -756,9 +802,12 @@ export class PinmonyNativeNetwork {
       });
       // A same-origin login redirect is evidence for the existing auth observer; never follow it with credentials.
       const location: string | string[] | undefined = response.headers['location'];
-      if (response.statusCode >= 300 && response.statusCode < 400 && typeof location === 'string' &&
-          /^(?:https:\/\/www\.pinterest\.com)?\/(?:login|signup)(?:\/|[?#]|$)/.test(location))
-        result.url = location.startsWith('/') ? 'https://www.pinterest.com' + location : location;
+      const origin: string = job.url.slice(0, job.url.indexOf('/', 8));
+      if (response.statusCode >= 300 && response.statusCode < 400 && typeof location === 'string') {
+        const target: string = location.startsWith('/') ? origin + location : location;
+        if (target.startsWith(origin + '/') && /^\/(?:login|signup)(?:\/|[?#]|$)/.test(target.slice(origin.length)))
+          result.url = target;
+      }
     } catch (error) {
       // Only SDK numeric error codes are diagnostic; never log request/response or exception messages.
       const code: number = (error as BusinessError).code || 0;

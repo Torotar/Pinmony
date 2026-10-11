@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -16,7 +16,7 @@ assert.doesNotMatch(apiSource, /__PWS_INITIAL_PROPS__|getElementById|document\./
 assert.doesNotMatch(source, /querySelector|querySelectorAll|MutationObserver|\.click\(|PinmonyHomePin|PinmonyHomeMore/);
 assert.match(source, /dataSource: 'api'/);
 assert.match(pageSource, /Button\(\{ type: ButtonType\.Circle \}\)/);
-assert.match(indexSource, /window\.PinmonyHomeSetUsername/);
+assert.match(readSourceFileSync('entry/src/main/ets/app/PinmonySessionCoordinator.ets','utf8'), /window\.PinmonyHomeSetUsername/);
 assert.match(indexSource, /this\.controller\.loadUrl\(pinUrl\)/);
 assert.doesNotMatch(indexSource, /window\.PinmonyHomeMore/);
 

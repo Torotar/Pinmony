@@ -1,6 +1,12 @@
 export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  var documentActive = true, observer = null;
+  window.addEventListener('pagehide', function () {
+    documentActive = false; if (observer) observer.disconnect();
+    apiSharePin = ''; profileSharePage = ''; clear();
+  });
+  window.addEventListener('pageshow', function () { documentActive = true; start(); });
   var panel = null;
   var apiSharePin = '';
   var profileSharePage = '';
@@ -313,11 +319,14 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     return window.PinmonyPostApi && !homeSharePin ? window.PinmonyPostApi.shareSnapshot(result, schedule) : result;
   }
   function notify(state) {
-    if (!window.PinmonyShareBridge || !window.PinmonyShareBridge.sheetState) return;
+    if (!documentActive) return;
     var value = JSON.stringify(state);
     if (value === lastState) return;
-    lastState = value;
-    window.PinmonyShareBridge.sheetState(value);
+    try {
+      if (!window.PinmonyShareBridge || !window.PinmonyShareBridge.sheetState) return;
+      window.PinmonyShareBridge.sheetState(value); lastState = value;
+    }
+    catch (_) { console.info('BridgeTrace: share unavailable'); }
   }
   function stage(state) {
     var now = Date.now();
@@ -383,6 +392,7 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     }));
   }
   function sync() {
+    if (!documentActive) { scheduled = false; return; }
     scheduled = false;
     if (profileSharePage) {
       if (!window.PinmonyProfilePanel || !window.PinmonyProfilePanel.shareCurrent(profileSharePage)) {
@@ -436,6 +446,7 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     }
   }
   function schedule() {
+    if (!documentActive) return;
     if (scheduled) return;
     scheduled = true;
     Promise.resolve().then(sync);
@@ -629,12 +640,14 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
   window.addEventListener('pointerup', interceptShareTrigger, true);
   window.addEventListener('click', interceptShareTrigger, true);
   function start() {
-    if (!document.documentElement) return;
+    if (!documentActive || !document.documentElement) return;
+    if (observer) observer.disconnect();
     ensureStyle();
-    new MutationObserver(function (changes) {
+    observer = new MutationObserver(function (changes) {
       hideAddedSheet(changes);
       schedule();
-    }).observe(document.documentElement, {
+    });
+    observer.observe(document.documentElement, {
       childList: true, subtree: true, attributes: true,
       attributeFilter: ['style', 'class', 'aria-hidden', 'aria-expanded', 'aria-disabled', 'value']
     });

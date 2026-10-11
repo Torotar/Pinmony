@@ -5,6 +5,8 @@ export const PINTEREST_LOGIN_URL: string = 'https://www.pinterest.com/login/';
 export const PIN_AUTH_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  var documentActive = true;
+  if (window.addEventListener) { window.addEventListener('pagehide', function () { documentActive = false; }); window.addEventListener('pageshow', function () { documentActive = true; last = ''; publish(); }); }
   var epoch = -1, evidence = null, initialNode = null, last = '', acknowledged = '', responseEvidence = false;
   var evidencePage = location.href.split('#')[0];
   function syncRoute() {
@@ -26,7 +28,7 @@ export const PIN_AUTH_BRIDGE_SCRIPT: string = `
       location.origin + '/' + username + '/' : '' };
   }
   function publish() {
-    if (epoch < 0 || !evidence) return;
+    if (!documentActive || epoch < 0 || !evidence) return;
     var message = { status: evidence.status, profileUrl: evidence.profileUrl, epoch: epoch, pageUrl: location.href };
     var value = JSON.stringify(message);
     if (value === last) return;

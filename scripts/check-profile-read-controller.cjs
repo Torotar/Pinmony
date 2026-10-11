@@ -1,0 +1,25 @@
+const assert=require('node:assert/strict'),ts=require(process.argv[2]||'typescript');
+const timers=new Map();let id=0;const {PinmonyProfileReadController:Controller}=require('./profile-read-controller-harness.cjs').create(ts,{setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key)});
+const flush=()=>new Promise(resolve=>setImmediate(resolve)),page='https://www.pinterest.com/sample/';
+function snapshot(extra={}){return {kind:'state',session:2,profileUrl:page,section:'saved',actions:[],boards:[{id:'1',title:'Board',covers:[]}],createdPins:[],displayName:'Synthetic',...extra};}
+function harness(){let document=page,auth=true,foreground=true,root=false,interacted=false;const cache=new Map(),requests=[],events=[];
+ const store={profileSession:0,profileRequestToken:0,profilePullToken:0,profileScrollOffset:50,origins:[],profileActionsReady:false,profileLoading:false,
+ profileCache:{get:(url,section)=>cache.get(url+section),put:(value,scroll)=>cache.set(value.profileUrl+value.section,{snapshot:value,scrollOffset:scroll}),clear:()=>cache.clear()}};
+ const controller=new Controller(store,{authenticated:()=>auth,foreground:()=>foreground,document:()=>document,addressKey:v=>v,profileAddress:v=>v.startsWith(page)?page:'',currentProfile:()=>document.startsWith(page)?page:'',rootOnly:()=>root,interacted:()=>interacted,backTarget:()=>'',apiEnabled:()=>true,activeTab:()=>3,pendingTab:()=>-1,rootAddress:()=>page,selectProfile:()=>events.push('select'),confirmPending(){},recordAddress:v=>events.push(v),clearProfile:()=>{controller.pause();store.profile=undefined},prepareRead:()=>false,requestRead:()=>events.push('read'),runScript:script=>new Promise((resolve,reject)=>requests.push({script,resolve,reject}))});
+ return {controller,store,cache,requests,events,document:v=>document=v,auth:v=>auth=v,foreground:v=>foreground=v,root:v=>root=v,interacted:v=>interacted=v,update:v=>controller.update(JSON.stringify(v))};}
+(async()=>{
+ const h=harness();h.controller.expect();assert.equal(timers.size,1);const old=[...timers.values()][0];h.controller.pause();assert.equal(timers.size,0);old();assert.equal(h.store.profileError,'');h.controller.resume();assert.equal(timers.size,1);
+ h.update(snapshot());assert.equal(timers.size,0);assert.equal(h.store.profileActionsReady,true);assert.equal(h.store.profileScrollOffset,50);
+ h.controller.refresh(true);h.controller.refresh(true);assert.equal(h.requests.length,1);assert.equal(timers.size,1);const late=h.requests[0];h.update(snapshot({session:3}));late.reject(Error('late'));await flush();assert.equal(h.store.profileError,'');assert.equal(h.store.profilePullRefreshing,false);
+ const retained=h.store.profile;h.update({kind:'apiPending',session:4,profileUrl:page,section:'saved'});assert.equal(h.store.profile,retained);assert.equal(h.store.profileActionsReady,false);
+ h.update(snapshot({session:4,contentLoading:true,boards:[]}));assert.equal(h.store.profile.boards.length,1);assert.equal(h.store.profileActionsReady,false);
+ h.update(snapshot({session:4,boards:[]}));assert.equal(h.store.profile.boards.length,0);assert.equal(h.store.profileActionsReady,true);
+ const current=h.store.profile;h.update(snapshot({session:2}));assert.equal(h.store.profile,current);h.update(snapshot({session:-1}));assert.equal(h.store.profile,current);h.update(snapshot({session:NaN}));assert.equal(h.store.profile,current);
+ h.foreground(false);h.update(snapshot({session:5}));assert.equal(h.store.profile,current);h.foreground(true);h.root(true);h.update(snapshot({session:5}));assert.equal(h.store.profile,current);h.interacted(true);h.update(snapshot({session:5}));assert.equal(h.store.profileSession,5);h.root(false);
+ h.controller.loadMore();h.controller.loadMore();assert.equal(h.requests.length,2);h.requests[1].resolve('true');await flush();h.controller.pause();
+ const missing=harness();missing.update({kind:'apiPending',session:1,profileUrl:page,section:'saved'});assert.equal(timers.size,1);const [expiredId,expiredCallback]=[...timers.entries()][0];timers.delete(expiredId);expiredCallback();assert.match(missing.store.profileError,/无法读取/);missing.controller.pause();
+ const failure=harness();failure.update(snapshot());failure.controller.refresh(true);failure.requests[0].reject(Error('failure'));await flush();assert.equal(failure.store.profilePullRefreshing,false);assert.match(failure.store.profileError,/无法读取/);failure.controller.pause();
+ const route=harness();route.update(snapshot());route.controller.refresh(true);route.document('https://www.pinterest.com/pin/101/');route.requests[0].reject(Error('late route'));await flush();assert.equal(route.store.profileError,'');route.controller.pause();assert.equal(timers.size,0);
+ const denied=harness();denied.auth(false);denied.controller.refresh();denied.controller.loadMore();denied.update(snapshot());assert.equal(denied.requests.length,0);assert.equal(denied.store.profile,undefined);
+ console.log('Profile read: retained/empty state, session/auth/root gates, timeout cleanup/resume, pull single flight, late failures, route and pagination guards passed');
+})().catch(error=>{console.error(error);process.exitCode=1});

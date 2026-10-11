@@ -12,7 +12,7 @@ function method(name) {
 const timers = [], logs = [];
 const context = { setTimeout: callback => timers.push(callback),
   PinmonyRuntimeLog: { info: message => logs.push(message) } };
-vm.runInNewContext(ts.transpileModule('class Page {' +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Page {' +
   ['rootPageHasReadState', 'onRootPageVisible'].map(method).join('\n') +
   '} globalThis.Page = Page;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 function harness(index) {
@@ -23,6 +23,7 @@ function harness(index) {
     homeStore: { homeForPresentation: () => undefined }, searchStore: {}, inboxStore: {}, profileStore: {},
     homePresentationPageKey: () => '/', retainedHomeRootPageKey: () => '/',
     requestRootPage(i) { requests.push(i); native.tabRequestToken++; native.pendingWebTab = i; } });
+  native.pagePerformance = {mark(){}}; native.markRootPerformance=()=>{};
   return { native, requests };
 }
 function flush() { while (timers.length) timers.shift()(); }

@@ -9,13 +9,14 @@ export function useNativeTransport(script: string): string {
 
 export const PIN_NATIVE_NETWORK_SCRIPT: string = `
 (function () {
-  if (window !== window.top || location.origin !== 'https://www.pinterest.com') return;
+  if (window !== window.top || !/^https:[/][/](?:www|uk)\\.pinterest\\.com$/.test(location.origin)) return;
   if (window.PinmonyNetwork) return;
   var originalFetch = window.fetch, epoch = -1, serial = 0, foreground = typeof document === 'undefined' || !document.hidden;
+  var nativeManaged = false, boundPage = "";
   var nonce = Math.random().toString(36).slice(2), pending = new Map();
   window.addEventListener('pagehide', function () {
     epoch = -1;
-    pending.forEach(function (job) { job.abort(); });
+    pending.forEach(function (job) { job.abort("pagehide"); });
   });
   function responseWithUrl(response, url) {
     Object.defineProperty(response, 'url', { value: url });
@@ -24,14 +25,15 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
     return response;
   }
   window.PinmonyNetwork = {
-    isForeground: function () { return foreground && (typeof document === 'undefined' || !document.hidden); },
+    isReady: function () { return nativeManaged && foreground && epoch >= 0 && boundPage === location.href; },
+    isForeground: function () { return (!nativeManaged && epoch < 0) || foreground && (nativeManaged || typeof document === 'undefined' || !document.hidden); },
     setForeground: function (value) {
-      foreground = value === true;
-      if (!foreground) pending.forEach(function (job) { if (!job.sent || job.readOnly) job.abort(); });
+      nativeManaged = true; foreground = value === true;
+      if (!foreground) pending.forEach(function (job) { if (!job.sent || job.readOnly) job.abort("background"); });
     },
     bind: function (value, page) {
       if (page !== location.href || !Number.isInteger(value)) return;
-      epoch = value;
+      epoch = value; boundPage = page;
       // Settle old-epoch reads now; they cannot accept a response after rebinding.
       pending.forEach(function (job) { if (job.sent && job.readOnly && job.epoch !== epoch) job.abort('epoch'); });
       pending.forEach(function (job) { if (!job.sent) job.send(); });
@@ -43,7 +45,7 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
       if (reply.error) {
         var failure = new TypeError(reply.error === 'rate-limited' ? '请求过于频繁，请稍后重试' : '原生网络请求未完成');
         if (reply.error === 'rate-limited') failure.pinmonyRateLimited = true;
-        if (/^(cancelled|stale|current=false|background)$/.test(reply.error)) failure.name = 'AbortError';
+        if (/^(cancelled|stale|current=false|background)$/.test(reply.error)) { failure.name = 'AbortError'; failure.pinmonyCancelled = true; }
         job.fail(failure); return;
       }
       try {
@@ -54,26 +56,29 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
     },
     fetch: function (input, init) {
       init = init || {};
-      if (!foreground || (typeof document !== 'undefined' && document.hidden)) { var paused = new Error('应用已暂停'); paused.name = 'AbortError'; return Promise.reject(paused); }
+      if (!window.PinmonyNetwork.isForeground()) { var paused = new Error('应用已暂停'); paused.name = 'AbortError'; return Promise.reject(paused); }
       if (window.PinmonyNativeNetworkEnabled !== true) return window.fetch(input, init);
       return new Promise(function (resolve, reject) {
         var id = nonce + '_' + (++serial), page = location.href, signal = init.signal;
         var readOnly = String(init.method || 'GET').toUpperCase() === 'GET' || /\\/resource\\/[A-Za-z]+Resource\\/get\\//.test(String(input));
-        var job = { page: page, epoch: -1, sent: false, readOnly: readOnly }, timer;
+        var job = { page: page, epoch: -1, sent: false, settled: false, readOnly: readOnly }, timer;
         function clean() { clearTimeout(timer); pending.delete(id); if (signal) signal.removeEventListener('abort', abort); }
-        job.finish = function (value) { clean(); resolve(value); };
-        job.fail = function (error) { clean(); reject(error); };
+        job.finish = function (value) { if (job.settled) return; job.settled = true; clean(); resolve(value); };
+        job.fail = function (error) { if (job.settled) return; job.settled = true; clean(); reject(error); };
         function abort(reason) {
-          if (job.sent && window.PinmonyShareBridge && window.PinmonyShareBridge.cancelNetwork)
-            window.PinmonyShareBridge.cancelNetwork(id);
+          if (job.settled) return;
+          if (job.sent && epoch >= 0 && page === location.href) {
+            try { var bridge = window.PinmonyShareBridge; if (bridge && bridge.cancelNetwork) bridge.cancelNetwork(id); } catch (_) {}
+          }
           var error = new Error('请求已取消'); error.name = 'AbortError';
           if (reason === 'epoch') error.pinWebEpochChanged = true;
+          error.pinmonyCancelled = ['epoch', 'background', 'pagehide', 'stale'].indexOf(reason) >= 0;
           job.fail(error);
         }
         job.abort = abort;
         job.send = function () {
           if (job.sent || !pending.has(id)) return;
-          if (page !== location.href) { abort(); return; }
+          if (page !== location.href) { abort("stale"); return; }
           try {
             var url = new URL(String(input), location.href);
             if (url.origin !== location.origin) throw new Error('invalid-origin');
@@ -91,12 +96,13 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
         if (signal && signal.aborted) { abort(); return; }
         pending.set(id, job);
         if (signal) signal.addEventListener('abort', abort, { once: true });
-        timer = setTimeout(abort, 20000);
+        timer = setTimeout(function () { abort('timeout'); }, 20000);
         if (epoch >= 0) job.send();
       });
     }
   };
-  window.addEventListener('visibilitychange', function () { window.PinmonyNetwork.setForeground(typeof document === 'undefined' || !document.hidden); });
+  window.addEventListener('visibilitychange', function () { if (!nativeManaged) { foreground = typeof document === 'undefined' || !document.hidden;
+    if (!foreground) pending.forEach(function (job) { if (!job.sent || job.readOnly) job.abort(); }); } });
   // Retain the existing auth/contract observers around fetch without changing website requests.
   var readGroups = new Map();
   function observed(input, init) {

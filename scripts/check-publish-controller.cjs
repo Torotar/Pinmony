@@ -29,6 +29,7 @@ function harness() {
   });
   return { controller, store, reads, writes, messages, scripts, ready: value => prepared(value),
     auth: value => { auth = value; }, foreground: value => { foreground = value; }, document: value => { document = value; },
+    hideSheet: () => { visible = false; },
     flow() { store.publishFlowToken = 3; store.publishFlow = { token: 3, page: document, profile: 'synthetic-profile', kind: 'website',
       phase: 'website', pins: [], boards: [], selectedIds: [], loading: false, busy: false, uncertain: false, completed: 0 }; },
     reply(extra = {}) { return JSON.stringify({ ...store.publishFlow, ...extra }); },
@@ -36,6 +37,13 @@ function harness() {
   };
 }
 (async () => {
+  const hidden = harness(); hidden.controller.openMenu(); hidden.hideSheet(); hidden.controller.dismissMenu();
+  assert.equal(hidden.store.publishLoading, false);
+  assert.equal(hidden.store.publishPreparing, false);
+  hidden.ready(true); await flush();
+  assert(!hidden.scripts.some(script => script.includes('PublishDiscover')), 'dismissed hidden sheet cannot dispatch');
+  hidden.controller.openMenu(); assert.equal(hidden.store.publishLoading, true, 'hidden sheet cleanup allows reopening');
+  hidden.controller.dismissMenu(); hidden.ready(true); await flush();
   const menu = harness(); menu.controller.openMenu(); menu.controller.openMenu();
   assert.equal(menu.store.publishRequestToken, 1); menu.controller.dismissMenu(); menu.ready(true); await flush();
   assert(!menu.scripts.some(script => script.includes('PublishDiscover')), 'closed preparation cannot dispatch discovery');

@@ -1,19 +1,35 @@
 export const PIN_SEARCH_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname)) return;
+  var documentActive = true, bridgeWarning = false;
+  if (window.addEventListener) {
+    window.addEventListener('pagehide', function () { documentActive = false; });
+    window.addEventListener('pageshow', function () { documentActive = true; bridgeWarning = false; lastState = ''; schedule(); });
+  }
   var session = 0, pageKey = '', query = '', edited = false, lastState = '', scheduled = 0, lastLoadAt = 0;
   var categories = [], suggestions = [], heroes = [], sections = [], results = [];
   function searchRoute() { return /^\\/search(?:\\/|$)/i.test(location.pathname); }
   function currentPageKey() { return location.origin + location.pathname + location.search; }
+  window.PinmonySearchDemand = function (page) {
+    if (!documentActive || page !== location.href) return false;
+    clearTimeout(scheduled); scheduled = 0; sync(); return true;
+  };
   function notify(value) {
-    if (!window.PinmonyShareBridge || !window.PinmonyShareBridge.searchState) return;
+    if (!documentActive) return;
     var serialized = JSON.stringify(value);
     if (serialized === lastState) return;
-    lastState = serialized; window.PinmonyShareBridge.searchState(serialized);
+    try {
+      var bridge = window.PinmonyShareBridge;
+      if (!bridge || !bridge.searchState) return;
+      bridge.searchState(serialized); lastState = serialized;
+    } catch (_) { if (!bridgeWarning) { bridgeWarning = true; console.warn('BridgeTrace: search unavailable'); } }
   }
   function empty(kind) { return { kind: kind, session: session, pageKey: pageKey, query: query, placeholder: '',
     selectedCategory: '', categories: [], suggestions: [], heroes: [], ideaSections: [], results: [] }; }
   function sync() {
+    scheduled = 0;
+    if (!documentActive) return;
+    if (window.PinmonyNativeNetworkEnabled === true && window.PinmonyNetwork && typeof window.PinmonyNetwork.isReady === "function" && !window.PinmonyNetwork.isReady()) return;
     scheduled = 0;
     if (window.PinmonyNetwork && !window.PinmonyNetwork.isForeground()) {
       ['PinmonySearchApi', 'PinmonySearchDiscoveryApi'].forEach(function (name) { if (window[name]) window[name].pause(); });
@@ -57,7 +73,7 @@ export const PIN_SEARCH_BRIDGE_SCRIPT: string = `
     value.apiActive = !!(api && api.active); value.apiBusy = !!(api && api.busy); value.apiEnded = !!(api && api.ended);
     notify(value);
   }
-  function schedule() { if (!scheduled) scheduled = setTimeout(sync, 160); }
+  function schedule() { if (!scheduled) scheduled = setTimeout(sync, 0); }
   function valid(s, p) { return s === session && p === pageKey && p === currentPageKey() && searchRoute(); }
   function navigate(value) {
     try { var url = new URL(value, pageKey); if (url.origin !== location.origin || url.protocol !== 'https:') return false;
@@ -103,5 +119,5 @@ export const PIN_SEARCH_BRIDGE_SCRIPT: string = `
   };
   window.addEventListener('pageshow', function () { lastState = ''; schedule(); });
   window.addEventListener('popstate', function () { lastState = ''; schedule(); });
-  window.setInterval(sync, 900); schedule();
+  window.setInterval(function () { if (documentActive && searchRoute()) schedule(); }, 2000); schedule();
 })();`;

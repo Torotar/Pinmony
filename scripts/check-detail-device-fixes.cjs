@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -24,9 +24,9 @@ window.fetch = (url, options) => new Promise(resolve => requests.push({ url, opt
 const context = { window, location, document, URL, URLSearchParams, Headers, AbortController, XMLHttpRequest: XHR,
   fetch: (...args) => window.fetch(...args), setTimeout, clearTimeout, console };
 function template(source, pattern) { return Function('return `' + source.match(pattern)[1] + '`')(); }
-vm.runInNewContext(template(base, /= `([\s\S]*?)`;/), context);
+require('./product-coordination-harness.cjs').run(ts,template(base, /= `([\s\S]*?)`;/), context);
 const sharePanel = readSourceFileSync('feature_pin/src/main/ets/services/PinmonySharePanelScript.ets', 'utf8');
-vm.runInNewContext(template(sharePanel, /const SHARE_PANEL_BRIDGE_SCRIPT: string = `([\s\S]*?)`;/), context);
+require('./product-coordination-harness.cjs').run(ts,template(sharePanel, /const SHARE_PANEL_BRIDGE_SCRIPT: string = `([\s\S]*?)`;/), context);
 const api = window.PinmonyPostApi;
 api.savedRead = () => null;
 const actions = api.detailActions(pin, [], () => {});
@@ -60,12 +60,15 @@ async function main() {
   assert.equal(messages.length, messageCount, 'Late contacts cannot reopen a closed share sheet');
   for (const wrapped of [false, true]) {
     const timers = [];
-    const Native = vm.runInNewContext(compiled, { PIN_POST_API_ENABLED: true,
+    const Native = require('./product-coordination-harness.cjs').run(ts,compiled, { PIN_POST_API_ENABLED: true,
       JSON, setTimeout: callback => timers.push(callback), console });
-    const native = new Native();
-    Object.assign(native, { authStatus: 'authenticated', pinStore: { detail: { pinUrl: pin }, commentToken: 0, saveToken: 0, editToken: 0, saveResult: { busy: false } },
-      currentPinUrl: () => pin, pinIdentity: url => url.match(/\/pin\/(\d+)/)?.[1] || '',
-      showMessage: message => { throw new Error(message); } });
+    const native = require('./product-coordination-harness.cjs').createHost(Native, ts);
+    Object.assign(native, {
+    authStatus: 'authenticated',
+    pinStore: Object.assign(native.pinStore, { detail: { pinUrl: pin }, commentToken: 0, saveToken: 0, editToken: 0, saveResult: { busy: false } }),
+    currentPinUrl: () => pin, pinIdentity: url => url.match(/\/pin\/(\d+)/)?.[1] || '',
+    showMessage: message => { throw new Error(message); }
+});
     const comments = { pin, loading: false, error: '', items: [{ id: '301', text: '真实评论' }] };
     const boards = { pin, loading: false, busy: false, error: '', items: [{ id: '401', name: '风景', enabled: true, imageUrl: '' }], shortlist: [] };
     let responsePin = pin;
@@ -75,19 +78,18 @@ async function main() {
       const text = JSON.stringify({ ...result, pin: responsePin });
       return wrapped ? JSON.stringify(text) : text;
     } };
-    for (const name of ['commentResult','saveResult','commentToken','saveToken']) { if (!Object.getOwnPropertyDescriptor(native, name)) Object.defineProperty(native, name, { get() { return this.pinStore[name]; }, set(value) { this.pinStore[name] = value; } }); }
     require('./post-panels-controller-harness.cjs').bind(native, ts, { setTimeout: callback => timers.push(callback), clearTimeout() {} });
     await native.openApiComments(); await flush();
-    assert.equal(native.commentResult.items[0].text, '真实评论', 'Both ArkWeb return encodings reach native comments');
+    assert.equal(native.pinStore.commentResult.items[0].text, '真实评论', 'Both ArkWeb return encodings reach native comments');
     await native.openApiBoards(); await flush();
-    assert.equal(native.saveResult.items[0].name, '风景');
-    native.activeSheetKind = 'comments'; native.commentToken++;
+    assert.equal(native.pinStore.saveResult.items[0].name, '风景');
+    native.activeSheetKind = 'comments'; native.pinStore.commentToken++;
     await timers[0]();
-    assert.equal(native.commentResult.items[0].id, '301', 'Expired poll is ignored');
+    assert.equal(native.pinStore.commentResult.items[0].id, '301', 'Expired poll is ignored');
     responsePin = pin.replace('101', '999');
     await native.openApiComments(); await flush();
-    assert.equal(native.commentResult.items.length, 0, 'A response for another Pin is rejected');
-    assert.match(native.commentResult.error, /读取失败/);
+    assert.equal(native.pinStore.commentResult.items.length, 0, 'A response for another Pin is rejected');
+    assert.match(native.pinStore.commentResult.error, /读取失败/);
   }
   console.log('detail fixes: absent DOM save, immediate share, late response, ArkWeb JSON encodings and Pin guards OK');
 }

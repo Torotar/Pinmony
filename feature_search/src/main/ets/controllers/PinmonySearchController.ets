@@ -301,7 +301,8 @@ export class PinmonySearchController {
       if (token !== this.searchStore.searchFilterToken || this.ports.sheetKind() !== 'searchFilter') return;
       let target: string = raw;
       if (raw.startsWith('"')) target = JSON.parse(raw) as string;
-      if (!/^https:\/\/www\.pinterest\.com\/search\/(?:pins|videos|boards|users|buyable_pins)\/\?q=/.test(target)) return;
+      if (!/^https:\/\/(?:www|uk)\.pinterest\.com\/search\/(?:pins|videos|boards|users|buyable_pins)\/\?q=/.test(target) ||
+          target.split('/')[2] !== search.pageKey.split('/')[2]) return;
       this.dismissSearchFilters();
       this.searchStore.searchResultsResetPending = true;
       this.searchStore.searchScrollOffset = 0;
@@ -467,7 +468,7 @@ export class PinmonySearchController {
         else message.quiz = previousSearch && previousSearch.pageKey === message.pageKey &&
           previousSearch.quiz && previousSearch.quiz.mode === 'entry' ? previousSearch.quiz : undefined;
       } else if (this.searchStore.searchQuizReturnPage) this.searchStore.searchQuizReturnPage = '';
-      this.searchStore.search = { kind: stableKind, session: message.session, pageKey: message.pageKey,
+      const nextSearch: PinmonySearchSnapshot = { kind: stableKind, session: message.session, pageKey: message.pageKey,
         quiz: message.quiz, inputReady: message.inputReady === true,
         api: message.api, apiError: message.apiError,
         suggestionBusy: message.suggestionBusy, suggestionError: message.suggestionError,
@@ -478,6 +479,9 @@ export class PinmonySearchController {
         query: message.query || '', placeholder: message.placeholder || '',
         selectedCategory: message.selectedCategory || '', categories: categories,
         suggestions: suggestions, heroes: heroes, ideaSections: ideaSections, results: results };
+      // Preserve object identity for an identical validated snapshot, including readiness fields.
+      if (!this.searchStore.search || JSON.stringify(this.searchStore.search) !== JSON.stringify(nextSearch))
+        this.searchStore.search = nextSearch;
       this.searchStore.searchActionsReady = message.kind === 'state' && !retainingApiResults;
       PinmonyRuntimeLog.info('SearchSnapshot: accepted kind=' + message.kind + ' results=' + results.length.toString() +
         ' sections=' + ideaSections.length.toString() + ' actionsReady=' + this.searchStore.searchActionsReady.toString());
@@ -548,7 +552,9 @@ export class PinmonySearchController {
     this.searchStore.searchResultsResetPending = true;
     this.searchStore.searchScrollOffset = 0;
     this.searchStore.searchRequestToken++;
-    const target: string = 'https://www.pinterest.com/search/pins/?q=' + encodeURIComponent(value.trim());
+    const origin: RegExpMatchArray | null = search.pageKey.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
+    if (!origin) return;
+    const target: string = origin[0] + '/search/pins/?q=' + encodeURIComponent(value.trim());
     try {
       this.ports.navigateSearch(target, search.pageKey);
       PinmonyRuntimeLog.info('SearchNavigationTrace: submit-native');

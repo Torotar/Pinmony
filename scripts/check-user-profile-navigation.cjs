@@ -9,7 +9,7 @@ function method(name) {
   return source.slice(start, source.indexOf('\n  private ', start + 1));
 }
 const context = { setTimeout() {} };
-vm.runInNewContext(ts.transpileModule('class Native {' + ['openUserProfile', 'backFromUserProfile'].map(method).join('\n') + '} globalThis.Native = Native;', {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + ['openUserProfile', 'backFromUserProfile'].map(method).join('\n') + '} globalThis.Native = Native;', {
   compilerOptions: { target: ts.ScriptTarget.ES2020 }
 }).outputText, context);
 const native = new context.Native(), loads = [], back = [], cached = [];
@@ -39,4 +39,20 @@ assert.equal(native.profileStore.origins.length, 0);
 native.authStatus = 'unauthenticated';
 native.openUserProfile('https://www.pinterest.com/sample/');
 assert.equal(loads.length, 1, 'logged out navigation is rejected');
+native.authStatus = 'authenticated';
+const notices = [];
+native.showMessage = value => notices.push(value);
+native.controller.getUrl = () => { throw Error('unavailable controller'); };
+native.openUserProfile('https://www.pinterest.com/sample/');
+assert.equal(native.profileStore.origins.length, 0, 'failed document read cannot create a navigation origin');
+assert.equal(loads.length, 1);
+native.controller.getUrl = () => page;
+native.controller.loadUrl = () => { throw Error('unavailable navigation'); };
+const retained = { profileUrl: 'https://www.pinterest.com/origin/' };
+native.profileStore.profile = retained;
+native.openUserProfile('https://www.pinterest.com/sample/');
+assert.equal(native.profileStore.origins.length, 0, 'failed load rolls back the new origin');
+assert.equal(native.profileStore.profile, retained);
+assert.equal(native.profileStore.profileActionsReady, false);
+assert.equal(notices.length, 2, 'both failures produce explicit native feedback');
 console.log('User avatar origin, URL guard, post scroll and return checks passed');

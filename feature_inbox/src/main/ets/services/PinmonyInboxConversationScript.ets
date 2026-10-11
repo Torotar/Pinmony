@@ -145,6 +145,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
               timeLabel: date && !isNaN(date.getTime()) ? String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0') : '' };
           }); pending.kind = 'ready'; changed();
         }).catch(function (e) { if (current() && token === listGeneration) {
+          if (e && e.pinmonyCancelled === true) { listKey = ''; pending.kind = 'loading'; changed(); return; }
           pending.kind = 'failed'; pending.error = e.name === 'AbortError' ? '会话列表请求超时，请重试' :
             e instanceof TypeError ? '会话列表网络请求失败，请重试' : clean(e.message); changed();
         } });

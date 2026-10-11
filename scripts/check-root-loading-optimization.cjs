@@ -14,7 +14,7 @@ function home(pathname = '/') {
   const context = { window, location, URL, AbortController, Date, console: { warn() {} },
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {}, setInterval() {},
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) };
-  vm.runInNewContext(script('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets') +
+  require('./product-coordination-harness.cjs').run(ts,script('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets') +
     script('feature_home/src/main/ets/services/PinmonyHomeScript.ets'), context);
   const publish = () => { const pending = timers.splice(0); pending.filter(callback => callback.name === 'publish').forEach(callback => callback()); };
   return { window, requests, messages, publish };
@@ -32,7 +32,7 @@ function method(name) {
 }
 let now = 1000;
 const context = { Date: { now: () => now }, PinmonyRuntimeLog: { info() {}, warn(message) { assert.fail(message); } } };
-vm.runInNewContext(ts.transpileModule('class Native {' +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' +
   ['prepareSearchNavigation', 'rootReadInFlight', 'requestRootPage', 'updateHome'].map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 function native() {
@@ -59,7 +59,7 @@ function native() {
   assert.equal(h.messages.at(-1).kind, 'state', 'All feed commits while categories are pending');
   assert.equal(h.messages.at(-1).pins.length, 21);
   await respond(categories, {}, false); h.publish();
-  const presentation = new context.Native();
+  const presentation = new context.Native(); presentation.markRootPerformance=()=>{};
   Object.assign(presentation, { homeStore: { homeRequestToken: 0, homeRefreshToken: 0 },
     searchStore: { knownSearchPinTitles: new Map() }, pinStore: { confirmedSaves: { isSaved: () => false } },
     currentHomePageKey: () => root, normalizeHomeBoard: () => undefined,

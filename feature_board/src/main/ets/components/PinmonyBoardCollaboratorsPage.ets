@@ -61,8 +61,8 @@ export struct PinmonyBoardCollaboratorsPage {
       }
     }.width('100%').padding({ top: 10, bottom: 10 })
   }
-  build() {
-    HdsNavigation(this.stack) {
+  @Builder
+  private destination(_name?: string, _param?: Object) {
       HdsNavDestination() {
         Column() {
           Scroll(this.scroller) {
@@ -110,6 +110,10 @@ export struct PinmonyBoardCollaboratorsPage {
       }.titleBar(this.titleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
         .onBackPressed(() => { this.back(); return true; })
         .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
-    }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+  }
+  build() {
+    HdsNavigation(this.stack) {}
+      .width('100%').height('100%').hideTitleBar(true)
+      .navDestination(this.destination).backgroundColor($r('app.color.page_background'))
   }
 }

@@ -15,7 +15,10 @@ export class DiskCache {
     this.directory = cacheDir.replace(/[\\/]+$/, '') + '/api_cache';
     let exists: boolean = false;
     try { exists = fs.accessSync(this.directory); } catch (_) {}
-    if (!exists) fs.mkdirSync(this.directory, true);
+    if (!exists) {
+      try { fs.mkdirSync(this.directory, true); }
+      catch (_) { throw new Error('cache-directory-unavailable'); }
+    }
   }
 
   get<T>(key: string, maxAgeMs: number): T | null {
@@ -48,6 +51,7 @@ export class DiskCache {
     const path: string = this.filePath(key);
     const temporaryPath: string = path + '.tmp';
     let file: fs.File | undefined = undefined;
+    let failed: boolean = false;
     try {
       // Commit through a sibling file so interruption cannot expose partial JSON.
       file = fs.openSync(temporaryPath, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
@@ -55,8 +59,12 @@ export class DiskCache {
       fs.closeSync(file);
       file = undefined;
       fs.renameSync(temporaryPath, path);
+    } catch (_) {
+      failed = true;
+      throw new Error('cache-write-failed');
     } finally {
-      if (file) fs.closeSync(file);
+      try { if (file) fs.closeSync(file); }
+      catch (_) { if (!failed) throw new Error('cache-close-failed'); }
       try { fs.unlinkSync(temporaryPath); } catch (_) {}
     }
   }

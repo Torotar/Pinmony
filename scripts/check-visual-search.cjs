@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyVisualSearchApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', href: 'https://www.pinterest.com/pin/123/', pathname: '/pin/123/' };
+if (process.env.PINMONY_TEST_REGION === 'uk') { location.hostname='uk.pinterest.com'; location.origin='https://uk.pinterest.com'; location.href=location.origin+'/pin/123/'; }
 const window = {}; window.top = window;
 const jobs = [];
 vm.runInNewContext(script, { window, location, AbortController, setTimeout, clearTimeout, Set,

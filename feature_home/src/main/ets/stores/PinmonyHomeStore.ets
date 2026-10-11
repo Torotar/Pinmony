@@ -14,6 +14,7 @@ export class PinmonyHomeStore {
   homeMenuPin: string = '';
   homeMenuPage: string = '';
   customHomeMenu: PinmonyHomeMenuState | undefined = undefined;
+  inboxMenuPending: boolean = false;
   customHomeMenuToken: number = 0;
   pendingHomeMorePin: string = '';
   homeDetailMoreToken: number = 0;

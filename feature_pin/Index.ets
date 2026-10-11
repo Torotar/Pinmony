@@ -36,3 +36,13 @@ export { PIN_VISUAL_SEARCH_API_ENABLED, PIN_VISUAL_SEARCH_API_SCRIPT } from './s
 export { readRelatedPresentation, RelatedPresentation } from './src/main/ets/services/PinmonyRelatedPresentation';
 
 export { PinmonyPostPanelsController, PinmonyPostPanelsPorts } from './src/main/ets/controllers/PinmonyPostPanelsController';
+
+export { PinmonyDetailReadController, PinmonyDetailReadControllerPorts } from './src/main/ets/controllers/PinmonyDetailReadController';
+
+export { PinmonyDetailOperationsController, PinmonyDetailOperationsControllerPorts } from './src/main/ets/controllers/PinmonyDetailOperationsController';
+
+export { PinmonySharePanelsController, PinmonySharePanelsControllerPorts } from './src/main/ets/controllers/PinmonySharePanelsController';
+
+export { PinmonyShareSheet } from './src/main/ets/components/PinmonyShareSheet';
+
+export { PinmonyMoreSheet } from './src/main/ets/components/PinmonyMoreSheet';

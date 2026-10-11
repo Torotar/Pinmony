@@ -19,7 +19,7 @@ const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const method = name => detail.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0];
 const context = {};
-vm.runInNewContext(ts.transpileModule(`class Page {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page {
   ${method('onPinChanged')}
   ${method('heroRenderKey')}
   ${method('heroImageSources')}

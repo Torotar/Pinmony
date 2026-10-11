@@ -1,10 +1,9 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 let source = readSourceFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-if (process.argv[3]) source = fs.readFileSync(process.argv[3], 'utf8').replaceAll('this.pinStore.', 'this.').replaceAll('this.inboxStore.', 'this.');
 const releaseStart = source.indexOf('  private releasePostSnack(');
 const start = releaseStart >= 0 ? releaseStart : source.indexOf('  private dismissPostSnack(): void');
 const end = source.indexOf('  private async undoSavedPin()', start);
@@ -31,7 +30,7 @@ class HdsSnackBar {
 const context = { HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 },
   Date: { now: () => now },
   PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
-vm.runInNewContext(ts.transpileModule('class Native { ' + source.slice(start, end) +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native { ' + source.slice(start, end) +
   source.slice(source.indexOf('  private showInboxBlockSnack('),
     source.indexOf('\n  @Builder', source.indexOf('  private showInboxBlockSnack('))) +
   ' } globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
@@ -45,12 +44,19 @@ function nativeCallback(presentation, callback, closeBefore = true) {
 }
 function close(presentation) { nativeCallback(presentation, () => presentation.operation.onCloseButtonClick()); }
 function back(presentation, closeBefore = true) { nativeCallback(presentation, () => presentation.style.pressBackCallback(), closeBefore); }
-const native = new context.Native(); let undo = 0, retry = 0;
-Object.assign(native, { postSnackToken: 0, getUIContext: () => ({}),
-  onBackPress: () => { events.push('page-back'); return true; },
-  currentPinUrl: () => 'pin', pinIdentity: value => value,
-  shareError: '分享链接尚未就绪，请重试', shareSession: 1, sharePin: 'pin', shareFeedback: '已发送',
-  activeSheetKind: 'share', showNativeSheet: true, refreshShareSheet: () => retry++ });
+const native = require('./product-coordination-harness.cjs').createHost(context.Native, ts); let undo = 0, retry = 0;
+Object.assign(native, {
+    postSnackToken: 0, getUIContext: () => ({}),
+    onBackPress: () => { events.push('page-back'); return true; },
+    currentPinUrl: () => 'pin', pinIdentity: value => value,
+    activeSheetKind: 'share', showNativeSheet: true, refreshShareSheet: () => retry++,
+    pinStore: Object.assign(native.pinStore, {
+        shareError: '分享链接尚未就绪，请重试',
+        shareSession: 1,
+        sharePin: 'pin',
+        shareFeedback: '已发送'
+    })
+});
 native.showUndoSnack('已收藏', 'pin', () => undo++);
 const first = shown.at(-1);
 events.length = 0;
@@ -133,7 +139,7 @@ assert.equal(events.length, failedEvents);
 
 // Preserve the inbox entry points that share the same cleanup owner.
 let inboxUndo = 0;
-native.inboxFlow = { newsId: 'news', newsHidden: true };
+native.inboxStore.inboxFlow = { newsId: 'news', newsHidden: true };
 native.inboxFlowAction = action => { assert.equal(action, 'undoNews'); inboxUndo++; };
 native.showInboxUndoSnack('news');
 assert.equal(shown.at(-1).style.duration, 8000);
@@ -152,15 +158,16 @@ shown.at(-1).operation.onCloseButtonClick();
 assert(!logs.join('\n').includes('not-for-logs'));
 
 // Retry still dispatches once while the same share context is current.
-native.shareSnackKey = '';
+// Retry still dispatches once while the same share context is current.
+native.pinStore.shareSnackKey = '';
 native.showShareLinkSnack();
 const retrySnack = shown.at(-1);
 retrySnack.operation.onContentClick();
 retrySnack.operation.onContentClick();
 assert.equal(retry, 1);
-native.shareSnackKey = '';
+native.pinStore.shareSnackKey = '';
 native.showShareLinkSnack();
-native.shareSession++;
+native.pinStore.shareSession++;
 const otherSessionEvents = events.length;
 shown.at(-1).operation.onContentClick();
 assert.equal(retry, 1);

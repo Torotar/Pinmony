@@ -75,12 +75,16 @@ export const PIN_PROFILE_API_SCRIPT: string = `
       mapped.lastPinSaveTime = clean(resource.data.last_pin_save_time, 100);
       info = mapped;
       changed();
-    } catch (_) {
+    } catch (error) {
+      if (token === generation && key === profile && current() && error && error.pinmonyCancelled === true) {
+        attempted = false; failed = false; changed(); return;
+      }
       // Pure API mode reports failure; retry is explicit, never a polling loop.
       if (token === generation && key === profile && current()) {
         cancelSavedPrefetch();
         failed = true;
         changed();
+        console.warn('ProfileReadTrace: failure=' + (error && error.message === 'invalid-user' ? 'invalid-user' : error && error.name === 'AbortError' ? 'timeout' : 'transport-or-response'));
         console.warn('Pinmony: profile API unavailable');
       }
     } finally {

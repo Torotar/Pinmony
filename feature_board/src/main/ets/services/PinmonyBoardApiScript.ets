@@ -3,6 +3,9 @@ export const PIN_BOARD_API_ENABLED: boolean = true;
 export const PIN_BOARD_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  var documentActive = true;
+  if (window.addEventListener) { window.addEventListener('pagehide', function () { documentActive = false; }); window.addEventListener('pageshow', function () { documentActive = true; lastMessage = ''; sync(); }); }
+  window.PinmonyBoardDemand = function (page) { if (page === location.href && documentActive) sync(); };
   var key = '', generation = 0, session = 0, board = null, pins = [], ready = false;
   var boardBusy = false, feedBusy = false, attempted = false, error = '', bookmark = '', ended = false, aborts = [];
   var lastMessage = '';
@@ -40,7 +43,7 @@ export const PIN_BOARD_API_SCRIPT: string = `
   function collection() { return new URL(key).pathname.split('/').filter(Boolean)[1] === 'pins'; }
   function image(url) { return typeof url === 'string' && /^https:\\/\\//i.test(url) ? url : ''; }
   function notify() {
-    if (!key || route() !== key || !window.PinmonyShareBridge || !window.PinmonyShareBridge.boardState) return;
+    if (!documentActive || !key || route() !== key) return;
     var owner = board && board.owner || {};
     var own = board && (board.isOwn === true || viewerId && String(owner.id || '') === viewerId);
     var member = board && board.collaborated_by_me === true;
@@ -68,7 +71,7 @@ export const PIN_BOARD_API_SCRIPT: string = `
       memberAvatar: image(owner.image_medium_url || owner.image_small_url), nextPage: nextPage, revision: revision,
       editable: !!own && !collection() && !recoveryRequired && !boardBusy });
     if (value === lastMessage) return;
-    lastMessage = value; window.PinmonyShareBridge.boardState(value);
+    try { var bridge = window.PinmonyShareBridge; if (!bridge || !bridge.boardState) return; bridge.boardState(value); lastMessage = value; } catch (_) { console.warn('BridgeTrace: board unavailable'); }
   }
   function validBoard(value) {
     if (!value || value.type !== 'board' || !/^\\d+$/.test(String(value.id || ''))) return false;
@@ -148,7 +151,8 @@ export const PIN_BOARD_API_SCRIPT: string = `
       if (!payload) return;
       var next = payload.resource_response.bookmark || (payload.resource && payload.resource.options && payload.resource.options.bookmarks || [])[0];
       merge(payload.resource_response.data, next, append);
-    } catch (_) {
+    } catch (failure) {
+      if (token === generation && route() === page && failure && failure.pinmonyCancelled === true) { attempted = false; return; }
       if (token === generation && route() === page) error = append ? '更多 Pin 图加载失败，请重试' : '图板内容读取失败，请重试';
     } finally {
       if (token === generation && page === key) { feedBusy = false; notify(); }
@@ -182,13 +186,16 @@ export const PIN_BOARD_API_SCRIPT: string = `
       board = refreshedBoard;
       await loadFeed(false);
       if (!error) recoveryRequired = false;
-    } catch (_) {
+    } catch (failure) {
+      if (token === generation && route() === page && failure && failure.pinmonyCancelled === true) { attempted = false; return; }
       if (token === generation && route() === page) error = '图板资料读取失败，请重试';
     } finally {
       if (token === generation && page === key) { boardBusy = false; refreshing = false; notify(); }
     }
   }
   function sync() {
+    if (!documentActive) return;
+    if (window.PinmonyNativeNetworkEnabled === true && window.PinmonyNetwork && typeof window.PinmonyNetwork.isReady === 'function' && !window.PinmonyNetwork.isReady()) return;
     if (window.PinmonyBoardApiEnabled !== true) { if (key) reset(); return; }
     var page = route();
     if (page !== key) { reset(); key = page; }

@@ -4,7 +4,7 @@ const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const start = source.indexOf('  private backFromSearch():');
 const method = source.slice(start, source.indexOf('\n  private backFromSearchLanding', start));
 const timers = [], home = 'https://www.pinterest.com/', target = home + 'search/';
-const Native = vm.runInNewContext(ts.transpileModule('class Native {' + method + '} Native;', {
+const Native = require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + method + '} Native;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText, { PINTEREST_URL: home, PinmonyRuntimeLog: { info() {} }, setTimeout: fn => timers.push(fn) });
 for (const cached of [true, false]) {

@@ -17,6 +17,7 @@ export struct PinmonyInboxFlowPage {
   private positionedConversation: string = '';
   @State private query: string = '';
   @State private draft: string = '';
+  @State private imageRatios: Map<string, number> = new Map<string, number>();
   @State private selectedMessage: InboxFlowMessage | undefined = undefined;
   @State private showMessageMenu: boolean = false;
   @State private reactionMessageId: string = '';
@@ -82,6 +83,20 @@ export struct PinmonyInboxFlowPage {
   }
 
   @Builder
+  private conversationTitle() {
+    Row({ space: 10 }) {
+      if (this.snapshot.screen === 'chat') {
+        ForEach(this.snapshot.users.filter((user: InboxFlowUser) => !user.self).slice(0, 1),
+          (user: InboxFlowUser) => { this.avatar(user, 32) }, (user: InboxFlowUser) => user.id)
+      }
+      Text(this.snapshot.screen === 'compose' ? '新消息' : this.snapshot.title || '聊天')
+        .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+    }.width('100%').padding({ left: 64, right: 72 }).alignItems(VerticalAlign.Center)
+      .hitTestBehavior(HitTestMode.Transparent)
+  }
+
+  @Builder
   private avatar(user: InboxFlowUser, size: number = 40) {
     if (user.avatar) {
       Image(user.avatar).onClick(() => { if (user.profileUrl && this.onUser) this.onUser(user.profileUrl); }).width(size).height(size).borderRadius(size / 2).objectFit(ImageFit.Cover)
@@ -102,6 +117,9 @@ export struct PinmonyInboxFlowPage {
           .fontColor($r('app.color.primary_text'))
       } else if (!user.self) {
         Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? '取消屏蔽' : '屏蔽')
+          .height(36).borderRadius(12).fontSize(14).fontWeight(FontWeight.Normal)
+          .padding({ left: 14, right: 14 })
+          .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
           .enabled(!this.snapshot.messageBusy)
           .onClick(() => { this.blockTarget = user; this.showMessageMenu = true; })
       }
@@ -212,14 +230,26 @@ export struct PinmonyInboxFlowPage {
       }
       Row({ space: 8 }) {
         if (message.own && !message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
-        if (!message.own && message.sender) { this.avatar(message.sender, 28) }
+        if (!message.own && message.sender) {
+          Column() { this.avatar(message.sender, 28) }.alignSelf(ItemAlign.End)
+        }
         Column({ space: 8 }) {
           if (!message.own && message.sender?.name && !message.deleted) {
             Text(message.sender.name).fontSize(12).fontColor($r('app.color.secondary_text'))
           }
           if (message.image && !message.deleted) {
-            Image(message.image).width(220).constraintSize({ maxHeight: 460 }).borderRadius(18)
+            Image(message.image).width(Math.min(220, 460 * (this.imageRatios.get(message.image) || 1)))
+              .constraintSize({ maxHeight: 460 }).borderRadius(18)
               .objectFit(ImageFit.Contain)
+              .onComplete((event) => {
+                if (event && event.width > 0 && event.height > 0) {
+                  const ratio: number = event.width / event.height;
+                  if (this.imageRatios.get(message.image) !== ratio) {
+                    const ratios: Map<string, number> = new Map<string, number>(this.imageRatios);
+                    ratios.set(message.image, ratio); this.imageRatios = ratios;
+                  }
+                }
+              })
               .onClick(() => { if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
           }
           if (message.deleted) {
@@ -234,18 +264,19 @@ export struct PinmonyInboxFlowPage {
           } else if (message.pinUrl && !message.image) {
             Text('Pin 图图片暂不可读取').fontColor($r('app.color.secondary_text'))
           }
-          if (!message.deleted && message.reactions?.length) {
-            Text(message.reactions.join(' ')).fontSize(18).padding(6).borderRadius(20)
-              .backgroundColor($r('app.color.surface_muted')).alignSelf(ItemAlign.End)
-          }
           if (!message.deleted) {
             Button({ type: ButtonType.Normal }) {
               Row() {
-              Text('☺').fontSize(22).fontColor($r('app.color.primary_text'))
-              Text('+').fontSize(12).fontColor($r('app.color.primary_text'))
+                if (message.reactions?.length) {
+                  Text(message.reactions.join(' ')).fontSize(18).fontColor($r('app.color.primary_text'))
+                } else {
+                  SymbolGlyph($r('sys.symbol.face_smiling')).fontSize(20).fontColor([$r('app.color.primary_text')])
+                  Text('+').fontSize(12).fontColor($r('app.color.primary_text'))
+                }
               }
-            }.width(40).height(30).padding(0).borderRadius(18)
+            }.constraintSize({ minWidth: 40 }).height(30).padding({ left: 6, right: 6 }).borderRadius(18)
               .backgroundColor($r('app.color.surface_muted'))
+              .alignSelf(ItemAlign.End).margin({ top: -16, right: 4 }).zIndex(1)
               .accessibilityText('选择消息表情')
               .onClick(() => { this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id; })
               .bindPopup(this.reactionMessageId === message.id, {
@@ -337,10 +368,6 @@ export struct PinmonyInboxFlowPage {
         Column() {
           if (this.snapshot.screen === 'compose' || this.snapshot.screen === 'settings') {
             ForEach(this.snapshot.users, (user: InboxFlowUser) => { this.userRow(user) }, (user: InboxFlowUser) => user.id)
-            if (this.snapshot.screen === 'settings') {
-              Button('举报会话').enabled(false).margin({ left: 20, top: 24 })
-                .accessibilityDescription('此操作接口尚未接入')
-            }
           } else {
             if (this.snapshot.users.length > 0) {
               Column({ space: 16 }) {
@@ -385,8 +412,8 @@ export struct PinmonyInboxFlowPage {
               .onClick(() => this.act('send', this.draft))
           } else {
           Button({ type: ButtonType.Circle }) {
-            Image($r('app.media.lucide_heart_filled')).width(20).height(20)
-              .fillColor($r('app.color.primary_text'))
+            SymbolGlyph($r('sys.symbol.heart_fill')).fontSize(20)
+              .fontColor([$r('app.color.accent')])
           }.width(44).height(44).backgroundColor($r('app.color.page_background'))
             .border({ width: 1, color: $r('app.color.surface_muted') })
             .accessibilityText('发送爱心')
@@ -414,7 +441,9 @@ export struct PinmonyInboxFlowPage {
             backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
           } }
         },
-        content: { title: { mainTitle: this.snapshot.screen === 'compose' ? '新消息' : this.snapshot.title || '聊天' },
+        content: { title: { mainTitle: this.snapshot.screen === 'chat' ? '' :
+          this.snapshot.screen === 'compose' ? '新消息' : this.snapshot.title || '消息设置' },
+          stackBuilder: this.snapshot.screen === 'chat' ? () => { this.conversationTitle(); } : undefined,
           backIcon: { isEnabled: true, action: () => this.act('back') },
           menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.inbox_more'), label: '消息设置', action: () => this.act('settings') } }] :
             this.snapshot.screen === 'compose' ? [{ content: { label: '下一步', isEnabled: !this.snapshot.loading && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })

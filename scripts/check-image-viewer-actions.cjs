@@ -9,7 +9,7 @@ async function scenario(kind){
   let result={loading:false,busy:false,error:kind==='denied'?'ownership failed':'',uncertain:false,done:''};
   const api={savedRead:()=>kind==='copy'?{id:'456'}:null,saveUndo:()=>true,savedUndoRead:()=>({status:'done'}),savedRestoreClose(){},editStart:()=>true,editRead:()=>result,
     editPhase:()=>true,editCommit:()=>{result.done='deleted';return true;}};
-  const Native=vm.runInNewContext(compiled,{JSON,Promise,setTimeout:(fn)=>setTimeout(fn,0)});
+  const Native=require('./product-coordination-harness.cjs').run(ts,compiled,{JSON,Promise,setTimeout:(fn)=>setTimeout(fn,0)});
   const native=new Native();
   native.authEpoch=1;native.authStatus='authenticated';
   native.pinStore={imageLayer:'zoom',detailActionsReady:true,viewerSaveBusy:false,saveCancelToken:0,
@@ -21,6 +21,7 @@ async function scenario(kind){
   native.controller={runJavaScript:async text=>{scripts.push(text);return String(vm.runInNewContext(text,{window:{PinmonyPostApi:api},JSON}));}};
   native.showMessage=t=>messages.push(t);native.undoSavedPin=async()=>scripts.push('undo');
   native.performDetailAction=()=>scripts.push('save-picker');
+  require('./pin-priority-controller-harness.cjs').bind(native,ts);
   await native.saveViewerImage();
   assert(!native.pinStore.viewerSaveBusy);
   if(kind==='copy'){assert.equal(scripts.filter(s=>s.includes('.saveUndo(')).length,1);assert.equal(native.pinStore.saveUndoId,'456');}

@@ -15,7 +15,7 @@ async function main() {
     const runtime = require('./search-controller-harness.cjs').createSearchRuntime(ts, { setTimeout: timeout, clearTimeout() {} });
     const code = ts.transpileModule('class Native {' + ['finishRootPull', 'pullRefreshRoot', 'refreshSearch', 'retryInbox']
       .map(method).join('\n') + '} Native;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText;
-    const Native = vm.runInNewContext(code, { setTimeout: timeout });
+    const Native = require('./product-coordination-harness.cjs').run(ts,code, { setTimeout: timeout });
     const native = new Native(); let response = 'true';
     Object.assign(native, { authStatus: 'authenticated', rootPullKind: '', rootPullToken: 0,
       searchStore: new runtime.Store(), inboxStore: {},
@@ -24,17 +24,23 @@ async function main() {
       controller: { runJavaScript: async script => { requests.push(script); return response; } } });
     native.searchStore.search = { session: 1, pageKey: native.currentSearchPageKey() };
     runtime.bindIndex(native);
+    native.activeTab = kind === 'search' ? 1 : 2; native.controller.getUrl = () => native.currentInboxUrl();
+    native.inboxUrlFromAddress = a => a; native.pagePerformance={count(){}};
+    native.inboxStore.inboxRequestToken=0; native.inboxStore.inboxCache={get(){}};
+    require('./inbox-read-controller-harness.cjs').bind(native, ts, {setTimeout:timeout,clearTimeout(){}});
     await native.pullRefreshRoot(kind);
     assert.equal(native.rootPullKind, kind, 'bridge acknowledgement does not finish the refresh');
     await native.pullRefreshRoot(kind);
     assert.equal(requests.length, 1, 'duplicate gestures do not repeat reads');
     assert.match(requests[0], kind === 'search' ? /PinmonySearchRefresh\(1,/ : /PinmonyInboxApiRefresh/);
-    native.finishRootPull(kind); await native.pullRefreshRoot(kind);
+    const oldTimerCount = timers.filter(t => t.ms === 20000).length;
+    native.finishRootPull(kind); if(kind==='inbox') native.inboxReadController.pause(); await native.pullRefreshRoot(kind);
     const pullTimers = timers.filter(t => t.ms === 20000);
-    pullTimers[0].fn(); assert.equal(native.rootPullKind, kind, 'old timeout cannot stop a newer pull');
-    pullTimers[1].fn(); assert.equal(native.rootPullKind, '');
+    for (const timer of pullTimers.slice(0, oldTimerCount)) timer.fn();
+    assert.equal(native.rootPullKind, kind, 'old timeout cannot stop a newer pull');
+    pullTimers[oldTimerCount].fn(); assert.equal(native.rootPullKind, '');
     assert.match(kind === 'search' ? native.searchStore.searchError : native.inboxStore.inboxError, /超时/);
-    response = 'false'; await native.pullRefreshRoot(kind);
+    response = 'false'; if(kind==='inbox') native.inboxReadController.pause(); await native.pullRefreshRoot(kind);
     assert.equal(native.rootPullKind, '', 'rejected refresh ends animation');
     native.authStatus = 'signedOut'; const count = requests.length;
     await native.pullRefreshRoot(kind); assert.equal(requests.length, count);

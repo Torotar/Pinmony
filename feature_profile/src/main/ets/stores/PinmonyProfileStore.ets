@@ -7,6 +7,11 @@ export interface ProfileOrigin { page: string; tab: number; profile?: PinmonyPro
 
 @Observed
 export class PinmonyProfileStore {
+  followingBusy: boolean = false;
+  saving: boolean = false;
+  followUncertain: boolean = false;
+  saveUncertain: boolean = false;
+  organizeUncertain: boolean = false;
   onNavigationChange: (() => void) | undefined = undefined;
   panel: PinmonyProfilePanel | undefined = undefined;
   panelToken: number = 0;

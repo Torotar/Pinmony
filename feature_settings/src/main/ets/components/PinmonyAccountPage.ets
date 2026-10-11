@@ -107,7 +107,7 @@ export struct PinmonyAccountPage {
               this.row('停用你的帐户', '', '', '暂时隐藏你的个人资料、Pin 图和图板')
               this.row('删除你的数据和帐户', '', '', '永久删除你的数据以及与你的帐户关联的所有内容')
             } else if (this.store.screen === 'personal') {
-              this.row('出生日期', this.birthday())
+              if (this.birthday()) { this.row('出生日期', this.birthday()) }
               this.row('性别', this.gender())
               this.row('国家/地区', this.store.data.country)
             } else if (this.store.screen === 'birthdate') {

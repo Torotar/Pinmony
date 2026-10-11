@@ -14,11 +14,11 @@ function method(name, lifecycle = false) {
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/';
 const timers = [];
 const context = { Date, setTimeout(fn, delay) { timers.push({ fn, delay }); },
-  PinmonyRuntimeLog: { info() {}, error() {}, warn() {} }, retainHomePins: (_old, pins) => pins };
+  PinmonyRuntimeLog: { info() {}, error() {}, warn() {}, flush() {return Promise.resolve();} }, retainHomePins: (_old, pins) => pins };
 const methods = ['isCurrentPageFailure', 'protectedDetailAddress', 'handleMainFrameFailure', 'scheduleInterruptedHomeRecovery',
   'homePresentationPageKey', 'expectHome', 'updateHome'].map(name => method(name));
 methods.push(method('onPageShow', true), method('onPageHide', true));
-vm.runInNewContext(ts.transpile('class Native {' + methods.join('\n') + '} globalThis.Native = Native;',
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + methods.join('\n') + '} globalThis.Native = Native;',
   { target: ts.ScriptTarget.ES2020 }), context);
 function drainRecovery() {
   const pending = timers.splice(0);
@@ -49,7 +49,7 @@ function harness() {
     currentHomePageKey() { return this.navigationAddress === home ? home : ''; },
     homePageKeyFromAddress: url => url === home ? home : '', isHomeRootAddress: url => url === home,
     pinIdentity: url => url.match(/\/pin\/(\d+)/)?.[1] || '', extractPinUrl: url => /\/pin\//.test(url) ? url : '',
-    searchUrlFromAddress: () => '', clearInbox() {}, clearSearch() {},
+    boardUrlFromAddress: () => '', searchUrlFromAddress: () => '', clearInbox() {}, clearSearch() {},
     clearHome() { this.homeStore.home = undefined; },
     clearDetail() { this.pinStore.detail = undefined; this.pinStore.detailOpeningPin = ''; },
     showNetworkNotice() {}, showMessage() {}, describeFailure: (_url, code) => 'error ' + code,
@@ -59,6 +59,7 @@ function harness() {
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
   require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
+  require('./medium-priority-controller-harness.cjs').bindWork(native,ts,context);native.returnCoordinator={cancel(){}};require('./controller-lifecycle-harness.cjs').bind(native,ts);
   native.nativeNetwork.setForeground = () => false;
   return { native, cached, loads, effects };
 }
@@ -117,5 +118,6 @@ assert.equal(ready.native.interruptedHomePage, '', 'validated current API data c
 drainRecovery(); assert.deepEqual(ready.loads, [], 'successful snapshot cancels queued reload');
 ready.native.handleMainFrameFailure(home, -21, 'new handover'); drainRecovery();
 assert.deepEqual(ready.loads, [home], 'successful read rearms a future network-change episode');
-assert.ok(source.includes("this.interruptedHomePage = '';\n    this.homeRecoveryAttempted = false;\n    this.homeRecoveryToken++;\n    this.closeImageLayer();"), 'logout clears interrupted identity and timers');
+const session=fs.readFileSync('entry/src/main/ets/app/PinmonySessionCoordinator.ets','utf8');
+assert.match(session,/setInterruptedHomePage\(''\)/);assert.match(session,/setHomeRecoveryAttempted\(false\)/);assert.match(session,/setHomeRecoveryToken\(this\.ports\.homeRecoveryToken\(\) \+ 1\)/);
 console.log('Home network recovery: error burst, foreground, bounded retry, retained feed, target/session guards and validated recovery passed');

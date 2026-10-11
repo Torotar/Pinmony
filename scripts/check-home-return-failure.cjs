@@ -14,7 +14,7 @@ function method(name) {
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/', other = home + 'pin/456/';
 const context = { PIN_HOME_API_ENABLED: true, PINTEREST_URL: home, Date, setTimeout() {},
   isPinterestAuthRoute: url => /\/login\//.test(url), PinmonyRuntimeLog: { info() {}, warn() {}, error() {} } };
-vm.runInNewContext(ts.transpile('class Native {' + ['isCurrentPageFailure', 'handleMainFrameFailure',
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['isCurrentPageFailure', 'handleMainFrameFailure',
   'homePresentationPageKey', 'refreshHome', 'selectNativeRootTab', 'rootPresentationAddress',
   'staleRootDocumentTarget', 'effectiveRootDocumentTarget', 'rootTabIndexFromAddress',
   'retainRootSnapshotAfterFailure', 'protectedDetailAddress'].map(method).join('\n') + '} globalThis.Native = Native;',
@@ -42,6 +42,7 @@ function harness() {
     describeFailure: (_url, code) => 'error ' + code,
     requestRootPage(index) { assert.equal(index,0); loads.push(home); },
     controller: { loadUrl(url) { loads.push(url); } } });
+  native.returnCoordinator={cancel(){}};native.traceAction=()=>{};native.logPageLifecycle=()=>{};require('./controller-lifecycle-harness.cjs').bind(native,ts);
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
   require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);

@@ -146,7 +146,7 @@ async function main() {
   // Exercise the actual Index capability bindings and its remaining auth/persistence gate.
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
   function method(name) { const start=index.indexOf('  private '+name+'('); return index.slice(start,index.indexOf('\n  }',start)+4); }
-  const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['restoreHomeDiskCache','persistHomeDiskCache','tryRestoreAuthenticatedHome'].map(method).join('\n')+'} Host;',
+  const Host=require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Host {'+['restoreHomeDiskCache','persistHomeDiskCache','tryRestoreAuthenticatedHome'].map(method).join('\n')+'} Host;',
     {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{...runtime.cache,PinmonyRuntimeLog:globals.PinmonyRuntimeLog});
   cached={snapshot:snapshot(7)};
   const host=new Host(); Object.assign(host,{homeStore:new runtime.Store(),homeApiCache:cache,homeCacheAccountId:'partition-one',
@@ -161,9 +161,10 @@ async function main() {
   const priorReads=reads.length; host.tryRestoreAuthenticatedHome('partition-two',root); assert.equal(reads.length,priorReads);
 
   assert.doesNotMatch(fs.readFileSync('feature_home/src/main/ets/controllers/PinmonyHomeController.ets','utf8'), /this\.(controller|activeTab|pinStore|searchStore|navigationAddress)\b/);
-  for(const signature of ['onPageHide():','aboutToDisappear():','private resetAuthenticatedContent():','private selectNativeRootTab(']) {
+  for(const signature of ['onPageHide():','aboutToDisappear():']) {
     const start=index.indexOf(signature), end=index.indexOf('\n  }',start); assert(index.slice(start,end).includes('this.homeController.invalidatePending()'));
   }
+  for(const name of ['Navigation','Session']) assert(fs.readFileSync('entry/src/main/ets/app/Pinmony'+name+'Coordinator.ets','utf8').includes('this.ports.homeController().invalidatePending()'));
   assert.equal((index.match(/new PinmonyHomeStore\(\)/g)||[]).length,1);
   assert(index.indexOf('homeStore: PinmonyHomeStore = new PinmonyHomeStore()')<index.indexOf('new PinmonyHomeController(this.homeStore'));
   console.log('Home controller: real Store/product binding, retention/refresh/empty states, current-session gates, cancellation, late results, fresh pagination and validated account-scoped cache passed');

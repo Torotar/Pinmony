@@ -20,7 +20,7 @@ const code = 'class Page {' + ['aboutToAppear', 'onSnapshotChanged', 'restoreScr
   ' attach() {' + scroll + '} } class Root {' +
   ['setBottomBarHidden', 'updateInboxScrollAvailability', 'handleRootContentScroll'].map(name => method(root, name)).join('\n') +
   '} globalThis.Page = Page; globalThis.Root = Root;';
-vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const coordinator = new context.Root(), motions = [];
 Object.assign(coordinator, { activeTab: 2, inboxContentScrollable: false,
   rootTabsScrollHidden: [false, false, false, false], childBottomBarRootTab: -1,
@@ -72,5 +72,5 @@ motions.length = 0; coordinator.handleRootContentScroll(20, context.ScrollState.
 assert.equal(motions.at(-1).hidden, true, 'other roots retain their existing behavior');
 assert.match(page, /this\.contentHeight = Number\(newArea\.height\)/);
 assert.match(page, /this\.viewportHeight = Number\(newArea\.height\)/);
-assert.match(root, /onScrollAvailability:.*updateInboxScrollAvailability/);
+assert.match(fs.readFileSync('entry/src/main/ets/components/PinmonyInboxRootContent.ets', 'utf8'), /onScrollAvailability:.*updateInboxScrollAvailability/);
 console.log('Inbox bottom bar: both segments, short content/bounce, overflow, shrink/resize, restoration and child/other-root boundaries passed');

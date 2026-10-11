@@ -1,0 +1,178 @@
+import { readRelatedPresentation, RelatedPresentation } from 'feature_pin';
+import { PinmonyPinStore } from 'feature_pin';
+import { PinmonyDetailTrace, PinmonyDetailReadCache } from 'feature_pin';
+import { PinmonyHomeStore } from 'feature_home';
+import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED } from 'common_network';
+import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
+import { PinmonyAuthStatus } from 'common_session';
+import { allowsSpeculativeReads } from 'common_foundation';
+import { PinmonyDetailSnapshot } from 'feature_pin';
+import { PIN_DETAIL_API_ENABLED } from 'feature_pin';
+import { PinmonyHomePin, PinmonyHomeSnapshot } from 'feature_home';
+interface PinmonyDetailReadData { options: PinmonyDetailReadOptions; }
+interface PinmonyDetailReadOptions { id: string; field_set_key: string; }
+export interface PinmonyDetailOpeningCoordinatorPorts {
+  activeSheetKind: () => string;
+  activeTab: () => number;
+  authStatus: () => PinmonyAuthStatus;
+  coordinatorTasks: () => PinmonyTaskRegistry;
+  currentHomePageKey: () => string;
+  detailJourney: () => PinmonyDetailTrace;
+  detailOpenedAt: () => number;
+  detailPrefetchTimer: () => number;
+  setDetailPrefetchTimer: (value: number) => number;
+  detailReadCache: () => PinmonyDetailReadCache;
+  detailReadNetwork: () => PinmonyNativeNetwork;
+  detailRequestOwners: () => Map<string, number>;
+  homeStore: () => PinmonyHomeStore;
+  nativeBackTarget: () => string;
+  nativeNetworkContext: () => PinmonyNetworkContext;
+  openingRelated: () => Promise<PinmonyNetworkReply> | undefined;
+  setOpeningRelated: (value: Promise<PinmonyNetworkReply> | undefined) => Promise<PinmonyNetworkReply> | undefined;
+  openingRelatedToken: () => number;
+  setOpeningRelatedToken: (value: number) => number;
+  pageTasks: () => PinmonyTaskRegistry;
+  pinIdentity: (value: string) => string;
+  pinStore: () => PinmonyPinStore;
+}
+export class PinmonyDetailOpeningCoordinator {
+  private readonly homeStore: PinmonyHomeStore;
+  private readonly pinStore: PinmonyPinStore;
+  private readonly ports: PinmonyDetailOpeningCoordinatorPorts;
+  constructor(ports: PinmonyDetailOpeningCoordinatorPorts) { this.ports = ports; this.homeStore = ports.homeStore(); this.pinStore = ports.pinStore(); }
+startOpeningDetailRead(pinUrl: string, token: number): void {
+    this.ports.setOpeningRelated(undefined);
+    this.ports.setOpeningRelatedToken(token);
+    this.ports.detailJourney().mark('base.request.or.takeover');
+    const captured: PinmonyNetworkContext = this.ports.nativeNetworkContext();
+    const current = (): boolean => this.ports.authStatus() === 'authenticated' && this.pinStore.videoForeground &&
+        token === this.pinStore.detailOpeningToken && this.pinStore.detailOpeningPin === pinUrl && !this.ports.nativeBackTarget();
+    this.ports.coordinatorTasks().timeout(() => {
+        if (current() && !this.pinStore.detailActionsReady)
+            this.pinStore.detailApiError = '帖子加载超时，请重试';
+    }, 12000);
+    this.pinStore.detailPrefetch.open(pinUrl, async (url: string, id: string, ownerCurrent: () => boolean): Promise<string> => {
+        this.ports.detailRequestOwners().set(id, this.ports.detailJourney().current());
+        const job: PinmonyNetworkJob = { id: id, epoch: captured.epoch, page: captured.page, url: url,
+            method: 'GET', body: '', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
+                'X-Pinterest-Pws-Handler': 'www/pin/[id].js' } };
+        const reply: PinmonyNetworkReply = await this.ports.detailReadNetwork().requestPinRead(job, (): PinmonyNetworkContext => this.ports.nativeNetworkContext(), pinUrl, ownerCurrent);
+        this.ports.detailRequestOwners().delete(id);
+        if (!ownerCurrent() || reply.error || reply.status !== 200) {
+            const failure: Error = new Error('detail-unavailable');
+            if (reply.error === 'cancelled' || reply.error === 'stale' || !ownerCurrent()) failure.name = 'AbortError';
+            throw failure;
+        }
+        return reply.body;
+    }, current, (id: string) => this.ports.detailReadNetwork().cancel(id)).then(() => {
+        if (!current() || this.pinStore.detailActionsReady)
+            return;
+        const detail: PinmonyDetailSnapshot | undefined = this.pinStore.detailPrefetch.get(pinUrl);
+        if (detail && this.pinStore.detail?.kind !== 'cached') {
+            this.pinStore.detailPin = pinUrl;
+            this.pinStore.detail = this.pinStore.confirmedSaves.apply(this.ports.pinIdentity(pinUrl), detail);
+        }
+        this.pinStore.detailApiError = '';
+        this.ports.detailJourney().mark('base.validated');
+        const context: PinmonyNetworkContext = this.ports.nativeNetworkContext();
+        const id: string = this.ports.pinIdentity(pinUrl);
+        const options: string = JSON.stringify({ pin_id: id, page_size: 12, context_pin_ids: [],
+            homefeed_source_sig: false, search_query: '', source: 'feed_home', top_level_source: 'feed_home',
+            top_level_source_depth: 1, is_pdp: false, additional_fields: ['pin.gen_ai_topics'] });
+        const url: string = context.page.slice(0, context.page.indexOf('/', 8)) + '/resource/RelatedModulesResource/get/?source_url=' +
+            encodeURIComponent('/pin/' + id + '/') + '&data=' + encodeURIComponent('{"options":' + options + ',"context":{}}');
+        const job: PinmonyNetworkJob = { id: 'opening_related_' + token.toString(), epoch: context.epoch,
+            page: context.page, url: url, method: 'GET', body: '', headers: { 'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/pin/[id].js' } };
+        this.ports.detailJourney().mark('related.opening.request');
+        const retainedRelated: PinmonyNetworkReply | undefined = this.ports.detailReadCache().retained(job);
+        this.ports.setOpeningRelated(retainedRelated ? Promise.resolve(retainedRelated) : this.ports.detailReadNetwork().requestPinRead(job, (): PinmonyNetworkContext => this.ports.nativeNetworkContext(), pinUrl, (): boolean => this.ports.authStatus() === 'authenticated' && this.pinStore.videoForeground &&
+            token === this.pinStore.detailOpeningToken && !this.ports.nativeBackTarget() &&
+            this.ports.pinIdentity(this.pinStore.detailPin) === id).then((reply: PinmonyNetworkReply): PinmonyNetworkReply => {
+            if (token !== this.pinStore.detailOpeningToken || this.ports.authStatus() !== 'authenticated' || this.ports.nativeBackTarget() ||
+                this.pinStore.detailPresentationOnly || this.pinStore.detailActionsReady || this.pinStore.detailPin !== pinUrl || reply.error || reply.status !== 200)
+                return reply;
+            const related: RelatedPresentation | undefined = readRelatedPresentation(reply.body, pinUrl);
+            const base: PinmonyDetailSnapshot | undefined = this.pinStore.detail;
+            if (related && base) {
+                this.pinStore.detailCache.put(id, base, this.pinStore.detailScrollOffset);
+                const presentation: PinmonyDetailSnapshot | undefined = this.pinStore.detailCache.get(id)?.detail;
+                if (presentation) {
+                    presentation.related = related.pins;
+                    presentation.relatedEnded = related.ended;
+                    presentation.relatedLoading = false;
+                    presentation.relatedRetained = true;
+                    this.pinStore.detail = presentation;
+                    this.ports.detailJourney().mark('related.native.presentation');
+                }
+            }
+            return reply;
+        }));
+        PinmonyRuntimeLog.info('DetailTrace: base ready openId=' + token.toString() + ' elapsedMs=' + (Date.now() - this.ports.detailOpenedAt()).toString());
+    }).catch((error: Error) => {
+        if (error.name === 'AbortError') {
+            if (current()) this.ports.detailJourney().mark('base.cancelled.await-document');
+            return;
+        }
+        if (current())
+            this.ports.detailJourney().mark('base.failed');
+        if (current())
+            this.pinStore.detailApiError = '帖子加载失败，请重试';
+    });
+}
+
+prefetchHomePinDetails(first: number, last: number): void {
+    if (!allowsSpeculativeReads())
+        return;
+    // Prefetch remains gated by !this.pinStore.detailOpeningPin; an opening detail has priority.
+    if (this.pinStore.detailOpeningPin)
+        return;
+    if (this.ports.detailPrefetchTimer() !== -1)
+        return;
+    this.ports.setDetailPrefetchTimer(this.ports.pageTasks().timeout(() => {
+        this.ports.setDetailPrefetchTimer(-1);
+        this.prefetchHomePinDetailsNow(first, last);
+    }, 700));
+}
+
+prefetchHomePinDetailsNow(first: number, last: number): void {
+    if (!allowsSpeculativeReads())
+        return;
+    const home: PinmonyHomeSnapshot | undefined = this.homeStore.home;
+    const captured: PinmonyNetworkContext = this.ports.nativeNetworkContext();
+    if (!PIN_DETAIL_API_ENABLED || !PIN_NATIVE_NETWORK_ENABLED || !home || !captured.authenticated ||
+        this.ports.activeTab() !== 0 || !this.pinStore.videoForeground || this.ports.activeSheetKind() || this.pinStore.detail || this.pinStore.detailOpeningPin ||
+        !this.homeStore.homeActionsReady || this.homeStore.homeLoading || this.homeStore.homeRefreshing ||
+        this.homeStore.pendingHomeTab || home.pageKey !== this.ports.currentHomePageKey())
+        return;
+    const session: number = home.session;
+    const tab: string = home.selectedTab;
+    const current = (): boolean => {
+        const now: PinmonyNetworkContext = this.ports.nativeNetworkContext();
+        return now.authenticated && now.epoch === captured.epoch && now.page === captured.page &&
+            this.ports.activeTab() === 0 && this.pinStore.videoForeground && !this.ports.activeSheetKind() && !this.pinStore.detail && !this.pinStore.detailOpeningPin &&
+            this.homeStore.homeActionsReady && !this.homeStore.homeLoading && !this.homeStore.homeRefreshing &&
+            !this.homeStore.pendingHomeTab && this.homeStore.home?.session === session && this.homeStore.home?.selectedTab === tab;
+    };
+    const urls: string[] = home.pins.slice(Math.max(0, first), Math.min(home.pins.length, first + 6, last + 1))
+        .map((pin: PinmonyHomePin): string => pin.pinUrl);
+    this.pinStore.detailPrefetch.onReady = (_detail: PinmonyDetailSnapshot) => {
+        if (!current())
+            return;
+        this.pinStore.prefetchedImageUrls = urls.map((url: string): string => this.pinStore.detailPrefetch.get(url)?.imageUrl || '').filter((url: string): boolean => !!url);
+    };
+    this.pinStore.prefetchedImageUrls = urls.map((url: string): string => this.pinStore.detailPrefetch.get(url)?.imageUrl || '').filter((url: string): boolean => !!url);
+    this.pinStore.detailPrefetch.offer(urls, captured.epoch.toString() + ':' + captured.page + ':' + session.toString() + ':' + tab, async (url: string, id: string, ownerCurrent: () => boolean): Promise<string> => {
+        if (!ownerCurrent())
+            throw new Error('stale-prefetch');
+        const job: PinmonyNetworkJob = { id: id, epoch: captured.epoch, page: captured.page, url: url,
+            method: 'GET', body: '', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
+                'X-Pinterest-Pws-Handler': 'www/pin/[id].js' } };
+        const pinId: string = (JSON.parse(decodeURIComponent(url.match(/[?&]data=([^&]+)/)![1])) as PinmonyDetailReadData).options.id;
+        const reply: PinmonyNetworkReply = await this.ports.detailReadNetwork().requestPinRead(job, (): PinmonyNetworkContext => this.ports.nativeNetworkContext(), captured.page.slice(0, captured.page.indexOf('/', 8)) + '/pin/' + pinId + '/', ownerCurrent);
+        if (!ownerCurrent() || reply.error || reply.status !== 200)
+            throw new Error('prefetch-unavailable');
+        return reply.body;
+    }, current, (id: string) => this.ports.detailReadNetwork().cancel(id));
+}
+}

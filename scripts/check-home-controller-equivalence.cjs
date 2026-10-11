@@ -6,7 +6,7 @@ const runtime=createHomeRuntime(ts,globals), root='https://www.pinterest.com/';
 const before=fs.readFileSync('diagnostics/home-controller-refactor-20261009/before/entry/src/main/ets/pages/Index.ets','utf8').replaceAll('PinWeb','Pinmony'); // Normalize only the historical product name; keep the protected snapshot unchanged.
 function method(name){const start=before.search(new RegExp('  private (?:async )?'+name+'\\('));assert(start>=0,name);return before.slice(start,before.indexOf('\n  }',start)+4);}
 const retainHomePins=runtime.loader.loadFile('feature_home/src/main/ets/services/PinmonyHomeRetention.ets').retainHomePins;
-const Legacy=vm.runInNewContext(ts.transpileModule('class Legacy {'+['prepareHomeForPageBegin','clearHome','expectHome','updateHome','selectHomeTab','loadMoreHome','refreshHome','normalizeHomeBoard'].map(method).join('\n')+'} Legacy;',
+const Legacy=require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Legacy {'+['prepareHomeForPageBegin','clearHome','expectHome','updateHome','selectHomeTab','loadMoreHome','refreshHome','normalizeHomeBoard'].map(method).join('\n')+'} Legacy;',
  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{...globals,Date,PIN_HOME_API_ENABLED:true,retainHomePins});
 const pin=id=>({id,pinUrl:root+'pin/'+id+'/',imageUrl:'https://i.pinimg.com/'+id+'.jpg',imageWidth:200,imageHeight:300,title:'title-'+id,hasMore:true});
 const tabs=[{id:'all',label:'所有',selected:true,enabled:true},{id:'board',label:'Board',selected:false,enabled:true}];

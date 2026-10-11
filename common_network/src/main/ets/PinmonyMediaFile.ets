@@ -7,6 +7,7 @@ import { NetworkManager, Priority } from './PinmonyNativeNetwork';
 const MAX_MEDIA_BYTES: number = 32 * 1024 * 1024;
 let nextMediaFile: number = 0;
 let sweptMediaFiles: boolean = false;
+const MEDIA_RECOVERY_BUDGET_MS: number = 12000;
 
 function mediaHeader(response: rcp.Response, name: string): string | undefined {
   const keys: string[] = Object.keys(response.headers).filter((key: string): boolean => key.toLowerCase() === name);
@@ -79,12 +80,12 @@ export class PinmonyMediaFile {
         this.abort = () => { failure = failure || 'cancelled'; cancelTransfer(); reject(new Error('media-cancelled')); };
         deadline = setTimeout(() => {
           failure = 'timeout'; cancelTransfer(); reject(new Error('media-timeout'));
-        }, 20000);
+        }, MEDIA_RECOVERY_BUDGET_MS);
       });
       let completed: rcp.Response | undefined;
       for (let attempt: number = 0; attempt < 2; attempt++) {
         if (!current() || failure) throw new Error('media-cancelled');
-        const remaining: number = 20000 - (Date.now() - started);
+        const remaining: number = MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started);
         if (remaining <= 0) { failure = 'timeout'; throw new Error('media-timeout'); }
         activeAttempt = attempt; status = 0;
         const profile: string = attempt === 0 ? 'system' : 'tls12';
@@ -93,7 +94,7 @@ export class PinmonyMediaFile {
           Accept: 'video/mp4, application/octet-stream', 'Accept-Encoding': 'identity' });
         activeSession = session; activeRequest = request;
         request.configuration = { proxy: 'system', transfer: { autoRedirect: false,
-          timeout: { connectMs: Math.min(10000, remaining), transferMs: remaining } },
+          timeout: { connectMs: Math.min(5000, remaining), transferMs: remaining } },
           tracing: { collectTimeInfo: true, httpEventsHandler: {
             onStatusCodeReceive: (value: number) => { if (activeAttempt === attempt && current()) status = value; },
             onTimeInfo: (value: rcp.TimeInfo) => {
@@ -117,9 +118,9 @@ export class PinmonyMediaFile {
         try {
           const transfer: Promise<rcp.Response> = NetworkManager.enqueue(Priority.NORMAL, async (): Promise<rcp.Response> => {
             if (!current() || failure || activeAttempt !== attempt) throw new Error('media-cancelled');
-            const budget: number = 20000 - (Date.now() - started);
+            const budget: number = MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started);
             if (budget <= 0) { failure = 'timeout'; throw new Error('media-timeout'); }
-            request.configuration!.transfer!.timeout = { connectMs: Math.min(10000, budget), transferMs: budget };
+            request.configuration!.transfer!.timeout = { connectMs: Math.min(5000, budget), transferMs: budget };
             return session.fetch(request);
           });
           completed = await Promise.race([transfer, cancelled]);
@@ -128,7 +129,7 @@ export class PinmonyMediaFile {
           const code: number = Number.isFinite((error as BusinessError).code) ? (error as BusinessError).code : 0;
           this.trace('event=connection-failed host=' + host + ' profile=' + profile + ' status=' + status.toString() +
             ' code=' + code.toString() + ' bytes=' + bytes.toString());
-          if (attempt !== 0 || code !== 1007900035 || status !== 0 || bytes !== 0 || !current() || failure) throw error as Error;
+          if (Date.now() - started >= 6000 || attempt !== 0 || code !== 1007900035 || status !== 0 || bytes !== 0 || !current() || failure) throw error as Error;
           this.trace('event=tls-compatibility reason=ssl-connect next=tls12');
         } finally {
           // Reject callbacks from a closed attempt before allowing another profile to write the file.

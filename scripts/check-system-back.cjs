@@ -6,7 +6,7 @@ const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const start = source.indexOf('  onBackPress(): boolean');
 const end = source.indexOf('\n  @Builder', start);
 const sandbox = { Date, PinmonyRuntimeLog: { info() {} } };
-vm.runInNewContext(ts.transpileModule('class Page {' + source.slice(start, end) +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Page {' + source.slice(start, end) +
   '} globalThis.Page = Page;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, sandbox);
 function page() {
   return Object.assign(new sandbox.Page(), {

@@ -22,13 +22,13 @@ const names = ['rootPresentationAddress', 'selectNativeRootTab', 'rootReadInFlig
   'updateDetail', 'updateBoard', 'syncNativeReturnRoute', 'recordPageNavigation',
   'protectedDetailAddress', 'ignoreSupersededDetailDocument'];
 const setup = ['onNavigation', 'onPageNavigation'].map(bridge).join('\n');
-const beginStart = source.indexOf('.onPageBegin((event) => {');
+const beginStart = source.indexOf('.onPageBegin(');
 const beginEnd = source.indexOf('\n            .onPageEnd(', beginStart);
 const begin = source.slice(beginStart, beginEnd).replace(/^\.onPageBegin\(/, 'this.pageBegin = ').replace(/\)\s*$/, ';');
 const context = { PINTEREST_URL: 'https://www.pinterest.com/', isPinterestAuthRoute: url => /\/login\//.test(url),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 const code = 'class Native {' + names.map(method).join('\n') + '\nsetup() {' + setup + begin + '} } globalThis.Native = Native;';
-vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const home = context.PINTEREST_URL, pin = home + 'pin/123/', profile = home + 'sample/';
 function harness() {
   const native = new context.Native(), requests = [], indices = [], confirmations = [];
@@ -61,11 +61,13 @@ function harness() {
     controller: { getUrl: () => document, loadUrl: url => requests.push(['load', url]),
       runJavaScript: code => { requests.push(['js', code]); return Promise.resolve('true'); },
       backOrForward: delta => requests.push(['history', delta]) } });
-  require('./board-state-controller-harness.cjs').bind(native, ts, context); native.postPanelsController = { pause() {}, resume() {} }; native.boardInvitationController = { pause() {}, resume() {}, reset() {}, clearPreview() {} }; native.publishController = { pause() {}, resume() {} }; native.returnCoordinator = { cancel() {} }; native.boardCollaboratorsController = { pause() {} };
+  require('./board-state-controller-harness.cjs').bind(native, ts, context); native.profileActionsController = { pause() {}, resume() {}, reset() {} }; native.profileReadController = { pause() {}, resume() {} }; native.postPanelsController = { pause() {}, resume() {} }; native.boardInvitationController = { pause() {}, resume() {}, reset() {}, clearPreview() {} }; native.publishController = { pause() {}, resume() {} }; native.returnCoordinator = { cancel() {}, navigationBegun() {} }; native.boardCollaboratorsController = { pause() {} };
   native.pinStore.detailPrefetch = { pause() {} };
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
   require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
+  require('./controller-lifecycle-harness.cjs').bind(native, ts);
+  require('./pin-priority-controller-harness.cjs').bind(native, ts, context);
   native.setup();
   return { native, requests, indices, confirmations, visit: url => { document = url; } };
 }
@@ -117,7 +119,7 @@ foreign.native.selectNativeRootTab(3);
 assert.equal(foreign.native.profileStore.profile, undefined, 'My never displays a retained foreign profile when its own cache is absent');
 assert.equal(foreign.native.nativeDisplayAddress(), profile);
 assert.deepEqual(foreign.requests, []);
-assert(!/runJavaScript|loadUrl|backOrForward|expectHome|expectSearch|expectInbox|expectProfile|waitForWebTabConfirmation/.test(method('selectNativeRootTab')));
+assert(!/runJavaScript|loadUrl|backOrForward|expectHome|expectSearch|expectInbox|expectProfile|waitForWebTabConfirmation/.test(fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8').split('selectNativeRootTab(index: number): void {')[1].split('presentNativeBackTarget(target: string): void {')[0]));
 assert.match(source, /\.animationDuration\(0\)/);
 const search = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
 assert.match(search, /if \(!this\.automaticLoadingEnabled\) return/);
@@ -129,10 +131,10 @@ for (const component of [search, profileSource]) {
     let reads = 0;
     const host = { automaticLoadingEnabled: false, actionsReady: true, loading: false,
       snapshot: { discoveryApi: true }, onLoadMore() { reads++; } };
-    vm.runInNewContext('(function () { const callback = ' + match[1] + '; callback(); }).call(host)', { host });
+    require('./product-coordination-harness.cjs').run(ts,'(function () { const callback = ' + match[1] + '; callback(); }).call(host)', { host });
     assert.equal(reads, 0, 'activation/reach-end cannot issue pagination after a pure tab switch');
     host.automaticLoadingEnabled = true;
-    vm.runInNewContext('(function () { const callback = ' + match[1] + '; callback(); }).call(host)', { host });
+    require('./product-coordination-harness.cjs').run(ts,'(function () { const callback = ' + match[1] + '; callback(); }).call(host)', { host });
     assert.equal(reads, 1, 'page scrolling can resume pagination after interaction');
   }
 }

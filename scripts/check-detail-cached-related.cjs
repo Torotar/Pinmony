@@ -11,7 +11,7 @@ function method(name) {
 const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true,
   PINTEREST_URL: 'https://www.pinterest.com/', setTimeout() {},
   PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${method('async openImageRelated')}
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}
@@ -44,6 +44,11 @@ async function main() {
       assert.equal(n.pinStore.detailActionsReady, false, 'route does not authorize target writes');
       loads.push(url);
     } } });
+  const {createArktsLoader}=require('./arkts-module-loader.cjs');
+  const {PinmonyDetailReadCache}=createArktsLoader(ts).loadFile('feature_pin/src/main/ets/services/PinmonyDetailReadCache.ets');
+  n.detailReadCache=new PinmonyDetailReadCache({ detailPin:()=>n.pinStore.detailPin, currentPin:()=>parent,
+    pinIdentity:n.pinIdentity,isAuthenticated:()=>n.authStatus==='authenticated',hasNativeBackTarget:()=>false,markJourney(){} });
+  require('./medium-priority-controller-harness.cjs').bindWork(n, ts, context);
   restoreParent(); await n.openImageRelated(card.id);
   assert.deepEqual(loads, [target]); assert.deepEqual(reads, [target]);
   assert.deepEqual(origins, [['102', parent]], 'back retains the native parent route');

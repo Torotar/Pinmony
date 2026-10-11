@@ -3,6 +3,7 @@ import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } fro
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyAiTopic, PinmonyRecentActivity } from '../models/PinmonyAccountSettings';
+import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyPreferencesPage {
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
@@ -64,7 +65,8 @@ export struct PinmonyPreferencesPage {
       context.getApplicationContext().setColorMode(value === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : value === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     } catch (_) {
       this.themePreference = previous;
-      this.getUIContext().getPromptAction().showToast({ message: '主题切换失败，请重试', duration: 3000 });
+      try { this.getUIContext().getPromptAction().showToast({ message: '主题切换失败，请重试', duration: 3000 }); }
+      catch (_) { PinmonyRuntimeLog.warn('Settings: theme failure feedback unavailable'); }
     }
   }
   private options(): HdsNavigationTitleBarOptions {

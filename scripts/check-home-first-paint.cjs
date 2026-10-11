@@ -11,12 +11,7 @@ assert.match(page, /const firstApiSnapshot: boolean = this\.home\.dataSource ===
   'home identifies the first non-empty API snapshot');
 assert.match(page, /if \(firstApiSnapshot\) this\.prefetchNotBefore = Date\.now\(\) \+ 900;/,
   'home delays pagination after the first card snapshot');
-assert.match(page, /if \(this\.chromeScrollDistance >= 6\)/,
-  'home chrome collapses after a short same-direction scroll');
-assert.match(page, /this\.homeChromeCollapsed && direction < 0 \? 18 : 6/,
-  'home chrome uses hysteresis before expanding on a slow reverse scroll');
-assert.match(page, /if \(direction !== this\.chromeScrollDirection\)[\s\S]*?this\.chromeScrollDistance = 0;/,
-  'reversing scroll direction resets the collapse distance');
+assert.match(page, /this\.homeChromeCollapsed = false;/, 'home chrome remains expanded under the current product contract');
 function method(source, name) {
   const start = source.search(new RegExp('  private (?:async )?' + name + '\\('));
   assert(start >= 0, name);
@@ -34,7 +29,7 @@ const root = 'https://www.pinterest.com/';
 const timers = [];
 const context = { PINTEREST_URL: root, PinmonyRuntimeLog: { info() {}, warn() {} },
   setTimeout: callback => { timers.push(callback); return timers.length; } };
-vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 
 const saved = { kind: 'state', session: 9, pageKey: root, selectedTab: '所有',
   tabs: [{ id: 'tab:all', label: '所有', selected: true }], pins: [{ id: '123' }] };
@@ -55,7 +50,7 @@ Object.assign(native, { homeStore: home, authStatus: 'authenticated', activeTab:
   profileStore: { origins: [], profileCache: { clear() {} } },
   inboxStore: { inboxCache: { clear() {} } }, searchStore: { searchCache: { clear() {} } },
   rootTabAddresses: new Map([[0, root]]), nativeDisplayAddress: () => address,
-  clearSearch() {}, clearProfile() {}, clearInbox() {} });
+  controllerLifecycle: () => ({pause(){}}),boardInvitationController:{reset(){}},cancelledBoardPins:new Set(),detailReadCache:{clear(){}},clearRootTabGuard(){},clearOfflineHomeMarker(){}, clearSearch() {}, clearProfile() {}, clearInbox() {} });
 assert.equal(native.homePresentationPageKey(), root, 'pending home tab is presented while Web still shows inbox');
 native.rootTabAddresses.set(0, 'https://other.example/');
 assert.equal(native.homePresentationPageKey(), '', 'untrusted retained routes cannot expose a cached page');
@@ -70,6 +65,7 @@ native.activeTab = 1;
 assert.equal(native.homePresentationPageKey(), '', 'quick tab switches do not leave home visible');
 native.activeTab = 0; native.pendingWebTab = -1; native.currentWebTab = 0; address = root + 'login/';
 assert.equal(native.homePresentationPageKey(), root, 'confirmed login can present a native shell before home document starts');
+require('./home-controller-harness.cjs').createHomeRuntime(ts,context).bindIndex(native);
 native.clearRootTabCaches();
 assert.equal(home.homeForPresentation(root), undefined, 'session reset removes cache from presentation');
 native.prepareHomeForPageBegin(root);

@@ -12,6 +12,7 @@ const profile = fs.readFileSync('feature_profile/src/main/ets/services/PinmonyPr
 const detail = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailCache.ets', 'utf8');
 const homeController = fs.readFileSync('feature_home/src/main/ets/controllers/PinmonyHomeController.ets', 'utf8');
 const indexActions = index + homeController + fs.readFileSync('entry/src/main/ets/app/PinmonySystemActions.ets', 'utf8');
+const failureRecovery = fs.readFileSync('entry/src/main/ets/app/PinmonyFailureRecoveryCoordinator.ets', 'utf8');
 
 assert.match(disk, /temporaryPath: string = path \+ '\.tmp'/);
 assert.match(disk, /fs\.renameSync\(temporaryPath, path\)/);
@@ -25,7 +26,7 @@ assert.match(api, /CacheAudit: disk write committed elapsedMs=/);
 assert.match(keys, /Object\.keys\(record\)\.sort\(\)/);
 assert.match(keys, /return accountId \+ '_' \+ resourceType \+ '_'/);
 assert.match(lru, /this\.entries\.delete\(key\);\s+this\.entries\.set\(key, entry\)/);
-assert.match(index, /this\.tryRestoreAuthenticatedHome\(accountId, authenticatedHomePage/);
+assert.match(fs.readFileSync('entry/src/main/ets/app/PinmonySessionCoordinator.ets','utf8'), /this\.ports\.tryRestoreAuthenticatedHome\(accountId, authenticatedHomePage/);
 assert.match(index, /this\.restoreHomeDiskCache\(accountId, pageKey, 'authenticated-identity'\)/);
 assert.match(homeController, /this\.homeStore\.homeActionsReady = !message\.refreshing/);
 assert.match(homeController, /this\.ports\.persistSnapshot\(committedHome\)/);
@@ -36,7 +37,7 @@ assert.match(inbox, /if \(snapshot\.kind !== 'state'.*return;/s);
 assert.match(profile, /if \(snapshot\.kind !== 'state'.*return;/s);
 assert.match(detail, /enabled: false/);
 assert.match(indexActions, /HomeRefresh: requested source=/);
-assert.match(indexActions, /HomeRefresh: failed reason=main-frame-error snapshotRetained=/);
+assert.match(failureRecovery, /HomeRefresh: failed reason=main-frame-error snapshotRetained=/);
 assert.match(indexActions, /ActionGate: home refresh blocked reason=/);
 assert.match(indexActions, /PhotoDownload: requested/);
 assert.match(indexActions, /PhotoDownload: completed/);

@@ -12,7 +12,7 @@ function moduleFrom(file, requireFn = () => ({})) {
 const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets');
 const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinmonyNativeNetwork.ets');
 const { useNativeTransport } = moduleFrom('common_network/src/main/ets/PinmonyNetworkScript.ets');
-const page = 'https://www.pinterest.com/synthetic/';
+const page = 'https://' + (process.env.PINMONY_TEST_REGION === 'uk' ? 'uk' : 'www') + '.pinterest.com/synthetic/';
 function harness() {
   const account = { id: '123', username: 'synthetic', email: 'synthetic@example.invalid', has_confirmed_email: true,
     birthdate: '2000-01-01', gender: 'male', custom_gender: '', country: 'US' };
@@ -43,6 +43,20 @@ async function main() {
   const h = harness();
   await h.api.start(page, 1, 'read', '');
   assert.equal(h.api.read().birthdate, '2000-01-01');
+  const timestamp = harness(); timestamp.account.birthdate = null;
+  timestamp.account.birthday = Date.UTC(2000, 0, 2) / 1000;
+  await timestamp.api.start(page, 1, 'read', '');
+  assert.equal(timestamp.api.read().birthdate, '2000-01-02');
+  timestamp.account.birthday = Date.UTC(2099, 0, 1) / 1000;
+  await timestamp.api.start(page, 2, 'read', '');
+  assert.equal(timestamp.api.read().birthdate, '', 'future birthday is hidden');
+  assert(timestamp.calls.some(url => url.includes('ApiResource/get/')), 'missing valid birthday reads the settings API');
+  for (const [input, expected] of [['2000/1/2', '2000-01-02'], ['2000-01-02T00:00:00Z', '2000-01-02'], ['2000-02-30', ''], [null, '']]) {
+    h.account.birthdate = input;
+    await h.api.start(page, 1, 'read', '');
+    assert.equal(h.api.read().birthdate, expected);
+  }
+  h.account.birthdate = '2000-01-01';
   await h.api.start(page, 2, 'birthdate', '2001-02-03');
   assert.equal(h.api.read().saved, true); assert.equal(h.writes[0].birthdate, '2001-02-03');
   assert.equal(h.writes[0].user_id, undefined);
@@ -68,13 +82,14 @@ async function main() {
   late.api.close(); resolve({ ok: true, json: async () => ({ resource_response: { status: 'success', code: 0, data: late.account } }) });
   await pending; assert.equal(late.api.read(), null); assert.equal(late.writes.length, 0);
   const state = { authenticated: true, epoch: 1, page, userAgent: 'synthetic' };
-  const job = { id: 'test', epoch: 1, page, url: 'https://www.pinterest.com/resource/UserSettingsResource/update/', method: 'POST', headers: {}, body: '' };
+  const origin = new URL(page).origin;
+  const job = { id: 'test', epoch: 1, page, url: origin + '/resource/UserSettingsResource/update/', method: 'POST', headers: {}, body: '' };
   function accepts(options) { return acceptsNetworkJob({ ...job, body: 'data=' + encodeURIComponent(JSON.stringify({ options, context: {} })) }, state); }
   assert(accepts({ surface_tag: 'settings', user_id: '123', gender: 'male' }));
   assert(!accepts({ surface_tag: 'settings', user_id: '123', password: 'synthetic' }));
   assert(!accepts({ surface_tag: 'settings', user_id: '123', gender: 'male', country: 'US' }));
   assert(!accepts({ surface_tag: 'settings', user_id: '123', custom_gender: 'x'.repeat(501) }));
-  assert(acceptsNetworkJob({ ...job, method: 'GET', url: 'https://www.pinterest.com/resource/CountriesResource/get/' }, state));
+  assert(acceptsNetworkJob({ ...job, method: 'GET', url: origin + '/resource/CountriesResource/get/' }, state));
   assert.match(useNativeTransport(PIN_ACCOUNT_SETTINGS_SCRIPT), /window.PinmonyNetwork.fetch\(/);
   console.log('Account settings: mapping, validated writes, invalid dates, identity, countries, no replay, cancellation and native allowlist passed');
 }

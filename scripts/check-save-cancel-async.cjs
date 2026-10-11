@@ -21,8 +21,8 @@ function harness(encoded = false) {
   const api = { reset() {}, currentPin: value => value === location.href, sessionUserId: () => account,
     resourceRequest: (p, name, verb, options, valid) => new Promise((resolve, reject) => requests.push({ p, name, verb, options, valid, resolve, reject })) };
   const window = { PinmonyPostApi: api, PinmonyPostExtensionsEnabled: true };
-  vm.runInNewContext(PIN_POST_EXTENSIONS_SCRIPT, { window, location, console: { info() {} } });
-  const Native = vm.runInNewContext(code, { PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
+  require('./product-coordination-harness.cjs').run(ts,PIN_POST_EXTENSIONS_SCRIPT, { window, location, console: { info() {} } });
+  const Native = require('./product-coordination-harness.cjs').run(ts,code, { PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
     PinmonyRuntimeLog: { info() {} }, Date: { now: () => now }, setTimeout: (fn, ms) => timers.push({ fn, ms }) });
   const native = new Native();
   const saves = new PinmonyConfirmedSaves(); saves.confirm('101', true, '802');
@@ -38,7 +38,7 @@ function harness(encoded = false) {
     showMessage: value => notices.push(value), showUndoSnack: value => notices.push(value),
     controller: { runJavaScript: async script => {
       calls.push(script);
-      const result = vm.runInNewContext(script, { window, JSON });
+      const result = require('./product-coordination-harness.cjs').run(ts,script, { window, JSON });
       // Model an ArkWeb bridge that does not await the Promise returned by page JavaScript.
       const text = result && typeof result.then === 'function' ? '{}' : String(result);
       return encoded ? JSON.stringify(text) : text;
@@ -47,6 +47,9 @@ function harness(encoded = false) {
   async function tick() { const timer = timers.shift(); if (timer) { now += timer.ms; timer.fn(); } await flush(); }
   async function finish(pending) { await flush(); for (let i = 0; i < 8 && timers.length; i++) await tick(); await pending; }
   const click = () => native.performDetailAction('api-save', 'save');
+  require('./pin-priority-controller-harness.cjs').bind(native, ts, {
+    Date: { now: () => now }, setTimeout: (fn, ms) => timers.push({ fn, ms })
+  });
   return { native, api, location, requests, traces, notices, calls, writes, cache, click, tick, finish,
     changeAccount: () => { account = '88'; } };
 }

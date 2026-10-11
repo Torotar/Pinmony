@@ -1,14 +1,14 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = readSourceFileSync('entry/src/main/ets/services/PinmonyPostApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();
-const requests = [], events = [];
+const requests = [], events = [], menuChanges = [];
 const pin = 'https://www.pinterest.com/pin/101/', page = 'https://www.pinterest.com/';
 const location = { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/', href: page };
 const window = { PinmonyPostApiEnabled: true, PinmonyPostExtensionsEnabled: true,
-  PinmonyShareBridge: { postState: value => events.push(JSON.parse(value)) } }; window.top = window;
+  PinmonyShareBridge: { homeMenuChanged: session => menuChanges.push(session), postState: value => events.push(JSON.parse(value)) } }; window.top = window;
 window.fetch = (url, options) => new Promise(resolve => requests.push({ url, options, resolve }));
 class XHR { open() {} send() {} setRequestHeader() {} addEventListener() {} }
 const context = vm.createContext({ window, document: { cookie: 'csrftoken=current',
@@ -39,14 +39,16 @@ async function main() {
   assert.equal(api.homeMenuRead(1, pin).loading, true);
   assert.equal(api.homeMenuAction(1, pin, 'home-see-more'), false);
   await reply(0, { data: { id: '101', tracking_params: 'real-context', images: { orig: { url: 'https://i.pinimg.com/original.jpg' } } } });
+  assert.equal(menuChanges.at(-1), 1, 'load completion notifies the current menu');
   const state = api.homeMenuRead(1, pin);
   assert.deepEqual(Array.from(state.options, item => item.label), ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X']);
-  assert.deepEqual(Array.from(state.actions, item => item.label), ['收藏', '下载图片', '查看更多', '查看更少']);
+  assert.deepEqual(Array.from(state.actions, item => item.label), ['收藏', '下载图片', '查看更多', '减少推荐']);
   assert.equal(state.actions[0].enabled, true);
   assert.equal(api.homeMenuAction(1, pin, 'home-download'), true);
   assert.equal(events.at(-1).value, 'https://i.pinimg.com/original.jpg');
   assert.equal(api.homeMenuAction(1, pin, 'home-see-more'), true);
   assert.equal(api.homeMenuAction(1, pin, 'home-see-more'), false, 'duplicate writes are blocked');
+  assert.equal(menuChanges.at(-1), 1, 'operation busy state notifies the current menu');
   const feedback = JSON.parse(new URLSearchParams(requests[1].options.body).get('data')).options;
   assert.equal(feedback.url, '/v3/pin/101/feedback/see_more/');
   assert.equal(feedback.data.client_tracking_params, 'real-context');
@@ -138,7 +140,7 @@ async function main() {
   const boardMenuRequest = requests.length;
   assert.equal(api.homeMenuOpen(7, pin, boardPage), true, 'board cards reuse home menu');
   await reply(boardMenuRequest, { data: { id: '101', images: { orig: { url: 'https://i.pinimg.com/board.jpg' } } } });
-  assert.deepEqual(Array.from(api.homeMenuRead(7, pin).actions, item => item.label), ['收藏', '下载图片', '查看更多', '查看更少']);
+  assert.deepEqual(Array.from(api.homeMenuRead(7, pin).actions, item => item.label), ['收藏', '下载图片', '查看更多', '减少推荐']);
   assert.equal(api.homeMenuAction(7, pin, 'home-download'), true);
   assert.equal(events.at(-1).value, 'https://i.pinimg.com/board.jpg');
   location.pathname = '/sample-user/another-board/';

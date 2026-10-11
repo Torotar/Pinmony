@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const s=readSourceFileSync('entry/src/main/ets/services/PinmonyInboxConversationScript.ets','utf8');const code=vm.runInNewContext(s.slice(s.indexOf('`'),s.lastIndexOf('`')+1));
 const requests=[],events=[];const w={PinmonyInboxConversationsEnabled:true};w.top=w;w.PinmonyShareBridge={inboxState:x=>events.push(JSON.parse(x))};

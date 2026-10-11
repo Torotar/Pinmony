@@ -12,7 +12,7 @@ export interface RelatedPresentation { pins: PinmonyRelatedPin[]; ended: boolean
 
 /** Read-only first-page presentation. Control readiness still belongs to the current bridge. */
 export function readRelatedPresentation(body: string, pinUrl: string): RelatedPresentation | undefined {
-  if (!/^https:\/\/www\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl) || body.length > 1000000) return undefined;
+  if (!/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl) || body.length > 1000000) return undefined;
   try {
     const resource: RelatedResource = (JSON.parse(body) as RelatedResponse).resource_response;
     if (!resource || resource.status !== 'success' || resource.error ||
@@ -20,7 +20,7 @@ export function readRelatedPresentation(body: string, pinUrl: string): RelatedPr
     const pins: PinmonyRelatedPin[] = [];
     for (const pin of resource.data.slice(0, 24)) {
       if (!pin || pin.type !== 'pin' || !/^\d+$/.test(String(pin.id))) continue;
-      const target: string = 'https://www.pinterest.com/pin/' + pin.id + '/';
+      const target: string = pinUrl.slice(0, pinUrl.indexOf('/', 8)) + '/pin/' + pin.id + '/';
       if (target === pinUrl || pins.some((item: PinmonyRelatedPin): boolean => item.pinUrl === target)) continue;
       const sizes: Record<string, RelatedImage> = pin.images || {};
       let selected: RelatedImage | undefined;

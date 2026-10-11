@@ -2,11 +2,14 @@ export const PIN_NAVIGATION_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || window.PinmonyRouteBridgeInstalled) return;
   window.PinmonyRouteBridgeInstalled = true;
-  var samePageDepth = 0;
+  var samePageDepth = 0, activeDocument = true;
+  window.addEventListener('pagehide', function () { activeDocument = false; });
   function notify(mode) {
-    if (window.PinmonyShareBridge && window.PinmonyShareBridge.pageNavigation) {
-      window.PinmonyShareBridge.pageNavigation(location.href, mode);
-    }
+    if (!activeDocument) return;
+    try {
+      if (window.PinmonyShareBridge && window.PinmonyShareBridge.pageNavigation)
+        window.PinmonyShareBridge.pageNavigation(location.href, mode);
+    } catch (_) { console.info('BridgeTrace: navigation unavailable'); }
   }
   ['pushState', 'replaceState'].forEach(function (name) {
     var original = history[name];
@@ -26,9 +29,10 @@ export const PIN_NAVIGATION_BRIDGE_SCRIPT: string = `
     return false;
   }
   function nativeBack() {
+    if (!activeDocument) return false;
     if (samePageDepth || hasOverlay() || !window.PinmonyShareBridge || !window.PinmonyShareBridge.pageBack) return false;
-    window.PinmonyShareBridge.pageBack();
-    return true;
+    try { window.PinmonyShareBridge.pageBack(); return true; }
+    catch (_) { console.info('BridgeTrace: back unavailable'); return false; }
   }
   var originalBack = history.back;
   history.back = function () {
@@ -43,7 +47,7 @@ export const PIN_NAVIGATION_BRIDGE_SCRIPT: string = `
     samePageDepth = Math.max(0, samePageDepth - 1);
     notify('pop');
   });
-  window.addEventListener('pageshow', function (event) { notify(event.persisted ? 'restore' : 'observe'); });
+  window.addEventListener('pageshow', function (event) { activeDocument = true; notify(event.persisted ? 'restore' : 'observe'); });
   // Bind the current auth epoch at DOM readiness instead of waiting for all page assets.
   document.addEventListener('DOMContentLoaded', function () { notify('ready'); });
   notify('observe');

@@ -14,7 +14,7 @@ const names = ['rootActionContextReady', 'ensureRootActionContext', 'updateSearc
   'openHomePin', 'prepareSearchNavigation', 'performSearchAction', 'performInboxAction'];
 const context = { setTimeout, Date, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
   PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpileModule('class Native {' + names.map(method).join('\n') +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + names.map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const roots = ['https://www.pinterest.com/', 'https://www.pinterest.com/search/',
   'https://www.pinterest.com/inbox/'];
@@ -36,17 +36,19 @@ function harness(index) {
     traceAction() {}, rejectOfflineAction: () => false, clearRootTabGuard() {},
     showMessage: message => notices.push(message), pinIdentity: url => url === pinUrl ? '123' : '',
     beginDetailOpening: (url, origin) => requests.push(['detail', url, origin]),
-    requestRootPage(i) { requests.push(['prepare', i]); native.pendingWebTab = i; native.tabRequestToken++; },
+    requestRootPage(i) { if(native.pendingWebTab===i)return; requests.push(['prepare', i]); native.pendingWebTab = i; native.tabRequestToken++; },
     controller: { getUrl: () => document, loadUrl: url => requests.push(['load', url]),
       runJavaScript: code => { requests.push(['js', code]); return Promise.resolve('true'); } } });
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
+  require('./medium-priority-controller-harness.cjs').bind(native,ts,context,['inboxActions']);
   require('./home-controller-harness.cjs').createHomeRuntime(ts, context).bindIndex(native);
   return { native, requests, notices, ready() {
     document = roots[index];
     if (index === 1) { native.searchStore.searchActionsReady = true; native.searchStore.search.session = 22; }
     if (index === 2) { native.inboxStore.inboxSectionReady = native.inboxStore.inboxActionsReady = true;
       native.inboxStore.inboxSession = native.inboxStore.inbox.session = 22; }
+    native.rootContextCoordinator?.notify();
   } };
 }
 (async () => {

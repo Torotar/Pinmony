@@ -3,13 +3,14 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+const lifecycle = fs.readFileSync('entry/src/main/ets/app/PinmonyWebLifecycleCoordinator.ets', 'utf8');
 const history = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationHistory.ets', 'utf8').replace('export class', 'class');
 const method = source.match(/  private backOnePage\([\s\S]*?(?=\r?\n  private async backFromDetail)/)[0];
 const loadMethod = source.match(/  private loadReturnTarget\([\s\S]*?(?=\r?\n  private backOnePage)/)[0];
 const timers = [];
 const context = { PINTEREST_URL: 'https://www.pinterest.com/', setTimeout: callback => timers.push(callback),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpile(history + '\nclass Native {' + loadMethod + method + '} globalThis.Native = Native; globalThis.History = PinmonyNavigationHistory;',
+require('./product-coordination-harness.cjs').run(ts,ts.transpile(history + '\nclass Native {' + loadMethod + method + '} globalThis.Native = Native; globalThis.History = PinmonyNavigationHistory;',
   { target: ts.ScriptTarget.ES2020 }), context);
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/';
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -61,13 +62,13 @@ async function main() {
   superseded.native.pageBackToken++;
   await flush();
   assert.equal(superseded.events.some(value => value.startsWith('load:')), false, 'a new navigation discards old inspection results');
-  assert.match(source, /this\.nativeBackTarget &&\s*this\.pageHistory\.key\(event\.url\) !== this\.pageHistory\.key\(this\.nativeBackTarget\)/,
+  assert.match(lifecycle, /this\.ports\.nativeBackTarget\(\) &&\s*this\.ports\.pageHistory\(\)\.key\(url\) !== this\.ports\.pageHistory\(\)\.key\(this\.ports\.nativeBackTarget\(\)\)/,
     'late page-begin callbacks cannot reopen the source');
   const nav = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationScript.ets', 'utf8').match(/`([\s\S]*)`;/)[1];
   const domListeners = {}, observed = [];
   const window = { top: null, PinmonyShareBridge: { pageNavigation: (_url, mode) => observed.push(mode) }, addEventListener() {} };
   window.top = window;
-  vm.runInNewContext(Function('return `' + nav + '`')(), { window, location: { href: home },
+  require('./product-coordination-harness.cjs').run(ts,Function('return `' + nav + '`')(), { window, location: { href: home },
     history: { pushState() {}, replaceState() {}, back() {}, go() {} },
     document: { addEventListener(name, fn) { domListeners[name] = fn; }, querySelectorAll: () => [] } });
   domListeners.DOMContentLoaded();
@@ -82,7 +83,7 @@ async function main() {
     observe() {}
     disconnect() { disconnected = true; }
   }
-  vm.runInNewContext(Function('return `' + auth + '`')(), { window: authWindow, URL,
+  require('./product-coordination-harness.cjs').run(ts,Function('return `' + auth + '`')(), { window: authWindow, URL,
     location: { href: home, origin: home.slice(0, -1), hostname: 'www.pinterest.com', pathname: '/' },
     MutationObserver: Observer, document: { getElementById: () => initial, addEventListener() {} } });
   authWindow.PinmonyAuthSync(7);
@@ -102,7 +103,7 @@ async function main() {
   }).join('\n');
   const allowsSpeculativeReads = () => true;
   const pageCtx = { allowsSpeculativeReads, setTimeout: callback => callback() };
-  vm.runInNewContext(ts.transpile('class Feed { ' + pageMethods + '} globalThis.Feed = Feed;', { target: ts.ScriptTarget.ES2020 }), pageCtx);
+  require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Feed { ' + pageMethods + '} globalThis.Feed = Feed;', { target: ts.ScriptTarget.ES2020 }), pageCtx);
   const feed = new pageCtx.Feed(), ranges = [];
   Object.assign(feed, { activeSession: 1, activePageKey: home, activeTab: 'all', visibleFirst: 10, visibleLast: 15,
     home: { session: 2, pageKey: home, selectedTab: 'all', pins: Array.from({ length: 30 }) }, feedActive: true, actionsReady: true,

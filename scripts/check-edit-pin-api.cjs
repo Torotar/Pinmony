@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const source = readSourceFileSync('entry/src/main/ets/services/PinmonyEditPinApiScript.ets', 'utf8');
 const script = Function('return `' + source.match(/= `([\s\S]*?)`;/)[1] + '`')();

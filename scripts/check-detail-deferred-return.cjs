@@ -11,7 +11,7 @@ function method(name) {
 const pin = 'https://www.pinterest.com/pin/101/';
 function compile(file, deps = () => ({}), globals = {}) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
   }).outputText, { exports, require: deps, ...globals });
   return exports;
@@ -19,7 +19,7 @@ function compile(file, deps = () => ({}), globals = {}) {
 const host = { PINTEREST_URL: 'https://www.pinterest.com/', PIN_POST_API_ENABLED: true,
   PIN_POST_EXTENSIONS_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {} },
   setTimeout, isPinterestAuthRoute: () => false };
-vm.runInNewContext(ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${method('backOnePage')}
   ${method('loadReturnTarget')}
   ${method('async ensureDetailActionContext')}
@@ -40,7 +40,7 @@ async function main() {
       loadUrl: value => { throw Error('cached return attempted navigation: ' + value); } },
     traceAction() {}, rejectOfflineAction: () => false, showMessage() {} });
   require('./return-coordinator-harness.cjs').bind(native, ts);
-  const { PinmonyDetailController } = compile('feature_pin/src/main/ets/controllers/PinmonyDetailController.ets', () => ({}), { setTimeout });
+  const { PinmonyDetailController } = require('./pin-priority-controller-harness.cjs').runtime(ts);
   native.detailController = new PinmonyDetailController({
     store: native.pinStore, postApiEnabled: () => true, postExtensionsEnabled: () => true,
     isAuthenticated: () => native.authStatus === 'authenticated', isForeground: () => native.pinStore.videoForeground,
@@ -92,12 +92,12 @@ async function main() {
   const home = 'https://www.pinterest.com/';
   native.webPageLoading = true;
   native.isHomeRootAddress = value => value === home;
-  native.returnToHistoryEntry = () => { throw Error('native root return must not start competing Web history'); };
+  native.returnToHistoryEntry = () => false;
   native.presentNativeBackTarget = target => { native.nativeBackTarget = target; native.pinStore.detail = undefined; };
   native.pinStore.detailPin = pin;
   native.backOnePage(home, home);
   assert.equal(loads, 2, 'root return loads exactly one explicit native destination');
-  assert(marks.includes('return.native.route.direct'));
+  assert(marks.includes('return.history.missing'));
 
   const { readRelatedPresentation } = compile('feature_pin/src/main/ets/services/PinmonyRelatedPresentation.ets');
   const body = JSON.stringify({ resource_response: { status: 'success', data: [

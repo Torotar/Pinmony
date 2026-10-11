@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const src=readSourceFileSync('entry/src/main/ets/services/PinmonySearchQuizApiScript.ets','utf8');
 const script=Function('return `'+src.match(/`([\s\S]*)`;/)[1]+'`')();new Function(script);

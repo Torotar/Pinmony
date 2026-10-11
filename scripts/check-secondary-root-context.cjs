@@ -15,7 +15,7 @@ const names = ['rootActionContextReady', 'ensureRootActionContext', 'prepareProf
 const context = { Date, setTimeout: (fn, ms) => ms <= 100 ? setTimeout(fn, ms) : 0,
   PinmonyRuntimeLog: { info() {}, warn() {} }, PIN_PROFILE_API_ENABLED: true, PIN_BOARD_API_ENABLED: true,
   PIN_ACCOUNT_SETTINGS_SCRIPT: '', useNativeTransport: () => '' };
-vm.runInNewContext(ts.transpileModule('class Native {' + names.map(method).join('\n') +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + names.map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const origin = 'https://www.pinterest.com/', roots = [origin, origin + 'search/', origin + 'inbox/', origin + 'sample/'];
 const pin = origin + 'pin/123/', board = roots[3] + 'board/';
@@ -24,7 +24,7 @@ function harness(index) {
   const n = new context.Native(), requests = [];
   Object.assign(n, { authStatus: 'authenticated', activeTab: index, activeSheetKind: '', tabRequestToken: 1,
     pendingWebTab: -1, showNativeSheet: false, profileSettingsVisible: true, rootTabAddresses: new Map(),
-    profileStore: { profileCache: { put() {}, clear() {} }, origins: [], profileActionsReady: false, profileSession: 1, publishRequestToken: 0,
+    profileStore: { profileCache: { put() {}, clear() {} }, origins: [], profileActionsReady: false, profileSession: 1, publishRequestToken: 0, panelToken: 0,
       profile: { session: 1, profileUrl: roots[3], section: 'created',
         createdPins: [{ id: '123', targetUrl: pin }], boards: [{ id: 'b', targetUrl: board, title: 'board', pinCount: '1' }] } },
     searchStore: { searchActionsReady: false, search: { session: 1, pageKey: roots[1] } },
@@ -50,7 +50,12 @@ function harness(index) {
     } } });
   n.searchStore = Object.assign(new searchRuntime.Store(), n.searchStore);
   searchRuntime.bindIndex(n);
+  n.inboxUrlFromAddress = value => value.startsWith(roots[2]) ? roots[2] : '';
+  n.finishRootPull=()=>{}; n.pagePerformance={count(){}}; n.markRootPerformance=()=>{};
+  require('./medium-priority-controller-harness.cjs').bind(n, ts, context);
+  require('./inbox-read-controller-harness.cjs').bind(n, ts, context);
   require('./publish-controller-harness.cjs').bind(n, ts, context);
+  require('./profile-actions-controller-harness.cjs').bind(n, ts, context);
   return { n, requests, ready() {
     document = roots[index];
     if (index === 3) { n.profileStore.profileActionsReady = true; n.profileStore.profileSession = n.profileStore.profile.session = 22; }
@@ -59,6 +64,14 @@ function harness(index) {
   } };
 }
 (async () => {
+  const sharedProfileDocument = harness(3);
+  sharedProfileDocument.ready();
+  sharedProfileDocument.n.rootPresentationAddress = () => roots[3] + '_created/';
+  assert.equal(sharedProfileDocument.n.rootActionContextReady(3), true,
+    'native created section reuses the authenticated saved profile document');
+  sharedProfileDocument.n.rootPresentationAddress = () => origin + 'another/_created/';
+  assert.equal(sharedProfileDocument.n.rootActionContextReady(3), false,
+    'a different profile cannot reuse the bound session');
   const nav = harness(3);
   assert.equal(await nav.n.performProfileAction('123'), true);
   assert.deepEqual(nav.requests, [['detail', pin, roots[3] + '_created/'], ['load', pin]]);

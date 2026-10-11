@@ -12,3 +12,5 @@ export { PinmonySearchStore } from './src/main/ets/stores/PinmonySearchStore';
 
 export { PinmonySearchController } from './src/main/ets/controllers/PinmonySearchController';
 export { PinmonySearchPorts } from './src/main/ets/models/PinmonySearchPorts';
+
+export { PinmonySearchFilterSheet } from './src/main/ets/components/PinmonySearchFilterSheet';

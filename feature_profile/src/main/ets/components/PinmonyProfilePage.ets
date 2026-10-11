@@ -526,6 +526,7 @@ export struct PinmonyProfilePage {
       Row() {
         if (this.compactHeader) {
           if (this.profile.avatarUrl) { Image(this.profile.avatarUrl).width(32).height(32).borderRadius(16)
+            .margin({ right: 10 })
             .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); }) }
           Text(this.profile.displayName || this.profile.handle).fontSize(18).fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(1)

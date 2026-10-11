@@ -67,8 +67,9 @@ export class PinmonyPostPanelsController {
   async openBoards(requestedPin: string = ''): Promise<void> {
     const pin: string = requestedPin || (this.ports.sheet() === 'save' ? this.store.saveResult.pin : this.store.detail?.pinUrl || '');
     if (!pin || !this.ports.authenticated() || !this.ports.foreground() || this.pendingWrite || !this.ports.moreCurrent(pin) || this.store.saveResult.busy) return;
-    this.begin('save', pin); this.store.saveCreating = false;
+    this.store.saveCreating = false;
     this.store.saveResult = { pin: pin, loading: true, busy: false, error: '', feedback: '', items: [], shortlist: [], savedId: '', savedBoard: '' };
+    this.begin('save', pin);
     await this.start('boardsStart');
   }
   async openEdit(pin: string): Promise<void> {

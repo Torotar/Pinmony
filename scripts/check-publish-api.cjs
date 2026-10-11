@@ -7,7 +7,7 @@ const flush = async () => { for (let i = 0; i < 12; i++) await new Promise(r => 
 const success = (data, endpoint) => ({ resource_response: { status: 'success', code: 0, endpoint_name: endpoint, data }, client_context: { user: { id: '100' } } });
 const board = { type: 'board', id: '200', name: 'Board', privacy: 'public', access: ['write'], owner: { id: '100' } };
 function harness() {
-  const calls = [], location = new URL('https://www.pinterest.com/sample/');
+  const calls = [], location = new URL('https://' + (process.env.PINMONY_TEST_REGION === 'uk' ? 'uk' : 'www') + '.pinterest.com/sample/');
   let responder = async (name, options) => {
     if (name === 'UserResource') return success({ type: 'user', id: '100', username: 'sample' });
     if (name === 'FindPinImagesResource') return success({ title: 'Site', destination_url: 'https://example.org/', items: [0, 1].map(i => ({ type: 'pinnable', url: 'https://images.example.org/' + i + '.png', link: 'https://example.org/' })) }, 'v3_find_image');

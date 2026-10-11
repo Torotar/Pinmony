@@ -27,7 +27,8 @@ export struct PinmonySettingsPage {
       }
     } catch (_) {
       PinmonyRuntimeLog.error('Runtime: log export failed');
-      this.getUIContext().getPromptAction().showToast({ message: '日志导出失败，请重试', duration: 4000 });
+      try { this.getUIContext().getPromptAction().showToast({ message: '日志导出失败，请重试', duration: 4000 }); }
+      catch (_) { PinmonyRuntimeLog.warn('Runtime: log export feedback unavailable'); }
     } finally { this.exportingLog = false; }
   }
   private readonly pathStack: NavPathStack = new NavPathStack();

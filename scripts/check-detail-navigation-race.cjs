@@ -12,7 +12,7 @@ const timers = [], logs = [], marks = [], effects = [];
 const context = { Date, setTimeout: fn => timers.push(fn),
   isPinterestAuthRoute: url => url.includes('/login/'),
   PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
-vm.runInNewContext(ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${['supersedeRootPreparationForDetail', 'protectedDetailAddress', 'ignoreSupersededDetailDocument',
     'isCurrentPageFailure', 'waitForWebTabConfirmation', 'requestRootPage',
     'recordPageNavigation', 'syncNativeReturnRoute'].map(method).join('\n')}
@@ -32,7 +32,11 @@ Object.assign(n, { authStatus: 'authenticated', authEpoch: 10, activeTab: 1,
   rootTabIndexFromAddress: url => url.includes('/search/') ? 1 : -1,
   extractPinUrl: url => url.includes('/pin/') ? url : '',
   refreshWebNavigation: async () => effects.push('refresh'), showMessage: () => effects.push('message') });
+const {createArktsLoader}=require('./arkts-module-loader.cjs');
+const {PinmonyDetailDocumentBinding}=createArktsLoader(ts).loadFile('feature_pin/src/main/ets/services/PinmonyDetailDocumentBinding.ets');
+n.detailDocumentBindingService=new PinmonyDetailDocumentBinding({});
 async function main() {
+  require('./medium-priority-controller-harness.cjs').bindWork(n, ts, context);
   n.waitForWebTabConfirmation(1, 7, Date.now());
   n.supersedeRootPreparationForDetail(); await timers[0]();
   assert.equal(n.tabRequestToken, 8); assert.equal(n.pageBackToken, 4);
@@ -62,8 +66,9 @@ async function main() {
   n.nativeBackTarget = ''; n.authStatus = 'checking';
   assert.equal(n.ignoreSupersededDetailDocument('https://www.pinterest.com/login/'), false);
   assert.equal(n.isCurrentPageFailure('https://www.pinterest.com/login/'), true);
-  const begin = source.slice(source.indexOf('.onPageBegin((event) => {'), source.indexOf('.onPageEnd('));
-  assert(begin.indexOf('ignoreSupersededDetailDocument') < begin.indexOf('else this.clearDetail()'));
+  const lifecycle = fs.readFileSync('entry/src/main/ets/app/PinmonyWebLifecycleCoordinator.ets', 'utf8');
+  const begin = lifecycle.slice(lifecycle.indexOf('pageBegin(url:'), lifecycle.indexOf('pageEnd():'));
+  assert(begin.indexOf('ignoreSupersededDetailDocument') < begin.indexOf('this.ports.clearDetail()'));
   assert(source.slice(source.indexOf('this.shareBridge.onPageNavigation ='), source.indexOf('this.shareBridge.onShare =')).includes('ignoreSupersededDetailDocument(url)'));
   assert(marks.includes('document.superseded.actions.invalidated'));
   assert(!logs.join('\n').includes('https://'));

@@ -1,0 +1,18 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
+const ts=require(process.argv[2]||'typescript');
+const {PinmonyRouteParser}=require('./product-coordination-harness.cjs').runtime(ts).loadFile('entry/src/main/ets/app/PinmonyRouteParser.ets');
+const prefix='https://www.pinterest.com/';
+assert.equal(PinmonyRouteParser.profileUrlFromAddress(prefix+'notifications/'),'');
+assert.equal(PinmonyRouteParser.profileUrlFromAddress(prefix+'example/_saved/'),prefix+'example/');
+assert.equal(PinmonyRouteParser.boardUrlFromAddress(prefix+'example/board/?x=1'),prefix+'example/board/');
+for(const route of ['pin/123','search/pins','example/_saved','example/followers'])assert.equal(PinmonyRouteParser.boardUrlFromAddress(prefix+route),'');
+assert.equal(PinmonyRouteParser.searchUrlFromAddress(prefix+'search/pins/?q=test#top'),prefix+'search/pins/?q=test');
+assert.equal(PinmonyRouteParser.extractPinUrl(encodeURIComponent(encodeURIComponent(prefix+'pin/123/'))),prefix+'pin/123/');
+assert.equal(PinmonyRouteParser.extractPinUrl('%broken'),'');
+assert.equal(PinmonyRouteParser.extractPinUrl('https://pin.it/abc123'),'https://pin.it/abc123');
+for(const url of ['https://user@example.com/','https://i.pinimg.com/a','https://pin.it/abc'])assert.equal(PinmonyRouteParser.externalSourceUrl(url),'');
+assert.equal(PinmonyRouteParser.externalSourceUrl('https://example.com/a'),'https://example.com/a');
+let shared,shown,fail=false;const host={};
+const kits={'@kit.ShareKit':{systemShare:{SharedData:class{constructor(data){shared=data}},ShareController:class{async show(context,options){shown={context,options};if(fail)throw Error('cancel')}},SelectionMode:{SINGLE:1},SharePreviewMode:{DEFAULT:2}}},'@kit.ArkData':{uniformTypeDescriptor:{UniformDataType:{HYPERLINK:'link'}}}};
+const exported={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/app/PinmonySystemActions.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:exported,require:name=>kits[name]||{webview:{WebDownloadDelegate:class{}},PinmonyRuntimeLog:{}}});
+(async()=>{const actions=new exported.PinmonySystemActions(()=>host,()=>{});await actions.shareLink(prefix+'pin/123/','Pin');assert.equal(shared.content,prefix+'pin/123/');assert.equal(shared.title,'Pin');assert.equal(shown.context,host);assert.equal(shown.options.selectionMode,1);fail=true;await assert.rejects(actions.shareLink('url','title'),/分享面板打开失败/);console.log('PASS route boundaries and system share data/context/error propagation; device behavior excluded');})().catch(e=>{console.error(e);process.exitCode=1});

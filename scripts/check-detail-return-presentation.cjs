@@ -7,7 +7,7 @@ const pin = id => home + 'pin/' + id + '/';
 const identity = value => String(value || '').match(/\/pin\/(\d+)/)?.[1] || '';
 function compile(source, requireDep = () => ({}), globals = {}) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(source.replace(/^@Observed\s*$/gm, ''), {
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(source.replace(/^@Observed\s*$/gm, ''), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
   }).outputText, { exports, require: requireDep, ...globals });
   return exports;
@@ -74,7 +74,7 @@ function method(name) {
 }
 const context = { PINTEREST_URL: home, PIN_NATIVE_NETWORK_ENABLED: true,
   PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${method('async backFromDetail')}
   ${method('bindCurrentDetailDocument')}
   ${method('clearRootTabGuard')}
@@ -121,10 +121,10 @@ async function main() {
   assert.match(index, /detailReturnedToRoot && this\.extractPinUrl\(url\)/);
   assert.match(documentBinding, /document\.transport\.confirmed/);
   assert.match(documentBinding, /document\.transport\.wait\.timeout/);
-  assert.match(index, /if \(detail && this\.pinStore\.detail\?\.kind !== 'cached'\)/,
+  assert.match(fs.readFileSync('entry/src/main/ets/app/PinmonyDetailOpeningCoordinator.ets','utf8'), /if \(detail && this\.pinStore\.detail\?\.kind !== 'cached'\)/,
     'a late base-only read cannot wipe a full parent cache');
-  assert(index.includes('this.detailReadCache.store(job, reply)'), 'successful current replies populate the return cache');
-  assert(method('presentNativeBackTarget').includes('this.detailReadCache.setPin(pin)'), 'return target enables Pin-scoped read reuse');
+  assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNetworkBridgeCoordinator.ets','utf8').includes('this.detailReadCache.store(job, reply)'), 'successful current replies populate the return cache');
+  assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8').includes('this.ports.detailReadCache().setPin(pin)'), 'return target enables Pin-scoped read reuse');
   console.log('Detail return: complete read-only cache, partial refresh, authoritative empty, cyclic origins, continuous back and early document binding passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

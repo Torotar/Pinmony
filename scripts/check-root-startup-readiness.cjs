@@ -6,7 +6,7 @@ const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const start = index.indexOf('  private tryRestoreAuthenticatedHome(');
 const end = index.indexOf('\n  private restoreHomeDiskCache(', start);
 const context = { PinmonyRuntimeLog: { info() {} } };
-vm.runInNewContext(ts.transpileModule('class Native {' + index.slice(start, end) +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + index.slice(start, end) +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 const native = new context.Native(), restores = [];
 Object.assign(native, { authStatus: 'authenticated', activeTab: 0, pinStore: {}, boardStore: {}, homeStore: { startupFeedCommitted: false },
@@ -30,7 +30,7 @@ async function profileCase(boardsFirst) {
   const requests = [], window = { PinmonyProfileApiEnabled: true, PinmonyHomeUsername: 'sample' };
   window.top = window;
   const profile = 'https://www.pinterest.com/sample/';
-  vm.runInNewContext(script, { window, URL, AbortController, Date,
+  require('./product-coordination-harness.cjs').run(ts,script, { window, URL, AbortController, Date,
     location: { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname: '/sample/' },
     setTimeout: () => 1, clearTimeout() {}, console,
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) });

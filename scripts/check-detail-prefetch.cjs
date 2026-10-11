@@ -6,7 +6,7 @@ const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailP
   .replace(/^import .*;\r?\n/gm, '').replace(/export /g, '');
 let now = 1000;
 const ctx = { Date: { now: () => now }, PinmonyRuntimeLog: { info() {} } };
-vm.runInNewContext(ts.transpile(source + '\nglobalThis.Prefetch = PinmonyDetailPrefetch; globalThis.mapDetail = mapPrefetchedDetail;',
+require('./product-coordination-harness.cjs').run(ts,ts.transpile(source + '\nglobalThis.Prefetch = PinmonyDetailPrefetch; globalThis.mapDetail = mapPrefetchedDetail;',
   { target: ts.ScriptTarget.ES2020 }), ctx);
 const url = id => 'https://www.pinterest.com/pin/' + id + '/';
 const pin = id => ({ id: String(id), type: 'pin', images: { '736x': { url: 'https://i.pinimg.com/736x/' + id + '.jpg', width: 736, height: 900 } },
@@ -15,6 +15,10 @@ const body = data => JSON.stringify({ resource_response: { status: 'success', da
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function main() {
   const mapped = ctx.mapDetail(body(pin(1)), url(1));
+  const regional = ctx.mapDetail(body(pin(1)), 'https://uk.pinterest.com/pin/1/');
+  assert.equal(regional.creatorUrl,'https://uk.pinterest.com/creator/');
+  assert.equal(regional.pinUrl,'https://uk.pinterest.com/pin/1/');
+  assert.equal(ctx.mapDetail(body(pin(1)), 'https://uk.pinterest.com.evil.test/pin/1/'),undefined);
   assert.equal(mapped.title, 'Detail title');
   assert.equal(mapped.description, 'Full description');
   assert.equal(mapped.creator, 'Creator');
@@ -70,14 +74,14 @@ async function main() {
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
   const method = index.match(/  private restoreCachedDetail\(pinUrl: string\): boolean \{[\s\S]*?(?=\r?\n  private saveDetailScrollPosition)/)[0];
   const nativeCtx = { PIN_DETAIL_API_ENABLED: true, PinmonyRuntimeLog: { info() {} } };
-  vm.runInNewContext(ts.transpile('class Native { ' + method + ' } globalThis.Native = Native;', { target: ts.ScriptTarget.ES2020 }), nativeCtx);
+  require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native { ' + method + ' } globalThis.Native = Native;', { target: ts.ScriptTarget.ES2020 }), nativeCtx);
   const native = new nativeCtx.Native();
   Object.assign(native, { pinIdentity: value => value, pinStore: { detailImageFailedPin: '', detailCache: { get() {} },
     detailPrefetch: { get: () => mapped }, confirmedSaves: { apply: (_id, detail) => detail } } });
   assert.equal(native.restoreCachedDetail(url(1)), true);
   assert.equal(native.pinStore.detail.title, 'Detail title');
   assert.equal(native.pinStore.detailActionsReady, false, 'preloaded content does not enable stale controls');
-  assert.match(index, /onPrefetchPins:.*prefetchHomePinDetails/);
+  assert.match(fs.readFileSync('entry/src/main/ets/components/PinmonyHomeRootContent.ets', 'utf8'), /onPrefetchPins:.*prefetchHomePinDetails/);
   console.log('Detail prefetch: identity/media validation, bounded queue, expiry, cancellation, stale responses and immediate opening passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

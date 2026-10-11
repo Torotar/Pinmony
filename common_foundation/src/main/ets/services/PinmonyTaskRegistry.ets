@@ -4,6 +4,16 @@ export class PinmonyTaskRegistry {
   private timeoutIds: Set<number> = new Set<number>();
   private intervalIds: Set<number> = new Set<number>();
   private generation: number = 0;
+  private waiters: Map<number, (completed: boolean) => void> = new Map<number, (completed: boolean) => void>();
+
+  // Unlike a cancelled timeout callback, an awaited delay must always settle.
+  wait(delayMs: number): Promise<boolean> {
+    return new Promise<boolean>((resolve: (completed: boolean) => void): void => {
+      let id: number = -1;
+      id = this.timeout((): void => { this.waiters.delete(id); resolve(true); }, delayMs);
+      this.waiters.set(id, resolve);
+    });
+  }
 
   timeout(callback: () => void, delayMs: number): number {
     const generation: number = this.generation;
@@ -29,6 +39,9 @@ export class PinmonyTaskRegistry {
     if (id < 0) return;
     clearTimeout(id);
     this.timeoutIds.delete(id);
+    const resolve = this.waiters.get(id);
+    this.waiters.delete(id);
+    if (resolve) resolve(false);
   }
 
   cancelInterval(id: number): void {
@@ -45,6 +58,8 @@ export class PinmonyTaskRegistry {
   }
 
   clearAll(): void {
+    this.waiters.forEach((resolve: (completed: boolean) => void): void => resolve(false));
+    this.waiters.clear();
     this.timeoutIds.forEach((id: number): void => clearTimeout(id));
     this.intervalIds.forEach((id: number): void => clearInterval(id));
     this.timeoutIds.clear();

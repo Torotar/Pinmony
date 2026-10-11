@@ -1,3 +1,4 @@
+import '../scripts/update-build-identity.cjs';
 import { hapTasks } from '@ohos/hvigor-ohos-plugin';
 
 export default {

@@ -20,5 +20,6 @@ export class PinmonyBoardStore {
   pendingBoardSource: string = '';
   boardReturnUrl: string = '';
   boardReturnPage: string = '';
+  discoveryBoardPage: string = '';
   boardOpeningToken: number = 0;
 }

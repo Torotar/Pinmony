@@ -1,3 +1,5 @@
+import { systemShare } from '@kit.ShareKit';
+import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { webview } from '@kit.ArkWeb';
 import { common } from '@kit.AbilityKit';
 import { picker, fileUri, fileIo } from '@kit.CoreFileKit';
@@ -29,23 +31,43 @@ export class PinmonySystemActions {
     this.selectingDownloads.clear();
   }
 
-  copyText(value: string): Promise<void> {
-    return pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, value));
+  async shareLink(url: string, title: string): Promise<void> {
+    try {
+    const data: systemShare.SharedData = new systemShare.SharedData({
+      utd: utd.UniformDataType.HYPERLINK, content: url, title: title
+    });
+    const controller: systemShare.ShareController = new systemShare.ShareController(data);
+    await controller.show(this.context(), {
+      selectionMode: systemShare.SelectionMode.SINGLE,
+      previewMode: systemShare.SharePreviewMode.DEFAULT
+    });
+    } catch (_) { throw new Error('分享面板打开失败'); }
   }
 
-  openLink(url: string): Promise<void> { return this.context().openLink(url); }
+  async copyText(value: string): Promise<void> {
+    try { await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, value)); }
+    catch (_) { throw new Error('无法复制链接，请重试'); }
+  }
+
+  async openLink(url: string): Promise<void> {
+    try { await this.context().openLink(url); }
+    catch (_) { throw new Error('无法打开链接，请重试'); }
+  }
 
   exportRuntimeLog(): Promise<boolean> { return PinmonyRuntimeLog.export(this.context()); }
 
   async pickImage(): Promise<string> {
+    try {
     const options: photoAccessHelper.PhotoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
     options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
     options.maxSelectNumber = 1;
     const selected: photoAccessHelper.PhotoSelectResult = await new photoAccessHelper.PhotoViewPicker().select(options);
     return selected.photoUris[0] || '';
+    } catch (_) { throw new Error('无法选择照片，请重试'); }
   }
 
   async readJpeg(uri: string): Promise<ArrayBuffer> {
+    try {
     const file: fileIo.File = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY);
     try {
       const source: image.ImageSource = image.createImageSource(file.fd);
@@ -55,6 +77,7 @@ export class PinmonySystemActions {
         finally { await packer.release(); }
       } finally { await source.release(); }
     } finally { await fileIo.close(file); }
+    } catch (_) { throw new Error('无法读取照片，请重试'); }
   }
 
   private cancelDownload(item: webview.WebDownloadItem): void {

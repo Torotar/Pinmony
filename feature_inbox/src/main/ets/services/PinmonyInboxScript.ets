@@ -3,6 +3,11 @@
 export const PIN_INBOX_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname)) return;
+  var documentActive = true, bridgeWarning = false;
+  if (window.addEventListener) {
+    window.addEventListener('pagehide', function () { documentActive = false; });
+    window.addEventListener('pageshow', function () { documentActive = true; bridgeWarning = false; lastState = ''; schedule(); });
+  }
   var active = false;
   var session = 0;
   var rootUrl = '';
@@ -16,12 +21,19 @@ export const PIN_INBOX_BRIDGE_SCRIPT: string = `
   function isRoot() {
     return /^\\/(?:messages|inbox|updates|notifications)\\/?$/i.test(location.pathname);
   }
-  function notify(message) {
-    if (!window.PinmonyShareBridge || !window.PinmonyShareBridge.inboxState) return;
-    var value = JSON.stringify(message);
-    if (value === lastState) return;
-    lastState = value;
-    window.PinmonyShareBridge.inboxState(value);
+  window.PinmonyInboxDemand = function (page) {
+    if (!documentActive || page !== location.href) return false;
+    clearTimeout(scheduled); scheduled = 0; sync(); return true;
+  };
+  function notify(value) {
+    if (!documentActive) return;
+    var serialized = JSON.stringify(value);
+    if (serialized === lastState) return;
+    try {
+      var bridge = window.PinmonyShareBridge;
+      if (!bridge || !bridge.inboxState) return;
+      bridge.inboxState(serialized); lastState = serialized;
+    } catch (_) { if (!bridgeWarning) { bridgeWarning = true; console.warn('BridgeTrace: inbox unavailable'); } }
   }
   function current(page, expectedSession) {
     return active && session === expectedSession && rootUrl === page && isRoot();
@@ -71,6 +83,9 @@ export const PIN_INBOX_BRIDGE_SCRIPT: string = `
     });
   }
   function sync() {
+    scheduled = 0;
+    if (!documentActive) return;
+    if (window.PinmonyNativeNetworkEnabled === true && window.PinmonyNetwork && typeof window.PinmonyNetwork.isReady === "function" && !window.PinmonyNetwork.isReady()) return;
     scheduled = false;
     if (!isRoot()) {
       if (active) notify({ kind: 'closed', session: session, pageUrl: rootUrl });
@@ -159,7 +174,7 @@ export const PIN_INBOX_BRIDGE_SCRIPT: string = `
   };
   window.addEventListener('popstate', schedule);
   window.addEventListener('pageshow', schedule);
-  window.setInterval(schedule, 1500);
+  window.setInterval(function () { if (documentActive && isRoot()) schedule(); }, 2000);
   schedule();
 })();`;
 

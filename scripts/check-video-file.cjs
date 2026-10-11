@@ -58,7 +58,7 @@ function harness(config = {}) {
     invalidate: () => owner = false,
     cancellations: () => cancellations,
     async runQueue() { for (const task of queued) await task(); },
-    timeout() { for (const { fn, ms } of Array.from(timers.values())) if (ms === 20000) fn(); } };
+    timeout() { for (const { fn, ms } of Array.from(timers.values())) if (ms === 12000) fn(); } };
 }
 async function main() {
   const h = harness();
@@ -109,14 +109,17 @@ async function main() {
   await assert.rejects(queuedRead); await queued.runQueue();
   assert.equal(queued.requests.length, 0, 'cancelled queued media must never reach the network');
   assert.equal(queued.files.size, 0); assert.equal(queued.handles.size, 0);
-  const ssl = harness({ attempts: [{ error: { code: 1007900035 }, elapsed: 17000 }, {}] });
+  const slowSsl = harness({ attempts: [{ error: { code: 1007900035 }, elapsed: 6000 }, {}] });
+  await assert.rejects(slowSsl.read());
+  assert.equal(slowSsl.requests.length, 1, 'slow connection failure does not restart TLS negotiation');
+  const ssl = harness({ attempts: [{ error: { code: 1007900035 }, elapsed: 1000 }, {}] });
   const recovered = await ssl.read();
   assert.equal(ssl.requests.length, 2);
   assert.equal(ssl.requests[0].configuration.security, undefined);
   assert.equal(ssl.requests[1].configuration.security.tlsRange.min, 'TlsV1.2');
   assert.equal(ssl.requests[1].configuration.security.tlsRange.max, 'TlsV1.2');
   assert.equal(ssl.requests[1].configuration.security.skipCertificatesValidation, undefined, 'compatibility keeps certificate verification');
-  assert.equal(ssl.requests[1].configuration.transfer.timeout.transferMs, 3000, 'compatibility uses remaining overall budget');
+  assert.equal(ssl.requests[1].configuration.transfer.timeout.transferMs, 11000, 'compatibility uses remaining overall budget');
   assert(ssl.traces.some(event => /event=connection-time host=v1.pinimg.com profile=tls12 dnsMs=8/.test(event)));
   assert(ssl.traces.some(event => /event=tls-compatibility/.test(event)));
   assert(ssl.sessions.every(session => session.closed)); recovered.release();

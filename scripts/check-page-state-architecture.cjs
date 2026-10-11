@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+const lifecycle = fs.readFileSync('entry/src/main/ets/app/PinmonyWebLifecycleCoordinator.ets', 'utf8');
 const architecture = fs.readFileSync('docs/ARCHITECTURE.md', 'utf8');
 
 assert(/@Entry\s+@Component\s+struct Index/.test(index), 'Index remains the single ArkUI entry component');
@@ -27,7 +28,7 @@ for (const event of [
   'about-to-appear', 'about-to-disappear', 'page-show', 'page-hide',
   'root-tabs-appear', 'root-tabs-disappear', 'root-tab-click', 'root-tab-request',
   'web-page-begin', 'web-page-end'
-]) assert(index.includes("logPageLifecycle('" + event + "'"), 'PageLifecycle event is logged: ' + event);
+]) assert((event.startsWith('web-page-') ? lifecycle : event === 'root-tab-request' ? fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8') : index).includes("logPageLifecycle('" + event + "'"), 'PageLifecycle event is logged: ' + event);
 assert(index.includes('this.nativeNetwork.invalidate()'), 'page disappearance invalidates native network');
 assert(index.includes('this.detailReadNetwork.invalidate()'), 'page disappearance invalidates detail network');
 assert(index.includes('this.shareBridge.onNetworkRequest = undefined'), 'page disappearance unbinds network bridge');

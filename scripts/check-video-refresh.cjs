@@ -24,7 +24,7 @@ async function harness(encoded = false) {
   const ctx = vm.createContext({ window, location, document: doc, URL, AbortController, Date: { now: () => now }, ...time,
     console: { info: msg => traces.push(msg), warn() {} }, fetch: (...args) => window.fetch(...args) });
   vm.runInContext(videoScript, ctx); vm.runInContext(detailScript, ctx);
-  const Native = vm.runInNewContext(nativeCode, { ...time, Date: { now: () => now }, PinmonyRuntimeLog: { info() {} } });
+  const Native = require('./product-coordination-harness.cjs').run(ts,nativeCode, { ...time, Date: { now: () => now }, PinmonyRuntimeLog: { info() {} } });
   const native = new Native();
   Object.assign(native, { authEpoch: 1, authStatus: 'authenticated', businessSuspended: false,
     pinStore: { detailMediaRetryBusy: false, detailMediaRetryToken: 0, detailPresentationOnly: false,
@@ -38,6 +38,7 @@ async function harness(encoded = false) {
       const text = result && typeof result.then === 'function' ? '{}' : String(result);
       return encoded ? JSON.stringify(text) : text;
     } } });
+  require('./pin-priority-controller-harness.cjs').bind(native, ts, { ...time, Date: { now: () => now } });
   const api = window.PinmonyDetailApi;
   const read = () => api.read(pin, update, () => active);
   function update() { const value = read(); native.pinStore.detail = { pinUrl: pin, ...value.detail,

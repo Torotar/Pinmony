@@ -1,0 +1,278 @@
+[
+  {
+    "name": "rootActionContextReady",
+    "field": "rootContextCoordinator",
+    "className": "PinmonyRootContextCoordinator",
+    "group": "RootContext"
+  },
+  {
+    "name": "ensureRootActionContext",
+    "field": "rootContextCoordinator",
+    "className": "PinmonyRootContextCoordinator",
+    "group": "RootContext"
+  },
+  {
+    "name": "requestRootPage",
+    "field": "rootContextCoordinator",
+    "className": "PinmonyRootContextCoordinator",
+    "group": "RootContext"
+  },
+  {
+    "name": "prepareRootPageRead",
+    "field": "rootContextCoordinator",
+    "className": "PinmonyRootContextCoordinator",
+    "group": "RootContext"
+  },
+  {
+    "name": "rootReadInFlight",
+    "field": "rootContextCoordinator",
+    "className": "PinmonyRootContextCoordinator",
+    "group": "RootContext"
+  },
+  {
+    "name": "selectNativeRootTab",
+    "field": "navigationCoordinator",
+    "className": "PinmonyNavigationCoordinator",
+    "group": "Navigation"
+  },
+  {
+    "name": "presentNativeBackTarget",
+    "field": "navigationCoordinator",
+    "className": "PinmonyNavigationCoordinator",
+    "group": "Navigation"
+  },
+  {
+    "name": "syncNativeReturnRoute",
+    "field": "navigationCoordinator",
+    "className": "PinmonyNavigationCoordinator",
+    "group": "Navigation"
+  },
+  {
+    "name": "handleBack",
+    "field": "navigationCoordinator",
+    "className": "PinmonyNavigationCoordinator",
+    "group": "Navigation"
+  },
+  {
+    "name": "onBackPress",
+    "field": "navigationCoordinator",
+    "className": "PinmonyNavigationCoordinator",
+    "group": "Navigation"
+  },
+  {
+    "name": "updateAuthState",
+    "field": "sessionCoordinator",
+    "className": "PinmonySessionCoordinator",
+    "group": "Session"
+  },
+  {
+    "name": "resetAuthenticatedContent",
+    "field": "sessionCoordinator",
+    "className": "PinmonySessionCoordinator",
+    "group": "Session"
+  },
+  {
+    "name": "syncAuthentication",
+    "field": "sessionCoordinator",
+    "className": "PinmonySessionCoordinator",
+    "group": "Session"
+  },
+  {
+    "name": "retryLogin",
+    "field": "sessionCoordinator",
+    "className": "PinmonySessionCoordinator",
+    "group": "Session"
+  },
+  {
+    "name": "openCustomHomeMenu",
+    "field": "photoMenuCoordinator",
+    "className": "PinmonyPhotoMenuCoordinator",
+    "group": "PhotoMenu"
+  },
+  {
+    "name": "performCustomHomeAction",
+    "field": "photoMenuCoordinator",
+    "className": "PinmonyPhotoMenuCoordinator",
+    "group": "PhotoMenu"
+  },
+  {
+    "name": "openHomeMoreViaDetail",
+    "field": "photoMenuCoordinator",
+    "className": "PinmonyPhotoMenuCoordinator",
+    "group": "PhotoMenu"
+  },
+  {
+    "name": "cancelHomeDetailMore",
+    "field": "photoMenuCoordinator",
+    "className": "PinmonyPhotoMenuCoordinator",
+    "group": "PhotoMenu"
+  },
+  {
+    "name": "startOpeningDetailRead",
+    "field": "detailOpeningCoordinator",
+    "className": "PinmonyDetailOpeningCoordinator",
+    "group": "DetailOpening"
+  },
+  {
+    "name": "prefetchHomePinDetails",
+    "field": "detailOpeningCoordinator",
+    "className": "PinmonyDetailOpeningCoordinator",
+    "group": "DetailOpening"
+  },
+  {
+    "name": "prefetchHomePinDetailsNow",
+    "field": "detailOpeningCoordinator",
+    "className": "PinmonyDetailOpeningCoordinator",
+    "group": "DetailOpening"
+  },
+  {
+    "name": "handlePostResult",
+    "field": "businessResultsCoordinator",
+    "className": "PinmonyBusinessResultsCoordinator",
+    "group": "BusinessResults"
+  },
+  {
+    "name": "updateSearchPinTitle",
+    "field": "businessResultsCoordinator",
+    "className": "PinmonyBusinessResultsCoordinator",
+    "group": "BusinessResults"
+  },
+  {
+    "name": "updateHomePinTitle",
+    "field": "businessResultsCoordinator",
+    "className": "PinmonyBusinessResultsCoordinator",
+    "group": "BusinessResults"
+  },
+  {
+    "name": "controllerAttached",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "pageBegin",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "pageEnd",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "consoleMessage",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "mainFrameError",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "overrideUrl",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "interceptLoad",
+    "field": "webLifecycleCoordinator",
+    "className": "PinmonyWebLifecycleCoordinator",
+    "group": "WebLifecycle"
+  },
+  {
+    "name": "bindNativeNetwork",
+    "field": "networkBridgeCoordinator",
+    "className": "PinmonyNetworkBridgeCoordinator",
+    "group": "PinmonyNetworkBridgeCoordinator"
+  },
+  {
+    "name": "requestNativeNetwork",
+    "field": "networkBridgeCoordinator",
+    "className": "PinmonyNetworkBridgeCoordinator",
+    "group": "PinmonyNetworkBridgeCoordinator"
+  },
+  {
+    "name": "detailNetworkReply",
+    "field": "networkBridgeCoordinator",
+    "className": "PinmonyNetworkBridgeCoordinator",
+    "group": "PinmonyNetworkBridgeCoordinator"
+  },
+  {
+    "name": "cancelNativeNetwork",
+    "field": "networkBridgeCoordinator",
+    "className": "PinmonyNetworkBridgeCoordinator",
+    "group": "PinmonyNetworkBridgeCoordinator"
+  },
+  {
+    "name": "isCurrentPageFailure",
+    "field": "failureRecoveryCoordinator",
+    "className": "PinmonyFailureRecoveryCoordinator",
+    "group": "PinmonyFailureRecoveryCoordinator"
+  },
+  {
+    "name": "retainRootSnapshotAfterFailure",
+    "field": "failureRecoveryCoordinator",
+    "className": "PinmonyFailureRecoveryCoordinator",
+    "group": "PinmonyFailureRecoveryCoordinator"
+  },
+  {
+    "name": "scheduleInterruptedHomeRecovery",
+    "field": "failureRecoveryCoordinator",
+    "className": "PinmonyFailureRecoveryCoordinator",
+    "group": "PinmonyFailureRecoveryCoordinator"
+  },
+  {
+    "name": "handleMainFrameFailure",
+    "field": "failureRecoveryCoordinator",
+    "className": "PinmonyFailureRecoveryCoordinator",
+    "group": "PinmonyFailureRecoveryCoordinator"
+  },
+  {
+    "name": "describeFailure",
+    "field": "failureRecoveryCoordinator",
+    "className": "PinmonyFailureRecoveryCoordinator",
+    "group": "PinmonyFailureRecoveryCoordinator"
+  },
+  {
+    "name": "setBottomBarHidden",
+    "field": "bottomBarCoordinator",
+    "className": "PinmonyBottomBarCoordinator",
+    "group": "PinmonyBottomBarCoordinator"
+  },
+  {
+    "name": "onBottomBarScrollSettingChanged",
+    "field": "bottomBarCoordinator",
+    "className": "PinmonyBottomBarCoordinator",
+    "group": "PinmonyBottomBarCoordinator"
+  },
+  {
+    "name": "updateInboxScrollAvailability",
+    "field": "bottomBarCoordinator",
+    "className": "PinmonyBottomBarCoordinator",
+    "group": "PinmonyBottomBarCoordinator"
+  },
+  {
+    "name": "handleRootContentScroll",
+    "field": "bottomBarCoordinator",
+    "className": "PinmonyBottomBarCoordinator",
+    "group": "PinmonyBottomBarCoordinator"
+  },
+  {
+    "name": "syncBottomBarForPageDepth",
+    "field": "bottomBarCoordinator",
+    "className": "PinmonyBottomBarCoordinator",
+    "group": "PinmonyBottomBarCoordinator"
+  },
+  {
+    "name": "syncFloatingTabsMotion",
+    "field": "bottomBarCoordinator",
+    "className": "PinmonyBottomBarCoordinator",
+    "group": "PinmonyBottomBarCoordinator"
+  }
+]

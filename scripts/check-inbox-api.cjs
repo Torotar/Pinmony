@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 function script(p){const s=readSourceFileSync(p,'utf8');return vm.runInNewContext(s.slice(s.indexOf('`'),s.lastIndexOf('`')+1));}
 const code=script('entry/src/main/ets/services/PinmonyInboxApiScript.ets');

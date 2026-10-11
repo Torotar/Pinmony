@@ -1,4 +1,6 @@
 export class PinmonyShareBridge {
+  onHomeMenuChanged: ((session: number) => void) | undefined = undefined;
+  homeMenuChanged(session: number): void { if (this.onHomeMenuChanged) this.onHomeMenuChanged(session); }
   onNetworkRequest: ((value: string) => void) | undefined = undefined;
   onCancelNetwork: ((id: string) => void) | undefined = undefined;
   networkRequest(value: string): void { if (this.onNetworkRequest) this.onNetworkRequest(value); }

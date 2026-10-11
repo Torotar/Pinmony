@@ -208,7 +208,7 @@ export struct PinmonyHomePage {
 
   @Builder
   private feedStatus() {
-    if (this.error || this.synchronizing || this.loading) {
+    if (this.error || this.loading || (this.synchronizing && this.home.pins.length === 0)) {
       Column({ space: 8 }) {
         Row({ space: 8 }) {
           if (!this.error) {

@@ -221,7 +221,7 @@ export class PinmonyHomeController {
           this.homeStore.cachedHome.selectedTab !== message.selectedTab)) this.homeStore.cachedHomeScrollOffset = 0;
       this.homeStore.home = { kind: 'state', session: message.session, pageKey: message.pageKey,
         selectedTab: retained?.selectedTab || message.selectedTab || '',
-        tabs: retained && !sameCategory ? retained.tabs : tabs,
+        tabs: retained && (!sameCategory || message.categorySourceFailure === true) ? retained.tabs : tabs,
         board: board || (retained && sameCategory ? retained.board : undefined),
         pins: pins,
         dataSource: message.dataSource, loadingMore: message.loadingMore, refreshing: message.refreshing,

@@ -12,7 +12,7 @@ const response = id => JSON.stringify({ client_context: { ignored: 'not retained
 const log = { info() {}, warn() {} };
 function compile(path, deps = () => ({})) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path, 'utf8'), {
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync(path, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
   }).outputText, { exports, require: deps, console, setTimeout, clearTimeout });
   return exports;
@@ -26,15 +26,16 @@ const rcp = { Request: class { constructor(url, method, headers) { Object.assign
 class Credentials { async read() { return 'synthetic'; } async update(_url, value, current) {
   assert(current()); cookies.push(value);
 } }
+const { PinmonyRequestPolicy } = compile('common_network/src/main/ets/PinmonyRequestPolicy.ets', () => ({ PinmonyRuntimeLog: log }));
 const { PinmonyNativeNetwork, acceptsNetworkJob } = compile('common_network/src/main/ets/PinmonyNativeNetwork.ets', name =>
   name === 'common_session' ? { PinmonySessionCredentials: Credentials } : name === 'common_foundation' ?
-    { PinmonyRuntimeLog: log } : { rcp });
+    { PinmonyRuntimeLog: log } : name.includes('PinmonyRequestPolicy') ? { PinmonyRequestPolicy } : { rcp });
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 function method(name) { const begin = index.indexOf(`  private ${name}`); const end = index.indexOf('\n  private ', begin + 1); return index.slice(begin, end); }
 const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true,
   PINTEREST_URL: 'https://www.pinterest.com/', acceptsNetworkJob,
   PinmonyRuntimeLog: log, readRelatedPresentation: () => undefined, setTimeout() {}, clearTimeout() {} };
-vm.runInNewContext(ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}
   ${method('startOpeningDetailRead')}
@@ -71,10 +72,11 @@ async function main() {
     closeImageLayer() {}, clearRootTabGuard() {}, pageHistory: { visit() {}, cancelBack() {} },
     clearDetail() { this.pinStore.detail = undefined; this.pinStore.detailActionsReady = false; this.pinStore.detailOpeningToken++; },
     restoreCachedDetail() {}, probeDetailDocument() {}, detailReadNetwork: network,
-    detailReadCache: { retained() { return undefined; }, store() {}, clear() {}, reset() {} },
+    detailReadCache: { getPin() { return ''; }, retained() { return undefined; }, store() {}, clear() {}, reset() {} },
     detailImageStage: { reset() {} },
     nativeNetwork: { request() { throw Error('duplicate or unvalidated request reached regular network'); } },
     nativeNetworkContext: () => ({ ...state }), currentPinUrl: () => state.page });
+  require('./medium-priority-controller-harness.cjs').bindWork(native, ts, context);
   native.beginDetailOpening(url(1)); homeCurrent = false;
   assert.equal(native.pinStore.detail.kind, 'opening', 'clicked card is visible before network/document readiness');
   assert.equal(native.pinStore.detailActionsReady, false);

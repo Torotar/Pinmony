@@ -598,5 +598,13 @@
   "invitationReadPage": {
     "store": "inboxStore",
     "field": "invitationReadPage"
+  },
+  "profileFollowingBusy": {
+    "store": "profileStore",
+    "field": "followingBusy"
+  },
+  "profileSaving": {
+    "store": "profileStore",
+    "field": "saving"
   }
 }

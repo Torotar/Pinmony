@@ -1,10 +1,14 @@
 import { PinmonyDetailAction } from '../models/PinmonyDetail';
 import { PinmonyDetailPorts } from '../models/PinmonyDetailPorts';
+import { PinmonyTaskRegistry } from 'common_foundation';
 
 // Owns detail action readiness and dispatch; product navigation remains injected.
 export class PinmonyDetailController {
   private readonly ports: PinmonyDetailPorts;
+  private readonly tasks: PinmonyTaskRegistry = new PinmonyTaskRegistry();
+  private generation: number = 0;
   constructor(ports: PinmonyDetailPorts) { this.ports = ports; }
+  pause(): void { this.generation++; this.tasks.invalidate(); }
 
   async ensureActionContext(): Promise<boolean> {
     const store = this.ports.store;
@@ -15,11 +19,12 @@ export class PinmonyDetailController {
     this.ports.beginDetailOpening(pin);
     store.detailPreparing = true;
     const token = store.detailOpeningToken;
+    const generation: number = this.generation;
     this.ports.markJourney('action.context.requested');
     try {
       this.ports.loadDetailUrl(pin);
       for (let attempt = 0; attempt < 80; attempt++) {
-        if (token !== store.detailOpeningToken || !this.ports.isAuthenticated() ||
+        if (generation !== this.generation || token !== store.detailOpeningToken || !this.ports.isAuthenticated() ||
             store.detailPin !== pin || !this.ports.isForeground()) return false;
         if (store.detailActionsReady && store.detail?.imageStageReady &&
             !store.detail.actionsRetained && this.ports.currentPinUrl() === pin) {
@@ -27,12 +32,13 @@ export class PinmonyDetailController {
           return true;
         }
         if (store.detailApiError) return false;
-        await new Promise<void>((resolve: () => void): void => { setTimeout(() => resolve(), 150); });
+        if (!await this.tasks.wait(150)) return false;
       }
       store.detailApiError = '当前帖子状态尚未确认，请重试';
       return false;
     } catch (_) {
-      if (token === store.detailOpeningToken) store.detailApiError = '当前帖子状态准备失败，请重试';
+      if (generation === this.generation && token === store.detailOpeningToken && this.ports.isAuthenticated() &&
+          this.ports.isForeground()) store.detailApiError = '当前帖子状态准备失败，请重试';
       return false;
     } finally {
       if (token === store.detailOpeningToken) store.detailPreparing = false;

@@ -84,7 +84,7 @@ export class PinmonyDetailDocumentBinding {
     };
     try {
       this.ports.runJavaScript('location.href === ' + JSON.stringify(url) +
-        ' && window.PinmonyNetwork && window.PinmonyDetailRefresh ? (window.PinmonyNetwork.bind(' +
+        ' && window.PinmonyNetwork && window.PinmonyDetailRefresh ? (window.PinmonyNetwork.setForeground(true), window.PinmonyNetwork.bind(' +
         epoch.toString() + ',' + JSON.stringify(url) + '), window.PinmonyDetailRefresh(true), true) : false')
         .then((result: string) => {
           if (this.binding !== binding || token !== this.ports.openingToken()) return;

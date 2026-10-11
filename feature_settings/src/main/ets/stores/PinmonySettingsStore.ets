@@ -11,9 +11,10 @@ export class PinmonySettingsStore {
   data: PinmonyAccountSettings | undefined = undefined;
   loading: boolean = false;
   busy: boolean = false;
+  writeUncertain: boolean = false;
   error: string = '';
   token: number = 0;
-  reset(): void { this.token++; this.notifications = []; this.screen = 'root'; this.confirmOpen = false; this.recommendationTab = 'ai'; this.data = undefined; this.loading = false; this.busy = false; this.error = ''; }
+  reset(): void { this.token++; this.notifications = []; this.screen = 'root'; this.confirmOpen = false; this.recommendationTab = 'ai'; this.data = undefined; this.loading = false; this.busy = false; this.writeUncertain = false; this.error = ''; }
   back(): boolean {
     if (this.busy) return true;
     if (this.confirmOpen) { this.confirmOpen = false; return true; }

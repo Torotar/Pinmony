@@ -10,11 +10,11 @@ function method(name) {
 }
 const home = 'https://www.pinterest.com/', login = home + 'login/';
 const auth = {};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8'),
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8'),
   { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, { exports: auth });
 const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: login,
   PinmonyRuntimeLog: { info() {}, warn() {} }, clearTimeout() {} };
-vm.runInNewContext(ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure'].map(method).join('\n') +
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure'].map(method).join('\n') +
   '} globalThis.Native=Native;', { target: ts.ScriptTarget.ES2020 }), context);
 function harness() {
   const native = new context.Native(), loads = [], scripts = [], effects = [];
@@ -77,3 +77,19 @@ assert.equal(loggingOut.native.authStatus, 'unauthenticated', 'old document auth
 assert.deepEqual(loggingOut.loads, []);
 assert.match(explicitGuest.native.describeFailure(login, -113), /HTTPS 安全连接协商失败/, 'TLS error is described as a connection error, not login quota');
 console.log('Session startup: home-first, explicit evidence, one login redirect, stored-session reuse, expiry and manual retry boundaries passed');
+const regional = harness();
+const regionalHome = 'https://uk.pinterest.com/';
+const regionalProfile = regionalHome + 'fixture_owner/';
+regional.setUrl(regionalHome);
+regional.native.isHomeRootAddress = url => url === regionalHome;
+regional.native.homePageKeyFromAddress = url => url === regionalHome ? regionalHome : '';
+regional.native.profileUrlFromAddress = url => /^https:\/\/(?:www|uk)\.pinterest\.com\/[a-zA-Z0-9_]+\/$/.test(url) ? url : '';
+regional.native.updateAuthState(JSON.stringify({status:'authenticated',epoch:1,pageUrl:regionalHome,profileUrl:regionalProfile}));
+assert.equal(regional.native.authenticatedProfileUrl,regionalProfile);
+const identityScript = regional.scripts.find(script=>script.includes('PinmonyHomeSetUsername'));
+let username = '';
+vm.runInNewContext(identityScript,{window:{PinmonyHomeSetUsername(value){username=value;}}});
+assert.equal(username,'fixture_owner','regional authentication must supply the homepage identity gate');
+assert.deepEqual(regional.loads,[],'regional homepage stays in its current document');
+assert.ok(regional.effects.includes('bind'));
+console.log('Regional authentication: current profile supplies nonempty home identity and binds without navigation');

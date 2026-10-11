@@ -21,6 +21,7 @@ export function stableSerialize(params: Object | string | number | boolean | nul
 }
 
 export function hashCacheString(text: string): string {
+  try {
   const bytes: Uint8Array = new util.TextEncoder().encodeInto(text);
   const md = cryptoFramework.createMd('MD5');
   md.updateSync({ data: bytes });
@@ -30,6 +31,10 @@ export function hashCacheString(text: string): string {
     hash += digest[index].toString(16).padStart(2, '0');
   }
   return hash;
+  } catch (_) {
+    // Fail closed: never replace a failed hash with a shared or empty cache key.
+    throw new Error('cache-hash-unavailable');
+  }
 }
 
 export function buildCacheKey(accountId: string, resourceType: string,

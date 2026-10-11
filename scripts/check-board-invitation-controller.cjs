@@ -8,6 +8,7 @@ const { PinmonyBoardInvitationController: Controller } = r.compile('feature_inbo
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const item = { boardId: '1', invitedUser: '2', boardUrl: 'https://www.pinterest.com/sample/board/', boardName: 'synthetic',
   imageUrl: '', inviter: '', inviterAvatar: '', invitedAvatar: '', createdAt: '', status: 'new' };
+if (process.env.PINMONY_TEST_REGION === 'uk') item.boardUrl=item.boardUrl.replace('www.pinterest.com','uk.pinterest.com');
 function harness() {
   let page = item.boardUrl, auth = true, foreground = true;
   const store = { boardInvitationToken: 0, invitationReadPage: '', invitationBusy: false }, reads = [], writes = [], opens = [], messages = [];

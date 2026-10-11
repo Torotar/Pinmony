@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -16,36 +16,43 @@ const code = ts.transpileModule('class Native {' + names.map(method).join('\n') 
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
 const timers = [], context = { PIN_BOARD_API_ENABLED: true, PIN_POST_API_ENABLED: true, setTimeout: fn => timers.push(fn),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(code, context);
+require('./product-coordination-harness.cjs').run(ts,code, context);
 const from = 'https://www.pinterest.com/sample/_saved/', target = 'https://www.pinterest.com/sample/board/';
 function harness(destination = target, failNavigation = false) {
-  const native = new context.Native();
-  const aliases = JSON.parse(fs.readFileSync('scripts/feature-state-aliases.json', 'utf8'));
-  for (const [name, alias] of Object.entries(aliases)) {
-    native[alias.store] ||= {};
-    Object.defineProperty(native, name, { get() { return this[alias.store][alias.field]; },
-      set(value) { this[alias.store][alias.field] = value; } });
-  }
+  const native = require('./product-coordination-harness.cjs').createHost(context.Native, ts);
   let address = from;
   const navigations = [];
   const backTargets = [];
-  Object.assign(native, { loadFailed: false, pendingBoardUrl: '', pendingBoardSource: '', boardOpeningToken: 0,
+  Object.assign(native, {
+    loadFailed: false,
     authStatus: 'authenticated', activeTab: 3, tabRequestToken: 0, rootTabAddresses: new Map(),
-    profileStore: { origins: [], profileCache: { put() {} } }, clearRootTabGuard() {},
+    clearRootTabGuard() { },
     cancelledBoardPins: new Set(),
-    boardReturnUrl: '', boardReturnPage: '', backOnePage: (fallback, override) => backTargets.push(override || fallback),
-    pageHistory: { key: url => url.split(/[?#]/)[0], visit() {}, cancelBack() {} }, controller: { getUrl: () => address, loadUrl: url => {
-      assert.equal(native.nativeBoardVisible(), true, 'native cover exists before opening the board');
-      if (failNavigation) throw new Error('navigation unavailable');
-      navigations.push(url);
-    } },
-    currentProfileUrl: () => 'https://www.pinterest.com/sample/', showMessage() {}, traceAction() {},
+    backOnePage: (fallback, override) => backTargets.push(override || fallback),
+    pageHistory: { key: url => url.split(/[?#]/)[0], visit() { }, cancelBack() { } }, controller: { getUrl: () => address, loadUrl: url => {
+            assert.equal(native.nativeBoardVisible(), true, 'native cover exists before opening the board');
+            if (failNavigation)
+                throw new Error('navigation unavailable');
+            navigations.push(url);
+        } },
+    currentProfileUrl: () => 'https://www.pinterest.com/sample/', showMessage() { }, traceAction() { },
     extractPinUrl: url => /\/pin\/\d+\//.test(url) ? url : '',
     profileUrlFromAddress: url => url === from || url === 'https://www.pinterest.com/sample/' ? 'https://www.pinterest.com/sample/' : '',
     nativeRootPageAddress: () => '',
     boardOperation(method, value) { this.lastBoardAction = JSON.parse(value).action; },
-    profile: { profileUrl: 'https://www.pinterest.com/sample/', boards: [{ id: 'card', title: 'Board',
-      targetUrl: destination, pinCount: '2 张 Pin 图' }] }, handleBack() { backTargets.push('generic-history'); } });
+    handleBack() { backTargets.push('generic-history'); },
+    boardStore: Object.assign(native.boardStore, {
+        pendingBoardUrl: '',
+        pendingBoardSource: '',
+        boardOpeningToken: 0,
+        boardReturnUrl: '',
+        boardReturnPage: ''
+    }),
+    profileStore: Object.assign(native.profileStore, { origins: [], profileCache: { put() { } } }, {
+        profile: { profileUrl: 'https://www.pinterest.com/sample/', boards: [{ id: 'card', title: 'Board',
+                    targetUrl: destination, pinCount: '2 张 Pin 图' }] }
+    })
+});
   // Returning to the source clears the opening cover before dispatch.
   const loadUrl = native.controller.loadUrl;
   native.controller.loadUrl = url => url === from ? navigations.push(url) : loadUrl(url);
@@ -87,34 +94,34 @@ async function main() {
   assert.equal(menus.length, 2, 'stale board cannot operate a card');
   const h = harness();
   const opening = h.native.openProfileBoard('card');
-  assert.equal(h.native.boardDetail.title, 'Board');
+  assert.equal(h.native.boardStore.boardDetail.title, 'Board');
   h.native.syncBoardRoute(from);
   assert.equal(h.native.nativeBoardVisible(), true, 'late source-page callback cannot expose the website');
   h.native.syncBoardRoute(target);
   assert.equal(h.native.nativeBoardVisible(), true, 'page-begin before getUrl must retain the cover');
-  assert.equal(h.native.pendingBoardUrl, target);
+  assert.equal(h.native.boardStore.pendingBoardUrl, target);
   h.navigate(target); h.native.syncBoardRoute(target);
-  assert.equal(h.native.pendingBoardUrl, '');
+  assert.equal(h.native.boardStore.pendingBoardUrl, '');
   assert.equal(h.native.nativeBoardVisible(), true, 'handoff to the current board has no visibility gap');
   assert.deepEqual(h.navigations, [target], 'validated board route uses direct background navigation');
   await opening;
   h.navigate('https://www.pinterest.com/pin/123/'); h.native.syncBoardRoute('https://www.pinterest.com/pin/123/');
   assert.equal(h.native.nativeBoardVisible(), true, 'board stays mounted beneath its child Pin');
   assert.equal(h.native.boardStore.presentationOnly, true);
-  assert.equal(h.native.boardDetail.session, 0, 'departed board controls cannot be reused');
+  assert.equal(h.native.boardStore.boardDetail.session, 0, 'departed board controls cannot be reused');
   const failure = harness(target, true); await failure.native.openProfileBoard('card');
-  assert.equal(failure.native.pendingBoardUrl, ''); assert.equal(failure.native.boardDetail, undefined);
+  assert.equal(failure.native.boardStore.pendingBoardUrl, ''); assert.equal(failure.native.boardStore.boardDetail, undefined);
   const back = harness(); const interrupted = back.native.openProfileBoard('card');
   back.native.backFromBoard(); await interrupted;
   assert.deepEqual(back.navigations, [target, from], 'cancelled opening returns to its source');
-  assert.equal(back.native.pendingBoardUrl, ''); assert.equal(back.native.nativeBoardVisible(), false);
+  assert.equal(back.native.boardStore.pendingBoardUrl, ''); assert.equal(back.native.nativeBoardVisible(), false);
   timers.forEach(fn => fn());
-  assert.equal(back.native.boardDetail, undefined, 'cancelled timer cannot restore a cover');
+  assert.equal(back.native.boardStore.boardDetail, undefined, 'cancelled timer cannot restore a cover');
   for (const destination of [target, 'https://www.pinterest.com/sample/pins/']) {
     const returned = harness(destination); const opened = returned.native.openProfileBoard('card');
     returned.navigate(destination); returned.native.syncBoardRoute(destination);
     await opened;
-    assert.equal(returned.native.pendingBoardSource, '', 'transient opening source is released');
+    assert.equal(returned.native.boardStore.pendingBoardSource, '', 'transient opening source is released');
     returned.navigate('https://www.pinterest.com/pin/123/');
     returned.native.syncBoardRoute('https://www.pinterest.com/pin/123/');
     returned.navigate(destination); returned.native.syncBoardRoute(destination);
@@ -125,13 +132,13 @@ async function main() {
     assert.equal(returned.backTargets.at(-1), 'generic-history', 'another board cannot reuse the stored origin');
   }
   console.log('Board opening handoff checks passed');
-  const nested = harness(); nested.native.boardDetail = { flow: { phase: 'targets', busy: false } };
+  const nested = harness(); nested.native.boardStore.boardDetail = { flow: { phase: 'targets', busy: false } };
   nested.native.backFromBoard(); assert.equal(nested.native.lastBoardAction, 'select');
-  nested.native.boardDetail.flow.phase = 'ideas'; nested.native.backFromBoard();
+  nested.native.boardStore.boardDetail.flow.phase = 'ideas'; nested.native.backFromBoard();
   assert.equal(nested.native.lastBoardAction, 'close');
-  nested.native.boardDetail.flow.phase = 'targets'; nested.native.boardDetail.flow.uncertain = true;
+  nested.native.boardStore.boardDetail.flow.phase = 'targets'; nested.native.boardStore.boardDetail.flow.uncertain = true;
   nested.native.backFromBoard(); assert.equal(nested.native.lastBoardAction, 'close', 'unknown move can close for refresh');
-  nested.native.boardDetail.flow.busy = true; nested.native.lastBoardAction = '';
+  nested.native.boardStore.boardDetail.flow.busy = true; nested.native.lastBoardAction = '';
   nested.native.backFromBoard(); assert.equal(nested.native.lastBoardAction, '', 'write locks system back');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

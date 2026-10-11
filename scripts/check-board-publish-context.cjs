@@ -9,7 +9,7 @@ function method(name) {
   return source.slice(start, source.indexOf('\n  private ', start + 1));
 }
 const context = { Date, setTimeout, PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpileModule('class Native {' +
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' +
   ['rootReadInFlight', 'ensureRootActionContext', 'restorePublishBoard', 'boardOperation'].map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 (async () => {
@@ -37,6 +37,7 @@ vm.runInNewContext(ts.transpileModule('class Native {' +
   n.boardOperation('flow', JSON.stringify({ action: 'select' }));
   assert(dispatches[0].includes('close'), 'single Pin menu returns to board');
   assert.equal(n.singlePinMovePage, '');
+  await new Promise(setImmediate);
   n.boardOperation('flow', JSON.stringify({ action: 'select' }));
   assert(dispatches[1].includes('select'), 'organize flow retains selection return');
   n.restorePublishBoard(); n.restorePublishBoard();

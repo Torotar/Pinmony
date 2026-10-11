@@ -184,7 +184,8 @@ export class PinmonyBoardStateController {
         return;
       }
       if (message.nextPage && this.ports.boardAddress(message.nextPage) === message.nextPage &&
-          message.nextPage.startsWith('https://www.pinterest.com/') && message.nextPage !== message.pageKey) {
+          /^https:\/\/(?:www|uk)\.pinterest\.com\//.test(message.nextPage) &&
+          message.nextPage.split('/')[2] === message.pageKey.split('/')[2] && message.nextPage !== message.pageKey) {
         if (this.store.boardReturnPage === message.pageKey) this.store.boardReturnPage = message.nextPage;
         this.store.pendingBoardUrl = message.nextPage;
         this.store.pendingBoardSource = message.pageKey;

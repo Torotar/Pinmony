@@ -13,7 +13,7 @@ const home = 'https://www.pinterest.com/', board = home + 'sample/board/', pin =
 const context = { PIN_BOARD_API_ENABLED: true, PINTEREST_URL: home, Date,
   setTimeout: fn => timers.push(fn),
   PinmonyRuntimeLog: { info: value => log.push(value), warn: value => log.push(value) } };
-vm.runInNewContext(ts.transpileModule('class Native {' + ['boardUrlFromAddress', 'currentBoardUrl',
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + ['boardUrlFromAddress', 'currentBoardUrl',
   'syncBoardRoute', 'nativeBoardVisible', 'presentNativeBackTarget', 'backOnePage', 'loadReturnTarget',
   'boardOperation', 'updateBoard', 'handleMainFrameFailure', 'backFromBoard'].map(method).join('\n') + '} globalThis.Native = Native;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
@@ -42,6 +42,9 @@ function harness() {
     showMessage() {}, isCurrentPageFailure: value => value === address, effectiveRootDocumentTarget: () => 3,
     showNetworkNotice() {}, describeFailure: () => 'failure' });
   const invitationRuntime = require('./return-coordinator-harness.cjs').runtime(ts);
+  const { PinmonyPagePerformance } = invitationRuntime.compile('common_foundation/src/main/ets/services/PinmonyPagePerformance.ets',
+    () => ({ PinmonyRuntimeLog: context.PinmonyRuntimeLog }));
+  n.pagePerformance = new PinmonyPagePerformance();
   const { PinmonyBoardInvitationController } = invitationRuntime.compile('feature_inbox/src/main/ets/controllers/PinmonyBoardInvitationController.ets', () => invitationRuntime.foundation);
   n.inboxStore.boardInvitationToken = 0;
   n.boardInvitationController = new PinmonyBoardInvitationController(n.inboxStore, { authenticated: () => true, foreground: () => true, page: () => address });

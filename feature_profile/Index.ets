@@ -18,3 +18,7 @@ export { PinmonyPublishFlow } from './src/main/ets/models/PinmonyPublishFlow';
 export { PinmonyPublishPage } from './src/main/ets/components/PinmonyPublishPage';
 export { PIN_PUBLISH_API_SCRIPT } from './src/main/ets/services/PinmonyPublishApiScript';
 export { PinmonyPublishPhoto, pickPublishPhotoUris, readPublishPhoto } from './src/main/ets/services/PinmonyPublishPhoto';
+
+export { PinmonyProfileReadController, PinmonyProfileReadPorts } from './src/main/ets/controllers/PinmonyProfileReadController';
+
+export { PinmonyProfileActionsController, PinmonyProfileActionsPorts } from './src/main/ets/controllers/PinmonyProfileActionsController';

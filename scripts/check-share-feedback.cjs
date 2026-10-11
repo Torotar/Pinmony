@@ -24,10 +24,10 @@ class HdsSnackBar {
   dismiss() {}
 }
 const nativeContext = { HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 }, Date: { now: () => now } };
-vm.runInNewContext(ts.transpileModule('class Log { ' + sanitize + ' } globalThis.Log = Log;', {}).outputText, nativeContext);
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Log { ' + sanitize + ' } globalThis.Log = Log;', {}).outputText, nativeContext);
 nativeContext.PinmonyRuntimeLog = { info: text => logs.push(nativeContext.Log.sanitize(text)), warn: text => logs.push(nativeContext.Log.sanitize(text)) };
 const nativeCode = 'class Native { ' + source.slice(start, end) + method('updateShareSheet') + method('handlePostResult') + ' } globalThis.Native = Native;';
-vm.runInNewContext(ts.transpileModule(nativeCode, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, nativeContext);
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(nativeCode, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, nativeContext);
 const native = new nativeContext.Native();
 Object.assign(native, { postSnackToken: 0, homeStore: {}, profileStore: {}, inboxStore: {},
   pinStore: { shareSession: 1, sharePin: current, shareFeedback: '', shareError: '', shareFeedbackSnackKey: '', shareSnackKey: '', shareOptions: [], shareActions: [] },
@@ -37,6 +37,8 @@ Object.assign(native, { postSnackToken: 0, homeStore: {}, profileStore: {}, inbo
   showMessage: message => messages.push(message), onBackPress: () => { native.dismissPostSnack(); native.activeSheetKind = ''; },
   systemActions: { copyText: value => { copies.push(value); return new Promise((resolve, reject) => { copyResolve = resolve; copyReject = reject; }); } } });
 
+native.authStatus = 'authenticated'; native.controller = { getUrl: () => current };
+require('./pin-priority-controller-harness.cjs').bind(native, ts, nativeContext);
 const pin = current, requests = [], pendingCopies = [];
 let rawPin = { id: '101', title: 'Synthetic current Pin' };
 const snapshot = () => ({ kind: 'state', session: 1, pinUrl: pin, pinDetail: true, options: [{ id: 'copy', label: '复制链接', enabled: true }], actions: [], contacts: [] });
@@ -50,7 +52,7 @@ class XHR { open() {} send() {} setRequestHeader() {} addEventListener() {} }
 const context = { window, document: { cookie: '' }, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/pin/101/', href: pin },
   URL, URLSearchParams, Headers, XMLHttpRequest: XHR, AbortController, setTimeout, clearTimeout, fetch: (...args) => window.fetch(...args) };
 const script = Function('return `' + postSource.match(/= `([\s\S]*?)`;/)[1] + '`')();
-vm.runInNewContext(script, context);
+require('./product-coordination-harness.cjs').run(ts,script, context);
 const api = window.PinmonyPostApi;
 const update = () => native.updateShareSheet(JSON.stringify(api.shareSnapshot(snapshot(), update)));
 const flush = () => new Promise(resolve => setImmediate(resolve));

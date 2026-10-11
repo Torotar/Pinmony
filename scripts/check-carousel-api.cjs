@@ -1,4 +1,4 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');

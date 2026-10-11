@@ -58,7 +58,7 @@ export class PinmonyBoardInvitationController {
   }
   private validItem(item: PinmonyBoardInvitation): boolean {
     return !!item && /^\d{1,30}$/.test(item.boardId) && /^\d{1,30}$/.test(item.invitedUser) &&
-      /^https:\/\/www\.pinterest\.com\/[^/?#]+\/[^/?#]+\/$/.test(item.boardUrl) &&
+      /^https:\/\/(?:www|uk)\.pinterest\.com\/[^/?#]+\/[^/?#]+\/$/.test(item.boardUrl) &&
       typeof item.boardName === 'string' && typeof item.inviter === 'string' && typeof item.invitedAvatar === 'string' &&
       typeof item.inviterAvatar === 'string' && typeof item.imageUrl === 'string' && typeof item.createdAt === 'string' &&
       (item.status === 'new' || item.status === 'accepted');

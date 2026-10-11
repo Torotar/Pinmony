@@ -8,7 +8,7 @@ function method(name) {
 }
 const context = { PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
   PinmonyRuntimeLog: { info() {} }, setTimeout };
-vm.runInNewContext(ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${['performDetailAction', 'cancelDetailSave', 'retryDetailMedia'].map(method).join('\n')}
 } globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const pin = 'https://www.pinterest.com/pin/101/';
@@ -31,6 +31,7 @@ function harness(selected = true) {
       if (script.includes('savedUndoRead')) return JSON.stringify({ status: 'done' });
       return JSON.stringify({ id: '802' });
     } } });
+  require('./pin-priority-controller-harness.cjs').bind(native, ts, context);
   return { native, events };
 }
 async function main() {

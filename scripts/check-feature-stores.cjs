@@ -17,7 +17,7 @@ function load(file) {
   file=path.resolve(file);
   if(cache.has(file))return cache.get(file);
   const exports={};cache.set(file,exports);
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync(file,'utf8'),{
     compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}
   }).outputText,{exports,Observed:type=>type,require:spec=>{
     const resolved = resolveImport(file, spec);

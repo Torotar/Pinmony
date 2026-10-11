@@ -2,7 +2,7 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const ts = require(process.argv[2] || 'typescript');
 function compiled(file, requireFn = () => ({})) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {
     target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: requireFn });
   return exports;
 }
@@ -10,10 +10,11 @@ const api = compiled('feature_settings/src/main/ets/services/PinmonyLogout.ets')
 const { acceptsNetworkJob, PinmonyNativeNetwork } = compiled('common_network/src/main/ets/PinmonyNativeNetwork.ets',
   name => name === 'common_foundation' ? { PinmonyRuntimeLog: { info() {}, warn() {} } } :
     name === 'common_session' ? { PinmonySessionCredentials: class {} } : {});
-const page = 'https://www.pinterest.com/sample/', login = 'https://www.pinterest.com/login/';
+const origin = 'https://' + (process.env.PINMONY_TEST_REGION === 'uk' ? 'uk' : 'www') + '.pinterest.com';
+const page = origin + '/sample/', login = 'https://www.pinterest.com/login/';
 const state = { authenticated: true, epoch: 7, page, userAgent: 'synthetic' };
 const job = { id: 'session_logout_1', epoch: 7, page, method: 'POST',
-  url: 'https://www.pinterest.com/resource/UserSessionResource/delete/', body: api.logoutRequestBody(),
+  url: origin + '/resource/UserSessionResource/delete/', body: api.logoutRequestBody(),
   headers: { 'X-Pinterest-Pws-Handler': 'www/settings.js' } };
 assert.equal(acceptsNetworkJob(job, state), true);
 for (const change of [{ method: 'GET' }, { epoch: 6 }, { page: page + 'other/' },
@@ -35,7 +36,7 @@ const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const method = source.match(/  private async logoutAccount\([\s\S]*?(?=\r?\n  private )/)[0];
 const context = { ...api, Date, PINTEREST_URL: 'https://www.pinterest.com/', PINTEREST_LOGIN_URL: login,
   PIN_NATIVE_NETWORK_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {} } };
-vm.runInNewContext(ts.transpile('class Native {' + method + '} globalThis.Native=Native;',
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + method + '} globalThis.Native=Native;',
   { target: ts.ScriptTarget.ES2021 }), context);
 function harness() {
   const native = new context.Native(), calls = [], loads = []; let resolve;
@@ -48,6 +49,7 @@ function harness() {
 }
 async function main() {
   const success = harness(); const pending = success.native.logoutAccount();
+  assert.equal(success.calls[0].url,origin+'/resource/UserSessionResource/delete/');
   await success.native.logoutAccount(); assert.equal(success.calls.length, 1, 'repeated click cannot dispatch another write');
   assert.equal(success.native.authStatus, 'authenticated', 'dispatch is not logout success');
   success.reply({ status: 200, body: confirmedBody, error: '' }); await pending;
@@ -70,7 +72,7 @@ async function main() {
   const settingsSource = fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets', 'utf8');
   const confirmMethod = settingsSource.match(/  private confirmLogout\([\s\S]*?(?=\r?\n  private )/)[0];
   const confirmContext = {};
-  vm.runInNewContext(ts.transpileModule('class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
   }).outputText, confirmContext);
   const confirm = new confirmContext.Confirm(), dialogs = [], confirmedWrites = [];

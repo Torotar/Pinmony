@@ -1,16 +1,32 @@
 export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
 (function () {
-  if (window !== window.top || location.origin !== 'https://www.pinterest.com' || window.PinmonyAccountSettings) return;
+  if (window !== window.top || !/^https:[/][/](?:www|uk)\\.pinterest\\.com$/.test(location.origin) || window.PinmonyAccountSettings) return;
   var state = null, generation = 0, abort = null, identity = '', active = '', closedActivity = new Set(), attemptedActivity = new Set();
   function valid(page) { return page === active && location.href === active; }
   function text(v, n) { return typeof v === 'string' ? v.slice(0, n) : ''; }
+  function birthdate(v) {
+    if (typeof v !== 'string') return '';
+    var match = /^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})(?:T.*)?$/.exec(v.trim());
+    if (!match) return '';
+    var value = match[1] + '-' + match[2].padStart(2, '0') + '-' + match[3].padStart(2, '0');
+    var date = new Date(value + 'T00:00:00Z');
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : '';
+  }
   function map(d) {
     if (!d || !/^\\d+$/.test(String(d.id || '')) || typeof d.username !== 'string') throw Error('shape');
     var username = decodeURIComponent(new URL(active).pathname.split('/')[1]);
     if (d.username.toLowerCase() !== username.toLowerCase()) throw Error('identity');
     identity = String(d.id);
     state.email = text(d.email, 320); state.confirmedEmail = d.has_confirmed_email === true;
-    state.birthdate = text(d.birthdate, 10); state.gender = text(d.gender, 30);
+    state.birthdate = birthdate(d.birthdate);
+    if (!state.birthdate && typeof d.birthday === 'number' && Number.isSafeInteger(d.birthday) && d.birthday > 0) {
+      var birthdayDate = new Date(d.birthday * 1000);
+      if (Number.isFinite(birthdayDate.getTime())) {
+        var birthdayValue = birthdayDate.toISOString().slice(0, 10);
+        if (birthdayValue >= '1900-01-01' && birthdayValue <= new Date().toISOString().slice(0, 10)) state.birthdate = birthdayValue;
+      }
+    }
+    state.gender = text(d.gender, 30);
     state.customGender = text(d.custom_gender, 500); state.country = text(d.country, 2);
     state.privateProfile = d.opt_in_private_account === true;
     state.searchPrivacy = typeof d.search_privacy_enabled === 'boolean' ? d.search_privacy_enabled : d.exclude_from_search === true;
@@ -34,7 +50,7 @@ export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
     close: function () { generation++; if (abort) abort.abort(); abort = null; state = null; identity = ''; active = ''; closedActivity.clear(); attemptedActivity.clear(); },
     read: function () { return state; },
     start: async function (page, token, action, value) {
-      if (location.href !== page || !/^https:\\/\\/www\\.pinterest\\.com\\/[^/?#]+\\/(?:_created\\/)?(?:[?#].*)?$/.test(page)) return;
+      if (location.href !== page || !/^https:[/][/](?:www|uk)\\.pinterest\\.com[/][^/?#]+[/](?:_created[/])?(?:[?#].*)?$/.test(page)) return;
       if (abort) return;
       active = page;
       var g = ++generation, previous = state;
@@ -46,6 +62,11 @@ export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
         var account = await request('UserSettingsResource', 'get', {}, '/settings/account-settings/', a.signal);
         if (g !== generation || !valid(page)) return;
         map(account);
+        if (!state.birthdate && action === 'read') {
+          var birthdayAccount = await request('ApiResource', 'get', {url: '/v3/users/settings/', data: {}}, '/settings/edit/birthdate/', a.signal);
+          if (g !== generation || !valid(page)) return;
+          map(birthdayAccount);
+        }
         state.ready = true;
         if (action === 'countries' || action === 'country') {
           var countries = await request('CountriesResource', 'get', {}, '/settings/edit/country-region/', a.signal);

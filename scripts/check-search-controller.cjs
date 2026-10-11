@@ -10,11 +10,21 @@ const pin = { id: '123', kind: 'pin', title: 'art', targetUrl: 'https://www.pint
 const snapshot = fields => ({ kind: 'state', session: 2, pageKey: page, query: 'art', categories: [], suggestions: [],
   results: [pin], heroes: [], ideaSections: [], api: true, inputReady: true, apiActive: true, ...fields });
 async function main() {
+  const regional = runtime.harness();
+  const regionalPage='https://uk.pinterest.com/search/pins/?q=art';
+  regional.setPage(regionalPage);
+  regional.controller.updateSearch(JSON.stringify(snapshot({pageKey:regionalPage})));
+  await regional.controller.submitSearch('regional');
+  assert(regional.events.some(event=>event[0]==='search' && event[1]==='https://uk.pinterest.com/search/pins/?q=regional'));
+  regional.controller.invalidatePending();
   const h = runtime.harness();
   h.controller.updateSearch(JSON.stringify(snapshot()));
   assert.equal(h.store.search.results.length, 1);
   assert.equal(h.store.searchActionsReady, true);
   assert.equal(h.store.searchInputReady, true);
+  const sameSnapshot = h.store.search;
+  h.controller.updateSearch(JSON.stringify(snapshot()));
+  assert.equal(h.store.search, sameSnapshot, 'identical validated snapshots preserve list identity');
   h.controller.updateSearch(JSON.stringify(snapshot({ session: 1, results: [] })));
   assert.equal(h.store.search.results.length, 1, 'older sessions cannot replace confirmed content');
   h.controller.updateSearch(JSON.stringify(snapshot({ pageKey: page + '&other=1', results: [] })));

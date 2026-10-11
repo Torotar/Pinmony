@@ -1,11 +1,11 @@
-const { readLegacySourceFileSync: readSourceFileSync } = require('./source-files.cjs');
+const { readSourceFileSync } = require('./source-files.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 function moduleFrom(path) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(readSourceFileSync(path, 'utf8'), {
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(readSourceFileSync(path, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS }
   }).outputText, { exports });
   return exports;
@@ -28,7 +28,7 @@ function harness(url, initial, acknowledge = true) {
     } },
     fetch: async () => ({ url: nextUrl, clone() { return { json: async () => nextBody }; } }) };
   context.window = context; context.top = context;
-  vm.runInNewContext(PIN_AUTH_BRIDGE_SCRIPT, context);
+  require('./product-coordination-harness.cjs').run(ts,PIN_AUTH_BRIDGE_SCRIPT, context);
   return { context, messages, location,
     setResponse(body, url = location.origin + '/resource/UserResource/get/') { nextBody = body; nextUrl = url; } };
 }
@@ -108,19 +108,31 @@ async function check() {
     isPinterestAuthRoute: moduleFrom('entry/src/main/ets/models/PinmonyAuth.ets').isPinterestAuthRoute };
   context.acceptsAuthMessage = acceptsAuthMessage;
   context.PINTEREST_URL = 'https://www.pinterest.com/';
-  vm.runInNewContext(ts.transpileModule('class Native {' + names.map(method).join('\n') +
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + names.map(method).join('\n') +
     '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
-  const native = new context.Native();
+  const native = require('./product-coordination-harness.cjs').createHost(context.Native, ts);
   let effects = 0;
   native.rejectOfflineAction = () => false;
-  Object.assign(native, { traceAction() {}, traceAuth() {}, profileStore: { profileActionsReady: true, profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] } }, pinStore: { detailActionsReady: true, detail: { pinUrl: 'https://www.pinterest.com/pin/123/' } }, searchStore: { search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false, heroes: [] } }, inboxStore: {}, controller: { runJavaScript() { effects++; return Promise.resolve('true'); } },
-    showMessage() { effects++; }, profileActionsReady: true,
-    profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] },
+  Object.assign(native, {
+    traceAction() { }, traceAuth() { },
+    inboxStore: Object.assign(native.inboxStore, {}),
+    controller: { runJavaScript() { effects++; return Promise.resolve('true'); } },
+    showMessage() { effects++; },
     currentProfileUrl: () => 'https://www.pinterest.com/sample/',
-    detail: { pinUrl: 'https://www.pinterest.com/pin/123/' }, detailActionsReady: true,
     currentPinUrl: () => 'https://www.pinterest.com/pin/123/', pinIdentity: value => value,
-    search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false, heroes: [] },
-    boardUrlFromAddress: () => '', currentSearchPageKey: () => 'https://www.pinterest.com/search/' });
+    boardUrlFromAddress: () => '', currentSearchPageKey: () => 'https://www.pinterest.com/search/',
+    profileStore: Object.assign(native.profileStore, { profileActionsReady: true, profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] } }, {
+        profileActionsReady: true,
+        profile: { profileUrl: 'https://www.pinterest.com/sample/', createdPins: [] }
+    }),
+    pinStore: Object.assign(native.pinStore, { detailActionsReady: true, detail: { pinUrl: 'https://www.pinterest.com/pin/123/' } }, {
+        detail: { pinUrl: 'https://www.pinterest.com/pin/123/' },
+        detailActionsReady: true
+    }),
+    searchStore: Object.assign(native.searchStore, { search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false, heroes: [] } }, {
+        search: { pageKey: 'https://www.pinterest.com/search/', discoveryApi: false, heroes: [] }
+    })
+});
   const searchRuntime = require('./search-controller-harness.cjs').createSearchRuntime(ts);
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);
   searchRuntime.bindIndex(native);
@@ -133,18 +145,22 @@ async function check() {
   await native.performProfileAction('settings'); await native.performInboxAction('dom-update');
   await native.performSearchAction('hero', 'hero'); await native.performDetailAction('unsupported', 'unsupported');
   assert.equal(effects, 0, 'unintegrated controls cause no request, navigation or feedback');
-  Object.assign(native, { authStatus: 'authenticated', navigationAddress: 'https://www.pinterest.com/login/' });
+  Object.assign(native, {
+    authStatus: 'authenticated', navigationAddress: 'https://www.pinterest.com/login/'
+});
   assert.equal(native.authWebVisible(), false, 'authenticated state never exposes website UI');
   native.authStatus = 'unauthenticated'; assert.equal(native.authWebVisible(), true);
   native.navigationAddress = 'https://www.pinterest.com/'; assert.equal(native.authWebVisible(), false);
   let resetCount = 0, currentUrl = message.pageUrl;
   const loaded = [];
-  Object.assign(native, { authEpoch: 3, authStatus: 'authenticated', authCheckTimer: -1,
+  Object.assign(native, {
+    authEpoch: 3, authStatus: 'authenticated', authCheckTimer: -1,
     controller: { getUrl: () => currentUrl, loadUrl: url => loaded.push(url), runJavaScript: async () => 'true' },
     homeCacheAccountIdFromProfileUrl: value => value || '', homePageKeyFromAddress: () => '',
-    tryRestoreAuthenticatedHome() {}, profileUrlFromAddress: value => value || '',
-    resetAuthenticatedContent() { resetCount++; }, configureDocumentRetention() {}, bindNativeNetwork() {}, tabsController: { changeIndex() {} },
-    pageHistory: { reset() {} }, isHomeRootAddress: () => false });
+    tryRestoreAuthenticatedHome() { }, profileUrlFromAddress: value => value || '',
+    resetAuthenticatedContent() { resetCount++; }, configureDocumentRetention() { }, bindNativeNetwork() { }, tabsController: { changeIndex() { } },
+    pageHistory: { reset() { } }, isHomeRootAddress: () => false
+});
   native.updateAuthState(JSON.stringify({ ...message, epoch: 2, status: 'unauthenticated' }));
   assert.equal(native.authStatus, 'authenticated'); assert.equal(resetCount, 0);
   native.updateAuthState(JSON.stringify({ ...message, status: 'unauthenticated' }));
@@ -154,18 +170,22 @@ async function check() {
   native.updateAuthState(JSON.stringify({ ...message, pageUrl: currentUrl }));
   assert.equal(native.authStatus, 'authenticated'); assert.equal(loaded.at(-1), context.PINTEREST_URL);
   let clearedDetails = 0, clearedCache = 0, clearedPrefetch = 0;
-  Object.assign(native, { homeCacheAccountId: 'old-account', clearOfflineHomeMarker() {}, clearRootTabCaches() {},
-    nativeNetwork: { invalidate() {} }, clearDetail() { clearedDetails++; },
-    pinStore: { detailCache: { clear() { clearedCache++; } }, clearDetailOrigins() {},
-      detailPrefetch: { clear() { clearedPrefetch++; } }, confirmedSaves: { clear() {} } } });
-  native.detailCache = native.pinStore.detailCache;
+  Object.assign(native, {
+    homeCacheAccountId: 'old-account', clearOfflineHomeMarker() { }, clearRootTabCaches() { },
+    nativeNetwork: { invalidate() { } }, clearDetail() { clearedDetails++; },
+    pinStore: Object.assign(native.pinStore, { detailCache: { clear() { clearedCache++; } }, clearDetailOrigins() { },
+        detailPrefetch: { clear() { clearedPrefetch++; } }, confirmedSaves: { clear() { } } })
+});
+  native.pinStore.detailCache = native.pinStore.detailCache;
   native.detailPrefetch = native.pinStore.detailPrefetch;
-  native.confirmedSaves = native.pinStore.confirmedSaves;
+  native.pinStore.confirmedSaves = native.pinStore.confirmedSaves;
   native.updateAuthState(JSON.stringify({ ...message, pageUrl: currentUrl, profileUrl: 'https://www.pinterest.com/new-account/' }));
   assert.equal(clearedDetails, 1, 'account switch discards old detail state and pending intentions');
   assert.equal(clearedCache, 1, 'account switch discards old cached presentation');
   assert.equal(clearedPrefetch, 1, 'account switch discards old prefetch data');
-  Object.assign(native, { authStatus: 'error', webPageLoading: false, lastLoginRetryAt: -1, showNetworkNotice() {} });
+  Object.assign(native, {
+    authStatus: 'error', webPageLoading: false, lastLoginRetryAt: -1, showNetworkNotice() { }
+});
   const beforeRetry = loaded.length;
   native.retryLogin(); native.retryLogin();
   assert.equal(loaded.length, beforeRetry + 1, 'rapid manual retry loads the session page once');
