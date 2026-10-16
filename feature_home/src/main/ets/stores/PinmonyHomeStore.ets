@@ -1,8 +1,13 @@
 import { PinmonyHomeMenuState } from '../models/PinmonyHomeMenu';
-import { PinmonyHomeSnapshot } from '../models/PinmonyHome';
+import { PinmonyHomeSnapshot, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
 
 @Observed
 export class PinmonyHomeStore {
+  imageRecovery: PinmonyHomeImageRecovery | undefined = undefined;
+  recoverImage(pinUrl: string, imageUrl: string): void {
+    if (!/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl) || !/^https:\/\/i\.pinimg\.com\//.test(imageUrl)) return;
+    this.imageRecovery = { pinUrl: pinUrl, imageUrl: imageUrl, revision: (this.imageRecovery?.revision || 0) + 1 };
+  }
   diskCacheRestored: boolean = false;
   diskCacheRestoredAt: number = 0;
   startupFeedCommitted: boolean = false;
@@ -27,6 +32,7 @@ export class PinmonyHomeStore {
   homeRefreshing: boolean = false;
   homeRefreshToken: number = 0;
   homeRefreshAwaitingPage: boolean = false;
+  homeNativeReadsReady: boolean = false;
   homeActionsReady: boolean = false;
   homeLoading: boolean = false;
   homeError: string = '';

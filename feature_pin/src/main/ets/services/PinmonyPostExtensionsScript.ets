@@ -39,6 +39,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
       likeCount: photo ? item.like_count || 0 : item.reaction_counts && item.reaction_counts['1'] || 0,
       liked: photo ? item.liked_by_me === true : item.reaction_by_me === 1,
       canLike: photo || item.type === 'aggregatedcomment', canEdit: own && item.type === 'aggregatedcomment',
+      canTranslate: item.type === 'aggregatedcomment' && typeof item.text === 'string' && !!item.text.trim(),
       canDelete: own && (photo || item.type === 'aggregatedcomment'), canReply: photo || item.type === 'aggregatedcomment', replyCount: item.comment_count || 0,
       replies: [], repliesOpen: false, repliesLoading: false, repliesError: '', busy: false };
   }
@@ -58,8 +59,17 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     } catch (e) { if (valid(state, comments)) state.error = e.message; }
     finally { if (valid(state, comments)) state.loading = false; } return true;
   }
-  api.commentsStart = function (pin) {
+  api.commentsAdopt = function (pin, encoded) {
+    if (window.PinmonyNativeCommentWritesEnabled === true) return false;
     if (!api.currentPin(pin)) return false;
+    try { var seed = JSON.parse(encoded), result = seed.result;
+      if (!/^\\d+$/.test(seed.aggregate || '') || !result || result.pin !== pin || !Array.isArray(result.items) || result.loading || result.busy) return false;
+      comments = { pin: pin, token: ++version, aggregate: seed.aggregate, loading: false, error: '', items: result.items,
+        bookmark: '', ended: false, busy: false, uncertain: false, mutationVersion: 0, actionError: '' }; return true;
+    } catch (_) { return false; }
+  };
+  api.commentsStart = function (pin) {
+    if (window.PinmonyNativeDetailReadsEnabled === true || !api.currentPin(pin)) return false;
     var state = comments = { pin: pin, token: ++version, aggregate: aggregate(pin), loading: false, error: '', items: [], bookmark: '', ended: false,
       busy: false, uncertain: false, mutationVersion: 0, actionError: '' };
     if (!state.aggregate) { state.error = '当前帖子缺少评论聚合标识，请稍后重试'; return false; }
@@ -74,14 +84,17 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     return found;
   }
   api.commentPhotoBegin = function (pin) {
+    if (window.PinmonyNativeCommentWritesEnabled === true) return false;
     if (!comments || comments.pin !== pin || !valid(comments, comments) || comments.loading || comments.busy || comments.uncertain) return false;
     comments.busy = true; comments.photoPending = true; comments.actionError = ''; return true;
   };
   api.commentPhotoFail = function (pin) {
+    if (window.PinmonyNativeCommentWritesEnabled === true) return false;
     if (!comments || comments.pin !== pin || !comments.photoPending) return;
     comments.photoPending = false; comments.busy = false; comments.actionError = '图片上传未确认，尚未提交评论，请重新选择图片';
   };
   api.commentWrite = async function (pin, encoded) {
+    if (window.PinmonyNativeCommentWritesEnabled === true) return false;
     var state = comments, value;
     try { value = JSON.parse(encoded); } catch (_) { return false; }
     if (!state || state.pin !== pin || !valid(state, comments) || state.loading || state.uncertain ||
@@ -158,6 +171,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     finally { if (valid(state, comments)) item.repliesLoading = false; } return true;
   };
   api.commentLike = async function (pin, commentId) {
+    if (window.PinmonyNativeCommentWritesEnabled === true) return false;
     var state = comments, item = null;
     if (!state || state.pin !== pin || !valid(state, comments) || state.loading || state.busy || state.uncertain) return false;
     state.items.some(function (p) { item = p.id === commentId ? p : p.replies.find(function (r) { return r.id === commentId; }); return !!item; });
@@ -179,6 +193,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     finally { item.busy = false; if (valid(state, comments)) state.busy = false; } return true;
   };
   api.previewRead = function (pin, readOnly) {
+    if (window.PinmonyNativeDetailReadsEnabled === true) return null;
     if (!api.currentPin(pin)) return null;
     var state = previews[id(pin)], aggregated = aggregate(pin);
     if (!aggregated) return null;
@@ -241,7 +256,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     } catch (e) { if (valid(state, boards)) state.error = stage + '读取失败：' + e.message; }
     finally { if (valid(state, boards)) state.loading = false; }
   }
-  api.boardsStart = function (pin) { if (!api.currentPin(pin)) return false;
+  api.boardsStart = function (pin) { if(window.PinmonyNativePostOperationsEnabled === true)return false; if (!api.currentPin(pin)) return false;
     boards = { pin: pin, loading: true, error: '', feedback: '', busy: false, items: [], shortlist: [], userId: '', raw: null,
       savedId: saved[id(pin)] && saved[id(pin)].id || '', savedBoard: saved[id(pin)] && saved[id(pin)].board || '', suggestions: [] };
     loadBoards(boards); return true;
@@ -249,6 +264,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
   api.boardsRead = function (pin) { return boards && boards.pin === pin && valid(boards, boards) ? boards : null; };
   api.boardsClose = function () { boards = null; };
   api.boardsSave = async function (pin, boardId) {
+    if(window.PinmonyNativePostOperationsEnabled === true)return false;
     var state = boards, board = state && state.items.concat(state.shortlist).find(function (p) { return p.id === boardId && p.enabled; });
     if (!state || state.pin !== pin || !valid(state, boards) || state.busy || state.loading || !board) return false;
     state.busy = true; state.error = ''; state.feedback = '';
@@ -273,6 +289,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     finally { if (valid(state, boards)) state.busy = false; } return true;
   };
   api.boardsCreate = async function (pin, name, secret) {
+    if(window.PinmonyNativePostOperationsEnabled === true)return false;
     var state = boards;
     if (!state || state.pin !== pin || !valid(state, boards) || state.busy || state.loading || !clean(name)) return false;
     if (state.createdBoard && state.createdBoard.name === clean(name) && state.createdBoard.secret === !!secret) {
@@ -297,6 +314,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     finally { if (valid(state, boards)) state.busy = false; } return true;
   };
   api.boardsRemove = async function (pin) {
+    if(window.PinmonyNativePostOperationsEnabled === true)return false;
     var state = boards, stored = saved[id(pin)];
     if (!state || state.pin !== pin || !valid(state, boards) || state.busy || !stored || !/^\\d+$/.test(stored.id) || stored.id !== state.savedId) return false;
     state.busy = true; state.error = ''; state.feedback = '';
@@ -365,6 +383,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
       { operation: 0, status: undo.status, error: undo.error } : null;
   };
   api.saveUndo = function (pin, copyId) {
+    if(window.PinmonyNativePostOperationsEnabled === true)return false;
     var stored = saved[id(pin)];
     if (!api.currentPin(pin) || !savedCurrent(stored) || !/^\\d+$/.test(copyId) || copyId === id(pin) || stored.id !== copyId || stored.busy) return false;
     stored.busy = true;
@@ -394,6 +413,7 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
   };
   api.feedbackRecord = function (pin, session) { feedback = { pin: pin, session: session, busy: false }; };
   api.feedbackUndo = function (pin, session) {
+    if(window.PinmonyNativePinMenusEnabled === true)return false;
     var state = feedback;
     if (!state || state.pin !== pin || state.session !== session || !api.currentPin(pin) || state.busy) return false;
     state.busy = true;

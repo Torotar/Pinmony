@@ -12,6 +12,7 @@ export interface PinmonyProfileRootView {
   rootContentInteracted: boolean;
   handleRootContentScroll: (offset: number, state: ScrollState) => void;
   openUserProfile: (url: string) => void;
+  openWebsite: (url: string) => void;
   backFromUserProfile: () => void;
   currentProfileUrl: () => string;
   changeProfileTab: (section: string) => Promise<void>;
@@ -37,16 +38,18 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
           if ((view.profileStore.profile || view.profileStore.profileLoading || view.profileStore.profileError) &&
               !view.profileStore.profileWebFlow && !view.pinStore.detail && !view.loadFailed) {
             Stack() {
-              if (view.profileStore.profile && !view.profileStore.profileWebFlow && !view.pinStore.detail && !view.loadFailed) {
+              if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && !view.pinStore.detail && !view.loadFailed) {
                 PinmonyProfilePage({
                   interactionReady: view.authStatus === 'authenticated' &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
-                  automaticLoadingEnabled: (!view.nativeRootOnly || view.rootContentInteracted) &&
+                  automaticLoadingEnabled: (view.profileStore.profileNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
                   profile: view.profileStore.profile,
                   onUser: (url: string) => view.openUserProfile(url),
+                  onWebsite: (url: string) => view.openWebsite(url),
                   onBack: view.profileStore.origins.length > 0 ? () => view.backFromUserProfile() : undefined,
+                  readsReady: view.profileStore.profileNativeReadsReady,
                   actionsReady: view.profileStore.profileActionsReady &&
                     view.profileStore.profile?.profileUrl === view.currentProfileUrl(),
                   syncError: view.profileStore.profileError,
@@ -55,7 +58,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                     if (!view.profileStore.profile || view.profileStore.profile.profileUrl !== url || view.profileStore.profile.section !== section ||
                         view.currentProfileUrl() !== url) return;
                     view.profileStore.profileScrollOffset = offset;
-                    if (view.profileStore.profileActionsReady) view.profileStore.profileCache.put(view.profileStore.profile, offset);
+                    if (view.profileStore.profileNativeReadsReady || view.profileStore.profileActionsReady) view.profileStore.profileCache.put(view.profileStore.profile, offset);
                   },
                   loading: view.profileStore.profileSwitching,
                   onTab: (section: string) => view.changeProfileTab(section),
@@ -75,7 +78,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                 })
                 .width('100%')
                 .height('100%')
-              } else if ((view.profileStore.profileLoading || view.profileStore.profileError) && !view.profileStore.profileWebFlow &&
+              } else if ((view.profileStore.profileLoading || view.profileStore.profileError || view.profileStore.profile?.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow &&
                          !view.pinStore.detail && !view.loadFailed) {
                 PinmonyBuildProfileStatus(view)
               }

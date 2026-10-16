@@ -45,6 +45,11 @@ export interface PinmonyOrganizeSnapshot {
 }
 
 export interface PinmonyProfileSnapshot {
+  contextEpoch?: number;
+  nativeOwn?: boolean;
+  nativeVersion?: number;
+  nativeInvalidation?: number;
+  contentHasMore?: boolean;
   kind: string;
   session: number;
   profileUrl: string;
@@ -52,10 +57,12 @@ export interface PinmonyProfileSnapshot {
   displayName: string;
   handle: string;
   avatarUrl: string;
+  coverUrl?: string;
   business?: boolean;
   isOwn?: boolean;
   about?: string;
   website?: string;
+  monthlyViews?: number;
   followers: string;
   following: string;
   actions: PinmonyProfileAction[];

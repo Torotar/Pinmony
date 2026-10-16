@@ -2,6 +2,7 @@ export const PIN_SEARCH_QUIZ_API_ENABLED: boolean = true;
 export const PIN_SEARCH_QUIZ_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname)) return;
+  if(window.PinmonyNativeSearchReadsEnabled === true)return;
   var page = '', epoch = 0, abort = null, attempted = false, changed = function () {};
   var bookmark = '', ended = true;
   var observedEntry = null;
@@ -85,6 +86,10 @@ export const PIN_SEARCH_QUIZ_API_SCRIPT: string = `
       consume(resource);
     } catch (failure) {
       if (live(token, key)) {
+        if (failure && failure.pinmonyCancelled === true) {
+          if (mode === 'entry') attempted = false;
+          error = ''; return false;
+        }
         var reason = controller.signal.aborted ? '请求超时' : failure && failure.message;
         if (!/^(HTTP [0-9]+|返回内容不是有效 JSON|接口未返回成功状态|返回数据格式不匹配|请求超时)$/.test(reason || '')) reason = '网络请求异常';
         error = '灵感推荐接口读取失败（' + reason + '），请重试';
@@ -141,6 +146,10 @@ export const PIN_SEARCH_QUIZ_API_SCRIPT: string = `
     return true;
   }
   window.PinmonySearchQuizApi = {
+    pause: function () {
+      if (mode !== 'entry' || !busy) return;
+      epoch++; if (abort) abort.abort(); abort = null; busy = false; attempted = false; error = '';
+    },
     reset: reset,
     read: function (key, callback) {
       if (window.PinmonySearchQuizApiEnabled !== true) return null;

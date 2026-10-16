@@ -11,6 +11,7 @@ export const PIN_EDIT_API_SCRIPT: string = `
   var reset = api.reset;
   api.reset = function () { state = null; reset(); };
   api.editStart = async function (pin) {
+    if(window.PinmonyNativePostOperationsEnabled === true)return false;
     if (!api.currentPin(pin) || state && state.busy && api.currentPin(state.pin)) return false;
     api.boardsClose();
     var s = state = { pin: pin, loading: true, busy: false, error: '', phase: 'edit', imageUrl: '',
@@ -74,11 +75,12 @@ export const PIN_EDIT_API_SCRIPT: string = `
   };
   api.editText = function(pin, field, value) {
     var s = state;
-    if (!s || s.pin !== pin || !valid(s) || s.phase !== 'edit' || s.busy || s.loading || s.error || s.uncertain || s.done ||
+    if (!s || s.pin !== pin || !valid(s) || !s.editableContent || s.phase !== 'edit' || s.busy || s.loading || s.error || s.uncertain || s.done ||
         ['title', 'description'].indexOf(field) < 0 || typeof value !== 'string' || value.length > 10000) return false;
     s[field] = value; return true;
   };
   api.editCommit = async function(pin, remove, title, description) {
+    if(window.PinmonyNativePostOperationsEnabled === true)return false;
     var s = state, picker = api.boardsRead(pin);
     if (!s || s.pin !== pin || !valid(s) || s.busy || s.loading || s.error || s.uncertain || s.done || !s.raw ||
         picker && picker.busy || remove && s.phase !== 'confirm') return false;

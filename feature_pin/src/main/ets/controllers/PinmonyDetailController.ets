@@ -49,6 +49,7 @@ export class PinmonyDetailController {
     const store = this.ports.store;
     this.ports.traceAction('detail.action.' + kind, id);
     if (this.ports.isOffline('detail.' + kind) || !this.ports.isAuthenticated()) return;
+    if(this.ports.nativePostAction && ['like','save','share','comment','more'].includes(kind) && await this.ports.nativePostAction(kind))return;
     if (store.detailPresentationOnly) {
       if (!await this.ensureActionContext()) return;
       const fresh: PinmonyDetailAction | undefined = store.detail?.actions.find(

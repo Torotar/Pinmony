@@ -106,17 +106,18 @@ export const PIN_DETAIL_API_SCRIPT: string = `
       title: (clean(pin.grid_title) || clean(pin.title) || clean(pin.description)).slice(0, 160) };
   }
   async function resolveMedia(pin, requestedKey, token, abort) {
+    if (window.PinmonyNativeDetailAuxiliaryEnabled === true) { detail = pin; detailBusy = false; mediaLoading = false; changed(); return true; }
     var id = String(pin.id);
     isVideo = pin.is_video === true || hasMedia(pin.videos) || !!(window.PinmonyVideoApi &&
       window.PinmonyVideoApi.detect && window.PinmonyVideoApi.detect(pin, id));
     carousel = null;
-    var isCarousel = hasPages(pin.carousel_data) || !!(window.PinmonyCarouselApi && window.PinmonyCarouselApi.detect(pin, id));
-    mediaUnsupported = isCarousel && !window.PinmonyCarouselApi ||
-      hasPages(pin.story_pin_data) && !singleImageStory(pin) && !isCarousel && !isVideo ||
-      isVideo && !window.PinmonyVideoApi;
-    if (mediaUnsupported) {
-      detail = null; detailError = '暂不支持此帖子的媒体内容';
-      return false;
+    var isCarousel = hasPages(pin.carousel_data) || !!(window.PinmonyCarouselApi && window.PinmonyCarouselApi.detect(pin, id)) ||
+      hasPages(pin.story_pin_data) && !singleImageStory(pin) && !isVideo;
+    // Story metadata is a reason to resolve the full media response, not evidence of an unsupported format.
+    mediaUnsupported = false;
+    if (isCarousel && !window.PinmonyCarouselApi || isVideo && !window.PinmonyVideoApi) {
+      console.info('PinmonyDiagnostic: media.resolve.failed reason=bridge-unavailable');
+      throw new Error('media-bridge-unavailable');
     }
     if (!mapPin(pin)) throw new Error('invalid-pin');
     // Publish the verified base before waiting for extra media resources.
@@ -155,6 +156,7 @@ export const PIN_DETAIL_API_SCRIPT: string = `
     return true;
   }
   function retryMedia(requestedPin, operation) {
+    if (window.PinmonyNativeDetailAuxiliaryEnabled === true) return false;
     if (!enabled || !detail || !current() || detailBusy || mediaLoading || mediaUnsupported) return false;
     if (requestedPin && requestedPin !== key || operation !== undefined &&
         (!Number.isInteger(operation) || operation < 1 || operation > 2147483647)) return false;
@@ -229,6 +231,7 @@ export const PIN_DETAIL_API_SCRIPT: string = `
     return true;
   }
   async function request(isRelated, append) {
+    if (isRelated && window.PinmonyNativeDetailReadsEnabled === true) return false;
     // Related content may start once the current Pin is verified; comments
     // and other interaction state are refreshed independently.
     if (isRelated ? relatedBusy || (append && ended) : detailBusy || mediaLoading) return false;
@@ -301,7 +304,9 @@ export const PIN_DETAIL_API_SCRIPT: string = `
           }
         }
         else {
-          detailError = '帖子加载失败，请重试';
+          detailError = error && error.message === 'media-bridge-unavailable' ? '媒体读取尚未就绪，请重试' :
+            error && (error.message === 'network-unavailable' || error.pinmonyNetworkUnavailable === true) ?
+              '网络连接失败，帖子未能加载，请重试' : '帖子加载失败，请重试';
           if (error && error.name === 'AbortError' && error.pinWebEpochChanged === true && detailRetryCount < 1) {
             detailRetryCount++;
             setTimeout(function () {

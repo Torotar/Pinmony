@@ -10,7 +10,7 @@ function method(name) {
 }
 const context = { Date, setTimeout, PinmonyRuntimeLog: { info() {}, warn() {} } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' +
-  ['rootReadInFlight', 'ensureRootActionContext', 'restorePublishBoard', 'boardOperation'].map(method).join('\n') +
+  ['rootReadInFlight', 'ensureRootActionContext', 'restorePublishBoard', 'boardOperation', 'clearProfile', 'nativeBoardVisible'].map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 (async () => {
   const n = new context.Native();
@@ -42,5 +42,23 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class N
   assert(dispatches[1].includes('select'), 'organize flow retains selection return');
   n.restorePublishBoard(); n.restorePublishBoard();
   assert.deepEqual(loads, [board], 'publish returns to original board exactly once');
+  const preparing = new context.Native();
+  Object.assign(preparing, {
+    activeSheetKind: 'publish', showNativeSheet: true, nativeRootOnly: true,
+    publishBoardReturn: board, loadFailed: false,
+    boardStore: { boardDetail: { pageKey: board }, presentationPage: board },
+    boardUrlFromAddress: () => '', nativeDisplayAddress: () => root,
+    profileReadController: { pause() {} }, profileActionsController: { reset() {} },
+    closePublishFlow() {}, finishProfilePull() {},
+    profileStore: { publishPreparing: true, publishLoading: true, profileRequestToken: 0 }
+  });
+  assert.equal(preparing.nativeBoardVisible(), true, 'background profile preparation cannot hide retained board');
+  preparing.clearProfile();
+  assert.equal(preparing.showNativeSheet, true, 'profile reset preserves preparing menu');
+  assert.equal(preparing.activeSheetKind, 'publish');
+  assert.equal(preparing.profileStore.publishLoading, true);
+  preparing.profileStore.publishPreparing = false;
+  preparing.clearProfile();
+  assert.equal(preparing.showNativeSheet, false, 'ordinary profile reset still clears old menu');
   console.log('Board publish context: stale read, pending tab, cancelled navigation and board restoration passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

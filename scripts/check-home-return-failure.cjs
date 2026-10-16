@@ -66,7 +66,13 @@ reopened.native.handleMainFrameFailure(pin, -2, 'ERR_FAILED');
 assert.deepEqual(reopened.effects, [], 'failure from Pin A cannot erase newly opened Pin B');
 assert.equal(reopened.native.pinStore.detailOpeningPin, other);
 const failedHome = harness();
+Object.assign(failedHome.native, { rootReadToken: 7, tabRequestToken: 7, rootReadAddress: home,
+  rootReadStartedAt: Date.now(), retainedRootTabPending: 0, pendingWebTab: 0, clearRootTabGuard() {} });
 failedHome.native.handleMainFrameFailure(home, -2, 'ERR_FAILED');
+assert.equal(failedHome.native.rootReadToken, -1, 'failed document releases the shared read');
+assert.equal(failedHome.native.tabRequestToken, 8, 'late confirmation cannot revive a failed read');
+assert.equal(failedHome.native.retainedRootTabPending, -1);
+assert.equal(failedHome.native.rootReadAddress, '');
 assert.ok(failedHome.effects.includes('notice'), 'actual target failure remains visible');
 assert.equal(failedHome.native.homeStore.home, failedHome.cached);
 assert.equal(failedHome.native.homeStore.homeActionsReady, false);

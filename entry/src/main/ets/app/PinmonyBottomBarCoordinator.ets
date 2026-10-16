@@ -4,6 +4,7 @@ import { PinmonyAuthStatus } from 'common_session';
 import { HdsTabsController, HdsAnimationMode } from '@kit.UIDesignKit';
 
 export interface PinmonyBottomBarCoordinatorPorts {
+  searchResultsVisible?: () => boolean;
   floatingTabsMounted: () => boolean;
   setFloatingTabsMounted: (value: boolean) => void;
   floatingTabsHidden: () => boolean;
@@ -80,6 +81,7 @@ export class PinmonyBottomBarCoordinator {
   }
 
   handleRootContentScroll(offset: number, state: ScrollState): void {
+    if (this.ports.searchResultsVisible?.()) return;
     if (this.activeTab === 2 && !this.inboxContentScrollable) return;
     if (!this.bottomBarScrollCollapseEnabled || state !== ScrollState.Scroll || offset === 0 ||
         !this.floatingTabsMounted || this.authStatus !== 'authenticated' ||
@@ -97,7 +99,7 @@ export class PinmonyBottomBarCoordinator {
       this.setBottomBarHidden(true, HdsAnimationMode.CLICK_ANIMATION);
       return;
     }
-    if (this.pinStore.detailOpeningPin || !this.nativeRootTabsVisible()) {
+    if (this.pinStore.detailOpeningPin || !this.nativeRootTabsVisible() || this.ports.searchResultsVisible?.()) {
       // Like Frogmark folder depth: capture once, never overwrite in children.
       if (this.childBottomBarRestoreHidden === null) {
         this.childBottomBarRootTab = this.activeTab;

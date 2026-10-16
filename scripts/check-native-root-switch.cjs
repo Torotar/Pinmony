@@ -48,7 +48,7 @@ function harness() {
     traceAction() {}, logPageLifecycle() {}, syncFloatingTabsMotion() {}, cancelHomeDetailMore() {},
     detailRequestOwners: new Map(), detailJourney: { close() {} }, detailImageTimer: -1,
     pageTasks: { cancelTimeout() {} }, detailReadNetwork: { invalidate() {} }, dismissPostSnack() {},
-    detailDocumentBindingService: { reset() {} }, detailImageStage: { reset() {} },
+    detailNativeAuxiliary: { pause() {}, cancelVisual() {}, apply() {} }, detailDocumentBindingService: { reset() {} }, detailImageStage: { reset() {} },
     restoreRetainedSearch() {}, restoreInbox() {}, restoreProfile() {},
     expectHome() {}, expectSearch() {}, expectInbox() {}, expectProfile() {}, showMessage() {},
     rootActionContextReady: () => false,

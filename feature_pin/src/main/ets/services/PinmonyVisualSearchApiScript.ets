@@ -20,6 +20,7 @@ export const PIN_VISUAL_SEARCH_API_SCRIPT: string = `
     read: function (pin) { return state && state.pin === pin && current(state) ?
       { pin: pin, loading: state.loading, error: state.error, ended: state.ended, items: state.items } : null; },
     start: function (pin, crop, append, first) {
+      if (window.PinmonyNativeDetailAuxiliaryEnabled === true) return false;
       var m = String(pin).match(/^https:[/][/](?:www|uk)\\.pinterest\\.com[/]pin[/](\\d+)[/]$/);
       if (!m || String(pin) !== location.origin + '/pin/' + m[1] + '/' || location.pathname !== '/pin/' + m[1] + '/' || !validCrop(crop)) return false;
       if (append && (!state || !current(state) || state.pin !== pin || state.loading || state.ended ||

@@ -169,6 +169,39 @@ async function main() {
   assert.equal(api.moreAction(7, pin, 'edit', () => {}), false, 'stale menu session cannot open editor');
   assert.equal(api.moreAction(8, pin, 'edit', () => {}), true);
   assert.equal(events.at(-1).kind, 'editOpen');
+  document.getElementById = () => ({ textContent: JSON.stringify({ client_context: { is_authenticated: true, user: { id: '1' } } }) });
+  for (const repin of [false, true]) {
+    data = { id: '101', pinner: { id: '1' }, is_repin: repin };
+    assert(api.detailMoreOpen(10, pin));
+    assert(api.detailMoreRead(10, pin).options.some(item => item.id === 'detail-edit' && item.enabled),
+      'own original and own saved copy both expose edit');
+    api.detailMoreClose(10, pin);
+  }
+  data = { id: '101', pinner: { id: '99' }, is_repin: false };
+  api.detailMoreOpen(11, pin);
+  assert(!api.detailMoreRead(11, pin).options.some(item => item.id === 'detail-edit'), 'another account original does not expose edit');
+  api.detailMoreClose(11, pin);
+  for (const [fields, visible] of [
+    [{ ai_disclosures: [1] }, true],
+    [{ gen_ai_topics: [{ name: '艺术' }], digital_media_source_type: 16 }, true],
+    [{ gen_ai_topics: [{ name: '艺术' }], digital_media_source_type: 11 }, true],
+    [{ gen_ai_topics: null, digital_media_source_type: 16 }, false],
+    [{ gen_ai_topics: [null, { name: ' ' }, { name: 1 }] }, false],
+    [{}, false]
+  ]) {
+    data = { id: '101', ...fields };
+    api.detailMoreOpen(12, pin);
+    const menu = api.detailMoreRead(12, pin);
+    assert.equal(menu.options.some(item => item.id === 'detail-ai-help'), visible);
+    if (visible) {
+      const count = requests.length;
+      assert.equal(api.moreAction(12, pin, 'detail-ai-help', () => {}), true);
+      assert.equal(events.at(-1).kind, 'help');
+      assert.equal(events.at(-1).value, 'https://help.pinterest.com/en/article/gen-ai-labels');
+      assert.equal(requests.length, count, 'help navigation must not issue a business write');
+    }
+    api.detailMoreClose(12, pin);
+  }
   window.PinmonyEditApiEnabled = false;
   assert.equal(api.moreSnapshot({ session: 9, pin, options: [{ id: 'edit', label: '编辑 Pin 图', enabled: true }] }).options[0].enabled, false);
   const disabled = { ...window, PinmonyPostApi: undefined, PinmonyPostApiEnabled: false }; disabled.top = disabled;

@@ -1,4 +1,5 @@
 import { PinmonyImageViewer } from './PinmonyImageViewer';
+import { splitDescriptionTags, PinmonyDescriptionPart } from '../services/PinmonyDescriptionTags';
 import { PinmonyVisualSearchView } from './PinmonyVisualSearchView';
 import { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from '../models/PinmonyVisualSearch';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -7,6 +8,7 @@ import { PinmonyCarouselView } from './PinmonyCarouselView';
 import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
 import { PinmonyDetailHero, DetailHeroSource } from './PinmonyDetailHero';
 import { display } from '@kit.ArkUI';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { SmartImage, getRecommendCardWidth, getRecommendColumnCount, RECOMMEND_CARD_RADIUS_VP,
   RECOMMEND_PHONE_GAP_VP, RECOMMEND_WIDE_GAP_VP } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
@@ -18,6 +20,13 @@ export struct PinmonyDetailPage {
   @Prop @Watch('onRenderIdentityChanged') renderIdentity: string = '';
   @Prop traceId: number = 0;
   @Prop @Watch('updateDetailLayout') actionsReady: boolean = true;
+  @Prop postActionsReady: boolean = false;
+  @Prop shareActionsReady: boolean = false;
+  @Prop likeBlocked: boolean = false;
+  @Prop menuActionsReady: boolean = false;
+  @Prop commentActionsReady: boolean = false;
+  @Prop auxiliaryReady: boolean = false;
+  @Prop readsReady: boolean = false;
   @Prop deferredActions: boolean = false;
   @Prop saveBusy: boolean = false;
   @Prop mediaReadBusy: boolean = false;
@@ -34,6 +43,7 @@ export struct PinmonyDetailPage {
   onVisualSearch?: (crop: PinmonyImageCrop, append: boolean, first: boolean) => void;
   onDownload?: () => void;
   onViewerSave?: () => void;
+  onTagSearch?: (query: string, pin: string) => void;
   @Prop contentError: string = '';
   @Prop contentRetryable: boolean = true;
   onContentRetry?: () => void;
@@ -42,6 +52,7 @@ export struct PinmonyDetailPage {
   onPresented?: () => void;
   private heroVisible: boolean = false;
   @State private heroRenderRevision: number = 0;
+  @State private decodedHeroSource: DetailHeroSource | undefined = undefined;
   @State private textOverflowing: boolean = false;
   @State private videoFailure: string = '';
   @State private videoRetryRevision: number = 0;
@@ -76,6 +87,7 @@ export struct PinmonyDetailPage {
   private onPinChanged(): void {
     if (this.activePin !== this.detail.pinUrl) {
       this.activePin = this.detail.pinUrl;
+      this.decodedHeroSource = undefined;
       this.expanded = false;
       this.zoomImageUrl = '';
       this.textOverflowing = false;
@@ -89,6 +101,12 @@ export struct PinmonyDetailPage {
   }
 
   private notifyImageLoaded(pinUrl: string, imageUrl: string): void {
+    if (pinUrl === this.detail.pinUrl && imageUrl === this.detail.imageUrl) {
+      const key: string = this.heroRenderKey(imageUrl, pinUrl);
+      if (this.decodedHeroSource?.key !== key) this.decodedHeroSource = {
+        key: key, url: imageUrl, pinUrl: pinUrl, revision: this.heroRenderRevision
+      };
+    }
     if (!this.onImageLoaded) return;
     const identity: string = this.renderIdentity + '|' + pinUrl + '|' + imageUrl;
     if (this.lastImageNotification === identity) return;
@@ -121,6 +139,7 @@ export struct PinmonyDetailPage {
     if (!this.heroVisible || !this.detail.imageUrl || key !== this.heroRenderKey(this.detail.imageUrl, this.detail.pinUrl)) return;
     this.heroRenderRevision = (this.heroRenderRevision + 1) % 2147483647;
     this.lastImageNotification = '';
+    if (this.onContentRetry) this.onContentRetry();
   }
 
   private titleBarOptions(): HdsNavigationTitleBarOptions {
@@ -131,15 +150,15 @@ export struct PinmonyDetailPage {
         style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: {
           backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
         content: { title: { mainTitle: '' },
-          backIcon: { icon: $r('app.media.image_close'), label: '关闭放大', isEnabled: true,
+          backIcon: { icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]), label: '关闭放大', isEnabled: true,
             action: () => { if (this.onImageLayer) this.onImageLayer(''); } },
           menu: { maxCount: 3, value: [
             { content: { icon: $r('app.media.lucide_share_2'), label: '分享', isEnabled: !!share && this.acceptsActionIntent(share),
               action: () => { if (share && this.onAction) this.onAction(share.id, share.kind); } } },
-            { content: { icon: $r('app.media.lucide_download'), label: '下载图片', isEnabled: this.actionsReady,
+            { content: { icon: $r('app.media.lucide_download'), label: '下载图片', isEnabled: this.actionsReady || this.auxiliaryReady,
               action: () => { if (this.onDownload) this.onDownload(); } } },
             { content: { label: this.saveBusy ? '取消中' : (this.action('save')?.selected ? '已收藏' : '收藏'), type: TextStyleMode.NORMAL,
-              isEnabled: !this.saveBusy && this.actionsReady && !!this.action('save')?.enabled,
+              isEnabled: !this.saveBusy && (this.actionsReady || this.postActionsReady) && (this.postActionsReady || !!this.action('save')?.enabled),
               action: () => { if (this.onViewerSave) this.onViewerSave(); } } }
           ] } }
       };
@@ -202,7 +221,9 @@ export struct PinmonyDetailPage {
   }
 
   private action(kind: string): PinmonyDetailAction | undefined {
-    return this.detail.actions.find((item: PinmonyDetailAction): boolean => item.kind === kind);
+    const item: PinmonyDetailAction | undefined = this.detail.actions.find((value: PinmonyDetailAction): boolean => value.kind === kind);
+    if(!item && kind === 'share' && this.shareActionsReady)return {id:'native-share',kind:'share',label:'分享',countText:'',enabled:true,selected:false};
+    return item;
   }
 
   private leftActions(): PinmonyDetailAction[] {
@@ -212,7 +233,7 @@ export struct PinmonyDetailPage {
     const kinds: string[] = ['like', 'comment'];
     const result: PinmonyDetailAction[] = kinds.map((kind: string): PinmonyDetailAction => {
       const real: PinmonyDetailAction | undefined = available.find((item: PinmonyDetailAction): boolean => item.kind === kind);
-      if (real && (this.detail.imageStageReady && this.actionsReady ||
+      if (real && (this.readsReady || this.detail.imageStageReady && (this.actionsReady || this.postActionsReady && kind === 'like' || this.commentActionsReady && kind === 'comment') ||
           this.detail.kind === 'cached' || this.detail.actionsRetained)) return real;
       return { id: 'pending-' + kind, kind: kind, label: kind === 'like' ? '点赞' : '评论',
         countText: '', enabled: false, selected: false };
@@ -246,7 +267,7 @@ export struct PinmonyDetailPage {
   }
 
   private isCommentsReady(): boolean {
-    return this.detail.dataSource !== 'api' || this.detail.interactionsSettled === true;
+    return this.readsReady || this.detail.dataSource !== 'api' || this.detail.interactionsSettled === true;
   }
 
   private isRecommendReady(): boolean {
@@ -333,9 +354,23 @@ export struct PinmonyDetailPage {
   }
 
   private acceptsActionIntent(item: PinmonyDetailAction): boolean {
-    if (item.kind === 'save' && this.saveBusy) return false;
-    return (this.actionsReady && item.enabled) ||
+    if (item.kind === 'save' && this.saveBusy || item.kind === 'like' && this.likeBlocked) return false;
+    if (item.kind === 'share' && this.shareActionsReady) return true;
+    if (item.kind === 'more' && this.menuActionsReady) return true;
+    return (this.commentActionsReady && item.kind === 'comment') || (this.postActionsReady && (item.kind === 'save' || item.kind === 'like' && !item.selected)) || (this.actionsReady && item.enabled) ||
       (this.deferredActions && /^(like|comment|save|share|more|source)$/.test(item.kind));
+  }
+
+  private creatorFontSize(): number {
+    try {
+      const utils = this.getUIContext().getMeasureUtils();
+      const width: string = Math.max(1, this.contentWidth - 36 - (this.detail.creatorAvatar ? 42 : 0)).toString() + 'vp';
+      const full = utils.measureTextSize({ textContent: this.detail.creator, fontSize: '18fp',
+        fontWeight: FontWeight.Medium, constraintWidth: width });
+      const single = utils.measureTextSize({ textContent: this.detail.creator, fontSize: '18fp',
+        fontWeight: FontWeight.Medium, constraintWidth: width, maxLines: 1 });
+      return Number(full.height) > Number(single.height) + 1 ? 16 : 18;
+    } catch (_) { return 18; }
   }
 
   @Builder
@@ -401,9 +436,9 @@ export struct PinmonyDetailPage {
     .padding(0)
     .width('100%')
     .backgroundColor(Color.Transparent)
-    .enabled(((this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions))
+    .enabled(((this.readsReady || this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions))
     .onClick(() => {
-      if (((this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions) && this.onRelated)
+      if (((this.readsReady || this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions) && this.onRelated)
         this.onRelated(pin.id);
     })
     .accessibilityText(pin.title.length > 0 ? pin.title : '打开相关 Pin')
@@ -465,8 +500,8 @@ export struct PinmonyDetailPage {
             }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
           } else if (this.detail.video && this.detail.isVideo) {
             PinmonyVideoPlayer({ video: this.detail.video, poster: this.detail.imageUrl, active: this.videoActive, openId: this.traceId,
-              mediaOwner: this.detail.pinUrl + '|' + this.detail.session.toString(),
-              sessionReady: this.actionsReady,
+              mediaOwner: this.detail.pinUrl + '|' + this.traceId.toString(),
+              sessionReady: this.actionsReady || this.readsReady,
               readingAddress: this.detail.mediaLoading === true || this.mediaReadBusy,
               retryRevision: this.videoRetryRevision,
               onFailureChanged: (pinId: string, message: string) => {
@@ -495,22 +530,24 @@ export struct PinmonyDetailPage {
           }
 
             if (this.detail.aiLabel) {
-              Text(this.detail.aiLabel).fontSize(14).fontColor(Color.White)
-                .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-                .backgroundColor('#B34B4F52').borderRadius(16).margin(8)
-                .align(Alignment.BottomStart).hitTestBehavior(HitTestMode.None)
-                .accessibilityText(this.detail.aiLabel)
+              Row() {
+                Text(this.detail.aiLabel).fontSize(14).fontColor(Color.White)
+                  .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+                  .backgroundColor('#B34B4F52').borderRadius(16)
+                  .accessibilityText(this.detail.aiLabel)
+              }.width('100%').justifyContent(FlexAlign.Start).padding(8)
+                .hitTestBehavior(HitTestMode.None)
             }
             Button({ type: ButtonType.Normal }) {
               Row() {
                 Text('搜索图片').fontSize(14).fontColor(Color.White)
                   .width(this.searchLabelVisible ? 64 : 0).opacity(this.searchLabelVisible ? 1 : 0)
                   .maxLines(1).clip(true).animation({ duration: 240, curve: Curve.EaseInOut })
-                Image($r('app.media.image_search')).width(24).height(24)
+                SymbolGlyph($r('sys.symbol.circle_viewfinder')).fontSize(24).fontColor([Color.White])
               }
             }.width(this.searchLabelVisible ? 108 : 44).height(44).padding({ left: 10, right: 10 })
               .animation({ duration: 240, curve: Curve.EaseInOut }).borderRadius(16).margin(8)
-              .backgroundColor('#77303030').enabled(this.actionsReady)
+              .backgroundColor('#77303030').enabled(this.actionsReady || this.auxiliaryReady || this.deferredActions)
               .onClick(() => { if (this.onImageLayer) this.onImageLayer('search'); })
               .accessibilityText('搜索图片中的相关内容')
           }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
@@ -519,7 +556,7 @@ export struct PinmonyDetailPage {
           if (this.contentError) {
             Text(this.contentError).fontSize(14).fontColor($r('app.color.secondary_text'))
             if (this.contentRetryable) Button('重试详情').onClick(() => { if (this.onContentRetry) this.onContentRetry(); })
-          } else if (!this.actionsReady && !this.deferredActions) {
+          } else if (!this.actionsReady && !this.readsReady && !this.deferredActions) {
             Text(this.detail.kind === 'cached' ? '正在同步当前帖子状态…' : '正在确认帖子内容…')
               .fontSize(14).fontColor($r('app.color.secondary_text'))
           } else if ((this.detail.actionsRetained || this.detail.commentsRetained || this.detail.relatedRetained) &&
@@ -563,19 +600,24 @@ export struct PinmonyDetailPage {
               Row({ space: 10 }) {
                 if (this.detail.creatorAvatar.length > 0) {
                   Image(this.detail.creatorAvatar)
-                    .onClick(() => { if (this.detail.creatorUrl && this.onUser) this.onUser(this.detail.creatorUrl); })
                     .width(32)
                     .height(32)
                     .borderRadius(16)
                     .objectFit(ImageFit.Cover)
                 }
                 Text(this.detail.creator)
-                  .fontSize(18)
+                  .fontSize(this.creatorFontSize())
+                  .layoutWeight(1)
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.primary_text'))
                   .maxLines(2)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
               }
               .width('100%')
+              .onClick(() => {
+                PinmonyRuntimeLog.info('DetailCreatorTrace: click target=' + (this.detail.creatorUrl ? 'ready' : 'missing'));
+                if (this.detail.creatorUrl && this.onUser) this.onUser(this.detail.creatorUrl);
+              })
             }
             if (this.detail.title.length > 0) {
               Text(this.detail.title)
@@ -587,7 +629,15 @@ export struct PinmonyDetailPage {
                 .width('100%')
             }
             if (this.detail.description.length > 0) {
-              Text(this.detail.description)
+              Text() {
+                ForEach(splitDescriptionTags(this.detail.description), (part: PinmonyDescriptionPart) => {
+                  Span(part.text)
+                    .fontColor(part.query ? $r('app.color.link_text') : $r('app.color.primary_text'))
+                    .onClick(() => {
+                      if (part.query && this.onTagSearch) this.onTagSearch(part.query, this.detail.pinUrl);
+                    })
+                })
+              }
                 .fontSize(16)
                 .lineHeight(24)
                 .fontColor($r('app.color.primary_text'))
@@ -596,33 +646,19 @@ export struct PinmonyDetailPage {
                 .width('100%')
             }
             if (this.expanded || this.textOverflowing) {
+              Row() {
+                Blank()
               Button(this.expanded ? '收起' : '查看更多')
                 .height(32)
                 .padding(0)
                 .backgroundColor(Color.Transparent)
                 .fontColor($r('app.color.primary_text'))
                 .onClick(() => this.expanded = !this.expanded)
+              }.width('100%')
             }
-            if (this.detail.sourceLabel.length > 0 && this.action('source')) {
-              Button(this.detail.sourceLabel)
-                .width('100%')
-                .height(50)
-                .backgroundColor($r('app.color.surface_muted'))
-                .fontColor($r('app.color.primary_text'))
-                .fontSize(17)
-                .borderRadius(25)
-                .enabled(this.acceptsActionIntent(this.action('source')!))
-                .onClick(() => {
-                  const item: PinmonyDetailAction | undefined = this.action('source');
-                  if (item && this.acceptsActionIntent(item) && this.onAction) {
-                    this.onAction(item.id, item.kind);
-                  }
-                })
-                .accessibilityText(this.detail.sourceLabel)
-            }
-          if ((this.actionsReady && this.detail.imageStageReady !== false ||
+          if ((this.readsReady || this.actionsReady && this.detail.imageStageReady !== false ||
               this.detail.kind === 'cached' || this.detail.commentsRetained) && !this.detail.commentEmpty &&
-              (this.detail.commentsAvailable || this.detail.commentPreview)) {
+              (this.detail.commentsAvailable || this.detail.commentPreview || this.detail.commentError)) {
             Button({ type: ButtonType.Normal }) {
               Column({ space: 2 }) {
                 if (this.detail.commentLoading && !this.detail.commentsRetained) {
@@ -637,16 +673,33 @@ export struct PinmonyDetailPage {
                   .fontColor($r('app.color.primary_text')).width('100%')
               }.width('100%').alignItems(HorizontalAlign.Start)
             }.width('100%').padding(0).borderRadius(0).backgroundColor(Color.Transparent)
-              .enabled(((this.actionsReady && this.detail.kind !== 'cached' && !this.detail.commentsRetained) || this.deferredActions))
+              .enabled((this.readsReady || (this.actionsReady && this.detail.kind !== 'cached' && !this.detail.commentsRetained) || this.deferredActions))
               .onClick(() => { if (this.onComments) this.onComments(); })
             if (this.detail.commentError && !this.detail.commentLoading) {
               Button('重试评论预览')
                 .height(32).padding(0).backgroundColor(Color.Transparent)
                 .fontColor($r('app.color.primary_text'))
-                .enabled(this.actionsReady && !this.detail.commentsRetained)
+                .enabled((this.actionsReady || this.readsReady) && !this.detail.commentsRetained)
                 .onClick(() => { if (this.onCommentsRetry) this.onCommentsRetry(); })
             }
           }
+            if (this.detail.sourceLabel.length > 0 && this.action('source')) {
+              Button('访问网站')
+                .width('100%')
+                .height(50)
+                .backgroundColor($r('app.color.surface_muted'))
+                .fontColor($r('app.color.primary_text'))
+                .fontSize(17)
+                .borderRadius(25)
+                .enabled(this.acceptsActionIntent(this.action('source')!))
+                .onClick(() => {
+                  const item: PinmonyDetailAction | undefined = this.action('source');
+                  if (item && this.acceptsActionIntent(item) && this.onAction) {
+                    this.onAction(item.id, item.kind);
+                  }
+                })
+                .accessibilityText('访问网站，' + this.detail.sourceLabel)
+            }
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
@@ -663,7 +716,13 @@ export struct PinmonyDetailPage {
   @Builder
   private detailFooter() {
     Column({ space: 12 }) {
-          if (this.detail.dataSource === 'api' && this.actionsReady) {
+          if (this.detail.kind === 'cached' && !this.detail.relatedLoading && this.detail.relatedError) {
+            Text(this.detail.relatedError)
+              .fontSize(14).fontColor($r('app.color.secondary_text'))
+            Button('加载推荐').enabled(this.deferredActions || this.readsReady || this.actionsReady)
+              .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+          }
+          if (this.detail.kind !== 'cached' && this.detail.dataSource === 'api' && (this.actionsReady || this.readsReady)) {
             if (!this.detail.relatedLoading && this.detail.relatedError) {
               Text(this.detail.relatedError).fontSize(14).fontColor($r('app.color.secondary_text'))
               Button('重试推荐').onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
@@ -678,10 +737,12 @@ export struct PinmonyDetailPage {
   @Builder
   private heroImage() {
     // Image lifecycle belongs to a component with a stable complete source key.
+    Stack() {
     ForEach(this.heroImageSources(this.detail.imageUrl, this.detail.pinUrl), (source: DetailHeroSource) => {
       PinmonyDetailHero({ source: source, openId: this.traceId, heightVp: this.heroHeight(), label: this.detail.title,
         phase: this.detail.kind, blocked: !!this.contentError, renderIdentity: this.renderIdentity,
         stageReady: this.detail.imageStageReady === true, confirmedLoaded: this.detail.imageLoaded === true,
+        previewAvailable: this.decodedHeroSource?.pinUrl === this.detail.pinUrl,
         onLoaded: (pin: string, image: string) => {
           if (!this.heroVisible || source.key !== this.heroRenderKey(this.detail.imageUrl, this.detail.pinUrl) ||
               pin !== this.detail.pinUrl || image !== this.detail.imageUrl) return;
@@ -694,10 +755,13 @@ export struct PinmonyDetailPage {
         }, onRetry: () => this.retryHeroImage(source.key),
         onTap: () => { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } })
     }, (source: DetailHeroSource): string => source.key)
+    }.width('100%').height(this.heroHeight())
   }
 
   private heroImageSources(url: string, pinUrl: string): DetailHeroSource[] {
-    return [{ key: this.heroRenderKey(url, pinUrl), url: url, pinUrl: pinUrl, revision: this.heroRenderRevision }];
+    const next: DetailHeroSource = { key: this.heroRenderKey(url, pinUrl), url: url, pinUrl: pinUrl, revision: this.heroRenderRevision };
+    return this.decodedHeroSource?.pinUrl === pinUrl && this.decodedHeroSource.key !== next.key ?
+      [this.decodedHeroSource, next] : [next];
   }
 
   private heroRenderKey(url: string, pinUrl: string): string {
@@ -757,7 +821,7 @@ export struct PinmonyDetailPage {
       .onDidScroll(() => this.reportScrollPosition())
       .onScrollStop(() => this.reportScrollPosition(true))
       .onReachEnd(() => {
-        if (this.detail.kind === 'cached' || this.detail.relatedRetained) {
+        if (!this.readsReady && (this.detail.kind === 'cached' || this.detail.relatedRetained)) {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=cached-presentation');
           return;
         }
@@ -765,11 +829,11 @@ export struct PinmonyDetailPage {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=recommend-not-ready');
           return;
         }
-        if (!this.detail.interactionsSettled) {
+        if (!this.readsReady && !this.detail.interactionsSettled) {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=interactions-pending');
           return;
         }
-        if (this.actionsReady && !this.detail.relatedError && this.onLoadMore) this.onLoadMore();
+        if ((this.actionsReady || this.readsReady) && !this.detail.relatedError && this.onLoadMore) this.onLoadMore();
       })
     }
     .width('100%')
@@ -811,6 +875,7 @@ export struct PinmonyDetailPage {
           .visibility(this.imageLayer ? Visibility.Hidden : Visibility.Visible)
       if (this.imageLayer === 'zoom') {
         PinmonyImageViewer({ detail: this.detail, imageUrl: this.zoomImageUrl || this.detail.originalImageUrl || this.detail.imageUrl,
+          active: this.videoActive,
           actionsReady: this.actionsReady,
           onClose: () => { if (this.onImageLayer) this.onImageLayer(''); }, onAction: this.onAction,
           onDownload: this.onDownload, onSave: this.onViewerSave,
@@ -830,7 +895,7 @@ export struct PinmonyDetailPage {
     .titleBar(this.titleBarOptions())
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideBackButton(false)
-    .hideTitleBar(this.imageLayer === 'zoom' && !this.viewerControls)
+    .hideTitleBar(this.imageLayer === 'zoom')
     .onBackPressed(() => {
       PinmonyRuntimeLog.info('PinmonyReturn: detail destination back');
       if (this.imageLayer && this.onImageLayer) this.onImageLayer('');

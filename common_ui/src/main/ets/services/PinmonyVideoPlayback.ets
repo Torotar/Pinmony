@@ -106,9 +106,19 @@ export class PinmonyVideoPlayback {
       buffering: false, muted: false, error: '' }; this.notify();
   }
 
+  private openInitial(): void {
+    this.candidateFailures = []; this.state.failureSummary = ''; this.fileAttempted = false;
+    const mp4: number = this.video ? this.video.sources.findIndex((source) => source.kind === 'mp4') : -1;
+    if (this.fileReader && mp4 >= 0) {
+      this.fileAttempted = true;
+      this.record('event=source-selected kind=mp4-file reason=detail-native-transport');
+      this.open(mp4, true);
+    } else this.open(0);
+  }
+
   setSurface(surface: string): void {
     this.surface = surface;
-    if (this.wanted && this.active && !this.player && this.state.phase === 'idle') this.open(0);
+    if (this.wanted && this.active && !this.player && this.state.phase === 'idle') this.openInitial();
   }
 
   setActive(active: boolean): void {
@@ -134,7 +144,7 @@ export class PinmonyVideoPlayback {
   retry(): void {
     if (!this.active || !this.video || !this.surface || this.state.phase === 'loading') return;
     this.record('event=retry reason=user');
-    this.wanted = true; this.open(0);
+    this.wanted = true; this.openInitial();
   }
 
   toggle(): void {
@@ -144,7 +154,7 @@ export class PinmonyVideoPlayback {
       this.wanted = false; player.pause().catch(() => {}); return;
     }
     this.wanted = true;
-    if (!player || this.state.phase === 'error') { if (this.surface) this.open(0); return; }
+    if (!player || this.state.phase === 'error') { if (this.surface) this.openInitial(); return; }
     if (player.state === 'prepared' || player.state === 'paused' || player.state === 'completed') {
       if (player.state === 'completed') player.seek(0, media.SeekMode.SEEK_CLOSEST);
       const token: number = this.generation;

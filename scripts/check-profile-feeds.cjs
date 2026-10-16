@@ -31,12 +31,12 @@ async function main() {
   await respond(1, [
     { type: 'story', id: '10', story_type: 'all_pins', title: { format: '所有 Pin 图' },
       action: { url: '/users/123/pins/' }, objects: [{ image_medium_url: 'https://i.pinimg.com/a.jpg' }] },
-    { type: 'board', id: '11', name: 'Board', url: '/sample/board/', pin_count: 0,
+    { type: 'board', id: '11', name: 'Board', url: '/sample/board/', pin_count: 0, section_count: 1,
       board_order_modified_at: new Date(Date.now() - 21 * 86400000).toUTCString(),
       images: { '236x': [{ url: 'https://i.pinimg.com/b.jpg' }] } }
   ], 'next');
   assert.equal(read('saved').items.length, 2);
-  assert.equal(read('saved').items[1].pinCount, '0 张 Pin 图');
+  assert.equal(read('saved').items[1].pinCount, '0 张 Pin 图 · 1 个图板区块');
   assert.equal(read('saved').items[1].updated, '3 周前');
   assert.equal(read('saved').items[0].pinCount, '406 张 Pin 图', 'all-pins count comes from the viewed profile');
   assert.equal(read('saved').items[0].updated, '3 周前', 'all-pins uses the viewed profile last save time');
@@ -65,6 +65,13 @@ async function main() {
   await respond(4, [], '-end-');
   assert.equal(read('created').ready, true);
   assert.equal(read('created').items.length, 0, 'successful empty feed is ready');
+  const cachedSaved = read('saved');
+  assert.equal(cachedSaved.items.length, 2);
+  assert.equal(api.open(oldId), false, 'cached sections receive new action identifiers');
+  assert.equal(api.open(cachedSaved.items[1].id), true);
+  assert.equal(read('created').ready, true, 'successful empty section is cached');
+  assert.equal(requests.length, 5, 'section switching reuses completed feeds');
+  api.invalidateContent();
   read('saved'); read('created');
   assert.equal(requests[5].options.signal.aborted, true);
   await respond(5, [{ type: 'board', id: '99', name: 'Stale', url: '/sample/stale/' }], '-end-');

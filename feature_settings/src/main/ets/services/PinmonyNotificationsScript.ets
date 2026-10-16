@@ -1,5 +1,6 @@
 export const PIN_NOTIFICATIONS_READ_SCRIPT: string = `
 (function(){
+  if(window.PinmonyNativeProfileSettingsEnabled === true)return;
   var page = location.href, token = window.PinmonyNotificationsToken = (window.PinmonyNotificationsToken || 0) + 1;
   window.PinmonyNotificationsResult = null;
   var query = new URLSearchParams({source_url:location.pathname,data:JSON.stringify({options:{url:'/v3/settings/notifications/'},context:{}})});

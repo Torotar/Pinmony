@@ -21,6 +21,7 @@ export struct PinmonyCommentsSheet {
   onMore?: () => void;
   onReplies?: (id: string) => void;
   onLike?: (id: string) => void;
+  onTranslate?: (id: string) => void;
 
   private resultChanged(): void {
     if (this.draftPin !== this.result.pin || (this.result.mutationVersion || 0) > this.mutationVersion) {
@@ -86,12 +87,29 @@ export struct PinmonyCommentsSheet {
           Text(this.ageLabel(item.createdAt)).fontSize(12).fontColor($r('app.color.secondary_text'))
         }.alignItems(VerticalAlign.Center)
         if (item.text) {
-          Text(item.text).fontSize(15).fontColor($r('app.color.primary_text'))
+          Text(item.translationVisible && item.translatedText ? item.translatedText : item.text)
+            .fontSize(15).fontColor($r('app.color.primary_text'))
+        }
+        if (item.translationError) {
+          Text(item.translationError).fontSize(12).fontColor($r('app.color.secondary_text'))
         }
         if (item.imageUrl) {
           Image(item.imageUrl).width(82).height(110).objectFit(ImageFit.Contain).borderRadius(10)
         }
         Row({ space: 8 }) {
+        if (item.canTranslate && this.onTranslate) {
+          Button({ type: ButtonType.Normal }) {
+            Row({ space: 5 }) {
+              if (item.translationLoading) { LoadingProgress().width(14).height(14).color($r('app.color.accent')) }
+              Text(item.translationLoading ? '翻译中…' : item.translationVisible ? '显示原文' :
+                item.translatedText ? '显示译文' : item.translationError ? '重新翻译' : '翻译')
+                .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+            }
+          }.height(32).padding({ left: 0, right: 4 }).backgroundColor(Color.Transparent)
+            .enabled(!item.translationLoading && !this.result.loading && !this.result.busy && !this.result.uncertain)
+            .onClick(() => { if (this.onTranslate) this.onTranslate(item.id); })
+            .accessibilityText(item.translationVisible ? '显示评论原文' : '翻译评论')
+        }
         if (item.canReply) {
           Text('回复').fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
             .onClick(() => {
@@ -190,8 +208,7 @@ export struct PinmonyCommentsSheet {
               } else if (this.result.items.length === 0) {
                 Text('写评论，分享反馈，或者击个掌开始对话').fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
                   .margin({ top: 140 })
-              } else if (!this.result.ended) {
-                Button('加载更多评论').onClick(() => { if (this.onMore) this.onMore(); })
+
               }
             }.width('100%')
           }

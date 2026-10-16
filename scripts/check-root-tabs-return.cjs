@@ -10,16 +10,17 @@ function method(name) {
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf('\n  private ', start + 1));
 }
-const names = ['nativeDisplayAddress', 'nativeRootPageAddress', 'syncNativeReturnRoute', 'nativeRootTabsVisible', 'profileUrlFromAddress', 'boardUrlFromAddress', 'isHomeRootAddress', 'backFromDetail', 'protectedDetailAddress', 'ignoreSupersededDetailDocument'];
+const names = ['returnToNativeProfile', 'nativeDisplayAddress', 'nativeRootPageAddress', 'syncNativeReturnRoute', 'nativeRootTabsVisible', 'profileUrlFromAddress', 'boardUrlFromAddress', 'isHomeRootAddress', 'backFromDetail', 'protectedDetailAddress', 'ignoreSupersededDetailDocument'];
 const code = ts.transpileModule('class Native {' + names.map(method).join('\n') + '} globalThis.Native=Native;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-const context = { PIN_BOARD_API_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {}, error() {} } }; require('./product-coordination-harness.cjs').run(ts,code, context);
+// Legacy document-return compatibility; default native navigation has a dedicated production binding test.
+const context = { PIN_NATIVE_PROFILE_READS_ENABLED: false, PIN_BOARD_API_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {}, error() {} } }; require('./product-coordination-harness.cjs').run(ts,code, context);
 const root = 'https://www.pinterest.com/sample/_created/', pin = 'https://www.pinterest.com/pin/123/',
   board = 'https://www.pinterest.com/sample/board/';
 function harness() {
   const native = require('./product-coordination-harness.cjs').createHost(context.Native, ts); let url = root, cleared = 0;
   Object.assign(native, {
-    nativePinRoute: '',
+    nativePinRoute: '', publishPageVisible: () => false,
     loadFailed: false, activeSheetKind: '', activeTab: 3, pendingWebTab: -1,
     rootTabAddresses: new Map(), searchUrlFromAddress: value => value.includes('/search/') ? value : '',
     controller: { getUrl: () => url }, pageHistory: { key: value => value.split('#')[0] }, tabsController: { changeIndex() { } },

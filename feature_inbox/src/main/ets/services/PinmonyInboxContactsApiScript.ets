@@ -3,6 +3,9 @@ export const PIN_INBOX_CONTACTS_API_ENABLED: boolean = true;
 export const PIN_INBOX_CONTACTS_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  if(window.PinmonyNativeInboxMessagesEnabled) {
+    window.PinmonyInboxContactsApi = {reset:function(){},pause:function(){},find:function(){return null;},read:function(){return {kind:'ready',items:[]};}}; return;
+  }
   var key = '', generation = 0, abort = null, state = null;
   function reset() {
     generation++; if (abort) abort.abort();

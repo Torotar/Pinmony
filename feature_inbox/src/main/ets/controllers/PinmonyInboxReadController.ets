@@ -3,6 +3,20 @@ import { PinmonyInboxStore } from '../stores/PinmonyInboxStore';
 import { PinmonyInboxSnapshot, PinmonyInboxItem } from '../models/PinmonyInbox';
 import { PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 export interface PinmonyInboxReadPorts {
+  nativeMessages?: () => boolean;
+  nativeMessagesApply?: () => void;
+  nativeMessagesDemand?: () => Promise<void>;
+  nativeMessagesRefresh?: () => Promise<void>;
+  nativeMessagesContacts?: () => Promise<void>;
+  nativeMessagesBridge?: (flow: PinmonyInboxFlowSnapshot) => boolean;
+  documentEpoch?: () => number;
+  nativeUpdates?: () => boolean;
+  nativeUpdatesApply?: () => void;
+  nativeUpdatesSelect?: (section: string) => Promise<boolean>;
+  nativeUpdatesDemand?: () => Promise<void>;
+  nativeUpdatesRefresh?: () => Promise<void>;
+  nativeUpdatesMore?: () => Promise<void>;
+  nativeUpdatesVisibility?: (newsId: string,hidden: boolean) => void;
   authenticated: () => boolean;
   foreground: () => boolean;
   document: () => string;
@@ -59,6 +73,8 @@ export class PinmonyInboxReadController {
   }
   resume(): void { if (this.allowed() && this.ports.activeTab() === 2 && this.store.inboxLoading) this.armLoading(); }
   clear(): void {
+    if(this.ports.nativeMessages?.()){this.cancelReads(); this.store.inboxActionsReady = false; this.ports.nativeMessagesApply?.(); return;}
+    if(this.ports.nativeUpdates?.()){ this.cancelReads(); this.store.inboxActionsReady = false; this.ports.nativeUpdatesApply?.(); return; }
     // A document prepared for the latest explicit intent may clear the old snapshot.
     // Keep that waiting intent; tab/background/session cancellation goes through pause().
     this.cancelReads();
@@ -73,7 +89,7 @@ export class PinmonyInboxReadController {
     this.store.inboxRetainedContent = false;
     this.store.inboxScrollOffset = 0;
     this.store.restoringInboxSection = '';
-    this.store.inboxFlow = undefined;
+    this.store.inboxFlow = this.store.retainedChat;
     this.store.inboxRequestToken++;
     this.store.inbox = undefined;
     this.store.inboxSession = 0;
@@ -103,6 +119,8 @@ export class PinmonyInboxReadController {
 
 
   expect(): void {
+    if(this.ports.nativeMessages?.()){this.ports.nativeMessagesDemand?.(); return;}
+    if(this.ports.nativeUpdates?.()){ this.ports.nativeUpdatesDemand?.(); return; }
     if (!this.allowed()) return;
     if (this.store.inbox && this.store.inboxUrl === this.ports.currentInbox()) return;
     if (this.store.inbox && this.ports.pendingTab() === 2 &&
@@ -141,15 +159,49 @@ export class PinmonyInboxReadController {
     try {
       const flow: PinmonyInboxFlowSnapshot = JSON.parse(value) as PinmonyInboxFlowSnapshot;
       if (flow.kind === 'nativeFlow') {
+        if(this.ports.nativeUpdates?.() && flow.screen === 'updatesMenu')return;
+        if((this.ports.nativeUpdates?.() || this.ports.nativeMessages?.()) && this.ports.documentEpoch && flow.contextEpoch !== this.ports.documentEpoch()) return;
+        if (this.store.flowDismissed) return;
         if (flow.pageUrl !== this.ports.currentInbox() || flow.session !== this.store.inboxSession ||
             this.ports.inboxAddress(this.ports.document()) !== flow.pageUrl) return;
-        if (flow.screen === 'closed') { this.store.inboxFlow = undefined; return; }
+        if(this.ports.nativeMessages?.() && flow.screen === 'closed')return;
+        if (flow.screen === 'closed') {
+          if (!this.store.retainedChat) { this.store.inboxFlow = undefined; this.store.chatReturnConversation = ''; }
+          this.ports.nativeUpdatesApply?.(); return;
+        }
         if (!Array.isArray(flow.users) || !Array.isArray(flow.messages) || !Array.isArray(flow.selectedIds) ||
             flow.users.length > 1000 || flow.messages.length > 2000 || flow.selectedIds.length > 1000) return;
+        if(this.ports.nativeMessages?.() && this.ports.nativeMessagesBridge?.(flow))return;
+        if (flow.screen === 'chat' && flow.loading && this.store.retainedChat?.conversationId === flow.conversationId) return;
+        const retained = this.store.retainedChat;
+        if (flow.screen === 'chat' && retained && retained.conversationId === flow.conversationId && !flow.loading) {
+          if (flow.error) flow.messages = retained.messages;
+          else if (flow.messages.length > 0 && flow.hasMore) {
+            const oldest: number = Math.min(...flow.messages.map(message => Date.parse(message.createdAt)).filter(value => Number.isFinite(value)));
+            const freshIds: Set<string> = new Set(flow.messages.map(message => message.id));
+            const older = retained.messages.filter(message => !freshIds.has(message.id) && Date.parse(message.createdAt) < oldest);
+            flow.messages = older.concat(flow.messages);
+            if (older.length > 0) {
+              // Restore read history in the current script too, so later reads and
+              // confirmed reactions do not discard it. This dispatch never sends a message.
+              this.ports.runScript('window.PinmonyInboxConversations && window.PinmonyInboxConversations.retainHistory(' +
+                flow.session.toString() + ',' + JSON.stringify(flow.conversationId) + ',' + JSON.stringify(older) + ')').catch(() => {});
+            }
+          }
+        }
         this.store.inboxFlow = flow;
+        if(flow.screen === 'updatesMenu' && typeof flow.newsHidden === 'boolean' && flow.newsId) this.ports.nativeUpdatesVisibility?.(flow.newsId,flow.newsHidden);
+        if (flow.screen === 'chat' && !flow.loading && !flow.error && this.store.retainedChat?.conversationId === flow.conversationId) this.store.retainedChat = undefined;
         return;
       }
       const message: PinmonyInboxSnapshot = JSON.parse(value) as PinmonyInboxSnapshot;
+      if(this.ports.nativeUpdates?.() || this.ports.nativeMessages?.()) {
+        // Only the current document may confirm an action session; its root data stays separate.
+        if(message && Number.isInteger(message.session) && message.session >= 0 && (!this.ports.documentEpoch || message.contextEpoch === this.ports.documentEpoch()) && message.pageUrl === this.ports.currentInbox() && this.ports.inboxAddress(this.ports.document()) === message.pageUrl) {
+          this.store.inboxSession = message.session; this.store.inboxActionsReady = message.kind === 'state'; this.ports.nativeUpdatesApply?.(); this.ports.nativeMessagesApply?.();
+        }
+        return;
+      }
       if (!message || !Number.isInteger(message.session) || message.session < 0 || typeof message.pageUrl !== 'string') return;
       if (message.kind === 'closed') {
         if (this.ports.currentInbox()) return;
@@ -250,6 +302,11 @@ export class PinmonyInboxReadController {
       if (message.kind === 'apiFailed' || message.kind === 'state' &&
           (message.section === 'updates' || message.contactsLoading !== true)) this.ports.finishPull();
       if (this.store.inboxActionsReady) {
+        const chat = this.store.retainedChat;
+        if (chat && chat.pageUrl === message.pageUrl && /^\d+$/.test(chat.conversationId || '')) {
+          this.ports.runScript('window.PinmonyInboxApiAction && window.PinmonyInboxApiAction(' +
+            JSON.stringify('conversation:' + chat.conversationId) + ',' + message.session.toString() + ')').catch(() => {});
+        }
         this.store.inboxCache.put(this.store.inbox, this.store.inboxScrollOffset);
         this.ports.recordAddress(message.pageUrl);
         this.ports.confirmed();
@@ -261,9 +318,11 @@ export class PinmonyInboxReadController {
 
 
   async selectSection(section: string): Promise<void> {
+    if (this.store.inboxFlow) return;
     if (!this.allowed() || this.ports.activeTab() !== 2) return;
     const preparation: number = ++this.preparation;
     if (section !== 'updates' && section !== 'messages') return;
+    if(await this.ports.nativeUpdatesSelect?.(section)) return;
     if (!await this.ports.prepareContext() || preparation !== this.preparation || !this.allowed() || this.ports.activeTab() !== 2) return;
     const generation: number = this.generation;
     if (!this.store.inboxSectionReady || !this.store.inbox || this.store.inboxSession !== this.store.inbox.session || this.store.inboxUrl !== this.ports.currentInbox() ||
@@ -305,6 +364,7 @@ export class PinmonyInboxReadController {
 
 
   async loadMore(): Promise<void> {
+    if(this.ports.nativeUpdates?.()){ await this.ports.nativeUpdatesMore?.(); return; }
     if (!this.allowed() || this.ports.activeTab() !== 2 || this.loadingMore || !this.store.inbox?.hasMore || this.store.inbox?.moreLoading) return;
     if (this.store.inboxActionsReady === false) return;
     if (!this.store.inbox || this.store.inbox.section !== 'updates' || this.store.inboxUrl !== this.ports.currentInbox()) return;
@@ -317,6 +377,8 @@ export class PinmonyInboxReadController {
   }
 
   async refresh(): Promise<void> {
+    if(this.ports.nativeMessages?.()){await this.ports.nativeMessagesRefresh?.(); this.ports.finishPull(); return;}
+    if(this.ports.nativeUpdates?.()){ await this.ports.nativeUpdatesRefresh?.(); this.ports.finishPull(); return; }
     if (!this.allowed() || this.ports.activeTab() !== 2 || this.refreshing || this.refreshAwaiting) return;
     if (this.ports.rootOnly() && this.ports.prepareRead()) return;
     if (!this.ports.currentInbox()) { this.ports.requestRead(); return; }
@@ -352,6 +414,7 @@ export class PinmonyInboxReadController {
 
 
   async refreshContacts(): Promise<void> {
+    if(this.ports.nativeMessages?.()){await this.ports.nativeMessagesContacts?.(); return;}
     if (!this.allowed() || this.ports.activeTab() !== 2 || this.contactsReading) return;
     const preparation: number = ++this.preparation;
     if (!await this.ports.prepareContext() || preparation !== this.preparation || !this.allowed() || this.ports.activeTab() !== 2) return;

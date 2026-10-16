@@ -10,7 +10,8 @@ function method(name) {
 }
 const timers = [], log = [];
 const home = 'https://www.pinterest.com/', board = home + 'sample/board/', pin = home + 'pin/101/';
-const context = { PIN_BOARD_API_ENABLED: true, PINTEREST_URL: home, Date,
+// Legacy document-return compatibility; native profile returns execute in check-native-profile-navigation.cjs.
+const context = { PIN_NATIVE_PROFILE_READS_ENABLED: false, PIN_BOARD_API_ENABLED: true, PINTEREST_URL: home, Date,
   setTimeout: fn => timers.push(fn),
   PinmonyRuntimeLog: { info: value => log.push(value), warn: value => log.push(value) } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + ['boardUrlFromAddress', 'currentBoardUrl',

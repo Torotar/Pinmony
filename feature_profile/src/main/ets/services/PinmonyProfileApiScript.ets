@@ -5,7 +5,11 @@ export const PIN_PROFILE_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
   var key = '', generation = 0, abort = null, attempted = false, info = null, failed = false;
-  var savedPrefetch = null;
+  var savedPrefetch = null, nativeSnapshot = null, nativeCursor = '', nativeInvalidation = 0;
+  function nativeOwn(profile) {
+    if (window.PinmonyNativeProfileReadsEnabled !== true || !window.PinmonyHomeUsername) return false;
+    try { var u = new URL(profile); return u.origin === location.origin && u.pathname === '/' + window.PinmonyHomeUsername + '/'; } catch (_) { return false; }
+  }
   function cancelSavedPrefetch() {
     if (savedPrefetch) savedPrefetch.controller.abort();
     savedPrefetch = null;
@@ -14,7 +18,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     cancelSavedPrefetch();
     generation++;
     if (abort) abort.abort();
-    key = ''; abort = null; attempted = false; info = null; failed = false;
+    key = ''; abort = null; attempted = false; info = null; failed = false; nativeSnapshot = null; nativeCursor = '';
     resetContent();
   }
   function suspend() {
@@ -44,7 +48,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     function count(value) {
       return typeof value === 'number' && isFinite(value) && value >= 0 && Math.floor(value) === value ? value : null;
     }
-    return { name: clean(user.full_name, 160), handle: clean(user.username, 100),
+    return { monthlyViews: count(user.profile_reach), name: clean(user.full_name, 160), handle: clean(user.username, 100),
       followingUser: typeof user.explicitly_followed_by_me === 'boolean' ? user.explicitly_followed_by_me : null, blocked: user.blocked_by_me === true, business: user.is_partner === true, about: clean(user.about, 2000), website: clean(user.website_url, 2000),
       avatar: avatar.slice(0, 2000), followers: count(user.follower_count), following: count(user.following_count) };
   }
@@ -93,10 +97,15 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     }
   }
   var contentKey = '', contentGeneration = 0, contentAbort = null, contentState = null, targets = {};
-  function resetContent() {
+  var sectionCache = {}, contentReadAt = 0;
+  function resetContent(retain) {
+    if (retain === true && contentState && contentState.ready && !contentState.error) {
+      sectionCache[contentKey] = { state: Object.assign({}, contentState, { items: contentState.items.slice(), loading: false }),
+        targets: Object.assign({}, targets), at: contentReadAt };
+    } else if (retain !== true) sectionCache = {};
     contentGeneration++;
     if (contentAbort) contentAbort.abort();
-    contentKey = ''; contentAbort = null; contentState = null; targets = {};
+    contentKey = ''; contentAbort = null; contentState = null; targets = {}; contentReadAt = 0;
   }
   function safeUrl(value) {
     if (typeof value !== 'string' || !value.trim()) return '';
@@ -130,7 +139,9 @@ export const PIN_PROFILE_API_SCRIPT: string = `
         if (!covers.length && image(item.image_cover_hd_url || item.image_cover_url)) covers.push(item.image_cover_hd_url || item.image_cover_url);
         card = { title: clean(item.name, 300), covers: covers.slice(0, 3),
           collaboratorAvatars: item.is_collaborative === true ? [item.owner].concat(item.collaborating_users || []).filter(function (u, i, all) { return u && all.findIndex(function (v) { return v && String(v.id) === String(u.id); }) === i; }).slice(0, 6).map(function (u) { return image(u.image_small_url || u.image_medium_url); }).filter(Boolean) : [],
-          pinCount: typeof item.pin_count === 'number' && item.pin_count >= 0 ? item.pin_count + ' 张 Pin 图' : '',
+          pinCount: (typeof item.pin_count === 'number' && isFinite(item.pin_count) && item.pin_count >= 0 ? item.pin_count + ' 张 Pin 图' : '') +
+            (Number.isInteger(item.section_count) && item.section_count > 0 ?
+              (typeof item.pin_count === 'number' && isFinite(item.pin_count) && item.pin_count >= 0 ? ' · ' : '') + item.section_count + ' 个图板区块' : ''),
           updated: relativeTime(item.board_order_modified_at) };
       } else if (item.type === 'story' && item.story_type === 'all_pins') {
         if (info.pinCount === 0 && !(item.objects || []).length) return null;
@@ -162,6 +173,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     return card;
   }
   function prefetchSaved(profile, section, current) {
+    if (window.PinmonyNativeProfileReadsEnabled === true) return false;
     if (window.PinmonySpeculativeReadsEnabled === false) { cancelSavedPrefetch(); return false; }
     if (section !== 'saved') { cancelSavedPrefetch(); return false; }
     if (info || failed || savedPrefetch || key !== profile || !current()) return false;
@@ -177,7 +189,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
       '&data=' + encodeURIComponent(JSON.stringify({ options: options, context: {} })) + '&_=' + Date.now(),
       { credentials: 'same-origin', signal: controller.signal, headers: { Accept: 'application/json',
         'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/index.js' } })
-      .catch(function () { return null; }).finally(function () { clearTimeout(timer); });
+      .catch(function (failure) { return failure && failure.pinmonyCancelled === true ? { pinmonyCancelled: true } : null; }).finally(function () { clearTimeout(timer); });
     savedPrefetch = { profile: profile, generation: token, controller: controller, promise: promise };
     return true;
   }
@@ -201,6 +213,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
         '&data=' + encodeURIComponent(JSON.stringify({ options: options, context: {} })) + '&_=' + Date.now(),
         { credentials: 'same-origin', signal: requestAbort.signal, headers: { Accept: 'application/json',
           'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/index.js' } });
+      if (response && response.pinmonyCancelled === true) throw response;
       if (!response || !response.ok) throw new Error('http-error');
       var payload = await response.json(), resource = payload.resource_response;
       if (token !== contentGeneration || requestKey !== contentKey || !current()) return;
@@ -216,8 +229,11 @@ export const PIN_PROFILE_API_SCRIPT: string = `
       var bookmark = resource.bookmark || (payload.resource && payload.resource.options && payload.resource.options.bookmarks || [])[0] || '';
       contentState.hasMore = typeof bookmark === 'string' && !!bookmark && bookmark !== '-end-' && bookmark !== contentState.bookmark;
       contentState.bookmark = bookmark; contentState.ready = true;
-    } catch (_) {
-      if (token === contentGeneration && requestKey === contentKey && current()) contentState.error = '内容接口读取失败，请重试';
+      contentReadAt = Date.now();
+    } catch (failure) {
+      if (token === contentGeneration && requestKey === contentKey && current()) {
+        contentState.error = failure && failure.pinmonyCancelled === true ? '' : '内容接口读取失败，请重试';
+      }
     } finally {
       clearTimeout(timer);
       if (token === contentGeneration && requestKey === contentKey) {
@@ -227,24 +243,56 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     }
   }
   window.PinmonyProfileApi = {
+    nativeOwn: nativeOwn,
+    nativeVersion: function () { return nativeSnapshot ? nativeSnapshot.nativeVersion : -1; },
+    nativeUnorganized: function () { return nativeSnapshot ? { pins: nativeSnapshot.unorganizedPins || [], bookmark: nativeCursor, hasMore: !!nativeSnapshot.unorganizedHasMore, error: nativeSnapshot.unorganizedError || '' } : null; },
+    installNative: function (profile, user, section, snapshot, cursor) {
+      var path = location.pathname;
+      if (!nativeOwn(profile) || [profile, profile + '_created/', profile + '_saved/'].indexOf(location.origin + path) < 0 ||
+          !user || user.isOwn !== true || user.userId !== user.viewerId || user.handle !== window.PinmonyHomeUsername || !snapshot || snapshot.profileUrl !== profile || snapshot.section !== section) return false;
+      if (key !== profile) { reset(); key = profile; }
+      cancelSavedPrefetch(); if (abort) abort.abort(); if (contentAbort) contentAbort.abort();
+      generation++; contentGeneration++; abort = null; contentAbort = null; info = user; attempted = true; failed = false;
+      nativeSnapshot = snapshot; nativeCursor = cursor; targets = {};
+      var items = section === 'saved' ? snapshot.boards : snapshot.createdPins;
+      items.forEach(function (item) { if (typeof item.targetUrl === 'string' && item.targetUrl.indexOf(location.origin + '/') === 0) targets[item.id] = item.targetUrl; });
+      if (window.PinmonyProfileNativeSection) window.PinmonyProfileNativeSection(section);
+      return true;
+    },
     prefetchSaved: prefetchSaved,
     currentInfo: function (page) { return key === page ? info : null; },
-    invalidateContent: resetContent,
+    invalidateContent: function () { if (nativeOwn(key)) nativeInvalidation++; resetContent(); },
+    nativeInvalidation: function () { return nativeInvalidation; },
     hasContentError: function () { return !!(contentState && contentState.error); },
     readContent: function (profile, section, changed, current) {
-      if (!info) return null;
+      if (!info || key !== profile || (section !== 'saved' && section !== 'created')) return null;
+      if (window.PinmonyNativeProfileReadsEnabled === true) return nativeSnapshot && nativeSnapshot.section === section ? { items: section === 'saved' ? nativeSnapshot.boards : nativeSnapshot.createdPins, loading: false, ready: true, error: '', hasMore: false } : { items: [], ready: false, loading: false, error: '' };
       if (contentKey !== profile + section) {
-        resetContent(); contentKey = profile + section;
-        contentState = { items: [], loading: false, ready: false, error: '', bookmark: '', hasMore: false };
-        requestContent(profile, section, changed, current);
+        resetContent(true); contentKey = profile + section;
+        var retained = sectionCache[contentKey];
+        if (retained && Date.now() - retained.at < 300000) {
+          contentReadAt = retained.at;
+          contentState = Object.assign({}, retained.state);
+          contentState.items = retained.state.items.map(function (item) {
+            var id = item.id.replace(/^profile-api-[0-9]+-/, 'profile-api-' + contentGeneration + '-');
+            targets[id] = retained.targets[item.id];
+            return Object.assign({}, item, { id: id });
+          });
+        } else {
+          delete sectionCache[contentKey];
+          contentState = { items: [], loading: false, ready: false, error: '', bookmark: '', hasMore: false };
+        }
       }
+      if (!contentState.ready && !contentState.loading && !contentState.error) requestContent(profile, section, changed, current);
       return contentState;
     },
     more: function (profile, section, changed, current) {
+      if (window.PinmonyNativeProfileReadsEnabled === true) return false;
       if (!contentState || contentKey !== profile + section || contentState.loading || contentState.error || !contentState.hasMore) return;
       requestContent(profile, section, changed, current); changed();
     },
     retryContent: function (profile, section, changed, current) {
+      if (window.PinmonyNativeProfileReadsEnabled === true) return false;
       if (contentState && contentKey === profile + section && !contentState.loading) {
         requestContent(profile, section, changed, current); changed();
       }
@@ -267,6 +315,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
       if (window.PinmonyProfileApiEnabled !== true) { if (key) reset(); return null; }
       if (key !== profile) { reset(); key = profile; }
       if (!profile) return null;
+      if (window.PinmonyNativeProfileReadsEnabled === true) return { kind: info ? 'ready' : 'loading', info: info };
       if (!attempted && typeof fetch === 'function' && typeof AbortController === 'function') {
         attempted = true;
         request(profile, changed, current);

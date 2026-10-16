@@ -7,7 +7,7 @@ const parent = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetai
 const method = name => source.match(new RegExp('  (?:private )?' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0];
 let serial = 0;
 const timers = new Map(), decoded = [], logs = [];
-const context = { Date, PinmonyRuntimeLog: { info: line => logs.push(line) },
+const context = { Date, PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) },
   setTimeout(fn, delay) { const id = ++serial; timers.set(id, { fn, delay }); return id; },
   clearTimeout(id) { timers.delete(id); } };
 vm.runInNewContext(ts.transpileModule(`class Hero {
@@ -30,7 +30,8 @@ opening.completeImage(1); assert.equal(decoded.length, 1, 'duplicate decode call
 opening.renderIdentity = 'current-confirmation'; opening.onRenderChanged();
 assert.equal(decoded.length, 2, 'an unchanged decoded node reports readiness for a new detail confirmation');
 const stage = hero(); stage.stageReady = true; stage.onStageChanged();
-assert.equal(stage.imageState, 'timeout', 'bridge timeout stops waiting but does not unmount the Image');
+assert.equal(stage.imageState, 'loading', 'bridge deadline does not prematurely show image timeout');
+assert(timers.has(stage.deadline), 'image keeps its own deadline after the bridge releases its wait');
 assert.equal(stage.decoded, false);
 stage.completeImage(1); assert.equal(stage.imageState, 'loaded', 'real late decode replaces timeout');
 let retries = 0; const retry = hero(1); retry.onRetry = () => retries++;
@@ -53,3 +54,15 @@ assert(parent.includes('private heroImage()'));
 assert(!logs.join('\n').includes('https://'), 'node diagnostics exclude Pin and image URLs');
 assert(logs.some(line => line.includes('event=node-created')) && logs.some(line => line.includes('event=node-disposed')));
 console.log('Isolated detail hero: node lifecycle, bounded timeout, actual retry generation, decode-only success, confirmation reuse, stale guards and payload-free diagnostics passed');
+
+function parentMethod(name){const start=parent.indexOf('  private '+name+'(');assert(start>=0);return parent.slice(start,parent.indexOf('\n  private ',start+1)).replace(/@Builder/g,'');}
+const Parent=vm.runInNewContext(ts.transpileModule('class Parent {'+['notifyImageLoaded','heroImageSources','heroRenderKey'].map(parentMethod).join('\n')+'} Parent;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const page=new Parent();page.heroRenderRevision=0;page.detail={pinUrl:'pin',imageUrl:'preview'};page.notifyImageLoaded('pin','preview');
+const initial=page.heroImageSources('preview','pin');assert.equal(initial.length,1);
+page.detail.imageUrl='full';const upgrading=page.heroImageSources('full','pin');assert.equal(upgrading.length,2);assert.equal(upgrading[0].key,initial[0].key,'decoded preview keeps the same mounted node');
+page.notifyImageLoaded('other','full');assert.equal(page.heroImageSources('full','pin').length,2,'stale success cannot discard preview');
+page.notifyImageLoaded('pin','full');const settled=page.heroImageSources('full','pin');assert.equal(settled.length,1);assert.equal(settled[0].key,upgrading[1].key,'decoded full image is not recreated');
+assert.equal(page.heroImageSources('new-image','other-pin').length,1,'preview is never used across Pins');
+page.heroRenderRevision++;assert.equal(page.heroImageSources('full','pin').length,2,'explicit retry retains decoded fallback');
+assert(source.includes("!this.previewAvailable && this.imageState === 'loading'"));
+console.log('Detail upgrade: decoded preview retained until current decode, stable full-image node, stale/Pin isolation and retry fallback passed');

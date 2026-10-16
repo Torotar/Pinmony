@@ -7,6 +7,7 @@ export struct PinmonyProfilePage {
   @Prop automaticLoadingEnabled: boolean = true;
   @Prop @Watch('onProfileChanged') profile: PinmonyProfileSnapshot = {} as PinmonyProfileSnapshot;
   @Prop loading: boolean = false;
+  @Prop readsReady: boolean = false;
   @Prop actionsReady: boolean = true;
   @Prop interactionReady: boolean = true;
   @Prop refreshing: boolean = false;
@@ -18,10 +19,13 @@ export struct PinmonyProfilePage {
   @State private contentWidth: number = 360;
   private activeProfile: string = '';
   private activeSection: string = '';
+  private backRequested: boolean = false;
+  private readonly compactTitleBuilder: () => void = (): void => { this.compactTitle(); };
   private readonly scroller: Scroller = new Scroller();
   onTab?: (section: string) => void;
   onBack?: () => void;
   onUser?: (url: string) => void;
+  onWebsite?: (url: string) => void;
   private readonly profilePaths: NavPathStack = new NavPathStack();
   @State private headerHeight: number = 180;
   @State private compactHeader: boolean = false;
@@ -49,6 +53,7 @@ export struct PinmonyProfilePage {
   }
 
   private onProfileChanged(): void {
+    if (this.activeProfile !== this.profile.profileUrl) this.backRequested = false;
     if (this.activeProfile !== this.profile.profileUrl || this.activeSection !== this.profile.section) {
       this.activeProfile = this.profile.profileUrl;
       this.activeSection = this.profile.section;
@@ -147,12 +152,18 @@ export struct PinmonyProfilePage {
   @Builder
   private profileHeader() {
     Column({ space: 9 }) {
-      if (this.profile.business) {
+      if (this.profile.business || this.profile.isOwn === false) {
         Row({ space: 16 }) {
           if (this.profile.avatarUrl) { Image(this.profile.avatarUrl).width(72).height(72).borderRadius(36)
             .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); }) }
-          Text(this.profile.displayName || this.profile.handle).fontSize(24).fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.primary_text')).layoutWeight(1)
+          Column({ space: 4 }) {
+            Text(this.profile.displayName || this.profile.handle).fontSize(this.profile.isOwn === false ? 20 : 24).fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.primary_text')).width('100%')
+              .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+            if (this.profile.handle) {
+              Text(this.profile.handle).fontSize(14).fontColor($r('app.color.secondary_text'))
+            }
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         }.width('100%')
       } else {
       Stack({ alignContent: Alignment.Center }) {
@@ -184,11 +195,15 @@ export struct PinmonyProfilePage {
         .fontColor($r('app.color.primary_text'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+      if (this.profile.handle) {
+        Text(this.profile.handle).fontSize(14).fontColor($r('app.color.secondary_text'))
+      }
       if (this.profile.website || this.profile.about) {
         Text() {
           if (this.profile.website) {
             Span(this.profile.website.replace(/^https?:\/\//i, '').replace(/\/$/, ''))
               .fontWeight(FontWeight.Bold)
+              .onClick(() => { if (this.onWebsite) this.onWebsite(this.profile.website || ''); })
           }
           if (this.profile.website && this.profile.about) { Span(' · ') }
           if (this.profile.about) { Span(this.profile.about) }
@@ -196,10 +211,6 @@ export struct PinmonyProfilePage {
         .width('100%').fontSize(14).fontColor($r('app.color.primary_text'))
         .textAlign(TextAlign.Center)
       }
-      Text(this.profile.handle)
-        .fontSize(16)
-        .fontColor($r('app.color.secondary_text'))
-        .maxLines(1)
       }
       Row({ space: 7 }) {
         if (this.profile.followers.length > 0) {
@@ -224,25 +235,35 @@ export struct PinmonyProfilePage {
       }
       .margin({ top: 3 })
 
-      if (this.profile.business) {
-        Row({ space: 6 }) {
-          Text(this.profile.about || '关于此账户……').layoutWeight(1).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-            .fontColor($r('app.color.secondary_text'))
-          Text('更多').fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-        }.width('100%').alignItems(VerticalAlign.Top).onClick(() => { this.aboutVisible = true; })
+      if (this.profile.isOwn === false && this.profile.about) {
+        Text(this.profile.about).fontSize(16).fontColor($r('app.color.primary_text')).width('100%')
+      } else if (this.profile.business && this.profile.isOwn !== false) {
+        Text() {
+          Span(this.profile.about || '关于此账户……').fontColor($r('app.color.secondary_text'))
+          Span(' 更多').fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        }.maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+        .onClick(() => { this.aboutVisible = true; })
       }
-      if (this.profile.business && this.profile.website) { Text(this.profile.website).fontColor($r('app.color.primary_text')).fontSize(14) }
+      if ((this.profile.business || this.profile.isOwn === false) && this.profile.website) {
+        Row({ space: 8 }) {
+          Image($r('app.media.lucide_globe')).width(20).height(20).fillColor($r('app.color.primary_text'))
+          Text(this.profile.website.replace(/^https?:\/\//i, '').replace(/\/$/, '')).fontColor($r('app.color.primary_text')).fontSize(14)
+            .layoutWeight(1).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+        }.width('100%').onClick(() => { if (this.onWebsite) this.onWebsite(this.profile.website || ''); })
+          .accessibilityText('在浏览器中打开网站')
+      }
       Row({ space: 10 }) {
         if (this.profile.isOwn === false) {
+          Button(this.action('follow')?.label || '关注', { type: ButtonType.Normal }).height(44).padding({ left: 18, right: 18 }).borderRadius(16)
+            .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent')).enabled(!this.followingBusy && !!this.action('follow') && this.action('follow')!.enabled).onClick(() => this.perform('follow'))
           if (this.action('contact') || this.action('message')) {
             Button((this.action('contact') || this.action('message'))!.label, { type: ButtonType.Normal })
               .height(44).padding({ left: 18, right: 18 }).borderRadius(16)
               .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text')).onClick(() => {})
           }
-          Button(this.action('follow')?.label || '关注', { type: ButtonType.Normal }).height(44).padding({ left: 18, right: 18 }).borderRadius(16)
-            .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent')).enabled(!this.followingBusy && !!this.action('follow') && this.action('follow')!.enabled).onClick(() => this.perform('follow'))
         }
         if (this.action('edit')) {
+          if (!this.profile.business) {
           Button('分享', { type: ButtonType.Normal })
             .height(44)
             .padding({ left: 21, right: 21 })
@@ -251,6 +272,7 @@ export struct PinmonyProfilePage {
             .fontColor($r('app.color.primary_text'))
             .enabled(this.action('edit')!.enabled)
             .onClick(() => { if (this.onShare) this.onShare(); })
+          }
           Button(this.action('edit')!.label, { type: ButtonType.Normal })
             .height(44)
             .padding({ left: 21, right: 21 })
@@ -262,10 +284,10 @@ export struct PinmonyProfilePage {
         }
       }
       .margin({ top: 8 })
-      .justifyContent(this.profile.business ? FlexAlign.Start : FlexAlign.Center)
+      .justifyContent(this.profile.business || this.profile.isOwn === false ? FlexAlign.Start : FlexAlign.Center)
     }
     .width('100%')
-    .alignItems(this.profile.business ? HorizontalAlign.Start : HorizontalAlign.Center)
+    .alignItems(this.profile.business || this.profile.isOwn === false ? HorizontalAlign.Start : HorizontalAlign.Center)
     .padding({ left: 20, right: 20, top: 16 })
     .onAreaChange((_old: Area, area: Area) => { this.headerHeight = Number(area.height); })
   }
@@ -275,11 +297,38 @@ export struct PinmonyProfilePage {
     Column({ space: 24 }) {
       Text('关于 ' + this.profile.displayName).fontSize(26).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
       if (this.profile.about) { Text(this.profile.about).fontColor($r('app.color.primary_text')) }
-      if (this.profile.website) { Text(this.profile.website).fontColor($r('app.color.primary_text')) }
-      Text(this.profile.followers).fontColor($r('app.color.primary_text')).onClick(() => { this.aboutVisible = false; this.perform('followers'); })
-      Text(this.profile.following).fontColor($r('app.color.primary_text')).onClick(() => { this.aboutVisible = false; this.perform('following'); })
-      if (this.profile.isOwn) { Button('编辑个人资料').onClick(() => { this.aboutVisible = false; this.perform('edit'); }) }
-    }.width('100%').padding(24).alignItems(HorizontalAlign.Start)
+      if (this.profile.website) {
+        Row({ space: 16 }) {
+          Image($r('app.media.lucide_globe')).width(24).height(24).fillColor($r('app.color.primary_text'))
+          Text(this.profile.website).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        }.width('100%').constraintSize({ minHeight: 48 })
+        .onClick(() => { if (this.onWebsite) this.onWebsite(this.profile.website || ''); })
+        .accessibilityText('在浏览器中打开网站')
+      }
+      Row({ space: 16 }) {
+        SymbolGlyph($r('sys.symbol.person_badge_plus')).fontSize(24).fontColor([$r('app.color.primary_text')])
+        Text() {
+          Span(this.profile.followers).fontWeight(FontWeight.Bold)
+          if (this.profile.monthlyViews !== undefined) {
+            Span(' · ' + this.profile.monthlyViews.toString() + ' 月浏览量')
+          }
+        }.fontColor($r('app.color.primary_text')).layoutWeight(1)
+      }.width('100%').constraintSize({ minHeight: 48 })
+      .onClick(() => { this.aboutVisible = false; this.perform('followers'); })
+      Row({ space: 16 }) {
+        SymbolGlyph($r('sys.symbol.person_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
+        Text(this.profile.following).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+      }.width('100%').constraintSize({ minHeight: 48 })
+      .onClick(() => { this.aboutVisible = false; this.perform('following'); })
+      Blank().layoutWeight(1)
+      if (this.profile.isOwn) {
+        Button('编辑个人资料', { type: ButtonType.Normal })
+          .width('100%').height(48).borderRadius(16)
+          .backgroundColor($r('app.color.surface_muted'))
+          .fontColor($r('app.color.primary_text'))
+          .onClick(() => { this.aboutVisible = false; this.perform('edit'); })
+      }
+    }.width('100%').height('100%').padding(24).alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -329,34 +378,31 @@ export struct PinmonyProfilePage {
   private boardCard(board: PinmonyBoard) {
     Column({ space: 7 }) {
       this.boardCover(board)
-      Row() {
-      Text(board.title)
-        .fontSize(17)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.primary_text'))
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
-        .layoutWeight(1)
-      Row() {
-        ForEach(board.collaboratorAvatars || [], (avatar: string, index: number) => {
-          Image(avatar).width(18).height(18).borderRadius(9).margin({ left: index > 0 ? -6 : 0 })
-        }, (avatar: string) => avatar)
-      }
-      }.width('100%')
       Row({ space: 6 }) {
-        if (board.pinCount.length > 0) {
-          Text(board.pinCount)
-            .fontSize(13)
-            .fontColor($r('app.color.secondary_text'))
+        Text(board.title)
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.primary_text'))
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+        if (board.collaboratorAvatars?.length) {
+          Row() {
+            ForEach(board.collaboratorAvatars || [], (avatar: string, index: number) => {
+              Image(avatar).width(18).height(18).borderRadius(9).margin({ left: index > 0 ? -6 : 0 })
+            }, (avatar: string) => avatar)
+          }.constraintSize({ maxWidth: 54 }).clip(true).flexShrink(0)
         }
-        if (board.updated.length > 0) {
-          Text(board.updated)
-            .fontSize(13)
-            .fontColor($r('app.color.secondary_text'))
-        }
+      }.width('100%')
+      if (board.pinCount.length > 0 || board.updated.length > 0) {
+        Text(board.pinCount + (board.pinCount.length > 0 && board.updated.length > 0 ? ' · ' : '') + board.updated)
+          .fontSize(13)
+          .fontColor($r('app.color.secondary_text'))
+          .width('100%')
+          .textAlign(TextAlign.Start)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
-      .width('100%')
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
@@ -406,7 +452,7 @@ export struct PinmonyProfilePage {
 
   @Builder
   private profileContent() {
-    if (this.syncError || (!this.actionsReady && this.profile.contentError)) {
+    if (this.syncError || this.profile.contentError) {
       Column({ space: 8 }) {
         Text(this.syncError || this.profile.contentError || '')
           .fontSize(14).fontColor($r('app.color.secondary_text'))
@@ -444,7 +490,8 @@ export struct PinmonyProfilePage {
         .width('100%')
         .alignItems(VerticalAlign.Top)
         .margin({ bottom: 24 })
-      }, (start: number) => start.toString())
+      }, (start: number) => this.profile.boards[start].id + ':' +
+        (start + 1 < this.profile.boards.length ? this.profile.boards[start + 1].id : ''))
     } else if (this.profile.section === 'created' && this.profile.createdPins.length > 0) {
       WaterFlow() {
         ForEach(this.profile.createdPins, (pin: PinmonyCreatedPin) => {
@@ -476,14 +523,23 @@ export struct PinmonyProfilePage {
     }
   }
 
+  private requestProfileBack(): void {
+    if (this.backRequested || !this.onBack) return;
+    this.backRequested = true;
+    this.onBack();
+  }
+
+  private profileCoverHeight(): number {
+    return this.profile.coverUrl && this.profile.isOwn === false ? Math.min(260, this.contentWidth * 0.52) : 0;
+  }
+
   private profileTitleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
       style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
         backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
-      content: { title: { mainTitle: '' }, stackBuilder: () => { this.compactTitle(); },
-        backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } },
-        menu: { value: [{ content: { icon: $r('app.media.lucide_share_2'), label: '分享个人资料', action: () => { if (this.onShare) this.onShare(); } } },
-          { content: { icon: $r('app.media.lucide_ellipsis'), label: '更多选项', action: () => { if (this.onMenu) this.onMenu(); } } }] } } };
+      content: { title: { mainTitle: '' }, stackBuilder: this.compactTitleBuilder,
+        backIcon: { isEnabled: true, action: () => this.requestProfileBack() },
+        menu: { value: [{ content: { icon: $r('app.media.lucide_share_2'), label: '分享个人资料', action: () => { if (this.onShare) this.onShare(); } } }] } } };
   }
   @Builder
   private compactTitle() {
@@ -492,15 +548,17 @@ export struct PinmonyProfilePage {
         if (this.profile.avatarUrl) { Image(this.profile.avatarUrl).width(32).height(32).borderRadius(16)
           .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); }) }
         Text(this.profile.displayName || this.profile.handle).fontSize(18).fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.primary_text')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-      }.padding({ left: 64, right: 24 }).width('100%')
+          .maxFontSize(18).minFontSize(12).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST)
+          .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+      }.padding({ left: 64, right: 72 }).width('100%').constraintSize({ maxHeight: 48 })
     }
   }
   @Builder
   private profileDestination(_name?: string, _param?: Object) {
     HdsNavDestination() { this.profileBody() }
       .titleBar(this.profileTitleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
-      .onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
+      .onBackPressed(() => { this.requestProfileBack(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .backgroundColor($r('app.color.page_background'))
   }
@@ -545,6 +603,10 @@ export struct PinmonyProfilePage {
       Refresh({ refreshing: this.refreshing }) {
       Scroll(this.scroller) {
         Column() {
+          if (this.profileCoverHeight() > 0) {
+            Image(this.profile.coverUrl).width('100%').height(this.profileCoverHeight()).objectFit(ImageFit.Cover)
+              .accessibilityText('个人资料封面')
+          }
           this.profileHeader()
           Row({ space: 38 }) {
             this.sectionTab('created', '已创建')
@@ -552,7 +614,7 @@ export struct PinmonyProfilePage {
           }
           .width('100%')
           .height(72)
-          .margin({ top: 34, bottom: 24 })
+          .margin({ top: this.profile.isOwn === false ? 16 : 34, bottom: 24 })
           .justifyContent(FlexAlign.Center)
           Column() {
             this.profileContent()
@@ -578,14 +640,14 @@ export struct PinmonyProfilePage {
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       .onAppear(() => this.restoreScroll())
       .onDidScroll((_xOffset: number, offset: number, state: ScrollState) => {
-          this.compactHeader = (this.scroller.offset()?.yOffset || 0) > this.headerHeight;
+          this.compactHeader = (this.scroller.offset()?.yOffset || 0) > this.headerHeight + this.profileCoverHeight();
           this.reportScroll();
           if (this.onContentScroll) this.onContentScroll(offset, state);
         })
-      .onReachEnd(() => { if (this.automaticLoadingEnabled && this.actionsReady && this.onLoadMore) this.onLoadMore(); })
+      .onReachEnd(() => { if (this.automaticLoadingEnabled && (this.readsReady || this.actionsReady) && this.onLoadMore) this.onLoadMore(); })
       }
       .width('100%').layoutWeight(1)
-      .pullToRefresh(!this.refreshing && !this.loading && (this.actionsReady || !!this.syncError || !!this.profile.contentError))
+      .pullToRefresh(this.interactionReady && !this.refreshing && !this.loading)
       .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
     }
     .width('100%')

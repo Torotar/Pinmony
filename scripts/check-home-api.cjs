@@ -10,14 +10,14 @@ new Function(script);
 const fixture = JSON.parse(readSourceFileSync(path.join(__dirname, 'fixtures/home-api.json'), 'utf8'));
 const categoryFixture = JSON.parse(readSourceFileSync(path.join(__dirname, 'fixtures/category-api.json'), 'utf8').replace(/^\uFEFF/, ''));
 const flush = () => new Promise(resolve => setImmediate(resolve));
-function harness(enabled = true, initial = null) {
+function harness(enabled = true, initial = null, clock = Date) {
   const requests = [];
   let valid = true;
   const window = { PinmonyHomeApiEnabled: enabled };
   window.top = window;
   vm.runInNewContext(script, { window, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com', pathname: '/' },
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
-    AbortController, setTimeout, clearTimeout, console: { warn() {} } });
+    AbortController, setTimeout, clearTimeout, Date: clock, console: { warn() {}, info() {} } });
   const read = (key = '1:/全部', eligible = true, boardId = '') => window.PinmonyHomeApi.read(key, eligible, () => {}, () => valid, boardId);
   const respond = async (index, value, status = 200) => {
     requests[index].resolve({ ok: status === 200, status, json: async () => value });
@@ -165,6 +165,46 @@ async function main() {
   await category.respond(6, categoryFixture.first);
   assert.equal(category.api.isActive(), true);
   assert.equal(harness(false).api.initialTabs().length, 0, 'rollback also disables saved categories');
+  const retained = harness();
+  retained.read('home'); await retained.respond(0, fixture);
+  retained.read('board', true, '42');
+  assert.equal(retained.requests[1].options.signal.aborted, false);
+  assert.equal(retained.read('home').active, true, 'switching back restores completed current-document feed');
+  assert.equal(retained.requests[1].options.signal.aborted, true, 'switch cancels pending board feed');
+  assert.equal(retained.requests.length, 3, 'cached All feed does not request another first page');
+  await retained.respond(1, categoryFixture.first);
+  assert.equal(retained.read('home').pins.length, 21, 'late board response cannot overwrite cached All feed');
+  retained.api.setUsername('another');
+  assert.equal(retained.read('home').active, false, 'identity change clears category feeds');
+  const cancelled = harness();
+  cancelled.read();
+  cancelled.requests[0].resolve({ ok: true, json: async () => { throw { pinmonyCancelled: true }; } });
+  await flush();
+  cancelled.read();
+  assert.equal(cancelled.requests.length, 2, 'cancelled first page remains eligible for a fresh demand');
+  const retainedTabs = Array.from(category.api.initialTabs(), tab => tab.boardId);
+  const retryIndex = category.requests.length;
+  category.api.retrySavedTabs(); category.api.retrySavedTabs();
+  assert.equal(category.requests.length, retryIndex + 1, 'category retry joins in-flight read');
+  assert.deepEqual(Array.from(category.api.initialTabs(), tab => tab.boardId), retainedTabs);
+  await category.respond(retryIndex, {}, 503);
+  assert.equal(category.api.savedTabsFailed(), true);
+  assert.deepEqual(Array.from(category.api.initialTabs(), tab => tab.boardId), retainedTabs, 'failed retry retains validated categories');
+  let cacheNow = 1000;
+  const expiry = harness(true, null, { now: () => cacheNow });
+  expiry.read('home'); await expiry.respond(0, fixture);
+  expiry.read('board', true, '42');
+  cacheNow += 299000;
+  assert.equal(expiry.read('home').active, true);
+  expiry.read('board', true, '42');
+  cacheNow += 2000;
+  assert.equal(expiry.read('home').active, false, 'switching does not extend the successful-read TTL');
+  const bounded = harness();
+  for (let index = 0; index < 6; index++) {
+    const requestIndex = bounded.requests.length;
+    bounded.read('feed-' + index); await bounded.respond(requestIndex, fixture);
+  }
+  assert.equal(bounded.read('feed-0').active, false, 'old category feeds are evicted at the bound');
   assert.doesNotMatch(source, /document\.|getElementById|__PWS_INITIAL_PROPS__/,
     'category username and order do not come from homepage DOM');
   console.log('home API: 25-Pin fixture, mapping, session credentials, pagination, retries, cancellation and rollback OK');

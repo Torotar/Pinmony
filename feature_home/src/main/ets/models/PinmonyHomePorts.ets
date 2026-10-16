@@ -1,5 +1,11 @@
 import { PinmonyHomeSnapshot } from './PinmonyHome';
 export interface PinmonyHomePorts {
+  documentEpoch?: () => number;
+  nativeReads?: () => boolean;
+  nativeDemand?: () => Promise<void>;
+  nativeSelect?: (id: string) => Promise<void>;
+  nativeMore?: () => Promise<void>;
+  nativeRefresh?: () => Promise<void>;
   canAcceptMessages: () => boolean;
   currentPageKey: () => string;
   presentationPageKey: () => string;

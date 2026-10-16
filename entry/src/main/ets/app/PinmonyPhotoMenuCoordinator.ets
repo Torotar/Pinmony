@@ -7,10 +7,15 @@ import { PinmonyShareBridge } from './PinmonyShareBridge';
 import { PinmonyTaskRegistry } from 'common_foundation';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyAuthStatus } from 'common_session';
-import { PinmonyBoardDetail, PinmonyBoardPin } from 'feature_board';
+import { PinmonyBoardDetail, PinmonyBoardPin, boardVisiblePins } from 'feature_board';
 import { PinmonyDetailAction, PinmonyDetailSnapshot } from 'feature_pin';
 import { PinmonyHomeMenuOption, PinmonyHomeMenuState } from 'feature_home';
 export interface PinmonyPhotoMenuCoordinatorPorts {
+  nativeMenu?: () => boolean;
+  nativeRead?: (token: number,pin: string) => Promise<PinmonyHomeMenuState>;
+  nativeAction?: (id: string) => Promise<void>;
+  nativePause?: () => void;
+  nativeShare?: (pin: string) => Promise<void>;
   activeSheetKind: () => string;
   setActiveSheetKind: (value: string) => string;
   authEpoch: () => number;
@@ -18,6 +23,8 @@ export interface PinmonyPhotoMenuCoordinatorPorts {
   boardOperation: (method: string, id?: string) => void;
   boardStore: () => PinmonyBoardStore;
   cancelledBoardPins: () => Set<string>;
+  nativeBoardContentWrites?: () => boolean;
+  cancelBoardPin?: (pin: string, current: () => boolean) => Promise<string>;
   clearRootTabGuard: (reason: string) => void;
   controller: () => webview.WebviewController;
   coordinatorTasks: () => PinmonyTaskRegistry;
@@ -57,7 +64,7 @@ export class PinmonyPhotoMenuCoordinator {
     this.menuReady.notify();
   }
   notify(): void { this.detailReady.notify(); this.menuReady.notify(); }
-  pause(): void { this.menuGeneration++; this.menuReady.cancel(); this.cancelHomeDetailMore(); }
+  pause(): void { if(this.ports.nativeMenu?.())this.ports.nativePause?.(); this.menuGeneration++; this.menuReady.cancel(); this.cancelHomeDetailMore(); }
   private readonly homeStore: PinmonyHomeStore;
   private readonly inboxStore: PinmonyInboxStore;
   private readonly pinStore: PinmonyPinStore;
@@ -67,6 +74,7 @@ export class PinmonyPhotoMenuCoordinator {
 async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = '', profilePin: boolean = false): Promise<void> {
     if (this.ports.rejectOfflineAction('share panel'))
         return;
+    if(this.ports.nativeMenu?.() && inboxAction === 'share'){await this.ports.nativeShare?.(pinUrl);return;}
     const token: number = ++this.homeStore.customHomeMenuToken;
     this.homeStore.inboxMenuPending = !!inboxAction;
     this.homeStore.homeMenuPin = pinUrl;
@@ -86,17 +94,18 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
     this.menuReady.cancel();
     let lastSnapshot: string = '';
     try {
-        const opened: string = await this.ports.controller().runJavaScript('window.PinmonyPostApi && ' +
+        const native: boolean = this.ports.nativeMenu?.() === true;
+        const opened: string = native ? 'true' : await this.ports.controller().runJavaScript('window.PinmonyPostApi && ' +
             'window.PinmonyPostApi.homeMenuOpen(' + token + ',' + JSON.stringify(pinUrl) + ',' + JSON.stringify(pageKey) + ')');
         if (generation !== this.menuGeneration || token !== this.homeStore.customHomeMenuToken)
             return;
         if (opened !== 'true' && opened !== '"true"')
             throw new Error('menu unavailable');
         while (generation === this.menuGeneration && token === this.homeStore.customHomeMenuToken && this.homeStore.customHomeMenu &&
-            (this.ports.isCurrentBoardMenuPin(pinUrl, pageKey) || this.ports.isCurrentSearchMenuPin(pinUrl, pageKey) || pageKey === this.ports.currentHomePageKey() || !!inboxAction && this.inboxStore.inboxFlow?.screen === 'chat' &&
+            (this.ports.isCurrentBoardMenuPin(pinUrl, pageKey) || this.ports.isCurrentSearchMenuPin(pinUrl, pageKey) || pageKey === this.ports.currentHomePageKey() || profilePin && this.ports.isCurrentMorePin(pinUrl) || !!inboxAction && this.inboxStore.inboxFlow?.screen === 'chat' &&
                 pageKey.replace(/\/$/, '') === this.ports.currentInboxUrl().replace(/\/$/, ''))) {
             const revision: number = this.menuRevision;
-            let serialized: string = await this.ports.controller().runJavaScript('JSON.stringify(window.PinmonyPostApi && ' +
+            let serialized: string = native ? JSON.stringify(await this.ports.nativeRead!(token,pinUrl)) : await this.ports.controller().runJavaScript('JSON.stringify(window.PinmonyPostApi && ' +
                 'window.PinmonyPostApi.homeMenuRead(' + token + ',' + JSON.stringify(pinUrl) + '))');
             if (generation !== this.menuGeneration || token !== this.homeStore.customHomeMenuToken)
                 return;
@@ -116,13 +125,14 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                 state.options = [];
                 state.actions = [
                     { id: 'board-menu-cancel-save', label: '取消收藏', enabled: !this.ports.cancelledBoardPins().has(pinUrl) && !state.loading && !state.error && !state.busy &&
-                            !!board?.editable && !board.flow?.phase && !board.loadingMore && board.pins.some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
+                            !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && !board.loadingMore && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
                     { id: 'board-menu-move', label: '移至其他图板', enabled: !state.loading && !state.error && !state.busy &&
-                            !!board?.editable && !board.flow?.phase && board.pins.some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
+                            !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
                     { id: 'home-download', label: '下载', enabled: !!download?.enabled },
                     { id: 'home-see-more', label: '查看更多', enabled: !!more?.enabled },
                     { id: 'home-system-share', label: '分享链接', enabled: !state.loading && !state.error && !state.busy }
                 ];
+                state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.enabled);
                 if (board && /\/pins\/$/i.test(board.pageKey)) {
                     state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean =>
                         option.id !== 'board-menu-cancel-save' && option.id !== 'board-menu-move');
@@ -152,6 +162,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                 await this.ports.openApiBoards(pinUrl);
                 return;
             }
+            if(native)return;
             await this.menuReady.wait(
                 (): boolean => generation === this.menuGeneration && token === this.homeStore.customHomeMenuToken && !!this.homeStore.customHomeMenu,
                 (): boolean => revision !== this.menuRevision, (): boolean => false, 5000);
@@ -180,6 +191,23 @@ async performCustomHomeAction(id: string): Promise<void> {
             !menu.actions.some((option: PinmonyHomeMenuOption): boolean => option.id === id && option.enabled))
             return;
         const token: number = ++this.homeStore.customHomeMenuToken;
+        if(this.ports.nativeBoardContentWrites?.() && this.ports.cancelBoardPin) {
+          const nativeCurrent = (): boolean => token === this.homeStore.customHomeMenuToken && this.ports.authStatus() === 'authenticated' &&
+            this.homeStore.customHomeMenu === menu && this.boardStore.boardDetail?.pageKey === board.pageKey && this.ports.currentBoardUrl() === board.pageKey;
+          menu.busy = true;
+          try {
+            const error: string = await this.ports.cancelBoardPin(menu.pinUrl,nativeCurrent);
+            if(!nativeCurrent())return;
+            if(error)menu.error = error;
+            else {
+              this.ports.cancelledBoardPins().add(menu.pinUrl);
+              this.ports.setRetainedBoardContent(this.boardStore.boardDetail);
+              this.ports.dismissShareSheet();this.ports.showMessage('已取消收藏');
+            }
+          }catch (_) {if(nativeCurrent())menu.error = '取消收藏结果未确认，请关闭后刷新核对；不会重复提交';}
+          finally {if(nativeCurrent()){menu.busy = false;menu.actions.forEach((option: PinmonyHomeMenuOption): void => {option.enabled = false;});}}
+          return;
+        }
         const epoch: number = this.ports.authEpoch();
         const current = (): boolean => token === this.homeStore.customHomeMenuToken && this.ports.authEpoch() === epoch &&
             this.ports.authStatus() === 'authenticated' && this.homeStore.customHomeMenu === menu && this.ports.currentBoardUrl() === board.pageKey;
@@ -237,15 +265,15 @@ async performCustomHomeAction(id: string): Promise<void> {
     }
     if (id === 'board-menu-move') {
         const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
-        if (!board?.editable || board.flow?.phase || !this.ports.isCurrentBoardMenuPin(menu.pinUrl, board.pageKey) ||
+        if (!board?.editable || board.flow?.phase && board.flow.phase !== 'section' || !this.ports.isCurrentBoardMenuPin(menu.pinUrl, board.pageKey) ||
             !menu.actions.some((option: PinmonyHomeMenuOption): boolean => option.id === id && option.enabled))
             return;
-        const pin: PinmonyBoardPin | undefined = board.pins.find((item: PinmonyBoardPin): boolean => item.pinUrl === menu.pinUrl);
+        const pin: PinmonyBoardPin | undefined = boardVisiblePins(board).find((item: PinmonyBoardPin): boolean => item.pinUrl === menu.pinUrl);
         if (!pin)
             return;
         this.ports.dismissShareSheet();
         this.ports.setSinglePinMovePage(board.pageKey);
-        this.ports.boardOperation('flow', JSON.stringify({ action: 'targets', value: [pin.id] }));
+        this.ports.boardOperation('flow', JSON.stringify(board.flow?.phase === 'section' ? {action:'sectionSingleMove',value:pin.id} : { action: 'targets', value: [pin.id] }));
         return;
     }
     if (id === 'home-system-share') {
@@ -264,6 +292,13 @@ async performCustomHomeAction(id: string): Promise<void> {
         await this.ports.openApiBoards(menu.pinUrl);
         return;
     }
+    if(this.ports.nativeMenu?.()){
+        if(!menu.actions.some((option: PinmonyHomeMenuOption): boolean => option.id === id && option.enabled))return;
+        menu.busy = true;
+        try{await this.ports.nativeAction?.(id);}
+        finally{if(this.homeStore.customHomeMenu === menu){menu.busy = false;menu.actions = menu.actions.map((option: PinmonyHomeMenuOption): PinmonyHomeMenuOption => ({id:option.id,label:option.label,enabled:option.enabled && (!/see-(?:more|less)$/.test(id) || option.id !== id)}));}}
+        return;
+    }
     try {
         const result: string = await this.ports.controller().runJavaScript('window.PinmonyPostApi && ' +
             'window.PinmonyPostApi.homeMenuAction(' + menu.session + ',' + JSON.stringify(menu.pinUrl) + ',' + JSON.stringify(id) + ')');
@@ -278,6 +313,7 @@ async performCustomHomeAction(id: string): Promise<void> {
 }
 
 async openHomeMoreViaDetail(pinUrl: string, returnUrl: string): Promise<void> {
+    if(this.ports.nativeMenu?.()){await this.openCustomHomeMenu(pinUrl,returnUrl);return;}
     this.ports.clearRootTabGuard('home-more-detail');
     if (this.ports.rejectOfflineAction('home menu detail'))
         return;

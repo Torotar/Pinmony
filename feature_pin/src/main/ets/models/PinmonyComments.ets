@@ -19,6 +19,11 @@ export interface PinmonyComment {
   repliesOpen?: boolean;
   repliesLoading?: boolean;
   repliesError?: string;
+  canTranslate?: boolean;
+  translationLoading?: boolean;
+  translatedText?: string;
+  translationVisible?: boolean;
+  translationError?: string;
 }
 
 export interface PinmonyCommentResult {

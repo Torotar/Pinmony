@@ -10,14 +10,14 @@ const board = { type: 'board', id: '123', url: '/sample/board/', name: 'Board', 
   owner: { id: '700', username: 'sample', full_name: 'Sample', image_medium_url: 'https://i.pinimg.com/avatar.jpg' } };
 const pin = id => ({ type: 'pin', id, board: { id: '123' }, title: '', images: {
   '474x': { url: 'https://i.pinimg.com/' + id + '.jpg', width: 474, height: 700 } } });
-function harness(pathname = '/sample/board/') {
+function harness(pathname = '/sample/board/', readyState = 'complete') {
   const requests = [], messages = [];
   let tick;
   const window = { PinmonyBoardApiEnabled: true, addEventListener() {}, setInterval(fn) { tick = fn; },
     PinmonyShareBridge: { boardState(value) { messages.push(JSON.parse(value)); } } };
   window.top = window;
   const location = { origin: 'https://www.pinterest.com', hostname: 'www.pinterest.com', pathname };
-  const document = { readyState: 'complete', getElementById() { throw new Error('DOM initial context must not be read'); } };
+  const document = { readyState, getElementById() { throw new Error('DOM initial context must not be read'); } };
   const fetch = (url, options) => new Promise((resolve, reject) => {
     requests.push({ url, options, resolve });
     options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
@@ -42,6 +42,38 @@ async function loadBoard(h, value = board, viewerId = '700', feed = [pin('111')]
   await h.respond(1, feed, '-end-', true, viewerId);
 }
 async function main() {
+  const createSection = harness();
+  await loadBoard(createSection, { ...board });
+  assert.equal(createSection.call('sectionCreate', '  New section  '), 'pending');
+  assert.equal(createSection.call('sectionCreate', 'Duplicate'), 'unavailable');
+  const write = createSection.requests[2];
+  assert.equal(new URL(write.url, createSection.location.origin).pathname, '/resource/BoardSectionResource/create/');
+  assert.equal(write.options.method, 'POST');
+  const body = new URLSearchParams(write.options.body);
+  assert.equal(body.get('source_url'), '/board/123/create_section/');
+  assert.equal(write.options.headers['X-Pinterest-Pws-Handler'], 'www/board/[id]/create_section.js');
+  assert.deepEqual(JSON.parse(body.get('data')).options, { board_id: '123', initial_pins: [], name: 'New section' });
+  await createSection.respond(2, { type: 'board_section', id: '456', title: 'New section', pin_count: null,
+    board: { id: '123', section_count: 1 } });
+  assert.equal(createSection.call('sectionCreateRead'), 'pending', 'wait for list refresh');
+  await createSection.respond(3, [{ type: 'board_section', id: '456', title: 'New section', pin_count: 0 }]);
+  assert.equal(createSection.call('sectionCreateRead'), 'created');
+  assert.equal(createSection.state().sections[0].id, '456');
+  const unconfirmed = harness();
+  await loadBoard(unconfirmed);
+  unconfirmed.call('sectionCreate', 'New section');
+  await unconfirmed.respond(2, { type: 'board_section', id: '456', title: 'New section', board: { id: '999' } });
+  assert.equal(unconfirmed.call('sectionCreateRead'), 'uncertain', 'wrong board cannot confirm success');
+  assert.equal(unconfirmed.call('sectionCreate', 'New section'), 'unavailable', 'uncertain mutation cannot replay');
+  const staleCreate = harness();
+  await loadBoard(staleCreate);
+  staleCreate.call('sectionCreate', 'New section');
+  staleCreate.location.pathname = '/sample/other/';
+  await staleCreate.respond(2, { type: 'board_section', id: '456', title: 'New section', board: { id: '123' } });
+  assert.equal(staleCreate.call('sectionCreateRead'), 'uncertain', 'late response cannot update another board');
+  const beforeDom = harness('/sample/board/', 'loading');
+  assert.equal(beforeDom.requests.length, 1, 'board demand starts before DOMContentLoaded');
+  await loadBoard(beforeDom);
   const own = harness();
   assert.equal(own.state().loading, true);
   await loadBoard(own, board, '700', [pin('111'), pin('222')]);

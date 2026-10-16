@@ -11,7 +11,7 @@ function home(pathname = '/') {
     PinmonyShareBridge: { homeState: value => messages.push(JSON.parse(value)) } };
   window.top = window;
   const location = { origin: root.slice(0, -1), hostname: 'www.pinterest.com', pathname, href: root.slice(0, -1) + pathname };
-  const context = { window, location, URL, AbortController, Date, console: { warn() {} },
+  const context = { window, location, URL, AbortController, Date, console: { warn() {}, info() {} },
     setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {}, setInterval() {},
     fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) };
   require('./product-coordination-harness.cjs').run(ts,script('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets') +
@@ -40,6 +40,7 @@ function native() {
   let document = root, ready = false;
   Object.assign(n, { authStatus: 'authenticated', activeTab: 1, tabRequestToken: 1,
     webPageLoading: false,
+    searchController: { searchPlaceholder: pageKey => ({ pageKey, results: [] }) }, syncFloatingTabsMotion() {},
     pendingWebTab: -1, rootReadToken: -1, rootTabAddresses: new Map([[1, root + 'search/']]), searchStore: {}, pinStore: {},
     pageHistory: { key: value => value || '' }, rootPresentationAddress: index => n.rootTabAddresses.get(index),
     rootTabIndexFromAddress: value => value.startsWith(root + 'search/') ? 1 : -1,
@@ -96,6 +97,28 @@ function native() {
     { resource_response: { status: 'success', data: [] } }); h2.publish();
   await respond(h2.requests.find(item => item.url.includes('UserHomefeedResource')), {}, false); h2.publish();
   assert.equal(h2.messages.at(-1).kind, 'failed', 'feed failures remain independent from category success');
+  const profileReuse = native();
+  const profile = root + 'sample/';
+  const synchronized = [];
+  profileReuse.n.activeTab = 3;
+  profileReuse.document(profile);
+  profileReuse.n.rootTabAddresses.set(3, profile);
+  profileReuse.n.profileUrlFromAddress = value => value === profile ? profile : '';
+  profileReuse.n.rootTabIndexFromAddress = value => value === profile ? 3 : -1;
+  profileReuse.n.expectProfile = () => {};
+  profileReuse.n.syncAuthentication = () => {};
+  profileReuse.n.controller.runJavaScript = async code => { synchronized.push(code); return 'true'; };
+  profileReuse.n.requestRootPage(3); await new Promise(setImmediate);
+  assert.equal(profileReuse.loads.length, 0, 'current profile document is synchronized without navigation');
+  assert(synchronized[0].includes('PinmonyProfileSync'));
+  const missingBridge = native(); missingBridge.n.activeTab = 3; missingBridge.document(profile);
+  missingBridge.n.rootTabAddresses.set(3, profile);
+  missingBridge.n.profileUrlFromAddress = profileReuse.n.profileUrlFromAddress;
+  missingBridge.n.rootTabIndexFromAddress = profileReuse.n.rootTabIndexFromAddress;
+  missingBridge.n.expectProfile = () => {};
+  missingBridge.n.controller.runJavaScript = async () => 'false';
+  missingBridge.n.requestRootPage(3); await new Promise(setImmediate);
+  assert.deepEqual(missingBridge.loads, [profile], 'missing profile bridge still navigates once');
   const read = native(); read.n.requestRootPage(1); const token = read.n.tabRequestToken;
   read.n.requestRootPage(1);
   read.n.pendingWebTab = -1; read.n.requestRootPage(1);

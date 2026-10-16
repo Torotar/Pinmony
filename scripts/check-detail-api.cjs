@@ -8,7 +8,7 @@ new Function(script);
 const requests = [];
 const window = { PinmonyDetailApiEnabled: true }; window.top = window;
 vm.runInNewContext(script, { window, location: { hostname: 'www.pinterest.com', origin: 'https://www.pinterest.com' },
-  AbortController, setTimeout, clearTimeout, console: { warn() {} },
+  AbortController, setTimeout, clearTimeout, console: { warn() {}, info() {} },
   fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })) });
 const api = window.PinmonyDetailApi;
 const pin = id => ({ id, type: 'pin', title: '', images: { '474x': { url: 'https://i.pinimg.com/test.jpg', width: 474, height: 700 } } });
@@ -65,8 +65,9 @@ async function main() {
   api.reset(); const videoRequest = requests.length; read();
   await respond(videoRequest, { ...pin('123'), is_video: true }); await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(api.startRelated(url), false);
-  assert.equal(read().mediaUnsupported, true); assert.equal(read().detail, null);
-  api.retry(); assert.equal(requests.length, videoRequest + 2);
+  assert.equal(read().mediaUnsupported, false); assert.equal(read().detail, null);
+  assert.match(read().detailError, /尚未就绪/);
+  const beforeRetry = requests.length; api.retry(); assert.equal(requests.length, beforeRetry + 1);
   api.reset();
   for (const media of [{ carousel_data: {}, story_pin_data: {} }, { carousel_data: [], story_pin_data: [] },
       { is_video: false, carousel_data: null, story_pin_data: null },
@@ -87,10 +88,16 @@ async function main() {
       { story_pin_data: { pages: [{ blocks: [{ block_type: 3 }] }] } }]) {
     const next = requests.length;
     read(); await respond(next, { ...pin('123'), ...media }); assert.equal(api.startRelated(url), false);
-    assert.equal(read().mediaUnsupported, true);
-    assert.match(read().detailError, /暂不支持/);
+    assert.equal(read().mediaUnsupported, false);
+    assert.match(read().detailError, /尚未就绪/);
     assert.equal(read().detail, null, 'Do not present a video cover as the full post'); api.reset();
   }
+  window.PinmonyCarouselApi = { detect: () => false, resolve: async () => ({ pinId: '123', items: [{ id: '1' }, { id: '2' }] }) };
+  const storyRequest = requests.length; read();
+  await respond(storyRequest, { ...pin('123'), story_pin_data: { pages: [{}, {}] } });
+  assert.equal(read().mediaUnsupported, false);
+  assert.equal(read().carousel.items.length, 2, 'Multi-page stories must reach the media resolver');
+  await respond(storyRequest + 1, [], '-end-'); api.reset();
   const bridgeSource = readSourceFileSync('entry/src/main/ets/services/PinmonyDetailScript.ets', 'utf8');
   const bridge = Function('return `' + bridgeSource.match(/= `([\s\S]*?)`;/)[1] + '`')();
   new Function(bridge);

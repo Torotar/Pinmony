@@ -6,6 +6,7 @@ export interface PinmonyAuthMessage {
   pageUrl: string;
   epoch: number;
   profileUrl: string;
+  appVersion?: string;
 }
 
 export function isPinterestAuthRoute(url: string): boolean {

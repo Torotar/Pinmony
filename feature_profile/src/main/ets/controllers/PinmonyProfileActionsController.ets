@@ -4,6 +4,13 @@ import { PinmonyProfilePanel } from '../models/PinmonyProfilePanel';
 interface ProfileOperation { token: number; page: string; document: string; session: number; }
 interface ProfileSaveResult { pending?: boolean; ok?: boolean; duplicate?: boolean; message?: string; username?: string; }
 export interface PinmonyProfileActionsPorts {
+  nativeEnabled?: () => boolean;
+  nativeOpen?: (mode: string,section: string) => Promise<void>;
+  nativeClose?: () => void;
+  nativePause?: () => void;
+  nativeFollow?: (id: string) => Promise<void>;
+  nativeSave?: (input: string) => Promise<void>;
+  nativeOrganize?: (action: string,value: string,secret: boolean) => Promise<void>;
   authenticated: () => boolean;
   foreground: () => boolean;
   visible: () => boolean;
@@ -38,6 +45,7 @@ export class PinmonyProfileActionsController {
   private organizePage: string = '';
   constructor(store: PinmonyProfileStore, ports: PinmonyProfileActionsPorts) { this.store = store; this.ports = ports; }
   pause(): void {
+    if(this.ports.nativeEnabled?.())this.ports.nativePause?.();
     this.generation++; this.intent++; this.tasks.invalidate();
     this.waits.forEach((resolve: (value: boolean) => void): void => resolve(false)); this.waits.clear();
     this.panelReading = false; this.followReading = false; this.saveReading = false; if (!this.following) this.store.followingBusy = false; this.store.profileSwitching = false;
@@ -48,6 +56,7 @@ export class PinmonyProfileActionsController {
     this.store.organizeUncertain = false;
   }
   resume(): void {
+    if(this.ports.nativeEnabled?.())return;
     this.reconcile();
     if (this.store.panel?.loading && this.panelDocument === this.ports.document()) this.readPanel();
     if (this.following) this.readFollow(this.following);
@@ -80,10 +89,13 @@ export class PinmonyProfileActionsController {
       typeof panel.loading === 'boolean' && typeof panel.error === 'string' && Array.isArray(panel.items) && panel.items.length <= 100;
   }
   async openPanel(mode: string, section: string = 'users'): Promise<void> {
+    if(this.ports.nativeEnabled?.()){await this.ports.nativeOpen?.(mode,section);return;}
     this.reconcile();
     if (!this.available() || !['edit','following','followers'].includes(mode) || !['users','boards'].includes(section) || this.store.saving || this.store.followingBusy) return;
     const intent: number = ++this.intent, generation: number = this.generation;
-    if (!await this.ports.prepare() || generation !== this.generation || intent !== this.intent || !this.available()) return;
+    const prepared: boolean = await this.ports.prepare();
+    if (generation !== this.generation || intent !== this.intent || !this.available()) return;
+    if (!prepared) { this.ports.feedback('资料会话尚未就绪，请重试'); return; }
     const page: string = this.ports.currentProfile(); if (!page) return;
     this.closePanel(); this.panelDocument = this.ports.document();
     const token: number = ++this.store.panelToken;
@@ -119,10 +131,12 @@ export class PinmonyProfileActionsController {
     finally { if (generation === this.generation) this.panelReading = false; }
   }
   closePanel(): void {
+    if(this.ports.nativeEnabled?.()){this.ports.nativeClose?.();return;}
     this.pause(); this.following = undefined; this.saving = undefined; this.store.followingBusy = false; this.store.saving = false; this.store.followUncertain = false; this.store.saveUncertain = false; this.store.panelToken++; this.store.panel = undefined; this.panelDocument = ''; this.ports.syncMotion();
     this.ports.runScript('window.PinmonyProfilePanel && window.PinmonyProfilePanel.close()').catch(() => {});
   }
   async follow(id: string = ''): Promise<void> {
+    if(this.ports.nativeEnabled?.()){await this.ports.nativeFollow?.(id);return;}
     this.reconcile();
     if (!this.available() || this.store.followingBusy || this.store.followUncertain) return;
     const generation: number = this.generation;
@@ -166,6 +180,7 @@ export class PinmonyProfileActionsController {
     finally { if (generation === this.generation) this.followReading = false; }
   }
   async save(input: string): Promise<void> {
+    if(this.ports.nativeEnabled?.()){await this.ports.nativeSave?.(input);return;}
     this.reconcile();
     const panel: PinmonyProfilePanel | undefined = this.store.panel;
     if (!this.available() || !panel || panel.loading || panel.mode !== 'edit' || this.store.saving || this.store.saveUncertain || this.panelDocument !== this.ports.document()) return;
@@ -235,6 +250,7 @@ export class PinmonyProfileActionsController {
     this.store.profileSwitching = false; this.ports.feedback('无法切换个人资料页签，请重试');
   }
   async organize(action: string, value: string = '', secret: boolean = false): Promise<void> {
+    if(this.ports.nativeEnabled?.()){await this.ports.nativeOrganize?.(action,value,secret);return;}
     if (!this.available() || this.organizePending) return;
     const generation: number = this.generation;
     if (!await this.ports.prepare() || generation !== this.generation || !this.available() || !this.store.profileActionsReady) return;

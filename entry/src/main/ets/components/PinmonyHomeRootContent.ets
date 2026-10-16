@@ -2,6 +2,7 @@ import { PinmonyPinStore } from 'feature_pin';
 import { PinmonyHomeStore, PinmonyHomeSnapshot, PinmonyHomePage } from 'feature_home';
 import { NetworkManager } from 'common_network';
 import { PinmonyAuthStatus } from 'common_session';
+import { PIN_NATIVE_PIN_MENUS_ENABLED } from '../app/PinmonyPinMenuNative';
 
 export interface PinmonyHomeRootView {
   homePresentationPageKey: () => string;
@@ -34,13 +35,14 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
           if ((view.homePresentationPageKey() || view.retainedHomeRootPageKey()) &&
               (!view.nativeRootOnly || view.homeStore.home || view.homeStore.cachedHome)) {
             PinmonyHomePage({
+              imageRecovery: view.homeStore.imageRecovery,
               prefetchedImageUrls: view.pinStore.prefetchedImageUrls,
-              feedActive: (!view.nativeRootOnly || view.rootContentInteracted) && view.activeTab === 0 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.pinStore.detailOpeningPin && !view.currentPinUrl(),
+              feedActive: (view.homeStore.homeNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) && view.activeTab === 0 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.homeStore.homeNativeReadsReady || !view.currentPinUrl()),
               mediaActive: view.activeTab === 0 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.pinStore.detailOpeningPin && !view.currentPinUrl(),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               home: view.homeStore.homeForPresentation(view.homePresentationPageKey() || view.retainedHomeRootPageKey()) || view.homePlaceholder(),
-              actionsReady: view.activeTab === 0 && view.homeStore.homeActionsReady && view.pendingWebTab !== 0 &&
-                view.currentHomePageKey() === (view.homePresentationPageKey() || view.retainedHomeRootPageKey()),
+              actionsReady: view.activeTab === 0 && (view.homeStore.homeNativeReadsReady || view.homeStore.homeActionsReady && view.pendingWebTab !== 0 &&
+                view.currentHomePageKey() === (view.homePresentationPageKey() || view.retainedHomeRootPageKey())),
               navigationReady: view.activeTab === 0 && !!view.homeStore.homeForPresentation(
                 view.homePresentationPageKey() || view.retainedHomeRootPageKey()) &&
                 view.authStatus === 'authenticated',
@@ -48,7 +50,7 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               menuReady: view.homeMenuReady(),
               initialScrollOffset: view.homeStore.cachedHomeScrollOffset,
               pendingTabId: view.homeStore.pendingHomeTab,
-              menuLoadingId: view.homeStore.homeMoreLoadingId,
+              menuLoadingId: PIN_NATIVE_PIN_MENUS_ENABLED ? '' : view.homeStore.homeMoreLoadingId,
               loading: view.homeStore.homeLoading ||
                 !view.homeStore.homeForPresentation(view.homePresentationPageKey() || view.retainedHomeRootPageKey()) && !view.homeStore.homeError,
               // A retained snapshot is immediately usable for display while

@@ -4,6 +4,7 @@ export const PIN_HOME_API_ENABLED: boolean = true;
 export const PIN_HOME_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  if (window.PinmonyNativeHomeReadsEnabled === true) return;
   var enabled = window.PinmonyHomeApiEnabled === true;
   var key = '', generation = 0, abort = null, boardAbort = null, busy = false;
   var attempted = false, active = false, pins = [], bookmark = '', ended = false, error = '', refreshing = false;
@@ -11,6 +12,14 @@ export const PIN_HOME_API_SCRIPT: string = `
   var lastRequestKey = '', lastRequestAt = 0;
   var feedBoard = '';
   var boardSummary = null;
+  var feeds = [], feedReadAt = 0;
+  function retainFeed() {
+    if (!key || !active || error) return;
+    feeds = feeds.filter(function (entry) { return entry.key !== key && Date.now() - entry.at < 300000; });
+    feeds.push({ key: key, boardId: feedBoard, pins: pins.slice(), bookmark: bookmark,
+      ended: ended, board: boardSummary, at: feedReadAt });
+    if (feeds.length > 4) feeds.shift();
+  }
   var savedUsername = '', savedTabs = [], savedTabsStatus = 'idle';
   var savedAbort = null, savedGeneration = 0;
   function savedChanged() { if (window.PinmonyHomeDemand) window.PinmonyHomeDemand(location.href); }
@@ -30,7 +39,8 @@ export const PIN_HOME_API_SCRIPT: string = `
   function requestSavedTabs(username) {
     var token = ++savedGeneration;
     if (savedAbort) savedAbort.abort();
-    savedTabsStatus = 'loading'; savedTabs = []; savedUsername = username;
+    if (savedUsername !== username) savedTabs = [];
+    savedTabsStatus = 'loading'; savedUsername = username;
     if (!username) { savedTabsStatus = 'idle'; savedUsername = ''; return; }
     var controller = new AbortController(); savedAbort = controller;
     var options = { field_set_key: 'profile_grid_item', filter_stories: false,
@@ -47,12 +57,12 @@ export const PIN_HOME_API_SCRIPT: string = `
     }).then(function (payload) {
       if (token !== savedGeneration || controller.signal.aborted) return;
       var mapped = mapSavedTabs(payload.resource_response);
-      savedTabsStatus = mapped ? 'ready' : 'failed'; savedTabs = mapped || [];
+      savedTabsStatus = mapped ? 'ready' : 'failed'; if (mapped) savedTabs = mapped;
       if (!mapped) console.warn('HomeCategoryTrace: invalid-resource status=' + (payload.resource_response && payload.resource_response.status === 'success' ? 'success' : 'other') + ' list=' + Array.isArray(payload.resource_response && payload.resource_response.data));
       savedChanged();
     }).catch(function (error) {
       if (token === savedGeneration && error && error.pinmonyCancelled === true) { savedTabsStatus = 'idle'; return; }
-      if (token === savedGeneration && !controller.signal.aborted) { savedTabsStatus = 'failed'; savedTabs = []; console.warn('HomeCategoryTrace: request-failed'); savedChanged(); }
+      if (token === savedGeneration && !controller.signal.aborted) { savedTabsStatus = 'failed'; console.warn('HomeCategoryTrace: request-failed'); savedChanged(); }
     }).finally(function () {
       clearTimeout(timer); if (savedAbort === controller) savedAbort = null;
     });
@@ -72,20 +82,23 @@ export const PIN_HOME_API_SCRIPT: string = `
     if (!enabled) return false;
     var username = window.PinmonyHomeUsername || '';
     if (!username) return false;
+    if (savedTabsStatus === 'loading' && username === savedUsername) return true;
     requestSavedTabs(username);
     return true;
   }
   function initialTabs() {
     ensureSavedTabs();
-    return savedTabsStatus === 'ready' ? savedTabs : [];
+    return savedTabs;
   }
-  function reset() {
+  function reset(preserveFeeds) {
+    if (preserveFeeds !== true) feeds = [];
     generation++;
     if (abort) abort.abort();
     if (boardAbort) boardAbort.abort();
     key = ''; feedBoard = ''; abort = null; boardAbort = null; busy = false; attempted = false; active = false;
     pins = []; bookmark = ''; ended = false; error = ''; refreshing = false;
     boardSummary = null;
+    feedReadAt = 0;
     lastRequestKey = ''; lastRequestAt = 0;
   }
   function pause() {
@@ -200,6 +213,8 @@ export const PIN_HOME_API_SCRIPT: string = `
   async function request(append) {
     if (!current() || busy || (append && (!active || ended))) return false;
     var token = generation, requestedKey = key, previous = bookmark;
+    var traceAt = Date.now(), traceCount = pins.length;
+    console.info('HomePaginationTrace: phase=request append=' + append + ' count=' + traceCount);
     if (!append) { lastRequestKey = requestedKey; lastRequestAt = Date.now(); }
     busy = true; refreshing = !append; attempted = true; error = ''; changed();
     abort = new AbortController();
@@ -236,12 +251,16 @@ export const PIN_HOME_API_SCRIPT: string = `
         if (!merged.some(function (saved) { return saved.id === pin.id; })) merged.push(pin);
       });
       pins = merged; bookmark = next;
+      console.info('HomePaginationTrace: phase=merged append=' + append + ' incoming=' + incoming.length +
+        ' added=' + (pins.length - (append ? traceCount : 0)) + ' count=' + pins.length + ' elapsedMs=' + (Date.now() - traceAt));
       ended = !next || next === '-end-' || (append && next === previous) || !resource.data.length;
       active = true;
+      feedReadAt = Date.now();
     } catch (failure) {
       if (token !== generation || requestedKey !== key || !current()) return false;
       if (failure && failure.pinmonyCancelled === true) { attempted = false; error = ''; return false; }
       error = append ? '更多帖子读取失败，请重试' : active ? '首页刷新失败，请下拉重试' : '首页接口读取失败，请重试';
+      console.info('HomePaginationTrace: phase=failed append=' + append + ' elapsedMs=' + (Date.now() - traceAt));
       console.warn('Pinmony home API: ' + (failure.message || 'request-failed'));
     } finally {
       clearTimeout(timer);
@@ -257,6 +276,7 @@ export const PIN_HOME_API_SCRIPT: string = `
       var value = typeof username === 'string' && /^[a-zA-Z0-9_]+$/.test(username) ? username : '';
       if (value === (window.PinmonyHomeUsername || '')) return;
       window.PinmonyHomeUsername = value;
+      reset(); feeds = [];
       savedTabsStatus = 'idle'; savedTabs = []; savedUsername = '';
       if (savedAbort) { savedAbort.abort(); savedAbort = null; }
       savedGeneration++;
@@ -282,11 +302,17 @@ export const PIN_HOME_API_SCRIPT: string = `
       if (!enabled) { if (key) reset(); return null; }
       if (!eligible) { pause(); return null; }
       var requestedBoard = /^\\d+$/.test(String(boardId || '')) ? String(boardId) : '';
-      if (key !== contextKey || feedBoard !== requestedBoard) { reset(); key = contextKey; feedBoard = requestedBoard; }
-      changed = onChange; current = isCurrent;
-      if (!attempted && !busy && lastRequestKey === contextKey && Date.now() - lastRequestAt < 5000) {
-        attempted = true;
+      if (key !== contextKey || feedBoard !== requestedBoard) {
+        retainFeed(); reset(true); key = contextKey; feedBoard = requestedBoard;
+        var retained = feeds.filter(function (entry) {
+          return entry.key === contextKey && entry.boardId === requestedBoard && Date.now() - entry.at < 300000;
+        })[0];
+        if (retained) {
+          pins = retained.pins.slice(); bookmark = retained.bookmark; ended = retained.ended;
+          boardSummary = retained.board; feedReadAt = retained.at; active = true; attempted = true;
+        }
       }
+      changed = onChange; current = isCurrent;
       if (!attempted) request(false);
       return { active: active, pins: pins, busy: busy, refreshing: refreshing, ended: ended, error: error,
         board: boardSummary };

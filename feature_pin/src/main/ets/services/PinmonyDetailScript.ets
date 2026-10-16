@@ -444,7 +444,10 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
         countText: '', enabled: true, selected: false });
     } else sourceLabel = '';
     return { kind: 'state', dataSource: 'api', session: session, pinUrl: pin,
-      aiLabel: Array.isArray(data.ai_disclosures) && data.ai_disclosures.indexOf(1) >= 0 ? '由 AI 修改' : '',
+      aiLabel: (Array.isArray(data.ai_disclosures) && data.ai_disclosures.indexOf(1) >= 0 ||
+        Array.isArray(data.gen_ai_topics) && data.gen_ai_topics.some(function (topic) {
+          return topic && typeof topic.name === 'string' && !!topic.name.trim();
+        })) ? '由 AI 修改' : '',
       carousel: api.carousel, isVideo: api.isVideo === true, video: api.video, videoError: api.videoError || '',
       mediaLoading: api.mediaLoading === true, mediaError: api.mediaError || '', mediaKind: api.mediaKind || '',
       originalImageUrl: data.images && data.images.orig && data.images.orig.url || api.image.url,
@@ -544,7 +547,7 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
       if (!existingPreview && preview) schedule();
       window.PinmonyDetailApi.scheduleRelated(pin);
       if (!preview || !preview.loading) {
-        if (!preview && !stage.interactionsSettled && window.PinmonyDetailReadTiming) window.PinmonyDetailReadTiming(pin, 'comments.unavailable', 0);
+        if (window.PinmonyNativeDetailReadsEnabled !== true && !preview && !stage.interactionsSettled && window.PinmonyDetailReadTiming) window.PinmonyDetailReadTiming(pin, 'comments.unavailable', 0);
         window.PinmonyDetailApi.settleInteractions(pin);
         window.PinmonyDetailApi.scheduleRelated(pin);
       }

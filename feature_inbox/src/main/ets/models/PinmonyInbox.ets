@@ -2,6 +2,7 @@ export interface PinmonyInboxItem {
   id: string;
   title: string;
   subtitle: string;
+  outgoing?: boolean;
   imageUrl: string;
   profileUrl?: string;
   enabled: boolean;
@@ -9,9 +10,11 @@ export interface PinmonyInboxItem {
   updatedAt?: string;
   unread?: boolean;
   moreId?: string;
+  subdued?: boolean;
 }
 
 export interface PinmonyInboxSnapshot {
+  contextEpoch?: number;
   kind: string;
   session: number;
   pageUrl: string;

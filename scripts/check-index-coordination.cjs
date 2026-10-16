@@ -1,7 +1,6 @@
 const fs = require('node:fs'), assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
-const { createArktsLoader } = require('./arkts-module-loader.cjs');
-const scripts = createArktsLoader(ts, {common_foundation: {allowsSpeculativeReads: () => false}})
+const scripts = require('./product-coordination-harness.cjs').runtime(ts)
   .loadFile('entry/src/main/ets/app/PinmonyScriptRegistry.ets').pinWebDocumentStartScripts();
 // Authorized feature changes invalidate old byte hashes; retain injection boundaries,
 // parse every real script and verify the dependency-sensitive order explicitly.

@@ -276,6 +276,7 @@ export class PinmonyFailureRecoveryCoordinator {
       return;
     }
     PinmonyRuntimeLog.warn('NavigationFailureTrace: epoch=' + this.authEpoch + ' targetTab=' + this.effectiveRootDocumentTarget().toString() + ' preparing=' + (this.rootReadToken === this.tabRequestToken).toString() + ' foreground=' + (!this.businessSuspended).toString());
+    this.rootContextCoordinator.failDocument(url);
     this.showNetworkNotice(code === -200 ? '网站证书校验失败，请检查网络或代理后重试' : '网络不稳定，页面加载失败，请重试');
     this.pageHistory.cancelBack();
     this.webPageLoading = false;
@@ -299,6 +300,13 @@ export class PinmonyFailureRecoveryCoordinator {
     }
     const failedBoard: string = this.boardUrlFromAddress(url);
     if (failedBoard && this.boardStore.boardDetail?.pageKey === failedBoard) {
+      if(this.boardStore.boardDetail.nativeReadsReady !== undefined) {
+        // Web failure revokes write context; native GETs keep their own outcome.
+        this.boardStore.boardDetail.session = 0;
+        this.loadFailed = false; this.failureDetails = '';
+        PinmonyRuntimeLog.warn('BoardNativeTrace: write-context-unavailable');
+        return;
+      }
       this.boardStore.presentationPage = failedBoard;
       this.boardStore.presentationOnly = true;
       this.boardStore.boardDetail.session = 0;
@@ -348,13 +356,13 @@ export class PinmonyFailureRecoveryCoordinator {
     }
     this.clearInbox();
     if (keepHomeAfterFailure && cachedHome) {
-      PinmonyRuntimeLog.warn('HomeRefresh: failed reason=main-frame-error snapshotRetained=true');
+      PinmonyRuntimeLog.warn((failedRoot === 0 ? 'HomeRefresh' : 'DetailReturn') + ': failed reason=main-frame-error snapshotRetained=true');
       this.homeStore.homeRefreshing = false;
       this.homeStore.pendingHomeTab = '';
       this.homeStore.home = cachedHome;
       this.homeStore.homeActionsReady = false;
       this.homeStore.homeLoading = false;
-      this.homeStore.homeError = '首页连接失败，请重试';
+      if (failedRoot === 0) this.homeStore.homeError = '首页连接失败，请重试';
       if (!keepDetailForFailedPin) {
         this.clearDetail();
         this.nativeBackTarget = cachedHome.pageKey;
@@ -364,7 +372,7 @@ export class PinmonyFailureRecoveryCoordinator {
         this.tabsController.changeIndex(0);
       }
     } else {
-      if (this.activeTab === 0 || this.homeStore.homeRefreshing) {
+      if (failedRoot === 0) {
         PinmonyRuntimeLog.warn('HomeRefresh: failed reason=main-frame-error snapshotRetained=false');
       }
       this.clearHome();

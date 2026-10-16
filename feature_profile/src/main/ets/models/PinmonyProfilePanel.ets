@@ -19,6 +19,8 @@ export interface PinmonyProfilePanel {
   error: string;
   items: PinmonyProfilePanelItem[];
   hasMore?: boolean;
+  moreLoading?: boolean;
+  moreError?: string;
   firstName: string;
   lastName: string;
   about: string;
@@ -27,4 +29,6 @@ export interface PinmonyProfilePanel {
   avatar: string;
   avatarPreview?: string;
   avatarError?: string;
+  avatarBusy?: boolean;
+  avatarAction?: string;
 }

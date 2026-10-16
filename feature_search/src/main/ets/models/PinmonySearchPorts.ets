@@ -1,4 +1,23 @@
 export interface PinmonySearchPorts {
+  nativeSearch?: () => boolean;
+  nativeSearchApply?: () => void;
+  nativeSearchDemand?: () => Promise<void>;
+  nativeSearchMore?: () => Promise<void>;
+  nativeSearchRefresh?: () => Promise<void>;
+  nativeSearchClearProductFilter?: (kind: string) => void;
+  nativeSearchFollowUser?: (id: string) => Promise<void>;
+  nativeSearchFollowBoard?: (id: string) => Promise<void>;
+  nativeSearchDeleteHistory?: (id: string) => Promise<void>;
+  nativeSearchInput?: (term: string, immediate: boolean) => Promise<void>;
+  nativeSearchCancelFilters?: () => void;
+  nativeSearchFilters?: () => Promise<void>;
+  nativeSearchFilterTarget?: (id: string) => string;
+
+  nativeDiscovery?: () => boolean;
+  nativeDiscoveryApply?: () => void;
+  nativeDiscoveryDemand?: () => Promise<void>;
+  nativeDiscoveryMore?: () => Promise<void>;
+  nativeDiscoveryRefresh?: () => Promise<void>;
   currentPageKey: () => string;
   isActive: () => boolean;
   preservingPinSearch: () => boolean;
@@ -10,6 +29,7 @@ export interface PinmonySearchPorts {
   recordPageKey: (pageKey: string) => void;
   setDetailReturn: (pageKey: string) => void;
   navigateSearch: (target: string, source: string) => void;
+  navigateFilterAfterClose?: (target: string, source: string) => void;
   navigateResult: (target: string, source: string) => void;
   cancelNavigation: (clearRetained: boolean) => void;
   clearOpeningDetail: () => void;

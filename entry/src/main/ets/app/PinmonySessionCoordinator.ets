@@ -38,6 +38,7 @@ export interface PinmonySessionCoordinatorPorts {
   authenticatedProfileUrl: () => string;
   setAuthenticatedProfileUrl: (value: string) => string;
   bindNativeNetwork: () => void;
+  confirmBusinessSession: (appVersion: string) => void;
   boardStore: () => PinmonyBoardStore;
   cancelAccountSettings: () => void;
   cancelHomeDetailMore: () => void;
@@ -200,7 +201,7 @@ updateAuthState(value: string): void {
             this.ports.clearRootTabCaches(false);
             this.ports.nativeNetwork().invalidate();
             this.ports.clearDetail();
-            this.pinStore.detailCache.clear();
+            this.pinStore.detailCache.clear(); this.homeStore.imageRecovery = undefined;
             this.pinStore.clearDetailOrigins();
             this.pinStore.detailPrefetch.clear();
             this.pinStore.prefetchedImageUrls = [];
@@ -231,6 +232,7 @@ updateAuthState(value: string): void {
             /^https:\/\/(?:www|uk)\.pinterest\.com\//.test(message.profileUrl)) {
             this.ports.setAuthenticatedProfileUrl(message.profileUrl);
         }
+        this.ports.confirmBusinessSession(message.appVersion || '');
         const authenticatedProfile: string = this.ports.profileUrlFromAddress(this.ports.authenticatedProfileUrl());
         const usernameMatch: RegExpMatchArray | null = authenticatedProfile.match(/^https:\/\/(?:www|uk)\.pinterest\.com\/([a-zA-Z0-9_]+)\//i);
         const homeUsername: string = usernameMatch ? usernameMatch[1] : '';
@@ -289,6 +291,10 @@ resetAuthenticatedContent(): void {
     this.ports.closeProfilePanel();
     this.ports.setProfileSettingsVisible(false);
     this.settingsStore.reset();
+    this.inboxStore.retainedChat = undefined;
+    this.inboxStore.inboxFlow = undefined;
+    this.inboxStore.chatScrollOffset = 0;
+    this.inboxStore.chatReturnConversation = '';
     this.ports.cancelAccountSettings();
     this.ports.setShowNativeSheet(false);
     this.ports.setActiveSheetKind('');
@@ -296,7 +302,7 @@ resetAuthenticatedContent(): void {
     this.ports.cancelHomeDetailMore();
     this.ports.clearRootTabCaches();
     this.ports.clearDetail();
-    this.pinStore.detailCache.clear();
+    this.pinStore.detailCache.clear(); this.homeStore.imageRecovery = undefined;
     this.pinStore.clearDetailOrigins();
     this.pinStore.detailPrefetch.clear();
     this.pinStore.prefetchedImageUrls = [];

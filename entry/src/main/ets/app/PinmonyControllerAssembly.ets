@@ -1,3 +1,11 @@
+import { PinmonyBoardNativeReads } from './PinmonyBoardNativeReads';
+import { PinmonyProfileNativeReads } from './PinmonyProfileNativeReads';
+import { PinmonyInboxMessagesNativeReads } from './PinmonyInboxMessagesNativeReads';
+import { PinmonyInboxUpdatesNativeReads } from './PinmonyInboxUpdatesNativeReads';
+import { PinmonySearchNativeReads } from './PinmonySearchNativeReads';
+import { PinmonySearchDiscoveryNativeReads } from './PinmonySearchDiscoveryNativeReads';
+import { PinmonyHomeNativeReads } from './PinmonyHomeNativeReads';
+import { PinmonyDetailNativeReads } from './PinmonyDetailNativeReads';
 import { PinmonyControllerHooks } from './PinmonyControllerLifecycle';
 
 import { PinmonySearchStore } from 'feature_search';
@@ -24,11 +32,19 @@ export interface PinmonyProductControllers {
   inboxActions: PinmonyInboxActionsController;
   detail: PinmonyDetailController;
   detailRead: PinmonyDetailReadController;
+  homeNativeReads: PinmonyHomeNativeReads;
+  searchNativeReads: PinmonySearchNativeReads;
+  searchDiscoveryNativeReads: PinmonySearchDiscoveryNativeReads;
+  detailNativeReads: PinmonyDetailNativeReads;
   detailOperations: PinmonyDetailOperationsController;
   sharePanels: PinmonySharePanelsController;
   postPanels: PinmonyPostPanelsController;
+  boardNativeReads: PinmonyBoardNativeReads;
+  profileNativeReads: PinmonyProfileNativeReads;
   profileRead: PinmonyProfileReadController;
   profileActions: PinmonyProfileActionsController;
+  inboxMessagesNativeReads: PinmonyInboxMessagesNativeReads;
+  inboxUpdatesNativeReads: PinmonyInboxUpdatesNativeReads;
   inboxRead: PinmonyInboxReadController;
 }
 
@@ -54,6 +70,14 @@ export function assembleControllerLifecycle(controllers: PinmonyProductControlle
     pauseHook('settings', (): void => controllers.settings.pause()),
     pauseHook('inbox-actions', (): void => controllers.inboxActions.pause()),
     pauseHook('detail-actions', (): void => controllers.detail.pause()),
+    resumeHook('board-native', (): void => controllers.boardNativeReads.pause(), (): void => {controllers.boardNativeReads.demand();}),
+    pauseHook('profile-native', (): void => controllers.profileNativeReads.pause()),
+    pauseHook('inbox-messages-native', (): void => controllers.inboxMessagesNativeReads.pause()),
+    pauseHook('inbox-updates-native', (): void => controllers.inboxUpdatesNativeReads.pause()),
+    pauseHook('search-native', (): void => controllers.searchNativeReads.pause()),
+    pauseHook('search-discovery-native', (): void => controllers.searchDiscoveryNativeReads.pause()),
+    pauseHook('home-native-reads', (): void => controllers.homeNativeReads.pause()),
+    pauseHook('detail-native-reads', (): void => controllers.detailNativeReads.pause()),
     pauseHook('detailReadController', (): void => controllers.detailRead.pause()),
     pauseHook('detailOperationsController', (): void => controllers.detailOperations.pause()),
     pauseHook('sharePanelsController', (): void => controllers.sharePanels.pause()),

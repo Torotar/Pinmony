@@ -1,4 +1,5 @@
 export { PinmonyStatusPage } from './src/main/ets/components/PinmonyStatusPage';
+export { PinmonyUserAvatar } from './src/main/ets/components/PinmonyUserAvatar';
 export { PinmonyBoardPlaceholder } from './src/main/ets/components/PinmonyBoardPlaceholder';
 
 export { PinmonyVideo, PinmonyVideoSource, PinmonyVideoFileLease, PinmonyVideoFileReader } from './src/main/ets/models/PinmonyVideo';

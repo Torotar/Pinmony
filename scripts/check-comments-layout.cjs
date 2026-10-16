@@ -9,6 +9,18 @@ catch (_) {
   ts = require(process.argv[2]);
 }
 const source = readSourceFileSync('entry/src/main/ets/components/PinmonyCommentsSheet.ets', 'utf8');
+const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+assert.match(source, /if \(item\.canTranslate && this\.onTranslate\)/);
+assert.match(source, /item\.translationVisible && item\.translatedText \? item\.translatedText : item\.text/,
+  'translations change display without overwriting the editable original');
+assert.match(source, /\.enabled\(!item\.translationLoading && !this\.result\.loading && !this\.result\.busy && !this\.result\.uncertain\)/);
+assert.match(index, /onTranslate: PIN_NATIVE_DETAIL_READS_ENABLED \? \(id: string\) => this\.commentApiAction\('commentTranslate', id\) : undefined/);
+assert.match(index, /keyboardAvoidMode: this\.activeSheetKind === 'comments' \? SheetKeyboardAvoidMode\.RESIZE_ONLY :\s*SheetKeyboardAvoidMode\.TRANSLATE_AND_SCROLL/,
+  'comments resize the available content rather than translating or scrolling the entire sheet');
+assert.match(source, /List\(\{ space: 18 \}\)[\s\S]*?\.width\('100%'\)\.layoutWeight\(1\)/,
+  'the comment list absorbs the reduced viewport');
+assert.match(source, /this\.composer\(\)[\s\S]*?\.height\('100%'\)/,
+  'composer remains outside the list in the bounded sheet');
 const methods = source.slice(source.indexOf('  private ageLabel'), source.indexOf('  @Builder'));
 const compiled = ts.transpileModule('class Presentation {' + methods + '} Presentation;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;

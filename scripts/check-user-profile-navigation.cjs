@@ -8,19 +8,21 @@ function method(name) {
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  private ', start + 1));
 }
-const context = { setTimeout() {} };
+const context = { setTimeout() {}, PIN_NATIVE_PROFILE_READS_ENABLED: false }; // Explicit manual-rollback coverage; native production path is checked separately.
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + ['openUserProfile', 'backFromUserProfile'].map(method).join('\n') + '} globalThis.Native = Native;', {
   compilerOptions: { target: ts.ScriptTarget.ES2020 }
 }).outputText, context);
 const native = new context.Native(), loads = [], back = [], cached = [];
 let page = 'https://www.pinterest.com/pin/123/';
 Object.assign(native, { authStatus: 'authenticated', activeTab: 0,
+  usesNativeProfileReads: () => false,
   profileStore: { origins: [], profileScrollOffset: 48 },
   pinStore: { detail: { pinUrl: page }, detailScrollOffset: 64, detailCache: { put(...args) { cached.push(args); } } },
   tabsController: { changeIndex() {} }, pageHistory: { visit() {} },
   controller: { getUrl: () => page, loadUrl: url => loads.push(url) },
   currentProfileUrl: () => '', profileUrlFromAddress: url => /^https:\/\/www\.pinterest\.com\/sample\/$/.test(url) ? url : '',
   clearRootTabGuard() {},
+  nativeRootOnly: true, syncFloatingTabsMotion() {},
   closeProfilePanel() { this.profileStore.panel = undefined; }, clearDetail() {}, clearProfile() {},
   pinIdentity: url => url, backOnePage: (...args) => back.push(args),
 });
@@ -28,6 +30,8 @@ native.openUserProfile('https://example.com/sample/');
 assert.equal(loads.length, 0, 'external avatar targets are rejected');
 native.openUserProfile('https://www.pinterest.com/sample/');
 assert.equal(loads.length, 1);
+assert.equal(native.nativeRootOnly, false, 'avatar navigation releases root-only presentation');
+assert.equal(native.profileStore.profileLoading, true, 'profile loading starts immediately');
 assert.equal(native.activeTab, 0, 'avatar navigation must not select the My root tab');
 assert.equal(native.profileStore.origins[0].page, page);
 assert.equal(native.profileStore.origins[0].tab, 0);
@@ -55,4 +59,24 @@ assert.equal(native.profileStore.origins.length, 0, 'failed load rolls back the 
 assert.equal(native.profileStore.profile, retained);
 assert.equal(native.profileStore.profileActionsReady, false);
 assert.equal(notices.length, 2, 'both failures produce explicit native feedback');
+native.currentProfileUrl = () => 'https://www.pinterest.com/sample/';
+native.controller.loadUrl = url => loads.push(url);
+native.openUserProfile('https://www.pinterest.com/sample/');
+assert.equal(loads.length, 2, 'a retained matching profile must not swallow a creator click from detail');
+assert.equal(native.profileStore.origins.length, 1);
+native.pinStore.detail = undefined; native.pinStore.detailOpeningPin = '';
+native.openUserProfile('https://www.pinterest.com/sample/');
+assert.equal(loads.length, 2, 'an already visible matching profile does not navigate again');
+const routes = { PIN_NATIVE_PROFILE_READS_ENABLED: true };
+vm.runInNewContext(ts.transpileModule('class Routes {' + ['usesNativeProfileReads', 'currentProfileUrl'].map(method).join('\n') + '} globalThis.Routes = Routes;', {
+  compilerOptions: { target: ts.ScriptTarget.ES2020 }
+}).outputText, routes);
+const route = new routes.Routes();
+Object.assign(route, { authStatus: 'authenticated', profileStore: { origins: [{}] }, authenticatedProfileUrl: 'https://www.pinterest.com/self/',
+  navigationAddress: 'https://www.pinterest.com/self/', profileUrlFromAddress: value => value,
+  nativeRootPageAddress: () => '', controller: { getUrl: () => page } });
+assert.equal(route.currentProfileUrl(), route.navigationAddress, 'opening target wins before hidden document navigation');
+assert.equal(route.usesNativeProfileReads(), true, 'nested self profile uses the native account reader');
+route.navigationAddress = 'https://www.pinterest.com/other/';
+assert.equal(route.usesNativeProfileReads(), true, 'other profiles use the native account reader');
 console.log('User avatar origin, URL guard, post scroll and return checks passed');

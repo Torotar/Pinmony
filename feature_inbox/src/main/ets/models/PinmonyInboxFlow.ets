@@ -5,18 +5,39 @@ export interface InboxFlowUser {
   profileUrl?: string;
   self?: boolean;
 }
+export interface InboxFlowBoard {
+  id: string;
+  title: string;
+  url: string;
+  images: string[];
+  cover: string;
+  pinCount?: number;
+  sectionCount?: number;
+}
 export interface InboxFlowMessage {
   id: string;
   text: string;
   image: string;
+  imageWidth?: number;
+  imageHeight?: number;
   pinUrl: string;
   createdAt: string;
   own: boolean;
   deleted?: boolean;
   reactions?: string[];
   sender?: InboxFlowUser;
+  profile?: InboxFlowUser;
+  profileImages?: string[];
+  board?: InboxFlowBoard;
 }
 export interface PinmonyInboxFlowSnapshot {
+  nativeAccountGeneration?: number;
+  writeUncertain?: boolean;
+  writeAction?: string;
+  writeTarget?: string;
+  contextEpoch?: number;
+  nativeToken?: number;
+  nativeRead?: boolean;
   kind: string;
   pageUrl: string;
   session: number;
@@ -36,6 +57,7 @@ export interface PinmonyInboxFlowSnapshot {
   canUnsubscribePin?: boolean;
   unsubscribedPin?: boolean;
   newsHidden?: boolean;
+  newsUndoing?: boolean;
   newsId?: string;
   blocked?: boolean;
   blockedUserId?: string;

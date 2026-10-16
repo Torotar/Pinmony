@@ -1,5 +1,8 @@
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode } from '@kit.UIDesignKit';
 import { InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
+import { PinmonyUserAvatar } from 'common_ui';
+import { PinmonyInboxBoardCard } from './PinmonyInboxBoardCard';
+import { PinmonyChatScrollPosition } from '../services/PinmonyChatScrollPosition';
 interface ReactionPopupState { isVisible: boolean; }
 
 @Component
@@ -8,44 +11,123 @@ export struct PinmonyInboxFlowPage {
   onUser?: (url: string) => void;
   onAction?: (action: string, value: string) => void;
   onPin?: (url: string) => void;
+  onBoard?: (messageId: string) => void;
+  onCopyText?: (text: string) => Promise<boolean>;
+  @Prop restoreOffset: number = -1;
+  @Prop @Watch('activeChanged') active: boolean = true;
+  onOffset?: (offset: number) => void;
   onNotifications?: () => void;
   onPinAction?: (action: string, url: string) => void;
   onNewsHidden?: (newsId: string) => void;
   onNewsRestored?: (newsId: string) => void;
+  onPinUnsubscribed?: () => void;
   onBlockChanged?: (blocked: boolean, userName: string) => void;
   private scroller: Scroller = new Scroller();
-  private positionedConversation: string = '';
+  private readonly chatPosition: PinmonyChatScrollPosition = new PinmonyChatScrollPosition();
+  private viewportHeight: number = 0;
+  private presentedConversation: string = '';
+  private visible: boolean = false;
   @State private query: string = '';
   @State private draft: string = '';
   @State private imageRatios: Map<string, number> = new Map<string, number>();
+  private textControllers: Map<string, TextController> = new Map<string, TextController>();
+  @State private textAvatarOffsets: Map<string, number> = new Map<string, number>();
+  @State private senderLabelHeights: Map<string, number> = new Map<string, number>();
   @State private selectedMessage: InboxFlowMessage | undefined = undefined;
   @State private showMessageMenu: boolean = false;
   @State private reactionMessageId: string = '';
   @State private blockTarget: InboxFlowUser | undefined = undefined;
   private historyPending: boolean = false;
   private contentHeight: number = 0;
+  private settingsReturnOffset: number = -1;
+  private previousScreen: string = '';
   private historyHeight: number = 0;
   private historyOffset: number = 0;
   private sentRevision: number = 0;
   @State private showUpdatesMenu: boolean = false;
+  private presentedNewsId: string = '';
   private queryToken: number = 0;
   private lastHiddenNewsId: string = '';
   private lastRestoredNewsId: string = '';
   private lastBlockRevision: number = 0;
   private flowPathStack: NavPathStack = new NavPathStack();
-  aboutToAppear(): void { this.flowPathStack.pushPath({ name: 'inbox-flow' }, false); }
+  // HDS invokes this as its own callback. Capture the page explicitly while
+  // keeping a stable callback identity across scroll and snapshot updates.
+  private readonly conversationTitleBuilder: () => void = (): void => { this.conversationTitle(); };
+  aboutToAppear(): void {
+    this.visible = true;
+    this.flowPathStack.pushPath({ name: 'inbox-flow' }, false);
+    this.prepareChatPosition();
+  }
+  aboutToDisappear(): void {
+    this.visible = false; this.queryToken++;
+    // Do not pop the destination while its final frame is being removed.
+    // The stack belongs to this component and is released with it.
+  }
+
+  private messageConfirmationKey(): string {
+    return this.snapshot.pageUrl + ':' + (this.snapshot.conversationId || '') + ':' + (this.snapshot.nativeAccountGeneration === undefined ?
+      this.snapshot.session.toString() : this.snapshot.nativeAccountGeneration.toString() + ':' + (this.snapshot.nativeToken || 0).toString());
+  }
+  private activeChanged(): void {
+    if (!this.active) return;
+    this.prepareChatPosition();
+    this.chatPosition.restore(this.restoreOffset);
+    this.positionChat();
+  }
+
+  private prepareChatPosition(): void {
+    if (this.snapshot.screen !== 'chat' || !this.snapshot.conversationId) return;
+    if (this.presentedConversation !== this.snapshot.conversationId) {
+      this.presentedConversation = this.snapshot.conversationId;
+      // A retained sentRevision is history, not a newly completed send.
+      this.sentRevision = this.snapshot.sentRevision || 0;
+      this.chatPosition.begin(this.snapshot.conversationId, this.restoreOffset);
+    }
+  }
+
+  private positionChat(): void {
+    if (!this.visible || !this.active || this.snapshot.screen !== 'chat' || !this.snapshot.messages.length) return;
+    const offset: number | undefined = this.chatPosition.layout(this.contentHeight, this.viewportHeight);
+    if (offset !== undefined && Math.abs(this.scroller.currentOffset().yOffset - offset) > 0.5) {
+      this.scroller.scrollTo({ xOffset: 0, yOffset: offset });
+    }
+  }
+
+  private captureChatOffset(): void {
+    if (this.visible && this.active && this.snapshot.screen === 'chat' && this.onOffset) this.onOffset(this.scroller.currentOffset().yOffset);
+  }
+
+  private messageImageRatio(message: InboxFlowMessage): number {
+    return message.imageWidth && message.imageHeight ? message.imageWidth / message.imageHeight :
+      this.imageRatios.get(message.image) || 1;
+  }
+
+  private messageImageWidth(message: InboxFlowMessage): number {
+    return Math.min(220, 460 * this.messageImageRatio(message));
+  }
 
   private snapshotChanged(): void {
+    this.prepareChatPosition();
+    if (this.previousScreen === 'settings' && this.snapshot.screen === 'chat' && this.settingsReturnOffset >= 0) {
+      this.chatPosition.restore(this.settingsReturnOffset); this.contentHeight = 0; this.settingsReturnOffset = -1;
+    }
+    this.previousScreen = this.snapshot.screen;
+    if (this.snapshot.screen === 'updatesMenu' && !this.snapshot.newsUndoing && this.snapshot.newsId &&
+        this.snapshot.newsId !== this.presentedNewsId && !this.snapshot.newsHidden) {
+      this.presentedNewsId = this.snapshot.newsId;
+      this.showUpdatesMenu = true;
+    }
     if (this.historyPending && !this.snapshot.loading && this.snapshot.error) this.historyPending = false;
     if (this.snapshot.newsHidden && this.snapshot.newsId && this.snapshot.newsId !== this.lastHiddenNewsId) {
       this.lastHiddenNewsId = this.snapshot.newsId;
       if (this.snapshot.screen === 'updatesMenu') this.showUpdatesMenu = false;
-      if (this.onNewsHidden) this.onNewsHidden(this.snapshot.newsId);
     }
+    if (this.snapshot.screen === 'updatesMenu' && this.snapshot.unsubscribedPin) this.showUpdatesMenu = false;
     if (!this.snapshot.newsHidden && this.lastHiddenNewsId && this.snapshot.newsId === this.lastHiddenNewsId &&
         this.snapshot.newsId !== this.lastRestoredNewsId) {
       this.lastRestoredNewsId = this.snapshot.newsId;
-      if (this.onNewsRestored) this.onNewsRestored(this.snapshot.newsId);
+      if (!this.snapshot.newsUndoing && this.onNewsRestored) this.onNewsRestored(this.snapshot.newsId);
     }
     if ((this.snapshot.blockRevision || 0) > this.lastBlockRevision) {
       this.lastBlockRevision = this.snapshot.blockRevision || 0;
@@ -54,18 +136,16 @@ export struct PinmonyInboxFlowPage {
       this.blockTarget = undefined;
       if (this.onBlockChanged) this.onBlockChanged(!!this.snapshot.blocked, target ? target.name : '联系人');
     }
+    if ((this.snapshot.sentRevision || 0) < this.sentRevision) this.sentRevision = this.snapshot.sentRevision || 0;
     if ((this.snapshot.sentRevision || 0) > this.sentRevision) {
       this.sentRevision = this.snapshot.sentRevision || 0;
       this.draft = '';
-      setTimeout((): void => { this.scroller.scrollEdge(Edge.Bottom); }, 30);
+      this.chatPosition.latest();
     }
-    if (this.snapshot.screen !== 'chat' || !this.snapshot.messages.length ||
-      this.positionedConversation === this.snapshot.conversationId) return;
-    this.positionedConversation = this.snapshot.conversationId || '';
-    setTimeout(() => { if (this.snapshot.screen === 'chat') this.scroller.scrollEdge(Edge.Bottom); }, 30);
   }
 
   private act(action: string, value: string = ''): void {
+    if (action === 'settings' && this.snapshot.screen === 'chat') { this.settingsReturnOffset = this.scroller.currentOffset().yOffset; this.captureChatOffset(); }
     if (this.onAction) this.onAction(action, value);
   }
 
@@ -84,26 +164,28 @@ export struct PinmonyInboxFlowPage {
 
   @Builder
   private conversationTitle() {
+    if (this.snapshot.screen === 'chat') {
     Row({ space: 10 }) {
-      if (this.snapshot.screen === 'chat') {
-        ForEach(this.snapshot.users.filter((user: InboxFlowUser) => !user.self).slice(0, 1),
-          (user: InboxFlowUser) => { this.avatar(user, 32) }, (user: InboxFlowUser) => user.id)
+      if (this.snapshot.users.some((user: InboxFlowUser) => !user.self)) {
+        this.avatar(this.snapshot.users.filter((user: InboxFlowUser) => !user.self)[0], 32)
       }
-      Text(this.snapshot.screen === 'compose' ? '新消息' : this.snapshot.title || '聊天')
+      Text(this.snapshot.title || '聊天')
         .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+        .onClick(() => {
+          const peers: InboxFlowUser[] = this.snapshot.users.filter((user: InboxFlowUser): boolean => !user.self);
+          this.captureChatOffset();
+          if (peers.length === 1 && peers[0].profileUrl && this.onUser) this.onUser(peers[0].profileUrl);
+        })
     }.width('100%').padding({ left: 64, right: 72 }).alignItems(VerticalAlign.Center)
       .hitTestBehavior(HitTestMode.Transparent)
+    }
   }
 
   @Builder
   private avatar(user: InboxFlowUser, size: number = 40) {
-    if (user.avatar) {
-      Image(user.avatar).onClick(() => { if (user.profileUrl && this.onUser) this.onUser(user.profileUrl); }).width(size).height(size).borderRadius(size / 2).objectFit(ImageFit.Cover)
-    } else {
-      Text(user.name.slice(0, 1)).onClick(() => { if (user.profileUrl && this.onUser) this.onUser(user.profileUrl); }).width(size).height(size).borderRadius(size / 2).backgroundColor('#5867B5')
-        .fontColor(Color.White).fontSize(22).textAlign(TextAlign.Center)
-    }
+    PinmonyUserAvatar({ image: user.avatar, name: user.name, avatarSize: size })
+      .onClick(() => { this.captureChatOffset(); if (user.profileUrl && this.onUser) this.onUser(user.profileUrl); })
   }
 
   @Builder
@@ -113,17 +195,23 @@ export struct PinmonyInboxFlowPage {
       Text(user.name).fontSize(17).fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
       if (this.snapshot.screen === 'compose') {
-        Text(this.snapshot.selectedIds.includes(user.id) ? '✓' : '○').fontSize(20)
-          .fontColor($r('app.color.primary_text'))
+        Checkbox().select(this.snapshot.selectedIds.includes(user.id)).width(24).height(24).margin(0)
+          .selectedColor($r('app.color.accent'))
+          .onChange((selected: boolean) => {
+            if (this.snapshot.selectedIds.includes(user.id) !== selected) this.act('select', user.id);
+          })
+          .hitTestBehavior(HitTestMode.None)
+          .accessibilityText('选择 ' + user.name)
       } else if (!user.self) {
         Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? '取消屏蔽' : '屏蔽')
           .height(36).borderRadius(12).fontSize(14).fontWeight(FontWeight.Normal)
           .padding({ left: 14, right: 14 })
           .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
-          .enabled(!this.snapshot.messageBusy)
+          .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
           .onClick(() => { this.blockTarget = user; this.showMessageMenu = true; })
       }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
+      .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain)
       .onClick(() => { if (this.snapshot.screen === 'compose') this.act('select', user.id); })
   }
 
@@ -150,7 +238,7 @@ export struct PinmonyInboxFlowPage {
         Button({ type: ButtonType.Normal }) {
           Text(reaction).fontSize(24).textAlign(TextAlign.Center).width('100%')
         }.width(40).height(44).padding(0).backgroundColor(Color.Transparent)
-          .enabled(!this.snapshot.messageBusy)
+          .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
           .onClick(() => { this.act('react', this.reactionMessageId + '|' + reaction); this.reactionMessageId = ''; })
       })
     }.padding(8)
@@ -159,20 +247,36 @@ export struct PinmonyInboxFlowPage {
   @Builder
   private messageMenuContent() {
     Column({ space: 8 }) {
-      Row({ space: 8 }) {
+      if (!this.selectedMessage?.board && !this.selectedMessage?.profile) {
+      Row() {
         ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
-          Button({ type: ButtonType.Normal }) {
+          Button({ type: ButtonType.Circle }) {
             Text(reaction).fontSize(24).textAlign(TextAlign.Center).width('100%')
-          }.padding(0).layoutWeight(1).height(44)
+          }.padding(0).width(44).height(44)
             .backgroundColor($r('app.color.surface_muted'))
-            .enabled(!this.snapshot.messageBusy)
+            .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
             .onClick(() => {
               if (this.selectedMessage) this.act('react', this.selectedMessage.id + '|' + reaction);
               this.showMessageMenu = false;
             })
         })
-      }.width('100%')
+      }.width('100%').justifyContent(FlexAlign.SpaceBetween)
       Divider().margin({ top: 8, bottom: 8 })
+      }
+      if (this.selectedMessage?.text && !this.selectedMessage.deleted && this.onCopyText) {
+        Button({ type: ButtonType.Normal }) {
+          Row({ space: 10 }) {
+            SymbolGlyph($r('sys.symbol.rectangle_on_rectangle')).fontSize(20)
+              .fontColor([$r('app.color.primary_text')])
+            Text('复制').fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+          }.width('100%').justifyContent(FlexAlign.Start)
+        }.width('100%').height(48).padding({ left: 8, right: 8 })
+          .backgroundColor(Color.Transparent).accessibilityText('复制消息文字')
+          .onClick(async () => {
+            const text: string = this.selectedMessage?.text || '';
+            if (text && this.onCopyText && await this.onCopyText(text)) this.showMessageMenu = false;
+          })
+      }
       if (this.selectedMessage?.pinUrl) {
         Button('收藏').width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('save', this.selectedMessage.pinUrl); this.showMessageMenu = false; })
@@ -181,11 +285,13 @@ export struct PinmonyInboxFlowPage {
       }
       if (this.selectedMessage?.own) {
         Button('删除').width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.accent'))
+          .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
           .onClick(() => {
             const id: string = this.selectedMessage?.id || '';
+            const intent: string = this.messageConfirmationKey();
             this.getUIContext().showAlertDialog({ title: '删除消息', message: '确认删除这条消息？',
               primaryButton: { value: '取消', action: (): void => {} },
-              secondaryButton: { value: '删除', action: (): void => { this.act('deleteMessage', id); this.showMessageMenu = false; } } });
+              secondaryButton: { value: '删除', action: (): void => { if(this.messageConfirmationKey() === intent)this.act('deleteMessage', id); this.showMessageMenu = false; } } });
           })
       }
     }.padding({ left: 16, right: 16, bottom: 24 }).width('100%')
@@ -221,6 +327,38 @@ export struct PinmonyInboxFlowPage {
     else this.messageMenuContent();
   }
 
+  private messageLayoutKey(message: InboxFlowMessage): string {
+    return this.snapshot.conversationId + ':' + message.id;
+  }
+
+  private messageTextController(message: InboxFlowMessage): TextController {
+    const key: string = this.messageLayoutKey(message);
+    let controller: TextController | undefined = this.textControllers.get(key);
+    if (!controller) {
+      controller = new TextController();
+      this.textControllers.set(key, controller);
+    }
+    return controller;
+  }
+
+  private openSharedProfile(messageId: string): void {
+    const message: InboxFlowMessage | undefined = this.snapshot.messages.find((item: InboxFlowMessage): boolean => item.id === messageId);
+    if (!this.active || message?.deleted || !message?.profile?.profileUrl || !this.onUser) return;
+    this.captureChatOffset();
+    this.onUser(message.profile.profileUrl);
+  }
+
+  private messageAvatarSize(message: InboxFlowMessage): number {
+    return 44;
+  }
+
+  private textAvatarOffset(message: InboxFlowMessage): number {
+    if (message.deleted || message.image || message.board || !message.text || message.text === '❤️') return -1;
+    const key: string = this.messageLayoutKey(message);
+    const offset: number = this.textAvatarOffsets.get(key) ?? 0;
+    return offset < 0 ? -1 : offset + (message.sender?.name ? (this.senderLabelHeights.get(key) || 16) + 8 : 0);
+  }
+
   @Builder
   private messageRow(message: InboxFlowMessage) {
     Column({ space: 12 }) {
@@ -231,14 +369,47 @@ export struct PinmonyInboxFlowPage {
       Row({ space: 8 }) {
         if (message.own && !message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
         if (!message.own && message.sender) {
-          Column() { this.avatar(message.sender, 28) }.alignSelf(ItemAlign.End)
+          Column() { this.avatar(message.sender, this.messageAvatarSize(message)) }
+            .alignSelf(this.textAvatarOffset(message) >= 0 ? ItemAlign.Start : ItemAlign.End)
+            .margin({ top: Math.max(0, this.textAvatarOffset(message)) })
         }
         Column({ space: 8 }) {
           if (!message.own && message.sender?.name && !message.deleted) {
             Text(message.sender.name).fontSize(12).fontColor($r('app.color.secondary_text'))
+              .onClick(() => { this.captureChatOffset(); if (message.sender?.profileUrl && this.onUser) this.onUser(message.sender.profileUrl); })
+              .onAreaChange((_old: Area, area: Area) => {
+                const key: string = this.messageLayoutKey(message);
+                const height: number = Number(area.height);
+                if (this.senderLabelHeights.get(key) !== height) {
+                  const heights: Map<string, number> = new Map(this.senderLabelHeights);
+                  heights.set(key, height); this.senderLabelHeights = heights;
+                }
+              })
           }
-          if (message.image && !message.deleted) {
-            Image(message.image).width(Math.min(220, 460 * (this.imageRatios.get(message.image) || 1)))
+          if (message.profile && !message.deleted) {
+            Button({ type: ButtonType.Normal }) {
+            Column({ space: 8 }) {
+              if (message.profileImages?.length) {
+                Row() {
+                  ForEach(message.profileImages, (url: string) => { Image(url).width(message.profileImages!.length === 1 ? '100%' : '50%').height(160).objectFit(ImageFit.Cover) }, (url: string) => url)
+                }.width(240).clip(true).borderRadius(18)
+              }
+              Stack({ alignContent: Alignment.Center }) {
+                PinmonyUserAvatar({ image: message.profile.avatar, name: message.profile.name, avatarSize: 60 })
+              }
+                .width(64).height(64).margin({ top: -32 }).borderRadius(32)
+                .backgroundColor($r('app.color.page_background')).clip(true).zIndex(1)
+              Text(message.profile.name).fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+            }.width('100%').alignItems(HorizontalAlign.Center).hitTestBehavior(HitTestMode.None)
+            }.width(240).padding(0).borderRadius(18).backgroundColor(Color.Transparent)
+              .accessibilityText('查看 ' + message.profile.name + ' 的个人资料')
+              .onClick(() => this.openSharedProfile(message.id))
+          } else if (message.board && !message.deleted) {
+            PinmonyInboxBoardCard({ board: message.board,
+              onOpen: () => { this.captureChatOffset(); if (this.onBoard) this.onBoard(message.id); } })
+          } else if (message.image && !message.deleted) {
+            Image(message.image).width(this.messageImageWidth(message))
+              .height(this.messageImageWidth(message) / this.messageImageRatio(message))
               .constraintSize({ maxHeight: 460 }).borderRadius(18)
               .objectFit(ImageFit.Contain)
               .onComplete((event) => {
@@ -250,7 +421,7 @@ export struct PinmonyInboxFlowPage {
                   }
                 }
               })
-              .onClick(() => { if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
+              .onClick(() => { this.captureChatOffset(); if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
           }
           if (message.deleted) {
             Text(message.own ? '你删除了一条消息' : this.snapshot.title + ' 删除了一条消息')
@@ -259,12 +430,24 @@ export struct PinmonyInboxFlowPage {
           } else if (message.text === '❤️') {
             Image($r('app.media.lucide_heart_filled')).width(48).height(48).fillColor($r('app.color.accent'))
           } else if (message.text) {
-            Text(message.text).fontSize(16).fontColor($r('app.color.primary_text'))
+            Text(message.text, { controller: this.messageTextController(message) })
+              .fontSize(16).fontColor($r('app.color.primary_text'))
               .padding(12).borderRadius(16).backgroundColor($r('app.color.surface_muted'))
+              .onAreaChange((_old: Area, area: Area) => {
+                if (message.own || message.image || message.board) return;
+                const lines: number = this.messageTextController(message).getLayoutManager().getLineCount();
+                if (lines <= 0) return;
+                const key: string = this.messageLayoutKey(message);
+                const offset: number = lines <= 2 ? Math.max(0, (Number(area.height) - this.messageAvatarSize(message)) / 2) : -1;
+                if (this.textAvatarOffsets.get(key) !== offset) {
+                  const offsets: Map<string, number> = new Map(this.textAvatarOffsets);
+                  offsets.set(key, offset); this.textAvatarOffsets = offsets;
+                }
+              })
           } else if (message.pinUrl && !message.image) {
             Text('Pin 图图片暂不可读取').fontColor($r('app.color.secondary_text'))
           }
-          if (!message.deleted) {
+          if (!message.deleted && !message.board && !message.profile) {
             Button({ type: ButtonType.Normal }) {
               Row() {
                 if (message.reactions?.length) {
@@ -285,7 +468,7 @@ export struct PinmonyInboxFlowPage {
               })
           }
         }.constraintSize({ maxWidth: 260 }).alignItems(HorizontalAlign.Start)
-          .gesture(LongPressGesture().onAction(() => { if (!message.deleted) { this.selectedMessage = message; this.showMessageMenu = true; } }))
+          .parallelGesture(LongPressGesture().onAction(() => { if (!message.deleted) { this.selectedMessage = message; this.showMessageMenu = true; } }))
         if (!message.own && !message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
       }.width('100%').justifyContent(message.own ? FlexAlign.End : FlexAlign.Start)
         .padding({ left: 20, right: 20 })
@@ -307,7 +490,7 @@ export struct PinmonyInboxFlowPage {
         Text('删除更新').fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
-        .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy)
+        .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
         .onClick(() => this.act('hideNews'))
       Button({ type: ButtonType.Normal }) {
         Text('查看通知设置').fontSize(18).fontWeight(FontWeight.Medium)
@@ -322,9 +505,13 @@ export struct PinmonyInboxFlowPage {
   }
 
   build() {
-    if (this.snapshot.screen === 'updatesMenu') {
-      Column().width('100%').height('100%')
-        .onAppear(() => { this.showUpdatesMenu = true; })
+    if (this.snapshot.screen === 'updatesMenu' && this.snapshot.newsUndoing) {
+      Column().width(1).height(1).hitTestBehavior(HitTestMode.Transparent)
+      if (this.snapshot.error) { Text(this.snapshot.error).fontColor($r('app.color.secondary_text')) }
+    } else if (this.snapshot.screen === 'updatesMenu') {
+      Column().width(1).height(1)
+        .hitTestBehavior(HitTestMode.Transparent)
+        .onAppear(() => { this.presentedNewsId = this.snapshot.newsId || ''; this.showUpdatesMenu = !this.snapshot.newsHidden; })
         .bindSheet($$this.showUpdatesMenu, this.updatesMenuContent(), {
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
@@ -332,14 +519,20 @@ export struct PinmonyInboxFlowPage {
           title: { title: '更新选项' },
           backgroundColor: $r('app.color.page_background'),
           maskColor: '#66000000',
+          onDisappear: () => {
+            if (this.snapshot.screen !== 'updatesMenu' || this.snapshot.newsUndoing) return;
+            if (this.snapshot.newsHidden && this.snapshot.newsId && this.onNewsHidden) this.onNewsHidden(this.snapshot.newsId);
+            if (this.snapshot.unsubscribedPin && this.onPinUnsubscribed) this.onPinUnsubscribed();
+            this.act('back');
+          },
           onWillDismiss: (action: DismissSheetAction) => {
             action.dismiss();
             this.showUpdatesMenu = false;
-            this.act('back');
           }
         })
     } else {
     HdsNavigation(this.flowPathStack) {}.width('100%').height('100%').hideTitleBar(true)
+      .backgroundColor($r('app.color.page_background'))
       .navDestination(this.flowDestination)
     }
   }
@@ -349,6 +542,7 @@ export struct PinmonyInboxFlowPage {
     Column() {
       if (this.snapshot.screen === 'compose') {
         TextInput({ text: this.query, placeholder: '按姓名或电子邮箱搜索' }).margin({ left: 16, right: 16, bottom: 8 })
+          .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain)
           .onChange((value: string) => {
             this.query = value;
             const token: number = ++this.queryToken;
@@ -359,7 +553,9 @@ export struct PinmonyInboxFlowPage {
       if (this.snapshot.error) {
         Column({ space: 8 }) {
           Text(this.snapshot.error).fontColor($r('app.color.secondary_text'))
-          Button('重试').onClick(() => this.act('retry'))
+          if (!(this.snapshot.screen === 'settings' && this.snapshot.writeUncertain)) {
+            Button(this.snapshot.writeUncertain ? '重新读取' : '重试').onClick(() => this.act('retry'))
+          }
         }.padding(16)
       }
       if (this.snapshot.loading) { LoadingProgress().width(28).height(28) }
@@ -391,24 +587,30 @@ export struct PinmonyInboxFlowPage {
               this.historyPending = false;
               this.scroller.scrollTo({ xOffset: 0, yOffset: this.historyOffset + this.contentHeight - this.historyHeight });
             }
+            this.positionChat();
           })
       }.width('100%').layoutWeight(1).align(Alignment.TopStart)
         .scrollBar(BarState.Off)
         .onScrollStop(() => {
-          if (this.snapshot.screen !== 'chat' || !this.snapshot.hasMore || this.snapshot.loading || this.historyPending || this.snapshot.error) return;
+          if (this.chatPosition.canLoadHistory()) this.captureChatOffset();
+          if (!this.active || this.snapshot.screen !== 'chat' || !this.chatPosition.canLoadHistory() || !this.snapshot.hasMore || this.snapshot.loading || this.historyPending || this.snapshot.error) return;
           if (this.scroller.currentOffset().yOffset > 80) return;
           this.historyHeight = this.contentHeight; this.historyOffset = this.scroller.currentOffset().yOffset;
           this.historyPending = true; this.act('more');
         })
-        .onAppear(() => { if (this.snapshot.screen === 'chat') this.scroller.scrollEdge(Edge.Bottom); })
+        .onAreaChange((_old: Area, area: Area) => { this.viewportHeight = Number(area.height); this.positionChat(); })
+        .onDidScroll((_x: number, _y: number, state: ScrollState) => {
+          const offset: number = this.scroller.currentOffset().yOffset;
+          if (this.visible && this.active && this.snapshot.screen === 'chat') this.chatPosition.record(offset, state === ScrollState.Scroll);
+        })
       if (this.snapshot.screen === 'chat') {
         Row({ space: 8 }) {
           TextInput({ text: this.draft, placeholder: '输入消息…' }).layoutWeight(1).maxLength(2000)
-            .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.sendError)
+            .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
             .onChange((value: string) => { this.draft = value; })
             .onSubmit(() => { if (this.draft.trim()) this.act('send', this.draft); })
           if (this.draft.trim()) {
-            Button('发送').enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.sendError)
+            Button('发送').enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
               .onClick(() => this.act('send', this.draft))
           } else {
           Button({ type: ButtonType.Circle }) {
@@ -417,7 +619,7 @@ export struct PinmonyInboxFlowPage {
           }.width(44).height(44).backgroundColor($r('app.color.page_background'))
             .border({ width: 1, color: $r('app.color.surface_muted') })
             .accessibilityText('发送爱心')
-            .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.sendError)
+            .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
             .onClick(() => this.act('send', '❤️'))
           }
         }.padding({ left: 16, right: 16, top: 8, bottom: 24 })
@@ -443,17 +645,13 @@ export struct PinmonyInboxFlowPage {
         },
         content: { title: { mainTitle: this.snapshot.screen === 'chat' ? '' :
           this.snapshot.screen === 'compose' ? '新消息' : this.snapshot.title || '消息设置' },
-          stackBuilder: this.snapshot.screen === 'chat' ? () => { this.conversationTitle(); } : undefined,
+          stackBuilder: this.conversationTitleBuilder,
           backIcon: { isEnabled: true, action: () => this.act('back') },
-          menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.inbox_more'), label: '消息设置', action: () => this.act('settings') } }] :
-            this.snapshot.screen === 'compose' ? [{ content: { label: '下一步', isEnabled: !this.snapshot.loading && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
+          menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: '消息设置', action: () => this.act('settings') } }] :
+            this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: '下一步', isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
       .bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .onBackPressed(() => { this.act('back'); return true; })
   }
 }
-
-
-
-

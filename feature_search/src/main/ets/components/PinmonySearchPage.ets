@@ -1,6 +1,5 @@
 import { PinmonyVideoCard } from 'common_ui';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonySearchSkeleton } from './PinmonySearchSkeleton';
 import { PinmonySearchQuizPanel } from './PinmonySearchQuizPanel';
 import { Chip, ChipSize } from '@kit.ArkUI';
 import { HdsNavDestination, HdsNavigation } from '@kit.UIDesignKit';
@@ -9,6 +8,7 @@ import { PinmonySearchCategory, PinmonySearchResult, PinmonySearchSnapshot,
 
 @Component
 export struct PinmonySearchPage {
+  @Prop @Watch('activeChanged') active: boolean = true;
   @Prop automaticLoadingEnabled: boolean = true;
   @Prop @Watch('onSnapshotChanged') snapshot: PinmonySearchSnapshot = {} as PinmonySearchSnapshot;
   @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
@@ -18,7 +18,9 @@ export struct PinmonySearchPage {
   @Prop refreshing: boolean = false;
   onRefresh?: () => void;
   @Prop error: string = '';
+  @Prop resultsReadsReady: boolean = false;
   @Prop actionsReady: boolean = true;
+  @Prop discoveryReadsReady: boolean = false;
   @Prop interactionReady: boolean = true;
   @Prop historyActionsReady: boolean = false;
   @Prop initialResultsScrollOffset: number = 0;
@@ -29,9 +31,39 @@ export struct PinmonySearchPage {
   private flowShape: string = '';
   @State private contentWidth: number = 360;
   @State private failedImages: string[] = [];
+  @State private upcomingImageUrls: string[] = [];
+  private lastPrefetchResultCount: number = -1;
   @State private currentHeroIndex: number = 0;
+  @Prop initialHeroId: string = '';
+  private currentHeroId: string = '';
+  onHeroPosition?: (pageKey: string, id: string) => void;
   private readonly inputController: SearchController = new SearchController();
   private readonly searchPathStack: NavPathStack = new NavPathStack();
+  private pagePresent: boolean = false;
+  private presentationTrace: string = '';
+
+  private ensureSearchDestination(): void {
+    if (!this.pagePresent || !this.active) return;
+    if (this.searchPathStack.size() === 0) this.searchPathStack.pushPath({ name: 'pin-web-search' }, false);
+  }
+
+  private activeChanged(): void {
+    if (!this.pagePresent) return;
+    if (this.active) { this.restoreHeroPosition(); this.ensureSearchDestination(); }
+    else this.searchPathStack.clear(false);
+    this.tracePresentation();
+  }
+
+  private tracePresentation(): void {
+    const state: string = 'active=' + this.active.toString() + ' stack=' + this.searchPathStack.size().toString() +
+      ' kind=' + this.snapshot.kind + ' query=' + (!!this.committedQuery()).toString() +
+      ' heroes=' + this.snapshot.heroes.length.toString() + ' sections=' + this.snapshot.ideaSections.length.toString() +
+      ' results=' + this.snapshot.results.length.toString() + ' loading=' + this.loading.toString();
+    if (state === this.presentationTrace) return;
+    this.presentationTrace = state;
+    PinmonyRuntimeLog.info('SearchUITrace: ' + state);
+  }
+
   private readonly swiperController: SwiperController = new SwiperController();
   private readonly discoveryScroller: Scroller = new Scroller();
   private readonly resultsScroller: Scroller = new Scroller();
@@ -58,21 +90,26 @@ export struct PinmonySearchPage {
   onLoadMore?: () => void;
   onRetry?: () => void;
   onBack?: () => void;
+  onClearProductFilter?: (kind: string) => void;
+  onFollowUser?: (id: string) => void;
+  onFollowBoard?: (id: string) => void;
   onFilters?: () => void;
   onQuizAction?: (kind: string, id: string) => void;
   onContentScroll?: (offset: number, state: ScrollState) => void;
   onResultsScrollPosition?: (pageKey: string, offset: number) => void;
 
   aboutToAppear(): void {
+    this.restoreHeroPosition();
     this.restoringResultsScroll = this.initialResultsScrollOffset > 0;
-    this.searchPathStack.clear();
-    this.searchPathStack.pushPath({ name: 'pin-web-search' }, false);
+    this.pagePresent = true;
+    this.ensureSearchDestination();
     this.activeSession = this.snapshot.session;
     this.activePage = this.snapshot.pageKey;
     this.query = this.committedQuery();
     this.lastSnapshotQuery = this.snapshot.query || '';
     this.syncQuizPresentation();
     this.fillInitialViewport();
+    this.tracePresentation();
   }
 
   private restoreResultsScroll(): void {
@@ -102,6 +139,7 @@ export struct PinmonySearchPage {
   }
 
   aboutToDisappear(): void {
+    this.pagePresent = false;
     this.fillGeneration++;
     this.resultsViewportReady = false;
     this.initialFillScheduled = false;
@@ -109,12 +147,20 @@ export struct PinmonySearchPage {
   }
 
   private onSnapshotChanged(): void {
+    this.ensureSearchDestination();
+    this.tracePresentation();
     if (this.activeSession !== this.snapshot.session || this.activePage !== this.snapshot.pageKey) {
+      const changedPage: boolean = this.activePage !== this.snapshot.pageKey;
       this.activeSession = this.snapshot.session;
       this.activePage = this.snapshot.pageKey;
-      this.entryQuiz = undefined;
-      this.failedImages = [];
-      this.currentHeroIndex = 0;
+      if (changedPage) {
+        this.upcomingImageUrls = [];
+        this.lastPrefetchResultCount = -1;
+        this.entryQuiz = undefined;
+        this.failedImages = [];
+        this.currentHeroIndex = 0;
+        this.currentHeroId = '';
+      }
       this.initialFillCount = 0;
       this.fillGeneration++;
       this.initialFillScheduled = false;
@@ -127,6 +173,7 @@ export struct PinmonySearchPage {
       if (!this.inputEditing) this.query = this.committedQuery();
     }
     if (this.currentHeroIndex >= this.snapshot.heroes.length) this.currentHeroIndex = 0;
+    this.restoreHeroPosition();
     this.syncQuizPresentation();
     this.fillInitialViewport();
   }
@@ -180,7 +227,7 @@ export struct PinmonySearchPage {
     setTimeout(() => {
       if (generation !== this.fillGeneration) return;
       this.initialFillScheduled = false;
-      if (!this.automaticLoadingEnabled || this.snapshot.pageKey !== page || !this.actionsReady ||
+      if (!this.automaticLoadingEnabled || this.snapshot.pageKey !== page || !(this.actionsReady || this.resultsReadsReady || discovery && this.discoveryReadsReady) ||
           this.loading || this.restoringResultsScroll || !this.onLoadMore) return;
       if (!discovery) {
         if (this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiError || !this.resultsViewportReady) return;
@@ -198,7 +245,7 @@ export struct PinmonySearchPage {
   }
 
   private resultsReachEnd(): void {
-    if (!this.automaticLoadingEnabled || !this.actionsReady || this.loading || this.snapshot.apiBusy ||
+    if (!this.automaticLoadingEnabled || !(this.actionsReady || this.resultsReadsReady) || this.loading || this.snapshot.apiBusy ||
         this.snapshot.apiEnded || this.snapshot.apiError || this.restoringResultsScroll || !this.onLoadMore) return;
     try {
       const position = this.resultsScroller.offset();
@@ -207,6 +254,20 @@ export struct PinmonySearchPage {
       if (!this.resultsScroller.isAtEnd()) return;
     } catch (_) { return; }
     PinmonyRuntimeLog.info('SearchPagination: source=scroll-end results=' + this.snapshot.results.length.toString());
+    this.onLoadMore();
+  }
+
+  private resultsVisible(first: number, last: number): void {
+    if (!this.automaticLoadingEnabled || !this.committedQuery() || !(this.actionsReady || this.resultsReadsReady) || this.restoringResultsScroll) return;
+    const cardLast: number = Math.max(0, last - (this.entryQuiz ? 1 : 0));
+    const urls: string[] = this.snapshot.results.slice(cardLast + 1, cardLast + 9)
+      .filter((item: PinmonySearchResult): boolean => !!item.imageUrl && !item.video)
+      .map((item: PinmonySearchResult): string => item.imageUrl);
+    if (urls.join('|') !== this.upcomingImageUrls.join('|')) this.upcomingImageUrls = urls;
+    if (this.loading || this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiError ||
+        !this.onLoadMore || first < 0 || this.snapshot.results.length - cardLast - 1 > 4 ||
+        this.lastPrefetchResultCount === this.snapshot.results.length) return;
+    this.lastPrefetchResultCount = this.snapshot.results.length;
     this.onLoadMore();
   }
 
@@ -320,51 +381,51 @@ export struct PinmonySearchPage {
     .clip(true)
     .accessibilityText(hero.title + (hero.subtitle ? '，' + hero.subtitle : ''))
     .onClick(() => {
-      if (hero.enabled && this.onExploreAction) this.onExploreAction(hero.id, 'hero');
+      if (hero.enabled && this.onExploreAction) {
+        this.selectHeroPosition(this.snapshot.heroes.findIndex((item: PinmonySearchHero): boolean => item.id === hero.id));
+        this.onExploreAction(hero.id, 'hero');
+      }
     })
+  }
+
+  private restoreHeroPosition(): void {
+    const id: string = this.currentHeroId || this.initialHeroId;
+    const index: number = this.snapshot.heroes.findIndex((hero: PinmonySearchHero): boolean => hero.id === id);
+    this.currentHeroIndex = index >= 0 ? index : Math.max(0, Math.min(this.currentHeroIndex, this.snapshot.heroes.length - 1));
+    // Keep the identity through transient empty loading snapshots.
+    if (this.snapshot.heroes.length > 0) this.currentHeroId = this.snapshot.heroes[this.currentHeroIndex].id;
+  }
+
+  private selectHeroPosition(index: number): void {
+    if (!this.active || !Number.isInteger(index) || index < 0 || index >= this.snapshot.heroes.length) return;
+    this.currentHeroIndex = index;
+    this.currentHeroId = this.snapshot.heroes[index].id;
+    if (this.onHeroPosition) this.onHeroPosition(this.snapshot.pageKey, this.currentHeroId);
   }
 
   @Builder
   private heroCarousel() {
-    Column() {
-      Swiper(this.swiperController) {
-        ForEach(this.snapshot.heroes, (hero: PinmonySearchHero) => {
-          this.heroSlide(hero)
-        }, (hero: PinmonySearchHero) => hero.id)
-      }
-      .width('100%')
-      .height(390)
-      .indicator(false)
-      .autoPlay(this.snapshot.heroes.length > 1)
-      .interval(4800)
-      .loop(this.snapshot.heroes.length > 1)
-      .nestedScroll(SwiperNestedScrollMode.SELF_ONLY)
-      .onChange((index: number) => this.currentHeroIndex = index)
-
-      Row({ space: 8 }) {
-        ForEach(this.snapshot.heroes, (hero: PinmonySearchHero, index: number) => {
-          Button({ type: ButtonType.Circle })
-            .width(this.currentHeroIndex === index ? 9 : 7)
-            .height(this.currentHeroIndex === index ? 9 : 7)
-            .padding(0)
-            .backgroundColor(this.currentHeroIndex === index ?
-              $r('app.color.primary_text') : $r('app.color.secondary_text'))
-            .opacity(this.currentHeroIndex === index ? 1 : 0.52)
-            .animation({ duration: 240, curve: Curve.EaseInOut })
-            .onClick(() => {
-              this.currentHeroIndex = index;
-              this.swiperController.changeIndex(index, true);
-            })
-            .accessibilityText(`切换到第${index + 1}张推荐轮播图`)
-            .accessibilitySelected(this.currentHeroIndex === index)
-        }, (hero: PinmonySearchHero) => hero.id)
-      }
-      .width('100%')
-      .height(38)
-      .justifyContent(FlexAlign.Center)
-      .alignItems(VerticalAlign.Center)
+    Swiper(this.swiperController) {
+      ForEach(this.snapshot.heroes, (hero: PinmonySearchHero) => {
+        Column() {
+          Column() { this.heroSlide(hero) }.width('100%').height(390)
+        }.width('100%').height('100%')
+      }, (hero: PinmonySearchHero) => hero.id)
     }
     .width('100%')
+    .height(428)
+    // Native stretching dots match the multi-image Pin indicator.
+    // Reserve 38vp below the image for the indicator.
+    .index(this.currentHeroIndex)
+    .indicator(Indicator.dot().bottom(4)
+      .itemWidth(7).itemHeight(7).selectedItemWidth(9).selectedItemHeight(9)
+      .color($r('app.color.secondary_text')).selectedColor($r('app.color.primary_text')))
+    .autoPlay(this.active && this.snapshot.heroes.length > 1)
+    .interval(4800)
+    .loop(this.snapshot.heroes.length > 1)
+    .nestedScroll(SwiperNestedScrollMode.SELF_ONLY)
+    .onChange((index: number) => this.selectHeroPosition(index))
+    .accessibilityText('当前第 ' + (this.currentHeroIndex + 1) + ' 张，共 ' + this.snapshot.heroes.length + ' 张推荐轮播图')
   }
 
   @Builder
@@ -491,6 +552,15 @@ export struct PinmonySearchPage {
 
   @Builder
   private discoveryContent() {
+    if (this.discoveryInitialLoading()) {
+      Column({ space: 12 }) {
+        LoadingProgress().width(32).height(32).color($r('app.color.accent'))
+        Text('正在加载搜索内容…').fontSize(14).fontColor($r('app.color.secondary_text'))
+      }
+      .width('100%').height('100%')
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+    } else {
     Scroll(this.discoveryScroller) {
       Column({ space: 0 }) {
         if (this.snapshot.heroes.length > 0) {
@@ -511,12 +581,7 @@ export struct PinmonySearchPage {
                     if (this.onLoadMore) this.onLoadMore();
                   } else if (this.onRetry) this.onRetry();
                 })
-            } else if (this.snapshot.discoveryBusy) {
-              LoadingProgress().width(28).height(28)
-              Text('正在读取搜索主题…')
-                .fontSize(14)
-                .fontColor($r('app.color.secondary_text'))
-            } else if (this.snapshot.discoveryActive && this.snapshot.ideaSections.length === 0) {
+            } else if (!this.snapshot.discoveryBusy && this.snapshot.discoveryActive && this.snapshot.ideaSections.length === 0) {
               Text('暂时没有推荐主题')
                 .fontSize(14)
                 .fontColor($r('app.color.secondary_text'))
@@ -543,18 +608,30 @@ export struct PinmonySearchPage {
         })
     .onScrollStop(() => this.reportResultsScroll())
     .onReachEnd(() => {
-      if (this.automaticLoadingEnabled && this.actionsReady && this.snapshot.discoveryApi && !this.snapshot.discoveryBusy &&
+      if (this.automaticLoadingEnabled && (this.actionsReady || this.discoveryReadsReady) && this.snapshot.discoveryApi && !this.snapshot.discoveryBusy &&
           !this.snapshot.discoveryError && !this.snapshot.discoveryEnded && this.onLoadMore) this.onLoadMore();
     })
+    }
+  }
+
+  private discoveryInitialLoading(): boolean {
+    if (this.discoveryReadsReady && !this.snapshot.discoveryBusy) return false;
+    if (this.snapshot.heroes.length > 0 || this.snapshot.ideaSections.length > 0 ||
+        this.error || this.snapshot.discoveryError || this.snapshot.apiError) return false;
+    return this.loading || this.snapshot.kind === 'loading' || this.snapshot.session === 0 ||
+      this.snapshot.discoveryBusy === true ||
+      (this.snapshot.discoveryApi === true && this.snapshot.discoveryActive !== true);
   }
 
   @Builder
   private pinCard(result: PinmonySearchResult) {
     Column({ space: 8 }) {
       if (result.video) {
-        PinmonyVideoCard({ video: result.video, poster: result.imageUrl, active: this.mediaActive && this.actionsReady && !this.quizSheetOpen })
+        PinmonyVideoCard({ video: result.video, poster: result.imageUrl, active: this.mediaActive && (this.actionsReady || this.resultsReadsReady) && !this.quizSheetOpen })
           .width('100%').height(this.imageHeight(result))
-          
+          .onClick(() => {
+            if (this.interactionReady && result.enabled && this.onResult) this.onResult(result.targetUrl);
+          })
       } else if (this.failedImages.indexOf(result.imageUrl) >= 0 || !result.imageUrl) {
         Column() {
           Text(result.imageUrl ? '图片加载失败' : '暂无预览图')
@@ -590,6 +667,17 @@ export struct PinmonySearchPage {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
       }
+      if (result.merchant) {
+        Text(result.merchant).fontSize(13).fontColor($r('app.color.secondary_text')).width('100%').maxLines(1)
+      }
+      if (result.price) {
+        Row({ space: 6 }) {
+          Text(result.price).fontSize(14).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+          if (result.standardPrice && result.standardPrice !== result.price) {
+            Text(result.standardPrice).fontSize(13).decoration({ type: TextDecorationType.LineThrough }).fontColor($r('app.color.secondary_text'))
+          }
+        }.width('100%')
+      }
       if (result.kind === 'pin') {
         Row() {
           Blank()
@@ -611,13 +699,47 @@ export struct PinmonySearchPage {
   }
 
   @Builder
+  private boardResult(result: PinmonySearchResult) {
+    Column({ space: 8 }) {
+      Row({ space: 2 }) {
+        if (result.imageUrl) {
+          Image(result.boardImages?.[0] || result.imageUrl).layoutWeight(2).height('100%').objectFit(ImageFit.Cover)
+        }
+        if ((result.boardImages?.length || 0) > 1) {
+          Column({ space: 2 }) {
+            Image(result.boardImages![1]).width('100%').layoutWeight(1).objectFit(ImageFit.Cover)
+            if ((result.boardImages?.length || 0) > 2) {
+              Image(result.boardImages![2]).width('100%').layoutWeight(1).objectFit(ImageFit.Cover)
+            }
+          }.layoutWeight(1).height('100%')
+        }
+      }.width('100%').aspectRatio(1.5).borderRadius(14).clip(true).backgroundColor($r('app.color.surface_muted'))
+      Text(result.title).fontSize(16).fontWeight(FontWeight.Bold).maxLines(2)
+        .fontColor($r('app.color.primary_text'))
+      if (result.ownerName) {
+        Text(result.ownerName).fontSize(13).fontColor($r('app.color.primary_text')).maxLines(1)
+      }
+      if (result.subtitle || result.updated) {
+        Text([result.subtitle, result.updated].filter((value: string | undefined): boolean => !!value).join(' · ')).fontSize(13).fontColor($r('app.color.secondary_text')).maxLines(2)
+      }
+      Button(result.followBusy ? '处理中…' : result.following === true ? '关注中' : '关注', { type: ButtonType.Normal })
+        .border({ width: 0 })
+        .height(36).borderRadius(12).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+        .enabled(this.interactionReady && result.canFollow === true && !result.followBusy)
+        .accessibilityText(result.followBusy ? '正在提交图板关注操作' : result.following ? '取消关注图板' : '关注图板')
+        .onClick(() => { if (this.interactionReady && result.canFollow && this.onFollowBoard) this.onFollowBoard(result.id); })
+    }.width('100%').alignItems(HorizontalAlign.Start)
+      .onClick(() => { if (this.interactionReady && result.enabled && this.onResult) this.onResult(result.targetUrl); })
+  }
+
+  @Builder
   private resultRow(result: PinmonySearchResult) {
     Row({ space: 14 }) {
       if (result.imageUrl && this.failedImages.indexOf(result.imageUrl) < 0) {
         Image(result.imageUrl)
-          .width(result.kind === 'profile' ? 58 : 74)
-          .height(result.kind === 'profile' ? 58 : 74)
-          .borderRadius(result.kind === 'profile' ? 29 : 14)
+          .width((result.kind === 'profile' || result.kind === 'user') ? 58 : 74)
+          .height((result.kind === 'profile' || result.kind === 'user') ? 58 : 74)
+          .borderRadius((result.kind === 'profile' || result.kind === 'user') ? 29 : 14)
           .objectFit(ImageFit.Cover)
           .accessibilityLevel('no')
           .onError(() => {
@@ -631,9 +753,9 @@ export struct PinmonySearchPage {
             .fontSize(22)
             .fontColor($r('app.color.secondary_text'))
         }
-        .width(result.kind === 'profile' ? 58 : 74)
-        .height(result.kind === 'profile' ? 58 : 74)
-        .borderRadius(result.kind === 'profile' ? 29 : 14)
+        .width((result.kind === 'profile' || result.kind === 'user') ? 58 : 74)
+        .height((result.kind === 'profile' || result.kind === 'user') ? 58 : 74)
+        .borderRadius((result.kind === 'profile' || result.kind === 'user') ? 29 : 14)
         .backgroundColor($r('app.color.surface_muted'))
         .justifyContent(FlexAlign.Center)
         .accessibilityLevel('no')
@@ -645,7 +767,9 @@ export struct PinmonySearchPage {
           .fontColor($r('app.color.primary_text'))
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        if (result.subtitle) {
+        if (result.kind === 'user' && result.followerCount !== undefined) {
+          Text(result.followerCount.toString() + ' 位粉丝').fontSize(13).fontColor($r('app.color.secondary_text'))
+        } else if (result.subtitle) {
           Text(result.subtitle)
             .fontSize(13)
             .fontColor($r('app.color.secondary_text'))
@@ -655,15 +779,57 @@ export struct PinmonySearchPage {
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
-      Text('重试')
-        .fontSize(24)
-        .fontColor($r('app.color.secondary_text'))
+      Button(result.followBusy ? '处理中…' : result.following ? '关注中' : '关注', { type: ButtonType.Normal })
+        .border({ width: 0 }).borderRadius(12)
+        .height(44).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+        .enabled(this.interactionReady && result.kind === 'user' && result.canFollow === true)
+        .accessibilityText(result.followBusy ? '正在提交用户关注操作' : result.following ? '取消关注用户' : '关注用户')
+        .onClick(() => { if (this.interactionReady && result.canFollow && this.onFollowUser) this.onFollowUser(result.id); })
     }
     .width('100%')
     .padding({ left: 18, right: 18, top: 10, bottom: 10 })
     .opacity(result.enabled ? 1 : 0.45)
     .accessibilityText(result.title + (result.subtitle ? '，' + result.subtitle : ''))
     .onClick(() => { if (result.enabled && this.onResult) this.onResult(result.targetUrl); })
+  }
+
+  private hasProductFilter(kind: string): boolean {
+    return kind === 'price' ? /[?&]price_(?:min|max)=[^&#]+/.test(this.snapshot.pageKey) : /[?&]domains=[^&#]+/.test(this.snapshot.pageKey);
+  }
+
+  @Builder
+  private filteredEmptyState() {
+    Column({ space: 12 }) {
+      if (/\/search\/videos\//.test(this.snapshot.pageKey)) {
+        Image($r('app.media.search_video_empty')).width(200).height(200).objectFit(ImageFit.Contain).accessibilityLevel('no')
+        Text('这似乎不太有效').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text('目前根据所选的筛选器，未找到搜索结果。\n请尝试更新你的筛选器。')
+          .fontSize(16).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center)
+      } else {
+        Image($r('app.media.search_product_empty')).width(200).height(200).objectFit(ImageFit.Contain).accessibilityLevel('no')
+        Text('调整你的搜索').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text('当前没有符合搜索条件的 Pin 图。请尝试修改或移除筛选器以获得搜索结果。')
+          .fontSize(16).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center)
+        if (this.hasProductFilter('price') || this.hasProductFilter('merchant')) {
+          Row({ space: 12 }) {
+            if (this.hasProductFilter('price')) {
+              Button('移除价格').backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+                .enabled(this.interactionReady).onClick(() => { if (this.onClearProductFilter) this.onClearProductFilter('price'); })
+            }
+            if (this.hasProductFilter('merchant')) {
+              Button('移除零售商').backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+                .enabled(this.interactionReady).onClick(() => { if (this.onClearProductFilter) this.onClearProductFilter('merchant'); })
+            }
+          }.margin({ top: 32 })
+        }
+      }
+    }.width('100%').alignItems(HorizontalAlign.Center)
+  }
+
+  private profileSearchEmpty(): boolean {
+    return !this.loading && !this.error && !this.snapshot.apiBusy && !this.snapshot.apiError &&
+      this.snapshot.apiActive === true && this.snapshot.apiEnded === true && this.snapshot.results.length === 0 &&
+      !!this.snapshot.query.trim() && /\/search\/users\//.test(this.snapshot.pageKey);
   }
 
   @Builder
@@ -673,12 +839,8 @@ export struct PinmonySearchPage {
         Text('按搜索键查看结果').fontColor($r('app.color.secondary_text'))
       } else if (this.loading || this.snapshot.kind === 'loading' ||
           (this.snapshot.api && this.snapshot.apiActive === false && !this.error)) {
-        LoadingProgress()
-          .width(32)
-          .height(32)
-        Text('正在加载搜索结果…')
-          .fontSize(15)
-          .fontColor($r('app.color.secondary_text'))
+        LoadingProgress().width(32).height(32)
+        Text('正在加载搜索结果…').fontSize(15).fontColor($r('app.color.secondary_text'))
       } else if (this.error) {
         Text(this.error)
           .fontSize(15)
@@ -686,11 +848,17 @@ export struct PinmonySearchPage {
           .textAlign(TextAlign.Center)
         Button('重新读取')
           .onClick(() => { if (this.onRetry) this.onRetry(); })
+      } else if (this.profileSearchEmpty()) {
+        Text('我们找不到任何叫“' + this.snapshot.query.trim() + '”的人。')
+          .fontSize(15).fontColor($r('app.color.primary_text')).width('100%')
+          .textAlign(TextAlign.Start).margin({ top: 20 })
+        Text('抱歉，我们没有找到任何与该搜索相关的 Pin 图。')
+          .fontSize(16).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+          .width('100%').textAlign(TextAlign.Center).margin({ top: 60 })
+      } else if (this.query.trim() && this.snapshot.apiActive === true && this.snapshot.apiEnded === true && /\/search\/(videos|buyable_pins)\//.test(this.snapshot.pageKey)) {
+        this.filteredEmptyState()
       } else if (this.query.trim()) {
-        Text('没有读取到可显示的搜索结果')
-          .fontSize(15)
-          .fontColor($r('app.color.secondary_text'))
-          .textAlign(TextAlign.Center)
+        Text('没有读取到可显示的搜索结果').fontSize(15).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
       } else {
         Text('Pinterest 当前没有提供可显示的探索内容')
           .fontSize(16)
@@ -700,7 +868,7 @@ export struct PinmonySearchPage {
     }
     .width('100%')
     .layoutWeight(1)
-    .justifyContent(FlexAlign.Center)
+    .justifyContent(this.profileSearchEmpty() ? FlexAlign.Start : FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .padding({ left: 24, right: 24, bottom: 0 })
   }
@@ -782,21 +950,14 @@ export struct PinmonySearchPage {
             .layoutWeight(1)
           Button('重试')
             .onClick(() => {
-              if (!this.actionsReady && this.onRetry) this.onRetry();
+              if (!(this.actionsReady || this.resultsReadsReady) && this.onRetry) this.onRetry();
               else if (this.onLoadMore) this.onLoadMore();
             })
         }
         .width('100%')
         .padding(12)
       }
-      if (!this.error && (this.loading || this.snapshot.kind === 'loading' ||
-          (this.snapshot.api && this.snapshot.apiActive === false && this.snapshot.results.length === 0))) {
-        PinmonySearchSkeleton({ showCategories: this.visibleCategories().length === 0 })
-          .width('100%')
-          .layoutWeight(1)
-      } else if ((this.error && !(this.snapshot.api && this.snapshot.results.length > 0)) ||
-          this.loading || this.snapshot.kind === 'loading' || this.snapshot.results.length === 0) {
-        this.inspirationEntry()
+      if (this.snapshot.results.length === 0) {
         this.searchStatus()
       } else if (this.allPins()) {
         WaterFlow({ scroller: this.resultsScroller, sections: this.flowSections }) {
@@ -823,11 +984,27 @@ export struct PinmonySearchPage {
         })
         .onScrollStop(() => this.reportResultsScroll())
         .onReachEnd(() => this.resultsReachEnd())
+        .onScrollIndex((first: number, last: number) => this.resultsVisible(first, last))
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           this.resultsAreaChanged(newArea);
           const width: number = Number(newArea.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
         })
+      } else if (this.snapshot.results.every((item: PinmonySearchResult): boolean => item.kind === 'board')) {
+        WaterFlow({ scroller: this.resultsScroller }) {
+          ForEach(this.snapshot.results, (item: PinmonySearchResult) => {
+            FlowItem() { this.boardResult(item) }.width('100%')
+          }, (item: PinmonySearchResult) => item.id)
+        }.columnsTemplate('1fr 1fr').columnsGap(12).rowsGap(24)
+          .width('100%').layoutWeight(1).padding({ left: 12, right: 12, top: 16 })
+          .scrollBar(BarState.Off).onAppear(() => this.restoreResultsScroll())
+          .onDidScroll((offset: number, state: ScrollState) => {
+            this.reportResultsScroll();
+            if (this.onContentScroll) this.onContentScroll(offset, state);
+          })
+          .onScrollStop(() => this.reportResultsScroll())
+          .onReachEnd(() => this.resultsReachEnd())
+          .onAreaChange((_old: Area, area: Area) => this.resultsAreaChanged(area))
       } else {
         List({ scroller: this.resultsScroller }) {
           if (this.entryQuiz) { ListItem() { this.inspirationEntry() }.padding(12) }
@@ -850,9 +1027,6 @@ export struct PinmonySearchPage {
         .onScrollStop(() => this.reportResultsScroll())
         .onReachEnd(() => this.resultsReachEnd())
         .onAreaChange((_oldArea: Area, newArea: Area) => this.resultsAreaChanged(newArea))
-      }
-      if (this.snapshot.api && this.snapshot.apiBusy && this.snapshot.results.length > 0 && !this.loading && !this.error) {
-        LoadingProgress().width(24).height(24).margin({ top: 12, bottom: 24 })
       }
     }
     .width('100%')
@@ -895,6 +1069,13 @@ export struct PinmonySearchPage {
       Column() {
         // Lay out the compact search row directly; HDS stackBuilder reserves extra title-bar space.
         this.searchHeader()
+        if (this.automaticLoadingEnabled && this.committedQuery()) {
+          Row() {
+            ForEach(this.upcomingImageUrls, (url: string) => {
+              Image(url).width(1).height(1).opacity(0).accessibilityLevel('no')
+            }, (url: string) => url)
+          }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+        }
         if (!this.inputEditing && !this.committedQuery() && this.visibleCategories().length > 0) {
           Scroll() {
             Row({ space: 10 }) {
@@ -912,11 +1093,7 @@ export struct PinmonySearchPage {
           if (this.inputEditing) {
             this.inputSuggestionsContent()
           } else if (!this.committedQuery()) {
-            if (!this.error && (this.loading || this.snapshot.kind === 'loading')) {
-              PinmonySearchSkeleton({ showCategories: false, loadingText: '正在加载搜索内容…' })
-                .width('100%')
-                .layoutWeight(1)
-            } else if (this.error) {
+            if (this.error && this.snapshot.heroes.length === 0 && this.snapshot.ideaSections.length === 0) {
               this.searchStatus()
             } else {
               this.discoveryContent()

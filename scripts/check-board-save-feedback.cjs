@@ -24,4 +24,10 @@ view.snapshot.flow.uncertain = true; view.snapshot.flow.saved.push('102'); view.
 assert.equal(messages.length, 1, 'unconfirmed results do not notify');
 view.snapshot.session = 2; view.snapshot.flow.uncertain = false; view.updateSavedFeedback();
 assert.equal(messages.length, 1, 'new session does not replay old saved state');
+// Native writes retain one feedback scope despite Web document session changes.
+view.snapshot = {pageKey:'native-board',session:7,nativeAccountGeneration:3,title:'原生图板',flow:{phase:'ideas',saved:[],busy:false}};
+view.updateSavedFeedback();view.snapshot.session=0;view.snapshot.flow.saved.push('201');view.updateSavedFeedback();
+assert.equal(messages.at(-1),'已收藏至 原生图板');const count=messages.length;
+view.snapshot.session=99;view.updateSavedFeedback();assert.equal(messages.length,count,'Web session updates cannot replay native feedback');
+view.snapshot.nativeAccountGeneration=4;view.updateSavedFeedback();assert.equal(messages.length,count,'a different account generation never replays saved feedback');
 console.log('board save feedback: confirmed success only, dedupe, uncertain and session isolation passed');

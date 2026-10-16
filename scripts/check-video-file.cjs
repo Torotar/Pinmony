@@ -29,7 +29,7 @@ function harness(config = {}) {
     if (plan.pending) return new Promise((resolve, reject) => { request.resolve = resolve; request.reject = reject; });
     return Promise.resolve().then(() => {
       now += plan.elapsed ?? 0;
-      request.configuration.tracing.httpEventsHandler.onTimeInfo({ nameLookupTimeMs: 8, connectTimeMs: 10,
+      request.configuration.tracing.httpEventsHandler.onTimeInfo(plan.timeInfo ?? { nameLookupTimeMs: 8, connectTimeMs: 10,
         tlsHandshakeTimeMs: plan.error ? 0 : 30, startTransferTimeMs: plan.error ? 0 : 40 });
       if (plan.error && !plan.partialError) throw plan.error;
       for (const chunk of plan.chunks ?? [mp4.subarray(0, 5), mp4.subarray(5)])
@@ -109,9 +109,9 @@ async function main() {
   await assert.rejects(queuedRead); await queued.runQueue();
   assert.equal(queued.requests.length, 0, 'cancelled queued media must never reach the network');
   assert.equal(queued.files.size, 0); assert.equal(queued.handles.size, 0);
-  const slowSsl = harness({ attempts: [{ error: { code: 1007900035 }, elapsed: 6000 }, {}] });
+  const slowSsl = harness({ attempts: [{ error: { code: 1007900035 }, elapsed: 8500 }, {}] });
   await assert.rejects(slowSsl.read());
-  assert.equal(slowSsl.requests.length, 1, 'slow connection failure does not restart TLS negotiation');
+  assert.equal(slowSsl.requests.length, 1, 'insufficient remaining budget does not restart TLS negotiation');
   const ssl = harness({ attempts: [{ error: { code: 1007900035 }, elapsed: 1000 }, {}] });
   const recovered = await ssl.read();
   assert.equal(ssl.requests.length, 2);
@@ -124,6 +124,24 @@ async function main() {
   assert(ssl.traces.some(event => /event=tls-compatibility/.test(event)));
   assert(ssl.sessions.every(session => session.closed)); recovered.release();
   assert.throws(() => ssl.requests[0].destination(Uint8Array.from(mp4).buffer), /cancelled/, 'closed profile cannot write to the new file lease');
+  const tlsTimed = harness({ attempts: [{ error: { code: 1007900028 }, elapsed: 5026 }, {}] });
+  const timedLease = await tlsTimed.read();
+  assert.equal(tlsTimed.requests.length, 2, 'zero-response TLS timeout receives one compatibility attempt');
+  assert.equal(tlsTimed.requests[1].configuration.security.tlsRange.max, 'TlsV1.2');
+  assert.equal(tlsTimed.requests[1].configuration.transfer.timeout.connectMs, 6974, 'remaining budget is available for the compatible connection');
+  assert(tlsTimed.traces.some(event => /reason=tls-timeout/.test(event)));
+  timedLease.release();
+  for (const plan of [
+    { error: { code: 1007900028 }, elapsed: 5026, timeInfo: { nameLookupTimeMs: 0, connectTimeMs: 0, tlsHandshakeTimeMs: 0, startTransferTimeMs: 0 } },
+    { error: { code: 1007900028 }, elapsed: 5026, timeInfo: { nameLookupTimeMs: 8, connectTimeMs: 10, tlsHandshakeTimeMs: 30, startTransferTimeMs: 0 } },
+    { error: { code: 1007900028 }, elapsed: 5026, partialError: true, chunks: [mp4.subarray(0, 5)] },
+    { error: { code: 1007900028 }, elapsed: 8500 },
+    { error: { code: 1007900060 }, elapsed: 1000 }
+  ]) {
+    const blocked = harness(plan); await assert.rejects(blocked.read());
+    assert.equal(blocked.requests.length, 1, 'DNS/transfer/partial/budget/certificate failures do not trigger TLS compatibility');
+    assert.equal(blocked.files.size, 0); assert(blocked.sessions.every(session => session.closed));
+  }
   for (const config of [{ error: { code: 1007900035 } }, { error: { code: 1007900007 } },
     { error: { code: 1007900035 }, partialError: true, chunks: [mp4.subarray(0, 5)] },
     { error: { code: 1007900035 }, elapsed: 20001 }]) {

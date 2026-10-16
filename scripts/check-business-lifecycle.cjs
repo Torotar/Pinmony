@@ -13,6 +13,7 @@ let now=1000;const timers=[],notices=[];
 const ReturnHost=require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class ReturnHost {'+
   method('  private presentNativeBackTarget(', '  private returnToHistoryEntry(')+
   method('  private rootReadInFlight(', '  private requestRootPage(')+
+  method('  private failRootPreparation(', '  // A visible page owns')+
   method('  private waitForWebTabConfirmation(', '  private async refreshWebNavigation(')+'}\nReturnHost;',
   {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,
   {Date:{now:()=>now},setTimeout:cb=>timers.push(cb),PinmonyRuntimeLog:{info(){},warn(){}}});
@@ -28,6 +29,7 @@ Object.assign(r,{pinStore:{detail:{}},tabRequestToken:0,profileStore:{origins:[]
   showMessage(v){notices.push(v)}});
 require('./medium-priority-controller-harness.cjs').bindWork(r, ts, {Date:{now:()=>now},setTimeout:cb=>timers.push(cb),clearTimeout(){}});
 r.boardStore = {}; r.pagePerformance={begin(){}}; r.rootTabIndexFromAddress=()=>0;
+require('./product-coordination-harness.cjs').bind(r, ts, {Date:{now:()=>now},PinmonyRuntimeLog:{info(){},warn(){}}}, ['RootContext']);
 r.presentNativeBackTarget(home);
 assert.equal(r.rootReadInFlight(0,home),true,'return preparation is shared with root content demand');
 assert.equal(r.rootReadInFlight(0,home+'search/'),false,'a different target cannot join return preparation');

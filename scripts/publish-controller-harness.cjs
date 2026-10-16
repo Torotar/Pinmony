@@ -14,6 +14,7 @@ function bind(native, ts, globals = {}) {
     menuVisible: () => native.activeSheetKind === 'publish' && native.showNativeSheet,
     sheetAvailable: () => !native.activeSheetKind,
     setMenuVisible: visible => { native.showNativeSheet = visible; native.activeSheetKind = visible ? 'publish' : ''; },
+    waitMenuClosed: () => Promise.resolve(true),
     profileAddress: () => native.profileUrlFromAddress(native.authenticatedProfileUrl || ''),
     documentMatches: profile => native.profileDocumentMatches(profile), currentDocument: () => native.controller.getUrl(),
     normalizeProfile: address => native.profileUrlFromAddress(address),

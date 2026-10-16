@@ -12,7 +12,7 @@ function method(name) {
 }
 const names = ['rootActionContextReady', 'ensureRootActionContext', 'updateSearchQuery', 'submitSearch',
   'openHomePin', 'prepareSearchNavigation', 'performSearchAction', 'performInboxAction'];
-const context = { setTimeout, Date, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
+const context = { PIN_NATIVE_INBOX_MESSAGES_ENABLED:false, PIN_NATIVE_INBOX_UPDATES_ENABLED:false, setTimeout, Date, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + names.map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
@@ -23,6 +23,7 @@ function harness(index) {
   const native = new context.Native(), requests = [], notices = [];
   let document = roots[0] + 'sample/';
   Object.assign(native, { authStatus: 'authenticated', activeTab: index, tabRequestToken: 1,
+    inboxMessagesNativeReads:{open:async()=>false,installScript:()=>''}, inboxUpdatesNativeReads:{installScript:()=>''},
     rootSearchIntentToken: 0, pendingWebTab: -1, rootContentInteracted: false,
     homeStore: { homeActionsReady: false, homeForPresentation: () => ({ pageKey: roots[0],
       pins: [{ id: '123', pinUrl }] }) },
@@ -54,7 +55,7 @@ function harness(index) {
 (async () => {
   const home = harness(0);
   await home.native.openHomePin('123');
-  assert.deepEqual(home.requests, [['detail', pinUrl, roots[0]], ['load', pinUrl]],
+  assert.deepEqual(home.requests, [['detail', pinUrl, roots[0]]],
     'retained native Pin opens directly from a different hidden root');
   home.requests.length = 0;
   await home.native.openHomePin('missing');
@@ -71,6 +72,7 @@ function harness(index) {
     'fresh session replaces the retained session');
   const canceled = harness(2);
   const action = canceled.native.performInboxAction('compose');
+  await new Promise(resolve=>setImmediate(resolve));
   canceled.native.activeTab = 0;
   canceled.native.tabRequestToken++;
   canceled.ready();

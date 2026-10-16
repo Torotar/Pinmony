@@ -6,6 +6,15 @@ import { PinmonyEditPinResult } from '../models/PinmonyEditPin';
 interface PinmonyPanelCommentAction { action: string; }
 
 export interface PinmonyPostPanelsPorts {
+  nativePause?: () => void;
+  cancelNativeCommentWrites?: () => void;
+  nativeCommentWrite?: (encoded: string, current: () => boolean) => Promise<void>;
+  nativeCommentLike?: (id: string, current: () => boolean) => Promise<void>;
+  nativeTranslate?: (id: string, current: () => boolean) => Promise<void>;
+  nativeReplies?: (id: string, current: () => boolean) => Promise<void>;
+  nativeComments?: (append: boolean, current: () => boolean) => Promise<void>;
+  cancelNativeComments?: () => void;
+  adoptComments?: () => Promise<boolean>;
   authenticated: () => boolean;
   foreground: () => boolean;
   document: () => string;
@@ -31,20 +40,21 @@ export class PinmonyPostPanelsController {
   private pendingWrite: boolean = false;
   private uncertain: boolean = false;
   private mode: string = '';
+  private nativeComments: boolean = false;
   private pin: string = '';
   private page: string = '';
   constructor(store: PinmonyPinStore, ports: PinmonyPostPanelsPorts) { this.store = store; this.ports = ports; }
-  pause(): void { this.generation++; this.tasks.invalidate(); this.reading = false; }
+  pause(): void { this.ports.nativePause?.();this.ports.cancelNativeCommentWrites?.();this.ports.cancelNativeComments?.(); this.generation++; this.tasks.invalidate(); this.reading = false; }
   resume(): void { this.poll(); }
   private token(): number { return this.mode === 'comments' ? this.store.commentToken : this.mode === 'save' ? this.store.saveToken : this.store.editToken; }
   private context(token: number): boolean {
     return !!this.mode && token === this.token() && this.ports.authenticated() && this.ports.sheet() === this.mode &&
-      this.page === this.ports.document() && (this.mode === 'comments' ?
+      (this.mode === 'comments' && this.nativeComments || this.page === this.ports.document()) && (this.mode === 'comments' ?
       this.ports.pinIdentity(this.pin) === this.ports.pinIdentity(this.ports.currentPin()) : this.ports.moreCurrent(this.pin));
   }
   private current(token: number, generation: number): boolean { return generation === this.generation && this.ports.foreground() && this.context(token); }
   private begin(mode: string, pin: string): void {
-    this.pause(); this.mode = mode; this.pin = pin; this.page = this.ports.document(); this.pendingWrite = false; this.uncertain = false;
+    this.pause(); this.mode = mode; this.pin = pin; this.page = mode === 'comments' && this.ports.nativeComments ? '' : this.ports.document(); this.pendingWrite = false; this.uncertain = false;
     if (mode === 'comments') this.store.commentToken++;
     else if (mode === 'save') this.store.saveToken++;
     else this.store.editToken++;
@@ -61,8 +71,21 @@ export class PinmonyPostPanelsController {
     const pin: string = this.store.detail?.pinUrl || '';
     if (!pin || !this.ports.authenticated() || !this.ports.foreground() || this.pendingWrite ||
         this.ports.pinIdentity(pin) !== this.ports.pinIdentity(this.ports.currentPin())) return;
-    this.begin('comments', pin); this.store.commentResult = { pin: pin, loading: true, error: '', items: [] };
+    this.begin('comments', pin); this.nativeComments = !!this.ports.nativeComments; this.store.commentResult = { pin: pin, loading: true, error: '', items: [] };
+    if (this.nativeComments) { await this.readNativeComments(false); return; }
     await this.start('commentsStart');
+  }
+  private async readNativeComments(append: boolean): Promise<void> {
+    if (this.store.commentResult.busy) return;
+    const token: number = this.token(), generation: number = this.generation;
+    await this.ports.nativeComments?.(append, (): boolean => this.current(token, generation));
+  }
+  private async adoptNativeComments(): Promise<boolean> {
+    if (!this.nativeComments) return true;
+    const token: number = this.token(), pin: string = this.pin;
+    if (!this.current(token, this.generation) || this.store.commentResult.loading || this.blocked() ||
+        !this.ports.adoptComments || !await this.ports.adoptComments() || this.pin !== pin || !this.current(token, this.generation)) return false;
+    this.nativeComments = false; this.page = this.ports.document(); return true;
   }
   async openBoards(requestedPin: string = ''): Promise<void> {
     const pin: string = requestedPin || (this.ports.sheet() === 'save' ? this.store.saveResult.pin : this.store.detail?.pinUrl || '');
@@ -93,6 +116,7 @@ export class PinmonyPostPanelsController {
   }
   private poll(): void {
     const token: number = this.token(), generation: number = this.generation;
+    if (this.mode === 'comments' && this.nativeComments) { this.readNativeComments(false); return; }
     if (this.reading || !this.current(token, generation)) return;
     this.tasks.invalidate(); this.reading = true;
     const method: string = this.mode === 'comments' ? 'commentsRead' : this.mode === 'save' ? 'boardsRead' : 'editRead';
@@ -109,6 +133,13 @@ export class PinmonyPostPanelsController {
           const result: PinmonySaveResult | null = JSON.parse(this.ports.jsonText(raw)) as PinmonySaveResult | null;
           if (!result || !this.boardsValid(result)) throw new Error('Unavailable');
           this.store.saveResult = result; busy = result.loading || result.busy;
+          if (!busy && !result.error && !this.pendingWrite && !this.uncertain &&
+              /^\d+$/.test(result.savedId) && /^已收藏至/.test(result.feedback)) {
+            const feedback: string = result.feedback;
+            this.dismiss('save', true);
+            this.ports.feedback(feedback);
+            return;
+          }
         } else {
           const result: PinmonyEditPinResult | null = JSON.parse(this.ports.jsonText(raw)) as PinmonyEditPinResult | null;
           if (!result || result.pin !== this.pin || !result.board || !result.picker || !this.boardsValid(result.picker) ||
@@ -150,8 +181,27 @@ export class PinmonyPostPanelsController {
     catch (_) { if (this.mode === mode && this.context(token)) { if (write) this.uncertain = true; this.fail(write ? '操作结果未确认，请关闭后重新读取核对' : '读取操作失败，请重试'); } }
     finally { if (this.mode === mode && this.context(token)) { this.pendingWrite = false; this.poll(); } }
   }
-  commentAction(method: string, id: string = ''): void {
-    if (this.mode !== 'comments' || !['commentsMore', 'commentReplies', 'commentLike'].includes(method)) return;
+  async commentAction(method: string, id: string = ''): Promise<void> {
+    if (this.mode !== 'comments' || !['commentsMore', 'commentReplies', 'commentLike', 'commentTranslate'].includes(method)) return;
+    if (method === 'commentTranslate') {
+      if (!this.ports.nativeTranslate || !this.current(this.token(), this.generation) || this.blocked() || this.store.commentResult.loading) return;
+      if (!this.nativeComments) this.pause(); this.nativeComments = true;
+      const token: number = this.token(), generation: number = this.generation;
+      await this.ports.nativeTranslate(id, (): boolean => this.current(token, generation)); return;
+    }
+    if (method === 'commentsMore' && this.ports.nativeComments) { if (this.blocked()) return; if (!this.nativeComments) this.pause(); this.nativeComments = true; await this.readNativeComments(this.store.commentResult.items.length > 0); return; }
+    if (method === 'commentReplies' && this.ports.nativeReplies) {
+      if (!this.current(this.token(), this.generation) || this.blocked() || this.store.commentResult.loading) return;
+      if (!this.nativeComments) this.pause(); this.nativeComments = true;
+      const token: number = this.token(), generation: number = this.generation;
+      await this.ports.nativeReplies(id, (): boolean => this.current(token, generation)); return;
+    }
+    if (method === 'commentLike' && this.ports.nativeCommentLike) {
+      if (!this.current(this.token(),this.generation) || this.blocked() || this.store.commentResult.loading) return;
+      const token: number = this.token(), generation: number = this.generation;
+      await this.ports.nativeCommentLike(id,(): boolean => this.current(token,generation)); return;
+    }
+    if (!await this.adoptNativeComments()) return;
     this.dispatch(method, id ? ',' + JSON.stringify(id) : '', method === 'commentLike');
   }
   saveAction(method: string, args: string = ''): void {
@@ -164,6 +214,12 @@ export class PinmonyPostPanelsController {
     this.dispatch(method, args, method === 'editCommit' || method === 'boardsCreate');
   }
   async writeComment(encoded: string): Promise<void> {
+    if (this.ports.nativeCommentWrite) {
+      if (this.mode !== 'comments' || !this.current(this.token(),this.generation) || this.blocked() || this.store.commentResult.loading) return;
+      const token: number = this.token(), generation: number = this.generation;
+      await this.ports.nativeCommentWrite(encoded,(): boolean => this.current(token,generation)); return;
+    }
+    if (!await this.adoptNativeComments()) return;
     const token: number = this.token(), pin: string = this.pin;
     if (this.mode !== 'comments' || !this.current(token, this.generation) || this.blocked()) return;
     this.pause(); this.pendingWrite = true; this.store.commentResult.busy = true;
@@ -192,7 +248,7 @@ export class PinmonyPostPanelsController {
     else { this.store.editToken++; this.store.editResult.busy = false; this.store.editResult.picker.busy = false; }
     this.mode = ''; this.pendingWrite = false; this.uncertain = false; this.ports.show('');
     const close: string = kind === 'comments' ? 'commentsClose' : kind === 'save' ? 'boardsClose' : 'editClose';
-    this.ports.runScript('window.PinmonyPostApi && window.PinmonyPostApi.' + close + '()').catch(() => {});
+    if (!(kind === 'comments' && this.nativeComments)) this.ports.runScript('window.PinmonyPostApi && window.PinmonyPostApi.' + close + '()').catch(() => {});
     if (kind === 'save') this.ports.saveDismissed();
   }
 }

@@ -16,6 +16,7 @@ export interface PinmonySearchRootView {
   handleRootContentScroll: (offset: number, state: ScrollState) => void;
   searchPlaceholder: () => PinmonySearchSnapshot;
   currentSearchPageKey: () => string;
+  syncFloatingTabsMotion: () => void;
   updateSearchQuery: (value: string, refreshSuggestions?: boolean) => Promise<void>;
   submitSearch: (value: string) => Promise<void>;
   performSearchAction: (id: string, kind: string) => Promise<void>;
@@ -38,11 +39,19 @@ export interface PinmonySearchRootView {
 export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
           if (view.shouldKeepSearchRootMounted() && !view.pinStore.detail && !view.loadFailed) {
             PinmonySearchPage({
+              active: view.nativeSearchPageVisible(),
               interactionReady: view.activeTab === 1 && view.authStatus === 'authenticated',
               automaticLoadingEnabled: view.activeTab === 1 && (!view.nativeRootOnly || view.rootContentInteracted),
               mediaActive: view.activeTab === 1 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.currentPinUrl(),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               snapshot: view.searchStore.search || view.searchPlaceholder(),
+              initialHeroId: view.searchStore.searchCache.heroPosition(view.searchStore.search?.pageKey || ''),
+              onHeroPosition: (pageKey: string, id: string) => {
+                const snapshot: PinmonySearchSnapshot | undefined = view.searchStore.search;
+                if (snapshot?.pageKey === pageKey) view.searchStore.searchCache.rememberHero(snapshot, id);
+              },
+              resultsReadsReady: view.activeTab === 1 && view.searchStore.searchNativeReadsReady,
+              discoveryReadsReady: view.activeTab === 1 && view.searchStore.searchDiscoveryReadsReady,
               actionsReady: view.activeTab === 1 && view.searchStore.searchActionsReady &&
                 view.searchStore.search?.pageKey === view.currentSearchPageKey(),
               initialResultsScrollOffset: view.searchStore.searchScrollOffset,
@@ -60,6 +69,9 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               onSuggestion: (id: string) => view.performSearchAction(id, 'suggestion'),
               historyActionsReady: view.activeTab === 1 && view.authStatus === 'authenticated' && (view.searchStore.searchInputReady || view.searchStore.searchActionsReady),
               onDeleteHistory: (id: string) => view.performSearchAction(id, 'deleteHistory'),
+              onClearProductFilter: (kind: string) => view.performSearchAction(kind, 'clearProductFilter'),
+              onFollowUser: (id: string) => view.performSearchAction(id, 'followUser'),
+              onFollowBoard: (id: string) => view.performSearchAction(id, 'followBoard'),
               onResult: (id: string) => view.performSearchAction(id, 'result'),
               onMore: (url: string) => view.openSearchPinMenu(url),
               onExploreAction: (id: string, kind: string) => view.performSearchAction(id, kind),
@@ -76,6 +88,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
                 const visible: boolean = view.shouldKeepSearchPageMounted();
                 view.searchStore.searchInputFocused = visible && focused;
                 view.searchStore.searchInputStopEditing = visible && focused ? stopEditing : undefined;
+                view.syncFloatingTabsMotion();
               }
             })
             .width('100%')

@@ -21,6 +21,7 @@ import { PinmonyProfileSnapshot } from 'feature_profile';
 import { PinmonyHomeSnapshot } from 'feature_home';
 const PINTEREST_URL: string = 'https://www.pinterest.com/';
 export interface PinmonyNavigationCoordinatorPorts {
+  nativeBusinessOnly?: () => boolean;
   activeSheetKind: () => string;
   activeTab: () => number;
   setActiveTab: (value: number) => number;
@@ -203,6 +204,9 @@ selectNativeRootTab(index: number): void {
     this.profileStore.origins = [];
     this.profileStore.profileWebFlow = false;
     this.inboxStore.inboxFlow = undefined;
+    this.inboxStore.retainedChat = undefined;
+    this.inboxStore.chatScrollOffset = 0;
+    this.inboxStore.chatReturnConversation = '';
     this.inboxStore.inboxWebFlow = false;
     this.boardStore.pendingBoardUrl = '';
     this.boardStore.pendingBoardSource = '';
@@ -445,6 +449,7 @@ async handleBack(): Promise<void> {
     if (this.ports.backInProgress() || this.ports.pageHistory().isPending()) {
         return;
     }
+    if(this.ports.nativeBusinessOnly?.()){this.ports.backOnePage();this.ports.setLastRootBackAt(0);return;}
     this.ports.setBackInProgress(true);
     try {
         let handled: boolean = false;
@@ -532,7 +537,10 @@ onBackPress(): boolean {
     }
     if (Date.now() < this.pinStore.shareBackHandledUntil)
         return true;
-    if (this.inboxStore.inboxFlow) {
+    const inboxPresented: boolean = !!this.ports.nativeBackTarget() &&
+      this.ports.inboxUrlFromAddress(this.ports.nativeBackTarget()) === this.inboxStore.inboxFlow?.pageUrl;
+    if (this.inboxStore.inboxFlow && (inboxPresented || !this.boardStore.pendingBoardUrl && !this.ports.currentBoardUrl() &&
+        !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.ports.currentPinUrl())) {
         this.ports.setNativeChildBackUntil(Date.now() + 300);
         this.ports.inboxFlowAction('back');
         return true;
@@ -571,6 +579,10 @@ onBackPress(): boolean {
     }
     else if (this.ports.activeSheetKind() === 'searchFilter') {
         this.ports.dismissSearchFilters();
+    }
+    else if (this.ports.authStatus() === 'authenticated' && this.ports.activeTab() === 1 && this.ports.nativeRootTabsVisible() &&
+        /[?&]q=[^&#]+/.test(this.ports.currentSearchPageKey())) {
+        this.ports.backFromSearch();
     }
     else if (this.ports.authStatus() !== 'authenticated' || this.ports.nativeRootTabsVisible()) {
         PinmonyRuntimeLog.info('PinmonyReturn: root back delegated to system');

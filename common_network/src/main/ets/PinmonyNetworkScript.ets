@@ -25,6 +25,7 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
     return response;
   }
   window.PinmonyNetwork = {
+    documentEpoch: function () { return nativeManaged && foreground && epoch >= 0 && boundPage === location.href ? epoch : -1; },
     isReady: function () { return nativeManaged && foreground && epoch >= 0 && boundPage === location.href; },
     isForeground: function () { return (!nativeManaged && epoch < 0) || foreground && (nativeManaged || typeof document === 'undefined' || !document.hidden); },
     setForeground: function (value) {
@@ -45,6 +46,7 @@ export const PIN_NATIVE_NETWORK_SCRIPT: string = `
       if (reply.error) {
         var failure = new TypeError(reply.error === 'rate-limited' ? '请求过于频繁，请稍后重试' : '原生网络请求未完成');
         if (reply.error === 'rate-limited') failure.pinmonyRateLimited = true;
+        if (reply.error === 'network-unavailable') failure.pinmonyNetworkUnavailable = true;
         if (/^(cancelled|stale|current=false|background)$/.test(reply.error)) { failure.name = 'AbortError'; failure.pinmonyCancelled = true; }
         job.fail(failure); return;
       }

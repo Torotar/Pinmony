@@ -5,6 +5,12 @@ import { PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 
 @Observed
 export class PinmonyInboxStore {
+  inboxNativeMessagesReady: boolean = false;
+  inboxNativeUpdatesReady: boolean = false;
+  retainedChat: PinmonyInboxFlowSnapshot | undefined = undefined;
+  chatScrollOffset: number = 0;
+  chatReturnConversation: string = '';
+  flowDismissed: boolean = false;
   boardInvitations: PinmonyBoardInvitations | undefined = undefined;
   boardInvitationPreview: PinmonyBoardInvitation | undefined = undefined;
   invitationBannerVisible: boolean = false;

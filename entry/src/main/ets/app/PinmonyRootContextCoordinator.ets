@@ -76,6 +76,22 @@ export class PinmonyRootContextCoordinator {
   private readonly readiness: PinmonyReadinessGate = new PinmonyReadinessGate();
   notify(): void { this.readiness.notify(); }
   pause(): void { this.readiness.cancel(); }
+  failDocument(address: string): void {
+    if (this.ports.rootReadToken() < 0 ||
+        this.ports.rootReadToken() !== this.ports.tabRequestToken() ||
+        this.ports.rootReadAddress() !== address) return;
+    const index: number = this.ports.rootTabIndexFromAddress(address);
+    this.ports.setTabRequestToken(this.ports.tabRequestToken() + 1);
+    this.ports.setRootReadToken(-1);
+    this.ports.setRootReadAddress('');
+    this.ports.setRootReadStartedAt(0);
+    this.ports.setPendingWebTab(-1);
+    this.ports.setRetainedRootTabPending(-1);
+    this.ports.setRetainedRootTabAddress('');
+    this.ports.clearRootTabGuard('document-failed');
+    this.readiness.cancel();
+    PinmonyRuntimeLog.warn('HomeRecoveryTrace: phase=read-released targetTab=' + index.toString());
+  }
   private readonly ports: PinmonyRootContextCoordinatorPorts;
   constructor(ports: PinmonyRootContextCoordinatorPorts) { this.ports = ports; this.homeStore = ports.homeStore(); this.searchStore = ports.searchStore(); this.profileStore = ports.profileStore(); this.inboxStore = ports.inboxStore(); this.pinStore = ports.pinStore(); }
 rootActionContextReady(index: number, requireData: boolean = true): boolean {
@@ -102,7 +118,7 @@ rootActionContextReady(index: number, requireData: boolean = true): boolean {
             this.inboxStore.inboxSession === this.inboxStore.inbox?.session &&
             this.inboxStore.inboxUrl === this.ports.currentInboxUrl();
     if (index === 3)
-        return this.profileStore.profileActionsReady &&
+        return (requireData ? this.profileStore.profileActionsReady : this.profileStore.profileSessionReady) &&
             this.profileStore.profileSession === this.profileStore.profile?.session &&
             this.profileStore.profile?.profileUrl === this.ports.currentProfileUrl();
     return false;
@@ -153,7 +169,10 @@ requestRootPage(index: number): void {
     try { document = this.ports.controller().getUrl(); }
     catch (_) { PinmonyRuntimeLog.warn('RootTabTrace: document-read-unavailable'); }
     const reuseHomeDocument: boolean = index === 0 && !!document && !this.ports.webPageLoading() && !this.ports.loadFailed() &&
-        !this.homeStore.homeError && this.ports.pageHistory().key(document) === this.ports.pageHistory().key(address);
+        (!this.homeStore.homeError || this.homeStore.home?.categorySourceFailure === true) &&
+        this.ports.pageHistory().key(document) === this.ports.pageHistory().key(address);
+    const reuseProfileDocument: boolean = index === 3 && !!document && !this.ports.webPageLoading() && !this.ports.loadFailed() &&
+        !!this.ports.profileUrlFromAddress(document) && this.ports.profileUrlFromAddress(document) === this.ports.profileUrlFromAddress(address);
     const token: number = this.ports.setTabRequestToken(this.ports.tabRequestToken() + 1);
     this.ports.setRootReadAddress(address);
     this.ports.setRootReadToken(token);
@@ -174,16 +193,18 @@ requestRootPage(index: number): void {
     else
         this.ports.expectProfile();
     PinmonyRuntimeLog.info('RootTabTrace: page-read-request targetTab=' + index.toString());
-    if (reuseHomeDocument) {
+    if (reuseHomeDocument || reuseProfileDocument) {
         // Confirm the live document and bridge before reusing it; the native
         // cached snapshot and getUrl() alone are not session evidence.
-        this.ports.controller().runJavaScript('location.href === ' + JSON.stringify(address) +
-            ' && typeof window.PinmonyHomeRefresh === "function" ? (window.PinmonyHomeRefresh(), true) : false')
+        const syncScript: string = reuseProfileDocument ?
+            'location.href === ' + JSON.stringify(document) + ' && typeof window.PinmonyProfileSync === "function" ? (window.PinmonyProfileSync(), true) : false' :
+            'location.href === ' + JSON.stringify(address) + ' && typeof window.PinmonyHomeRefresh === "function" ? (window.PinmonyHomeRefresh(), true) : false';
+        this.ports.controller().runJavaScript(syncScript)
             .then((result: string) => {
-            if (token !== this.ports.tabRequestToken() || this.ports.activeTab() !== 0)
+            if (token !== this.ports.tabRequestToken() || this.ports.activeTab() !== index)
                 return;
             if (result === 'true' || result === '"true"') {
-                PinmonyRuntimeLog.info('HomeRecoveryTrace: phase=document-reused elapsedMs=' +
+                PinmonyRuntimeLog.info('RootRecoveryTrace: phase=document-reused targetTab=' + index.toString() + ' elapsedMs=' +
                     (Date.now() - this.ports.rootReadStartedAt()).toString());
                 this.ports.syncAuthentication();
             }
@@ -192,12 +213,11 @@ requestRootPage(index: number): void {
                 this.ports.controller().loadUrl(address);
             }
         }).catch(() => {
-            if (token !== this.ports.tabRequestToken() || this.ports.activeTab() !== 0)
+            if (token !== this.ports.tabRequestToken() || this.ports.activeTab() !== index)
                 return;
-            this.ports.setRootReadToken(-1);
-            this.ports.setPendingWebTab(-1);
-            this.homeStore.homeLoading = false;
-            this.homeStore.homeError = '首页会话恢复失败，请重试';
+            this.failDocument(address);
+            if (index === 0) { this.homeStore.homeLoading = false; this.homeStore.homeError = '首页会话恢复失败，请重试'; }
+            else { this.profileStore.profileLoading = false; this.profileStore.profileSessionReady = false; this.profileStore.profileError = '资料会话恢复失败，请重试'; }
             PinmonyRuntimeLog.warn('HomeRecoveryTrace: phase=failed reason=document-reuse');
         });
         this.ports.waitForWebTabConfirmation(index, token, this.ports.rootReadStartedAt());
@@ -208,10 +228,7 @@ requestRootPage(index: number): void {
         this.ports.waitForWebTabConfirmation(index, token, Date.now());
     }
     catch (_) {
-        this.ports.setRootReadToken(-1);
-        this.ports.setPendingWebTab(-1);
-        this.ports.setRetainedRootTabPending(-1);
-        this.ports.clearRootTabGuard('page-read-failed');
+        this.failDocument(address);
         this.ports.setLoadFailed(true);
         this.ports.setFailureDetails('无法加载当前页面，请重试');
     }
@@ -226,7 +243,9 @@ prepareRootPageRead(index: number): boolean {
         document = this.ports.controller().getUrl();
     }
     catch (_) { }
-    if (!address || this.ports.pageHistory().key(address) !== this.ports.pageHistory().key(document)) {
+    if (!address || this.ports.loadFailed() || (index === 0 && !!this.homeStore.homeError &&
+        this.homeStore.home?.categorySourceFailure !== true) ||
+        this.ports.pageHistory().key(address) !== this.ports.pageHistory().key(document)) {
         this.requestRootPage(index);
         return true;
     }

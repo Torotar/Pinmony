@@ -8,7 +8,11 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
+import { PinmonyImageDownload, PinmonyDownloadedImage, acceptsImageDownloadUrl } from 'common_network';
+
 export class PinmonySystemActions {
+  private readonly imageDownload: PinmonyImageDownload = new PinmonyImageDownload();
+  private imageDownloadBusy: boolean = false;private imageDownloadSequence: number = 0;
   private readonly downloadDelegate: webview.WebDownloadDelegate = new webview.WebDownloadDelegate();
   private active: boolean = true;
   private generation: number = 0;
@@ -24,7 +28,7 @@ export class PinmonySystemActions {
   activate(): void { this.active = true; }
 
   dispose(): void {
-    this.active = false; this.generation++;
+    this.active = false; this.generation++;this.imageDownload.cancel();this.imageDownloadBusy = false;
     this.selectingDownloads.forEach((item: webview.WebDownloadItem): void => {
       try { this.cancelDownload(item); } catch (_) { PinmonyRuntimeLog.warn('PhotoDownload: cancellation unavailable'); }
     });
@@ -78,6 +82,26 @@ export class PinmonySystemActions {
       } finally { await source.release(); }
     } finally { await fileIo.close(file); }
     } catch (_) { throw new Error('无法读取照片，请重试'); }
+  }
+
+  async downloadImage(source: string): Promise<void> {
+    if(!this.active || this.imageDownloadBusy || !acceptsImageDownloadUrl(source))return;
+    this.imageDownloadBusy = true;const generation: number = this.generation;let output: string = '';
+    try {
+      const options: picker.DocumentSaveOptions = new picker.DocumentSaveOptions();options.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
+      const selected: string[] = await new picker.DocumentViewPicker().save(options);
+      if(!this.active || generation !== this.generation || !selected[0])return;
+      const directory: string = new fileUri.FileUri(selected[0]).path;if(!directory)throw new Error('directory');
+      this.showMessage('正在下载到所选目录');
+      const result: PinmonyDownloadedImage = await this.imageDownload.read(source,(): boolean => this.active && generation === this.generation);
+      if(!this.active || generation !== this.generation)return;
+      output = directory + '/pin-' + Date.now().toString() + '-' + (++this.imageDownloadSequence).toString() + '.' + result.extension;
+      const file: fileIo.File = await fileIo.open(output,fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      try {let offset: number = 0;while(offset < result.data.byteLength){const written: number = await fileIo.write(file.fd,result.data.slice(offset));if(written <= 0)throw new Error('write');offset += written;}}
+      finally {await fileIo.close(file);}
+      if(this.active && generation === this.generation)this.showMessage('下载完成，请在所选目录查看');
+    }catch (_) {if(output){try {await fileIo.unlink(output);}catch (_) {}}if(this.active && generation === this.generation)this.showMessage('下载失败，请重试');}
+    finally {if(generation === this.generation)this.imageDownloadBusy = false;}
   }
 
   private cancelDownload(item: webview.WebDownloadItem): void {

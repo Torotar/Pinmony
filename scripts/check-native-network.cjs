@@ -45,6 +45,28 @@ const native = new PinmonyNativeNetwork();
 const state = { authenticated:true,epoch:3,page:'https://www.pinterest.com/',userAgent:'synthetic-agent' };
 const base = { id:'test',epoch:3,page:state.page,url:'https://www.pinterest.com/resource/UserHomefeedResource/get/?data=synthetic',method:'GET',headers:{Accept:'application/json'},body:'' };
 async function main() {
+  const documentGuard = new PinmonyNativeNetwork();
+  documentGuard.pending.add('web-document'); documentGuard.pending.add('native_board_1');
+  documentGuard.pending.add('native_search_discovery_1');
+  documentGuard.invalidateDocument();
+  assert.equal(documentGuard.pending.has('web-document'), false);
+  assert.equal(documentGuard.pending.has('native_board_1'), true, 'hidden navigation preserves account-owned board read');
+  assert.equal(documentGuard.pending.has('native_search_discovery_1'), true);
+  documentGuard.invalidate(); assert.equal(documentGuard.pending.size, 0, 'full session invalidation still cancels native jobs');
+
+  const sectionState = { ...state, page: 'https://www.pinterest.com/sample/board/' };
+  const sectionOptions = { board_id: '123', name: 'New section', initial_pins: [] };
+  const sectionBody = options => 'source_url=' + encodeURIComponent('/board/123/create_section/') +
+    '&data=' + encodeURIComponent(JSON.stringify({ options, context: {} }));
+  const sectionJob = { ...base, page: sectionState.page,
+    url: 'https://www.pinterest.com/resource/BoardSectionResource/create/', method: 'POST',
+    headers: { 'X-Pinterest-Pws-Handler': 'www/board/[id]/create_section.js' }, body: sectionBody(sectionOptions) };
+  assert(acceptsNetworkJob(sectionJob, sectionState), 'captured empty section creation is admitted');
+  assert(!acceptsNetworkJob({ ...sectionJob, body: sectionBody({ ...sectionOptions, initial_pins: ['111'] }) }, sectionState));
+  assert(!acceptsNetworkJob({ ...sectionJob, body: sectionBody({ ...sectionOptions, extra: true }) }, sectionState));
+  assert(!acceptsNetworkJob({ ...sectionJob, headers: {} }, sectionState));
+  assert(!acceptsNetworkJob({ ...sectionJob, url: sectionJob.url.replace('/create/', '/delete/') }, sectionState));
+  assert(!acceptsNetworkJob({ ...sectionJob, body: sectionBody({ ...sectionOptions, board_id: '999' }) }, sectionState));
   const regionalState = {...state, page:'https://uk.pinterest.com/'};
   const regionalJob = {...base, page:regionalState.page, url:base.url.replace('www.pinterest.com','uk.pinterest.com')};
   assert(acceptsNetworkJob(regionalJob, regionalState), 'regional same-origin resource is allowed');
@@ -360,6 +382,91 @@ async function main() {
   }
   window.PinmonySearchUiApi.reset(); window.PinmonySearchDiscoveryApi.reset();
   assert.equal(webRequests, 0, 'search integration never falls back to webpage fetch');
+  // Run the actual board request builder through native admission and RCP, not a fetch-only stub.
+  const boardSource = compiled('feature_board/src/main/ets/services/PinmonyBoardApiScript.ets', () => ({}));
+  for (const region of ['www', 'uk']) {
+    const origin = 'https://' + region + '.pinterest.com';
+    const boardState = { ...state, page: origin + '/fixture/board/' };
+    const snapshots = [], boardJobs = [];
+    const boardLocation = { origin, hostname: region + '.pinterest.com', href: boardState.page, pathname: '/fixture/board/' };
+    const boardWindow = { PinmonyNativeNetworkEnabled: true, PinmonyBoardApiEnabled: true,
+      addEventListener() {}, setInterval() {}, fetch() { throw Error('board Web fallback forbidden'); },
+      PinmonyShareBridge: {
+        boardState(raw) { snapshots.push(JSON.parse(raw)); },
+        networkRequest(raw) {
+          const job = JSON.parse(raw); boardJobs.push(job);
+          native.request(job, () => boardState).then(reply => boardWindow.PinmonyNetwork.complete(reply));
+        }, cancelNetwork(id) { native.cancel(id); }
+      } };
+    boardWindow.top = boardWindow;
+    const boardContext = { window: boardWindow, location: boardLocation, URL, Headers, Response, Map, Set,
+      AbortController, Promise, setTimeout, clearTimeout, console };
+    vm.runInNewContext(PIN_NATIVE_NETWORK_SCRIPT, boardContext);
+    boardWindow.PinmonyNetwork.setForeground(true);
+    boardWindow.PinmonyNetwork.bind(boardState.epoch, boardState.page);
+    const sectionPin = id => ({ type: 'pin', id, title: 'Section Pin', board: { id: '123' },
+      images: { '474x': { url: 'https://i.pinimg.com/fixture.jpg', width: 474, height: 700 } } });
+    response = req => {
+      const resource = new URL(req.url).pathname.split('/')[2];
+      const options = JSON.parse(new URL(req.url).searchParams.get('data')).options;
+      const data = resource === 'BoardResource' ? { type: 'board', id: '123', url: '/fixture/board/',
+        name: 'Board', pin_count: 2, section_count: 1, owner: { id: '700', username: 'fixture' } } :
+        resource === 'BoardSectionsResource' ? [{ type: 'board_section', id: '456', title: 'Section', pin_count: 2,
+          preview_pins: [{ image_medium_url: 'https://i.pinimg.com/fixture.jpg' }] }] :
+        resource === 'BoardSectionPinsResource' ? [sectionPin(options.bookmarks ? '222' : '111')] : [];
+      const bookmark = resource === 'BoardSectionPinsResource' && !options.bookmarks ? 'fixture-next' : '-end-';
+      return { statusCode: 200, headers: {}, toString: () => JSON.stringify({
+        resource_response: { status: 'success', data, bookmark }, resource: { options: { bookmarks: [bookmark] } }
+      }) };
+    };
+    vm.runInNewContext(useNativeTransport(boardSource.PIN_BOARD_API_SCRIPT), boardContext);
+    await until(() => snapshots.at(-1)?.sections?.length === 1 && snapshots.at(-1)?.ready);
+    const currentBoard = () => snapshots.at(-1);
+    const flow = action => boardWindow.PinmonyBoardApi.flow(currentBoard().session, currentBoard().pageKey, JSON.stringify(action));
+    assert.equal(currentBoard().sectionsError, '');
+    flow({ action: 'section', value: '456' });
+    await until(() => currentBoard().flow.pins.length === 1 && !currentBoard().flow.loading);
+    flow({ action: 'sectionMore' });
+    await until(() => currentBoard().flow.pins.length === 2 && !currentBoard().flow.loading);
+    assert.equal(currentBoard().flow.hasMore, false);
+    for (const resource of ['BoardSectionsResource', 'BoardSectionPinsResource']) {
+      const actualJobs = boardJobs.filter(job => job.url.includes('/' + resource + '/get/'));
+      assert.equal(actualJobs.length, resource === 'BoardSectionsResource' ? 1 : 2);
+      for (const job of actualJobs) {
+        assert(acceptsNetworkJob(job, boardState), resource + ' actual builder admitted in ' + region);
+        assert(requests.some(req => req.url === job.url), resource + ' reaches RCP in ' + region);
+      }
+      const job = actualJobs[0];
+      const withOptions = options => {
+        const url = new URL(job.url);
+        url.searchParams.set('data', JSON.stringify({ options, context: {} }));
+        return { ...job, url: url.href };
+      };
+      const options = JSON.parse(new URL(job.url).searchParams.get('data')).options;
+      const idKey = resource === 'BoardSectionsResource' ? 'board_id' : 'section_id';
+      const invalid = [
+        [{ ...job, method: 'POST' }, boardState], [{ ...job, body: 'unexpected' }, boardState],
+        [{ ...job, epoch: 2 }, boardState], [job, { ...boardState, authenticated: false }],
+        [{ ...job, page: boardState.page + '?old' }, boardState],
+        [{ ...job, url: job.url.replace(region + '.pinterest.com', 'evil.example') }, boardState],
+        [{ ...job, url: job.url.replace(region + '.pinterest.com', (region === 'www' ? 'uk' : 'www') + '.pinterest.com') }, boardState],
+        [{ ...job, url: job.url.replace('/get/', '/update/') }, boardState],
+        [{ ...job, url: job.url.split('?')[0] + '?data=malformed' }, boardState],
+        [withOptions({ ...options, [idKey]: 'invalid' }), boardState],
+        [withOptions({ ...options, unexpected: true }), boardState],
+        [withOptions({ ...options, ...(resource === 'BoardSectionsResource' ? { redux_normalize_feed: false } : { prepend: true }) }), boardState],
+        ...(resource === 'BoardSectionPinsResource' ? [[], [''], [123], ['a', 'b'], ['x'.repeat(8193)]].map(bookmarks =>
+          [withOptions({ ...options, bookmarks }), boardState]) : [])
+      ];
+      const before = requests.length;
+      for (const [bad, context] of invalid) {
+        assert.equal(acceptsNetworkJob(bad, context), false, resource + ' rejects invalid contract');
+        assert.equal((await native.request(bad, () => context)).error, 'request-unavailable');
+      }
+      assert.equal(requests.length, before, 'invalid section jobs never reach RCP');
+    }
+    flow({ action: 'close' });
+  }
   for(const module of ['feature_home','feature_pin','feature_search','feature_inbox','feature_profile','feature_board']) {
     for(const file of fs.readdirSync(module+'/src/main/ets/services').filter(n=>n.endsWith('Script.ets'))) {
       const s=fs.readFileSync(module+'/src/main/ets/services/'+file,'utf8');const match=s.match(/= `([\s\S]*?)`;/);
@@ -367,6 +474,6 @@ async function main() {
     }
   }
   native.invalidate();
-  console.log('Native transport, credential isolation, observers, cancellation, stale cookies and actual home/search mapping passed');
+  console.log('Native transport, credential isolation, observers, cancellation, stale cookies and actual home/search/board sections mapping passed');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

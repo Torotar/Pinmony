@@ -27,7 +27,9 @@ export class PinmonyProfileStore {
     if (this.onNavigationChange) this.onNavigationChange();
   }
   readonly profileCache: PinmonyProfileCache = new PinmonyProfileCache();
+  profileNativeReadsReady: boolean = false;
   profileActionsReady: boolean = false;
+  profileSessionReady: boolean = false;
   profilePullRefreshing: boolean = false;
   profilePullToken: number = 0;
   profileScrollOffset: number = 0;

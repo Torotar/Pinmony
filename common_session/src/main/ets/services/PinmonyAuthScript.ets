@@ -24,12 +24,13 @@ export const PIN_AUTH_BRIDGE_SCRIPT: string = `
     var hasUser = user && /^\\d+$/.test(String(user.id || '')) && String(user.id) !== '0';
     if (authenticated !== true && !hasUser) return null;
     var username = user && user.username;
-    return { status: 'authenticated', profileUrl: typeof username === 'string' && /^[a-zA-Z0-9_]+$/.test(username) ?
+    var appVersion = typeof context.app_version === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(context.app_version) ? context.app_version : '';
+    return { status: 'authenticated', appVersion: appVersion, profileUrl: typeof username === 'string' && /^[a-zA-Z0-9_]+$/.test(username) ?
       location.origin + '/' + username + '/' : '' };
   }
   function publish() {
     if (!documentActive || epoch < 0 || !evidence) return;
-    var message = { status: evidence.status, profileUrl: evidence.profileUrl, epoch: epoch, pageUrl: location.href };
+    var message = { status: evidence.status, profileUrl: evidence.profileUrl, appVersion: evidence.appVersion || '', epoch: epoch, pageUrl: location.href };
     var value = JSON.stringify(message);
     if (value === last) return;
     var previous = last;

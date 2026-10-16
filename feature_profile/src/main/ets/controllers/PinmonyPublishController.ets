@@ -4,12 +4,20 @@ import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
 import { PinmonyProfileSnapshot, PinmonyPublishOption, PinmonyCreatedPin, PinmonyOrganizeBoard } from '../models/PinmonyProfile';
 
 export interface PinmonyPublishPorts {
+  nativeFlow?: () => boolean;
+  nativeMenu?: (current: () => boolean) => Promise<boolean>;
+  nativeOpen?: () => Promise<boolean>;
+  nativeAction?: (action: string,value: string,secret: boolean) => Promise<void>;
+  nativePause?: () => void;
+  nativeClose?: () => void;
   authenticated: () => boolean;
   foreground: () => boolean;
   activeProfileTab: () => boolean;
   menuVisible: () => boolean;
   sheetAvailable: () => boolean;
   setMenuVisible: (visible: boolean) => void;
+  waitMenuClosed: () => Promise<boolean>;
+  openSection: () => void;
   profileAddress: () => string;
   documentMatches: (profile: string) => boolean;
   currentDocument: () => string;
@@ -38,6 +46,7 @@ export class PinmonyPublishController {
   private menuGeneration: number = 0;
   private flowGeneration: number = 0;
   private polling: boolean = false;
+  private selecting: boolean = false;
 
   constructor(store: PinmonyProfileStore, ports: PinmonyPublishPorts) { this.store = store; this.ports = ports; }
 
@@ -48,12 +57,13 @@ export class PinmonyPublishController {
   }
 
   private pauseFlow(): void {
+    if(this.ports.nativeFlow?.())this.ports.nativePause?.();
     this.flowGeneration++; this.flowTasks.invalidate(); this.polling = false;
   }
 
   resume(): void {
     const flow: PinmonyPublishFlow | undefined = this.store.publishFlow;
-    if (flow) this.poll(flow.token, flow.page);
+    if (flow) { if(!this.ports.nativeFlow?.())this.poll(flow.token, flow.page); }
     else if (this.ports.menuVisible() && this.store.publishLoading && this.store.profile) {
       this.readMenuWhenReady(this.store.profile.profileUrl, Date.now() + 8000, this.store.publishRequestToken);
     }
@@ -84,6 +94,9 @@ export class PinmonyPublishController {
       token === this.store.publishRequestToken && this.ports.authenticated() && this.ports.foreground() &&
       this.ports.menuVisible() && this.ports.activeProfileTab();
     PinmonyRuntimeLog.info('PublishTrace: entry accepted');
+    if(this.ports.nativeFlow?.() && this.ports.nativeMenu){
+      this.ports.nativeMenu(current).then((ready: boolean): void => {if(current() && !ready)this.ports.feedback('发布入口尚未就绪，请关闭后重试');}).finally((): void => {if(current())this.store.publishPreparing = false;});return;
+    }
     this.ports.prepareContext(current).then((ready: boolean): void => {
       if (!current()) return;
       if (ready && this.store.profile?.profileUrl === url && this.ports.documentMatches(url)) {
@@ -110,7 +123,8 @@ export class PinmonyPublishController {
   readMenuWhenReady(url: string, deadline: number, token: number): void {
     const generation: number = this.menuGeneration;
     if (!this.currentMenu(token, url, generation)) return;
-    if (!this.store.profileActionsReady || !this.ports.documentMatches(url)) {
+    if(this.ports.nativeFlow?.() && this.ports.nativeMenu){this.ports.nativeMenu((): boolean => this.currentMenu(token,url,generation));return;}
+    if (!this.store.profileSessionReady || !this.ports.documentMatches(url)) {
       if (Date.now() >= deadline) { this.menuError(token, url, generation); return; }
       this.menuTasks.timeout((): void => this.readMenuWhenReady(url, deadline, token), 150);
       return;
@@ -126,7 +140,10 @@ export class PinmonyPublishController {
     });
   }
 
-  dismissMenu(): void {
+  dismissMenu(restore: boolean = true): void {
+    if(this.ports.nativeFlow?.())this.ports.nativePause?.();
+    if (restore) this.ports.suppressChildBack();
+    if (restore && this.selecting) this.pauseFlow();
     // bindSheet may already have cleared its visibility before dismissal arrives.
     // Always release the logical menu and pending reads as well.
     this.menuGeneration++; this.menuTasks.invalidate(); this.store.publishRequestToken++;
@@ -134,9 +151,9 @@ export class PinmonyPublishController {
     const session: number = this.store.profileSession, url: string = this.store.profileUrl;
     this.ports.setMenuVisible(false);
     this.store.publishLoading = false; this.store.publishOptions = []; this.store.publishTitle = '';
-    this.ports.runScript('window.PinmonyProfilePublishClose && window.PinmonyProfilePublishClose(' +
+    if(!this.ports.nativeFlow?.())this.ports.runScript('window.PinmonyProfilePublishClose && window.PinmonyProfilePublishClose(' +
       session.toString() + ',' + JSON.stringify(url) + ')').catch(() => {});
-    if (!this.store.publishFlow) this.ports.restoreBoard();
+    if (restore && !this.selecting && !this.store.publishFlow) this.ports.restoreBoard();
   }
 
   isCurrent(token: number, page: string): boolean {
@@ -147,7 +164,7 @@ export class PinmonyPublishController {
   async select(id: string): Promise<void> {
     const profile: PinmonyProfileSnapshot | undefined = this.store.profile;
     if (!profile || !this.ports.menuVisible() || !this.ports.authenticated() || !this.ports.foreground() ||
-        this.store.publishFlow || !this.ports.nativeEnabled()) return;
+        this.store.publishFlow || this.selecting || !this.ports.nativeEnabled()) return;
     const option: PinmonyPublishOption | undefined = this.store.publishOptions.find((item: PinmonyPublishOption): boolean => item.id === id && item.enabled);
     if (!option || !['website', 'photo', 'board'].includes(option.kind)) return;
     const page: string = this.ports.currentDocument();
@@ -155,11 +172,27 @@ export class PinmonyPublishController {
     this.pauseFlow();
     const generation: number = this.flowGeneration;
     const token: number = ++this.store.publishFlowToken;
+    this.selecting = true;
+    const closed: Promise<boolean> = this.ports.waitMenuClosed();
+    this.dismissMenu(false);
+    const disappeared: boolean = await closed;
+    this.selecting = false;
+    if (!disappeared || generation !== this.flowGeneration || token !== this.store.publishFlowToken ||
+        !this.ports.authenticated() || !this.ports.foreground() || this.ports.currentDocument() !== page) {
+      this.ports.restoreBoard();
+      return;
+    }
     this.store.publishFlow = { token: token, page: page, profile: profile.profileUrl, kind: option.kind,
       phase: option.kind === 'board' ? 'create' : option.kind === 'photo' ? 'photo' : 'website',
       pins: [], selectedIds: [], boards: [], loading: true, busy: false, error: '', feedback: '', hasMore: false, uncertain: false, completed: 0 };
-    this.dismissMenu(); this.ports.syncMotion();
+    PinmonyRuntimeLog.info('PublishTrace: selected kind=' + option.kind);
+    this.ports.syncMotion();
     try {
+      if(this.ports.nativeFlow?.() && this.ports.nativeOpen){
+        const opened: boolean = await this.ports.nativeOpen();
+        if(opened && this.isCurrent(token,page) && option.kind === 'photo')await this.ports.pickPhotos(token,page);
+        return;
+      }
       const result: string = await this.ports.runScript(this.ports.publishScript() +
         'window.PinmonyPublishApi.open(' + JSON.stringify(profile.profileUrl) + ',' + JSON.stringify(option.kind) + ',' + token.toString() + ')');
       if (generation !== this.flowGeneration || !this.isCurrent(token, page)) return;
@@ -178,7 +211,24 @@ export class PinmonyPublishController {
     }
   }
 
+  async selectSection(): Promise<void> {
+    if (this.selecting || !this.ports.menuVisible() || !this.ports.hasBoardReturn() ||
+        !this.ports.authenticated() || !this.ports.foreground()) return;
+    this.pauseFlow();
+    const generation: number = this.flowGeneration;
+    this.selecting = true;
+    const closed: Promise<boolean> = this.ports.waitMenuClosed();
+    this.dismissMenu(false);
+    const disappeared: boolean = await closed;
+    this.selecting = false;
+    if (!disappeared || generation !== this.flowGeneration || !this.ports.authenticated() || !this.ports.foreground()) {
+      this.ports.restoreBoard(); return;
+    }
+    this.ports.openSection();
+  }
+
   poll(token: number, page: string): void {
+    if(this.ports.nativeFlow?.())return;
     const generation: number = this.flowGeneration;
     if (this.polling || !this.ports.foreground() || !this.isCurrent(token, page)) return;
     this.flowTasks.invalidate(); this.polling = true;
@@ -214,13 +264,15 @@ export class PinmonyPublishController {
   close(force: boolean = false): void {
     const flow: PinmonyPublishFlow | undefined = this.store.publishFlow;
     if (!flow && !this.store.publishPicking || !force && (flow?.busy || this.store.publishPicking)) return;
+    PinmonyRuntimeLog.info('PublishTrace: close force=' + force.toString());
+    if(this.ports.nativeFlow?.())this.ports.nativeClose?.();
     this.pauseFlow(); this.store.publishFlowToken++; this.store.publishFlow = undefined; this.store.publishPicking = false;
     this.ports.suppressChildBack(); this.ports.syncMotion();
-    if (flow && (flow.completed > 0 || flow.uncertain)) {
+    if (flow && (flow.completed > 0 || flow.boardCreated || flow.uncertain || flow.busy)) {
       this.store.profileCache.clear();
       if (!force && !this.ports.hasBoardReturn()) this.ports.refreshProfile();
     }
-    if (flow) this.ports.runScript('window.PinmonyPublishApi && window.PinmonyPublishApi.action(' + flow.token.toString() + ',"close","",false)').catch(() => {});
+    if (flow && !this.ports.nativeFlow?.()) this.ports.runScript('window.PinmonyPublishApi && window.PinmonyPublishApi.action(' + flow.token.toString() + ',"close","",false)').catch(() => {});
     this.ports.restoreBoard();
   }
 
@@ -230,6 +282,7 @@ export class PinmonyPublishController {
     if (action === 'close' || action === 'next' && flow.selectedIds.length === 0) { this.close(); return; }
     if (action === 'pickPhoto') { this.ports.pickPhotos(flow.token, flow.page); return; }
     if (flow.busy || flow.loading || flow.uncertain) return;
+    if(this.ports.nativeFlow?.() && this.ports.nativeAction){this.ports.nativeAction(action,value,secret);return;}
     const token: number = flow.token, page: string = flow.page;
     const write: boolean = ['move', 'create'].includes(action);
     if (write) { flow.busy = true; this.commit(flow); }

@@ -3,6 +3,14 @@ export const PIN_SEARCH_DISCOVERY_API_ENABLED: boolean = true;
 export const PIN_SEARCH_DISCOVERY_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname) || window.PinmonySearchDiscoveryApiEnabled !== true) return;
+  if (window.PinmonyNativeSearchDiscoveryEnabled === true) {
+    window.PinmonySearchDiscoveryApi = {
+      read: function () { return /^\\/search\\/?$/.test(location.pathname) && !new URLSearchParams(location.search).get('q') ?
+        { sections: [], heroes: [], busy: false, active: true, ended: true, error: '' } : null; },
+      isBusy: function () { return false; }, loadMore: function () { return false; }, action: function () { return false; },
+      refresh: function () { return false; }, pause: function () {}, reset: function () {}
+    }; return;
+  }
   var page = '', generation = 0, abort = null, sections = [], heroes = [], targets = {};
   var cursor = '', ended = false, active = false, busy = false, attempted = false, error = '', changed = function () {};
   function key() { return location.origin + location.pathname + location.search; }
@@ -55,10 +63,16 @@ export const PIN_SEARCH_DISCOVERY_API_SCRIPT: string = `
       var next = connection.pageInfo.endCursor;
       cursor = typeof next === 'string' ? next : ''; ended = !connection.pageInfo.hasNextPage || !cursor || cursor === previous;
       sections = mapped; heroes = banners; targets = nextTargets; active = true; busy = false; error = ''; changed();
-    } catch (_) { if (token === generation && requestedPage === key()) { busy = false; error = '搜索发现接口读取失败，请重试'; changed(); } }
+    } catch (failure) { if (token === generation && requestedPage === key()) {
+      busy = false;
+      if (failure && failure.pinmonyCancelled === true) { if (!active) attempted = false; error = ''; }
+      else error = '搜索发现接口读取失败，请重试';
+      changed();
+    } }
     finally { clearTimeout(timer); if (abort === controller) abort = null; }
   }
   window.PinmonySearchDiscoveryApi = {
+    isBusy: function () { return busy; },
     read: function (requestedPage, callback) {
       if (!eligible() || requestedPage !== key()) { if (page) reset(); return null; }
       if (page !== key()) { reset(); page = key(); } changed = callback;
@@ -67,7 +81,7 @@ export const PIN_SEARCH_DISCOVERY_API_SCRIPT: string = `
     },
     loadMore: function () { if (!eligible() || page !== key() || busy || !active || ended) return false; requestPage(true); return true; },
     action: function (id) { if (!eligible() || page !== key() || !targets[id]) return false; location.assign(targets[id]); return true; },
-    refresh: function () { if (!eligible() || page !== key()) return false; if (abort) abort.abort(); generation++; busy = false; requestPage(false); return true; },
+    refresh: function () { if (!eligible() || page !== key()) return false; if (busy) return true; if (abort) abort.abort(); generation++; busy = false; requestPage(false); return true; },
     pause: function () { generation++; if (abort) abort.abort(); abort = null; busy = false; if (!active) attempted = false; }, reset: reset
   };
 })();`;

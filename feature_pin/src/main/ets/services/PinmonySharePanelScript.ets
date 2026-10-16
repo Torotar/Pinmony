@@ -485,6 +485,7 @@ export const SHARE_PANEL_BRIDGE_SCRIPT: string = `
     return true;
   };
   window.PinmonyNativeShareApiOpen = function (pin, profile) {
+    if(window.PinmonyNativeSharePublishEnabled === true)return false;
     if (profile === true || window.PinmonyBoardApi && window.PinmonyBoardApi.shareInfo(pin)) {
       if (!window.PinmonyProfilePanel || panel || opening || closing || apiSharePin || profileSharePage) return false;
       session++; var opened = session; profileSharePage = pin;

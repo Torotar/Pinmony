@@ -8,9 +8,9 @@ interface RelatedPin {
 }
 interface RelatedResource { status: string; data: RelatedPin[]; bookmark?: string; error?: Object; code?: number; }
 interface RelatedResponse { resource_response: RelatedResource; }
-export interface RelatedPresentation { pins: PinmonyRelatedPin[]; ended: boolean; }
+export interface RelatedPresentation { pins: PinmonyRelatedPin[]; ended: boolean; bookmark?: string; }
 
-/** Read-only first-page presentation. Control readiness still belongs to the current bridge. */
+/** Validated native recommendation data. Mutation readiness is separate. */
 export function readRelatedPresentation(body: string, pinUrl: string): RelatedPresentation | undefined {
   if (!/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl) || body.length > 1000000) return undefined;
   try {
@@ -39,6 +39,7 @@ export function readRelatedPresentation(body: string, pinUrl: string): RelatedPr
         imageWidth: selected.width, imageHeight: selected.height, images: images, title: title.trim().slice(0, 160) });
     }
     if (resource.data.length > 0 && pins.length === 0) return undefined;
-    return { pins: pins, ended: !resource.bookmark || resource.bookmark === '-end-' || resource.data.length === 0 };
+    const bookmark: string = typeof resource.bookmark === 'string' && resource.bookmark.length <= 4096 ? resource.bookmark : '';
+    return { pins: pins, bookmark: bookmark, ended: !bookmark || bookmark === '-end-' || resource.data.length === 0 };
   } catch (_) { return undefined; }
 }

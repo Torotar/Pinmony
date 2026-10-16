@@ -1,6 +1,22 @@
 export const PIN_HOME_BRIDGE_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\.com$/.test(location.hostname)) return;
+  if (window.PinmonyNativeHomeReadsEnabled === true) {
+    var nativePaused = false;
+    function nativeContext() {
+      if (nativePaused || document.readyState !== 'complete' || location.pathname !== '/' ||
+          !window.PinmonyNetwork || !window.PinmonyNetwork.isReady()) return;
+      try { var bridge = window.PinmonyShareBridge;
+        if (bridge && bridge.homeState) bridge.homeState(JSON.stringify({ kind: 'context', session: 0,
+          contextEpoch: window.PinmonyNetwork.documentEpoch(), pageKey: location.origin + '/', selectedTab: '', tabs: [], pins: [] }));
+      } catch (_) {}
+    }
+    window.PinmonyHomeDemand = nativeContext;
+    window.PinmonyHomeRefresh = function () { nativePaused = false; nativeContext(); return true; };
+    window.PinmonyHomePause = function () { nativePaused = true; };
+    window.PinmonyHomeResume = function () { nativePaused = false; nativeContext(); };
+    window.addEventListener('load', nativeContext); nativeContext(); return;
+  }
   var documentActive = true, bridgeWarning = false;
   if (window.addEventListener) {
     window.addEventListener('pagehide', function () { documentActive = false; });
@@ -114,7 +130,6 @@ export const PIN_HOME_BRIDGE_SCRIPT: string = `
     if (!target) return false;
     if (selectedId === id) return true;
     resume(); selectedId = id; session++; lastState = '';
-    if (window.PinmonyHomeApi) window.PinmonyHomeApi.reset();
     schedule(0); return true;
   };
   window.PinmonyHomeLoadMore = function (requestedSession, requestedPage) {

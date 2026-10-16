@@ -25,6 +25,14 @@ export const PIN_INBOX_BRIDGE_SCRIPT: string = `
     if (!documentActive || page !== location.href) return false;
     clearTimeout(scheduled); scheduled = 0; sync(); return true;
   };
+  window.PinmonyInboxPoll = function (page, expectedSession, chat) {
+    if (!documentActive || page !== location.href || !current(rootUrl, expectedSession)) return false;
+    if (chat) return window.PinmonyInboxConversations && window.PinmonyInboxConversations.pollChat(expectedSession);
+    var isCurrent = function () { return documentActive && current(rootUrl, expectedSession); };
+    if (section === 'messages' && window.PinmonyInboxConversations) window.PinmonyInboxConversations.read(rootUrl, schedule, isCurrent, true);
+    if (section === 'updates' && window.PinmonyInboxApi) window.PinmonyInboxApi.poll(schedule, isCurrent);
+    return true;
+  };
   function notify(value) {
     if (!documentActive) return;
     var serialized = JSON.stringify(value);
@@ -121,7 +129,7 @@ export const PIN_INBOX_BRIDGE_SCRIPT: string = `
       !conversations || conversations.kind === 'loading';
     var message = {
       kind: pending ? 'apiPending' : apiFailed ? 'apiFailed' : 'state',
-      session: session, pageUrl: page, section: section, dataSource: 'api',
+      session: session, contextEpoch: window.PinmonyNetwork && window.PinmonyNetwork.documentEpoch ? window.PinmonyNetwork.documentEpoch() : -1, pageUrl: page, section: section, dataSource: 'api',
       contactsDataSource: 'api', hasMore: !!(api && api.hasMore),
       moreLoading: !!(api && api.moreLoading), moreError: api ? api.moreError || '' : '',
       apiError: apiFailed ? apiFailure(section, section === 'updates' ? api && api.error : conversations && conversations.error) : '',

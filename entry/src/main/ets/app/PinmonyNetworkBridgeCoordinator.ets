@@ -68,7 +68,7 @@ export class PinmonyNetworkBridgeCoordinator {
   bindNativeNetwork(): void {
     const context: PinmonyNetworkContext = this.nativeNetworkContext();
     if (!context.authenticated) return;
-    try { this.controller.onInactive(); } catch (_) { PinmonyRuntimeLog.warn('WebActivity: update unavailable'); }
+    try { this.controller.onActive(); } catch (_) { PinmonyRuntimeLog.warn('WebActivity: update unavailable'); }
     try { this.controller.runJavaScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(' + (!this.businessSuspended).toString() + ');' +
       'window.PinmonyNetwork && window.PinmonyNetwork.bind(' +
       context.epoch.toString() + ',' + JSON.stringify(context.page) + ');' +
@@ -125,8 +125,12 @@ export class PinmonyNetworkBridgeCoordinator {
             /\/resource\/(RelatedModulesResource|UnifiedCommentsPreviewResource)\/get\//.test(job.url)) {
           this.detailReadCache.store(job, reply);
         }
+        const deliveryAt: number = Date.now();
+        const boardRead: boolean = /\/resource\/(BoardResource|BoardFeedResource)\/get\//.test(job.url);
+        if (boardRead) PinmonyRuntimeLog.info('BoardReadTrace: phase=bridge-start responseMs=' + (deliveryAt - requestAt).toString());
         this.controller.runJavaScript('window.PinmonyNetwork && window.PinmonyNetwork.complete(' + JSON.stringify(reply) + ')')
           .then((state: string) => {
+            if (boardRead) PinmonyRuntimeLog.info('BoardReadTrace: phase=bridge-finish elapsedMs=' + (Date.now() - deliveryAt).toString());
             if (traced && journey && journey === this.detailJourney.current() && state.includes('delivered'))
               this.detailJourney.mark(traced[1] + '.bridge.delivered', false, Date.now() - requestAt);
             if (/^(?:"?)(delivered|no-job|stale)(?:"?)$/.test(state))

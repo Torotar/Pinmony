@@ -173,7 +173,7 @@ export struct PinmonyOrganizePage {
         Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.state.busy)
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
-      Button('创建图板').backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
+      Button('创建图板').width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
         .enabled(!!this.name.trim() && !this.state.busy && !this.state.uncertain)
         .onClick(() => this.act('create', this.name.trim()))
     }.width('100%')

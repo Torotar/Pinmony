@@ -10,14 +10,14 @@ export { PIN_PROFILE_BRIDGE_SCRIPT } from './src/main/ets/services/PinmonyProfil
 export { PinmonyProfileStore } from './src/main/ets/stores/PinmonyProfileStore';
 export { PinmonyPublishController, PinmonyPublishPorts } from './src/main/ets/controllers/PinmonyPublishController';
 
-export { PinmonyProfilePanel } from './src/main/ets/models/PinmonyProfilePanel';
+export { PinmonyProfilePanel, PinmonyProfilePanelItem } from './src/main/ets/models/PinmonyProfilePanel';
 export { PinmonyProfilePanelPage } from './src/main/ets/components/PinmonyProfilePanelPage';
 export { PIN_PROFILE_PANEL_SCRIPT } from './src/main/ets/services/PinmonyProfilePanelScript';
 
 export { PinmonyPublishFlow } from './src/main/ets/models/PinmonyPublishFlow';
 export { PinmonyPublishPage } from './src/main/ets/components/PinmonyPublishPage';
 export { PIN_PUBLISH_API_SCRIPT } from './src/main/ets/services/PinmonyPublishApiScript';
-export { PinmonyPublishPhoto, pickPublishPhotoUris, readPublishPhoto } from './src/main/ets/services/PinmonyPublishPhoto';
+export { PinmonyPublishPhoto, PinmonyProfileAvatarPhoto, pickPublishPhotoUris, readPublishPhoto, readProfileAvatarPhoto } from './src/main/ets/services/PinmonyPublishPhoto';
 
 export { PinmonyProfileReadController, PinmonyProfileReadPorts } from './src/main/ets/controllers/PinmonyProfileReadController';
 

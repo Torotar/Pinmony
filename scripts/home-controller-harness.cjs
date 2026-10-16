@@ -11,7 +11,7 @@ function createHomeRuntime(ts, globals = {}) {
   const Controller = loader.loadFile('feature_home/src/main/ets/controllers/PinmonyHomeController.ets').PinmonyHomeController;
   const Store = loader.loadFile('feature_home/src/main/ets/stores/PinmonyHomeStore.ets').PinmonyHomeStore;
   const cache = loader.loadFile('feature_home/src/main/ets/services/PinmonyHomeCache.ets');
-  function bindIndex(native) {
+  function bindIndex(native, nativeMode = false) {
     native.homeStore ||= new Store();
     for (const [key, value] of Object.entries(new Store())) if (!(key in native.homeStore)) native.homeStore[key] = value;
     const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
@@ -23,7 +23,7 @@ function createHomeRuntime(ts, globals = {}) {
     const binding = ts.transpileModule('function bind() {' + body + '} bind;', {
       compilerOptions: { target: ts.ScriptTarget.ES2021 }
     }).outputText;
-    vm.runInNewContext(binding, { PinmonyHomeController: Controller, PinmonyRuntimeLog: log, ...globals }).call(native);
+    vm.runInNewContext(binding, { PinmonyHomeController: Controller, PinmonyRuntimeLog: log, ...globals, PIN_NATIVE_HOME_READS_ENABLED: nativeMode }).call(native);
     return native.homeController;
   }
   function harness(overrides = {}) {

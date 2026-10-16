@@ -349,6 +349,7 @@ export const PIN_POST_API_SCRIPT: string = `
     sessionUserId: function () { return currentUserId(); },
     reset: function () { cancelContacts(shares); homeMenu = null; routeVersion++; graph = null; siteHeaders = {}; detailReadHandler = ''; nextToken++; shares = null; more = null; comments = null; reaction = null; likeBusy = false; feedbackContext = {}; aggregated = {}; },
     homeMenuOpen: function (session, pin, pageKey) {
+      if(window.PinmonyNativePinMenusEnabled === true)return false;
       if (!Number.isInteger(session) || session < 1 || !pinId(pin) ||
           new URL(pin, location.href).origin !== location.origin || pageKey !== menuPageKey() ||
           !searchMenuPage() && !/^(?:\\/|\\/(?:ideas|today)(?:\\/.*)?|\\/(?:inbox|messages|updates|notifications)\\/?|\\/(?!_|(?:pin|users|search|ideas|today|settings|messages|inbox|login|signup|business|explore)\\/)[^/]+\\/(?!_|(?:followers|following)(?:\\/|$))[^/]+\\/?)$/i.test(location.pathname)) return false;
@@ -402,6 +403,7 @@ export const PIN_POST_API_SCRIPT: string = `
     shareClose: function () { cancelContacts(shares); shares = null; },
     moreClose: function () { more = null; },
     shareSnapshot: function (snapshot, changed) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return snapshot;
       var state = shares;
       if (!state || state.session !== snapshot.session || state.pin !== snapshot.pinUrl) {
         state = shares = { session: snapshot.session, pin: snapshot.pinUrl, changed: changed, token: 0, query: '', items: [], loading: false, feedback: '', contactsError: '', inviteError: '', sending: '', options: [] };
@@ -424,10 +426,12 @@ export const PIN_POST_API_SCRIPT: string = `
       return snapshot;
     },
     shareSearch: function (session, query) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return false;
       if (!shares || shares.session !== session || !current(shares.pin)) return false;
       shares.query = String(query).slice(0, 200); contacts(shares, shares.query.trim()); return true;
     },
     shareRetry: function (session) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return false;
       if (!shares || shares.session !== session || !current(shares.pin)) return false;
       var state = shares; contacts(state, state.query.trim());
       if (state.inviteError) invite(state, '10').then(function (result) {
@@ -438,6 +442,7 @@ export const PIN_POST_API_SCRIPT: string = `
       return true;
     },
     shareAction: function (session, id) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return false;
       var state = shares; if (!state || state.session !== session || !current(state.pin) || state.sending) return false;
       var user = state.items.find(function (item) { return 'api-user:' + item.id === id; });
       var option = state.options.find(function (item) { return item.id === id && item.enabled; });
@@ -517,6 +522,7 @@ export const PIN_POST_API_SCRIPT: string = `
       });
     },
     like: function (pin, changed, failed) {
+      if(window.PinmonyNativePostOperationsEnabled === true)return false;
       var p = raw(pin), state = p && (p.reaction_data || p);
       if (!current(pin) || likeBusy || !p || !p.tracking_params ||
           reaction && reaction.pin === pin && reaction.selected || !state || state.reaction_by_me !== 0) return false;
@@ -541,6 +547,7 @@ export const PIN_POST_API_SCRIPT: string = `
       snapshot.options = more.options; return snapshot;
     },
     detailMoreOpen: function (session, pin) {
+      if(window.PinmonyNativePinMenusEnabled === true)return false;
       if (!Number.isInteger(session) || session < 1 || !pinId(pin) || !current(pin) || !raw(pin)) return false;
       more = { session: session, pin: pin, busy: false };
       return true;
@@ -554,10 +561,13 @@ export const PIN_POST_API_SCRIPT: string = `
         options.push({ id: 'detail-see-less', label: '减少推荐', enabled: true });
         options.push({ id: 'detail-share', label: '分享链接', enabled: true });
       }
-      if (p && Array.isArray(p.ai_disclosures) && p.ai_disclosures.indexOf(1) >= 0)
+      if (p && (Array.isArray(p.ai_disclosures) && p.ai_disclosures.indexOf(1) >= 0 ||
+          Array.isArray(p.gen_ai_topics) && p.gen_ai_topics.some(function (topic) {
+            return topic && typeof topic.name === 'string' && !!topic.name.trim();
+          })))
         options.push({ id: 'detail-ai-help', label: '详细了解 AI 标签', enabled: true });
       var userId = currentUserId();
-      if (window.PinmonyEditApiEnabled && p && p.is_repin === false && p.pinner && userId && String(p.pinner.id) === userId) options.unshift({ id: 'detail-edit', label: '编辑 Pin 图', enabled: true });
+      if (window.PinmonyEditApiEnabled && p && p.pinner && userId && String(p.pinner.id) === userId) options.unshift({ id: 'detail-edit', label: '编辑 Pin 图', enabled: true });
       var snapshot = this.moreSnapshot({ session: session, pin: pin, options: options });
       return { session: session, pin: pin, pinUrl: pin, loading: false, busy: !!more.busy, error: '', options: snapshot.options || [] };
     },
@@ -566,6 +576,7 @@ export const PIN_POST_API_SCRIPT: string = `
       more = null; return true;
     },
     moreAction: function (session, pin, id, changed) {
+      if(window.PinmonyNativePinMenusEnabled === true)return false;
       var thisApi = this;
       var state = more, item = state && state.options.find(function (option) { return option.id === id && option.enabled; });
       if (!item || state.session !== session || state.pin !== pin || !current(pin) || state.busy) return false;

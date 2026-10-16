@@ -3,6 +3,16 @@ export const PIN_INBOX_API_ENABLED: boolean = true;
 export const PIN_INBOX_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname)) return;
+  if (window.PinmonyNativeInboxUpdatesEnabled === true) {
+    var nativeRows = [];
+    window.PinmonyInboxApi = {
+      installNative:function(page,rows){ if(page !== location.origin + location.pathname.replace(/\\/$/,'') + '/' || !Array.isArray(rows) || rows.length > 2000)return false; nativeRows = rows; return true; },
+      read:function(){return {kind:'ready',items:nativeRows,hasMore:false,moreLoading:false,moreError:''};},
+      find:function(id){return nativeRows.find(function(row){return row.id === id;}) || null;},
+      hideConfirmed:function(id){nativeRows = nativeRows.filter(function(row){return row.newsId !== id;});},
+      reset:function(){nativeRows = [];},pause:function(){},poll:function(){return false;},more:function(){return false;}
+    }; return;
+  }
   var key = '', generation = 0, controller = null, state = null;
   var fields = ['board.name','board.id','board.images[170x]','board.image_cover_url',
     'board.image_thumbnail_urls[100x]','board.subscribed_to_notifications','board.type',
@@ -35,7 +45,7 @@ export const PIN_INBOX_API_SCRIPT: string = `
       notificationPinId: obj && obj.type === 'pin' && /^\\d+$/.test(obj.id || '') ? obj.id : '',
       updatedAt: clean(row.last_updated_at), unread: typeof row.unread === 'boolean' ? row.unread : undefined };
   }
-  function request(more, changed, current) {
+  function request(more, changed, current, quiet) {
     var g = generation, page = key, previous = state.bookmark;
     if (more) { state.moreLoading = true; state.moreError = ''; }
     controller = new AbortController();
@@ -57,14 +67,17 @@ export const PIN_INBOX_API_SCRIPT: string = `
       if (!r || r.status !== 'success' || r.code !== undefined && r.code !== 0 || r.error) throw new Error('更新接口业务状态未成功，请重试');
       if (!Array.isArray(r.data) || r.endpoint_name && r.endpoint_name !== 'v3_get_news_hub_feed') throw new Error('更新返回格式无效');
       var rows = r.data.map(function (row) { return map(row, g); });
-      var combined = more ? state.items.concat(rows) : rows;
+      var combined = more ? state.items.concat(rows) : quiet ? rows.concat(state.items) : rows;
       var seen = {};
       state.items = combined.filter(function (row) { if (seen[row.id]) return false; seen[row.id] = true; return true; });
-      state.bookmark = clean(r.bookmark);
-      state.hasMore = !!state.bookmark && state.bookmark !== '-end-' && state.bookmark !== previous;
+      if (!quiet) {
+        state.bookmark = clean(r.bookmark);
+        state.hasMore = !!state.bookmark && state.bookmark !== '-end-' && state.bookmark !== previous;
+      }
       state.kind = 'ready'; state.moreLoading = false; state.moreError = ''; changed();
     }).catch(function (e) {
       if (g !== generation || page !== key || !current()) return;
+      if (quiet) return;
       if (more) { state.moreLoading = false; state.moreError = '加载更多失败，请重试'; }
       else {
         state.kind = 'failed'; state.error = e.name === 'AbortError' ? '更新请求超时，请重试' :
@@ -74,6 +87,10 @@ export const PIN_INBOX_API_SCRIPT: string = `
     }).finally(function () { clearTimeout(timer); if (controller === abort) controller = null; });
   }
   window.PinmonyInboxApi = {
+    poll: function (changed, current) {
+      if (!state || state.kind !== 'ready' || controller || !current()) return false;
+      request(false, changed, current, true); return true;
+    },
     find: function (id) { return state && state.kind === 'ready' ? state.items.find(function (row) { return row.id === id; }) : null; },
     hideConfirmed: function (id) { if (state && state.kind === 'ready') state.items = state.items.filter(function (row) { return row.newsId !== id; }); },
     reset: reset,

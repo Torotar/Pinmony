@@ -11,6 +11,7 @@ function createSearchRuntime(ts, globals = {}) {
   const Store = loader.loadFile('feature_search/src/main/ets/stores/PinmonySearchStore.ets').PinmonySearchStore;
 
   function bindIndex(native) {
+    native.searchNativeReads ||= { eligible: () => false, apply() {}, demand:async()=>{}, pause(){}, reset(){} };
     const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
     const begin = source.indexOf('  private readonly searchController:');
     const end = source.indexOf('\n  private ', begin + 1);

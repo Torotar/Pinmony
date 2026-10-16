@@ -1,5 +1,6 @@
 {
   "color": [
+    { "name": "link_text", "value": "#065BD8" },
     { "name": "recommendation_selection", "value": "#6155E8" },
     {
       "name": "page_background",

@@ -10,6 +10,9 @@ function harness(){
   const settingsStore=new (loader.loadFile('feature_settings/src/main/ets/stores/PinmonySettingsStore.ets').PinmonySettingsStore)();
   const inboxStore=new (loader.loadFile('feature_inbox/src/main/ets/stores/PinmonyInboxStore.ets').PinmonyInboxStore)();
   const n={settingsStore,inboxStore,authStatus:'authenticated',authEpoch:1,businessSuspended:false,activeTab:3,profileSettingsVisible:true,
+    // Legacy action fixture; native reads and write adoption are checked in check-native-inbox-messages.cjs.
+    inboxUpdatesNativeReads:{installScript:()=>''},
+    inboxMessagesNativeReads:{open:async()=>false,action:async()=>false,ownsFlow:()=>false,installScript:()=>''},
     currentProfileUrl:()=>page,profileUrlFromAddress:s=>s,currentInboxUrl:()=>page,webJsonText:s=>s,
     ensureRootActionContext:async()=>true,showMessage:s=>feedback.push(s),
     controller:{getUrl:()=>page,runJavaScript:s=>{calls.push(s);if(s.includes('.close()'))return Promise.resolve('true');return new Promise((resolve,reject)=>pending.push({resolve,reject}));}}};
@@ -45,14 +48,25 @@ function harness(){
   const inbox=harness();inbox.n.activeTab=2;Object.assign(inbox.inboxStore,{inboxActionsReady:true,inboxUrl:inbox.n.currentInboxUrl(),inboxSession:1,inbox:{}});
   const opening=inbox.n.inboxActionsController.open('compose');await flush();await inbox.n.inboxActionsController.open('compose');assert.equal(inbox.pending.length,1);
   inbox.visit('https://www.pinterest.com/search/');inbox.pending.shift().reject(Error('old document'));await opening;assert.equal(inbox.feedback.length,0);
+  const menu=harness();menu.n.activeTab=2;
+  Object.assign(menu.inboxStore,{inboxActionsReady:true,inboxUrl:menu.n.currentInboxUrl(),inboxSession:2,
+    inbox:{items:[{moreId:'news-menu:inbox-news-api-2-synthetic-news'}]}});
+  menu.n.ensureRootActionContext=async()=>{menu.n.authEpoch++;return true;};
+  const reopening=menu.n.inboxActionsController.open('news-menu:inbox-news-api-1-synthetic-news');await flush();
+  assert.equal(menu.pending.length,1,'context preparation may advance document epoch');
+  assert(menu.calls[0].includes('news-menu:inbox-news-api-2-synthetic-news'),'menu uses current-generation row identity');
+  menu.pending.shift().resolve('true');await reopening;
+  await menu.n.inboxActionsController.open('news-menu:inbox-news-api-1-missing');
+  assert.equal(menu.pending.length,0,'removed notification cannot dispatch a stale menu');
   const actions=harness();actions.n.activeTab=2;actions.inboxStore.inboxSession=1;
   actions.inboxStore.inboxFlow={pageUrl:actions.n.currentInboxUrl(),session:1,screen:'chat',conversationId:'synthetic-a',loading:false};
-  const sending=actions.n.inboxActionsController.action('send','hello');await actions.n.inboxActionsController.action('send','hello');assert.equal(actions.pending.length,1);
+  const sending=actions.n.inboxActionsController.action('send','hello');await flush();await actions.n.inboxActionsController.action('send','hello');assert.equal(actions.pending.length,1);
   actions.inboxStore.inboxFlow={...actions.inboxStore.inboxFlow,conversationId:'synthetic-b'};actions.pending.shift().reject(Error('old chat'));await sending;assert.equal(actions.feedback.length,0);
   actions.inboxStore.inboxFlow={...actions.inboxStore.inboxFlow,sending:true};await actions.n.inboxActionsController.action('send','hello');assert.equal(actions.pending.length,0);
-  const back=actions.n.inboxActionsController.action('back');actions.pending.shift().resolve('true');await back;
-  actions.inboxStore.inboxFlow={...actions.inboxStore.inboxFlow,screen:'compose',loading:true,sending:false};
-  const first=actions.n.inboxActionsController.action('search','old'),second=actions.n.inboxActionsController.action('search','new');
+  const back=actions.n.inboxActionsController.action('back');await flush();actions.pending.shift().resolve('true');await back;
+  assert.equal(actions.inboxStore.inboxFlow,undefined,'chat back closes native state immediately');
+  actions.inboxStore.inboxFlow={pageUrl:actions.n.currentInboxUrl(),session:1,screen:'compose',loading:true,sending:false};
+  const first=actions.n.inboxActionsController.action('search','old'),second=actions.n.inboxActionsController.action('search','new');await flush();
   actions.pending.shift().reject(Error('old query'));actions.pending.shift().resolve('true');await Promise.all([first,second]);assert.equal(actions.feedback.length,0);
   const task=actions.n.coordinatorTasks,waiting=task.wait(1000);task.timeout(()=>{throw Error('late work');},1000);task.invalidate();
   assert.equal(await waiting,false);assert.equal(actions.timers.size,0);

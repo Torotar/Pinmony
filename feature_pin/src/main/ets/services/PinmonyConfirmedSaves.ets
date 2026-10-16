@@ -13,6 +13,7 @@ export class PinmonyConfirmedSaves {
     else if (/^\d+$/.test(copyId) && copyId !== identity) this.copies.set(identity, copyId);
   }
   copyId(identity: string): string { return this.copies.get(identity) || ''; }
+  known(identity: string): boolean { return this.states.has(identity); }
   isSaved(identity: string): boolean {
     return this.states.get(identity) === true;
   }

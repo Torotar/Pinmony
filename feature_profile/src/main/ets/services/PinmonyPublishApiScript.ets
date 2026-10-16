@@ -2,6 +2,7 @@
 export const PIN_PUBLISH_API_SCRIPT: string = String.raw`
 (function () {
   if (window !== window.top || !/^https:[/][/](?:www|uk)\.pinterest\.com$/.test(location.origin) || window.PinmonyPublishApi) return;
+  if(window.PinmonyNativeSharePublishEnabled === true)return;
   var state = null, pendingWrite = false;
   function clean(v, n) { return typeof v === 'string' ? v.trim().slice(0, n || 2000) : ''; }
   function web(v) { try { var u = new URL(v); return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href : ''; } catch (_) { return ''; } }

@@ -3,6 +3,9 @@ import { PinmonySearchCache } from '../services/PinmonySearchCache';
 
 @Observed
 export class PinmonySearchStore {
+  searchNativeReadsReady: boolean = false;
+  searchNativeInputReady: boolean = false;
+  searchDiscoveryReadsReady: boolean = false;
   onNavigationChange: (() => void) | undefined = undefined;
   private _search: PinmonySearchSnapshot | undefined = undefined;
   get search(): PinmonySearchSnapshot | undefined { return this._search; }
@@ -17,6 +20,14 @@ export class PinmonySearchStore {
   searchFilterLoading: boolean = false;
   searchFilterError: string = '';
   searchFilterToken: number = 0;
+  searchProductDomains: PinmonySearchFilterOption[] = [];
+  searchProductCurrency: string = '';
+  searchProductPrices: boolean = false;
+  searchProductLower: number = 0;
+  searchProductUpper: number = 0;
+  searchProductMin: string = '';
+  searchProductMax: string = '';
+  searchProductError: string = '';
   searchInputFocused: boolean = false;
   searchInputStopEditing: (() => void) | undefined = undefined;
   searchRequestToken: number = 0;

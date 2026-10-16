@@ -4,8 +4,8 @@ export const PIN_PROFILE_ORGANIZE_SCRIPT: string = `
 (function () {
   var api = window.PinmonyProfileApi;
   if (!api || window.PinmonyProfileOrganizeEnabled !== true) return;
-  var state = null, pendingWrite = false, originalReset = api.reset;
-  api.reset = function () { state = null; originalReset(); };
+  var state = null, retainedPins = null, pendingWrite = false, originalReset = api.reset;
+  api.reset = function () { state = null; retainedPins = null; originalReset(); };
   var originalSuspend = api.suspend;
   api.suspend = function () {
     if (state && (state.loading || state.organize)) state = null;
@@ -68,8 +68,10 @@ export const PIN_PROFILE_ORGANIZE_SCRIPT: string = `
       var mapped = p.resource_response.data.map(function (pin) { return mapPin(pin, s); });
       if (mapped.some(function (pin) { return !pin; })) throw new Error('未整理 Pin 身份或图片无效');
       s.pins = merge(append ? s.pins.slice() : [], mapped); s.bookmark = cursor(p);
+      s.readAt = Date.now();
+      s.loaded = true;
       s.hasMore = !!s.bookmark && s.bookmark !== '-end-' && s.bookmark !== previous && mapped.length > 0;
-    } catch (e) { if (valid(s)) s.error = clean(e.message) || '未整理 Pin 读取失败，请重试'; }
+    } catch (e) { if (valid(s)) s.error = e && e.pinmonyCancelled === true ? '' : clean(e.message) || '未整理 Pin 读取失败，请重试'; }
     finally { if (valid(s)) { s.loading = false; changed(s); } }
   }
   async function loadBoards(s, append) {
@@ -89,18 +91,32 @@ export const PIN_PROFILE_ORGANIZE_SCRIPT: string = `
     finally { if (valid(s) && s.organize === o) { o.loading = false; changed(s); } }
   }
   api.readUnorganized = function (profile, section, notify, current) {
-    if (section !== 'saved') { state = null; return null; }
+    if(window.PinmonyNativeProfileSettingsEnabled === true)return null;
+    if (section !== 'saved') {
+      if (state && state.loaded && !state.loading && !state.error && !state.organize && !pendingWrite) retainedPins = state;
+      state = null; return null;
+    }
     var user = api.read(profile, notify, current).info;
-    if (!user || user.isOwn !== true || !/^\\d+$/.test(user.userId || '')) { state = null; return null; }
+    if (!user || user.isOwn !== true || !/^\\d+$/.test(user.userId || '')) { state = null; retainedPins = null; return null; }
     if (!state || state.profile !== profile || state.userId !== user.userId) {
-      state = { profile: profile, userId: user.userId, username: user.handle, changed: notify, current: current,
-        pins: [], loading: false, error: '', bookmark: '', hasMore: false, feedback: '', organize: null };
-      loadPins(state, false);
+      if (retainedPins && retainedPins.profile === profile && retainedPins.userId === user.userId &&
+          Date.now() - retainedPins.readAt < 300000) {
+        state = retainedPins; retainedPins = null;
+      } else {
+        retainedPins = null;
+        state = { profile: profile, userId: user.userId, username: user.handle, changed: notify, current: current,
+          pins: [], loading: false, error: '', bookmark: '', hasMore: false, feedback: '', organize: null, readAt: 0, loaded: false };
+        var native = api.nativeUnorganized && api.nativeUnorganized();
+        if (native) { state.pins = native.pins.slice(); state.bookmark = native.bookmark; state.hasMore = native.hasMore; state.error = native.error; state.loaded = true; state.readAt = Date.now(); }
+        else loadPins(state, false);
+      }
     }
     state.changed = notify; state.current = current;
+    if (!state.loaded && !state.loading && !state.error) loadPins(state, false);
     return state;
   };
   api.organizeAction = function (action, value, secret) {
+    if(window.PinmonyNativeProfileSettingsEnabled === true)return false;
     var s = state, o = s && s.organize;
     if (!s || !valid(s)) return false;
     if (action === 'morePins' || action === 'retryPins') { if (!o || !o.busy) loadPins(s, action === 'morePins' || !!s.pins.length); return true; }

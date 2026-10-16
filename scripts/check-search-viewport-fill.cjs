@@ -7,7 +7,7 @@ function method(name) {
 }
 const timers = [], logs = [];
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
-  ['fillInitialViewport', 'resultsReachEnd', 'resultsAreaChanged'].map(method).join('\n') + '} Host;',
+  ['fillInitialViewport', 'resultsReachEnd', 'resultsAreaChanged', 'resultsVisible'].map(method).join('\n') + '} Host;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
   { setTimeout: fn => timers.push(fn), PinmonyRuntimeLog: { info: value => logs.push(value) } });
 function harness(atEnd, offset = 0) {
@@ -21,6 +21,16 @@ function harness(atEnd, offset = 0) {
   return { h, calls: () => calls };
 }
 const flush = () => timers.splice(0).forEach(fn => fn());
+const ahead = harness(false, 120);
+ahead.h.committedQuery = () => 'test'; ahead.h.upcomingImageUrls = []; ahead.h.lastPrefetchResultCount = -1;
+ahead.h.snapshot.results = Array.from({length:20}, (_, index) => ({imageUrl:'https://i.pinimg.com/'+index+'.jpg'}));
+ahead.h.resultsVisible(0,5); assert.equal(ahead.calls(),0); assert.equal(ahead.h.upcomingImageUrls.length,8);
+ahead.h.resultsVisible(10,15); assert.equal(ahead.calls(),1,'next page starts before the last card');
+ahead.h.resultsVisible(10,15); assert.equal(ahead.calls(),1,'visible callbacks do not repeat the same prefetch');
+ahead.h.snapshot.results.push({imageUrl:'next'}); ahead.h.snapshot.apiBusy=true;
+ahead.h.resultsVisible(12,18); assert.equal(ahead.calls(),1,'busy read cannot start another page');
+ahead.h.snapshot.apiBusy=false; ahead.h.automaticLoadingEnabled=false;
+ahead.h.resultsVisible(12,18); assert.equal(ahead.calls(),1,'hidden search cannot prefetch');
 const full = harness(false); full.h.fillInitialViewport(); flush();
 assert.equal(full.calls(), 0, 'three results that fill the viewport must not fetch three extra pages');
 const short = harness(true); short.h.fillInitialViewport(); short.h.resultsReachEnd(); flush();

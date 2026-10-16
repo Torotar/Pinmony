@@ -85,7 +85,9 @@ export class PinmonyBoardCollaboratorsController {
       }).catch((): void => {
         const state: PinmonyBoardCollaborators | undefined = this.ports.state();
         if (state && this.current(token, generation)) {
-          state.error = '合作用户状态读取失败，请返回重新查看'; state.loading = false;
+          if(state.busy){state.busy = false;state.uncertain = true;state.error = '操作结果未确认，请关闭后重新查看，勿重复提交';}
+          else state.error = '合作用户状态读取失败，请返回重新查看';
+          state.loading = false;
           this.ports.setState(state);
         }
       }).finally((): void => { if (generation === this.generation) this.polling = false; });

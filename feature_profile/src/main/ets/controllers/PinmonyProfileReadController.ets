@@ -42,6 +42,7 @@ export class PinmonyProfileReadController {
     this.store.profileUrl = url;
     this.store.profileScrollOffset = entry.scrollOffset;
     this.store.profileActionsReady = false;
+    this.store.profileSessionReady = false;
     this.store.profileLoading = false;
     this.store.profileError = '';
     return true;
@@ -91,6 +92,7 @@ export class PinmonyProfileReadController {
         this.store.profileSession = message.session;
         this.store.profileUrl = message.profileUrl;
         this.store.profileActionsReady = false;
+        this.store.profileSessionReady = false;
         if (!this.restore(message.profileUrl + (message.section === 'created' ? '_created/' : ''))) {
           this.store.profile = undefined;
         }
@@ -112,6 +114,7 @@ export class PinmonyProfileReadController {
     this.loadingTasks.invalidate();
           this.store.profile = undefined;
           this.store.profileSession = message.session;
+          this.store.profileSessionReady = false;
           this.store.profileUrl = message.profileUrl;
           this.store.profileLoading = false;
           this.store.profileError = '无法读取当前 Pinterest 资料页';
@@ -159,6 +162,8 @@ export class PinmonyProfileReadController {
         kind: 'state', session: message.session, profileUrl: message.profileUrl, section: message.section,
         displayName: message.displayName || '', handle: message.handle || '',
         avatarUrl: message.avatarUrl || '', followers: message.followers || '',
+        monthlyViews: typeof message.monthlyViews === 'number' && Number.isSafeInteger(message.monthlyViews) &&
+          message.monthlyViews >= 0 ? message.monthlyViews : undefined,
         following: message.following || '', actions: actions,
         business: message.business === true, isOwn: message.isOwn, about: typeof message.about === 'string' ? message.about.slice(0, 2000) : '',
         website: typeof message.website === 'string' && /^https?:\/\//.test(message.website) ? message.website.slice(0, 2000) : '',
@@ -173,6 +178,7 @@ export class PinmonyProfileReadController {
         unorganizedFeedback: message.unorganizedFeedback || '', organize: message.organize || undefined
       };
       this.store.profileActionsReady = !retainingContent;
+      this.store.profileSessionReady = message.kind === 'state';
       if (this.store.profileActionsReady && this.store.origins.length === 0) this.ports.recordAddress(
         message.profileUrl + (message.section === 'created' ? '_created/' : ''));
       if (message.contentLoading !== true || !!message.contentError) this.finishPull();
@@ -193,11 +199,11 @@ export class PinmonyProfileReadController {
     const generation: number = this.generation;
     if (this.ports.rootOnly() && this.ports.prepareRead()) return;
     if (this.store.profilePullRefreshing) return;
-    if (pull && (!this.store.profile || this.store.profileSwitching ||
-        !this.store.profileActionsReady && !this.store.profileError && !this.store.profile.contentError)) return;
+    if (pull && (!this.store.profile || this.store.profileSwitching)) return;
     if (pull && this.store.profile) this.store.profileCache.put(this.store.profile, this.store.profileScrollOffset);
     else this.store.profileCache.clear();
     this.store.profileActionsReady = false;
+    this.store.profileSessionReady = false;
     this.store.profileError = '';
     if (!this.ports.currentProfile()) {
       this.ports.requestRead();

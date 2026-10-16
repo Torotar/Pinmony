@@ -6,12 +6,28 @@ export interface PinmonyBoardPin {
   imageHeight: number;
   title: string;
   cancelled?: boolean;
+  creatorName?: string;
+  duration?: string;
 }
 
 export interface PinmonyBoardDetail {
+  nativeAccountGeneration?: number;
+  nativeWriteIntent?: number;
+  nativeVersion?: number;
+  nativeRecoveryVersion?: number;
+  nativeReadsReady?: boolean;
   flow?: PinmonyBoardFlow;
+  following?: boolean;
+  followBusy?: boolean;
+  canFollow?: boolean;
   editable?: boolean;
   featured?: boolean;
+  featuredCreator?: boolean;
+  sponsored?: boolean;
+  ownerVerified?: boolean;
+  sectionCount?: number;
+  sections?: PinmonyBoardSection[];
+  sectionsError?: string;
   subtitle?: string;
   description?: string;
   headerImage?: string;
@@ -50,7 +66,11 @@ export interface PinmonyBoardTarget {
 }
 
 export interface PinmonyBoardFlow {
+  targetBoardId?: string;
+  targetSections?: PinmonyBoardSection[];
   phase: string;
+  sectionId?: string;
+  sectionTitle?: string;
   loading: boolean;
   busy: boolean;
   uncertain: boolean;
@@ -67,3 +87,5 @@ export interface PinmonyBoardFlow {
 }
 
 export interface PinmonyBoardChatPeer { id: string; name: string; avatar: string; username: string; }
+
+export interface PinmonyBoardSection { id: string; title: string; pinCount?: number; images: string[]; pins?: PinmonyBoardPin[]; }

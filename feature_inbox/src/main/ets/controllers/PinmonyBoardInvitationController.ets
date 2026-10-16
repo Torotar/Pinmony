@@ -3,6 +3,10 @@ import { PinmonyInboxStore } from '../stores/PinmonyInboxStore';
 import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
 
 export interface PinmonyBoardInvitationPorts {
+  nativeEnabled?: () => boolean;
+  nativeOpen?: (preview: boolean) => Promise<void>;
+  nativePause?: () => void;
+  nativeAccept?: () => Promise<void>;
   authenticated: () => boolean;
   foreground: () => boolean;
   page: () => string;
@@ -22,7 +26,7 @@ export class PinmonyBoardInvitationController {
   private reading: boolean = false;
   private previewMode: boolean = false;
   constructor(store: PinmonyInboxStore, ports: PinmonyBoardInvitationPorts) { this.store = store; this.ports = ports; }
-  pause(): void { this.generation++; this.tasks.invalidate(); this.reading = false; }
+  pause(): void { this.ports.nativePause?.(); this.generation++; this.tasks.invalidate(); this.reading = false; }
   clearPreview(): void {
     this.pause(); this.store.boardInvitationToken++; this.store.boardInvitationPreview = undefined;
     this.store.invitationReadPage = ''; this.store.invitationBannerVisible = false;
@@ -40,6 +44,7 @@ export class PinmonyBoardInvitationController {
       this.ports.authenticated() && this.ports.foreground() && page === this.ports.page();
   }
   async open(preview: boolean = false): Promise<void> {
+    if(this.ports.nativeEnabled?.()){await this.ports.nativeOpen?.(preview);return;}
     if (!this.ports.authenticated() || !this.ports.foreground() || (preview && !this.store.boardInvitationPreview)) return;
     this.pause(); this.previewMode = preview;
     const token: number = ++this.store.boardInvitationToken;
@@ -54,6 +59,7 @@ export class PinmonyBoardInvitationController {
     } catch (_) { if (this.current(token, page, generation)) this.fail(preview, '图板邀请读取失败'); }
   }
   resume(): void {
+    if(this.ports.nativeEnabled?.()){if(this.store.invitationReadPage === this.ports.page())this.ports.nativeOpen?.(!!this.store.boardInvitationPreview);return;}
     if (this.store.invitationReadPage && this.store.invitationReadPage === this.ports.page()) this.poll(this.store.boardInvitationToken, this.previewMode);
   }
   private validItem(item: PinmonyBoardInvitation): boolean {
@@ -72,6 +78,7 @@ export class PinmonyBoardInvitationController {
     }
   }
   poll(token: number, preview: boolean): void {
+    if(this.ports.nativeEnabled?.())return;
     const page: string = this.store.invitationReadPage, generation: number = this.generation;
     if (this.reading || !this.current(token, page, generation)) return;
     this.tasks.invalidate(); this.reading = true;
@@ -103,6 +110,7 @@ export class PinmonyBoardInvitationController {
       .finally((): void => { if (generation === this.generation) this.reading = false; });
   }
   accept(): void {
+    if(this.ports.nativeEnabled?.()){this.ports.nativeAccept?.();return;}
     const token: number = this.store.boardInvitationToken, page: string = this.store.invitationReadPage;
     if (!this.current(token, page, this.generation) || this.store.invitationBusy || !this.store.invitationBannerVisible ||
         this.store.boardInvitationPreview?.status !== 'new' || this.store.boardInvitationPreview.boardUrl !== page) return;

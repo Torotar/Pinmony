@@ -1,6 +1,7 @@
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyProfilePanel';
+import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyProfilePanelPage {
   @Prop @Watch('syncUsername') snapshot: PinmonyProfilePanel;
@@ -34,6 +35,7 @@ export struct PinmonyProfilePanelPage {
   onSection?: (section: string) => void;
   onSave?: (input: string) => void;
   onFollow?: (id: string) => void;
+  onLoadMore?: () => void;
   onAvatar?: () => void;
   @Prop followingBusy: boolean = false;
   private readonly paths: NavPathStack = new NavPathStack();
@@ -47,7 +49,7 @@ export struct PinmonyProfilePanelPage {
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.snapshot.mode === 'edit' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),
-          label: '完成', isEnabled: !this.saving && !this.snapshot.loading, action: () => { if (!this.saving && this.onSave) this.onSave(JSON.stringify({ firstName: this.firstNameDraft, lastName: this.lastNameDraft, about: this.aboutDraft, websiteUrl: this.websiteDraft, username: this.usernameDraft })); } } }] : [] } } };
+          label: '完成', isEnabled: !this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy, action: () => { if (!this.saving && !this.snapshot.avatarBusy && this.onSave) this.onSave(JSON.stringify({ firstName: this.firstNameDraft, lastName: this.lastNameDraft, about: this.aboutDraft, websiteUrl: this.websiteDraft, username: this.usernameDraft })); } } }] : [] } } };
   }
   @Builder
   private field(label: string, value: string, placeholder: string = '') {
@@ -81,8 +83,8 @@ export struct PinmonyProfilePanelPage {
           if (!this.snapshot.loading && this.snapshot.error) { Text(this.snapshot.error).fontColor($r('app.color.secondary_text')) }
           else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
             if (this.snapshot.avatarPreview || this.snapshot.avatar) { Image(this.snapshot.avatarPreview || this.snapshot.avatar).width(120).height(120).borderRadius(60) }
-            Button('更改').height(40).fontSize(16).fontColor($r('app.color.primary_text'))
-              .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving).onClick(() => { if (!this.saving && this.onAvatar) this.onAvatar(); })
+            Button(this.snapshot.avatarBusy ? '处理中…' : this.snapshot.avatarAction === 'refresh' ? '刷新头像' : this.snapshot.avatarAction === 'check' ? '检查结果' : '更改').height(40).fontSize(16).fontColor($r('app.color.primary_text'))
+              .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
             if (this.snapshot.avatarError) { Text(this.snapshot.avatarError).fontSize(13).fontColor($r('app.color.secondary_text')) }
             this.field('名字', this.firstNameDraft)
             this.field('姓氏', this.lastNameDraft)
@@ -121,22 +123,28 @@ export struct PinmonyProfilePanelPage {
                   Text(item.name).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
                     .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
                   Text((item.pinCount || '') + (item.updated ? ' · ' + item.updated : '')).fontSize(13).fontColor($r('app.color.secondary_text'))
-                  Button('关注中').fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted')).onClick(() => {})
+                  Button(item.following ? '关注中' : '关注').fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
+                    .enabled(!this.followingBusy && item.canFollow === true).onClick(() => { if(this.onFollow)this.onFollow(item.id); })
                 }.width('48%').margin({ bottom: 24 }).alignItems(HorizontalAlign.Start)
               }, (item: PinmonyProfilePanelItem) => item.id)
               }.width('100%')
             } else {
             ForEach(this.snapshot.items, (item: PinmonyProfilePanelItem) => {
               Row({ space: 16 }) {
-                if (item.avatar) { Image(item.avatar).width(48).height(48).borderRadius(24)
-                  .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); }) }
+                PinmonyUserAvatar({ image: item.avatar || '', name: item.name, avatarSize: 48 })
+                  .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
                 Text(item.name).layoutWeight(1).fontColor($r('app.color.primary_text'))
                 Button(item.following ? '关注中' : '关注').enabled(!this.followingBusy && item.canFollow !== false).onClick(() => { if (this.onFollow) this.onFollow(item.id); })
               }.width('100%')
             }, (item: PinmonyProfilePanelItem) => item.id)
             }
           }
-          if (this.snapshot.hasMore) { Text('已显示首批粉丝，后续分页尚未接入').fontColor($r('app.color.secondary_text')) }
+          if (this.snapshot.mode === 'followers' && this.snapshot.hasMore) {
+            Button(this.snapshot.moreLoading ? '加载中…' : this.snapshot.moreError ? '重试加载粉丝' : '加载更多粉丝')
+              .enabled(!this.snapshot.moreLoading && !this.followingBusy && !this.saving)
+              .onClick(() => { if(this.onLoadMore)this.onLoadMore(); })
+          }
+          if (this.snapshot.moreError) { Text(this.snapshot.moreError).fontColor($r('app.color.secondary_text')) }
         }.width('100%').padding({ left: 24, right: 24, top: this.snapshot.mode === 'following' ? 0 : 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').height('100%').align(Alignment.Top)
       if (this.snapshot.loading) {

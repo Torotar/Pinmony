@@ -7,14 +7,15 @@ const { PinmonyPublishController } = require('./publish-controller-harness.cjs')
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function harness() {
   let auth = true, foreground = true, visible = false, document = 'synthetic-profile', prepared;
-  let refreshes = 0, returns = 0, photos = 0;
+  let refreshes = 0, returns = 0, photos = 0, suppressed = 0, sections = 0, boardReturn = false, closeSheet;
   const reads = [], writes = [], messages = [], scripts = [];
   const store = { profile: { profileUrl: document, session: 2 }, profileSession: 2, profileUrl: document,
-    publishRequestToken: 0, publishFlowToken: 0, publishOptions: [], profileActionsReady: true,
+    publishRequestToken: 0, publishFlowToken: 0, publishOptions: [], profileActionsReady: true, profileSessionReady: true,
     profileCache: { clear() { store.cleared = true; } } };
   const controller = new PinmonyPublishController(store, {
     authenticated: () => auth, foreground: () => foreground, activeProfileTab: () => true,
     menuVisible: () => visible, sheetAvailable: () => !visible, setMenuVisible: value => { visible = value; },
+    waitMenuClosed: () => new Promise(resolve => { closeSheet = resolve; }),
     profileAddress: () => 'synthetic-profile', documentMatches: profile => document === profile,
     currentDocument: () => document, normalizeProfile: address => address,
     prepareContext: () => new Promise(resolve => { prepared = resolve; }), nativeEnabled: () => true,
@@ -23,29 +24,37 @@ function harness() {
       if (script.includes('PinmonyPublishApi.read')) return new Promise((resolve, reject) => reads.push({ resolve, reject }));
       if (script.includes('PinmonyPublishApi.action') && !script.includes('"close"')) return new Promise((resolve, reject) => writes.push({ resolve, reject }));
       return Promise.resolve('true');
-    }, jsonText: value => value, captureBoardReturn() {}, hasBoardReturn: () => false,
-    restoreBoard: () => returns++, syncMotion() {}, suppressChildBack() {}, refreshProfile: () => refreshes++,
+    }, jsonText: value => value, captureBoardReturn() {}, hasBoardReturn: () => boardReturn,
+    openSection() { sections++; },
+    restoreBoard: () => returns++, syncMotion() {}, suppressChildBack() { suppressed++; }, refreshProfile: () => refreshes++,
     pickPhotos: async () => { photos++; }, feedback: value => messages.push(value), traceEntry() {}
   });
   return { controller, store, reads, writes, messages, scripts, ready: value => prepared(value),
     auth: value => { auth = value; }, foreground: value => { foreground = value; }, document: value => { document = value; },
     hideSheet: () => { visible = false; },
+    disappear: value => closeSheet(value),
     flow() { store.publishFlowToken = 3; store.publishFlow = { token: 3, page: document, profile: 'synthetic-profile', kind: 'website',
       phase: 'website', pins: [], boards: [], selectedIds: [], loading: false, busy: false, uncertain: false, completed: 0 }; },
     reply(extra = {}) { return JSON.stringify({ ...store.publishFlow, ...extra }); },
-    refreshes: () => refreshes, returns: () => returns, photos: () => photos
+    refreshes: () => refreshes, returns: () => returns, photos: () => photos, suppressed: () => suppressed,
+    boardReturn: value => { boardReturn = value; }, sections: () => sections
   };
 }
 (async () => {
   const hidden = harness(); hidden.controller.openMenu(); hidden.hideSheet(); hidden.controller.dismissMenu();
   assert.equal(hidden.store.publishLoading, false);
   assert.equal(hidden.store.publishPreparing, false);
+  assert.equal(hidden.suppressed(), 1, 'dismissal consumes the child back event');
   hidden.ready(true); await flush();
   assert(!hidden.scripts.some(script => script.includes('PublishDiscover')), 'dismissed hidden sheet cannot dispatch');
   hidden.controller.openMenu(); assert.equal(hidden.store.publishLoading, true, 'hidden sheet cleanup allows reopening');
   hidden.controller.dismissMenu(); hidden.ready(true); await flush();
   const menu = harness(); menu.controller.openMenu(); menu.controller.openMenu();
   assert.equal(menu.store.publishRequestToken, 1); menu.controller.dismissMenu(); menu.ready(true); await flush();
+  const independentMenu = harness(); independentMenu.store.profileActionsReady = false;
+  independentMenu.controller.openMenu(); independentMenu.ready(true); await flush();
+  assert(independentMenu.scripts.some(script => script.includes('PublishDiscover')), 'confirmed session opens menu without waiting for retained list');
+  independentMenu.controller.dismissMenu();
   assert(!menu.scripts.some(script => script.includes('PublishDiscover')), 'closed preparation cannot dispatch discovery');
   const failed = harness(); failed.controller.openMenu(); failed.ready(false); await flush();
   assert.equal(failed.store.publishLoading, false); assert.equal(failed.messages.length, 1);
@@ -76,8 +85,45 @@ function harness() {
   invalid.controller.close();
   const photo = harness(); photo.controller.openMenu(); photo.ready(true); await flush();
   photo.store.publishOptions = [{ id: 'synthetic', kind: 'photo', enabled: true }];
-  await photo.controller.select('synthetic'); assert.equal(photo.photos(), 1); assert.equal(photo.reads.length, 1);
+  const selectingPhoto = photo.controller.select('synthetic');
+  assert.equal(photo.store.publishFlow, undefined, 'child cannot mount under a closing sheet');
+  assert.equal(photo.photos(), 0, 'system picker waits for sheet disappearance');
+  await photo.controller.select('synthetic');
+  photo.disappear(true); await selectingPhoto;
+  assert.equal(photo.photos(), 1); assert.equal(photo.reads.length, 1);
   photo.controller.close(true); photo.reads[0].resolve('{}'); await flush(); assert.equal(timers.size, 0);
+  for (const kind of ['website', 'board']) {
+    const child = harness(); child.controller.openMenu(); child.ready(true); await flush();
+    child.store.publishOptions = [{ id: kind, kind, enabled: true }];
+    const selected = child.controller.select(kind);
+    assert.equal(child.store.publishFlow, undefined);
+    assert.equal(child.returns(), 0, 'selection must not navigate back while closing menu');
+    child.disappear(true); await selected;
+    assert.equal(child.store.publishFlow.kind, kind);
+    child.controller.close(true); child.reads[0].resolve('{}'); await flush();
+  }
+  const cancelledChild = harness(); cancelledChild.controller.openMenu(); cancelledChild.ready(true); await flush();
+  cancelledChild.store.publishOptions = [{ id: 'website', kind: 'website', enabled: true }];
+  const cancelledSelection = cancelledChild.controller.select('website');
+  cancelledChild.controller.dismissMenu(); cancelledChild.disappear(true); await cancelledSelection;
+  assert.equal(cancelledChild.store.publishFlow, undefined, 'back during closing cancels deferred child');
+  assert(!cancelledChild.scripts.some(script => script.includes('PinmonyPublishApi.open')));
+  const stuck = harness(); stuck.controller.openMenu(); stuck.ready(true); await flush();
+  stuck.store.publishOptions = [{ id: 'board', kind: 'board', enabled: true }];
+  const stuckSelection = stuck.controller.select('board'); stuck.disappear(false); await stuckSelection;
+  assert.equal(stuck.store.publishFlow, undefined, 'missing disappearance cannot open a child');
+  assert.equal(stuck.returns(), 1);
+  const section = harness(); section.boardReturn(true); section.controller.openMenu(); section.ready(true); await flush();
+  const enteringSection = section.controller.selectSection();
+  assert.equal(section.sections(), 0, 'section waits for old menu disappearance');
+  assert.equal(section.returns(), 0, 'section retains its board until closing');
+  section.disappear(true); await enteringSection;
+  assert.equal(section.sections(), 1);
+  assert(!section.scripts.some(script => script.includes('PinmonyPublishApi.open')), 'unconnected section cannot dispatch publish');
+  const cancelledSection = harness(); cancelledSection.boardReturn(true); cancelledSection.controller.openMenu(); cancelledSection.ready(true); await flush();
+  const pendingSection = cancelledSection.controller.selectSection();
+  cancelledSection.controller.dismissMenu(); cancelledSection.disappear(true); await pendingSection;
+  assert.equal(cancelledSection.sections(), 0, 'back cancels deferred section');
   const route = harness(); route.flow(); route.controller.poll(3, 'synthetic-profile'); route.document('other');
   route.reads[0].resolve(route.reply({ phase: 'done', completed: 1 })); await flush(); assert(route.store.publishFlow);
   assert.equal(route.messages.length, 0); route.controller.pause();

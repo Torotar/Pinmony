@@ -1,6 +1,7 @@
 export const PIN_BOARD_INVITATION_SCRIPT: string = String.raw`
 (function () {
   if (window !== window.top || !/(^|\.)pinterest\.com$/i.test(location.hostname)) return;
+  if(window.PinmonyNativeInboxUpdatesEnabled === true)return;
   var state = null, epoch = 0;
   function valid(s) { return state === s && s.epoch === epoch && s.page === location.href.split('#')[0]; }
   function id(value) { return /^\d{1,30}$/.test(String(value || '')); }

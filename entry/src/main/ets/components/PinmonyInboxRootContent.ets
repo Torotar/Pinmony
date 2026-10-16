@@ -30,11 +30,11 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
           if ((view.inboxStore.inbox || view.inboxStore.inboxLoading || view.inboxStore.inboxError) && !view.inboxStore.inboxWebFlow &&
               !view.pinStore.detail && !view.activeSheetKind && !view.loadFailed) {
             PinmonyInboxPage({ onUser: (url: string) => view.openUserProfile(url),
-              interactionReady: view.activeTab === 2 && view.authStatus === 'authenticated',
+              interactionReady: view.activeTab === 2 && view.authStatus === 'authenticated' && !view.inboxStore.inboxFlow,
               onScrollAvailability: (scrollable: boolean) => view.updateInboxScrollAvailability(scrollable),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               snapshot: view.inboxStore.inbox || view.inboxPlaceholder(),
-              actionsReady: view.activeTab === 2 && view.inboxStore.inboxActionsReady &&
+              actionsReady: view.activeTab === 2 && (view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady) &&
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),
               sectionReady: view.activeTab === 2 && view.inboxStore.inboxSectionReady &&
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),
@@ -46,7 +46,7 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
                 if (!view.inboxStore.inbox || view.inboxStore.inbox.pageUrl !== url || view.inboxStore.inbox.section !== section ||
                     view.currentInboxUrl() !== url) return;
                 view.inboxStore.inboxScrollOffset = offset;
-                if (view.inboxStore.inboxActionsReady && !view.inboxStore.inboxLoading && !view.inboxStore.inboxError) view.inboxStore.inboxCache.put(view.inboxStore.inbox, offset);
+                if ((view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady) && !view.inboxStore.inboxLoading && !view.inboxStore.inboxError) view.inboxStore.inboxCache.put(view.inboxStore.inbox, offset);
               },
               loading: view.inboxStore.inboxLoading,
               error: view.inboxStore.inboxError,
@@ -62,7 +62,7 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
             .width('100%')
             .height('100%')
             .visibility(view.activeTab === 2 ? Visibility.Visible : Visibility.Hidden)
-            .hitTestBehavior(view.activeTab === 2 ? HitTestMode.Default : HitTestMode.None)
+            .hitTestBehavior(view.activeTab === 2 && !view.inboxStore.inboxFlow ? HitTestMode.Default : HitTestMode.None)
           }
 
 

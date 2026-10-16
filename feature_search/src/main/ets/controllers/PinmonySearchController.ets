@@ -98,6 +98,12 @@ export class PinmonySearchController {
   }
 
   clearSearch(): void {
+    if (this.ports.nativeSearch?.()) { this.cancelTimers(); this.ports.finishPull(); this.searchStore.searchActionsReady = false; this.searchStore.searchInputReady = false; this.ports.nativeDiscoveryApply?.(); this.ports.nativeSearchApply?.(); return; }
+    if (this.ports.nativeDiscovery?.()) {
+      this.cancelTimers(); this.ports.finishPull();
+      this.searchStore.searchActionsReady = false; this.searchStore.searchInputReady = false;
+      this.ports.nativeDiscoveryApply?.(); return;
+    }
     // A document reset may be part of the current user intent's context preparation.
     // Cancel old business timers without superseding that product intent.
     this.cancelTimers();
@@ -144,8 +150,11 @@ export class PinmonySearchController {
     this.searchStore.searchReturnPageKey = '';
   }
 
-  searchPlaceholder(): PinmonySearchSnapshot {
-    return { kind: 'loading', session: 0, pageKey: this.ports.currentPageKey(), query: '',
+  searchPlaceholder(pageKey: string = this.ports.currentPageKey()): PinmonySearchSnapshot {
+    let query: string = '';
+    const match: RegExpMatchArray | null = pageKey.match(/[?&]q=([^&#]*)/);
+    try { query = match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : ''; } catch (_) {}
+    return { kind: 'loading', session: 0, pageKey: pageKey, query: query,
       placeholder: '', selectedCategory: '', categories: [], suggestions: [], heroes: [],
       ideaSections: [], results: [] };
   }
@@ -175,6 +184,11 @@ export class PinmonySearchController {
   }
 
   async openSearchFilters(): Promise<void> {
+    if (this.ports.nativeSearch?.()) {
+      if (!this.searchStore.searchNativeReadsReady || !this.searchStore.search?.query.trim() || this.ports.sheetKind()) return;
+      if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing(); this.searchStore.searchInputFocused = false;
+      this.searchStore.searchFilterToken++; this.searchStore.searchFilterOptions = []; this.ports.setFilterVisible(true); await this.ports.nativeSearchFilters?.(); return;
+    }
     this.ports.traceAction('search.filters');
     const generation: number = this.generation;
     if (!await this.ports.ensureContext(true) || generation !== this.generation) {
@@ -209,7 +223,6 @@ export class PinmonySearchController {
         this.searchStore.searchFilterError = '无法读取当前 Pinterest 页面的筛选入口';
         return;
       }
-      await this.pause(280);
       await this.refreshSearchFilters(token);
     } catch (error) {
       if (token !== this.searchStore.searchFilterToken) return;
@@ -254,7 +267,7 @@ export class PinmonySearchController {
       PinmonyRuntimeLog.info('SearchFilter: options received count=' + this.searchStore.searchFilterOptions.length.toString());
       this.searchStore.searchFilterError = snapshot && snapshot.error ? snapshot.error :
         this.searchStore.searchFilterOptions.length ? '' : PIN_SEARCH_UI_API_ENABLED ?
-          '筛选接口返回空列表，请重试' : '当前网页没有可用的筛选选项';
+          snapshot?.status === 'empty' ? '当前搜索没有可用的筛选选项' : '筛选接口返回空列表，请重试' : '当前网页没有可用的筛选选项';
     } catch (error) {
       if (token !== this.searchStore.searchFilterToken) return;
       this.searchStore.searchFilterError = '筛选选项读取失败，请重试';
@@ -263,6 +276,7 @@ export class PinmonySearchController {
   }
 
   async retrySearchFilters(): Promise<void> {
+    if (this.ports.nativeSearch?.()) { if(this.ports.sheetKind() === 'searchFilter' && !this.searchStore.searchFilterLoading) await this.ports.nativeSearchFilters?.(); return; }
     if (this.ports.sheetKind() !== 'searchFilter' || this.searchStore.searchFilterLoading) return;
     const token: number = ++this.searchStore.searchFilterToken;
     this.searchStore.searchFilterLoading = true;
@@ -276,7 +290,6 @@ export class PinmonySearchController {
         this.searchStore.searchFilterLoading = false;
         return;
       }
-      await this.pause(280);
       await this.refreshSearchFilters(token);
     } catch (error) {
       if (token === this.searchStore.searchFilterToken) {
@@ -287,6 +300,16 @@ export class PinmonySearchController {
   }
 
   async selectSearchFilter(id: string): Promise<void> {
+    if (this.ports.nativeSearch?.()) {
+      if (this.ports.sheetKind() !== 'searchFilter' || this.searchStore.searchFilterLoading) return;
+      const target: string = this.ports.nativeSearchFilterTarget?.(id) || '';
+      if (target) {
+        const source: string = this.ports.currentPageKey();
+        if (this.ports.navigateFilterAfterClose) this.ports.navigateFilterAfterClose(target, source);
+        else { this.dismissSearchFilters(); this.ports.navigateSearch(target, source); }
+      }
+      return;
+    }
     this.ports.traceAction('search.filter', id);
     const token: number = this.searchStore.searchFilterToken;
     if (this.ports.sheetKind() !== 'searchFilter' || this.searchStore.searchFilterLoading ||
@@ -317,14 +340,17 @@ export class PinmonySearchController {
     if (this.ports.sheetKind() !== 'searchFilter') return;
     const script: string = this.searchFilterScript('PinmonySearchCloseFilters');
     this.searchStore.searchFilterToken++;
+    if (this.ports.nativeSearch?.()) this.ports.nativeSearchCancelFilters?.();
     this.ports.setFilterVisible(false);
     this.searchStore.searchFilterLoading = false;
     this.searchStore.searchFilterError = '';
     this.searchStore.searchFilterOptions = [];
-    this.ports.runScript(script).catch(() => PinmonyRuntimeLog.warn('Pinmony: could not close web search filters'));
+    if (!this.ports.nativeSearch?.()) this.ports.runScript(script).catch(() => PinmonyRuntimeLog.warn('Pinmony: could not close web search filters'));
   }
 
   expectSearch(): void {
+    if (this.ports.nativeSearch?.() && /[?&]q=/.test(this.ports.currentPageKey())) { this.ports.nativeSearchDemand?.(); return; }
+    if (this.ports.nativeDiscovery?.()) { this.ports.nativeDiscoveryDemand?.(); return; }
     const pageKey: string = this.ports.currentPageKey();
     if (!pageKey) return;
     const token: number = ++this.searchStore.searchRequestToken;
@@ -338,6 +364,9 @@ export class PinmonySearchController {
   }
 
   updateSearch(value: string): void {
+    if (this.ports.nativeSearch?.()) {
+      this.ports.nativeDiscoveryApply?.(); this.ports.nativeSearchApply?.(); return;
+    }
     try {
       const message: PinmonySearchSnapshot = JSON.parse(value) as PinmonySearchSnapshot;
       if (!message || typeof message.session !== 'number' || typeof message.pageKey !== 'string') return;
@@ -444,19 +473,24 @@ export class PinmonySearchController {
       }
       const retainingApiResults: boolean = message.api === true && !!previousSearch &&
         previousSearch.pageKey === message.pageKey && previousSearch.query === (message.query || '') &&
-        !this.searchStore.searchResultsResetPending && (message.kind === 'loading' || message.apiBusy === true || !!message.apiError);
-      const sameSearchContext: boolean = (!message.api || retainingApiResults) && !this.searchStore.searchResultsResetPending && !!previousSearch &&
+        (message.kind === 'loading' || message.apiBusy === true || !!message.apiError);
+      const sameSearchContext: boolean =
+        (results.length > 0 || retainingApiResults) && !!previousSearch &&
         previousSearch.pageKey === message.pageKey && previousSearch.query === (message.query || '') &&
         (!message.selectedCategory || !previousSearch.selectedCategory ||
           previousSearch.selectedCategory === message.selectedCategory);
       results = mergeSearchFeedResults(sameSearchContext && previousSearch ? previousSearch.results : [], results);
       const preservedSearchResults: boolean = sameSearchContext && results.length > 0;
       const sameDiscoverySession: boolean = !message.query && !!previousSearch &&
-        (message.discoveryBusy === true || !!message.discoveryError || message.discoveryActive !== true) &&
+        (heroes.length > 0 || ideaSections.length > 0 || message.discoveryBusy === true ||
+          !!message.discoveryError || message.discoveryActive !== true) &&
         previousSearch.pageKey === message.pageKey &&
         !previousSearch.query;
       if (sameDiscoverySession && previousSearch) {
-        if (heroes.length === 0) heroes = previousSearch.heroes;
+        heroes = previousSearch.heroes.map((hero: PinmonySearchHero): PinmonySearchHero =>
+          heroes.find((incoming: PinmonySearchHero): boolean => incoming.targetUrl === hero.targetUrl) || hero)
+          .concat(heroes.filter((hero: PinmonySearchHero): boolean =>
+            !previousSearch.heroes.some((previous: PinmonySearchHero): boolean => previous.targetUrl === hero.targetUrl)));
         ideaSections = this.mergeSearchIdeaSections(previousSearch.ideaSections, ideaSections);
       }
       const preservedDiscovery: boolean = sameDiscoverySession && !!previousSearch &&
@@ -507,17 +541,18 @@ export class PinmonySearchController {
       }
     } catch (error) {
       PinmonyRuntimeLog.warn('Pinmony: invalid search state');
-    }
+    } finally { this.ports.nativeDiscoveryApply?.(); this.ports.nativeSearchApply?.(); }
   }
 
   async updateSearchQuery(value: string, refreshSuggestions: boolean = false): Promise<void> {
+    if (this.ports.nativeSearch?.()) { this.ports.markInteracted(); await this.ports.nativeSearchInput?.(value,refreshSuggestions); return; }
     if (refreshSuggestions) PinmonyRuntimeLog.info("SearchInputTrace: panel-open refresh=true");
     if (value.trim()) this.searchStore.searchQueryClearPage = '';
     const intent: number = ++this.searchStore.searchIntentToken;
-    if (!await this.ports.ensureContext(false) || intent !== this.searchStore.searchIntentToken) return;
+    if (!(this.ports.nativeSearch?.() || await this.ports.ensureContext(false)) || intent !== this.searchStore.searchIntentToken) return;
     const token: number = ++this.searchStore.searchQueryToken;
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
-    if (!search || !(this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
+    if (!search || !(this.searchStore.searchNativeInputReady || this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
     this.ports.markInteracted();
     try {
       const result: string = await this.ports.runScript('window.PinmonySearchQuery && ' +
@@ -542,12 +577,13 @@ export class PinmonySearchController {
     this.searchStore.searchQueryClearPage = '';
     const intent: number = ++this.searchStore.searchIntentToken;
     this.searchStore.searchQueryToken++;
-    if (!await this.ports.ensureContext(false) || intent !== this.searchStore.searchIntentToken) return;
+    if (!(this.ports.nativeSearch?.() || await this.ports.ensureContext(false)) || intent !== this.searchStore.searchIntentToken) return;
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
-    if (!search || !(this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
+    if (!search || !(this.searchStore.searchNativeInputReady || this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
     if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();
     this.searchStore.searchInputFocused = false; this.searchStore.searchInputStopEditing = undefined;
     this.ports.clearTabGuard('search-submit');
+    this.searchStore.searchCache.put(search,this.searchStore.searchScrollOffset);
     this.searchStore.retainedSearch = undefined;
     this.searchStore.searchResultsResetPending = true;
     this.searchStore.searchScrollOffset = 0;
@@ -571,7 +607,20 @@ export class PinmonySearchController {
     this.ports.traceAction('search.action.' + kind, id);
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
     if (!search || !id || !this.ports.isActive()) return;
+    if (kind === 'clearProductFilter') {
+      if (this.ports.nativeSearch?.() && search.results.length === 0 && !this.searchStore.searchLoading && !this.searchStore.searchError) this.ports.nativeSearchClearProductFilter?.(id);
+      return;
+    }
+    if (kind === 'followUser') {
+      if (this.ports.nativeSearch?.()) await this.ports.nativeSearchFollowUser?.(id);
+      return;
+    }
+    if (kind === 'followBoard') {
+      if (this.ports.nativeSearch?.()) await this.ports.nativeSearchFollowBoard?.(id);
+      return;
+    }
     if (kind === 'deleteHistory') {
+      if(this.ports.nativeSearch?.()){await this.ports.nativeSearchDeleteHistory?.(id);return;}
       const generation: number = this.generation;
       if (!this.searchStore.searchInputReady && !this.searchStore.searchActionsReady) return;
       const item: PinmonySearchSuggestion | undefined = search.suggestions.find((value: PinmonySearchSuggestion): boolean => value.id === id && value.deletable === true && value.deleting !== true);
@@ -721,6 +770,8 @@ export class PinmonySearchController {
   }
 
   loadMoreSearch(): void {
+    if (this.ports.nativeSearch?.() && /[?&]q=/.test(this.ports.currentPageKey())) { this.ports.nativeSearchMore?.(); return; }
+    if (this.ports.nativeDiscovery?.() && !this.searchStore.search?.query) { this.ports.nativeDiscoveryMore?.(); return; }
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
     if (!search || !this.searchStore.searchActionsReady || this.searchStore.searchLoading || search.pageKey !== this.ports.currentPageKey()) return;
     this.ports.runScript('window.PinmonySearchLoadMore && ' +
@@ -729,6 +780,8 @@ export class PinmonySearchController {
   }
 
   async refreshSearch(): Promise<void> {
+    if (this.ports.nativeSearch?.() && /[?&]q=/.test(this.ports.currentPageKey())) { await this.ports.nativeSearchRefresh?.(); this.ports.finishPull(); return; }
+    if (this.ports.nativeDiscovery?.()) { await this.ports.nativeDiscoveryRefresh?.(); this.ports.finishPull(); return; }
     const generation: number = this.generation;
     if (this.ports.prepareRead()) return;
     this.searchStore.retainedSearch = undefined;

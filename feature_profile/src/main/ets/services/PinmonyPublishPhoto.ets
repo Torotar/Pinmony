@@ -5,13 +5,13 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 
 export interface PinmonyPublishPhoto { uri: string; data: string; }
 
-export async function pickPublishPhotoUris(): Promise<string[]> {
+export async function pickPublishPhotoUris(maxCount: number = 10): Promise<string[]> {
   try {
   const options: photoAccessHelper.PhotoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
   options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
-  options.maxSelectNumber = 10;
+  options.maxSelectNumber = Math.max(1, Math.min(10, maxCount));
   const result: photoAccessHelper.PhotoSelectResult = await new photoAccessHelper.PhotoViewPicker().select(options);
-  return result.photoUris.slice(0, 10);
+  return result.photoUris.slice(0, options.maxSelectNumber);
   } catch (_) { throw new Error('无法选择照片，请重试'); }
 }
 
@@ -42,4 +42,15 @@ export async function readPublishPhoto(uri: string): Promise<PinmonyPublishPhoto
     PinmonyRuntimeLog.warn('PublishPhoto: read failed');
     throw error as Error;
   }
+}
+
+export interface PinmonyProfileAvatarPhoto { data: string; bytes: ArrayBuffer; mime: string; }
+export async function readProfileAvatarPhoto(uri: string): Promise<PinmonyProfileAvatarPhoto> {
+  const photo: PinmonyPublishPhoto = await readPublishPhoto(uri);
+  const comma: number = photo.data.indexOf(',');
+  const mime: string = photo.data.slice(5, photo.data.indexOf(';'));
+  const decoded: Uint8Array = new util.Base64Helper().decodeSync(photo.data.slice(comma + 1));
+  const bytes: ArrayBuffer = new ArrayBuffer(decoded.length);
+  new Uint8Array(bytes).set(decoded);
+  return { data: photo.data, bytes: bytes, mime: mime };
 }

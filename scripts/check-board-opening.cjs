@@ -11,11 +11,13 @@ function method(name) {
   const end = source.indexOf('\n  private ', start + 1);
   return source.slice(start, end);
 }
-const names = ['nativeDisplayAddress', 'boardUrlFromAddress', 'currentBoardUrl', 'syncBoardRoute', 'nativeBoardVisible', 'openProfileBoard', 'backFromBoard', 'pinIdentity', 'isCurrentBoardMenuPin', 'openBoardPinMore', 'shareCurrentBoard'];
+const names = ['nativeDisplayAddress', 'boardUrlFromAddress', 'currentBoardUrl', 'syncBoardRoute', 'nativeBoardVisible', 'openProfileBoard', 'backFromBoard', 'commitNativeSearchReturn', 'pinIdentity', 'isCurrentBoardMenuPin', 'openBoardPinMore', 'shareCurrentBoard'];
 const code = ts.transpileModule('class Native {' + names.map(method).join('\n') + '} globalThis.Native = Native;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
 const timers = [], context = { PIN_BOARD_API_ENABLED: true, PIN_POST_API_ENABLED: true, setTimeout: fn => timers.push(fn),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
+context.boardVisiblePins = require('./product-coordination-harness.cjs').runtime(ts).loadFile(
+  'feature_board/src/main/ets/services/PinmonyBoardPresentation.ets').boardVisiblePins;
 require('./product-coordination-harness.cjs').run(ts,code, context);
 const from = 'https://www.pinterest.com/sample/_saved/', target = 'https://www.pinterest.com/sample/board/';
 function harness(destination = target, failNavigation = false) {
@@ -27,6 +29,8 @@ function harness(destination = target, failNavigation = false) {
     loadFailed: false,
     authStatus: 'authenticated', activeTab: 3, tabRequestToken: 0, rootTabAddresses: new Map(),
     clearRootTabGuard() { },
+    boardNativeReads: {pause(){}}, returnCoordinator: {cancel(){}}, tabsController: {changeIndex(){}}, syncFloatingTabsMotion(){}, selectNativeRootTab(){}, shouldKeepSearchRootMounted:()=>true, nativeSearchPageVisible:()=>true,
+    searchUrlFromAddress: () => '',
     cancelledBoardPins: new Set(),
     backOnePage: (fallback, override) => backTargets.push(override || fallback),
     pageHistory: { key: url => url.split(/[?#]/)[0], visit() { }, cancelBack() { } }, controller: { getUrl: () => address, loadUrl: url => {
@@ -57,6 +61,7 @@ function harness(destination = target, failNavigation = false) {
   const loadUrl = native.controller.loadUrl;
   native.controller.loadUrl = url => url === from ? navigations.push(url) : loadUrl(url);
   require('./board-state-controller-harness.cjs').bind(native, ts, { setTimeout: () => 0, clearTimeout() {} });
+  require('./return-coordinator-harness.cjs').bind(native, ts, { setTimeout: () => 0, clearTimeout() {} });
   const r = require('./return-coordinator-harness.cjs').runtime(ts);
   const { PinmonyBoardInvitationController } = r.compile('feature_inbox/src/main/ets/controllers/PinmonyBoardInvitationController.ets', () => r.foundation);
   native.inboxStore.boardInvitationToken = 0;
@@ -131,6 +136,20 @@ async function main() {
     returned.native.syncBoardRoute('https://www.pinterest.com/sample/other/'); returned.native.backFromBoard();
     assert.equal(returned.backTargets.at(-1), 'generic-history', 'another board cannot reuse the stored origin');
   }
+  const searchBack = harness(target), searchPage = 'https://www.pinterest.com/search/';
+  const restored = [];
+  searchBack.native.boardStore.boardDetail = {pageKey: target};
+  searchBack.native.boardStore.boardReturnUrl = searchPage;
+  searchBack.native.boardStore.boardReturnPage = target;
+  searchBack.native.searchUrlFromAddress = url => url === searchPage ? url : '';
+  searchBack.native.presentNativeBackTarget = url => restored.push(url);
+  searchBack.native.searchDiscoveryNativeReads = {demand() {assert.equal(searchBack.native.boardStore.boardDetail, undefined); restored.push('discovery');}};
+  searchBack.native.searchNativeReads = {demand() {restored.push('results');}};
+  searchBack.navigate(target); searchBack.native.backFromBoard();
+  assert.deepEqual(restored, [searchPage, 'discovery', 'results']);
+  assert.equal(searchBack.native.nativeBackTarget, '');
+  assert.equal(searchBack.native.pendingWebTab, -1);
+  assert.equal(searchBack.backTargets.length, 0, 'native search return does not wait on hidden Web history');
   console.log('Board opening handoff checks passed');
   const nested = harness(); nested.native.boardStore.boardDetail = { flow: { phase: 'targets', busy: false } };
   nested.native.backFromBoard(); assert.equal(nested.native.lastBoardAction, 'select');

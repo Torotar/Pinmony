@@ -1,5 +1,6 @@
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyBoardCollaborators, PinmonyBoardCollaborator } from '../models/PinmonyBoardCollaborators';
 
 @Component
@@ -45,8 +46,7 @@ export struct PinmonyBoardCollaboratorsPage {
   }
   @Builder private userRow(user: PinmonyBoardCollaborator, invite: boolean) {
     Row({ space: 12 }) {
-      if (user.avatar) { Image(user.avatar).width(44).height(44).borderRadius(22) }
-      else { Image($r('app.media.lucide_user_round')).width(44).height(44).padding(10).borderRadius(22).backgroundColor($r('app.color.surface_muted')) }
+      PinmonyUserAvatar({ image: user.avatar, name: user.name || user.username, avatarSize: 44 })
       Column({ space: 2 }) {
         Text(user.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
         if (invite) { Text(user.username).fontSize(13).fontColor($r('app.color.secondary_text')) }
@@ -80,12 +80,12 @@ export struct PinmonyBoardCollaboratorsPage {
                     SymbolGlyph($r('sys.symbol.chevron_right')).fontColor([$r('app.color.primary_text')])
                   }.width('100%').enabled(this.snapshot.owner !== false).onClick(() => { this.allowInvites = this.snapshot.invites; this.selectedPermission = this.snapshot.permission; this.onAction('permissions', ''); })
                   Text('添加、移动或删除 Pin 图和图板区块，进行评论并作出回应').fontSize(15).fontColor($r('app.color.secondary_text'))
-                  ForEach(this.snapshot.users, (user: PinmonyBoardCollaborator) => { this.userRow(user, false) }, (user: PinmonyBoardCollaborator) => user.id)
+                  ForEach(this.snapshot.users, (user: PinmonyBoardCollaborator) => { this.userRow(user, false) }, (user: PinmonyBoardCollaborator) => user.id + ':' + user.status)
                 } else if (this.snapshot.phase === 'invite') {
                   Search({ value: this.query, placeholder: '按姓名或用户名搜索' }).onChange((value: string) => { this.query = value; })
                   ForEach(this.snapshot.suggestions.filter((user: PinmonyBoardCollaborator): boolean =>
                     (user.name + ' ' + user.username).toLowerCase().includes(this.query.trim().toLowerCase())),
-                    (user: PinmonyBoardCollaborator) => { this.userRow(user, true) }, (user: PinmonyBoardCollaborator) => user.id)
+                    (user: PinmonyBoardCollaborator) => { this.userRow(user, true) }, (user: PinmonyBoardCollaborator) => user.id + ':' + user.status)
                   if (!this.snapshot.suggestions.length) { Text('暂无可邀请的用户').fontColor($r('app.color.secondary_text')) }
                 } else {
                   Text('权限').fontColor($r('app.color.secondary_text'))
@@ -106,10 +106,11 @@ export struct PinmonyBoardCollaboratorsPage {
             Button('＋ 邀请合作用户').width('100%').height(56).backgroundColor($r('app.color.surface_muted'))
               .fontColor($r('app.color.primary_text')).onClick(() => { this.query = ''; this.onAction('invite', ''); })
           }
-        }.width('100%').height('100%')
+        }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
       }.titleBar(this.titleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
         .onBackPressed(() => { this.back(); return true; })
-        .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+      .backgroundColor($r('app.color.page_background'))
   }
   build() {
     HdsNavigation(this.stack) {}

@@ -6,6 +6,15 @@ import { PinmonyDetailSnapshot } from '../models/PinmonyDetail';
 import { PIN_POST_API_ENABLED } from '../services/PinmonyPostApiScript';
 
 export interface PinmonySharePanelsControllerPorts {
+  nativeMenu?: () => boolean;
+  nativeMoreOpen?: () => Promise<void>;
+  nativeMoreAction?: (id: string) => Promise<void>;
+  nativeMenuPause?: () => void;
+  nativeShare?: () => boolean;
+  nativeSearch?: (value: string) => void;
+  nativeRefresh?: () => Promise<void>;
+  nativeAction?: (id: string) => Promise<void>;
+  nativePause?: () => void;
   copyText: (value: string) => Promise<void>;
   currentProfileUrl: () => string;
   profileTitle: () => string;
@@ -52,6 +61,8 @@ export class PinmonySharePanelsController {
   private readonly ports: PinmonySharePanelsControllerPorts;
   constructor(store: PinmonyPinStore, ports: PinmonySharePanelsControllerPorts) { this.store = store; this.ports = ports; }
   pause(): void {
+    if(this.ports.nativeMenu?.())this.ports.nativeMenuPause?.();
+    if(this.ports.nativeShare?.())this.ports.nativePause?.();
     this.searchTasks.invalidate(); this.lastSearchKey = '';
     this.generation++; this.searchToken++; this.refreshToken++; this.refreshing = false; this.tasks.invalidate();
     if (this.ports.activeSheetKind() === 'share' && this.store.shareLoading) {
@@ -70,6 +81,7 @@ export class PinmonySharePanelsController {
   }
 
   updateShareSheet(value: string): void {
+    if(this.ports.nativeShare?.())return;
     if (!this.ports.foreground()) return;
     if (this.ports.customMenu()) return;
     try {
@@ -204,6 +216,7 @@ export class PinmonySharePanelsController {
 
 
   updateMoreSheet(value: string): void {
+    if(this.ports.nativeMenu?.())return;
     if (!this.ports.foreground()) return;
     if (this.ports.customMenu() || this.store.moreApiMode) return;
     try {
@@ -280,6 +293,7 @@ export class PinmonySharePanelsController {
 
 
   async openApiDetailMore(): Promise<void> {
+    if(this.ports.nativeMenu?.()){await this.ports.nativeMoreOpen?.();return;}
     if (!this.ports.foreground()) return;
     const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
     if (!detail || !this.store.detailActionsReady || !this.ports.isCurrentMorePin(detail.pinUrl)) return;
@@ -318,6 +332,7 @@ export class PinmonySharePanelsController {
 
 
   scheduleShareWebOpen(): void {
+    if(this.ports.nativeShare?.())return;
     if (this.store.shareOnPinDetail) return;
     const session: number = this.store.shareSession;
     if (!session || this.store.shareOpenRequestedSession === session ||
@@ -346,6 +361,7 @@ export class PinmonySharePanelsController {
 
   async searchShareContacts(value: string): Promise<void> {
     if (!this.ports.foreground() || this.ports.activeSheetKind() !== 'share' || this.ports.rejectOfflineAction('share contact search')) return;
+    if(this.ports.nativeShare?.()){this.ports.nativeSearch?.(value);return;}
     this.store.shareQuery = value;
     const session: number = this.store.shareSession;
     if (!session) {
@@ -378,6 +394,7 @@ export class PinmonySharePanelsController {
 
 
   async refreshShareSheet(): Promise<void> {
+    if(this.ports.nativeShare?.()){await this.ports.nativeRefresh?.();return;}
     if (this.refreshing || !this.ports.foreground() || this.ports.activeSheetKind() !== 'share' || this.ports.rejectOfflineAction('share refresh')) return;
     this.store.shareSnackKey = '';
     const session: number = this.store.shareSession;
@@ -408,6 +425,7 @@ export class PinmonySharePanelsController {
 
 
   async performMoreAction(id: string): Promise<void> {
+    if(this.ports.nativeMenu?.()){if(!this.ports.rejectOfflineAction('more.action'))await this.ports.nativeMoreAction?.(id);return;}
     const capturedSession: number = this.store.moreSession, capturedPin: string = this.store.morePin;
     const page: string = this.ports.document(), generation: number = this.generation;
     const current = (): boolean => this.current(capturedSession, capturedPin, page, generation, 'more');
@@ -445,6 +463,7 @@ export class PinmonySharePanelsController {
   }
 
   async refreshMoreSheet(): Promise<void> {
+    if(this.ports.nativeMenu?.()){if(!this.ports.rejectOfflineAction('more.refresh'))await this.ports.nativeMoreOpen?.();return;}
     const capturedSession: number = this.store.moreSession, capturedPin: string = this.store.morePin;
     const page: string = this.ports.document(), generation: number = this.generation;
     const current = (): boolean => this.current(capturedSession, capturedPin, page, generation, 'more');
@@ -482,6 +501,7 @@ export class PinmonySharePanelsController {
   }
 
   async performShareAction(id: string): Promise<void> {
+    if(this.ports.nativeShare?.()){if(!this.ports.rejectOfflineAction('share action'))await this.ports.nativeAction?.(id);return;}
     const capturedSession: number = this.store.shareSession, capturedPin: string = this.store.sharePin;
     const page: string = this.ports.document(), generation: number = this.generation;
     const current = (): boolean => this.current(capturedSession, capturedPin, page, generation, 'share');

@@ -1,5 +1,5 @@
 export { PinmonyInboxItem, PinmonyInboxSnapshot } from './src/main/ets/models/PinmonyInbox';
-export { InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from './src/main/ets/models/PinmonyInboxFlow';
+export { InboxFlowBoard, InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from './src/main/ets/models/PinmonyInboxFlow';
 export { PinmonyInboxPage } from './src/main/ets/components/PinmonyInboxPage';
 export { PinmonyInboxFlowPage } from './src/main/ets/components/PinmonyInboxFlowPage';
 export { PIN_INBOX_API_ENABLED, PIN_INBOX_API_SCRIPT } from './src/main/ets/services/PinmonyInboxApiScript';

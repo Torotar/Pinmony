@@ -12,6 +12,7 @@ import { PinmonyNavigationHistory } from './PinmonyNavigationHistory';
 const PINTEREST_URL: string = 'https://www.pinterest.com/';
 
 export interface PinmonyWebLifecycleCoordinatorPorts {
+  nativeBusinessOnly?: () => boolean;
   navigationBegun: (url: string) => void;
   activeSheetKind: () => string;
   setActiveSheetKind: (value: string) => string;
@@ -142,6 +143,12 @@ controllerAttached(): void {
 }
 
 pageBegin(url: string): void {
+    if(this.ports.nativeBusinessOnly?.() && this.ports.authStatus() === 'authenticated' && !isPinterestAuthRoute(url)){
+      try {if(this.ports.controller().getUrl().split('#')[0] !== url.split('#')[0])return;}catch (_) {return;}
+      if(this.ports.lastDocumentBeginUrl() === url && Date.now() - this.ports.lastDocumentBeginAt() < 1500 && this.ports.webPageLoading())return;
+      this.ports.setLastDocumentBeginUrl(url);this.ports.setLastDocumentBeginAt(Date.now());this.ports.setAuthEpoch(this.ports.authEpoch() + 1);this.ports.nativeNetwork().invalidateDocument();this.ports.setWebPageLoading(true);
+      PinmonyRuntimeLog.info('NativeRouteTrace: background document changed authOnly=true');return;
+    }
     this.ports.navigationBegun(url);
     if (this.ports.ignoreSupersededDetailDocument(url))
         return;
@@ -151,7 +158,7 @@ pageBegin(url: string): void {
         try {
             if (this.ports.pageHistory().key(url) === this.ports.pageHistory().key(this.ports.controller().getUrl())) {
                 this.ports.setAuthEpoch(this.ports.authEpoch() + 1);
-                this.ports.nativeNetwork().invalidate();
+                this.ports.nativeNetwork().invalidateDocument();
                 this.homeStore.homeActionsReady = false;
                 this.searchStore.searchActionsReady = false;
                 this.searchStore.searchInputReady = false;
@@ -237,7 +244,7 @@ pageBegin(url: string): void {
     this.ports.setAuthEpoch(this.ports.authEpoch() + 1);
     this.ports.setRetainedHomeAwaitingAuth(false);
     this.ports.setRetainedHomeAwaitingFeed(false);
-    this.ports.nativeNetwork().invalidate();
+    this.ports.nativeNetwork().invalidateDocument();
     if (this.ports.authCheckTimer() !== -1)
         this.ports.pageTasks().cancelTimeout(this.ports.authCheckTimer());
     if (isPinterestAuthRoute(url)) {
@@ -323,13 +330,14 @@ pageBegin(url: string): void {
     if (targetSearchPage) {
         if (!this.searchStore.search || this.searchStore.search.pageKey !== targetSearchPage)
             this.ports.restoreRetainedSearch(targetSearchPage);
-        const hasCachedSearch: boolean = !!this.searchStore.search && this.searchStore.search.pageKey === targetSearchPage;
+        const hasTargetSearch: boolean = !!this.searchStore.search && this.searchStore.search.pageKey === targetSearchPage;
+        const hasCachedSearch: boolean = hasTargetSearch && this.searchStore.search?.kind === 'state';
         if (hasCachedSearch) {
             this.searchStore.searchLoading = false;
             this.searchStore.searchError = '';
         }
         else {
-            this.ports.clearSearch();
+            if (!hasTargetSearch) this.ports.clearSearch();
             this.searchStore.searchLoading = true;
             this.searchStore.searchError = '';
         }
@@ -403,6 +411,7 @@ private currentDocumentIs(url: string): boolean {
 }
 
 pageEnd(): void {
+    if(this.ports.nativeBusinessOnly?.() && this.ports.authStatus() === 'authenticated'){this.ports.setWebPageLoading(false);this.ports.setWebPageLoadFinishedAt(Date.now());this.ports.syncAuthentication();return;}
     this.ports.logPageLifecycle('web-page-end');
     try {
         if (this.ports.ignoreSupersededDetailDocument(this.ports.controller().getUrl())) {
@@ -428,6 +437,9 @@ pageEnd(): void {
 
 consoleMessage(message: string): boolean {
     if (message.length > 512) return false;
+    if (/^HomePaginationTrace: phase=(request|merged|failed) append=(true|false)( (count|incoming|added|elapsedMs)=\d+)*$/.test(message)) {
+        PinmonyRuntimeLog.info(message);
+    }
     if (message === 'RequestPolicy: read-merged') {
         PinmonyRuntimeLog.info('RequestPolicy: read-merged');
     }
@@ -444,6 +456,7 @@ consoleMessage(message: string): boolean {
 }
 
 mainFrameError(url: string, code: number, info: string): void {
+    if(this.ports.nativeBusinessOnly?.() && this.ports.authStatus() === 'authenticated' && !isPinterestAuthRoute(url)){this.ports.setWebPageLoading(false);PinmonyRuntimeLog.info('NativeRouteTrace: background document failure ignored authOnly=true');return;}
     let knownOtherDocument: boolean = false;
     try {
       const currentUrl: string = this.ports.controller().getUrl();

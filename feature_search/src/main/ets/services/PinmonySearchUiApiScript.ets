@@ -4,11 +4,13 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname)) return;
   if (window.PinmonySearchUiApiEnabled !== true) return;
+  if (window.PinmonyNativeSearchReadsEnabled === true) { window.PinmonySearchUiApi = { pause:function(){},reset:function(){},readHint:function(){return '';},readSuggestions:function(){return {items:[],error:'',busy:false};},readSearch:function(){return null;},readFilters:function(){return {options:[],loading:false,error:'',status:'unavailable'};},prepareFilters:function(){},retryFilters:function(){},selectedFilter:function(){},refreshSuggestions:function(){},filterTarget:function(){return '';},filterOption:function(){return null;},deleteHistory:function(){return false;} }; return; }
   var page = '', generation = 0, hintAbort = null, filterAbort = null;
   var hintAttempted = false, hint = '', cursor = '', filterAttempted = false;
   var filterBusy = false, filterError = '', filters = [], changed = function () {};
   var captureVersion = 0;
   var searchVersion = 0, lastSearch = null;
+  var nativeFilterModules = null;
   var filterEpoch = 0, websiteFilters = null, filterReplay = null;
   var deleteAbort = null;
   var suggestionTerm = null, suggestionEdited = false, suggestionItems = [], suggestionError = '', suggestionAbort = null, suggestionTimer = 0, suggestionVersion = 0;
@@ -24,7 +26,7 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
     page = ''; hintAbort = null; filterAbort = null; hintAttempted = false; hint = '';
     cursor = ''; filterAttempted = false; filterBusy = false; filterError = ''; filters = [];
     lastSearch = null;
-    filterEpoch++; websiteFilters = null; filterReplay = null;
+    filterEpoch++; websiteFilters = null; filterReplay = null; nativeFilterModules = null;
   }
   function context(requestedPage) {
     if (page !== requestedPage) { reset(); page = requestedPage; }
@@ -79,6 +81,10 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
     }
     if (typeof resource.bookmark === 'string' && resource.bookmark && resource.bookmark !== '-end-' && cursor !== resource.bookmark) {
       invalidateFilters(); cursor = resource.bookmark; changed();
+    }
+    if (Array.isArray(resource.data.oneBarModules)) {
+      websiteFilters = mapSearchFilters(resource.data.oneBarModules, generation, 'website-' + searchVersion);
+      filters = websiteFilters; filterAttempted = true; filterError = '';
     }
     changed();
   }
@@ -162,6 +168,29 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
       '商品': 'buyable_pins', '产品': 'buyable_pins', 'Products': 'buyable_pins' };
     return scopes.indexOf(option.sourceId) >= 0 ? option.sourceId : labels[option.label] || '';
   }
+  function mapSearchFilters(modules, token, version) {
+    var mapped = [], seen = {};
+    modules.slice(0, 20).forEach(function (module) {
+      var action = module && module.action;
+      if (!action || action.type !== 'contenttypefiltermoduleaction' || !Array.isArray(action.filters)) return;
+      action.filters.slice(0, 50).forEach(function (option) {
+        var display = option && option.display, operation = option && option.action, target = '';
+        if (!option || option.type !== 'filteroption' || !display || typeof display.display_text !== 'string' || !display.display_text.trim()) return;
+        if (operation && operation.type === 'onebarmoduleaction' && typeof operation.feed_url === 'string' && operation.feed_url.length <= 2048) {
+          try {
+            var url = new URL(operation.feed_url, location.origin), current = new URL(page);
+            if (url.origin === current.origin && url.protocol === 'https:' && /^\\/search\\/(?:pins|videos|boards|users|buyable_pins)\\/$/.test(url.pathname) && url.searchParams.get('q') === current.searchParams.get('q') && !url.hash && !url.username && !url.password) target = url.href;
+          } catch (_) {}
+        }
+        var label = display.display_text.trim().slice(0, 70);
+        if (seen[label + ':' + target]) return; seen[label + ':' + target] = true;
+        mapped.push({ id: 'api-filter-' + token + '-' + version + '-' + mapped.length, label: label,
+          group: typeof action.title === 'string' ? action.title.slice(0, 70) : '', selected: option.is_selected === true,
+          enabled: !!target && option.disabled !== true && option.is_disabled !== true, target: target, sourceId: '' });
+      });
+    });
+    return mapped;
+  }
   function mapFilters(data, token, version) {
     var mapped = [];
     data.forEach(function (filter) {
@@ -209,8 +238,9 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
           deletable: term === '' && item.type === 'recent_query' && item.vertical === 'pins' && !!rawQuery, deleting: false };
       }).filter(Boolean);
       suggestionError = ''; changed();
-    }).catch(function () {
+    }).catch(function (failure) {
       if (token === generation && version === suggestionVersion && requested === currentPage()) {
+        if (failure && failure.pinmonyCancelled === true) { suggestionTerm = null; suggestionError = ''; return; }
         suggestionError = '搜索建议读取失败，请重试'; changed();
       }
     }).finally(function () { if (suggestionAbort === controller) { suggestionAbort = null; changed(); } });
@@ -244,8 +274,19 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
     } finally { clearTimeout(timer); if (deleteAbort === controller) deleteAbort = null; }
   }
   window.PinmonySearchUiApi = {
+    pause: function () {
+      generation++; captureVersion++; suggestionVersion++;
+      if (hintAbort) { hintAbort.abort(); hintAbort = null; hintAttempted = false; }
+      if (filterAbort) { filterAbort.abort(); filterAbort = null; filterAttempted = false; filterBusy = false; }
+      if (suggestionAbort || suggestionTimer || deleteAbort) {
+        if (suggestionAbort) suggestionAbort.abort();
+        if (suggestionTimer) clearTimeout(suggestionTimer);
+        suggestionAbort = null; suggestionTimer = 0; suggestionTerm = null; suggestionItems = []; suggestionError = '';
+      }
+    },
     deleteHistory: deleteHistory,
     refreshSuggestions: function () {
+      if (suggestionTerm === '' && !suggestionError) return;
       suggestionVersion++; if (suggestionAbort) suggestionAbort.abort(); if (suggestionTimer) clearTimeout(suggestionTimer);
       suggestionAbort = null; suggestionTimer = 0; suggestionTerm = null; suggestionItems = []; suggestionError = '';
     },
@@ -253,17 +294,20 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
       if (requestedPage !== currentPage() || typeof term !== 'string' || term.length > 300) return null;
       context(requestedPage); changed = callback;
       if (!edited && new URL(requestedPage).searchParams.get('q')) return { items: [], error: '' };
-      if (term !== suggestionTerm || edited !== suggestionEdited) {
+      if (term !== suggestionTerm || !!term && edited !== suggestionEdited) {
         suggestionVersion++; if (suggestionAbort) suggestionAbort.abort(); if (suggestionTimer) clearTimeout(suggestionTimer);
         suggestionTerm = term; suggestionEdited = edited; suggestionItems = []; suggestionError = '';
-        var version = suggestionVersion; suggestionTimer = setTimeout(function () { loadSuggestions(term, edited, version); }, 250);
+        var version = suggestionVersion;
+        if (!term) loadSuggestions(term, edited, version);
+        else suggestionTimer = setTimeout(function () { loadSuggestions(term, edited, version); }, 250);
       }
       return { items: suggestionItems, error: suggestionError, busy: !!suggestionTimer || !!suggestionAbort };
     },
     filterTarget: function (requestedPage, id) {
       if (requestedPage !== page || requestedPage !== currentPage() || filterBusy || filterError) return '';
       var option = filters.find(function (value) { return value.id === id && value.enabled; });
-      if (!option) return '';
+      if (!option || option.selected) return '';
+      if (option.target) return option.target;
       var scope = filterScope(option), route = new URL(page), query = route.searchParams.get('q');
       if (!scope || !query || option.selected) return '';
       return route.origin + '/search/' + scope + '/?q=' + encodeURIComponent(query) + '&rs=content_type_filter';
@@ -284,6 +328,7 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
     prepareFilters: function () { if (websiteFilters === null) invalidateFilters(); },
     retryFilters: function () { invalidateFilters(); websiteFilters = null; },
     selectedFilter: function () {
+      nativeFilterModules = null;
       invalidateFilters(); filterEpoch++; cursor = ''; lastSearch = null; websiteFilters = null; filterReplay = null;
     },
     readFilters: function (requestedPage) {
@@ -291,6 +336,22 @@ export const PIN_SEARCH_UI_API_SCRIPT: string = `
       if (requestedPage !== currentPage()) return { options: [], loading: false,
         error: '搜索页面已变化，请重新打开筛选器', status: 'error' };
       context(requestedPage);
+      if (window.PinmonySearchApi && window.PinmonySearchApi.context) {
+        var nativeContext = window.PinmonySearchApi.context();
+        if (Object.prototype.hasOwnProperty.call(nativeContext, 'filterModules') && nativeContext.page !== page) return { options: [], loading: true, error: '', status: 'waiting-search' };
+        if (nativeContext.page === page && Object.prototype.hasOwnProperty.call(nativeContext, 'filterModules')) {
+          if (Array.isArray(nativeContext.filterModules)) {
+            if (nativeFilterModules !== nativeContext.filterModules || websiteFilters === null) {
+              nativeFilterModules = nativeContext.filterModules;
+              invalidateFilters();
+              websiteFilters = mapSearchFilters(nativeFilterModules, generation, 'native-' + (++searchVersion));
+            }
+          } else if (websiteFilters === null) {
+            if (window.PinmonySearchApi.isBusy && window.PinmonySearchApi.isBusy()) return { options: [], loading: true, error: '', status: 'waiting-search' };
+            return { options: [], loading: false, error: '当前搜索响应未提供筛选选项', status: 'unavailable' };
+          }
+        }
+      }
       if (websiteFilters !== null) {
         filters = websiteFilters; filterAttempted = true;
       }

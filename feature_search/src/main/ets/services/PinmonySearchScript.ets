@@ -32,7 +32,7 @@ export const PIN_SEARCH_BRIDGE_SCRIPT: string = `
     if (window.PinmonyNativeNetworkEnabled === true && window.PinmonyNetwork && typeof window.PinmonyNetwork.isReady === "function" && !window.PinmonyNetwork.isReady()) return;
     scheduled = 0;
     if (window.PinmonyNetwork && !window.PinmonyNetwork.isForeground()) {
-      ['PinmonySearchApi', 'PinmonySearchDiscoveryApi'].forEach(function (name) { if (window[name]) window[name].pause(); });
+      ['PinmonySearchApi', 'PinmonySearchDiscoveryApi', 'PinmonySearchUiApi', 'PinmonySearchQuizApi'].forEach(function (name) { if (window[name] && window[name].pause) window[name].pause(); });
       return;
     }
     if (!searchRoute()) {
@@ -52,9 +52,9 @@ export const PIN_SEARCH_BRIDGE_SCRIPT: string = `
     var discovery = window.PinmonySearchDiscoveryApi && window.PinmonySearchDiscoveryApi.read(key, schedule);
     if (discovery) api = null;
     var ui = window.PinmonySearchUiApi;
-    var hint = ui && ui.readHint(key, schedule);
+    var hint = !new URLSearchParams(location.search).get('q') && ui && ui.readHint(key, schedule);
     var typeahead = ui && ui.readSuggestions(key, query, edited, schedule);
-    var quiz = window.PinmonySearchQuizApi && window.PinmonySearchQuizApi.read(key, schedule);
+    var quiz = api && api.active && window.PinmonySearchQuizApi && window.PinmonySearchQuizApi.read(key, schedule);
     categories = api && api.categories || []; results = api && api.results || [];
     suggestions = typeahead ? typeahead.items : []; heroes = discovery && discovery.heroes || [];
     sections = discovery && discovery.sections || [];
@@ -113,10 +113,18 @@ export const PIN_SEARCH_BRIDGE_SCRIPT: string = `
   window.PinmonySearchRefresh = function (s, p) {
     if (s !== undefined && !valid(s, p)) return false;
     if (!searchRoute()) return false;
-    if (window.PinmonySearchUiApi) window.PinmonySearchUiApi.reset();
     var api = new URLSearchParams(location.search).get('q') ? window.PinmonySearchApi : window.PinmonySearchDiscoveryApi;
-    var accepted = !!api && api.refresh(); lastState = ''; schedule(); return accepted;
+    if (api && api.isBusy && api.isBusy()) return true;
+    var accepted = !!api && api.refresh();
+    if (accepted && window.PinmonySearchUiApi) window.PinmonySearchUiApi.reset();
+    lastState = ''; schedule(); return accepted;
   };
+  window.addEventListener('pagehide', function () {
+    clearTimeout(scheduled); scheduled = 0;
+    ['PinmonySearchApi', 'PinmonySearchDiscoveryApi', 'PinmonySearchUiApi', 'PinmonySearchQuizApi'].forEach(function (name) {
+      if (window[name] && window[name].pause) window[name].pause();
+    });
+  });
   window.addEventListener('pageshow', function () { lastState = ''; schedule(); });
   window.addEventListener('popstate', function () { lastState = ''; schedule(); });
   window.setInterval(function () { if (documentActive && searchRoute()) schedule(); }, 2000); schedule();

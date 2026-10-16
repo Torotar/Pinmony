@@ -3,7 +3,9 @@ export const PIN_SEARCH_API_ENABLED: boolean = true;
 export const PIN_SEARCH_API_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/i.test(location.hostname)) return;
+  if (window.PinmonyNativeSearchReadsEnabled === true) { window.PinmonySearchApi = { reset:function(){},pause:function(){},suspend:function(){},read:function(){return null;},context:function(){return {page:'',bookmark:'',filterBookmark:'',filterModules:null};},isBusy:function(){return false;},loadMore:function(){return false;},refresh:function(){return false;} }; return; }
   var key = '', generation = 0, abort = null, busy = false, attempted = false;
+  var filterModules = null;
   var results = [], categories = [], bookmark = '', filterBookmark = '', ended = false, error = '', active = false;
   var changed = function () {}, current = function () { return false; };
   var suspendedPage = '';
@@ -13,7 +15,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
     generation++;
     if (abort) abort.abort();
     key = ''; abort = null; busy = false; attempted = false;
-    results = []; categories = []; bookmark = ''; filterBookmark = ''; ended = false; error = ''; active = false;
+    filterModules = null; results = []; categories = []; bookmark = ''; filterBookmark = ''; ended = false; error = ''; active = false;
     capturedOptions = null; observedVersion = 0; waitingSince = 0;
     needsObserved = false;
   }
@@ -35,6 +37,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
     var mapped = [], seen = {};
     items.forEach(function (pin) {
       if (!pin || !pin.id || seen[pin.id]) return;
+      if (pin.type === 'pin' && (pin.is_promoted === true || pin.ad_data || pin.pin_promotion_id)) return;
       if (pin.type === 'board' || pin.type === 'user') {
         var target = pin.type === 'board' ? pin.url : '/' + pin.username + '/';
         try { target = new URL(target, location.origin); } catch (_) { return; }
@@ -47,7 +50,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
           targetUrl: target.href, imageUrl: /^https:\\/\\//.test(imageUrl || '') ? imageUrl : '', imageWidth: 236, imageHeight: 236, enabled: true });
         return;
       }
-      if (pin.type !== 'pin' || ! /^(?:[0-9]+|[A-Za-z0-9_-]{20,})$/.test(String(pin.id))) return;
+      if (pin.type !== 'pin' || !/^\\d+$/.test(String(pin.id))) return;
       var image = null, sizes = pin.images || {};
       ['474x', '736x', '564x', 'orig', '236x'].some(function (size) {
         var candidate = sizes[size];
@@ -126,11 +129,13 @@ export const PIN_SEARCH_API_SCRIPT: string = `
       incoming.forEach(function (item) {
         if (!merged.some(function (saved) { return saved.id === item.id; })) merged.push(item);
       });
+      filterModules = Array.isArray(resource.data.oneBarModules) ? resource.data.oneBarModules.slice(0, 20) : null;
       results = merged; bookmark = next; active = true;
       if (next && next !== '-end-') filterBookmark = next;
       ended = !next || next === '-end-' || (append && previous === next) || !items.length;
-    } catch (_) {
+    } catch (failure) {
       if (token !== generation || key !== requestedKey || !current()) return;
+      if (failure && failure.pinmonyCancelled === true) { if (!active) attempted = false; error = ''; return; }
       error = append ? '更多搜索结果读取失败，请重试' : '搜索结果接口读取失败，请重试';
     } finally {
       clearTimeout(timer);
@@ -141,7 +146,8 @@ export const PIN_SEARCH_API_SCRIPT: string = `
     }
   }
   window.PinmonySearchApi = {
-    context: function () { return { page: key, bookmark: bookmark, filterBookmark: filterBookmark }; },
+    isBusy: function () { return busy; },
+    context: function () { return { page: key, bookmark: bookmark, filterBookmark: filterBookmark, filterModules: filterModules }; },
     reset: reset,
     pause: function () {
       generation++; if (abort) abort.abort(); abort = null; busy = false;
@@ -169,6 +175,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
           } else {
             categories = mapGuides(observed.resource.data, page);
             results = incoming; active = true; error = ''; capturedOptions = observed.options;
+            filterModules = Array.isArray(observed.resource.data.oneBarModules) ? observed.resource.data.oneBarModules.slice(0, 20) : null;
             bookmark = typeof observed.resource.bookmark === 'string' ? observed.resource.bookmark : '';
             if (bookmark && bookmark !== '-end-') filterBookmark = bookmark;
             ended = !bookmark || bookmark === '-end-' || !items.length;
@@ -199,6 +206,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
     },
     refresh: function () {
       if (!key || !current()) return false;
+      if (busy) return true;
       if (!attempted || (needsObserved && !capturedOptions)) return false;
       generation++;
       if (abort) abort.abort();

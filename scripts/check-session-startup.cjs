@@ -14,13 +14,13 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readF
   { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, { exports: auth });
 const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: login,
   PinmonyRuntimeLog: { info() {}, warn() {} }, clearTimeout() {} };
-require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure'].map(method).join('\n') +
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure', 'confirmBusinessSession', 'usesNativeProfileReads'].map(method).join('\n') +
   '} globalThis.Native=Native;', { target: ts.ScriptTarget.ES2020 }), context);
 function harness() {
   const native = new context.Native(), loads = [], scripts = [], effects = [];
   let current = home;
   Object.assign(native, { authStatus: 'checking', authEpoch: 1, authCheckTimer: -1, loginRedirectEpoch: -1,
-    navigationAddress: '', controller: { getUrl: () => current, loadUrl: url => loads.push(url),
+    navigationAddress: '', controller: { getUrl: () => current, getUserAgent: () => 'synthetic', loadUrl: url => loads.push(url),
       runJavaScript: script => { scripts.push(script); return Promise.resolve(true); } },
     pageHistory: { reset() {} }, tabsController: { changeIndex() {} },
     isHomeRootAddress: url => url === home, profileUrlFromAddress: () => '',

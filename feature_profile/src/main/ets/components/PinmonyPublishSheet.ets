@@ -5,6 +5,7 @@ export struct PinmonyPublishSheet {
   @Prop options: PinmonyPublishOption[] = [];
   @Prop loading: boolean = false;
   @Prop boardMode: boolean = false;
+  @Prop sectionMode: boolean = false;
   onSelect?: (id: string) => void;
   onRetry?: () => void;
   onSection?: () => void;
@@ -64,7 +65,7 @@ export struct PinmonyPublishSheet {
     Column({ space: 24 }) {
       this.group('create')
       this.group('add')
-      if (this.boardMode && !this.loading) {
+      if (this.boardMode && !this.sectionMode && !this.loading) {
         Text('添加').fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
         Text('图板区块').fontSize(17).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').height(58)

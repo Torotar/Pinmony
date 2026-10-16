@@ -1,5 +1,6 @@
 import { PinmonyBoardStore } from '../stores/PinmonyBoardStore';
 import { PinmonyBoardDetail, PinmonyBoardPin } from '../models/PinmonyBoardDetail';
+import { boardVisiblePins } from '../services/PinmonyBoardPresentation';
 export interface PinmonyBoardOperationsPorts {
   foreground: () => boolean;
   epoch: () => number;
@@ -52,9 +53,9 @@ export class PinmonyBoardOperationsController {
     if (method === 'refresh' && (board.refreshing || board.loading)) return;
     if (!board.session) { if (method === 'retry') this.ports.reload(); return; }
     if (method === 'open') {
-      if (board.pins.some((pin: PinmonyBoardPin): boolean => pin.id === id && this.ports.cancelled(pin.pinUrl))) return;
+      if (boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.id === id && this.ports.cancelled(pin.pinUrl))) return;
       this.ports.retain(board);
-      const target: PinmonyBoardPin | undefined = board.pins.find((pin: PinmonyBoardPin): boolean => pin.id === id);
+      const target: PinmonyBoardPin | undefined = boardVisiblePins(board).find((pin: PinmonyBoardPin): boolean => pin.id === id);
       this.ports.rememberPin(target?.pinUrl || '', board.pageKey);
     }
     const session: number = board.session;

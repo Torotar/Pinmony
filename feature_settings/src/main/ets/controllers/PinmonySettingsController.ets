@@ -4,6 +4,9 @@ import { PinmonyAccountSettings } from '../models/PinmonyAccountSettings';
 import { NotificationResult } from '../models/PinmonyNotifications';
 
 export interface PinmonySettingsPorts {
+  nativeEnabled?: () => boolean;
+  nativeRequest?: (action: string,value: string) => Promise<void>;
+  nativePause?: () => void;
   authenticated: () => boolean;
   foreground: () => boolean;
   epoch: () => number;
@@ -29,6 +32,7 @@ export class PinmonySettingsController {
   constructor(store: PinmonySettingsStore, ports: PinmonySettingsPorts) { this.store = store; this.ports = ports; }
   private allowed(): boolean { return this.ports.authenticated() && this.ports.foreground() && this.ports.visible(); }
   pause(): void {
+    if(this.ports.nativeEnabled?.()){this.ports.nativePause?.();return;}
     this.generation++; this.tasks.invalidate();
     if (this.writeDispatched) { this.store.writeUncertain = true; this.store.error = '保存结果未确认，请重新读取核对；不会自动重试保存'; }
     else if (this.store.loading) this.store.error = '读取已暂停，请重试';
@@ -43,6 +47,7 @@ export class PinmonySettingsController {
     if (!owned) this.closeBridge();
   }
   private closeBridge(): void {
+    if(this.ports.nativeEnabled?.())return;
     try {
       if (!this.page || this.page !== this.ports.document() || !this.ports.authenticated()) return;
       this.ports.runScript('window.PinmonyAccountSettings && window.PinmonyAccountSettings.close()').catch(() => {});
@@ -53,6 +58,7 @@ export class PinmonySettingsController {
       this.allowed() && (!page || page === this.ports.document());
   }
   async readNotifications(): Promise<void> {
+    if(this.ports.nativeEnabled?.()){if(this.allowed() && this.store.screen === 'notifications')await this.ports.nativeRequest?.('notifications','');return;}
     if (!this.allowed() || this.store.loading || this.store.busy || this.store.screen !== 'notifications') return;
     const token: number = ++this.store.token, generation: number = this.generation, epoch: number = this.ports.epoch();
     const page: string = this.ports.document(); this.page = page;
@@ -81,6 +87,7 @@ export class PinmonySettingsController {
     finally { if (token === this.store.token && generation === this.generation) this.store.loading = false; }
   }
   async request(action: string, value: string): Promise<void> {
+    if(this.ports.nativeEnabled?.()){if(this.allowed())await this.ports.nativeRequest?.(action,value);return;}
     if (action === 'notifications') { await this.readNotifications(); return; }
     if (!this.allowed() || this.store.busy || this.store.loading) return;
     const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy'].includes(action);

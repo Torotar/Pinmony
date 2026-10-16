@@ -72,10 +72,12 @@ function method(name) {
   assert(start >= 0, name);
   return index.slice(start, index.indexOf('\n  private ', start + 1));
 }
-const context = { PINTEREST_URL: home, PIN_NATIVE_NETWORK_ENABLED: true,
+// Legacy document-return compatibility; native profile returns execute in check-native-profile-navigation.cjs.
+const context = { PIN_NATIVE_PROFILE_READS_ENABLED: false, PINTEREST_URL: home, PIN_NATIVE_NETWORK_ENABLED: true,
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${method('async backFromDetail')}
+  ${method('returnToNativeProfile')}
   ${method('bindCurrentDetailDocument')}
   ${method('clearRootTabGuard')}
   ${method('currentPinUrl')}
@@ -121,7 +123,7 @@ async function main() {
   assert.match(index, /detailReturnedToRoot && this\.extractPinUrl\(url\)/);
   assert.match(documentBinding, /document\.transport\.confirmed/);
   assert.match(documentBinding, /document\.transport\.wait\.timeout/);
-  assert.match(fs.readFileSync('entry/src/main/ets/app/PinmonyDetailOpeningCoordinator.ets','utf8'), /if \(detail && this\.pinStore\.detail\?\.kind !== 'cached'\)/,
+  assert.match(fs.readFileSync('entry/src/main/ets/app/PinmonyDetailOpeningCoordinator.ets','utf8'), /if \(detail && !this\.pinStore\.detailActionsReady && this\.pinStore\.detail\?\.kind !== 'cached'\)/,
     'a late base-only read cannot wipe a full parent cache');
   assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNetworkBridgeCoordinator.ets','utf8').includes('this.detailReadCache.store(job, reply)'), 'successful current replies populate the return cache');
   assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8').includes('this.ports.detailReadCache().setPin(pin)'), 'return target enables Pin-scoped read reuse');

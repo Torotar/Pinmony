@@ -3,6 +3,7 @@ import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 
 export interface PinmonyDetailPorts {
   store: PinmonyPinStore;
+  nativePostAction?: (kind: string) => Promise<boolean>;
   postApiEnabled: () => boolean;
   postExtensionsEnabled: () => boolean;
   isAuthenticated: () => boolean;

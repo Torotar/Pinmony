@@ -5,7 +5,7 @@ const source=readSourceFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const start=source.indexOf('  private returnFromSearchQuiz():');
 assert.ok(start>=0);const method=source.slice(start,source.indexOf('\n  private ',start+1));
 const js=ts.transpileModule('class Host {'+method.replace('private ','')+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText+'\nHost;';
-const Host=require('./product-coordination-harness.cjs').run(ts,js,{console,PinmonyRuntimeLog:{warn(){}}});
+const Host=require('./product-coordination-harness.cjs').run(ts,js,{console,PIN_NATIVE_SEARCH_READS_ENABLED:false,PinmonyRuntimeLog:{warn(){}}});
 const host=require('./product-coordination-harness.cjs').createHost(Host, ts);const page='https://www.pinterest.com/search/pins/?q=design';
 host.searchStore.search={kind:'state',session:1,pageKey:page,query:'design',quiz:{mode:'picker',busy:true},results:[{id:'pin'}],categories:[],suggestions:[],heroes:[],ideaSections:[]};
 host.currentSearchPageKey=()=>page;

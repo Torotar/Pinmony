@@ -12,7 +12,7 @@ Object.assign(native, {
   authCheckTimer: -1, tabRequestToken: 4, rootTabGuardTarget: -1, staleRootDocumentTarget: () => -1,
   retainedRootTabPending: -1, retainedRootTabAddress: '', retainedHomeDocumentPending: false,
   nativeBackTarget: '', logoutAwaitingLogin: false, lastPageUrl: root, webPageLoading: false,
-  pageHistory: { key: v => v }, nativeNetwork: { invalidate() { calls.push('invalidate'); } },
+  pageHistory: { key: v => v }, nativeNetwork: { invalidateDocument() { calls.push('document-invalidate'); }, invalidate() { calls.push('invalidate'); } },
   controller: { getUrl() { if (urlFailure) throw Error('unavailable'); return document; } },
   pageTasks: { timeout(fn, delay) { timers.push({ fn, delay }); return timers.length; }, cancelTimeout() {} },
   coordinatorTasks: { timeout(fn, delay) { timers.push({ fn, delay }); return timers.length; } },
@@ -52,7 +52,11 @@ coordinator.pageBegin(search);
 assert.equal(native.homeStore.homeActionsReady, false);
 assert.equal(native.activeTab, 1, 'hidden document change keeps selected native screen');
 native.nativeRootOnly = false;
+const pendingSearch = { kind: 'loading', session: 0, pageKey: search, query: 'design', results: [] };
+native.searchStore.search = pendingSearch;
 coordinator.pageBegin(search);
+assert.equal(native.searchStore.search, pendingSearch, 'target loading presentation survives document begin');
+assert.equal(native.searchStore.searchLoading, true, 'target placeholder is not treated as a completed cache');
 assert.equal(native.webPageLoading, true);
 assert(calls.includes('menu-notify'), 'document begin immediately wakes closed menu waiters');
 const timer = timers.find(v => v.delay === 350);

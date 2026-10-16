@@ -17,12 +17,6 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
     var headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest',
       'X-Pinterest-AppState': 'active', 'X-Pinterest-Source-Url': location.pathname,
       'X-Pinterest-Pws-Handler': 'www/index.js' };
-    try {
-      var node = document.getElementById && document.getElementById('__PWS_INITIAL_PROPS__');
-      var initial = node && JSON.parse(node.textContent || '{}');
-      var version = initial && initial.client_context && initial.client_context.app_version;
-      if (typeof version === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(version)) headers['X-App-Version'] = version;
-    } catch (_) {}
     return headers;
   }
   function stop() { generation++; if (abort) abort.abort(); abort = null; state = null; }
@@ -33,6 +27,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
     shareCurrent: function (page) { return !!sharing && sharing.page === page && sharing.address === location.href && current(page); },
     shareLink: function (page, session) { return this.shareCurrent(page) && sharing.session === session ? sharing.link : ''; },
     shareOpen: function (page, session, changed) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return false;
       var info = window.PinmonyBoardApi && window.PinmonyBoardApi.shareInfo(page) || window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page);
       if (!current(page) || !info || !/^\\d+$/.test(info.userId)) return false;
       this.shareClose(); var g = shareGeneration;
@@ -73,6 +68,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
       return true;
     },
     shareSearch: function (page, session, value, changed) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return false;
       if (!sharing || sharing.page !== page || sharing.session !== session || !current(page)) return false;
       var query = String(value || '').trim().slice(0, 200), g = shareGeneration, s = sharing;
       if (!query) { s.contacts = []; s.feedback = ''; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, query: '', feedback: '', error: '' }); return true; }
@@ -87,23 +83,27 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
       return true;
     },
     shareContact: function (page, session, id, changed) {
+      if(window.PinmonyNativeSharePublishEnabled === true)return false;
       if (!sharing || sharing.page !== page || sharing.session !== session || !current(page) || !/^profile-contact:\\d+$/.test(id)) return false;
       var target = id.slice('profile-contact:'.length), info = window.PinmonyBoardApi && window.PinmonyBoardApi.shareInfo(page) || window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page), g = shareGeneration, s = sharing;
-      if (!info || !/^\\d+$/.test(info.userId)) return false;
+      if (!info || !/^\\d+$/.test(info.userId) || s.sending) return false;
+      s.sending = true;
       s.feedback = '正在发送…'; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, feedback: s.feedback, error: '' });
       var headers = requestHeaders(); headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      fetch('/resource/ConversationsResource/create/', { method: 'POST', credentials: 'same-origin', headers: headers, body: 'data=' + encodeURIComponent(JSON.stringify({ options: { user_ids: [target], user: info.userId }, context: {} })) }).then(function (r) { return r.json(); }).then(function (j) {
+      fetch('/resource/ConversationsResource/create/', { method: 'POST', credentials: 'same-origin', headers: headers, body: 'data=' + encodeURIComponent(JSON.stringify({ options: Object.assign({ user_ids: [target] }, info.board ? { board: info.userId } : { user: info.userId }), context: {} })) }).then(function (r) { return r.json(); }).then(function (j) {
         if (g !== shareGeneration || sharing !== s || !current(page)) return;
         var resource = j && j.resource_response, users = resource && resource.data && resource.data.users, message = resource && resource.data && resource.data.last_message;
         if (!resource || resource.status !== 'success' || resource.code !== 0 || !Array.isArray(users) || !users.some(function (u) { return String(u.id) === target; }) || !message || !message.id) throw new Error('send');
-        s.feedback = '已发送'; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, feedback: s.feedback, error: '' });
-      }).catch(function () { if (g === shareGeneration && sharing === s) { s.feedback = '发送失败，请重试'; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, feedback: s.feedback, error: '' }); } });
+        if (info.board && (resource.endpoint_name !== 'v3_create_conversation' || !message.board || String(message.board.id) !== info.userId)) throw new Error('unconfirmed-board-share');
+        s.sending = false; s.feedback = '已发送'; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, feedback: s.feedback, error: '' });
+      }).catch(function () { if (g === shareGeneration && sharing === s) { s.sending = false; s.feedback = info.board ? '发送结果未确认，请先核对会话' : '发送失败，请重试'; changed({ kind: 'state', session: session, pinUrl: page, title: s.title, sectionLabel: s.sectionLabel, options: s.options, actions: s.actions, contacts: s.contacts, searchActive: true, feedback: s.feedback, error: '' }); } });
       return true;
     },
     read: function () { return state; },
     readSave: function () { return saveResult; },
     readFollow: function () { return followResult; },
     follow: function (page, id) {
+      if(window.PinmonyNativeProfileSettingsEnabled === true)return false;
       if (followBusy || !current(page)) return false;
       var info = window.PinmonyProfileApi && window.PinmonyProfileApi.currentInfo(page);
       var item = id && state && state.page === page && state.section !== 'boards' && state.items.find(function (v) { return v.id === id; });
@@ -128,6 +128,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
       return true;
     },
     update: async function (page, token, input) {
+      if(window.PinmonyNativeProfileSettingsEnabled === true)return false;
       if (!state || state.page !== page || state.token !== token || state.mode !== 'edit' || !current(page)) return { ok: false, error: 'stale' };
       var g = generation; saveResult = { pending: true };
       try {
@@ -144,6 +145,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
       } catch (_) { if (g === generation) saveResult = { ok: false, message: '网络请求失败，保存结果未确认' }; }
     },
     open: async function (page, mode, section, token) {
+      if(window.PinmonyNativeProfileSettingsEnabled === true)return false;
       if (!current(page) || !/^(edit|following|followers)$/.test(mode)) return false;
       stop(); var g = generation, address = location.href;
       state = { page: page, mode: mode, section: section, token: token, loading: true, error: '', items: [],

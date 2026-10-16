@@ -3,6 +3,6 @@ export { PinmonyAccountSettings, PinmonyCountry, PinmonyAiTopic, PinmonyRecentAc
 export { PinmonySettingsStore } from './src/main/ets/stores/PinmonySettingsStore';
 export { PIN_ACCOUNT_SETTINGS_SCRIPT } from './src/main/ets/services/PinmonyAccountSettingsScript';
 export { PIN_NOTIFICATIONS_READ_SCRIPT } from './src/main/ets/services/PinmonyNotificationsScript';
-export { NotificationGroup, NotificationResult } from './src/main/ets/models/PinmonyNotifications';
+export { NotificationGroup, NotificationResult, NotificationCategory } from './src/main/ets/models/PinmonyNotifications';
 export { PIN_LOGOUT_API_ENABLED, logoutRequestBody, logoutResponseSucceeded } from './src/main/ets/services/PinmonyLogout';
 export { PinmonySettingsController, PinmonySettingsPorts } from './src/main/ets/controllers/PinmonySettingsController';

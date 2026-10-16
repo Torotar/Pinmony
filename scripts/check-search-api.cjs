@@ -32,6 +32,13 @@ function harness() {
     } };
 }
 async function main() {
+  const advertising = harness(); advertising.read();
+  await advertising.respond(0, [fixture, { ...fixture, id: '456', is_promoted: true },
+    { ...fixture, id: '789', ad_data: { grid_click_type: 1 } },
+    { ...fixture, id: '987', pin_promotion_id: '123' }, { ...fixture, id: 'OpaquePromotionFixture123456' }], 'next-page');
+  assert.equal(advertising.read().results.length, 1, 'promoted and opaque cards are excluded before presentation');
+  assert.equal(advertising.read().ended, false, 'filtering ads preserves pagination');
+
   const h = harness();
   assert.equal(h.read().busy, true);
   h.read(); assert.equal(h.requests.length, 1, 'no polling requests');

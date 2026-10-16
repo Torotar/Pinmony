@@ -1,4 +1,5 @@
 import { PinmonyVideo } from 'common_ui';
+export interface PinmonyHomeImageRecovery { pinUrl: string; imageUrl: string; revision: number; }
 export interface PinmonyHomeTab {
   id: string;
   label: string;
@@ -27,6 +28,7 @@ export interface PinmonyHomePin {
 
 export interface PinmonyHomeSnapshot {
   kind: string;
+  contextEpoch?: number;
   session: number;
   pageKey: string;
   selectedTab: string;

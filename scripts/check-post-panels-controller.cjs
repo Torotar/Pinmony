@@ -4,14 +4,18 @@ const {PinmonyPostPanelsController:Controller}=require('./post-panels-controller
 const flush=()=>new Promise(resolve=>setImmediate(resolve));const pin='https://www.pinterest.com/pin/101/';
 function boards(){return {pin,loading:false,busy:false,error:'',feedback:'',items:[],shortlist:[],savedId:'',savedBoard:''};}
 function edit(){return {pin,loading:false,busy:false,error:'',uncertain:false,done:'',phase:'edit',board:{id:'1'},picker:boards()};}
-function harness(){let page=pin,foreground=true,auth=true,sheet='';const reads=[],writes=[],starts=[],completed=[];
+function harness(extraPorts={}){let page=pin,foreground=true,auth=true,sheet='';const reads=[],writes=[],starts=[],completed=[];
  const store={detail:{pinUrl:pin},commentToken:0,saveToken:0,editToken:0,commentResult:{pin,items:[]},saveResult:boards(),editResult:edit()};
  const controller=new Controller(store,{authenticated:()=>auth,foreground:()=>foreground,document:()=>page,sheet:()=>sheet,show:v=>sheet=v,currentPin:()=>pin,pinIdentity:v=>v,moreCurrent:v=>v===pin,
- runScript:script=>{if(script.includes('Close()'))return Promise.resolve('true');return new Promise((resolve,reject)=>{(script.includes('Read(')?reads:script.includes('Start(')?starts:writes).push({resolve,reject,script});});},jsonText:v=>v,feedback(){},saveDismissed(){},editCompleted:async(p,d)=>completed.push([p,d]),prepareComment:async value=>value});
+ runScript:script=>{if(script.includes('Close()'))return Promise.resolve('true');return new Promise((resolve,reject)=>{(script.includes('Read(')?reads:script.includes('Start(')?starts:writes).push({resolve,reject,script});});},jsonText:v=>v,feedback(){},saveDismissed(){},editCompleted:async(p,d)=>completed.push([p,d]),prepareComment:async value=>value,...extraPorts});
  return {store,controller,reads,writes,starts,completed,foreground:v=>foreground=v,page:v=>page=v,auth:v=>auth=v,
  reply(extra={}){return JSON.stringify(sheet==='comments'?{pin,loading:false,error:'',items:[],...extra}:sheet==='save'?{...boards(),...extra}:{...edit(),...extra});}};}
 async function open(h,mode){const task=mode==='comments'?h.controller.openComments():mode==='save'?h.controller.openBoards():h.controller.openEdit(pin);h.starts.at(-1).resolve('true');await task;h.reads.at(-1).resolve(h.reply());await flush();}
 (async()=>{
+ const confirmed=harness();await open(confirmed,'save');const saveToken=confirmed.store.saveToken;
+ confirmed.controller.resume();confirmed.reads[1].resolve(confirmed.reply({savedId:'202',savedBoard:'Test',feedback:'已收藏至“Test”'}));await flush();
+ assert.equal(confirmed.store.saveToken,saveToken+1,'confirmed save dismisses the active picker');
+ confirmed.controller.resume();assert.equal(confirmed.reads.length,2,'completed save releases polling');
  for(const mode of ['comments','save','edit']){const h=harness();await open(h,mode);h.controller.pause();assert.equal(timers.size,0);h.controller.resume();h.controller.resume();assert.equal(h.reads.length,2);h.foreground(false);h.controller.pause();h.reads[1].resolve(h.reply({done:'saved'}));await flush();assert.equal(h.completed.length,0);h.foreground(true);h.controller.resume();assert.equal(h.reads.length,3);h.controller.dismiss(mode,true);h.reads[2].resolve(h.reply());await flush();assert.equal(timers.size,0);}
  const save=harness();await open(save,'save');save.controller.resume();save.controller.saveAction('boardsSave',',"1"');save.controller.saveAction('boardsSave',',"1"');assert.equal(save.writes.length,1);save.reads[1].resolve(save.reply());await flush();save.controller.saveAction('boardsSave',',"1"');assert.equal(save.writes.length,1,'old idle read cannot release submit');save.controller.pause();save.foreground(false);save.writes[0].resolve('true');await flush();save.foreground(true);save.controller.resume();assert.equal(save.writes.length,1);save.reads[2].resolve(save.reply());await flush();save.controller.dismiss('save');
  const unknown=harness();await open(unknown,'edit');unknown.controller.editAction('editCommit',',false');unknown.controller.editAction('editCommit',',false');assert.equal(unknown.writes.length,1);unknown.controller.dismiss('edit');unknown.writes[0].reject(Error('unknown'));await flush();unknown.reads[1].resolve(unknown.reply());await flush();unknown.controller.editAction('editCommit',',false');assert.equal(unknown.writes.length,1);unknown.controller.dismiss('edit');assert.equal(timers.size,0,'uncertain result can close');
@@ -22,5 +26,10 @@ async function open(h,mode){const task=mode==='comments'?h.controller.openCommen
  const route=harness();await open(route,'save');route.controller.resume();route.page(pin+'?changed');route.reads[1].resolve(route.reply({savedId:'2'}));await flush();assert.equal(route.store.saveResult.savedId,'');route.controller.pause();
  const closed=harness();await open(closed,'save');closed.controller.saveAction('boardsSave',',"1"');closed.controller.dismiss('save');const reopened=closed.controller.openBoards();assert.equal(closed.starts.length,2,'closed busy save can re-read');closed.starts[1].resolve('true');await reopened;closed.reads[1].resolve(closed.reply());await flush();closed.writes[0].reject(Error('late'));await flush();closed.controller.dismiss('save');
  const denied=harness();denied.auth(false);await denied.controller.openComments();assert.equal(denied.starts.length,0);assert.equal(timers.size,0);
+ const translations=[];const tr=harness({nativeTranslate:async(id,current)=>translations.push({id,current})});await open(tr,'comments');
+ await tr.controller.commentAction('commentTranslate','21');assert.equal(translations.length,1);assert.equal(translations[0].id,'21');assert(translations[0].current());
+ assert.equal(tr.writes.length,0,'translation never dispatches a comment mutation');assert.equal(tr.store.commentResult.busy,undefined);
+ tr.store.commentResult.busy=true;await tr.controller.commentAction('commentTranslate','21');assert.equal(translations.length,1);
+ tr.store.commentResult.busy=false;tr.controller.dismiss('comments');assert.equal(translations[0].current(),false,'closing the panel revokes translation ownership');
  console.log('Post panels: single read, physical timer cleanup, pause/resume, stale opening/route, duplicate writes, unknown results and confirmed edit completion passed');
 })().catch(error=>{console.error(error);process.exitCode=1});

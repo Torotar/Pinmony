@@ -33,7 +33,7 @@ async function main() {
   assert.equal(testing.requests.length, 1, 'debug mode keeps required profile read but skips saved prefetch');
   testing.invalidate();
   const user = { type: 'user', username: 'sample', full_name: 'Sample', follower_count: 0,
-    following_count: 12, image_large_url: 'https://i.pinimg.com/avatar.jpg' };
+    following_count: 12, profile_reach: 295, image_large_url: 'https://i.pinimg.com/avatar.jpg' };
   const h = harness();
   assert.equal(h.read().kind, 'loading');
   h.read();
@@ -45,6 +45,7 @@ async function main() {
   assert.equal(h.requests[0].options.headers.Cookie, undefined);
   await h.respond(0, user);
   assert.equal(h.read().info.followers, 0, 'zero is real data');
+  assert.equal(h.read().info.monthlyViews, 295, 'monthly reach is mapped from the validated current user response');
   assert.equal(h.read().info.name, 'Sample');
   assert.equal(h.updates(), 1);
   h.window.PinmonyProfileApi.reset();

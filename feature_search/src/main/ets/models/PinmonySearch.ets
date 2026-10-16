@@ -35,6 +35,19 @@ export interface PinmonySearchSuggestion {
 }
 
 export interface PinmonySearchResult {
+  userId?: string;
+  followerCount?: number;
+  blocked?: boolean;
+  boardImages?: string[];
+  ownerName?: string;
+  updated?: string;
+  merchant?: string;
+  price?: string;
+  standardPrice?: string;
+  boardId?: string;
+  following?: boolean;
+  followBusy?: boolean;
+  canFollow?: boolean;
   id: string;
   kind: string;
   title: string;

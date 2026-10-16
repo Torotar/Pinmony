@@ -274,5 +274,71 @@
     "field": "bottomBarCoordinator",
     "className": "PinmonyBottomBarCoordinator",
     "group": "PinmonyBottomBarCoordinator"
+  },
+  {
+    "name": "nativeReadFixtureBinding",
+    "field": "detailNativeReads",
+    "className": "PinmonyDetailNativeReads",
+    "group": "NativeDetailReads"
+  },
+  {
+    "name": "nativeHomeFixtureBinding",
+    "field": "homeNativeReads",
+    "className": "PinmonyHomeNativeReads",
+    "group": "NativeHomeReads"
+  },
+  {
+    "name": "nativeSearchDiscoveryFixtureBinding",
+    "field": "searchDiscoveryNativeReads",
+    "className": "PinmonySearchDiscoveryNativeReads",
+    "group": "NativeSearchDiscovery"
+  },
+  {
+    "name": "nativeSearchFixtureBinding",
+    "field": "searchNativeReads",
+    "className": "PinmonySearchNativeReads",
+    "group": "NativeSearchReads"
+  },
+  {
+    "name": "nativeInboxUpdatesFixtureBinding",
+    "field": "inboxUpdatesNativeReads",
+    "className": "PinmonyInboxUpdatesNativeReads",
+    "group": "NativeInboxUpdates"
+  },
+  {
+    "name": "nativeInboxMessagesFixtureBinding",
+    "field": "inboxMessagesNativeReads",
+    "className": "PinmonyInboxMessagesNativeReads",
+    "group": "NativeInboxMessages"
+  },
+  {
+    "name": "nativeProfileReadBinding",
+    "field": "profileNativeReads",
+    "className": "PinmonyProfileNativeReads",
+    "group": "NativeProfileReads"
+  },
+  {
+    "name": "boardNativeDemand",
+    "field": "boardNativeReads",
+    "className": "PinmonyBoardNativeReads",
+    "group": "NativeBoardReads"
+  },
+  {
+    "name": "nativeDetailAuxiliaryFixtureBinding",
+    "field": "detailNativeAuxiliary",
+    "className": "PinmonyDetailNativeAuxiliary",
+    "group": "NativeDetailAuxiliary"
+  },
+  {
+    "name": "_nativeInboxMenu",
+    "field": "inboxMenuNative",
+    "className": "PinmonyInboxMenuNative",
+    "group": "NativeInboxMenu"
+  },
+  {
+    "name": "_nativeInvitations",
+    "field": "boardInvitationNative",
+    "className": "PinmonyBoardInvitationNative",
+    "group": "NativeInvitations"
   }
 ]

@@ -85,9 +85,6 @@ export struct PinmonyVisualSearchView {
     Column({ space: 12 }) {
       Scroll(this.resultScroller) {
         Column({ space: 12 }) {
-          if (!this.result.loading) {
-            Text('图片搜索').fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).width('100%')
-          }
           Row({ space: 10 }) {
             Column({ space: 10 }) {
               ForEach(this.result.items.filter((_p: PinmonyRelatedPin, i: number): boolean => i % 2 === 0),
@@ -111,6 +108,7 @@ export struct PinmonyVisualSearchView {
             this.onSearch(this.crop, true, false);
         })
     }.padding({ left: 10, right: 10, top: 8, bottom: 16 }).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
   }
   @Builder
   private searchContent() {
@@ -157,8 +155,10 @@ export struct PinmonyVisualSearchView {
   }
   build() {
     Column() { this.searchContent() }.width('100%').height('100%')
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: '更多此类 Pin 图' },
+        scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,
         onHeightDidChange: (height: number) => { this.expanded = this.getUIContext().px2vp(height) > this.heightValue * 0.7; },
         onDetentsDidChange: (height: number) => {

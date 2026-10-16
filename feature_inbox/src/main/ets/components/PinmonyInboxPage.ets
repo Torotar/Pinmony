@@ -2,6 +2,7 @@ import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
 import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
 import { PinmonyBoardInvitationList } from './PinmonyBoardInvitationList';
+import { PinmonyUserAvatar } from 'common_ui';
 
 @Component
 export struct PinmonyInboxPage {
@@ -16,6 +17,21 @@ export struct PinmonyInboxPage {
   onScrollPosition?: (pageUrl: string, section: string, offset: number) => void;
   private readonly scroller: Scroller = new Scroller();
   private activeSection: string = '';
+  private segmentUpdateLabel: string = '';
+  private segmentInboxLabel: string = '';
+  private segmentItems: SegmentButtonV2Items = new SegmentButtonV2Items([
+    { text: '更新' }, { text: '收件箱' }
+  ]);
+
+  private syncSegmentItems(): void {
+    if (this.segmentUpdateLabel === this.snapshot.updateLabel && this.segmentInboxLabel === this.snapshot.inboxLabel) return;
+    this.segmentUpdateLabel = this.snapshot.updateLabel;
+    this.segmentInboxLabel = this.snapshot.inboxLabel;
+    this.segmentItems = new SegmentButtonV2Items([
+      { text: this.snapshot.updateLabel }, { text: this.snapshot.inboxLabel }
+    ]);
+  }
+  @State private sectionOpacity: number = 1;
   private restoringScroll: boolean = false;
   private contentHeight: number = 0;
   private viewportHeight: number = 0;
@@ -35,14 +51,20 @@ export struct PinmonyInboxPage {
   onInvitationAll: () => void = () => {};
 
   aboutToAppear(): void {
+    this.syncSegmentItems();
     this.activeSection = this.snapshot.section;
     this.restoringScroll = this.initialScrollOffset > 0;
     if (this.onScrollAvailability) this.onScrollAvailability(false);
   }
 
   private onSnapshotChanged(): void {
+    this.syncSegmentItems();
     if (this.activeSection === this.snapshot.section) return;
     this.activeSection = this.snapshot.section;
+    this.sectionOpacity = 0;
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+      this.sectionOpacity = 1;
+    });
     // Each segment starts expanded; layout determines whether its own
     // content permits scroll-driven bottom-bar collapse.
     if (this.onScrollAvailability) this.onScrollAvailability(false);
@@ -84,6 +106,17 @@ export struct PinmonyInboxPage {
     } catch (_) { console.warn('Pinmony: inbox scroll position unavailable'); }
   }
 
+  private selectSection(section: string): void {
+    if (!this.refreshing && this.interactionReady && section !== this.snapshot.section &&
+        ((!this.loading && !this.error) || this.snapshot.dataSource === 'api') && this.onSection) this.onSection(section);
+  }
+
+  private swipeSection(offsetX: number, offsetY: number): void {
+    if (Math.abs(offsetX) < 48 || Math.abs(offsetX) <= Math.abs(offsetY)) return;
+    if (offsetX < 0 && this.snapshot.section === 'updates') this.selectSection('messages');
+    else if (offsetX > 0 && this.snapshot.section === 'messages') this.selectSection('updates');
+  }
+
   private timeText(item: PinmonyInboxItem): string {
     if (item.timeLabel) return item.timeLabel;
     if (!item.updatedAt) return '';
@@ -106,35 +139,41 @@ export struct PinmonyInboxPage {
       .padding({ left: 20, right: 20, top: 16, bottom: 8 })
   }
 
+  private updateRowKey(item: PinmonyInboxItem): string {
+    return item.id + ':' + (item.subdued ? 'subdued' : 'normal') + ':' + (item.moreId || '');
+  }
+
   @Builder
   private updatesGroup(label: string, items: PinmonyInboxItem[]) {
     if (items.length > 0) {
       if (label) { this.groupTitle(label) }
       ForEach(items, (item: PinmonyInboxItem) => { this.itemRow(item, false) },
-        (item: PinmonyInboxItem) => item.id)
+        (item: PinmonyInboxItem) => this.updateRowKey(item))
     }
   }
 
   @Builder
   private itemRow(item: PinmonyInboxItem, contact: boolean = true) {
     Row({ space: 14 }) {
-      if (item.imageUrl) {
-        Image(item.imageUrl)
-          .width(48)
-          .height(48)
-          .borderRadius(24)
-          .objectFit(ImageFit.Cover)
+      if (item.imageUrl && !contact && !item.profileUrl && !/\/user\/default(?:[/_.-]|$)/i.test(item.imageUrl)) {
+        Stack({ alignContent: Alignment.BottomEnd }) {
+          Image(item.imageUrl).width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover)
+          if (/评论了|commented on/i.test(item.title)) {
+            Image($r('app.media.lucide_message_circle')).width(14).height(14)
+              .fillColor($r('app.color.secondary_text')).padding(5).width(24).height(24)
+              .backgroundColor($r('app.color.surface_muted')).borderRadius(12)
+              .accessibilityLevel('no').hitTestBehavior(HitTestMode.None)
+          } else if (/点赞了|liked your/i.test(item.title)) {
+            Image($r('app.media.lucide_heart_filled')).width(14).height(14)
+              .fillColor($r('app.color.accent')).padding(5).width(24).height(24)
+              .backgroundColor($r('app.color.surface_muted')).borderRadius(12)
+              .accessibilityLevel('no').hitTestBehavior(HitTestMode.None)
+          }
+        }.width(48).height(48)
           .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
       } else {
-        Text(item.title.slice(0, 1).toUpperCase())
-          .fontSize(23)
-          .fontColor(Color.White)
-          .textAlign(TextAlign.Center)
-          .width(48)
-          .height(48)
-          .borderRadius(24)
-          .backgroundColor('#5867B5')
-          .onClick(() => { if (item.enabled && this.onAction) this.onAction(item.id); })
+        PinmonyUserAvatar({ image: item.imageUrl, name: item.title, avatarSize: 48 })
+          .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
       }
       Column({ space: 4 }) {
         Text(item.title)
@@ -146,13 +185,16 @@ export struct PinmonyInboxPage {
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         if (item.subtitle) {
+          Row({ space: 4 }) {
+            if (item.outgoing) { SymbolGlyph($r('sys.symbol.arrow_up_circle')).fontSize(14).fontColor([$r('app.color.secondary_text')]) }
           Text(item.subtitle)
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
-            .width('100%')
+            .layoutWeight(1)
             .textAlign(TextAlign.Start)
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }.width('100%')
         }
       }
       .layoutWeight(1)
@@ -162,13 +204,14 @@ export struct PinmonyInboxPage {
         Column({ space: 8 }) {
           if (this.timeText(item)) {
             Text(this.timeText(item)).fontSize(12).fontColor($r('app.color.secondary_text'))
-              .textAlign(TextAlign.End).width(48)
+              .textAlign(TextAlign.Center).width('100%')
           }
           if (item.moreId) {
-            Button({ type: ButtonType.Normal }) {
+            Button({ type: ButtonType.Circle }) {
               Row({ space: 3 }) {
                 ForEach([0, 1, 2], (dot: number) => {
-                  Circle().width(3).height(3).fill($r('app.color.secondary_text'))
+                  Circle().width(3).height(3).fill(this.snapshot.section === 'updates' ?
+                    $r('app.color.primary_text') : $r('app.color.secondary_text'))
                 })
               }
             }
@@ -178,7 +221,7 @@ export struct PinmonyInboxPage {
                 if (item.moreId && this.onAction) this.onAction(item.moreId);
               })
           }
-        }.alignItems(HorizontalAlign.End).alignSelf(ItemAlign.Start)
+        }.width(48).alignItems(HorizontalAlign.Center).alignSelf(ItemAlign.Start)
       } else if (contact && item.enabled) {
         SymbolGlyph($r('sys.symbol.chevron_right'))
         .fontSize(18)
@@ -189,6 +232,7 @@ export struct PinmonyInboxPage {
     }
     .width('100%')
     .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+    .opacity(item.subdued ? 0.45 : 1)
     .accessibilityDescription(item.enabled ? '' : '当前接口入口不可用')
     .accessibilityText(item.title + (item.subtitle ? '，' + item.subtitle : ''))
   }
@@ -232,19 +276,14 @@ export struct PinmonyInboxPage {
 
   build() {
     Column() {
-      if (this.snapshot.session > 0) {
+      if (this.snapshot.updateLabel && this.snapshot.inboxLabel) {
         Row() {
           CapsuleSegmentButtonV2({
-            items: new SegmentButtonV2Items([
-              { text: this.snapshot.updateLabel },
-              { text: this.snapshot.inboxLabel }
-            ]),
+            items: this.segmentItems,
+            enableStateAnimation: true,
             selectedIndex: this.snapshot.section === 'messages' ? 1 : 0,
             onItemClicked: (index: number) => {
-              if (!this.refreshing && this.interactionReady &&
-                ((!this.loading && !this.error) || this.snapshot.dataSource === 'api') && this.onSection) {
-                this.onSection(index === 0 ? 'updates' : 'messages');
-              }
+              this.selectSection(index === 0 ? 'updates' : 'messages');
             }
           })
           .width(280)
@@ -293,11 +332,10 @@ export struct PinmonyInboxPage {
             }
             if (this.snapshot.section === 'messages') {
               Row({ space: 12 }) {
-                Text('✎')
-                  .fontSize(31)
-                  .fontColor(Color.White)
-                  .textAlign(TextAlign.Center)
-                  .width(54)
+                Stack({ alignContent: Alignment.Center }) {
+                  Image($r('app.media.lucide_pen_line')).width(28).height(28)
+                    .accessibilityLevel('no')
+                }.width(54)
                   .height(54)
                   .borderRadius(18)
                   .backgroundColor($r('app.color.detail_accent'))
@@ -311,7 +349,7 @@ export struct PinmonyInboxPage {
               .accessibilityText(this.snapshot.composeLabel)
               .enabled(!!this.snapshot.composeId)
               .onClick(() => {
-                if (this.snapshot.composeId && this.onAction) this.onAction(this.snapshot.composeId);
+                if (this.interactionReady && this.snapshot.composeId && this.onAction) this.onAction(this.snapshot.composeId);
               })
             }
 
@@ -416,6 +454,8 @@ export struct PinmonyInboxPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
+    .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
+      .onActionEnd((event: GestureEvent) => this.swipeSection(event.offsetX, event.offsetY)))
   }
 }
 

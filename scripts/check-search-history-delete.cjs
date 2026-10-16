@@ -17,7 +17,11 @@ async function main(){
  pending=api.deleteHistory(page,values[0].id);await reply(2,{status:'success',code:0,endpoint_name:'v3_recent_search_delete',data:null});assert.equal(await pending,true);assert.equal(read().items.length,1);assert.equal(requests.length,4);
  await reply(3,{status:'success',data:{items}});values=read().items;
  pending=api.deleteHistory(page,values[0].id);api.reset();assert.equal(requests[4].init.signal.aborted,true);await reply(4,{status:'success',code:0,endpoint_name:'v3_recent_search_delete',data:null});assert.equal(await pending,false);assert.equal(requests.length,5);api.reset();
- read();await new Promise(r=>setTimeout(r,280));await reply(5,{status:'success',data:{items}});api.refreshSuggestions();assert.equal(read().busy,true);await new Promise(r=>setTimeout(r,280));assert.equal(requests.length,7,'reopening unchanged empty query reads fresh history');await reply(6,{status:'success',data:{items:[]}});assert.equal(read().busy,false);assert.equal(read().items.length,0);api.reset();
+ api.readSuggestions(page,'',false,()=>{});await reply(5,{status:'success',data:{items}});
+ api.refreshSuggestions();assert.equal(read().busy,false);assert.equal(read().items.length,2);
+ assert.equal(requests.length,6,'opening empty input reuses current-document history without clearing or rereading it');
+ api.reset();read();assert.equal(read().busy,true);assert.equal(requests.length,7,'new document still reads fresh history');
+ await reply(6,{status:'success',data:{items:[]}});assert.equal(read().items.length,0);api.reset();
  console.log('search history delete and refresh: passed');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

@@ -10,6 +10,7 @@ import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 export class PinmonyHomeController {
   private readonly tasks: PinmonyTaskRegistry = new PinmonyTaskRegistry();
   private generation: number = 0;
+  private tabIntent: number = 0;
   private readonly homeStore: PinmonyHomeStore;
   private readonly ports: PinmonyHomePorts;
   constructor(homeStore: PinmonyHomeStore, ports: PinmonyHomePorts) {
@@ -19,6 +20,7 @@ export class PinmonyHomeController {
 
   invalidatePending(): void {
     this.generation++;
+    this.tabIntent++;
     this.tasks.invalidate();
     this.homeStore.homeRequestToken++;
     this.homeStore.homeRefreshToken++;
@@ -46,6 +48,7 @@ export class PinmonyHomeController {
   }
 
   prepareHomeForPageBegin(url: string, retainedDocument: boolean = false): void {
+    if (this.ports.nativeReads?.() && this.ports.isAuthenticated()) { this.homeStore.homeActionsReady = false; return; }
     const pageKey: string = this.ports.pageKeyFromAddress(url);
     if (!pageKey) {
       // A root-tab route change does not invalidate the native home snapshot.
@@ -102,6 +105,8 @@ export class PinmonyHomeController {
   }
 
   clearHome(): void {
+    if (this.ports.nativeReads?.() && this.ports.isAuthenticated()) { this.homeStore.homeActionsReady = false; return; }
+    this.homeStore.homeNativeReadsReady = false;
     // A document reset can be part of the user intent waiting for a fresh context.
     this.tasks.invalidate();
     this.homeStore.homeRefreshToken++;
@@ -123,6 +128,7 @@ export class PinmonyHomeController {
   }
 
   expectHome(): void {
+    if (this.ports.nativeReads?.()) { this.ports.nativeDemand?.(); return; }
     const token: number = ++this.homeStore.homeRequestToken;
     this.homeStore.homeLoading = !this.homeStore.home?.pins.length;
     this.homeStore.homeError = '';
@@ -135,6 +141,15 @@ export class PinmonyHomeController {
   }
 
   updateHome(value: string): void {
+    if (this.ports.nativeReads?.()) {
+      try { const message: PinmonyHomeSnapshot = JSON.parse(value) as PinmonyHomeSnapshot;
+        if (message.kind === 'context' && typeof message.session === 'number' && typeof message.contextEpoch === 'number' &&
+            message.contextEpoch >= 0 && message.contextEpoch === this.ports.documentEpoch?.() && this.ports.canAcceptMessages() &&
+            this.ports.isAuthenticated() && this.homeStore.homeNativeReadsReady && message.pageKey === this.ports.currentPageKey() &&
+            message.pageKey === this.homeStore.home?.pageKey) this.homeStore.homeActionsReady = true;
+      } catch (_) {}
+      return;
+    }
     if (!this.ports.canAcceptMessages()) return;
     try {
       const message: PinmonyHomeSnapshot = JSON.parse(value) as PinmonyHomeSnapshot;
@@ -177,6 +192,16 @@ export class PinmonyHomeController {
       if (message.kind === 'loading') {
         const loadingPins: PinmonyHomePin[] = message.pins.filter((pin: PinmonyHomePin): boolean =>
           !!pin.id && !!this.ports.pinIdentity(pin.pinUrl) && /^https:\/\//i.test(pin.imageUrl));
+        if (this.homeStore.pendingHomeTab && !this.homeStore.retainingHomeFeed &&
+            tabs.some((tab: PinmonyHomeTab): boolean => tab.id === this.homeStore.pendingHomeTab && tab.selected)) {
+          this.homeStore.home = { kind: 'loading', session: message.session, pageKey: message.pageKey,
+            selectedTab: message.selectedTab || '', tabs: tabs, board: board, pins: loadingPins,
+            dataSource: message.dataSource };
+          this.homeStore.homeActionsReady = false;
+          this.homeStore.homeLoading = true;
+          this.homeStore.homeError = '';
+          return;
+        }
         if (this.homeStore.home?.pins.length) {
           this.homeStore.homeActionsReady = false;
           this.homeStore.homeLoading = !!this.homeStore.pendingHomeTab && !this.homeStore.retainingHomeFeed;
@@ -280,13 +305,19 @@ export class PinmonyHomeController {
   }
 
   async selectHomeTab(id: string, restoring: boolean = false): Promise<void> {
+    if (this.ports.nativeReads?.()) { if (!this.ports.rejectOffline('home tab')) await this.ports.nativeSelect?.(id); return; }
     const generation: number = this.generation;
+    const intent: number = ++this.tabIntent;
     this.ports.traceAction(restoring ? 'home.tab.restore' : 'home.tab', id);
     if (this.ports.rejectOffline('home tab')) return;
-    if (!restoring && !await this.ports.ensureContext(true, (): boolean => generation === this.generation)) return;
-    if (generation !== this.generation) return;
+    const switching: boolean = !!this.homeStore.pendingHomeTab && this.homeStore.home?.kind === 'loading' &&
+      this.ports.isActive() && this.ports.isAuthenticated() &&
+      this.homeStore.home.pageKey === this.ports.currentPageKey();
+    if (!restoring && !switching && !await this.ports.ensureContext(true,
+      (): boolean => generation === this.generation && intent === this.tabIntent)) return;
+    if (generation !== this.generation || intent !== this.tabIntent) return;
     const home: PinmonyHomeSnapshot | undefined = this.homeStore.home;
-    if (!home || !this.homeStore.homeActionsReady || !id || home.pageKey !== this.ports.currentPageKey()) return;
+    if (!home || (!this.homeStore.homeActionsReady && !switching) || !id || home.pageKey !== this.ports.currentPageKey()) return;
     const target: PinmonyHomeTab | undefined = home.tabs.find((tab: PinmonyHomeTab): boolean => tab.id === id);
     if (!target || !target.enabled || target.selected && !this.homeStore.pendingHomeTab) return;
     if (!restoring) {
@@ -332,6 +363,7 @@ export class PinmonyHomeController {
   }
 
   async loadMoreHome(): Promise<void> {
+    if (this.ports.nativeReads?.()) { await this.ports.nativeMore?.(); return; }
     const generation: number = this.generation;
     if (this.ports.rejectOffline('home load-more')) return;
     const home: PinmonyHomeSnapshot | undefined = this.homeStore.home;
@@ -355,6 +387,7 @@ export class PinmonyHomeController {
   }
 
   refreshHome(): void {
+    if (this.ports.nativeReads?.()) { if (!this.ports.recoverOffline()) this.ports.nativeRefresh?.(); return; }
     if (this.ports.recoverOffline()) return;
     if (this.ports.prepareRead()) return;
     const currentPageKey: string = this.ports.currentPageKey();

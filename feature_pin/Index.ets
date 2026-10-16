@@ -2,6 +2,7 @@ export { PinmonyDetailAction, PinmonyRelatedPin, PinmonyCarouselItem, PinmonyCar
 export { PinmonyComment, PinmonyCommentResult, PinmonySaveBoard, PinmonySaveResult, PinmonyPostResult, PinmonySaveOperationResult } from './src/main/ets/models/PinmonyComments';
 export { PinmonyEditPinResult } from './src/main/ets/models/PinmonyEditPin';
 export { PinmonyDetailPage } from './src/main/ets/components/PinmonyDetailPage';
+export { descriptionTagSearchUrl } from './src/main/ets/services/PinmonyDescriptionTags';
 export { PinmonyCarouselView } from './src/main/ets/components/PinmonyCarouselView';
 export { PinmonyVideoPlayer } from './src/main/ets/components/PinmonyVideoPlayer';
 export { PinmonyCommentsSheet } from './src/main/ets/components/PinmonyCommentsSheet';
@@ -11,7 +12,7 @@ export { PIN_CAROUSEL_API_ENABLED, PIN_CAROUSEL_API_SCRIPT } from './src/main/et
 export { PinmonyConfirmedSaves } from './src/main/ets/services/PinmonyConfirmedSaves';
 export { PIN_DETAIL_API_ENABLED, PIN_DETAIL_API_SCRIPT } from './src/main/ets/services/PinmonyDetailApiScript';
 export { PinmonyDetailCacheEntry, PinmonyDetailCache, retainDetailPresentation } from './src/main/ets/services/PinmonyDetailCache';
-export { PinmonyDetailPrefetch } from './src/main/ets/services/PinmonyDetailPrefetch';
+export { PinmonyDetailPrefetch, mapPrefetchedDetail } from './src/main/ets/services/PinmonyDetailPrefetch';
 export { PinmonyDetailTrace } from './src/main/ets/services/PinmonyDetailTrace';
 export { PinmonyDetailReadCache, PinmonyDetailReadCachePorts } from './src/main/ets/services/PinmonyDetailReadCache';
 export { PinmonyDetailImageStage, PinmonyDetailImageStagePorts } from './src/main/ets/services/PinmonyDetailImageStage';

@@ -4,10 +4,33 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/(^|\\.)pinterest\\.com$/.test(location.hostname) || !window.PinmonyInboxConversationsEnabled) return;
   var list = null, listKey = '', listGeneration = 0, selfId = '', flow = null, stack = [], generation = 0;
-  var controllers = [];
+  var controllers = [], readingFlow = null, readSerial = 0, listReadBusy = false;
   function root() { return /^\\/(?:inbox|messages|updates|notifications)\\/?$/.test(location.pathname); }
   function page() { return location.origin + location.pathname.replace(/\\/$/, '') + '/'; }
   function clean(v) { return typeof v === 'string' ? v.trim().slice(0, 500) : ''; }
+  function imageUrl(v) {
+    if (typeof v !== 'string' || v.length > 2048) return '';
+    try { var u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password ? u.href : ''; }
+    catch (_) { return ''; }
+  }
+  function board(b) {
+    if (!b || typeof b.id !== 'string' || !/^\\d+$/.test(b.id) || b.id.length > 40) return undefined;
+    var target = '';
+    try {
+      var u = new URL(typeof b.url === 'string' && b.url.length <= 2048 ? b.url : '', location.origin);
+      var parts = u.pathname.split('/').filter(Boolean);
+      if (u.origin === location.origin && !u.username && !u.password && parts.length === 2 &&
+          !/^(?:_|pin$|users$|search$|ideas$|today$|settings$|messages$|inbox$|login$|signup$|business$|explore$)/i.test(parts[0]) &&
+          !/^(?:_|followers$|following$)/i.test(parts[1])) target = u.origin + '/' + parts.join('/') + '/';
+    } catch (_) {}
+    var covers = b.cover_images || {};
+    var images = Array.isArray(b.pin_thumbnail_urls) ? b.pin_thumbnail_urls.slice(0, 3).map(imageUrl).filter(Boolean) : [];
+    return { id: b.id, title: clean(b.name), url: target, images: images,
+      cover: imageUrl(covers['400x300'] && covers['400x300'].url) || imageUrl(b.image_cover_hd_url) ||
+        imageUrl(b.image_cover_url) || imageUrl(b.image_thumbnail_url) || images[0] || '',
+      pinCount: Number.isSafeInteger(b.pin_count) && b.pin_count >= 0 ? b.pin_count : undefined,
+      sectionCount: Number.isSafeInteger(b.section_count) && b.section_count >= 0 ? b.section_count : undefined };
+  }
   function user(u) {
     if (!u || typeof u.id !== 'string' || !/^\\d+$/.test(u.id)) throw new Error('用户返回格式无效');
     return { profileUrl: /^[a-zA-Z0-9_]+$/.test(u.username || '') ? location.origin + '/' + u.username + '/' : '', id: u.id, self: !!(selfId && u.id === selfId), name: clean(u.full_name) || clean(u.username),
@@ -50,46 +73,67 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
     } finally { clearTimeout(timer); controllers = controllers.filter(function (c) { return c !== controller; }); }
   }
   function reset() {
+    readingFlow = null; readSerial++; listReadBusy = false;
     generation++; listGeneration++; controllers.forEach(function (c) { c.abort(); }); controllers = [];
     list = null; listKey = ''; flow = null; stack = []; selfId = '';
   }
-  function newFlow(screen, session) {
+  function newFlow(screen, session, initialMessages, conversationId) {
     generation++;
-    var s = { kind: 'nativeFlow', pageUrl: page(), session: session, screen: screen, title: '', loading: true,
-      error: '', users: [], messages: [], selectedIds: [], hasMore: false, conversationId: '', bookmark: '' };
+    var s = { kind: 'nativeFlow', contextEpoch: window.PinmonyNetwork && window.PinmonyNetwork.documentEpoch ? window.PinmonyNetwork.documentEpoch() : -1, pageUrl: page(), session: session, screen: screen, title: '', loading: true,
+      error: '', users: [], messages: initialMessages || [], selectedIds: [], hasMore: false, conversationId: conversationId || '', bookmark: '' };
     flow = s; publish(); return s;
   }
-  async function messages(s, more) {
-    s.loading = true; s.error = ''; publish();
+  async function messages(s, more, quiet) {
+    if(window.PinmonyNativeInboxMessagesEnabled) { s.nativeRead = true; s.loading = false; publish(); return; }
+    if (readingFlow === s) return;
+    readingFlow = s;
+    var readToken = ++readSerial;
+    var previousBookmark = s.bookmark, previousHasMore = s.hasMore;
+    if (!quiet) { s.loading = true; s.error = ''; publish(); }
     try {
       var options = { conversation_id: s.conversationId, page_size: 25, refresh: false, hide_sys_msg: true,
         field_set_key: ['default_with_reactions_and_deleted_by'] };
       if (more) options.bookmarks = [s.bookmark];
-      var r = await request('ConversationMessagesResource', 'get', options, function () { return valid(s); });
+      var r = await request('ConversationMessagesResource', 'get', options, function () { return valid(s) && readToken === readSerial; });
       if (r.endpoint_name && r.endpoint_name !== 'v3_get_conversation_messages' || !Array.isArray(r.data)) throw new Error('消息返回格式无效');
       var rows = r.data.map(function (m) {
         if (!m || typeof m.id !== 'string') throw new Error('消息标识无效');
         var pin = m.pin, imgs = pin && pin.images || {}, img = imgs['236x'] || imgs['474x'] || imgs['736x'] || imgs.orig;
         return { id: m.id, text: clean(m.text), image: img && /^https:\\/\\//.test(img.url || '') ? img.url : '',
+          imageWidth: img && Number.isFinite(img.width) && img.width > 0 ? img.width : undefined,
+          imageHeight: img && Number.isFinite(img.height) && img.height > 0 ? img.height : undefined,
           pinUrl: pin && /^\\d+$/.test(pin.id || '') ? location.origin + '/pin/' + pin.id + '/' : '',
           createdAt: clean(m.created_at), own: !!(selfId && m.sender && m.sender.id === selfId),
           sender: m.sender ? user(m.sender) : undefined,
+          profile: !m.deleted_by && m.user ? user(m.user) : undefined,
+          profileImages: !m.deleted_by && m.user ? ((m.user.recent_pin_images && (m.user.recent_pin_images['222x'] || m.user.recent_pin_images['192x']) || []).map(function (image) { return image.url; }).length ? (m.user.recent_pin_images['222x'] || m.user.recent_pin_images['192x']).map(function (image) { return image.url; }) : Array.isArray(m.user.pin_thumbnail_urls) ? m.user.pin_thumbnail_urls : []).filter(function (url) { return typeof url === 'string' && url.length <= 2048 && url.indexOf('https://i.pinimg.com/') === 0; }).slice(0, 2) : [],
+          board: m.deleted_by || m.text === '此消息已被删除' ? undefined : board(m.board),
           deleted: !!m.deleted_by || m.text === '此消息已被删除',
           reactions: Array.isArray(m.reactions) ? m.reactions.reduce(function (all, group) {
             return all.concat(Object.keys(group || {}).map(function (id) { return group[id]; })
               .filter(function (v) { return ['❤️','😂','😍','😮','👍','👎'].indexOf(v) >= 0; }));
           }, []).slice(0, 20) : [] };
       });
+      if (!more && r.bookmark && r.bookmark !== '-end-' && rows.length && s.messages.length) {
+        var oldest = Math.min.apply(null, rows.map(function (m) { return Date.parse(m.createdAt); }).filter(Number.isFinite));
+        rows = s.messages.filter(function (m) { return Date.parse(m.createdAt) < oldest; }).concat(rows);
+      }
       var seen = {}; s.messages = (more ? s.messages.concat(rows) : rows).filter(function (m) {
         if (seen[m.id]) return false; seen[m.id] = true; return true;
       }).sort(function (a, b) { return Date.parse(a.createdAt) - Date.parse(b.createdAt); });
       s.hasMore = !!r.bookmark && r.bookmark !== '-end-' && r.bookmark !== s.bookmark; s.bookmark = r.bookmark;
-    } catch (e) { if (valid(s)) s.error = e.message === 'stale' ? '' : e.name === 'AbortError' ? '会话消息请求超时，请重试' : e.message; }
-    finally { if (valid(s)) { s.loading = false; publish(); } }
+      if (quiet && previousBookmark) { s.bookmark = previousBookmark; s.hasMore = previousHasMore; }
+    } catch (e) { if (!quiet && valid(s)) s.error = e.message === 'stale' ? '' : e.name === 'AbortError' ? '会话消息请求超时，请重试' : e.message; }
+    finally { if (readToken === readSerial) { readingFlow = null; if (valid(s)) { if (!quiet) s.loading = false; publish(); } } }
   }
   async function openChat(id, session, users) {
     if (!/^\\d+$/.test(id || '')) return false;
-    var s = newFlow('chat', session); s.conversationId = id; s.users = users || [];
+    if(window.PinmonyNativeInboxMessagesEnabled) {
+      var token = flow && flow.nativeToken; var native = newFlow('chat',session,[],id);
+      native.nativeToken = token; native.users = users || []; native.nativeRead = true; publish(); return true;
+    }
+    var previous = flow && valid(flow) && flow.screen === 'chat' && flow.session === session && flow.conversationId === id ? flow : null;
+    var s = newFlow('chat', session, previous && previous.messages, id); s.users = users || [];
     try {
       var r = await request('ApiResource', 'get', { url: '/v3/conversations/' + id + '/',
         data: { fields: ['conversation.id','conversation.name','conversation.users()','conversation.read_times_ms',
@@ -101,6 +145,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
     return true;
   }
   async function compose(s, query) {
+    if(window.PinmonyNativeInboxMessagesEnabled){s.nativeRead = true; publish(); return;}
     var token = ++generation; s.loading = true; s.error = ''; publish();
     try {
       var options = query ? { count: 25, term: query, pin_scope: 'pins' } : { field_set_key: 'default' };
@@ -113,7 +158,35 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
     finally { if (valid(s) && token === generation) { s.loading = false; publish(); } }
   }
   window.PinmonyInboxConversations = {
+    installNative: function(key, snapshot, account) {
+      if(!window.PinmonyNativeInboxMessagesEnabled || !root() || key !== page() || !snapshot || snapshot.pageUrl !== key ||
+        !Number.isInteger(snapshot.nativeToken) || !Number.isInteger(snapshot.session) || !Array.isArray(snapshot.messages) || snapshot.messages.length > 2000 ||
+        !Array.isArray(snapshot.users) || snapshot.users.length > 1000 || !Array.isArray(snapshot.selectedIds) || snapshot.selectedIds.length > 1000 || !/^\\d{1,40}$/.test(account || '')) return false;
+      if(flow && flow.nativeToken === snapshot.nativeToken && (flow.sending || flow.messageBusy)) return false;
+      generation++; readSerial++; readingFlow = null; stack = []; selfId = account;
+      flow = Object.assign({},snapshot,{contextEpoch:window.PinmonyNetwork && window.PinmonyNetwork.documentEpoch ? window.PinmonyNetwork.documentEpoch() : -1}); return true;
+    },
     reset: reset,
+    close: function (session, conversationId) {
+      if (!flow || !valid(flow) || flow.session !== session || flow.conversationId !== conversationId) return false;
+      generation++; flow = null; stack = []; return true;
+    },
+    retainHistory: function (session, conversationId, older) {
+      var s = flow;
+      if (!s || !valid(s) || s.screen !== 'chat' || s.loading || s.error || s.session !== session ||
+          s.conversationId !== conversationId || !Array.isArray(older) || older.length > 2000 || !s.messages.length) return false;
+      var oldest = Math.min.apply(null, s.messages.map(function (m) { return Date.parse(m.createdAt); }).filter(Number.isFinite));
+      var ids = {}; s.messages.forEach(function (m) { ids[m.id] = true; });
+      var history = older.filter(function (m) {
+        if (!m || typeof m.id !== 'string' || !/^\\d+$/.test(m.id) || ids[m.id] || !Number.isFinite(Date.parse(m.createdAt)) ||
+            Date.parse(m.createdAt) >= oldest || typeof m.text !== 'string' || m.text.length > 500 ||
+            typeof m.image !== 'string' || m.image.length > 2048 || typeof m.pinUrl !== 'string' || m.pinUrl.length > 2048 ||
+            typeof m.own !== 'boolean') return false;
+        ids[m.id] = true; return true;
+      });
+      s.messages = history.concat(s.messages).slice(-2000).sort(function (a, b) { return Date.parse(a.createdAt) - Date.parse(b.createdAt); });
+      return true;
+    },
     pause: function () {
       generation++; listGeneration++; controllers.forEach(function (c) { c.abort(); }); controllers = [];
       if (!list || list.kind !== 'ready') list = null;
@@ -127,10 +200,20 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
       else { var s = newFlow('compose', session); s.loading = false; s.directContact = true; s.users = [{ profileUrl: /^[a-zA-Z0-9_]+$/.test(peer.username || '') ? location.origin + '/' + peer.username + '/' : '', id: peer.id, name: peer.name, avatar: peer.avatar || '' }]; s.selectedIds = [peer.id]; publish(); this.action('next', '', session); }
       return true;
     },
-    read: function (key, changed, current) {
-      if (listKey !== key) { list = null; listKey = key; listGeneration++; }
-      if (list) return list;
-      var token = listGeneration; list = { kind: 'loading', error: '', items: [], conversations: [] }; var pending = list;
+    pollChat: function (session) {
+      if(window.PinmonyNativeInboxMessagesEnabled)return false;
+      var s = flow;
+      if (!s || !valid(s) || s.session !== session || s.screen !== 'chat' || s.loading || s.sending || s.messageBusy || readingFlow === s) return false;
+      messages(s, false, true); return true;
+    },
+    read: function (key, changed, current, refresh) {
+      if(window.PinmonyNativeInboxMessagesEnabled)return {kind:'ready',items:[],conversations:[]};
+      if (listKey !== key) { list = null; listKey = key; listGeneration++; listReadBusy = false; }
+      if (list && (!refresh || list.kind !== 'ready' || listReadBusy)) return list;
+      var token = listGeneration;
+      var pending = { kind: 'loading', error: '', items: [], conversations: [] };
+      if (!refresh) list = pending;
+      listReadBusy = true;
       request('ConversationsResource', 'get', { field_set_key: 'default' }, function () { return current() && token === listGeneration && listKey === key; })
         .then(function (r) {
           if (r.endpoint_name && r.endpoint_name !== 'v3_get_conversations' || !Array.isArray(r.data)) throw new Error('会话列表返回格式无效');
@@ -138,21 +221,25 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
           pending.items = r.data.map(function (c) {
             if (!c || typeof c.id !== 'string' || !Array.isArray(c.users)) throw new Error('会话列表缺少有效 ID 或成员');
             var users = c.users.map(user).filter(function (u) { return u.id !== selfId; }); var last = c.last_message;
-            var text = last && clean(last.text) || (last && last.pin ? (last.sender && last.sender.id === selfId ? '你发送了一张 Pin 图' : '发送了一张 Pin 图') : '');
+            var text = last && clean(last.text) || (last && last.user ? (last.sender && last.sender.id === selfId ? '你发送了一份个人资料' : '发送了一份个人资料') : last && last.board ?
+              (last.sender && last.sender.id === selfId ? '你发送了一个图板' : '发送了一个图板') :
+              last && last.pin ? (last.sender && last.sender.id === selfId ? '你发送了一张 Pin 图' : '发送了一张 Pin 图') : '');
             var date = last && new Date(last.created_at);
             return { id: 'conversation:' + c.id, title: clean(c.name) || users.map(function (u) { return u.name; }).join('、'),
-              subtitle: text, profileUrl: users.length === 1 ? users[0].profileUrl || '' : '', imageUrl: users[0] && users[0].avatar || '', enabled: true, unread: !!c.unread,
+              outgoing: !!(last && last.sender && last.sender.id === selfId), subtitle: text, profileUrl: users.length === 1 ? users[0].profileUrl || '' : '', imageUrl: users[0] && users[0].avatar || '', enabled: true, unread: !!c.unread,
               timeLabel: date && !isNaN(date.getTime()) ? String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0') : '' };
-          }); pending.kind = 'ready'; changed();
+          }); pending.kind = 'ready'; list = pending; changed();
         }).catch(function (e) { if (current() && token === listGeneration) {
           if (e && e.pinmonyCancelled === true) { listKey = ''; pending.kind = 'loading'; changed(); return; }
+          if (refresh) return;
           pending.kind = 'failed'; pending.error = e.name === 'AbortError' ? '会话列表请求超时，请重试' :
             e instanceof TypeError ? '会话列表网络请求失败，请重试' : clean(e.message); changed();
-        } });
+        } }).finally(function () { if (token === listGeneration) listReadBusy = false; });
       return list;
     },
     open: function (id, session) {
       if (!root()) return false;
+      if(window.PinmonyNativeInboxUpdatesEnabled === true && id.indexOf('news-menu:') === 0)return false;
       if (id.indexOf('news-menu:') === 0 && window.PinmonyInboxApi && window.PinmonyInboxApi.find(id.slice(10))) {
         var news = window.PinmonyInboxApi.find(id.slice(10));
         stack = []; var menu = newFlow('updatesMenu', session); menu.loading = false;
@@ -182,6 +269,8 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
       return false;
     },
     action: function (action, value, session) {
+      if(window.PinmonyNativeInboxUpdatesEnabled === true && ['hideNews','undoNews','unsubscribePin'].includes(action))return false;
+      if(window.PinmonyNativeInboxWritesEnabled && ['send','next','react','deleteMessage','blockUser','unblockUser'].includes(action))return false;
       var s = flow; if (!s || !valid(s) || s.session !== session) return false;
       if (action === 'hideNews' && s.screen === 'updatesMenu' && !s.messageBusy && /^\\d+$/.test(s.newsId || '')) {
         s.messageBusy = true; s.error = ''; publish();
@@ -242,6 +331,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
         var target = s.messages.find(function (m) { return m.id === id; });
         if (!target || target.deleted || !/^\\d+$/.test(id) || action === 'deleteMessage' && !target.own ||
             action === 'react' && ['❤️','😂','😍','😮','👍','👎'].indexOf(reaction) < 0) return false;
+        readSerial++; readingFlow = null;
         s.messageBusy = true; s.error = ''; publish();
         request('ApiResource', action === 'react' ? 'create' : 'delete',
           action === 'react' ? { url: '/v3/conversations/messages/' + id + '/', data: { reaction_text: reaction } } :
@@ -260,6 +350,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
       if (action === 'send' && s.screen === 'chat' && !s.loading && !s.sending) {
         var text = typeof value === 'string' ? value.trim() : '';
         if (!text || text.length > 2000 || !/^\\d+$/.test(s.conversationId || '')) return false;
+        readSerial++; readingFlow = null;
         s.sending = true; s.sendError = ''; publish();
         request('ConversationMessagesResource', 'create', { conversation_id: s.conversationId,
           text: text, field_set_key: ['default_with_reactions'] }, function () { return valid(s); })

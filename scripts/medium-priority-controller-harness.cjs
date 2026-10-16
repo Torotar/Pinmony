@@ -21,7 +21,7 @@ function bind(native,ts,globals={},names=['settings','inboxActions']) {
     const exported=loader.loadFile(`feature_${feature}/src/main/ets/controllers/${match[1]}.ets`);
     const result={};
     vm.runInNewContext(ts.transpileModule(`export function bind(){this.${name}Controller=new ${match[1]}(this.${store},{${match[2]}});}`,{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,
-      {...globals,...exported,exports:result,useNativeTransport:s=>s,PIN_ACCOUNT_SETTINGS_SCRIPT:'',PIN_NOTIFICATIONS_READ_SCRIPT:'',PIN_INBOX_CONVERSATIONS_API_ENABLED:true});
+      {PIN_NATIVE_PROFILE_SETTINGS_ENABLED:false,...globals,...exported,exports:result,useNativeTransport:s=>s,PIN_ACCOUNT_SETTINGS_SCRIPT:'',PIN_NOTIFICATIONS_READ_SCRIPT:'',PIN_INBOX_CONVERSATIONS_API_ENABLED:true});
     result.bind.call(native);
   }
   return loader;

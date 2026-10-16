@@ -88,17 +88,21 @@ export class PinmonyMediaFile {
         const remaining: number = MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started);
         if (remaining <= 0) { failure = 'timeout'; throw new Error('media-timeout'); }
         activeAttempt = attempt; status = 0;
+        let tlsPending: boolean = false;
+        const connectionLimit: number = attempt === 0 ? 5000 : remaining;
         const profile: string = attempt === 0 ? 'system' : 'tls12';
         const session: rcp.Session = rcp.createSession();
         const request: rcp.Request = new rcp.Request(source, 'GET', {
           Accept: 'video/mp4, application/octet-stream', 'Accept-Encoding': 'identity' });
         activeSession = session; activeRequest = request;
         request.configuration = { proxy: 'system', transfer: { autoRedirect: false,
-          timeout: { connectMs: Math.min(5000, remaining), transferMs: remaining } },
+          timeout: { connectMs: Math.min(connectionLimit, remaining), transferMs: remaining } },
           tracing: { collectTimeInfo: true, httpEventsHandler: {
             onStatusCodeReceive: (value: number) => { if (activeAttempt === attempt && current()) status = value; },
             onTimeInfo: (value: rcp.TimeInfo) => {
               if (activeAttempt !== attempt || !current()) return;
+              tlsPending = Number.isFinite(value.connectTimeMs) && Number.isFinite(value.nameLookupTimeMs) &&
+                value.connectTimeMs > value.nameLookupTimeMs && value.tlsHandshakeTimeMs === 0 && value.startTransferTimeMs === 0;
               const metric = (number: number): string => Number.isFinite(number) && number >= 0 ? number.toString() : 'unknown';
               this.trace('event=connection-time host=' + host + ' profile=' + profile +
                 ' dnsMs=' + metric(value.nameLookupTimeMs) + ' connectMs=' + metric(value.connectTimeMs) +
@@ -120,7 +124,7 @@ export class PinmonyMediaFile {
             if (!current() || failure || activeAttempt !== attempt) throw new Error('media-cancelled');
             const budget: number = MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started);
             if (budget <= 0) { failure = 'timeout'; throw new Error('media-timeout'); }
-            request.configuration!.transfer!.timeout = { connectMs: Math.min(5000, budget), transferMs: budget };
+            request.configuration!.transfer!.timeout = { connectMs: Math.min(connectionLimit, budget), transferMs: budget };
             return session.fetch(request);
           });
           completed = await Promise.race([transfer, cancelled]);
@@ -129,8 +133,10 @@ export class PinmonyMediaFile {
           const code: number = Number.isFinite((error as BusinessError).code) ? (error as BusinessError).code : 0;
           this.trace('event=connection-failed host=' + host + ' profile=' + profile + ' status=' + status.toString() +
             ' code=' + code.toString() + ' bytes=' + bytes.toString());
-          if (Date.now() - started >= 6000 || attempt !== 0 || code !== 1007900035 || status !== 0 || bytes !== 0 || !current() || failure) throw error as Error;
-          this.trace('event=tls-compatibility reason=ssl-connect next=tls12');
+          const tlsTimeout: boolean = code === 1007900028 && tlsPending;
+          if (MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started) < 4000 || attempt !== 0 ||
+              (code !== 1007900035 && !tlsTimeout) || status !== 0 || bytes !== 0 || !current() || failure) throw error as Error;
+          this.trace('event=tls-compatibility reason=' + (tlsTimeout ? 'tls-timeout' : 'ssl-connect') + ' next=tls12');
         } finally {
           // Reject callbacks from a closed attempt before allowing another profile to write the file.
           activeAttempt = -1; activeRequest = undefined; activeSession = undefined;

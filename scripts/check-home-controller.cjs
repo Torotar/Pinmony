@@ -100,6 +100,24 @@ async function main() {
   assert(preparation.events.find(event => event[0] === 'js')[1].includes('PinmonyHomeTab(8,'), 'document reset preserves waiting intent and uses fresh session');
   preparation.controller.invalidatePending();
 
+  const rapid = runtime.harness(); update(rapid, snapshot(1));
+  await rapid.controller.selectHomeTab('board');
+  update(rapid, snapshot(2, [], { kind: 'loading', selectedTab: 'Board',
+    tabs: tabs.map(tab => ({ ...tab, selected: tab.id === 'board' })) }));
+  assert.equal(rapid.store.home.session, 2, 'loading selection publishes current bridge session');
+  rapid.ports.ensureContext = async () => { throw Error('must not wait for previous category feed'); };
+  await rapid.controller.selectHomeTab('all');
+  assert(rapid.events.some(event => event[0] === 'js' && event[1].includes('PinmonyHomeTab(2,') && event[1].includes('"all"')));
+  assert.equal(rapid.store.pendingHomeTab, 'all');
+  rapid.controller.invalidatePending();
+
+  const olderIntent = defer(), latestIntent = runtime.harness({ ensureContext: () => olderIntent.promise });
+  update(latestIntent, snapshot(1));
+  const olderSelection = latestIntent.controller.selectHomeTab('board');
+  const newerSelection = latestIntent.controller.selectHomeTab('all');
+  olderIntent.resolve(true); await Promise.all([olderSelection, newerSelection]);
+  assert(!latestIntent.events.some(event => event[0] === 'js'), 'older queued selection cannot override newest selected tab');
+
   const scriptWait = defer(), late = runtime.harness({ runScript: () => scriptWait.promise });
   update(late, snapshot(1)); const lateAction = late.controller.selectHomeTab('board'); await flush();
   late.controller.invalidatePending(); const timerCount = timers.size;

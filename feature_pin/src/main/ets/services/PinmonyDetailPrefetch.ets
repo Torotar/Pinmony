@@ -16,9 +16,11 @@ interface PrefetchPin {
   description?: string; closeup_unified_description?: string;
   origin_pinner?: PrefetchCreator; pinner?: PrefetchCreator;
   link_domain?: string; domain?: string; ai_disclosures?: number[];
+  gen_ai_topics?: PrefetchAiTopic[]; digital_media_source_type?: number;
   is_video?: boolean; videos?: PrefetchVideos;
   story_pin_data?: PrefetchStory; carousel_data?: PrefetchCarousel;
 }
+interface PrefetchAiTopic { name?: string; }
 interface PrefetchResource { status: string; data: PrefetchPin; }
 interface PrefetchResponse { resource_response: PrefetchResource; }
 interface PrefetchEntry { pinUrl: string; detail: PinmonyDetailSnapshot; expiresAt: number; }
@@ -38,8 +40,9 @@ function detailResource(body: string, pinUrl: string): string {
   const selected: Record<string, Object> = {};
   const fields: string[] = ['id', 'type', 'images', 'title', 'grid_title', 'closeup_unified_title',
     'description', 'closeup_unified_description', 'origin_pinner', 'pinner', 'link_domain', 'domain',
-    'ai_disclosures', 'is_video', 'videos', 'story_pin_data', 'carousel_data', 'aggregated_pin_id',
-    'aggregated_pin_data', 'tracking_params', 'client_tracking_params', 'reaction_data', 'reaction_by_me', 'reaction_counts',
+    'link', 'mobile_link', 'tracked_link', 'utm_link', 'affiliate_link', 'pin_direct_to_site_url',
+    'ai_disclosures', 'gen_ai_topics', 'digital_media_source_type', 'is_video', 'videos', 'story_pin_data', 'carousel_data', 'aggregated_pin_id',
+    'aggregated_pin_data', 'comment_count', 'tracking_params', 'client_tracking_params', 'reaction_data', 'reaction_by_me', 'reaction_counts',
     'is_eligible_for_image_download', 'is_eligible_for_ai_comparison', 'has_hidden_inner_pin', 'board',
     'through_id', 'rec_reason_type', 'source'];
   fields.forEach((field: string) => { if (input[field] !== undefined) selected[field] = input[field]; });
@@ -57,7 +60,7 @@ function imageValid(image: PrefetchImage | undefined): boolean {
 }
 
 // The same PinResource contract as detail, without live controls or playback.
-export function mapPrefetchedDetail(body: string, pinUrl: string): PinmonyDetailSnapshot | undefined {
+export function mapPrefetchedDetail(body: string, pinUrl: string, allowPendingMedia: boolean = false): PinmonyDetailSnapshot | undefined {
   if (body.length > 512 * 1024 || !/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pinUrl)) return undefined;
   try {
     const payload: PrefetchResponse = JSON.parse(body) as PrefetchResponse;
@@ -69,7 +72,7 @@ export function mapPrefetchedDetail(body: string, pinUrl: string): PinmonyDetail
       .map((size: string): PrefetchImage => images[size]).find((item: PrefetchImage): boolean => imageValid(item));
     if (!image) return undefined;
     // A cover is not a complete carousel/story. Keep their existing resolver.
-    if (pin.carousel_data?.pages?.length || pin.carousel_data?.carousel_slots?.length) return undefined;
+    if (pin.carousel_data?.pages?.length || !allowPendingMedia && pin.carousel_data?.carousel_slots?.length) return undefined;
     const story: PrefetchStory | undefined = pin.story_pin_data;
     if (story?.pages?.length || story?.story_pages?.length) {
       const blocks: PrefetchBlock[] | undefined = story.pages?.[0]?.blocks;
@@ -87,7 +90,7 @@ export function mapPrefetchedDetail(body: string, pinUrl: string): PinmonyDetail
     if (mp4 && /^https:\/\/(?:[a-z0-9-]+\.)*pinimg\.com\/videos\/[^\s?#]+\.mp4(?:\?[^\s#]*)?$/i.test(mp4.url) && mp4.url.length <= 2000)
       sources.push({ url: mp4.url, kind: 'mp4' });
     const isVideo: boolean = pin.is_video === true || !!pin.videos;
-    if (isVideo && !sources.length) return undefined;
+    if (isVideo && !sources.length && !allowPendingMedia) return undefined;
     const primary: PrefetchVideo | undefined = sources[0]?.kind === 'hls' ? hls : mp4;
     const video: PinmonyVideo | undefined = isVideo && primary ? { pinId: id, sources: sources,
       width: Number.isFinite(primary.width) ? Math.max(0, primary.width) : 0,
@@ -103,7 +106,9 @@ export function mapPrefetchedDetail(body: string, pinUrl: string): PinmonyDetail
       creatorAvatar: /^https:\/\/[^\s]+$/i.test(creator.image_medium_url || '') ? clean(creator.image_medium_url, 2000) : '',
       creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? pinUrl.slice(0, pinUrl.indexOf('/', 8)) + '/' + creator.username + '/' : '',
       sourceLabel: clean(pin.link_domain || pin.domain, 180),
-      aiLabel: Array.isArray(pin.ai_disclosures) && pin.ai_disclosures.includes(1) ? '由 AI 修改' : '',
+      aiLabel: (Array.isArray(pin.ai_disclosures) && pin.ai_disclosures.includes(1) ||
+        Array.isArray(pin.gen_ai_topics) && pin.gen_ai_topics.some((topic: PrefetchAiTopic): boolean =>
+          !!topic && typeof topic.name === 'string' && !!topic.name.trim())) ? '由 AI 修改' : '',
       isVideo: isVideo, video: video, actions: [], related: [] };
   } catch (_) { return undefined; }
 }

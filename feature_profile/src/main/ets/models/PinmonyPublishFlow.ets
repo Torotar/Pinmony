@@ -7,4 +7,5 @@ export interface PinmonyPublishFlow extends PinmonyOrganizeSnapshot {
   kind: string;
   pins: PinmonyCreatedPin[];
   completed: number;
+  boardCreated?: boolean;
 }

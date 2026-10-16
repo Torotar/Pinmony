@@ -1,13 +1,18 @@
 import { PinmonyTaskRegistry, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { PinmonyDetailSnapshot, PinmonyMediaReadResult } from '../models/PinmonyDetail';
-import { PinmonyImageCrop, PinmonyVisualResult } from '../models/PinmonyVisualSearch';
+import { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from '../models/PinmonyVisualSearch';
 import { PinmonySaveOperationResult } from '../models/PinmonyComments';
 import { PinmonyEditPinResult } from '../models/PinmonyEditPin';
 import { PIN_VISUAL_SEARCH_API_ENABLED } from '../services/PinmonyVisualSearchApiScript';
 interface PinmonySaveIdentity { id: string; }
 
 export interface PinmonyDetailOperationsControllerPorts {
+  nativeOpenLayer?: (layer: string) => Promise<void>;
+  nativeSearch?: (crop: PinmonyImageCrop, append: boolean, first: boolean) => Promise<void>;
+  nativeRetryMedia?: () => Promise<void>;
+  nativePause?: () => void;
+  nativeCancelVisual?: () => void;
   authEpoch: () => number;
   authStatus: () => string;
   businessSuspended: () => boolean;
@@ -30,9 +35,29 @@ export class PinmonyDetailOperationsController {
   private readonly store: PinmonyPinStore;
   private readonly ports: PinmonyDetailOperationsControllerPorts;
   constructor(store: PinmonyPinStore, ports: PinmonyDetailOperationsControllerPorts) { this.store = store; this.ports = ports; }
-  pause(): void { this.generation++; this.tasks.invalidate(); this.cancelVisual(); }
+  pause(): void { this.ports.nativePause?.(); this.generation++; this.tasks.invalidate(); this.cancelVisual(); }
+
+  async openImageLayer(layer: string): Promise<void> {
+    if(this.ports.nativeOpenLayer){await this.ports.nativeOpenLayer(layer);return;}
+    if ((layer !== 'search' && layer !== 'zoom') || layer === 'search' && !PIN_VISUAL_SEARCH_API_ENABLED ||
+        this.ports.authStatus() !== 'authenticated' || this.ports.businessSuspended() || this.store.detailPreparing) return;
+    const pin: string = this.store.detail?.pinUrl || '';
+    if (!this.ports.pinIdentity(pin)) return;
+    const generation: number = this.generation;
+    const epoch: number = this.ports.authEpoch();
+    // Preparing a retained detail closes the old image layer synchronously.
+    const preparation: Promise<boolean> = this.ports.ensureDetailActionContext();
+    const visualToken: number = this.store.visualToken;
+    if (!await preparation || generation !== this.generation || epoch !== this.ports.authEpoch() ||
+        visualToken !== this.store.visualToken || this.ports.businessSuspended() ||
+        this.ports.authStatus() !== 'authenticated' || this.store.detail?.pinUrl !== pin ||
+        this.store.detailPin !== pin || !this.store.detailActionsReady) return;
+    this.store.imageLayer = layer;
+    this.store.visualResult = emptyVisualResult();
+  }
 
   cancelVisual(): void {
+    this.ports.nativeCancelVisual?.();
     this.visualTasks.invalidate(); this.store.visualToken++;
     if (this.store.visualResult.loading) {
       this.store.visualResult.loading = false;
@@ -41,6 +66,7 @@ export class PinmonyDetailOperationsController {
   }
 
   async searchImage(crop: PinmonyImageCrop, append: boolean, first: boolean): Promise<void> {
+    if(this.ports.nativeSearch){await this.ports.nativeSearch(crop,append,first);return;}
     const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
     if (this.ports.authStatus() !== 'authenticated' || this.ports.businessSuspended() || !PIN_VISUAL_SEARCH_API_ENABLED || !detail || this.store.imageLayer !== 'search' || !this.store.detailActionsReady ||
         append && (this.store.visualResult.loading || this.store.visualResult.ended)) return;
@@ -187,7 +213,8 @@ export class PinmonyDetailOperationsController {
 
 
   async retryDetailMedia(): Promise<void> {
-    if (this.store.detailMediaRetryBusy || this.ports.businessSuspended() || this.ports.rejectOfflineAction('video refresh')) return;
+    if(this.ports.nativeRetryMedia){await this.ports.nativeRetryMedia();return;}
+    if (this.store.detailMediaRetryBusy || this.store.detailPreparing || this.ports.businessSuspended() || this.ports.rejectOfflineAction('video refresh')) return;
     const pin: string = this.store.detail?.pinUrl || '';
     PinmonyRuntimeLog.info('VideoTrace: openId=' + this.store.detailOpeningToken.toString() + ' event=refresh-context-requested');
     const generation: number = this.generation;

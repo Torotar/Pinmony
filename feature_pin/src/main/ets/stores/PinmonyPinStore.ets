@@ -14,6 +14,7 @@ interface DetailOrigin {
 
 @Observed
 export class PinmonyPinStore {
+  detailNativeReadsReady: boolean = false;
   detailPresentationOnly: boolean = false;
   detailPreparing: boolean = false;
   readonly detailPrefetch: PinmonyDetailPrefetch = new PinmonyDetailPrefetch();

@@ -1,6 +1,7 @@
 export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
 (function () {
   if (window !== window.top || !/^https:[/][/](?:www|uk)\\.pinterest\\.com$/.test(location.origin) || window.PinmonyAccountSettings) return;
+  if(window.PinmonyNativeProfileSettingsEnabled === true)return;
   var state = null, generation = 0, abort = null, identity = '', active = '', closedActivity = new Set(), attemptedActivity = new Set();
   function valid(page) { return page === active && location.href === active; }
   function text(v, n) { return typeof v === 'string' ? v.slice(0, n) : ''; }

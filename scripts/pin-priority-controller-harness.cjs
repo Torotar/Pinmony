@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm');
 const {createArktsLoader}=require('./arkts-module-loader.cjs');
 function runtime(ts,globals={}) {
-  const scope={setTimeout,clearTimeout,setInterval,clearInterval,useNativeTransport:s=>s,PIN_VISUAL_SEARCH_API_SCRIPT:'',PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,...globals};
+  const scope={setTimeout,clearTimeout,setInterval,clearInterval,useNativeTransport:s=>s,PIN_VISUAL_SEARCH_API_SCRIPT:'',PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:false,PIN_NATIVE_DETAIL_AUXILIARY_ENABLED:false,PIN_NATIVE_COMMENT_WRITES_ENABLED:false,PIN_NATIVE_POST_OPERATIONS_ENABLED:false,...globals};
   const loader=createArktsLoader(ts);
   const cache=loader.loadFile('feature_pin/src/main/ets/services/PinmonyDetailCache.ets');
   const deps={...cache,PinmonyRuntimeLog:{info(){},warn(){}},PIN_DETAIL_API_ENABLED:true,PIN_POST_API_ENABLED:true,PIN_EDIT_API_ENABLED:true,PIN_VISUAL_SEARCH_API_ENABLED:true};

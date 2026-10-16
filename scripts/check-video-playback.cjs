@@ -170,34 +170,46 @@ async function main() {
   let downloads = 0, fileReleases = 0, fileCancels = 0;
   const local = harness(false, { fakeTime: true, fileReader: {
     load: async source => { downloads++; assert.equal(source, 'mp4'); return { fd: 77, size: 24, release() {
-      assert.equal(local.players[1].releases, 1, 'AVPlayer releases before closing its file descriptor'); fileReleases++;
+      assert.equal(local.players[0].releases, 1, 'AVPlayer releases before closing its file descriptor'); fileReleases++;
     } }; }, cancel() { fileCancels++; }
   } });
-  local.playback.start(); await flush(); assert.equal(downloads, 0, 'healthy remote playback does not download');
-  local.players[0].events.error({ code: 5411009 }); await flush();
-  assert.equal(downloads, 1); assert.equal(local.players[1].source, undefined, 'file recovery does not send another remote URL to AVPlayer');
-  assert.equal(local.players[1].fileSource.fd, 77); assert.equal(local.players[1].fileSource.offset, 0);
-  assert.equal(local.players[1].fileSource.length, 24);
+  local.playback.start(); await flush();
+  assert.equal(downloads, 1); assert.equal(local.players.length, 1, 'detail skips the failing remote HLS candidate');
+  assert.equal(local.players[0].source, undefined, 'detail file playback does not send a remote URL to AVPlayer');
+  assert.equal(local.players[0].fileSource.fd, 77); assert.equal(local.players[0].fileSource.offset, 0);
+  assert.equal(local.players[0].fileSource.length, 24);
   assert.equal(local.states.at(-1).rendered, false, 'successful download is not proof of a first frame');
-  local.players[1].events.startRenderFrame(); assert.equal(local.states.at(-1).rendered, true);
-  const localStates = local.states.length; local.players[0].events.error({ code: 5411009 });
-  assert.equal(local.states.length, localStates, 'old TLS callbacks cannot replace the file player');
+  local.players[0].events.startRenderFrame(); assert.equal(local.states.at(-1).rendered, true);
+  assert(local.traces.some(event => event.includes('event=source-selected kind=mp4-file')));
   local.playback.release(); await flush(); assert.equal(fileReleases, 1); assert(fileCancels > 0);
   const failedRead = harness(false, { fakeTime: true, fileReader: {
     load: async () => { throw { code: 1007900035 }; }, cancel() {} } });
-  failedRead.playback.start(); await flush(); failedRead.players[0].events.error({ code: 5400103 }); await flush();
-  assert.equal(failedRead.players.length, 1); assert.equal(failedRead.states.at(-1).phase, 'error');
+  failedRead.playback.start(); await flush();
+  assert.equal(failedRead.players.length, 0); assert.equal(failedRead.states.at(-1).phase, 'error');
   assert(failedRead.traces.some(event => /event=failed stage=download.*code=1007900035/.test(event)));
   failedRead.fireTimers(200); failedRead.fireTimers(15000); await flush();
-  assert.equal(failedRead.players.length, 1, 'failed download cannot loop back into remote or local reads');
+  assert.equal(failedRead.players.length, 0, 'failed download cannot loop back into remote or local reads');
   failedRead.playback.release();
+  let retryDownloads = 0;
+  const directRetry = harness(false, { fileReader: {
+    load: async () => { retryDownloads++; throw { code: 1007900028 }; }, cancel() {} } });
+  directRetry.playback.start(); await flush(); directRetry.playback.retry(); await flush();
+  assert.equal(retryDownloads, 2, 'each explicit retry makes exactly one file attempt');
+  assert.equal(directRetry.players.length, 0, 'file failure does not replay the failing remote path');
+  directRetry.playback.release();
+  let hlsDownloads = 0;
+  const hlsOnly = harness(false, { fileReader: { load: async () => { hlsDownloads++; throw new Error('unexpected'); }, cancel() {} } });
+  hlsOnly.playback.setVideo({ ...hlsOnly.video, sources: [{ url: 'hls', kind: 'hls' }] });
+  hlsOnly.playback.start(); await flush();
+  assert.equal(hlsDownloads, 0); assert.equal(hlsOnly.players[0].source, 'hls', 'HLS-only sources retain native playback');
+  hlsOnly.playback.release();
   let completeFileRead, staleFileReleases = 0;
   const lateFile = harness(false, { fakeTime: true, fileReader: {
     load: () => new Promise(resolve => completeFileRead = resolve), cancel() {} } });
-  lateFile.playback.start(); await flush(); lateFile.players[0].events.error({ code: 5411009 }); await flush();
+  lateFile.playback.start(); await flush();
   lateFile.playback.setActive(false);
   completeFileRead({ fd: 88, size: 24, release() { staleFileReleases++; } }); await flush();
-  assert.equal(staleFileReleases, 1); assert.equal(lateFile.players.length, 1);
+  assert.equal(staleFileReleases, 1); assert.equal(lateFile.players.length, 0);
   assert.equal(lateFile.states.at(-1).phase, 'idle', 'background cancels the pending local candidate');
   lateFile.playback.release();
   const changeMethod = component.slice(component.indexOf('  private sourceChanged()'), component.indexOf('  private activeChanged()'));

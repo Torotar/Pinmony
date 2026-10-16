@@ -1,5 +1,6 @@
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { ShareSheetOption } from '../models/PinmonySheets';
+import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyShareSheet {
   @ObjectLink pinStore: PinmonyPinStore;
@@ -40,25 +41,7 @@ export struct PinmonyShareSheet {
   @Builder
   private buildShareContactRow(contact: ShareSheetOption) {
     Row({ space: 12 }) {
-      Stack() {
-        Text(contact.label.slice(0, 1))
-          .fontSize(17)
-          .fontColor('#FFFFFF')
-          .textAlign(TextAlign.Center)
-          .width(42)
-          .height(42)
-          .borderRadius(21)
-          .backgroundColor('#71839D')
-        if (contact.icon) {
-          Image(contact.icon)
-            .width(42)
-            .height(42)
-            .borderRadius(21)
-            .objectFit(ImageFit.Cover)
-        }
-      }
-      .width(42)
-      .height(42)
+      PinmonyUserAvatar({ image: contact.icon || '', name: contact.label, avatarSize: 42 })
       Text(contact.label)
         .fontSize(16)
         .fontColor($r('app.color.primary_text'))
@@ -111,6 +94,13 @@ export struct PinmonyShareSheet {
             .onChange((value: string) => {
               this.onSearch(value);
             })
+          if (this.pinStore.shareFeedback === '正在加载联系人…') {
+            Column({ space: 12 }) {
+              LoadingProgress().width(32).height(32).color($r('app.color.accent'))
+                .accessibilityText('正在加载联系人')
+              Text(this.pinStore.shareFeedback).fontSize(14).fontColor($r('app.color.secondary_text'))
+            }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
+          } else {
           Scroll() {
             Column() {
               ForEach(this.pinStore.shareContacts, (contact: ShareSheetOption) => {
@@ -123,6 +113,7 @@ export struct PinmonyShareSheet {
           .align(Alignment.TopStart)
           .layoutWeight(1)
           .width('100%')
+          }
         } else {
           if (this.pinStore.shareSearchId) {
             Row({ space: 14 }) {
@@ -178,7 +169,8 @@ export struct PinmonyShareSheet {
         }
         .margin({ left: 20, right: 20, top: 12 })
       }
-      if (this.pinStore.shareOnPinDetail && ['正在加载联系人…', '正在处理…', '没有可用的联系人'].includes(this.pinStore.shareFeedback)) {
+      if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && this.pinStore.shareFeedback === '正在加载联系人…') &&
+          ['正在加载联系人…', '正在处理…', '没有可用的联系人'].includes(this.pinStore.shareFeedback)) {
         Text(this.pinStore.shareFeedback)
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))

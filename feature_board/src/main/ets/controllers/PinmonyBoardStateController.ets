@@ -1,6 +1,6 @@
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyBoardStore } from '../stores/PinmonyBoardStore';
-import { PinmonyBoardDetail } from '../models/PinmonyBoardDetail';
+import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardSection } from '../models/PinmonyBoardDetail';
 
 export interface PinmonyBoardStatePorts {
   authenticated: () => boolean;
@@ -34,7 +34,7 @@ export class PinmonyBoardStateController {
   pause(): void { this.generation++; this.tasks.invalidate(); }
   resume(): void {
     const board: PinmonyBoardDetail | undefined = this.store.boardDetail;
-    if (board?.loading && board.session === 0 && board.pageKey === this.ports.currentBoard() &&
+    if (board?.nativeReadsReady === undefined && board?.loading && board.session === 0 && board.pageKey === this.ports.currentBoard() &&
         this.ports.authenticated() && this.ports.foreground() && !this.ports.rootOnly()) this.scheduleTimeout(board.pageKey);
   }
   syncRoute(address: string): void {
@@ -44,6 +44,8 @@ export class PinmonyBoardStateController {
         this.ports.profileAddress(address)) {
       this.store.presentationPage = this.ports.publishReturn();
       this.store.presentationOnly = true;
+      this.store.boardDetail.session = 0;
+      this.store.boardDetail.flow = undefined;
       return;
     }
     if (this.ports.pinAddress(address) && this.store.boardDetail) {
@@ -72,7 +74,11 @@ export class PinmonyBoardStateController {
         this.store.boardOpeningToken++;
       }
     }
-    if (page && this.store.boardDetail?.pageKey === page) return;
+    if (page && this.store.boardDetail?.pageKey === page) {
+      if (this.store.boardDetail.session === 0 && this.store.boardDetail.loading && this.ports.currentBoard() === page)
+        this.scheduleTimeout(page);
+      return;
+    }
     this.pause();
     this.store.presentationPage = page;
     this.store.presentationOnly = false;
@@ -90,7 +96,7 @@ export class PinmonyBoardStateController {
     this.tasks.invalidate();
     this.tasks.timeout((): void => {
         if (generation !== this.generation || !this.ports.authenticated() || !this.ports.foreground() || this.ports.rootOnly()) return;
-        if (this.ports.currentBoard() !== page || this.store.boardDetail?.pageKey !== page || this.store.boardDetail.session !== 0) return;
+        if (this.ports.currentBoard() !== page || this.store.boardDetail?.pageKey !== page || this.store.boardDetail.session !== 0 || this.store.boardDetail.nativeReadsReady !== undefined) return;
         const board: PinmonyBoardDetail = this.store.boardDetail;
         this.store.boardDetail = { kind: board.kind, session: board.session, pageKey: board.pageKey,
           boardId: board.boardId, title: board.title, pinCount: board.pinCount,
@@ -98,6 +104,14 @@ export class PinmonyBoardStateController {
           loadingMore: board.loadingMore, ready: board.ready, error: '图板接口尚未就绪，请重试',
           hasMore: board.hasMore, pins: board.pins };
       }, 20000);
+  }
+
+  private validSectionPin(pin: PinmonyBoardPin): boolean {
+    return !!pin && typeof pin.id === 'string' && /^\d{1,30}$/.test(pin.id) && typeof pin.title === 'string' && pin.title.length <= 300 &&
+      typeof pin.pinUrl === 'string' && /^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pin.pinUrl) && pin.pinUrl.endsWith('/pin/' + pin.id + '/') &&
+      typeof pin.imageUrl === 'string' && pin.imageUrl.length <= 2048 && /^https:\/\/i\.pinimg\.com\//.test(pin.imageUrl) &&
+      Number.isFinite(pin.imageWidth) && pin.imageWidth > 0 && Number.isFinite(pin.imageHeight) && pin.imageHeight > 0 &&
+      (pin.duration === undefined || pin.duration === '' || typeof pin.duration === 'string' && /^\d{1,4}:\d{2}$/.test(pin.duration));
   }
 
   update(value: string): void {
@@ -112,7 +126,7 @@ export class PinmonyBoardStateController {
       if (typeof message.title !== 'string' || typeof message.pinCount !== 'string' ||
           typeof message.ownerName !== 'string' || typeof message.ownerAvatar !== 'string' ||
           typeof message.error !== 'string' || !message.pins.every((pin): boolean =>
-            !!pin && /^\d+$/.test(pin.id) && typeof pin.title === 'string' &&
+            !!pin && /^\d+$/.test(pin.id) && typeof pin.title === 'string' && pin.title.length <= 300 && (pin.creatorName === undefined || typeof pin.creatorName === 'string' && pin.creatorName.length <= 300) && (pin.duration === undefined || typeof pin.duration === 'string' && /^\d{1,4}:\d{2}$/.test(pin.duration) || pin.duration === '') &&
             /^https:\/\//i.test(pin.imageUrl) && pin.imageWidth > 0 && pin.imageHeight > 0)) return;
       if (message.privacy !== undefined && message.privacy !== 'public' && message.privacy !== 'secret') return;
       if (message.nextPage !== undefined && (typeof message.nextPage !== 'string' || message.nextPage.length > 2048)) return;
@@ -125,7 +139,7 @@ export class PinmonyBoardStateController {
         this.store.boardDetail.error = message.error;
         return;
       }
-      if (message.flow && (!['', 'select', 'targets', 'ideas', 'edit', 'archive', 'archived', 'deleted', 'left', 'unfollowed'].includes(message.flow.phase) ||
+      if (message.flow && (!['', 'select', 'targets', 'ideas', 'section', 'edit', 'archive', 'archived', 'deleted', 'left', 'unfollowed'].includes(message.flow.phase) ||
           typeof message.flow.loading !== 'boolean' || typeof message.flow.busy !== 'boolean' ||
           typeof message.flow.uncertain !== 'boolean' || typeof message.flow.error !== 'string' || message.flow.error.length > 500 ||
           typeof message.flow.description !== 'string' || typeof message.flow.privacy !== 'string' ||
@@ -138,6 +152,7 @@ export class PinmonyBoardStateController {
             typeof target.title === 'string' && target.title.length <= 300 &&
             typeof target.imageUrl === 'string' && (!target.imageUrl || /^https:\/\//i.test(target.imageUrl))) ||
           !message.flow.saved.every((id): boolean => typeof id === 'string' && /^\d+$/.test(id)))) return;
+      if (message.flow?.phase === 'section' && (typeof message.flow.sectionId !== 'string' || !/^\d+$/.test(message.flow.sectionId) || typeof message.flow.sectionTitle !== 'string' || message.flow.sectionTitle.length > 300)) return;
       // The board bridge emits an initial loading snapshot before it has
       // resolved the collection owner. Keep the route-derived title during
       // that interval instead of briefly falling back to "图板".
@@ -155,14 +170,24 @@ export class PinmonyBoardStateController {
         ' collaborator=' + (message.collaborator === true).toString() + ' contribute=' + (message.canContribute === true).toString() +
         ' avatars=' + (Array.isArray(message.collaboratorAvatars) ? message.collaboratorAvatars.length : 0).toString());
       if (message.session > 0 || !message.loading) this.tasks.invalidate();
-      this.store.boardDetail = { kind: message.kind, session: message.session,
+      this.store.boardDetail = { kind: message.kind, session: message.session, nativeVersion: message.nativeVersion, nativeRecoveryVersion: message.nativeRecoveryVersion, nativeReadsReady: message.nativeReadsReady,
         pageKey: message.pageKey, boardId: message.boardId, title: message.title || existingTitle,
-        pinCount: message.pinCount, privacy: message.privacy, ownerName: message.ownerName, ownerAvatar: message.ownerAvatar, ownerUrl: this.ports.profileAddress(message.ownerUrl || ''),
+        pinCount: !message.ready && !message.pinCount && this.store.boardDetail?.pageKey === message.pageKey ? this.store.boardDetail.pinCount : message.pinCount,
+        privacy: message.privacy, ownerName: message.ownerName, ownerAvatar: message.ownerAvatar, ownerUrl: this.ports.profileAddress(message.ownerUrl || ''),
         loading: message.loading, loadingMore: message.loadingMore, refreshing: message.refreshing,
         ready: message.ready, error: message.error, hasMore: message.hasMore, pins: message.pins,
         chatMemberCount: Number.isInteger(message.chatMemberCount) ? message.chatMemberCount : 0,
         chatPeer: message.chatPeer && /^\d+$/.test(message.chatPeer.id) && typeof message.chatPeer.name === 'string' && message.chatPeer.name.length <= 300 && typeof message.chatPeer.username === 'string' && /^[a-zA-Z0-9_]*$/.test(message.chatPeer.username) && typeof message.chatPeer.avatar === 'string' && message.chatPeer.avatar.length <= 2048 && (!message.chatPeer.avatar || /^https:\/\//i.test(message.chatPeer.avatar)) ? message.chatPeer : undefined,
         featured: message.featured === true,
+        featuredCreator: message.featuredCreator === true,
+        sponsored: message.sponsored === true,
+        ownerVerified: message.ownerVerified === true,
+        sectionCount: Number.isInteger(message.sectionCount) && (message.sectionCount || 0) > 0 && (message.sectionCount || 0) <= 10000 ? message.sectionCount : 0,
+        sections: Array.isArray(message.sections) ? message.sections.filter((section): boolean => !!section && /^\d+$/.test(section.id) && typeof section.title === 'string' && section.title.length <= 300 && (section.pinCount === undefined || typeof section.pinCount === 'number' && Number.isFinite(section.pinCount) && section.pinCount >= 0) && Array.isArray(section.images) && section.images.length <= 2 && section.images.every((url: string): boolean => typeof url === 'string' && url.length <= 2048 && /^https:\/\/i\.pinimg\.com\//.test(url))).slice(0, 100).map((section: PinmonyBoardSection): PinmonyBoardSection => ({
+          id: section.id, title: section.title, pinCount: section.pinCount, images: section.images,
+          pins: Array.isArray(section.pins) ? section.pins.filter((pin: PinmonyBoardPin): boolean => this.validSectionPin(pin)).slice(0, 2) : []
+        })) : [],
+        sectionsError: typeof message.sectionsError === 'string' ? message.sectionsError.slice(0, 300) : '',
         subtitle: typeof message.subtitle === 'string' ? message.subtitle.slice(0, 300) : '',
         description: typeof message.description === 'string' ? message.description.slice(0, 2000) : '',
         headerImage: typeof message.headerImage === 'string' && /^https:\/\/i\.pinimg\.com\//.test(message.headerImage) ? message.headerImage.slice(0, 2048) : '',

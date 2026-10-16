@@ -22,6 +22,7 @@ export const PIN_NAVIGATION_BRIDGE_SCRIPT: string = `
     };
   });
   function hasOverlay() {
+    if (window.PinmonyBoardDocument === true) return false;
     var panels = document.querySelectorAll('[role="dialog"], [role="menu"], [aria-modal="true"]');
     for (var index = 0; index < panels.length; index++) {
       if (panels[index].getClientRects().length) return true;

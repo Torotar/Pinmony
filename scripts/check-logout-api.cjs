@@ -42,7 +42,7 @@ function harness() {
   const native = new context.Native(), calls = [], loads = []; let resolve;
   Object.assign(native, { authStatus: 'authenticated', authEpoch: 7, profileSettingsVisible: true,
     settingsStore: { screen: 'root', busy: false, loading: false, token: 1, error: '' },
-    nativeNetworkContext: () => state, nativeNetwork: { request(request) { calls.push(request); return new Promise(done => { resolve = done; }); } },
+    nativeBusinessSessionContext: () => ({authenticated:native.authStatus === 'authenticated',accountId:'synthetic',generation:native.authEpoch,origin,userAgent:'synthetic'}), nativeNetworkContext: () => { throw Error('hidden document must not gate logout'); }, nativeNetwork: { request(request) { calls.push(request); return new Promise(done => { resolve = done; }); } },
     resetAuthenticatedContent() { this.cleared = true; this.settingsStore.token++; this.settingsStore.busy = false; },
     controller: { loadUrl(url) { loads.push(url); } } });
   return { native, calls, loads, reply(value) { resolve(value); } };
@@ -61,6 +61,7 @@ async function main() {
     assert.equal(failed.calls.length, 1); assert.equal(failed.native.authStatus, 'authenticated');
     assert.equal(failed.native.cleared, undefined); assert.deepEqual(failed.loads, []);
     assert.equal(failed.native.settingsStore.busy, false); assert.ok(failed.native.settingsStore.error);
+    await failed.native.logoutAccount();assert.equal(failed.calls.length,1,'unconfirmed logout cannot be replayed on another click');
   }
   const stale = harness(); const request = stale.native.logoutAccount(); stale.native.authEpoch++;
   stale.reply({ status: 200, body: confirmedBody, error: '' }); await request;

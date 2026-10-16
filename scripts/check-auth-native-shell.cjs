@@ -34,6 +34,12 @@ function harness(url, initial, acknowledge = true) {
 }
 async function flush() { await new Promise(resolve => setImmediate(resolve)); }
 async function check() {
+  const metadata = harness('https://www.pinterest.com/', { client_context: { is_authenticated: true,
+    user: { id: '7', username: 'fixture' }, app_version: 'fixture.1' } });
+  metadata.context.PinmonyAuthSync(1); assert.equal(metadata.messages.at(-1).appVersion, 'fixture.1');
+  const invalidMetadata = harness('https://www.pinterest.com/', { client_context: { is_authenticated: true,
+    user: { id: '7', username: 'fixture' }, app_version: 'invalid version' } });
+  invalidMetadata.context.PinmonyAuthSync(1); assert.equal(invalidMetadata.messages.at(-1).appVersion, '');
   const unacknowledged = harness('https://www.pinterest.com/', {client_context: {is_authenticated: true}}, false);
   unacknowledged.context.PinmonyAuthSync(1);
   unacknowledged.context.PinmonyAuthSync(1);
@@ -100,7 +106,7 @@ async function check() {
     return source.slice(start, source.indexOf('\n  private ', start + 1));
   }
   const names = ['selectSearchFilter', 'selectProfilePublish', 'performProfileAction', 'performInboxAction',
-    'performSearchAction', 'performDetailAction', 'authWebVisible', 'updateAuthState', 'retryLogin'];
+    'performSearchAction', 'performDetailAction', 'authWebVisible', 'updateAuthState', 'retryLogin', 'confirmBusinessSession'];
   const context = { PIN_PROFILE_API_ENABLED: true, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
     PinmonyRuntimeLog: { info() {}, warn() {} },
     PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
@@ -205,6 +211,9 @@ async function check() {
   const build = source.slice(tabsEnd);
   assert.ok(build.indexOf('this.buildRootTabs()') < build.indexOf('PinmonySettingsPage({'),
     'secondary pages cover Tabs rather than placing an empty overlay above them');
+  // This suite checks authentication shell behavior; native business reads execute in focused suites.
+  native.usesNativeProfileReads = () => false;
+  for(const field of ['boardNativeReads','profileNativeReads','searchNativeReads','searchDiscoveryNativeReads','inboxUpdatesNativeReads','inboxMessagesNativeReads'])native[field] = {demand:async()=>{},pause(){},reset(){},eligible:()=>false,selected:()=>false};
   console.log('Auth gate, session evidence, stale responses, hidden host and unsupported-action checks passed');
 }
 check().catch(error => { console.error(error); process.exitCode = 1; });

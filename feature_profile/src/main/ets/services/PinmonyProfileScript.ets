@@ -12,40 +12,10 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
   var session = 0;
   var activeProfile = '';
   var activeSection = '';
-  var controls = {};
   var lastState = '';
   var scheduled = 0;
   var forcedSection = '';
-  var publishMenu = null;
-  var publishTrigger = null;
-  var publishOriginal = '';
-  var publishPriority = '';
-  var publishOptions = {};
-  var publishSnapshot = [];
-  var flowActive = false;
-  var flowSawPanel = false;
 
-  function text(node) {
-    return node ? (node.innerText || node.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 500) : '';
-  }
-  function label(node) {
-    return (node && (node.getAttribute('aria-label') || node.getAttribute('title') || text(node)) || '').trim();
-  }
-  function visible(node) {
-    if (!node || !node.isConnected || !node.getBoundingClientRect) return false;
-    var rect = node.getBoundingClientRect();
-    var style = getComputedStyle(node);
-    return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
-      style.visibility !== 'hidden' && style.opacity !== '0';
-  }
-  function enabled(node) {
-    return !!node && !node.disabled && node.getAttribute('disabled') === null &&
-      node.getAttribute('aria-disabled') !== 'true';
-  }
-  function imageUrl(node) {
-    var value = node && (node.currentSrc || node.src || node.getAttribute('src')) || '';
-    return /^https:\\/\\//i.test(value) ? value.slice(0, 2000) : '';
-  }
   function profileUrl() {
     var parts = location.pathname.split('/').filter(Boolean);
     if (!parts.length || /^(pin|search|messages|inbox|updates|notifications|login|signup|ideas|today|settings)$/i.test(parts[0])) return '';
@@ -59,6 +29,10 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
   };
   function notify(kind, value) {
     if (!documentActive) return;
+    value.contextEpoch = window.PinmonyNetwork && window.PinmonyNetwork.documentEpoch ? window.PinmonyNetwork.documentEpoch() : -1;
+    value.nativeOwn = !!(window.PinmonyProfileApi && window.PinmonyProfileApi.nativeOwn && window.PinmonyProfileApi.nativeOwn(value.profileUrl));
+    if (value.nativeOwn && window.PinmonyProfileApi.nativeVersion) value.nativeVersion = window.PinmonyProfileApi.nativeVersion();
+    if (value.nativeOwn && window.PinmonyProfileApi.nativeInvalidation) value.nativeInvalidation = window.PinmonyProfileApi.nativeInvalidation();
     var serialized = JSON.stringify(value);
     if (kind === 'profile' && serialized === lastState) return;
     try {
@@ -73,6 +47,10 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
     scheduled = 0;
     if (!documentActive) return;
     if (window.PinmonyNativeNetworkEnabled === true && window.PinmonyNetwork && typeof window.PinmonyNetwork.isReady === "function" && !window.PinmonyNetwork.isReady()) return;
+    if (window.PinmonyNetwork && typeof window.PinmonyNetwork.isForeground === 'function' && !window.PinmonyNetwork.isForeground()) {
+      if (window.PinmonyProfileApi) window.PinmonyProfileApi.suspend();
+      return;
+    }
     scheduled = 0;
     var profile = profileUrl();
     if (!profile && window.PinmonyProfileApi) {
@@ -85,9 +63,6 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
         activeSection = '';
         forcedSection = '';
         session++;
-        controls = {};
-        restorePublishMenu();
-        publishTrigger = null;
         notify('profile', { kind: 'closed', session: session, profileUrl: '', section: '' });
       }
       return;
@@ -99,12 +74,10 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
       activeProfile = profile;
       activeSection = section;
       session++;
-      controls = {};
       lastState = '';
-      flowActive = false;
-      flowSawPanel = false;
-      restorePublishMenu();
-      publishTrigger = null;
+    }
+    if (window.PinmonyProfileApi && window.PinmonyProfileApi.nativeOwn && window.PinmonyProfileApi.nativeOwn(profile) && !window.PinmonyProfileApi.currentInfo(profile)) {
+      notify('profile', { kind: 'nativeContext', session: session, profileUrl: profile, section: section }); return;
     }
     var apiState = window.PinmonyProfileApi && window.PinmonyProfileApi.read(profile, schedule, function () {
       return profileUrl() === profile && activeProfile === profile;
@@ -145,6 +118,7 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
       followers: info.followers, following: info.following, actions: actions,
       business: !!(apiInfo && apiInfo.business), isOwn: apiInfo ? apiInfo.isOwn : undefined,
       about: apiInfo ? apiInfo.about : "", website: apiInfo ? apiInfo.website : "",
+      monthlyViews: apiInfo ? apiInfo.monthlyViews : undefined,
       contentLoading: !!(content && content.loading && !content.ready),
       contentError: content ? content.error : '', contentLoadingMore: !!(content && content.loading && content.ready),
       boards: section === 'saved' ? (content ? content.items : []) : [],
@@ -157,7 +131,7 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
     if (scheduled) return;
     scheduled = setTimeout(sync, 0);
   }
-  function restorePublishMenu() {}
+  window.PinmonyProfileNativeSection = function (section) { if (section === 'saved' || section === 'created') { forcedSection = section; lastState = ''; schedule(); } };
   window.PinmonyProfileTab = function (requestedSession, requestedProfile, section) {
     if ((section !== 'created' && section !== 'saved') ||
       requestedSession !== session || requestedProfile !== activeProfile || profileUrl() !== activeProfile ||
@@ -181,6 +155,7 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
     return false;
   };
   window.PinmonyProfilePublishDiscover = function (requestedSession, requestedProfile) {
+    if(window.PinmonyNativeSharePublishEnabled === true)return false;
     if (requestedSession !== session || requestedProfile !== activeProfile || profileUrl() !== activeProfile ||
         !window.PinmonyProfileApiEnabled) return false;
     notify('publish', { kind: 'state', session: session, profileUrl: activeProfile, title: '创建', options: [
@@ -193,12 +168,10 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
   window.PinmonyProfilePublishSelect = function () { return false; };
   window.PinmonyProfilePublishClose = function (requestedSession, requestedProfile) {
     if (requestedSession !== session || requestedProfile !== activeProfile) return false;
-    restorePublishMenu();
-    publishTrigger = null;
     schedule();
     return true;
   };
-  window.PinmonyProfileSync = function () { lastState = ''; schedule(); };
+  window.PinmonyProfileSync = function () { lastState = ''; sync(); };
   window.PinmonyProfileRefresh = function (force) {
     if (!force && window.PinmonyProfileApiEnabled === true && window.PinmonyProfileApi && activeProfile &&
         window.PinmonyProfileApi.hasContentError()) {
@@ -212,8 +185,6 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
   };
   window.PinmonyProfileResume = function () {
     if (window.PinmonyProfileApi) window.PinmonyProfileApi.reset();
-    flowActive = false;
-    flowSawPanel = false;
     lastState = '';
     schedule();
   };
@@ -226,9 +197,7 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
       });
       return true;
     }
-    window.scrollBy(0, Math.max(350, innerHeight * .8));
-    schedule();
-    return true;
+    return false;
   };
   window.PinmonyProfileOrganizeAction = function (requestedSession, requestedProfile, action, value, secret) {
     if (requestedSession !== session || requestedProfile !== activeProfile || profileUrl() !== activeProfile || activeSection !== 'saved') return false;
@@ -236,17 +205,16 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
       window.PinmonyProfileApi.organizeAction(action, value, secret));
   };
   function start() {
-    if (!document.documentElement) return;
-    new MutationObserver(schedule).observe(document.documentElement, {
-      childList: true, subtree: true, attributes: true,
-      attributeFilter: ['src', 'class', 'style', 'aria-label', 'aria-selected', 'aria-current', 'disabled']
-    });
+    // Profile presentation is API-only; document mutations are not data signals.
     window.addEventListener('popstate', schedule);
     window.addEventListener('pageshow', schedule);
+    window.addEventListener('pagehide', function () {
+      if (scheduled) clearTimeout(scheduled); scheduled = 0;
+      if (window.PinmonyProfileApi) window.PinmonyProfileApi.suspend();
+    });
     window.setInterval(function () { if (documentActive && profileUrl()) schedule(); }, 2000);
     schedule();
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
+  start();
 })();`;
 

@@ -13,7 +13,9 @@ async function harness(member = false, allowInvites = false, editFirst = false, 
       const options = JSON.parse(query.get('data')).options;
       if (url.includes('/update/')) { writes.push(options); permissions = options.collaborator_permissions_setting; invites = options.collaborator_invites_enabled; }
       let data = name === 'BoardResource' ? { type: 'board', id: '100', url: '/sample/board/', name: 'Board',
-        pin_count: 0, collaborated_by_me: options.field_set_key === 'boardEdit' ? undefined : member, owner: { id: member ? '201' : '200', username: 'sample', full_name: 'Owner' }, collaborator_permissions_setting: permissions,
+        pin_count: 0, collaborated_by_me: options.field_set_key === 'boardEdit' ? undefined : member,
+        owner: options.field_set_key === 'boardEdit' ? { id: member ? '201' : '200' } :
+          { id: member ? '201' : '200', username: 'sample', full_name: 'Owner', image_large_url: 'https://example.invalid/owner.jpg' }, collaborator_permissions_setting: permissions,
         collaborator_invites_enabled: invites } : name === 'ShareSuggestionsResource' ? [{ id: '300', username: 'suggested', full_name: 'Suggested' }] : [];
       if (url.includes('/delete/')) { writes.push(options); data = options.url.endsWith('/follow/') ? null : { type: 'board', id: '100', collaborated_by_me: !confirmLeave }; }
       return { ok: true, json: async () => ({ resource_response: { status: 'success', code: 0,
@@ -74,6 +76,8 @@ async function harness(member = false, allowInvites = false, editFirst = false, 
   const h = await harness();
   assert.equal(h.api.collaboratorsRead(1).error, '', JSON.stringify(h.api.collaboratorsRead(1)));
   assert.equal(h.api.collaboratorsRead(1).users[0].status, 'owner');
+  assert.equal(h.api.collaboratorsRead(1).users[0].name, 'Owner');
+  assert.equal(h.api.collaboratorsRead(1).users[0].avatar, 'https://example.invalid/owner.jpg');
   assert(h.api.collaboratorsAction(1, 'invite', ''));
   assert.equal(h.api.collaboratorsAction(1, 'send', 'unknown'), false);
   assert(h.api.collaboratorsAction(1, 'send', '300'));

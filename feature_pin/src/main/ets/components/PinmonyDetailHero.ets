@@ -11,6 +11,7 @@ export struct PinmonyDetailHero {
   @Prop label: string = '';
   @Prop phase: string = 'current';
   @Prop blocked: boolean = false;
+  @Prop previewAvailable: boolean = false;
   @Prop @Watch('onRenderChanged') renderIdentity: string = '';
   @Prop @Watch('onStageChanged') stageReady: boolean = false;
   @Prop @Watch('onStageChanged') confirmedLoaded: boolean = false;
@@ -51,7 +52,9 @@ export struct PinmonyDetailHero {
   private onStageChanged(): void {
     if (!this.isCurrent() || this.decoded || this.imageState !== 'loading') return;
     if (this.stageReady && !this.confirmedLoaded && this.source.revision === 0) {
-      this.imageState = 'timeout'; this.stopDeadline(); this.audit('stage-timeout');
+      // The bridge deadline releases the detail pipeline; only this Image's
+      // own deadline or error callback may finish its loading feedback.
+      this.audit('stage-wait-released');
     }
   }
 
@@ -67,9 +70,11 @@ export struct PinmonyDetailHero {
     if (this.onLoaded) this.onLoaded(this.source.pinUrl, this.source.url);
   }
 
-  private failImage(): void {
+  private failImage(code: number = 0): void {
     if (!this.isCurrent()) { this.audit('callback-rejected'); return; }
     this.imageState = 'failed'; this.stopDeadline(); this.audit('failed');
+    PinmonyRuntimeLog.warn('HeroImageError: openId=' + this.openId.toString() +
+      ' code=' + (Number.isFinite(code) ? code : 0).toString() + ' revision=' + this.source.revision.toString());
     if (this.onFailed) this.onFailed(this.source.pinUrl);
   }
 
@@ -88,11 +93,12 @@ export struct PinmonyDetailHero {
     Stack({ alignContent: Alignment.Center }) {
       // State feedback never removes the Image while its source is still current.
       Image(this.source.url).width('100%').height(this.heightVp).objectFit(ImageFit.Cover).borderRadius(18)
+        .opacity(this.previewAvailable && this.imageState !== 'loaded' ? 0 : 1)
         .onComplete((event) => this.completeImage(event?.loadingStatus ?? -1))
-        .onError(() => this.failImage())
+        .onError((event) => this.failImage(event?.error?.code || 0))
         .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); })
         .accessibilityText(this.label || 'Pin 图片')
-      if (!this.blocked && this.imageState === 'loading') {
+      if (!this.blocked && !this.previewAvailable && this.imageState === 'loading') {
         LoadingProgress().width(28).height(28).color($r('app.color.accent'))
           .hitTestBehavior(HitTestMode.None).accessibilityText('正在加载图片')
       } else if (!this.blocked && (this.imageState === 'timeout' || this.imageState === 'failed')) {

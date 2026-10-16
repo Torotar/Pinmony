@@ -71,6 +71,8 @@ export class PinmonyDetailCache {
       commentEmpty: detail.commentEmpty, commentLoading: false,
       imageStageReady: detail.imageStageReady, imageLoaded: detail.imageLoaded, interactionsSettled: detail.interactionsSettled,
       relatedEnded: detail.relatedEnded,
+      relatedLoading: detail.relatedLoading,
+      relatedError: detail.relatedError,
       carousel: detail.carousel,
       isVideo: detail.isVideo,
       mediaKind: detail.mediaKind,
