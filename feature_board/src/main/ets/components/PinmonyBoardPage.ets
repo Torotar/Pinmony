@@ -904,7 +904,7 @@ export struct PinmonyBoardPage {
                   this.actionTile('整理', $r('app.media.lucide_brush_cleaning'), 'sectionOrganize', true)
                 }
                 this.actionTile('更多点子', $r('sys.symbol.square_grid_2x2'), 'sectionIdeas')
-              }.width('100%')
+              }.width('100%').justifyContent(FlexAlign.Center).direction(Direction.Ltr)
             }
             if (this.snapshot.flow?.loading) { LoadingProgress().width(28).height(28) }
             if (this.snapshot.flow?.error) { Text(this.snapshot.flow.error).fontColor($r('app.color.secondary_text')); Button('重试').onClick(() => this.act('retry')) }

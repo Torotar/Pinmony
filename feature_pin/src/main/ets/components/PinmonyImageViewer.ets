@@ -6,11 +6,14 @@ import { imagePanBounds, imageFling, imageFlingDistance } from '../services/Pinm
 export struct PinmonyImageViewer {
   @Prop detail: PinmonyDetailSnapshot;
   @Prop imageUrl: string = '';
+  @Prop previewUrl: string = '';
   @Prop actionsReady: boolean = false;
   @State private controls: boolean = true;
   @State private scaleValue: number = 1;
   @State private dx: number = 0;
   @State private dy: number = 0;
+  @State private previewReady: boolean = false;
+  @State private originalReady: boolean = false;
   @State private viewportWidth: number = 360;
   @State private viewportHeight: number = 720;
   private startScale: number = 1;
@@ -108,9 +111,16 @@ export struct PinmonyImageViewer {
   @Builder
   private imageContent() {
     Stack({ alignContent: Alignment.TopStart }) {
+      Image(this.previewUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
+        .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
+        .opacity(this.previewReady && !this.originalReady ? 1 : 0)
+        .onComplete((event) => { if (event?.loadingStatus === 1) this.previewReady = true; })
       Image(this.imageUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain)
         .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
-    }.width('100%').height('100%').backgroundColor($r('app.color.page_background')).clip(true)
+        .opacity(this.originalReady ? 1 : 0)
+        .onComplete((event) => { if (event?.loadingStatus === 1) this.originalReady = true; })
+    }.width('100%').height('100%')
+      .backgroundColor(this.previewReady || this.originalReady ? $r('app.color.page_background') : Color.Transparent).clip(true)
       // Keep gesture coordinates in the untransformed viewport, independent of image scale.
       .gesture(GestureGroup(GestureMode.Parallel,
           GestureGroup(GestureMode.Exclusive,

@@ -67,7 +67,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               onSubmit: (value: string) => view.submitSearch(value),
               onCategory: (id: string) => view.performSearchAction(id, 'category'),
               onSuggestion: (id: string) => view.performSearchAction(id, 'suggestion'),
-              historyActionsReady: view.activeTab === 1 && view.authStatus === 'authenticated' && (view.searchStore.searchInputReady || view.searchStore.searchActionsReady),
+              historyActionsReady: view.activeTab === 1 && view.authStatus === 'authenticated' && (view.searchStore.searchNativeInputReady || view.searchStore.searchInputReady || view.searchStore.searchActionsReady),
               onDeleteHistory: (id: string) => view.performSearchAction(id, 'deleteHistory'),
               onClearProductFilter: (kind: string) => view.performSearchAction(kind, 'clearProductFilter'),
               onFollowUser: (id: string) => view.performSearchAction(id, 'followUser'),

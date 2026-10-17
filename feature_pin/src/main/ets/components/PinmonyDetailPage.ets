@@ -12,7 +12,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { SmartImage, getRecommendCardWidth, getRecommendColumnCount, RECOMMEND_CARD_RADIUS_VP,
   RECOMMEND_PHONE_GAP_VP, RECOMMEND_WIDE_GAP_VP } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
-  HdsNavigationTitleBarOptions, TextStyleMode } from '@kit.UIDesignKit';
+  HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 
 @Component
 export struct PinmonyDetailPage {
@@ -144,25 +144,6 @@ export struct PinmonyDetailPage {
 
   private titleBarOptions(): HdsNavigationTitleBarOptions {
     const share: PinmonyDetailAction | undefined = this.action('share');
-    if (this.imageLayer === 'zoom') {
-      return {
-        avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-        style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: {
-          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
-        content: { title: { mainTitle: '' },
-          backIcon: { icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]), label: '关闭放大', isEnabled: true,
-            action: () => { if (this.onImageLayer) this.onImageLayer(''); } },
-          menu: { maxCount: 3, value: [
-            { content: { icon: $r('app.media.lucide_share_2'), label: '分享', isEnabled: !!share && this.acceptsActionIntent(share),
-              action: () => { if (share && this.onAction) this.onAction(share.id, share.kind); } } },
-            { content: { icon: $r('app.media.lucide_download'), label: '下载图片', isEnabled: this.actionsReady || this.auxiliaryReady,
-              action: () => { if (this.onDownload) this.onDownload(); } } },
-            { content: { label: this.saveBusy ? '取消中' : (this.action('save')?.selected ? '已收藏' : '收藏'), type: TextStyleMode.NORMAL,
-              isEnabled: !this.saveBusy && (this.actionsReady || this.postActionsReady) && (this.postActionsReady || !!this.action('save')?.enabled),
-              action: () => { if (this.onViewerSave) this.onViewerSave(); } } }
-          ] } }
-      };
-    }
     if (this.imageLayer === 'search') {
       return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
         style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: {
@@ -872,15 +853,8 @@ export struct PinmonyDetailPage {
     HdsNavDestination() {
       Stack() {
         Column() { this.detailContent() }.width('100%').height('100%')
-          .visibility(this.imageLayer ? Visibility.Hidden : Visibility.Visible)
-      if (this.imageLayer === 'zoom') {
-        PinmonyImageViewer({ detail: this.detail, imageUrl: this.zoomImageUrl || this.detail.originalImageUrl || this.detail.imageUrl,
-          active: this.videoActive,
-          actionsReady: this.actionsReady,
-          onClose: () => { if (this.onImageLayer) this.onImageLayer(''); }, onAction: this.onAction,
-          onDownload: this.onDownload, onSave: this.onViewerSave,
-          onControlsChange: (visible: boolean) => { this.viewerControls = visible; } })
-      } else if (this.imageLayer === 'search') {
+          .visibility(this.imageLayer === 'search' ? Visibility.Hidden : Visibility.Visible)
+      if (this.imageLayer === 'search') {
         PinmonyVisualSearchView({ pin: this.detail.pinUrl, imageUrl: this.detail.originalImageUrl || this.detail.imageUrl,
           imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight, result: this.visualResult,
           onSearch: this.onVisualSearch,
@@ -895,7 +869,7 @@ export struct PinmonyDetailPage {
     .titleBar(this.titleBarOptions())
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideBackButton(false)
-    .hideTitleBar(this.imageLayer === 'zoom')
+    .hideTitleBar(false)
     .onBackPressed(() => {
       PinmonyRuntimeLog.info('PinmonyReturn: detail destination back');
       if (this.imageLayer && this.onImageLayer) this.onImageLayer('');
@@ -913,6 +887,16 @@ export struct PinmonyDetailPage {
       }
       .width('100%').height('100%').hideTitleBar(true)
       .navDestination(this.detailDestination).backgroundColor($r('app.color.page_background'))
+      .hitTestBehavior(this.imageLayer === 'zoom' ? HitTestMode.None : HitTestMode.Default)
+      if (this.imageLayer === 'zoom') {
+        PinmonyImageViewer({ detail: this.detail, imageUrl: this.zoomImageUrl || this.detail.originalImageUrl || this.detail.imageUrl,
+          previewUrl: this.zoomImageUrl || this.detail.imageUrl,
+          active: this.videoActive,
+          actionsReady: this.actionsReady,
+          onClose: () => { if (this.onImageLayer) this.onImageLayer(''); }, onAction: this.onAction,
+          onDownload: this.onDownload, onSave: this.onViewerSave,
+          onControlsChange: (visible: boolean) => { this.viewerControls = visible; } })
+      }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
   }
 }

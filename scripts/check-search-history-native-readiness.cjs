@@ -1,0 +1,8 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=fs.readFileSync('entry/src/main/ets/components/PinmonySearchRootContent.ets','utf8');
+const expression=root.match(/historyActionsReady: (.*),/)[1];
+function ready(native,legacy=false,active=1,auth='authenticated'){return vm.runInNewContext(expression,{view:{activeTab:active,authStatus:auth,searchStore:{searchNativeInputReady:native,searchInputReady:legacy,searchActionsReady:false}}});}
+assert.equal(ready(true),true,'current native input enables history deletion without a Web handshake');assert.equal(ready(false),false);assert.equal(ready(true,false,0),false);assert.equal(ready(true,false,1,'unknown'),false);assert.equal(ready(false,true),true);
+const previous=expression.replace('view.searchStore.searchNativeInputReady || ','');assert.equal(vm.runInNewContext(previous,{view:{activeTab:1,authStatus:'authenticated',searchStore:{searchNativeInputReady:true,searchInputReady:false,searchActionsReady:false}}}),false,'previous wiring reproduced the disabled native delete control');
+const page=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');const block=page.slice(page.indexOf('  private inputSuggestionsContent()'),page.indexOf('  private searchDestination('));assert(block.includes('!item.deleting && this.onSuggestion'));assert(!/padding\(\{ left: 20, right: 12 \}\)\s*\.onClick/.test(block),'outer row must not submit when tapping delete');
+console.log('Search history native readiness: previous failure reproduced, native/legacy and account/tab gates, separate submit/delete regions passed');

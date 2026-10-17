@@ -8,7 +8,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 function harness() {
   let auth = true, foreground = true, visible = false, document = 'synthetic-profile', prepared;
   let refreshes = 0, returns = 0, photos = 0, suppressed = 0, sections = 0, boardReturn = false, closeSheet;
-  const reads = [], writes = [], messages = [], scripts = [];
+  const reads = [], writes = [], messages = [], scripts = [], restoreModes = [];
   const store = { profile: { profileUrl: document, session: 2 }, profileSession: 2, profileUrl: document,
     publishRequestToken: 0, publishFlowToken: 0, publishOptions: [], profileActionsReady: true, profileSessionReady: true,
     profileCache: { clear() { store.cleared = true; } } };
@@ -26,10 +26,10 @@ function harness() {
       return Promise.resolve('true');
     }, jsonText: value => value, captureBoardReturn() {}, hasBoardReturn: () => boardReturn,
     openSection() { sections++; },
-    restoreBoard: () => returns++, syncMotion() {}, suppressChildBack() { suppressed++; }, refreshProfile: () => refreshes++,
+    restoreBoard: refresh => {returns++;restoreModes.push(!!refresh);}, syncMotion() {}, suppressChildBack() { suppressed++; }, refreshProfile: () => refreshes++,
     pickPhotos: async () => { photos++; }, feedback: value => messages.push(value), traceEntry() {}
   });
-  return { controller, store, reads, writes, messages, scripts, ready: value => prepared(value),
+  return { controller, store, reads, writes, messages, scripts, restoreModes, ready: value => prepared(value),
     auth: value => { auth = value; }, foreground: value => { foreground = value; }, document: value => { document = value; },
     hideSheet: () => { visible = false; },
     disappear: value => closeSheet(value),
@@ -41,6 +41,10 @@ function harness() {
   };
 }
 (async () => {
+  const cancelledPublish = harness();cancelledPublish.flow();cancelledPublish.controller.close();assert.deepEqual(cancelledPublish.restoreModes,[false],'cancelled publish preserves board');
+  const completedPublish = harness();completedPublish.flow();completedPublish.store.publishFlow.completed = 1;completedPublish.controller.close();assert.deepEqual(completedPublish.restoreModes,[true],'completed publish revalidates board');
+  const unknownPublish = harness();unknownPublish.flow();unknownPublish.store.publishFlow.uncertain = true;unknownPublish.controller.close();assert.deepEqual(unknownPublish.restoreModes,[true],'unknown write revalidates without replay');
+
   const hidden = harness(); hidden.controller.openMenu(); hidden.hideSheet(); hidden.controller.dismissMenu();
   assert.equal(hidden.store.publishLoading, false);
   assert.equal(hidden.store.publishPreparing, false);

@@ -2,6 +2,7 @@ import { rcp } from '@kit.RemoteCommunicationKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { url } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { http } from '@kit.NetworkKit';
 import { NetworkManager, Priority } from './PinmonyNativeNetwork';
 
 const MAX_MEDIA_BYTES: number = 32 * 1024 * 1024;
@@ -9,7 +10,9 @@ let nextMediaFile: number = 0;
 let sweptMediaFiles: boolean = false;
 const MEDIA_RECOVERY_BUDGET_MS: number = 12000;
 
-function mediaHeader(response: rcp.Response, name: string): string | undefined {
+interface MediaFileResponse { statusCode: number; headers: rcp.ResponseHeaders; }
+
+function mediaHeader(response: MediaFileResponse, name: string): string | undefined {
   const keys: string[] = Object.keys(response.headers).filter((key: string): boolean => key.toLowerCase() === name);
   if (keys.length === 0) return undefined;
   if (keys.length !== 1) return '';
@@ -69,9 +72,11 @@ export class PinmonyMediaFile {
     const host: string = new url.URL(source).hostname;
     let activeRequest: rcp.Request | undefined;
     let activeSession: rcp.Session | undefined;
+    let activeHttp: http.HttpRequest | undefined;
     let activeAttempt: number = -1;
     const cancelTransfer = (): void => {
       if (activeRequest && activeSession) { try { activeSession.cancel(activeRequest); } catch (_) {} }
+      if (activeHttp) { try { activeHttp.destroy(); } catch (_) {} activeHttp = undefined; }
     };
     try {
       file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
@@ -82,15 +87,53 @@ export class PinmonyMediaFile {
           failure = 'timeout'; cancelTransfer(); reject(new Error('media-timeout'));
         }, MEDIA_RECOVERY_BUDGET_MS);
       });
-      let completed: rcp.Response | undefined;
+      let completed: MediaFileResponse | undefined;
       for (let attempt: number = 0; attempt < 2; attempt++) {
         if (!current() || failure) throw new Error('media-cancelled');
         const remaining: number = MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started);
         if (remaining <= 0) { failure = 'timeout'; throw new Error('media-timeout'); }
         activeAttempt = attempt; status = 0;
+        if (attempt === 1) {
+          const client: http.HttpRequest = http.createHttp();
+          activeHttp = client;
+          this.trace('event=connection-start host=' + host + ' profile=networkkit-http11 remainingMs=' + remaining.toString());
+          try {
+            const transfer: Promise<http.HttpResponse> = NetworkManager.enqueue(Priority.NORMAL, async (): Promise<http.HttpResponse> => {
+              if (!current() || failure || activeAttempt !== attempt) throw new Error('media-cancelled');
+              const budget: number = MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started);
+              if (budget <= 0) { failure = 'timeout'; throw new Error('media-timeout'); }
+              return client.request(source, { method: http.RequestMethod.GET,
+                header: { Accept: 'video/mp4, application/octet-stream', 'Accept-Encoding': 'identity' },
+                usingProxy: true, usingProtocol: http.HttpProtocol.HTTP1_1, usingCache: false,
+                maxRedirects: 0, expectDataType: http.HttpDataType.ARRAY_BUFFER, maxLimit: MAX_MEDIA_BYTES,
+                connectTimeout: budget, readTimeout: budget });
+            });
+            const response = await Promise.race([transfer, cancelled]);
+            if (!current() || failure || activeAttempt !== attempt) throw new Error('media-cancelled');
+            const native: http.HttpResponse = response as http.HttpResponse;
+            status = native.responseCode;
+            if (status !== 200) { failure = 'http'; throw new Error('media-http'); }
+            if (!(native.result instanceof ArrayBuffer)) { failure = 'content-type'; throw new Error('media-type'); }
+            if (native.result.byteLength > MAX_MEDIA_BYTES) { failure = 'size-limit'; throw new Error('media-size'); }
+            if (!file) throw new Error('media-cancelled');
+            if (fs.writeSync(file.fd, native.result) !== native.result.byteLength) { failure = 'file-write'; throw new Error('media-write'); }
+            bytes = native.result.byteLength;
+            completed = { statusCode: status, headers: native.header as rcp.ResponseHeaders };
+            this.trace('event=connection-ready host=' + host + ' profile=networkkit-http11 status=' + status.toString());
+            break;
+          } catch (error) {
+            const code: number = Number.isFinite((error as BusinessError).code) ? (error as BusinessError).code : 0;
+            this.trace('event=connection-failed host=' + host + ' profile=networkkit-http11 status=' + status.toString() +
+              ' code=' + code.toString() + ' bytes=' + bytes.toString());
+            throw error as Error;
+          } finally {
+            activeAttempt = -1;
+            if (activeHttp === client) { activeHttp = undefined; try { client.destroy(); } catch (_) {} }
+          }
+        }
         let tlsPending: boolean = false;
-        const connectionLimit: number = attempt === 0 ? 5000 : remaining;
-        const profile: string = attempt === 0 ? 'system' : 'tls12';
+        const connectionLimit: number = 5000;
+        const profile: string = 'system';
         const session: rcp.Session = rcp.createSession();
         const request: rcp.Request = new rcp.Request(source, 'GET', {
           Accept: 'video/mp4, application/octet-stream', 'Accept-Encoding': 'identity' });
@@ -109,7 +152,6 @@ export class PinmonyMediaFile {
                 ' tlsMs=' + metric(value.tlsHandshakeTimeMs) + ' firstByteMs=' + metric(value.startTransferTimeMs));
             }
           } } };
-        if (attempt === 1) request.configuration.security = { tlsRange: { min: 'TlsV1.2', max: 'TlsV1.2' } };
         request.destination = (chunk: ArrayBuffer): void => {
           if (!current() || failure || activeAttempt !== attempt) throw new Error('media-cancelled');
           if (status !== 200) { failure = 'http'; throw new Error('media-http'); }
@@ -127,7 +169,8 @@ export class PinmonyMediaFile {
             request.configuration!.transfer!.timeout = { connectMs: Math.min(connectionLimit, budget), transferMs: budget };
             return session.fetch(request);
           });
-          completed = await Promise.race([transfer, cancelled]);
+          const received: rcp.Response = await Promise.race([transfer, cancelled]);
+          completed = { statusCode: received.statusCode, headers: received.headers };
           break;
         } catch (error) {
           const code: number = Number.isFinite((error as BusinessError).code) ? (error as BusinessError).code : 0;
@@ -136,7 +179,7 @@ export class PinmonyMediaFile {
           const tlsTimeout: boolean = code === 1007900028 && tlsPending;
           if (MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started) < 4000 || attempt !== 0 ||
               (code !== 1007900035 && !tlsTimeout) || status !== 0 || bytes !== 0 || !current() || failure) throw error as Error;
-          this.trace('event=tls-compatibility reason=' + (tlsTimeout ? 'tls-timeout' : 'ssl-connect') + ' next=tls12');
+          this.trace('event=transport-compatibility reason=' + (tlsTimeout ? 'tls-timeout' : 'ssl-connect') + ' next=networkkit-http11');
         } finally {
           // Reject callbacks from a closed attempt before allowing another profile to write the file.
           activeAttempt = -1; activeRequest = undefined; activeSession = undefined;
@@ -144,7 +187,7 @@ export class PinmonyMediaFile {
         }
       }
       if (!completed) throw new Error('media-unavailable');
-      const response: rcp.Response = completed;
+      const response: MediaFileResponse = completed;
       if (!current() || failure) throw new Error('media-cancelled');
       status = response.statusCode;
       if (status !== 200 || bytes < 12) { failure = 'http-or-empty'; throw new Error('media-http'); }

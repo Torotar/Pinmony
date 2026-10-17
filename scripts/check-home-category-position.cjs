@@ -1,9 +1,14 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]);
 const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
 function method(name){const a=source.indexOf('  private '+name+'(');assert(a>=0);const b=source.indexOf('\n  private ',a+1);return source.slice(a,b);}
-const timers=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('alignSelectedCategory')+method('updateCategories')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{setTimeout:fn=>timers.push(fn)});
-const h=new Host(),moves=[];Object.assign(h,{home:{tabs:['all','ip','wide','art','icons'].map((id,index)=>({id,label:id,selected:index===3,enabled:true}))},pendingTabId:'',categoryWidths:new Map(),categoryAlignmentPending:false,categoryAlignmentKey:'',tabScroller:{scrollTo:o=>moves.push(o.xOffset)}});
-h.updateCategories();h.alignSelectedCategory();assert.equal(moves.length,0,'wait for measured widths');h.categoryWidths.set('all:all',60);h.categoryWidths.set('ip:ip',44);h.alignSelectedCategory();assert.deepEqual(moves,[124],'preceding label becomes first, selected becomes second');
-h.updateCategories();while(timers.length)timers.shift()();assert.deepEqual(moves,[124],'content refresh does not reset a manually scrolled bar');
-h.pendingTabId='icons';h.updateCategories();h.categoryWidths.set('wide:wide',132);while(timers.length)timers.shift()();assert.deepEqual(moves,[124,266],'latest pending selection uses real variable widths');
-h.pendingTabId='all';h.updateCategories();while(timers.length)timers.shift()();assert.equal(moves.at(-1),0,'first label stays at beginning');console.log('Home category positioning: measured widths, previous label, pending selection and no reset on feed updates passed');
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('updateCategories')+method('selectTab')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const h=new Host(),calls=[];Object.assign(h,{home:{tabs:['all','art','icons'].map((id,index)=>({id,label:id,selected:index===1,enabled:index!==2}))},pendingTabId:'',interactionReady:true,onTab:id=>calls.push(id)});
+h.updateCategories();assert.equal(h.categories.findIndex(tab=>tab.selected),1);
+h.selectTab(h.categories[1]);h.selectTab(h.categories[2]);assert.equal(calls.length,0);
+h.selectTab(h.categories[0]);assert.deepEqual(calls,['all']);
+h.pendingTabId='all';h.updateCategories();assert.equal(h.categories.findIndex(tab=>tab.selected),0);
+h.interactionReady=false;h.selectTab(h.categories[1]);assert.equal(calls.length,1);
+h.pendingTabId='';h.updateCategories();assert.equal(h.categories.findIndex(tab=>tab.selected),1,'failure restores confirmed selection');
+h.home.tabs=[];h.updateCategories();assert.equal(h.categories.length,0);
+assert(source.includes('type: ButtonType.Capsule'));assert(source.includes('.accessibilitySelected(tab.selected)'));assert(!source.includes('CapsuleSegmentButtonV2')); assert(source.includes('.scrollable(ScrollDirection.Horizontal)')); assert(!source.includes('Chip('));
+console.log('Home subtabs: confirmed/pending selection, unavailable and interaction gates passed');

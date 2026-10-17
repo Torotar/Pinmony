@@ -43,11 +43,29 @@ function harness(config = {}) {
   }
   class Request { constructor(url, method, headers) { Object.assign(this, { url, method, headers }); } }
   const exports = {};
-  vm.runInNewContext(code, { exports, URL, Date: class extends Date { static now() { return now; } },
+  vm.runInNewContext(code, { exports, URL, ArrayBuffer, Date: class extends Date { static now() { return now; } },
     setTimeout(fn, ms) { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
     clearTimeout: id => timers.delete(id),
     require: name => name.includes('RemoteCommunication') ? { rcp: { Request, createSession } } :
-      name.includes('CoreFile') ? { fileIo: io } : name.includes('ArkTS') ? { url: { URL } } :
+      name.includes('NetworkKit') ? { http: { RequestMethod: { GET: 'GET' }, HttpProtocol: { HTTP1_1: 'http1.1' },
+        HttpDataType: { ARRAY_BUFFER: 'buffer' }, createHttp() {
+          const session = createSession(); let pending = false;
+          return { request(url, options) {
+            const chunks = [];
+            const request = new Request(url, options.method, options.header);
+            request.nativeOptions = options;
+            request.configuration = { proxy: 'system', transfer: { autoRedirect: false,
+              timeout: { connectMs: options.connectTimeout, transferMs: options.readTimeout } },
+              tracing: { httpEventsHandler: { onStatusCodeReceive() {}, onTimeInfo() {} } } };
+            request.destination = chunk => chunks.push(Buffer.from(chunk));
+            pending = true;
+            return session.fetch(request).then(response => {
+              pending = false;
+              return { responseCode: response.statusCode, header: response.headers,
+                result: Uint8Array.from(Buffer.concat(chunks)).buffer };
+            }, error => { pending = false; throw error; });
+          }, destroy() { if (pending) session.cancel(); session.close(); } };
+        } } } : name.includes('CoreFile') ? { fileIo: io } : name.includes('ArkTS') ? { url: { URL } } :
       name.includes('PinmonyNativeNetwork') ? { Priority: { NORMAL: 1 },
         NetworkManager: { enqueue: (_priority, task) => config.queue ? new Promise((resolve, reject) =>
           queued.push(() => Promise.resolve().then(task).then(resolve, reject))) : task(),
@@ -116,21 +134,34 @@ async function main() {
   const recovered = await ssl.read();
   assert.equal(ssl.requests.length, 2);
   assert.equal(ssl.requests[0].configuration.security, undefined);
-  assert.equal(ssl.requests[1].configuration.security.tlsRange.min, 'TlsV1.2');
-  assert.equal(ssl.requests[1].configuration.security.tlsRange.max, 'TlsV1.2');
-  assert.equal(ssl.requests[1].configuration.security.skipCertificatesValidation, undefined, 'compatibility keeps certificate verification');
+  assert.equal(ssl.requests[1].nativeOptions.usingProtocol, 'http1.1');
+  assert.equal(ssl.requests[1].nativeOptions.usingProxy, true);
+  assert.equal(ssl.requests[1].nativeOptions.maxRedirects, 0);
+  assert.equal(ssl.requests[1].nativeOptions.maxLimit, 32 * 1024 * 1024);
+  assert.equal(ssl.requests[1].nativeOptions.usingCache, false);
+  assert.equal(ssl.requests[1].nativeOptions.caPath, undefined, 'compatibility keeps certificate verification');
   assert.equal(ssl.requests[1].configuration.transfer.timeout.transferMs, 11000, 'compatibility uses remaining overall budget');
-  assert(ssl.traces.some(event => /event=connection-time host=v1.pinimg.com profile=tls12 dnsMs=8/.test(event)));
-  assert(ssl.traces.some(event => /event=tls-compatibility/.test(event)));
+  assert(ssl.traces.some(event => /event=connection-ready host=v1.pinimg.com profile=networkkit-http11/.test(event)));
+  assert(ssl.traces.some(event => /event=transport-compatibility/.test(event)));
   assert(ssl.sessions.every(session => session.closed)); recovered.release();
   assert.throws(() => ssl.requests[0].destination(Uint8Array.from(mp4).buffer), /cancelled/, 'closed profile cannot write to the new file lease');
   const tlsTimed = harness({ attempts: [{ error: { code: 1007900028 }, elapsed: 5026 }, {}] });
   const timedLease = await tlsTimed.read();
   assert.equal(tlsTimed.requests.length, 2, 'zero-response TLS timeout receives one compatibility attempt');
-  assert.equal(tlsTimed.requests[1].configuration.security.tlsRange.max, 'TlsV1.2');
+  assert.equal(tlsTimed.requests[1].nativeOptions.usingProtocol, 'http1.1');
   assert.equal(tlsTimed.requests[1].configuration.transfer.timeout.connectMs, 6974, 'remaining budget is available for the compatible connection');
   assert(tlsTimed.traces.some(event => /reason=tls-timeout/.test(event)));
   timedLease.release();
+  for (const plan of [{ status: 403 }, { status: 302 }, { status: 206 },
+    { headers: { 'content-type': 'text/html' } },
+    { headers: { 'content-type': 'video/mp4', 'content-length': '25' } },
+    { chunks: [Buffer.alloc(24)] }, { chunks: [Buffer.alloc(32 * 1024 * 1024 + 1)] }]) {
+    const invalid = harness({ attempts: [{ error: { code: 1007900035 } }, plan] });
+    await assert.rejects(invalid.read());
+    assert.equal(invalid.requests.length, 2, 'compatibility never retries or follows a failed response');
+    assert.equal(invalid.files.size, 0); assert.equal(invalid.handles.size, 0);
+    assert(invalid.sessions.every(session => session.closed));
+  }
   for (const plan of [
     { error: { code: 1007900028 }, elapsed: 5026, timeInfo: { nameLookupTimeMs: 0, connectTimeMs: 0, tlsHandshakeTimeMs: 0, startTransferTimeMs: 0 } },
     { error: { code: 1007900028 }, elapsed: 5026, timeInfo: { nameLookupTimeMs: 8, connectTimeMs: 10, tlsHandshakeTimeMs: 30, startTransferTimeMs: 0 } },
@@ -153,6 +184,10 @@ async function main() {
   const compat = compatibilityPending.read(); await flush(); compatibilityPending.reader.cancel(); await assert.rejects(compat);
   assert.equal(compatibilityPending.requests.length, 2); assert.equal(compatibilityPending.cancellations(), 1);
   assert(compatibilityPending.sessions.every(session => session.closed)); assert.equal(compatibilityPending.files.size, 0);
+  compatibilityPending.requests[1].resolve({ statusCode: 200, headers: { 'content-type': 'video/mp4' } });
+  await flush();
+  assert.equal(compatibilityPending.files.size, 0, 'late native HTTP completion cannot recreate the cancelled file');
+  assert.equal(compatibilityPending.handles.size, 0);
   const compatTimeout = harness({ attempts: [{ error: { code: 1007900035 } }, { pending: true }] });
   const compatTimed = compatTimeout.read(); await flush(); assert.equal(compatTimeout.timers.size, 1, 'one deadline spans both profiles');
   compatTimeout.timeout(); await assert.rejects(compatTimed); assert(compatTimeout.sessions.every(session => session.closed));

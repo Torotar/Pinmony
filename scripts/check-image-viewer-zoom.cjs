@@ -90,4 +90,10 @@ view.scaleValue = 3; view.startInertia(1000, 0); const background = animations.a
 const previous = view.dx; background.onFrame(0.2); assert.equal(view.dx, previous); view.stopInertia(); assert(background.cancelled);
 assert.match(source, /GestureGroup\(GestureMode.Exclusive,\s*TapGesture\(\{ count: 2 \}\)/);
 assert(source.includes('PinchGesture()') && source.includes('PanGesture()'));
+const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
+assert(page.indexOf('PinmonyImageViewer({') > page.indexOf('  build() {'), 'viewer overlays navigation without toggling its title layout');
+assert(!page.includes(".hideTitleBar(this.imageLayer === 'zoom')"));
+assert(page.includes(".visibility(this.imageLayer === 'search' ? Visibility.Hidden : Visibility.Visible)"), 'detail stays rendered beneath zoom');
+assert(source.includes('this.previewReady || this.originalReady'), 'opaque background waits for a decoded image');
+assert(source.includes('.syncLoad(true)') && source.includes('.opacity(this.originalReady ? 1 : 0)'), 'cached preview bridges original decoding');
 console.log('Viewer: four-way friction decay, bounds, interruption/stale frames, multi-touch protection, animated double tap and single-tap exit passed');

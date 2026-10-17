@@ -551,15 +551,17 @@ export struct PinmonySearchPage {
   }
 
   @Builder
+  private searchLoadingState() {
+    Column({ space: 12 }) {
+      LoadingProgress().width(32).height(32).color($r('app.color.accent'))
+      Text('正在加载搜索内容…').fontSize(14).fontColor($r('app.color.secondary_text'))
+    }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
   private discoveryContent() {
     if (this.discoveryInitialLoading()) {
-      Column({ space: 12 }) {
-        LoadingProgress().width(32).height(32).color($r('app.color.accent'))
-        Text('正在加载搜索内容…').fontSize(14).fontColor($r('app.color.secondary_text'))
-      }
-      .width('100%').height('100%')
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
+      this.searchLoadingState()
     } else {
     Scroll(this.discoveryScroller) {
       Column({ space: 0 }) {
@@ -839,8 +841,7 @@ export struct PinmonySearchPage {
         Text('按搜索键查看结果').fontColor($r('app.color.secondary_text'))
       } else if (this.loading || this.snapshot.kind === 'loading' ||
           (this.snapshot.api && this.snapshot.apiActive === false && !this.error)) {
-        LoadingProgress().width(32).height(32)
-        Text('正在加载搜索结果…').fontSize(15).fontColor($r('app.color.secondary_text'))
+        this.searchLoadingState()
       } else if (this.error) {
         Text(this.error)
           .fontSize(15)
@@ -1045,9 +1046,12 @@ export struct PinmonySearchPage {
       ForEach(this.snapshot.suggestions, (item: PinmonySearchSuggestion) => {
         ListItem() {
           Row({ space: 16 }) {
+            Row({ space: 16 }) {
             SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(16).fontColor([$r('app.color.secondary_text')])
             Text(item.label).fontSize(16).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(2)
+            }.layoutWeight(1).constraintSize({ minHeight: 48 })
+              .onClick(() => { if (this.interactionReady && item.enabled && !item.deleting && this.onSuggestion) { this.closeInputPanel(false); this.onSuggestion(item.id); } })
             if (!this.query.trim()) {
               Button({ type: ButtonType.Circle }) {
                 SymbolGlyph($r('sys.symbol.xmark')).fontSize(14).fontColor([$r('app.color.secondary_text')])
@@ -1057,7 +1061,7 @@ export struct PinmonySearchPage {
                 .onClick(() => { if (this.interactionReady && this.historyActionsReady && item.deletable && !item.deleting && this.onDeleteHistory) this.onDeleteHistory(item.id); })
             }
           }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 20, right: 12 })
-            .onClick(() => { if (this.interactionReady && item.enabled && this.onSuggestion) { this.closeInputPanel(false); this.onSuggestion(item.id); } })
+
         }
       }, (item: PinmonySearchSuggestion) => item.id)
     }.width('100%').height('100%').scrollBar(BarState.Off)

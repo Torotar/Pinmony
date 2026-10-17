@@ -5,6 +5,34 @@ import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyProfilePanelPage {
   @Prop @Watch('syncUsername') snapshot: PinmonyProfilePanel;
+  private readonly followingSegments: SegmentButtonV2Items = new SegmentButtonV2Items([
+    { text: '用户' }, { text: '图板' }
+  ]);
+  private displayedSection: string = '';
+  private sectionMotionToken: number = 0;
+  @State private sectionOffset: number = 0;
+  private selectFollowingSection(section: string): void {
+    if (this.snapshot.mode !== 'following' || this.snapshot.loading || this.followingBusy || this.saving ||
+        section === this.snapshot.section || !this.onSection) return;
+    this.onSection(section);
+  }
+  private swipeFollowingSection(offsetX: number, offsetY: number): void {
+    if (Math.abs(offsetX) < 48 || Math.abs(offsetX) <= Math.abs(offsetY)) return;
+    if (offsetX < 0 && this.snapshot.section === 'users') this.selectFollowingSection('boards');
+    else if (offsetX > 0 && this.snapshot.section === 'boards') this.selectFollowingSection('users');
+  }
+  private syncFollowingMotion(): void {
+    if (this.snapshot.mode !== 'following' || this.snapshot.loading || this.displayedSection === this.snapshot.section) return;
+    const previous: string = this.displayedSection;
+    this.displayedSection = this.snapshot.section;
+    if (!previous) return;
+    const token: number = ++this.sectionMotionToken;
+    this.sectionOffset = this.snapshot.section === 'boards' ? 32 : -32;
+    setTimeout(() => {
+      if (token !== this.sectionMotionToken) return;
+      this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => { this.sectionOffset = 0; });
+    }, 16);
+  }
   @State private usernameDraft: string = '';
   @State private firstNameDraft: string = '';
   @State private lastNameDraft: string = '';
@@ -18,8 +46,9 @@ export struct PinmonyProfilePanelPage {
       if (this.usernameFocused && this.snapshot.mode === 'edit') this.scroller.scrollEdge(Edge.Bottom);
     }, 350);
   }
-  aboutToDisappear(): void { this.usernameFocused = false; }
+  aboutToDisappear(): void { this.usernameFocused = false; this.sectionMotionToken++; }
   private syncUsername(): void {
+    this.syncFollowingMotion();
     if (this.snapshot.mode === 'edit' && !this.snapshot.loading && this.usernameToken !== this.snapshot.token) {
       this.usernameDraft = this.snapshot.username;
       this.firstNameDraft = this.snapshot.firstName;
@@ -72,14 +101,15 @@ export struct PinmonyProfilePanelPage {
         Column({ space: 20 }) {
           if (this.snapshot.mode === 'following') {
             Row() {
-              CapsuleSegmentButtonV2({ items: new SegmentButtonV2Items([{ text: '用户' }, { text: '图板' }]),
+              CapsuleSegmentButtonV2({ items: this.followingSegments, enableStateAnimation: true,
                 selectedIndex: this.snapshot.section === 'boards' ? 1 : 0,
                 onItemClicked: (index: number) => {
                   const section: string = index === 0 ? 'users' : 'boards';
-                  if (section !== this.snapshot.section && this.onSection) this.onSection(section);
+                  this.selectFollowingSection(section);
                 } }).width(280).constraintSize({ maxWidth: '100%' })
             }.width('100%').height(48).justifyContent(FlexAlign.Center)
           }
+          Column({ space: 20 }) {
           if (!this.snapshot.loading && this.snapshot.error) { Text(this.snapshot.error).fontColor($r('app.color.secondary_text')) }
           else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
             if (this.snapshot.avatarPreview || this.snapshot.avatar) { Image(this.snapshot.avatarPreview || this.snapshot.avatar).width(120).height(120).borderRadius(60) }
@@ -145,8 +175,11 @@ export struct PinmonyProfilePanelPage {
               .onClick(() => { if(this.onLoadMore)this.onLoadMore(); })
           }
           if (this.snapshot.moreError) { Text(this.snapshot.moreError).fontColor($r('app.color.secondary_text')) }
+          }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
         }.width('100%').padding({ left: 24, right: 24, top: this.snapshot.mode === 'following' ? 0 : 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
-      }.width('100%').height('100%').align(Alignment.Top)
+      }.width('100%').height('100%').align(Alignment.Top).clip(true)
+        .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
+          .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))
       if (this.snapshot.loading) {
         LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
       }

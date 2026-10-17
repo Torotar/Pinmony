@@ -47,8 +47,9 @@ async function productionMenus(){
   function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\(')),end=index.indexOf('\n  private ',start+1);assert(start>=0);return index.slice(start,end);}
   function field(name){const start=index.indexOf('  private readonly '+name+':'),end=index.indexOf('\n  private ',start+1);assert(start>=0);return index.slice(start,end).trim().replace(/^private readonly /,'this.').replace(/: [A-Za-z]+ = /,' = ');}
   const context={PinmonyPinMenuNative:Menu,PinmonyPhotoMenuCoordinator:Photo,PinmonySharePanelsController:Panels,PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PinmonyRuntimeLog:foundation.PinmonyRuntimeLog};
-  const out={};vm.runInNewContext(ts.transpileModule('export class Host{'+['dismissShareSheet','dismissMoreSheet','openApiDetailMore','performMoreAction','openCustomHomeMenu','performCustomHomeAction'].map(method).join('\n')+'} export function bind(){'+['pinMenuNative','photoMenuCoordinator','sharePanelsController'].map(field).join('\n')+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:out,...context});
-  const f=fixture(),h=new out.Host(),effects=[];let route=origin+'/',web=0;
+  const out={};vm.runInNewContext(ts.transpileModule('export class Host{'+['dismissShareSheet','dismissMoreSheet','openApiDetailMore','performMoreAction','openCustomHomeMenu','performCustomHomeAction','shareDetailPinAfterMenu','notifyDetailSystemShareClosed'].map(method).join('\n')+'} export function bind(){'+['pinMenuNative','photoMenuCoordinator','sharePanelsController'].map(field).join('\n')+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:out,...context,setTimeout,clearTimeout});
+  const f=fixture(),h=new out.Host(),effects=[],frames=[];let route=origin+'/',web=0;
+  h.getUIContext=()=>({postFrameCallback:callback=>frames.push(callback)});
   Object.assign(h,{pinStore:f.store,homeStore:{customHomeMenuToken:0},inboxStore:{},boardStore:{},authStatus:'authenticated',businessSuspended:false,activeSheetKind:'',showNativeSheet:false,nativeNetwork:f.network,
     nativeBusinessSessionContext:f.getSession,nativeDisplayAddress:()=>route,isCurrentMorePin:p=>p===pin,pinIdentity:p=>p.match(/\/pin\/(\d+)/)?.[1]||'',currentPinUrl:()=>pin,currentProfileUrl:()=>'',currentBoardUrl:()=>route,currentHomePageKey:()=>origin+'/',currentInboxUrl:()=>origin+'/conversation/1/',
     isCurrentBoardMenuPin:(p,page)=>page===route&&!!h.boardStore.boardDetail,isCurrentSearchMenuPin:()=>false,cancelledBoardPins:new Set(),dismissPostSnack(){},lastRootBackAt:0,rootContextCoordinator:{notify(){}},
@@ -63,10 +64,37 @@ async function productionMenus(){
   await h.performCustomHomeAction('home-download');assert.equal(effects.at(-1)[0],'download');
   await h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);assert.equal(effects.at(-1)[0],'system-share');assert.equal(web,0);
   route=origin+'/visitor/board/';h.boardStore.boardDetail={pageKey:route,editable:false,pins:[{id:'11',pinUrl:pin}]};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
-  assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-move'));assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));h.dismissShareSheet();
+  assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-move'));assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));
+  assert.equal(h.homeStore.customHomeMenu.actions.find(o=>o.id==='home-system-share').label,'系统分享');
+  const boardShares=effects.filter(e=>e[0]==='system-share').length;
+  pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,boardShares,'board share waits for menu disappearance');
+  assert.equal(h.activeSheetKind,'share');assert(h.homeStore.customHomeMenu,'keep board menu mounted during exit');
+  h.notifyDetailSystemShareClosed();await flush();assert.equal(effects.filter(e=>e[0]==='system-share').length,boardShares);
+  frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['system-share',pin]);
   h.boardStore.boardDetail={pageKey:route,editable:true,pins:[],flow:{phase:'section',pins:[{id:'11',pinUrl:pin}]}};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-cancel-save'||o.id==='board-menu-move'));h.dismissShareSheet();
-  h.boardStore.boardDetail=undefined;route=pin;pending=h.openApiDetailMore();f.jobs.at(-1).resolve(body(raw));await pending;assert(h.pinStore.moreOptions.some(o=>o.id==='detail-see-more'));await h.performMoreAction('detail-share');assert.equal(effects.at(-1)[0],'contacts');assert.equal(web,0);
+  h.boardStore.boardDetail=undefined;route=pin;pending=h.openApiDetailMore();f.jobs.at(-1).resolve(body(raw));await pending;assert(h.pinStore.moreOptions.some(o=>o.id==='detail-see-more'));assert(h.pinStore.moreOptions.some(o=>o.id==='detail-share'&&o.label==='系统分享'));
+  const shareCount=effects.filter(e=>e[0]==='system-share').length;
+  pending=h.performMoreAction('detail-share');
+  assert.equal(h.activeSheetKind,'more');assert.equal(h.showNativeSheet,false);assert(h.pinStore.moreOptions.length>0);
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,shareCount,'system panel must wait for actual Sheet disappearance');
+  await h.shareDetailPinAfterMenu(pin);
+  h.notifyDetailSystemShareClosed();await flush();assert.equal(h.activeSheetKind,'');
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,shareCount,'wait for idle frame after Sheet teardown');
+  frames.shift().onIdle();await pending;
+  assert.deepEqual(effects.at(-1),['system-share',pin]);assert.equal(web,0);
+  const completed=effects.filter(e=>e[0]==='system-share').length;
+  h.notifyDetailSystemShareClosed();assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'duplicate disappearance cannot reopen share');
+  h.showNativeSheet=true;h.activeSheetKind='more';pending=h.shareDetailPinAfterMenu(pin);
+  h.currentPinUrl=()=>'';h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'leaving the pin during dismissal cancels sharing');
+  h.currentPinUrl=()=>pin;
+  h.showNativeSheet=true;h.activeSheetKind='more';pending=h.shareDetailPinAfterMenu(pin);
+  f.setSession({...f.getSession(),generation:2});h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'account generation change cancels sharing');
+  f.setSession({...f.getSession(),generation:1});
+  assert(index.includes('this.notifyDetailSystemShareClosed();'),'real Sheet disappearance is bound to completion');
   pending=h.openCustomHomeMenu(pin,origin+'/');h.dismissShareSheet();f.jobs.at(-1).resolve(body(raw));await pending;assert.equal(h.homeStore.customHomeMenu,undefined,'late menu read cannot reopen a closed sheet');
   const before=f.jobs.length;await h.openCustomHomeMenu(pin,origin+'/conversation/1/','share');assert.equal(f.jobs.length,before);assert.equal(effects.at(-1)[0],'contacts');assert.equal(web,0);
 }

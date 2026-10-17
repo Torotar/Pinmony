@@ -1,6 +1,5 @@
 import { PinmonyVideoCard } from 'common_ui';
 import { allowsSpeculativeReads, PinmonyRuntimeLog } from 'common_foundation';
-import { Chip, ChipSize } from '@kit.ArkUI';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
 import { PinmonyHomeSkeleton } from './PinmonyHomeSkeleton';
 
@@ -51,27 +50,6 @@ export struct PinmonyHomePage {
   private activeSession: number = 0;
   private activeTab: string = '';
   private activePageKey: string = '';
-  private readonly tabScroller: Scroller = new Scroller();
-  private readonly categoryWidths: Map<string, number> = new Map<string, number>();
-  private categoryAlignmentKey: string = '';
-  private categoryAlignmentPending: boolean = false;
-
-  private alignSelectedCategory(): void {
-    if (!this.categoryAlignmentPending) return;
-    const selected: number = this.categories.findIndex((tab: PinmonyHomeTab): boolean => tab.selected);
-    if (selected < 0) return;
-    let offset: number = 0;
-    for (let index: number = 0; index < Math.max(0, selected - 1); index++) {
-      const tab: PinmonyHomeTab = this.categories[index];
-      const width: number | undefined = this.categoryWidths.get(tab.id + ':' + tab.label);
-      if (width === undefined) return;
-      offset += width + 10;
-    }
-    try {
-      this.tabScroller.scrollTo({ xOffset: offset, yOffset: 0, animation: false });
-      this.categoryAlignmentPending = false;
-    } catch (_) { }
-  }
 
   private readonly feedScroller: Scroller = new Scroller();
   private lastReportedScrollOffset: number = 0;
@@ -187,7 +165,7 @@ export struct PinmonyHomePage {
     if (firstApiSnapshot) this.prefetchNotBefore = Date.now() + 900;
     this.lastHomePinCount = this.home.pins.length;
     this.onImageRecovery();
-    setTimeout(() => { this.alignSelectedCategory(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
   }
 
   private prefetchNextScreen(): void {
@@ -247,18 +225,11 @@ export struct PinmonyHomePage {
       return { id: tab.id, label: tab.label, enabled: tab.enabled,
         selected: this.pendingTabId ? tab.id === this.pendingTabId : tab.selected };
     });
-    const key: string = JSON.stringify(this.categories.map((tab: PinmonyHomeTab): string => tab.id + ':' + tab.label + ':' + tab.selected.toString()));
-    if (key !== this.categoryAlignmentKey) {
-      this.categoryAlignmentKey = key;
-      this.categoryAlignmentPending = true;
-    }
-    setTimeout(() => this.alignSelectedCategory(), 0);
   }
 
   private selectTab(tab: PinmonyHomeTab): void {
     if (!this.interactionReady || !tab.enabled || !this.onTab || tab.selected) return;
     this.onTab(tab.id);
-    this.alignSelectedCategory();
   }
 
   private imageHeight(pin: PinmonyHomePin): number {
@@ -321,24 +292,6 @@ export struct PinmonyHomePage {
     if (this.refreshing || this.home.refreshing) return '正在刷新首页…';
     if (this.loading) return '正在加载首页…';
     return '正在恢复首页连接…';
-  }
-
-  @Builder
-  private category(tab: PinmonyHomeTab) {
-    Chip({
-      label: { text: tab.label, fontSize: 14 },
-      size: ChipSize.NORMAL,
-      allowClose: false,
-      activated: tab.selected,
-      backgroundColor: $r('app.color.input_surface'),
-      activatedBackgroundColor: $r('app.color.accent'),
-      borderRadius: 18,
-      onClicked: () => {
-        this.selectTab(tab);
-      },
-      accessibilityDescription: `在首页显示${tab.label}内容`
-    })
-
   }
 
   @Builder
@@ -485,32 +438,29 @@ export struct PinmonyHomePage {
         }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }
       if (this.categories.length > 0) {
-        Column() {
-          Scroll(this.tabScroller) {
-            Row({ space: 10 }) {
-              ForEach(this.categories, (tab: PinmonyHomeTab) => {
-                Row() { this.category(tab) }
-                  .onAreaChange((_old: Area, area: Area) => {
-                    const width: number = Number(area.width);
-                    if (width > 0) this.categoryWidths.set(tab.id + ':' + tab.label, width);
-                    this.alignSelectedCategory();
-                  })
-              }, (tab: PinmonyHomeTab) => tab.id + ':' + tab.selected.toString() + ':' + tab.enabled.toString())
-            }
-            .height(48)
-            .padding({ left: 24, right: 24 })
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(this.categories, (tab: PinmonyHomeTab) => {
+              Button(tab.label, { type: ButtonType.Capsule })
+                .height(36)
+                .padding({ left: 20, right: 20 })
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .backgroundColor(tab.selected ? $r('app.color.home_category_selected') : $r('app.color.input_surface'))
+                .fontColor(tab.selected ? $r('app.color.page_background') : $r('app.color.primary_text'))
+                .enabled(this.interactionReady && tab.enabled)
+                .accessibilitySelected(tab.selected)
+                .onClick(() => this.selectTab(tab))
+            }, (tab: PinmonyHomeTab) => tab.id)
           }
-          .width('100%')
+          .padding({ left: 24, right: 24 })
           .height(48)
-          .scrollable(ScrollDirection.Horizontal)
-          .onAreaChange(() => { this.alignSelectedCategory(); })
-          .align(Alignment.Start)
-          .scrollBar(BarState.Off)
         }
         .width('100%')
         .height(48)
-        .opacity(1)
-        .clip(true)
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .align(Alignment.Start)
       }
 
       if (this.home.board && this.canShowFeed()) {

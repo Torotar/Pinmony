@@ -29,7 +29,7 @@ export interface PinmonyPublishPorts {
   jsonText: (value: string) => string;
   captureBoardReturn: () => void;
   hasBoardReturn: () => boolean;
-  restoreBoard: () => void;
+  restoreBoard: (refresh?: boolean) => void;
   syncMotion: () => void;
   suppressChildBack: () => void;
   refreshProfile: () => void;
@@ -264,6 +264,7 @@ export class PinmonyPublishController {
   close(force: boolean = false): void {
     const flow: PinmonyPublishFlow | undefined = this.store.publishFlow;
     if (!flow && !this.store.publishPicking || !force && (flow?.busy || this.store.publishPicking)) return;
+    const refreshBoard: boolean = !!flow && (flow.completed > 0 || !!flow.boardCreated || flow.uncertain || flow.busy);
     PinmonyRuntimeLog.info('PublishTrace: close force=' + force.toString());
     if(this.ports.nativeFlow?.())this.ports.nativeClose?.();
     this.pauseFlow(); this.store.publishFlowToken++; this.store.publishFlow = undefined; this.store.publishPicking = false;
@@ -273,7 +274,7 @@ export class PinmonyPublishController {
       if (!force && !this.ports.hasBoardReturn()) this.ports.refreshProfile();
     }
     if (flow && !this.ports.nativeFlow?.()) this.ports.runScript('window.PinmonyPublishApi && window.PinmonyPublishApi.action(' + flow.token.toString() + ',"close","",false)').catch(() => {});
-    this.ports.restoreBoard();
+    this.ports.restoreBoard(refreshBoard);
   }
 
   action(action: string, value: string = '', secret: boolean = false): void {

@@ -46,6 +46,7 @@ export interface PinmonyPhotoMenuCoordinatorPorts {
   retainedBoardContent: () => PinmonyBoardDetail | undefined;
   setRetainedBoardContent: (value: PinmonyBoardDetail | undefined) => PinmonyBoardDetail | undefined;
   sharePinUrl: (url: string, title?: string) => Promise<void>;
+  shareBoardPinAfterMenu: (pin: string, page: string) => Promise<void>;
   showMessage: (message: string) => void;
   showNativeSheet: () => boolean;
   setShowNativeSheet: (value: boolean) => boolean;
@@ -130,7 +131,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                             !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
                     { id: 'home-download', label: '下载', enabled: !!download?.enabled },
                     { id: 'home-see-more', label: '查看更多', enabled: !!more?.enabled },
-                    { id: 'home-system-share', label: '分享链接', enabled: !state.loading && !state.error && !state.busy }
+                    { id: 'home-system-share', label: '系统分享', enabled: !state.loading && !state.error && !state.busy }
                 ];
                 state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.enabled);
                 if (board && /\/pins\/$/i.test(board.pageKey)) {
@@ -281,6 +282,11 @@ async performCustomHomeAction(id: string): Promise<void> {
             !menu.actions.some((option: PinmonyHomeMenuOption): boolean => option.id === id && option.enabled))
             return;
         const pinUrl: string = menu.pinUrl;
+        const page: string = this.homeStore.homeMenuPage;
+        if (this.ports.isCurrentBoardMenuPin(pinUrl, page)) {
+            await this.ports.shareBoardPinAfterMenu(pinUrl, page);
+            return;
+        }
         this.ports.dismissShareSheet();
         await this.ports.sharePinUrl(pinUrl);
         return;
