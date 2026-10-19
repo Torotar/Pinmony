@@ -195,7 +195,7 @@ export class PinmonyHomeNativeReads {
         board: this.boardSummary?.id === board ? this.boardSummary : undefined, pins: pins, dataSource: 'api', loadingMore: false,
         refreshing: false, endReached: !cursor || cursor === '-end-' || !!previous && cursor === previous || data.data.length === 0 || pins.length >= 3000 };
       this.commit(snapshot, append ? 'pagination' : 'feed');
-    } catch (_) { if (live()) this.store.homeError = append ? '更多帖子读取失败，请重试' : PinmonyI18n.message('首页读取失败，请重试'); }
+    } catch (_) { if (live()) this.store.homeError = append ? '更多帖子读取失败，请重试' : PinmonyI18n.message("pm_unable_to_load_home_feed_please_retry_cc9728f6"); }
     finally { if (revision === this.revision) { this.busy = false; this.store.homeLoading = false; this.store.homeRefreshing = false;
       this.store.pendingHomeTab = ''; if (this.store.home) this.store.home.loadingMore = false; } }
   }
@@ -216,7 +216,7 @@ export class PinmonyHomeNativeReads {
         !tabs.some((tab: PinmonyHomeTab): boolean => tab.id === 'tab:' + item.id)) tabs.push({ id: 'tab:' + item.id, label: item.name.trim().slice(0,160), selected: false, enabled: true }); });
       this.tabs = tabs; this.categoriesReady = true; this.store.homeSourceWarning = '';
       if (this.store.home) { this.store.home.tabs = this.makeTabs(); this.store.home.sourceError = undefined; this.store.home.categorySourceFailure = false; this.store.homeError = ''; this.ports.committed(this.store.home, 'metadata'); }
-    } catch (_) { if (live()) { this.store.homeSourceWarning = PinmonyI18n.message('已收藏图板分类读取失败，请下拉重试'); this.store.homeError = this.store.homeSourceWarning; if (this.store.home) { this.store.home.sourceError = this.store.homeSourceWarning; this.store.home.categorySourceFailure = true; } } }
+    } catch (_) { if (live()) { this.store.homeSourceWarning = PinmonyI18n.message("pm_unable_to_load_saved_board_categories_pull_down_to_retry_e1dd3288"); this.store.homeError = this.store.homeSourceWarning; if (this.store.home) { this.store.home.sourceError = this.store.homeSourceWarning; this.store.home.categorySourceFailure = true; } } }
     finally { if (revision === this.revision) this.categoriesBusy = false; }
   }
   private async readBoard(board: string, live: () => boolean): Promise<void> {

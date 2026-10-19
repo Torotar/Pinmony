@@ -74,7 +74,7 @@ export struct PinmonyShareSheet {
           LoadingProgress()
             .width(24)
             .height(24)
-          Text(this.uiText("正在读取分享选项…"))
+          Text(this.uiText("pm_loading_share_options_1790123c"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
@@ -105,7 +105,7 @@ export struct PinmonyShareSheet {
           if (PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) {
             Column({ space: 12 }) {
               LoadingProgress().width(32).height(32).color($r('app.color.accent'))
-                .accessibilityText(this.uiText("正在加载联系人"))
+                .accessibilityText(this.uiText("pm_loading_contacts_72ddd22e"))
               Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
             }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
           } else {
@@ -172,7 +172,7 @@ export struct PinmonyShareSheet {
             .fontSize(14)
             .fontColor('#D94A4A')
             .layoutWeight(1)
-          Button(this.uiText("重试"))
+          Button(this.uiText("pm_retry_b8784c8d"))
             .onClick(() => this.onRetry())
         }
         .margin({ left: 20, right: 20, top: 12 })

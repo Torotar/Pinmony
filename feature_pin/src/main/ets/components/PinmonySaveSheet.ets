@@ -49,7 +49,7 @@ export struct PinmonySaveSheet {
         } else {
           PinmonyBoardPlaceholder({ coverSize: 44 })
         }
-        Text(board.name + (board.secret ? this.uiText(" · 私密") : '')).fontSize(16).fontWeight(FontWeight.Bold)
+        Text(board.name + (board.secret ? this.uiText("pm_secret_03a32629") : '')).fontSize(16).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text')).layoutWeight(1)
       }.width('100%')
     }.width('100%').height(60).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
@@ -61,7 +61,7 @@ export struct PinmonySaveSheet {
     if (this.result.error && !this.result.items.length && !this.result.shortlist.length && !this.creating) {
       Column({ space: 16 }) {
         Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-        Button(this.uiText("重新读取图板")).enabled(!this.result.busy && !this.result.loading)
+        Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.result.busy && !this.result.loading)
           .onClick(() => { if (this.onRetry) this.onRetry(); })
       }.width('100%').padding(20).backgroundColor($r('app.color.page_background'))
     } else {
@@ -76,24 +76,24 @@ export struct PinmonySaveSheet {
         LoadingProgress().width(28).height(28)
       }
       if (this.creating) {
-        Text(this.uiText("图板名称")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-        TextInput({ placeholder: this.uiText("图板名称"), text: this.name }).maxLength(100)
+        Text(this.uiText("pm_board_name_dd9a7122")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+        TextInput({ placeholder: this.uiText("pm_board_name_dd9a7122"), text: this.name }).maxLength(100)
           .height(48).borderRadius(12).backgroundColor($r('app.color.input_surface'))
           .enabled(!this.result.busy).onChange((value: string) => this.name = value)
         Divider().color($r('app.color.secondary_text')).opacity(0.15)
         Row() {
-          Text(this.uiText("保持图板私密")).fontColor($r('app.color.primary_text')).layoutWeight(1)
+          Text(this.uiText("pm_keep_board_secret_2264c319")).fontColor($r('app.color.primary_text')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.result.busy)
             .onChange((value: boolean) => this.secret = value)
         }.width('100%')
         Row({ space: 12 }) {
-          Button(this.uiText("返回图板列表")).layoutWeight(1).height(44).fontSize(14)
+          Button(this.uiText("pm_back_to_boards_dcf21f0d")).layoutWeight(1).height(44).fontSize(14)
             .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
             .enabled(!this.result.busy).onClick(() => {
               this.creating = false;
               if (this.onCreatingChange) this.onCreatingChange(false);
             })
-          Button(this.uiText("创建")).layoutWeight(1).height(44).fontSize(14)
+          Button(this.uiText("pm_create_cde2cd07")).layoutWeight(1).height(44).fontSize(14)
             .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent'))
             .enabled(!!this.name.trim() && !this.result.busy && !this.result.loading)
             .onClick(() => { if (this.onCreate) this.onCreate(this.name.trim(), this.secret); })
@@ -102,21 +102,21 @@ export struct PinmonySaveSheet {
         Scroll() {
           Column({ space: 8 }) {
             if (!this.result.loading && this.result.shortlist.length) {
-              Text(this.uiText("精选")).fontColor($r('app.color.secondary_text')).width('100%')
+              Text(this.uiText("pm_featured_15b26cda")).fontColor($r('app.color.secondary_text')).width('100%')
               ForEach(this.result.shortlist, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => board.id)
             }
             if (!this.result.loading) {
-              Text(this.uiText("所有图板")).fontColor($r('app.color.secondary_text')).width('100%')
+              Text(this.uiText("pm_all_boards_f1847589")).fontColor($r('app.color.secondary_text')).width('100%')
             }
             if (!this.result.loading) {
               ForEach(this.result.items, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => board.id)
             }
             if (!this.result.loading && !this.result.error && !this.result.items.length) {
-              Text(this.uiText("暂无图板")).fontColor($r('app.color.secondary_text'))
+              Text(this.uiText("pm_no_boards_yet_43790af9")).fontColor($r('app.color.secondary_text'))
             }
             if (!this.result.loading && (this.result.suggestions || []).length) {
               Divider().color($r('app.color.secondary_text')).opacity(0.15).margin({ top: 12, bottom: 8 })
-              Text(this.uiText("或者，点击以创建新图板")).fontSize(13)
+              Text(this.uiText("pm_or_tap_to_create_a_new_board_4c13492c")).fontSize(13)
                 .fontColor($r('app.color.secondary_text')).width('100%')
               ForEach(this.result.suggestions || [], (suggestion: string) => {
                 Button({ type: ButtonType.Normal }) {
@@ -139,7 +139,7 @@ export struct PinmonySaveSheet {
             Text('+').fontSize(26).width(44).height(44).textAlign(TextAlign.Center)
               .backgroundColor($r('app.color.surface_muted')).borderRadius(10)
               .fontColor($r('app.color.primary_text'))
-            Text(this.uiText("创建图板")).fontSize(16).fontWeight(FontWeight.Bold)
+            Text(this.uiText("pm_create_board_513babc9")).fontSize(16).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).layoutWeight(1)
           }.width('100%')
         }.width('100%').height(56).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
@@ -149,11 +149,11 @@ export struct PinmonySaveSheet {
           Blank().height(68)
         }
         if (this.result.savedId) {
-          Button(this.uiText("取消本次收藏 · ") + this.result.savedBoard).enabled(!this.result.busy)
+          Button(this.uiText("pm_undo_save_8245d6cd") + this.result.savedBoard).enabled(!this.result.busy)
             .onClick(() => { if (this.onRemove) this.onRemove(); })
         }
         if (this.result.error) {
-          Button(this.uiText("重新读取图板")).enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
+          Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
         }
       }
     }.width('100%').height('100%').padding(20).backgroundColor($r('app.color.page_background'))

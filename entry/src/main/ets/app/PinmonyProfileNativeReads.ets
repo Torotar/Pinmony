@@ -75,11 +75,11 @@ export class PinmonyProfileNativeReads {
     if(!this.owned())return; const f: ProfileFeed = this.feed(), i: ProfileInfo | undefined = this.info;
     if(this.store.profile?.profileUrl !== this.page || this.store.profile.section !== this.section)this.store.profileScrollOffset = f.scroll;
     const previous: PinmonyProfileSnapshot | undefined = this.store.profile?.profileUrl === this.page && this.store.profile.section === this.section ? this.store.profile : undefined;
-    const actions: PinmonyProfileAction[] = i?.isOwn ? [{id:'api-edit-profile',kind:'edit',label:PinmonyI18n.message('编辑个人资料'),enabled:true}] : i && typeof i.followingUser === 'boolean' && !i.blocked ? [{id:'api-follow-user',kind:'follow',label:i.followingUser ? PinmonyI18n.message('关注中') : PinmonyI18n.message('关注'),enabled:true}] : [];
-    if(i && !i.isOwn && i.contact && !i.blocked)actions.push({id:'api-contact-user',kind:'contact',label:PinmonyI18n.message('联系'),enabled:true});
+    const actions: PinmonyProfileAction[] = i?.isOwn ? [{id:'api-edit-profile',kind:'edit',label:PinmonyI18n.message("pm_edit_profile_3b0b2bb8"),enabled:true}] : i && typeof i.followingUser === 'boolean' && !i.blocked ? [{id:'api-follow-user',kind:'follow',label:i.followingUser ? PinmonyI18n.message("pm_following_7dfa5d8f") : PinmonyI18n.message("pm_follow_eb137dee"),enabled:true}] : [];
+    if(i && !i.isOwn && i.contact && !i.blocked)actions.push({id:'api-contact-user',kind:'contact',label:PinmonyI18n.message("pm_contact_bfc96732"),enabled:true});
     const snapshot: PinmonyProfileSnapshot = { kind:'state',nativeVersion:this.version,session:this.store.profileSession,profileUrl:this.page,section:this.section,
       monthlyViews:i?.monthlyViews,displayName:i?.name || '',handle:i?.handle || '',avatarUrl:i?.avatar || '',coverUrl:i?.cover || '',business:i?.business,isOwn:i?.isOwn,about:i?.about || '',website:i?.website || '',
-      followers:i?.followers !== undefined && i.followers !== null ? i.followers.toString() + PinmonyI18n.message(' 粉丝') : '',following:i?.following !== undefined && i.following !== null ? i.following.toString() + PinmonyI18n.message(' 关注中') : '',
+      followers:i?.followers !== undefined && i.followers !== null ? i.followers.toString() + PinmonyI18n.message("pm_followers_7c3af361") : '',following:i?.following !== undefined && i.following !== null ? i.following.toString() + PinmonyI18n.message("pm_following_52ff9a6f") : '',
       actions:actions,boards:f.boards.slice(),createdPins:f.pins.slice(),
       contentLoading:!f.ready && this.busy,contentLoadingMore:f.ready && f.busy,contentError:f.error,contentHasMore:!f.ended && !!f.cursor,
       unorganizedPins:this.section === 'saved' ? this.unorganized.pins.slice() : [],unorganizedLoading:this.section === 'saved' && this.unorganized.busy,
@@ -148,7 +148,7 @@ export class PinmonyProfileNativeReads {
   private clean(value: string | undefined, limit: number = 300): string { return typeof value === 'string' ? value.trim().slice(0,limit) : ''; }
   private image(value: string | undefined): string { return typeof value === 'string' && value.length <= 2000 && /^https:\/\/(?:i|s)\.pinimg\.com\//i.test(value) ? value : ''; }
   private count(value: number | undefined): number | null { return typeof value === 'number' && Number.isFinite(value) && value >= 0 && Number.isInteger(value) ? value : null; }
-  private updated(value: string | undefined): string { const elapsed: number = Date.now() - Date.parse(value || ''); if(!Number.isFinite(elapsed) || elapsed < 0)return ''; const d: number = Math.floor(elapsed / 86400000); return d < 1 ? PinmonyI18n.message('今天') : d < 7 ? d.toString() + PinmonyI18n.message(' 天前') : d < 30 ? Math.floor(d / 7).toString() + PinmonyI18n.message(' 周前') : d < 365 ? Math.floor(d / 30).toString() + PinmonyI18n.message(' 个月前') : Math.floor(d / 365).toString() + PinmonyI18n.message(' 年前'); }
+  private updated(value: string | undefined): string { const elapsed: number = Date.now() - Date.parse(value || ''); if(!Number.isFinite(elapsed) || elapsed < 0)return ''; const d: number = Math.floor(elapsed / 86400000); return d < 1 ? PinmonyI18n.message("pm_today_d5f5a7a0") : d < 7 ? d.toString() + PinmonyI18n.message("pm_days_ago_5972982c") : d < 30 ? Math.floor(d / 7).toString() + PinmonyI18n.message("pm_weeks_ago_2ad8bd1c") : d < 365 ? Math.floor(d / 30).toString() + PinmonyI18n.message("pm_months_ago_1bb931f2") : Math.floor(d / 365).toString() + PinmonyI18n.message("pm_years_ago_c533a6c6"); }
   private target(value: string | undefined): string { if(typeof value !== 'string' || value.length > 2000)return ''; const url: string = value.startsWith('/') ? this.origin + value : value; return url.startsWith(this.origin + '/') && !/[\s?#]/.test(url) ? url : ''; }
   private pin(row: ProfileRow, unorganized: boolean = false): PinmonyCreatedPin | undefined {
     if(row?.type !== 'pin' || typeof row.id !== 'string' || !/^\d{1,40}$/.test(row.id) || unorganized && row.pinner?.id !== this.info?.userId)return undefined;
@@ -172,9 +172,9 @@ export class PinmonyProfileNativeReads {
     } else return undefined;
     if(!target || !title)return undefined;
     const sections: number | null = row.type === 'board' ? this.count(row.section_count) : null;
-    const metadata: string = (count !== null ? count.toString() + PinmonyI18n.message(' 张 Pin 图') : '') +
+    const metadata: string = (count !== null ? count.toString() + PinmonyI18n.message("pm_pins_0a89904f") : '') +
       (sections !== null && Number.isInteger(sections) && sections > 0 ? (count !== null ? ' · ' : '') +
-        (sections === 1 ? PinmonyI18n.message('1 个图板区块') : sections.toString() + PinmonyI18n.message(' 个图板区块')) : '');
+        (sections === 1 ? PinmonyI18n.message("pm_1_section_4d13c778") : sections.toString() + PinmonyI18n.message("pm_sections_68d526a8")) : '');
     return {id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
   }
   private async request(resource: string, options: ProfileOptions, source: string, revision: number): Promise<ProfileResponse> {
@@ -211,7 +211,7 @@ export class PinmonyProfileNativeReads {
       this.version++; f.boards = boards.slice(0,2000); f.pins = pins.slice(0,2000); f.cursor = cursor; f.ended = !cursor || cursor === '-end-' || cursor === previous || !rows.length; f.ready = true; if(boards.length >= 2000 || pins.length >= 2000)f.ended = true;
       PinmonyRuntimeLog.info('ProfileNativeTrace: committed section=' + section + ' append=' + append.toString() + ' count=' + (boards.length + pins.length).toString());
       if(info.isOwn && section === 'saved' && !append && (refresh || !this.unorganized.ready && !this.unorganized.error))await this.readUnorganized(false,true);
-    } catch (_) { if(live()) {if(readingUser)this.infoError = PinmonyI18n.message('个人资料读取失败，请重试'); else f.error = PinmonyI18n.message('内容读取失败，请重试');} }
+    } catch (_) { if(live()) {if(readingUser)this.infoError = PinmonyI18n.message("pm_unable_to_load_profile_please_retry_6dbb335a"); else f.error = PinmonyI18n.message("pm_unable_to_load_content_please_retry_95306b92");} }
     finally { if(revision === this.revision){this.busy = false; f.busy = false; this.requestId = ''; if(live())this.apply(); this.ports.settled(); if(this.refreshNeeded && live()){this.refreshNeeded = false; this.refresh();}} }
   }
   private async readUnorganized(append: boolean, nested: boolean = false): Promise<void> {
@@ -221,7 +221,7 @@ export class PinmonyProfileNativeReads {
       const rows: ProfileRow[] = body.resource_response.data as ProfileRow[]; if(!Array.isArray(rows) || rows.length > 500)throw new Error('unorganized-feed'); const pins: PinmonyCreatedPin[] = append ? f.pins.slice() : [];
       rows.forEach((r: ProfileRow): void => {const p: PinmonyCreatedPin | undefined = this.pin(r,true); if(!p)throw new Error('unorganized-owner'); if(!pins.some((v: PinmonyCreatedPin): boolean => v.id === p.id))pins.push(p);});
       const cursor: string = this.cursor(body); this.version++; f.pins = pins.slice(0,2000); f.cursor = cursor; f.ended = !cursor || cursor === '-end-' || cursor === previous || !rows.length || pins.length >= 2000; f.ready = true;
-    } catch (_) {if(live())f.error = PinmonyI18n.message('未整理 Pin 读取失败，请重试');}
+    } catch (_) {if(live())f.error = PinmonyI18n.message("pm_unable_to_load_unorganized_pins_please_retry_df900d1b");}
     finally {if(revision === this.revision){f.busy = false; if(!nested){this.busy = false; this.requestId = ''; if(live())this.apply(); this.ports.settled(); if(this.refreshNeeded && live()){this.refreshNeeded = false; this.refresh();}} }}
   }
 }

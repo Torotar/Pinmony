@@ -37,7 +37,7 @@ export class PinmonyCommentNativeWrites {
     this.waits.forEach((cancel: () => void): void => cancel()); this.waits.clear();
     if (this.pending && this.result && this.store.commentToken === this.token && this.store.commentResult.pin === this.result.pin) {
       this.store.commentResult.busy = false;
-      if (this.submitted) { this.store.commentResult.uncertain = true; this.store.commentResult.actionError = PinmonyI18n.message('操作结果未确认，请关闭后重新读取核对；不会重复提交'); }
+      if (this.submitted) { this.store.commentResult.uncertain = true; this.store.commentResult.actionError = PinmonyI18n.message("pm_result_not_confirmed_close_and_reload_to_check_it_will_not_be_re_d952b803"); }
       this.publish();
     }
     this.pending = false; this.submitted = false; this.result = undefined;
@@ -165,8 +165,8 @@ export class PinmonyCommentNativeWrites {
     } catch (_) {
       if (live()) {
         if (this.submitted && !confirmed) this.store.commentResult.uncertain = true;
-        this.store.commentResult.actionError = this.submitted && !confirmed ? PinmonyI18n.message('操作结果未确认，请关闭后重新读取核对；不会重复提交') :
-          value.action === 'photo' ? PinmonyI18n.message('图片上传或评论准备未完成，尚未提交评论') : PinmonyI18n.message('评论操作准备失败，请重新读取');
+        this.store.commentResult.actionError = this.submitted && !confirmed ? PinmonyI18n.message("pm_result_not_confirmed_close_and_reload_to_check_it_will_not_be_re_d952b803") :
+          value.action === 'photo' ? PinmonyI18n.message("pm_image_upload_or_comment_preparation_incomplete_the_comment_has_n_c87c853f") : PinmonyI18n.message("pm_unable_to_prepare_comment_action_reload_to_retry_19845ac7");
       }
     } finally {
       if (revision === this.revision) {

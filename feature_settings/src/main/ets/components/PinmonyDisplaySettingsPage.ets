@@ -36,8 +36,8 @@ export struct PinmonyDisplaySettingsPage {
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
     this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
-      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("重新读取") : this.uiText("重试"),
-      contentAccessibilityText: this.uiText("重新读取当前设置"),
+      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
+      contentAccessibilityText: this.uiText("pm_reload_current_settings_d2b82d8a"),
       onContentClick: () => {
         if (!this.pageVisible || key !== this.errorSnackKey || this.store.busy || this.store.loading) return;
         this.dismissErrorSnack();
@@ -45,8 +45,8 @@ export struct PinmonyDisplaySettingsPage {
       }
     }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
-  private title(): string { return this.store.screen === 'theme' ? this.uiText("主题") : this.uiText("显示设置"); }
-  private themeLabel(): string { return this.themePreference === 'dark' ? this.uiText("深色") : this.themePreference === 'light' ? this.uiText("浅色") : this.uiText("跟随系统"); }
+  private title(): string { return this.store.screen === 'theme' ? this.uiText("pm_theme_788db1cf") : this.uiText("pm_display_settings_32e62ed0"); }
+  private themeLabel(): string { return this.themePreference === 'dark' ? this.uiText("pm_dark_a6b75d06") : this.themePreference === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_follow_system_217cfe7d"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private selectTheme(value: string): void {
@@ -58,7 +58,7 @@ export struct PinmonyDisplaySettingsPage {
       context.getApplicationContext().setColorMode(value === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : value === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     } catch (_) {
       this.themePreference = previous;
-      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("主题切换失败，请重试"), duration: 3000 }); }
+      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_theme_please_retry_e0cd6314"), duration: 3000 }); }
       catch (_) { PinmonyRuntimeLog.warn('Settings: theme failure feedback unavailable'); }
     }
   }
@@ -76,7 +76,7 @@ export struct PinmonyDisplaySettingsPage {
       await mainWindow.setPreferredOrientation(orientations[index]);
       this.orientationPreference = value;
     } catch (_) {
-      this.getUIContext().getPromptAction().showToast({ message: this.uiText("屏幕方向切换失败，请重试"), duration: 3000 });
+      this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 });
     } finally { this.orientationBusy = false; }
   }
   private options(): HdsNavigationTitleBarOptions {
@@ -106,32 +106,32 @@ export struct PinmonyDisplaySettingsPage {
   @Builder
   private display() {
     Row({ space: 12 }) {
-      Text(this.uiText('语言')).fontSize(18).fontWeight(FontWeight.Bold)
+      Text(this.uiText("pm_language_9f6fee1a")).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Select([{ value: this.uiText('跟随系统') }, { value: '中文' }, { value: 'English' }])
+      Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: 'English' }])
         .selected(Math.max(0, ['system', 'zh', 'en'].indexOf(this.languagePreference)))
-        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'en' ? 'English' : this.uiText('跟随系统'))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'en' ? 'English' : this.uiText("pm_follow_system_217cfe7d"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
         .backgroundColor($r('app.color.surface_muted'))
         .selectedOptionBgColor($r('app.color.surface_muted'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
-        .accessibilityText(this.uiText('语言'))
+        .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
           if (index >= 0 && index < 3) {
             const value: string = ['system', 'zh', 'en'][index];
             try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
             catch (_) {
               PinmonyRuntimeLog.warn('LanguagePreference: save failed');
-              this.getUIContext().getPromptAction().showToast({ message: this.uiText('语言切换失败，请重试') });
+              this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_language_please_retry_f77e9a24") });
             }
           }
         })
     }.width('100%').padding({ top: 16, bottom: 16 })
     Row({ space: 12 }) {
-      Text(this.uiText("主题")).fontSize(18).fontWeight(FontWeight.Bold)
+      Text(this.uiText("pm_theme_788db1cf")).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Select([{ value: this.uiText("跟随系统") }, { value: this.uiText("浅色") }, { value: this.uiText("深色") }])
+      Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_light_aa0819df") }, { value: this.uiText("pm_dark_a6b75d06") }])
         .selected(this.themePreference === 'light' ? 1 : this.themePreference === 'dark' ? 2 : 0)
         .value(this.themeLabel())
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
@@ -139,39 +139,39 @@ export struct PinmonyDisplaySettingsPage {
         .selectedOptionBgColor($r('app.color.surface_muted'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
-        .accessibilityText(this.uiText("主题，") + this.themeLabel())
+        .accessibilityText(this.uiText("pm_theme_0fa0bfe4") + this.themeLabel())
         .onSelect((index: number) => {
           if (index >= 0 && index < 3) this.selectTheme(['system', 'light', 'dark'][index]);
         })
     }.width('100%').padding({ top: 16, bottom: 16 })
     if (this.isTablet) {
       Row({ space: 12 }) {
-        Text(this.uiText("屏幕方向")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-        Select([{ value: this.uiText("跟随系统") }, { value: this.uiText("始终自动旋转") }, { value: this.uiText("竖屏") }, { value: this.uiText("横屏") }])
+        Text(this.uiText("pm_screen_orientation_60cc99cc")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_always_rotate_automatically_d3a0ff23") }, { value: this.uiText("pm_portrait_c35bd83b") }, { value: this.uiText("pm_landscape_055a6b3a") }])
           .selected(Math.max(0, ['system', 'auto', 'portrait', 'landscape'].indexOf(this.orientationPreference)))
-          .value(this.orientationPreference === 'auto' ? this.uiText("始终自动旋转") : this.orientationPreference === 'portrait' ? this.uiText("竖屏") : this.orientationPreference === 'landscape' ? this.uiText("横屏") : this.uiText("跟随系统"))
+          .value(this.orientationPreference === 'auto' ? this.uiText("pm_always_rotate_automatically_d3a0ff23") : this.orientationPreference === 'portrait' ? this.uiText("pm_portrait_c35bd83b") : this.orientationPreference === 'landscape' ? this.uiText("pm_landscape_055a6b3a") : this.uiText("pm_follow_system_217cfe7d"))
           .font({ size: 15 }).fontColor($r('app.color.primary_text'))
           .backgroundColor($r('app.color.surface_muted')).enabled(!this.orientationBusy)
-          .accessibilityText(this.uiText("屏幕方向"))
+          .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
       }.width('100%').padding({ top: 16, bottom: 16 })
     }
     Row({ space: 16 }) {
       Column({ space: 6 }) {
-        Text(this.uiText("底栏收起动画")).fontSize(17).fontColor($r('app.color.primary_text'))
+        Text(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564")).fontSize(17).fontColor($r('app.color.primary_text'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled }).onChange((value: boolean) => { this.collapseEnabled = value; })
-        .accessibilityText(this.uiText("底栏收起动画"))
+        .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
     }.width('100%').padding({ top: 16, bottom: 16 })
   }
   @Builder
   private theme() {
     ForEach(['system', 'light', 'dark'], (value: string) => {
       Row() {
-        Text(value === 'system' ? this.uiText("跟随系统") : value === 'light' ? this.uiText("浅色") : this.uiText("深色")).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Text(value === 'system' ? this.uiText("pm_follow_system_217cfe7d") : value === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_dark_a6b75d06")).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Radio({ group: 'pinweb-theme', value }).checked(this.themePreference === value)
           .onChange((selected: boolean) => { if (selected) this.selectTheme(value); })
-          .accessibilityText(value === 'system' ? this.uiText("跟随系统") : value === 'light' ? this.uiText("浅色") : this.uiText("深色"))
+          .accessibilityText(value === 'system' ? this.uiText("pm_follow_system_217cfe7d") : value === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_dark_a6b75d06"))
       }.width('100%').constraintSize({ minHeight: 56 })
     }, (value: string) => value)
   }

@@ -145,7 +145,7 @@ async ensureRootActionContext(index: number, requireData: boolean = true, allowe
     if (ready) return true;
     if (current()) {
         PinmonyRuntimeLog.warn('RootTabTrace: content-context unavailable targetTab=' + index.toString());
-        this.ports.showMessage(PinmonyI18n.message('当前页面操作尚未就绪，请重试'));
+        this.ports.showMessage(PinmonyI18n.message("pm_page_actions_not_ready_please_retry_22ecc344"));
     }
     return false;
 }
@@ -157,7 +157,7 @@ requestRootPage(index: number): void {
         return;
     const address: string = this.ports.rootPresentationAddress(index);
     if (!address || this.ports.rootTabIndexFromAddress(address) !== index) {
-        this.ports.showMessage(PinmonyI18n.message('当前页面地址尚未确认，请稍后重试'));
+        this.ports.showMessage(PinmonyI18n.message("pm_page_url_not_confirmed_please_retry_later_4d7b5e4b"));
         return;
     }
     if (this.rootReadInFlight(index, address)) {
@@ -217,8 +217,8 @@ requestRootPage(index: number): void {
             if (token !== this.ports.tabRequestToken() || this.ports.activeTab() !== index)
                 return;
             this.failDocument(address);
-            if (index === 0) { this.homeStore.homeLoading = false; this.homeStore.homeError = PinmonyI18n.message('首页会话恢复失败，请重试'); }
-            else { this.profileStore.profileLoading = false; this.profileStore.profileSessionReady = false; this.profileStore.profileError = PinmonyI18n.message('资料会话恢复失败，请重试'); }
+            if (index === 0) { this.homeStore.homeLoading = false; this.homeStore.homeError = PinmonyI18n.message("pm_unable_to_restore_home_session_please_retry_f8a861ac"); }
+            else { this.profileStore.profileLoading = false; this.profileStore.profileSessionReady = false; this.profileStore.profileError = PinmonyI18n.message("pm_unable_to_restore_profile_session_please_retry_978e1f96"); }
             PinmonyRuntimeLog.warn('HomeRecoveryTrace: phase=failed reason=document-reuse');
         });
         this.ports.waitForWebTabConfirmation(index, token, this.ports.rootReadStartedAt());
@@ -231,7 +231,7 @@ requestRootPage(index: number): void {
     catch (_) {
         this.failDocument(address);
         this.ports.setLoadFailed(true);
-        this.ports.setFailureDetails(PinmonyI18n.message('无法加载当前页面，请重试'));
+        this.ports.setFailureDetails(PinmonyI18n.message("pm_unable_to_load_page_please_retry_72a01316"));
     }
 }
 

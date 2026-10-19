@@ -160,7 +160,7 @@ export class PinmonySearchDiscoveryNativeReads {
       this.ended = !connection.pageInfo.hasNextPage || !cursor || !!previous && cursor === previous || connection.edges.length === 0;
       this.ready = true; this.ports.committed(page);
       PinmonyRuntimeLog.info('SearchNativeTrace: discovery committed append=' + append.toString() + ' sections=' + sections.length.toString());
-    } catch (_) { if (live()) this.error = PinmonyI18n.message('搜索发现读取失败，请重试'); }
+    } catch (_) { if (live()) this.error = PinmonyI18n.message("pm_unable_to_load_search_discovery_please_retry_f37a889f"); }
     finally { if (revision === this.revision) { this.requestId = ''; this.busy = false; if (live()) this.apply(); this.ports.settled(); } }
   }
 }

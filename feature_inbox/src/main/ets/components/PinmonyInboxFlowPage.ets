@@ -138,7 +138,7 @@ export struct PinmonyInboxFlowPage {
       const target: InboxFlowUser | undefined = this.snapshot.users.filter((user: InboxFlowUser) => user.id === this.snapshot.blockedUserId)[0];
       this.showMessageMenu = false;
       this.blockTarget = undefined;
-      if (this.onBlockChanged) this.onBlockChanged(!!this.snapshot.blocked, target ? target.name : this.uiText("联系人"));
+      if (this.onBlockChanged) this.onBlockChanged(!!this.snapshot.blocked, target ? target.name : this.uiText("pm_contacts_3303b569"));
     }
     if ((this.snapshot.sentRevision || 0) < this.sentRevision) this.sentRevision = this.snapshot.sentRevision || 0;
     if ((this.snapshot.sentRevision || 0) > this.sentRevision) {
@@ -154,7 +154,7 @@ export struct PinmonyInboxFlowPage {
   }
 
   private blockTargetName(): string {
-    return this.blockTarget ? this.blockTarget.name : this.uiText("联系人");
+    return this.blockTarget ? this.blockTarget.name : this.uiText("pm_contacts_3303b569");
   }
 
   private messageTime(value: string): string {
@@ -163,7 +163,7 @@ export struct PinmonyInboxFlowPage {
     const today: Date = new Date();
     const time: string = date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
     return date.toDateString() === today.toDateString() ? time :
-      [this.uiText("星期日"), this.uiText("星期一"), this.uiText("星期二"), this.uiText("星期三"), this.uiText("星期四"), this.uiText("星期五"), this.uiText("星期六")][date.getDay()] + time;
+      [this.uiText("pm_sunday_7e06f314"), this.uiText("pm_monday_56451fdf"), this.uiText("pm_tuesday_8621c00d"), this.uiText("pm_wednesday_23ae0a11"), this.uiText("pm_thursday_478911d2"), this.uiText("pm_friday_6e5969e5"), this.uiText("pm_saturday_7bb2f5ec")][date.getDay()] + time;
   }
 
   @Builder
@@ -173,7 +173,7 @@ export struct PinmonyInboxFlowPage {
       if (this.snapshot.users.some((user: InboxFlowUser) => !user.self)) {
         this.avatar(this.snapshot.users.filter((user: InboxFlowUser) => !user.self)[0], 32)
       }
-      Text(this.snapshot.title || this.uiText("聊天"))
+      Text(this.snapshot.title || this.uiText("pm_chat_4b3510b8"))
         .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
         .onClick(() => {
@@ -205,9 +205,9 @@ export struct PinmonyInboxFlowPage {
             if (this.snapshot.selectedIds.includes(user.id) !== selected) this.act('select', user.id);
           })
           .hitTestBehavior(HitTestMode.None)
-          .accessibilityText(this.uiText("选择 ") + user.name)
+          .accessibilityText(this.uiText("pm_select_beb4816b") + user.name)
       } else if (!user.self) {
-        Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? this.uiText("取消屏蔽") : this.uiText("屏蔽"))
+        Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? this.uiText("pm_unblock_e2c88959") : this.uiText("pm_block_5e2a9472"))
           .height(36).borderRadius(12).fontSize(14).fontWeight(FontWeight.Normal)
           .padding({ left: 14, right: 14 })
           .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
@@ -225,12 +225,12 @@ export struct PinmonyInboxFlowPage {
       Button({ type: ButtonType.Circle }) {
         Image($r('app.media.lucide_share_2')).width(20).height(20).fillColor($r('app.color.primary_text'))
       }.width(40).height(40).backgroundColor($r('app.color.page_background'))
-        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText(this.uiText("分享 Pin 图"))
+        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText(this.uiText("pm_share_pin_d85b11f9"))
         .onClick(() => { if (message.pinUrl && this.onPinAction) this.onPinAction('share', message.pinUrl); })
       Button({ type: ButtonType.Circle }) {
         Image($r('app.media.lucide_bookmark')).width(20).height(20)
       }.width(40).height(40).backgroundColor($r('app.color.page_background'))
-        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText(this.uiText("收藏 Pin 图"))
+        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText(this.uiText("pm_save_pin_d5491456"))
         .onClick(() => { if (message.pinUrl && this.onPinAction) this.onPinAction('save', message.pinUrl); })
     }
   }
@@ -272,30 +272,30 @@ export struct PinmonyInboxFlowPage {
           Row({ space: 10 }) {
             SymbolGlyph($r('sys.symbol.rectangle_on_rectangle')).fontSize(20)
               .fontColor([$r('app.color.primary_text')])
-            Text(this.uiText("复制")).fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+            Text(this.uiText("pm_copy_63d90d97")).fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
           }.width('100%').justifyContent(FlexAlign.Start)
         }.width('100%').height(48).padding({ left: 8, right: 8 })
-          .backgroundColor(Color.Transparent).accessibilityText(this.uiText("复制消息文字"))
+          .backgroundColor(Color.Transparent).accessibilityText(this.uiText("pm_copy_message_text_280f1f93"))
           .onClick(async () => {
             const text: string = this.selectedMessage?.text || '';
             if (text && this.onCopyText && await this.onCopyText(text)) this.showMessageMenu = false;
           })
       }
       if (this.selectedMessage?.pinUrl) {
-        Button(this.uiText("收藏")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
+        Button(this.uiText("pm_save_60a53514")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('save', this.selectedMessage.pinUrl); this.showMessageMenu = false; })
-        Button(this.uiText("分享")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
+        Button(this.uiText("pm_share_7e564575")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('share', this.selectedMessage.pinUrl); this.showMessageMenu = false; })
       }
       if (this.selectedMessage?.own) {
-        Button(this.uiText("删除")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.accent'))
+        Button(this.uiText("pm_delete_2f9daa82")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.accent'))
           .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
           .onClick(() => {
             const id: string = this.selectedMessage?.id || '';
             const intent: string = this.messageConfirmationKey();
-            this.getUIContext().showAlertDialog({ title: this.uiText("删除消息"), message: this.uiText("确认删除这条消息？"),
-              primaryButton: { value: this.uiText("取消"), action: (): void => {} },
-              secondaryButton: { value: this.uiText("删除"), action: (): void => { if(this.messageConfirmationKey() === intent)this.act('deleteMessage', id); this.showMessageMenu = false; } } });
+            this.getUIContext().showAlertDialog({ title: this.uiText("pm_delete_message_053d6b4d"), message: this.uiText("pm_delete_this_message_94c4bcb6"),
+              primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: (): void => {} },
+              secondaryButton: { value: this.uiText("pm_delete_2f9daa82"), action: (): void => { if(this.messageConfirmationKey() === intent)this.act('deleteMessage', id); this.showMessageMenu = false; } } });
           })
       }
     }.padding({ left: 16, right: 16, bottom: 24 }).width('100%')
@@ -304,18 +304,18 @@ export struct PinmonyInboxFlowPage {
   @Builder
   private blockSheetContent() {
     Column({ space: 16 }) {
-      Text((this.snapshot.blocked ? this.uiText("取消屏蔽") : this.uiText("屏蔽")) + this.blockTargetName() + '？')
+      Text((this.snapshot.blocked ? this.uiText("pm_unblock_e2c88959") : this.uiText("pm_block_5e2a9472")) + this.blockTargetName() + '？')
         .fontSize(24).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         .alignSelf(ItemAlign.Start)
       Text(this.snapshot.blocked ?
-        this.uiText("你可以查看、关注、发送消息或收藏对方的 Pin 图。取消屏蔽后，对方可以再次与你互动。") :
-        this.uiText("你将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。屏蔽后，对方不会收到通知。"))
+        this.uiText("pm_you_can_view_follow_message_or_save_their_pins_after_you_unblock_74bd9651") :
+        this.uiText("pm_you_will_not_be_able_to_view_follow_contact_them_or_save_their_p_8111b778"))
         .fontSize(16).fontColor($r('app.color.primary_text')).lineHeight(26)
         .textAlign(TextAlign.Start)
       Row({ space: 12 }) {
-        Button(this.uiText("算了")).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+        Button(this.uiText("pm_not_now_6b758902")).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
           .onClick(() => { this.showMessageMenu = false; this.blockTarget = undefined; })
-        Button(this.snapshot.blocked ? this.uiText("取消屏蔽") : this.uiText("屏蔽"))
+        Button(this.snapshot.blocked ? this.uiText("pm_unblock_e2c88959") : this.uiText("pm_block_5e2a9472"))
           .backgroundColor(this.snapshot.blocked ? Color.Black : $r('app.color.accent'))
           .fontColor(Color.White).enabled(!this.snapshot.messageBusy && !!this.blockTarget)
           .onClick(() => {
@@ -406,7 +406,7 @@ export struct PinmonyInboxFlowPage {
               Text(message.profile.name).fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
             }.width('100%').alignItems(HorizontalAlign.Center).hitTestBehavior(HitTestMode.None)
             }.width(240).padding(0).borderRadius(18).backgroundColor(Color.Transparent)
-              .accessibilityText(this.uiText("查看 ") + message.profile.name + this.uiText(" 的个人资料"))
+              .accessibilityText(this.uiText("pm_view_9ae8f7e3") + message.profile.name + this.uiText("pm_s_profile_66416c2f"))
               .onClick(() => this.openSharedProfile(message.id))
           } else if (message.board && !message.deleted) {
             PinmonyInboxBoardCard({ board: message.board,
@@ -428,7 +428,7 @@ export struct PinmonyInboxFlowPage {
               .onClick(() => { this.captureChatOffset(); if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
           }
           if (message.deleted) {
-            Text(message.own ? this.uiText("你删除了一条消息") : this.snapshot.title + this.uiText(" 删除了一条消息"))
+            Text(message.own ? this.uiText("pm_you_deleted_a_message_4ed92139") : this.snapshot.title + this.uiText("pm_deleted_a_message_4d82968b"))
               .fontColor($r('app.color.secondary_text')).fontSize(14).padding(12).borderRadius(24)
               .border({ width: 1, color: $r('app.color.surface_muted'), style: BorderStyle.Dashed })
           } else if (message.text === '❤️') {
@@ -449,7 +449,7 @@ export struct PinmonyInboxFlowPage {
                 }
               })
           } else if (message.pinUrl && !message.image) {
-            Text(this.uiText("Pin 图图片暂不可读取")).fontColor($r('app.color.secondary_text'))
+            Text(this.uiText("pm_pin_image_unavailable_3240b81a")).fontColor($r('app.color.secondary_text'))
           }
           if (!message.deleted && !message.board && !message.profile) {
             Button({ type: ButtonType.Normal }) {
@@ -464,7 +464,7 @@ export struct PinmonyInboxFlowPage {
             }.constraintSize({ minWidth: 40 }).height(30).padding({ left: 6, right: 6 }).borderRadius(18)
               .backgroundColor($r('app.color.surface_muted'))
               .alignSelf(ItemAlign.End).margin({ top: -16, right: 4 }).zIndex(1)
-              .accessibilityText(this.uiText("选择消息表情"))
+              .accessibilityText(this.uiText("pm_choose_a_message_reaction_caf4b514"))
               .onClick(() => { this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id; })
               .bindPopup(this.reactionMessageId === message.id, {
                 builder: this.reactionChoices, placement: Placement.Top, showInSubWindow: false,
@@ -484,25 +484,25 @@ export struct PinmonyInboxFlowPage {
     Column({ space: 4 }) {
       if (this.snapshot.canUnsubscribePin) {
         Button({ type: ButtonType.Normal }) {
-          Text(this.uiText("关闭此 Pin 图的更新")).fontSize(18).fontWeight(FontWeight.Medium)
+          Text(this.uiText("pm_turn_off_updates_for_this_pin_01676b9f")).fontSize(18).fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
         }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
           .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.unsubscribedPin)
           .onClick(() => this.act('unsubscribePin'))
       }
       Button({ type: ButtonType.Normal }) {
-        Text(this.uiText("删除更新")).fontSize(18).fontWeight(FontWeight.Medium)
+        Text(this.uiText("pm_delete_update_b051285c")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
         .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
         .onClick(() => this.act('hideNews'))
       Button({ type: ButtonType.Normal }) {
-        Text(this.uiText("查看通知设置")).fontSize(18).fontWeight(FontWeight.Medium)
+        Text(this.uiText("pm_view_notification_settings_c3a6f9ff")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
         .backgroundColor(Color.Transparent).onClick(() => { if (this.onNotifications) this.onNotifications(); })
       if (this.snapshot.unsubscribedPin) {
-        Text(this.uiText("你不会再收到有关此 Pin 图的通知。")).fontSize(14).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("pm_you_will_no_longer_receive_notifications_about_this_pin_75459ce5")).fontSize(14).fontColor($r('app.color.secondary_text'))
       }
       if (this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')) }
     }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 24 })
@@ -522,7 +522,7 @@ export struct PinmonyInboxFlowPage {
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
           showClose: true,
-          title: { title: this.uiText("更新选项") },
+          title: { title: this.uiText("pm_update_options_c3643cd9") },
           backgroundColor: $r('app.color.page_background'),
           maskColor: '#66000000',
           onDisappear: () => {
@@ -547,7 +547,7 @@ export struct PinmonyInboxFlowPage {
     HdsNavDestination() {
     Column() {
       if (this.snapshot.screen === 'compose') {
-        TextInput({ text: this.query, placeholder: this.uiText("按姓名或电子邮箱搜索") }).margin({ left: 16, right: 16, bottom: 8 })
+        TextInput({ text: this.query, placeholder: this.uiText("pm_search_by_name_or_email_0c503b47") }).margin({ left: 16, right: 16, bottom: 8 })
           .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain)
           .onChange((value: string) => {
             this.query = value;
@@ -560,7 +560,7 @@ export struct PinmonyInboxFlowPage {
         Column({ space: 8 }) {
           Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
           if (!(this.snapshot.screen === 'settings' && this.snapshot.writeUncertain)) {
-            Button(this.snapshot.writeUncertain ? this.uiText("重新读取") : this.uiText("重试")).onClick(() => this.act('retry'))
+            Button(this.snapshot.writeUncertain ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d")).onClick(() => this.act('retry'))
           }
         }.padding(16)
       }
@@ -579,7 +579,7 @@ export struct PinmonyInboxFlowPage {
                 }
                 Text(this.snapshot.title).fontSize(18).fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text'))
-                Text(this.uiText("美好的事情可能即将发生")).fontSize(14).fontColor($r('app.color.secondary_text'))
+                Text(this.uiText("pm_good_things_could_be_on_their_way_3f8e968c")).fontSize(14).fontColor($r('app.color.secondary_text'))
               }.width('100%').padding({ top: 40, bottom: 40 }).alignItems(HorizontalAlign.Center)
             }
             ForEach(this.snapshot.messages, (message: InboxFlowMessage) => { this.messageRow(message) },
@@ -611,12 +611,12 @@ export struct PinmonyInboxFlowPage {
         })
       if (this.snapshot.screen === 'chat') {
         Row({ space: 8 }) {
-          TextInput({ text: this.draft, placeholder: this.uiText("输入消息…") }).layoutWeight(1).maxLength(2000)
+          TextInput({ text: this.draft, placeholder: this.uiText("pm_write_a_message_2156709a") }).layoutWeight(1).maxLength(2000)
             .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
             .onChange((value: string) => { this.draft = value; })
             .onSubmit(() => { if (this.draft.trim()) this.act('send', this.draft); })
           if (this.draft.trim()) {
-            Button(this.uiText("发送")).enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
+            Button(this.uiText("pm_send_edecf0ae")).enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
               .onClick(() => this.act('send', this.draft))
           } else {
           Button({ type: ButtonType.Circle }) {
@@ -624,14 +624,14 @@ export struct PinmonyInboxFlowPage {
               .fontColor([$r('app.color.accent')])
           }.width(44).height(44).backgroundColor($r('app.color.page_background'))
             .border({ width: 1, color: $r('app.color.surface_muted') })
-            .accessibilityText(this.uiText("发送爱心"))
+            .accessibilityText(this.uiText("pm_send_a_heart_dccfdd46"))
             .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
             .onClick(() => this.act('send', '❤️'))
           }
         }.padding({ left: 16, right: 16, top: 8, bottom: 24 })
         if (this.snapshot.sendError) {
           Text(PinmonyI18n.render(this.snapshot.sendError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')).padding(12)
-          Button(this.uiText("重新读取会话")).onClick(() => this.act('retry'))
+          Button(this.uiText("pm_reload_conversation_585a78c6")).onClick(() => this.act('retry'))
         }
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
@@ -639,7 +639,7 @@ export struct PinmonyInboxFlowPage {
         radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyInboxFlowPage.showMessageMenu radius=four-corners-32vp'); },
         height: SheetSize.FIT_CONTENT, showClose: true,
-        title: { title: this.snapshot.screen === 'settings' ? (this.snapshot.blocked ? this.uiText("取消屏蔽联系人") : this.uiText("屏蔽联系人")) : '' }, dragBar: true,
+        title: { title: this.snapshot.screen === 'settings' ? (this.snapshot.blocked ? this.uiText("pm_unblock_contact_4b2a7e25") : this.uiText("pm_block_contact_a32510e0")) : '' }, dragBar: true,
         backgroundColor: $r('app.color.page_background'),
         onWillDismiss: (action: DismissSheetAction) => { action.dismiss(); this.showMessageMenu = false; this.selectedMessage = undefined; this.blockTarget = undefined; }
       })
@@ -653,11 +653,11 @@ export struct PinmonyInboxFlowPage {
           } }
         },
         content: { title: { mainTitle: this.snapshot.screen === 'chat' ? '' :
-          this.snapshot.screen === 'compose' ? this.uiText("新消息") : this.snapshot.title || this.uiText("消息设置") },
+          this.snapshot.screen === 'compose' ? this.uiText("pm_new_message_3fc957bf") : this.snapshot.title || this.uiText("pm_message_settings_57326743") },
           stackBuilder: this.conversationTitleBuilder,
           backIcon: { isEnabled: true, action: () => this.act('back') },
-          menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: this.uiText("消息设置"), action: () => this.act('settings') } }] :
-            this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: this.uiText("下一步"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
+          menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: this.uiText("pm_message_settings_57326743"), action: () => this.act('settings') } }] :
+            this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: this.uiText("pm_next_acfc4e74"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
       .backgroundColor($r('app.color.page_background'))
       .bindToScrollable([this.scroller])

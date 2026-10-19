@@ -261,7 +261,7 @@ pageBegin(url: string): void {
             if (this.ports.tryEnterOfflinePreview(url, 'page-timeout'))
                 return;
             this.ports.setAuthStatus('error');
-            this.ports.setFailureDetails(PinmonyI18n.message('当前会话页面加载超时，请重试'));
+            this.ports.setFailureDetails(PinmonyI18n.message("pm_session_page_loading_timed_out_please_retry_6a97119e"));
         }, 20000));
     }
     this.ports.syncBoardRoute(url);

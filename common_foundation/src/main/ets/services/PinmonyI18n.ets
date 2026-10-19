@@ -1,5 +1,6 @@
 import { i18n } from '@kit.LocalizationKit';
-import { PINMONY_ENGLISH } from './PinmonyI18nCatalog';
+import { PINMONY_LOCAL_COPY_KEYS } from './PinmonyLocalCopyKeys';
+import { resourceManager } from '@kit.LocalizationKit';
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 
@@ -7,12 +8,20 @@ import { common } from '@kit.AbilityKit';
 // responses and user content must never pass through this catalog.
 export class PinmonyI18n {
   private static storage: preferences.Preferences | undefined = undefined;
+  private static chinese: resourceManager.ResourceManager | undefined = undefined;
+  private static english: resourceManager.ResourceManager | undefined = undefined;
   static resolve(preference: string, systemLanguage: string): string {
     if (preference === 'zh' || preference === 'en') return preference;
     return /^zh(?:[-_]|$)/i.test(systemLanguage) ? 'zh' : 'en';
   }
 
   static initialize(context: common.Context): void {
+    const chineseConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
+    chineseConfig.locale = 'zh-CN';
+    const englishConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
+    englishConfig.locale = 'en-US';
+    PinmonyI18n.chinese = context.resourceManager.getOverrideResourceManager(chineseConfig);
+    PinmonyI18n.english = context.resourceManager.getOverrideResourceManager(englishConfig);
     PinmonyI18n.storage = preferences.getPreferencesSync(context, { name: 'pinmony_local_display' });
     // Read disk before any component can create the AppStorage defaults.
     const previous: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'system';
@@ -39,25 +48,28 @@ export class PinmonyI18n {
 
   static text(source: string, language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {
     if (source.includes('\uE000')) return PinmonyI18n.render(source, language);
-    return language === 'en' ? PINMONY_ENGLISH[source] || source : source;
+    const key: string = PINMONY_LOCAL_COPY_KEYS[source] || source;
+    const manager: resourceManager.ResourceManager | undefined = language === 'en' ? PinmonyI18n.english : PinmonyI18n.chinese;
+    if (!manager || !key.startsWith('pm_')) return source;
+    return manager.getStringByNameSync(key);
   }
 
   // Stable local message tokens: never translate an unmarked website response.
-  static message(source: string): string { return '\uE000' + source + '\uE001'; }
+  static message(source: string): string { return '\uE000' + (PINMONY_LOCAL_COPY_KEYS[source] || source) + '\uE001'; }
 
   static render(value: string, language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {
     return value.replace(/\uE000([^\uE000\uE001]*)\uE001/g, (_match: string, source: string): string =>
-      language === 'en' ? PINMONY_ENGLISH[source] || source : source);
+      PinmonyI18n.text(source, language));
   }
 
   static optionLabel(id: string, original: string, language: string): string {
     const labels: Record<string, string> = {
-      'home-save': '收藏', 'home-edit': '编辑 Pin 图', 'home-download': '下载图片',
-      'home-see-more': '查看更多', 'home-see-less': '查看更少', 'home-share': '分享',
-      'board-menu-move': '移至其他图板', 'board-menu-cancel-save': '取消收藏',
-      'board-menu-download': '下载', 'board-menu-share': '分享链接', 'board-menu-more': '查看更多',
-      'detail-edit': '编辑 Pin 图', 'detail-download': '下载图片', 'detail-see-more': '查看更多',
-      'detail-see-less': '减少推荐', 'detail-share': '系统分享', 'detail-ai-help': '详细了解 AI 标签'
+      'home-save': "pm_save_60a53514", 'home-edit': "pm_edit_pin_f9119bcf", 'home-download': "pm_download_image_8894375c",
+      'home-see-more': "pm_see_more_92b2b2de", 'home-see-less': "pm_see_less_9c80a8dc", 'home-share': "pm_share_7e564575",
+      'board-menu-move': "pm_move_to_another_board_62574b0d", 'board-menu-cancel-save': "pm_unsave_dca60869",
+      'board-menu-download': "pm_download_4673a230", 'board-menu-share': "pm_share_link_10ba6479", 'board-menu-more': "pm_see_more_92b2b2de",
+      'detail-edit': "pm_edit_pin_f9119bcf", 'detail-download': "pm_download_image_8894375c", 'detail-see-more': "pm_see_more_92b2b2de",
+      'detail-see-less': "pm_see_fewer_like_this_7904e8ad", 'detail-share': "pm_system_share_13a1c63f", 'detail-ai-help': "pm_learn_about_ai_labels_0794696e"
     };
     return labels[id] ? PinmonyI18n.text(labels[id], language) : original;
   }
@@ -73,15 +85,16 @@ export class PinmonyI18n {
 
   static isText(value: string, source: string): boolean {
     value = PinmonyI18n.render(value, 'zh');
-    return value === source || value === PINMONY_ENGLISH[source];
+    return value === PinmonyI18n.text(source, 'zh') || value === PinmonyI18n.text(source, 'en');
   }
 
   static includesText(value: string, source: string): boolean {
     value = PinmonyI18n.render(value, 'zh');
-    return value.includes(source) || !!PINMONY_ENGLISH[source] && value.includes(PINMONY_ENGLISH[source]);
+    return value.includes(PinmonyI18n.text(source, 'zh')) || value.includes(PinmonyI18n.text(source, 'en'));
   }
 
   static isUnconfirmed(value: string): boolean {
+    value = PinmonyI18n.render(value, 'zh');
     return value.includes('未确认') || value.includes('待确认') || /not confirmed|unconfirmed/i.test(value);
   }
 }

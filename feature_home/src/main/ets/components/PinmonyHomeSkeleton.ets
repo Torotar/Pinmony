@@ -43,14 +43,14 @@ export struct PinmonyHomeSkeleton {
       }
       Row({ space: 8 }) {
         LoadingProgress().width(20).height(20).color($r('app.color.accent'))
-        Text(this.uiText("正在加载首页内容…"))
+        Text(this.uiText("pm_loading_home_content_03c47493"))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
           .layoutWeight(1)
       }
       .width('100%')
       .padding({ left: 16, right: 16 })
-      .accessibilityText(this.uiText("正在加载首页内容"))
+      .accessibilityText(this.uiText("pm_loading_home_content_8884d492"))
       Row({ space: 12 }) {
         Column({ space: 18 }) {
           this.card(200)

@@ -100,15 +100,15 @@ export struct PinmonyDetailHero {
         .onComplete((event) => this.completeImage(event?.loadingStatus ?? -1))
         .onError((event) => this.failImage(event?.error?.code || 0))
         .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); })
-        .accessibilityText(this.label || this.uiText("Pin 图片"))
+        .accessibilityText(this.label || this.uiText("pm_pin_image_c269651e"))
       if (!this.blocked && !this.previewAvailable && this.imageState === 'loading') {
         LoadingProgress().width(28).height(28).color($r('app.color.accent'))
-          .hitTestBehavior(HitTestMode.None).accessibilityText(this.uiText("正在加载图片"))
+          .hitTestBehavior(HitTestMode.None).accessibilityText(this.uiText("pm_loading_image_8fbf0f33"))
       } else if (!this.blocked && (this.imageState === 'timeout' || this.imageState === 'failed')) {
         Column({ space: 8 }) {
-          Text(this.imageState === 'failed' ? this.uiText("图片加载失败") : this.uiText("图片加载超时"))
+          Text(this.imageState === 'failed' ? this.uiText("pm_image_failed_to_load_572993f5") : this.uiText("pm_image_loading_timed_out_b829c7d3"))
             .fontSize(14).fontColor($r('app.color.secondary_text'))
-          Button(this.uiText("重新加载图片")).onClick(() => this.retryImage())
+          Button(this.uiText("pm_reload_image_0ad285f1")).onClick(() => this.retryImage())
         }.padding(12).borderRadius(12).backgroundColor($r('app.color.page_background'))
       }
     }.width('100%').height(this.heightVp)

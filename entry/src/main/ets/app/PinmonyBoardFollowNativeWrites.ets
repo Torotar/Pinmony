@@ -64,13 +64,13 @@ export class PinmonyBoardFollowNativeWrites {
       if (!reply || reply.error || reply.status !== 200 || !reply.body || reply.body.length > 2000000) throw new Error('unknown');
       const response: FollowResponse = JSON.parse(reply.body) as FollowResponse, r: FollowResource | undefined = response.resource_response;
       if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0) {
-        this.unknown.delete(id); this.ports.feedback(PinmonyI18n.message('网站拒绝本次图板关注操作，可以重试')); return;
+        this.unknown.delete(id); this.ports.feedback(PinmonyI18n.message("pm_the_website_rejected_this_board_follow_action_you_can_retry_768968ce")); return;
       }
       if (!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_board' : 'v3_unfollow_board') ||
           response.client_context?.user && response.client_context.user.id !== viewer ||
           (desired ? !r.data || r.data.id !== id || r.data.type !== 'board' || r.data.followed_by_me !== true : r.data !== null)) throw new Error('unknown');
-      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message('已取消关注图板'));
-    } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message('图板关注结果未确认，请刷新核对，勿重复提交')); }
+      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
+    } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message("pm_board_follow_result_not_confirmed_refresh_to_check_before_submit_b77726df")); }
     finally { if (this.job === job.id) { this.job = ''; this.board = ''; this.release = undefined; this.ports.changed(); } }
   }
 }

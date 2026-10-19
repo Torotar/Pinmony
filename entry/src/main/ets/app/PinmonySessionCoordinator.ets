@@ -390,7 +390,7 @@ syncAuthentication(): void {
         if (this.ports.tryEnterOfflinePreview(this.ports.navigationAddress() || this.ports.lastPageUrl() || PINTEREST_URL, 'auth-timeout'))
             return;
         this.ports.setAuthStatus('error');
-        this.ports.setFailureDetails(PinmonyI18n.message('无法确认当前会话，请重试读取'));
+        this.ports.setFailureDetails(PinmonyI18n.message("pm_unable_to_verify_session_please_reload_661f4ee3"));
     }, 15000));
 }
 
@@ -399,7 +399,7 @@ retryLogin(): void {
         return;
     const now: number = Date.now();
     if (this.ports.lastLoginRetryAt() >= 0 && now - this.ports.lastLoginRetryAt() < 5000) {
-        this.ports.showNetworkNotice(PinmonyI18n.message('会话页面正在重试，请稍后再试'));
+        this.ports.showNetworkNotice(PinmonyI18n.message("pm_session_page_is_retrying_please_try_again_later_0393e43e"));
         PinmonyRuntimeLog.info('RequestPolicy: login-retry-paused');
         return;
     }
@@ -417,7 +417,7 @@ retryLogin(): void {
     }
     catch (_) {
         this.ports.setAuthStatus('error');
-        this.ports.setFailureDetails(PinmonyI18n.message('当前会话页面暂时无法加载，请重试'));
+        this.ports.setFailureDetails(PinmonyI18n.message("pm_session_page_unavailable_please_retry_d209f31a"));
     }
 }
 }

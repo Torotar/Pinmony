@@ -19,7 +19,7 @@ export struct PinmonySearchFilterSheet {
     Stack() {
       Circle().width(16).height(16).fill($r('app.color.primary_text'))
     }.width(40).height(44).position({ x: this.priceHandleOffset(upper), y: 0 })
-      .accessibilityText((upper ? this.uiText("最高价 ") : this.uiText("最低价 ")) + this.price(upper).toString())
+      .accessibilityText((upper ? this.uiText("pm_maximum_price_dcb810cc") : this.uiText("pm_minimum_price_fc7533e3")) + this.price(upper).toString())
       .gesture(PanGesture({ direction: PanDirection.Horizontal, distance: 0 })
         .onActionStart(() => { this.dragStart = this.price(upper); })
         .onActionUpdate((event: GestureEvent) => {
@@ -41,7 +41,7 @@ export struct PinmonySearchFilterSheet {
           LoadingProgress()
             .width(24)
             .height(24)
-          Text(this.uiText("正在读取筛选选项…"))
+          Text(this.uiText("pm_loading_filters_e07a2b70"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
@@ -55,7 +55,7 @@ export struct PinmonySearchFilterSheet {
           .fontColor($r('app.color.secondary_text'))
           .padding({ left: 24, right: 24, top: 18, bottom: 18 })
           .width('100%')
-        Button(this.uiText("重试读取"))
+        Button(this.uiText("pm_retry_loading_1133d675"))
           .height(42)
           .margin({ left: 24, right: 24, bottom: 12 })
           .onClick(() => this.onRetry())
@@ -66,7 +66,7 @@ export struct PinmonySearchFilterSheet {
             if (this.searchStore.searchProductDomains.length || this.searchStore.searchProductPrices) {
               Column({space:12}) {
                 if(this.searchStore.searchProductPrices) {
-                  Text(this.uiText("价格范围")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
+                  Text(this.uiText("pm_price_range_e8debe5f")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
                   Row() {
                     Text(this.searchStore.searchProductCurrency + ' ' + this.price(false).toString())
                       .fontColor($r('app.color.primary_text')).fontWeight(FontWeight.Bold)
@@ -83,9 +83,9 @@ export struct PinmonySearchFilterSheet {
                     this.priceHandle(true)
                   }.width('100%').height(44)
                     .onAreaChange((_old: Area, area: Area) => { this.trackWidth = Math.max(1, Number(area.width) - 40); })
-                  Text(this.uiText("拖拽以更改价格")).fontSize(15).fontColor($r('app.color.secondary_text'))
+                  Text(this.uiText("pm_drag_to_change_price_9c52f526")).fontSize(15).fontColor($r('app.color.secondary_text'))
                 }
-                Text(this.uiText("商家")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
+                Text(this.uiText("pm_merchants_d5bae996")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
                 ForEach(this.searchStore.searchProductDomains,(domain: PinmonySearchFilterOption) => {
                   Row() {
                     Text(domain.label).layoutWeight(1).fontColor($r('app.color.primary_text'))
@@ -103,11 +103,11 @@ export struct PinmonySearchFilterSheet {
                 },(domain: PinmonySearchFilterOption) => domain.id)
                 if(this.searchStore.searchProductError) { Text(PinmonyI18n.render(this.searchStore.searchProductError, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
                 Row({space:12}) {
-                  Button(this.uiText("清除")).layoutWeight(1).height(48).onClick(() => {
+                  Button(this.uiText("pm_clear_bce23772")).layoutWeight(1).height(48).onClick(() => {
                     this.searchStore.searchProductMin = '';this.searchStore.searchProductMax = '';
                     this.onSelect('native-product:' + JSON.stringify({domains:[],min:'',max:''}));
                   })
-                  Button(this.uiText("应用")).layoutWeight(1).height(48).onClick(() => this.onSelect('native-product:' + JSON.stringify({
+                  Button(this.uiText("pm_apply_63c73c47")).layoutWeight(1).height(48).onClick(() => this.onSelect('native-product:' + JSON.stringify({
                     domains:this.searchStore.searchProductDomains.filter((item: PinmonySearchFilterOption): boolean => item.selected).map((item: PinmonySearchFilterOption): string => item.id),
                     min:this.searchStore.searchProductMin,max:this.searchStore.searchProductMax})))
                 }.width('100%')
@@ -144,7 +144,7 @@ export struct PinmonySearchFilterSheet {
               .height(56)
               .padding({ left: 24, right: 24 })
               .opacity(option.enabled && !this.searchStore.searchFilterLoading ? 1 : 0.45)
-              .accessibilityText(PinmonyI18n.render(option.label, this.uiLanguage) + (option.selected ? this.uiText("，已选中") : ''))
+              .accessibilityText(PinmonyI18n.render(option.label, this.uiLanguage) + (option.selected ? this.uiText("pm_selected_4689290d") : ''))
               .accessibilitySelected(option.selected)
               .onClick(() => {
                 if (option.enabled && !this.searchStore.searchFilterLoading) this.onSelect(option.id);

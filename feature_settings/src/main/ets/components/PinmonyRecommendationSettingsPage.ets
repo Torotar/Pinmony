@@ -29,8 +29,8 @@ export struct PinmonyRecommendationSettingsPage {
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
     this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
-      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("重新读取") : this.uiText("重试"),
-      contentAccessibilityText: this.uiText("重新读取当前设置"),
+      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
+      contentAccessibilityText: this.uiText("pm_reload_current_settings_d2b82d8a"),
       onContentClick: () => {
         if (!this.pageVisible || key !== this.errorSnackKey || this.store.busy || this.store.loading) return;
         this.dismissErrorSnack();
@@ -38,7 +38,7 @@ export struct PinmonyRecommendationSettingsPage {
       }
     }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
-  private title(): string { return this.uiText("优化你的推荐"); }
+  private title(): string { return this.uiText("pm_refine_your_recommendations_92ce2929"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private selectRecommendation(index: number): void {
@@ -74,14 +74,14 @@ export struct PinmonyRecommendationSettingsPage {
         menu: { value: this.store.screen === 'recommend' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.exclamationmark_circle'))
             .fontSize(30).fontColor([$r('app.color.primary_text')]),
-          label: this.uiText("推荐说明"), action: () => { this.showRecommendationInfo(); }
+          label: this.uiText("pm_about_recommendations_03c3b26e"), action: () => { this.showRecommendationInfo(); }
         } }] : [] } } };
   }
   private showRecommendationInfo(): void {
     this.getUIContext().showAlertDialog({
-      title: this.uiText("优化你的推荐"),
-      message: this.uiText("让 Pinterest 更懂你。编辑详细信息，以便 Pinterest 利用这些信息向你推荐帖子。这些详细信息不会公开显示。"),
-      confirm: { value: this.uiText("知道了"), action: () => {} }
+      title: this.uiText("pm_refine_your_recommendations_92ce2929"),
+      message: this.uiText("pm_help_pinterest_understand_you_better_edit_the_details_used_to_re_20d62659"),
+      confirm: { value: this.uiText("pm_got_it_de32e201"), action: () => {} }
     });
   }
   @Builder
@@ -90,10 +90,10 @@ export struct PinmonyRecommendationSettingsPage {
       ForEach((this.store.data?.activities || []).filter((_pin: PinmonyRecentActivity, index: number) => index % 2 === parity), (pin: PinmonyRecentActivity) => {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Image(pin.image).width('100%').aspectRatio(pin.width / pin.height).objectFit(ImageFit.Cover)
-            .accessibilityText(pin.title || this.uiText("最近浏览或收藏的 Pin 图"))
+            .accessibilityText(pin.title || this.uiText("pm_recently_viewed_or_saved_pins_b669376f"))
           if (pin.recommendationClosed || pin.closeUncertain) {
             Column() {
-              Text(pin.recommendationClosed ? this.uiText("已关闭此 Pin 图推荐") : this.uiText("关闭结果未确认"))
+              Text(pin.recommendationClosed ? this.uiText("pm_recommendations_turned_off_for_this_pin_4355c3b5") : this.uiText("pm_change_not_confirmed_0bb5d703"))
                 .width('100%').fontSize(14).fontColor(Color.White).padding(12)
             }.width('100%').height('100%').backgroundColor('#66000000').alignItems(HorizontalAlign.Start)
           }
@@ -107,7 +107,7 @@ export struct PinmonyRecommendationSettingsPage {
           }.width(44).height(44).backgroundColor(Color.Transparent).margin(4)
             .enabled(this.available() && !pin.recommendationClosed && !pin.closeUncertain)
             .onClick(() => { if (this.available() && !pin.recommendationClosed && !pin.closeUncertain) this.request('activityClose', pin.id); })
-            .accessibilityText((pin.title || this.uiText("此 Pin 图")) + (pin.recommendationClosed ? this.uiText("，已关闭推荐") : pin.closeUncertain ? this.uiText("，关闭结果未确认") : this.uiText("，关闭推荐")))
+            .accessibilityText((pin.title || this.uiText("pm_this_pin_05e8eaee")) + (pin.recommendationClosed ? this.uiText("pm_recommendations_off_7dd43c85") : pin.closeUncertain ? this.uiText("pm_change_not_confirmed_ccc2d77c") : this.uiText("pm_turn_off_recommendations_629265e0")))
         }.width('100%').aspectRatio(pin.width / pin.height).borderRadius(16).clip(true)
       }, (pin: PinmonyRecentActivity) => pin.id)
     }.layoutWeight(1)
@@ -124,30 +124,30 @@ export struct PinmonyRecommendationSettingsPage {
   @Builder
   private recommend() {
     CapsuleSegmentButtonV2({
-      items: new SegmentButtonV2Items([{ text: this.uiText("AI 内容") }, { text: this.uiText("动态") }]),
+      items: new SegmentButtonV2Items([{ text: this.uiText("pm_ai_content_7cdf4844") }, { text: this.uiText("pm_activity_780353e5") }]),
       selectedIndex: this.store.recommendationTab === 'ai' ? 0 : 1,
       $selectedIndex: (index: number) => { this.selectRecommendation(index); }
     }).width('100%').margin({ bottom: 12 }).enabled(!this.store.busy && !this.store.loading)
     if (this.store.recommendationTab === 'ai') {
-      Text(this.uiText("调整商品目录源内的 AI 修改内容。你可以减少看到的 AI 修改内容，但后续仍可能会出现部分此类内容。")).fontSize(15).fontColor($r('app.color.secondary_text'))
+      Text(this.uiText("pm_adjust_ai_modified_content_in_product_feeds_you_can_see_less_of__6f514185")).fontSize(15).fontColor($r('app.color.secondary_text'))
       Row({ space: 16 }) {
         Column({ space: 6 }) {
-          Text(this.uiText("显示 AI 内容")).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-          Text(this.uiText("关闭，以减少商品目录源内的 AI 内容。")).fontSize(14).fontColor($r('app.color.secondary_text'))
+          Text(this.uiText("pm_show_ai_content_409fe4d8")).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+          Text(this.uiText("pm_turn_off_to_see_less_ai_content_in_product_feeds_b51424cd")).fontSize(14).fontColor($r('app.color.secondary_text'))
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         Toggle({ type: ToggleType.Switch, isOn: this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled) || false })
           .enabled(this.available() && !!this.store.data?.topics.length)
           .onChange((enabled: boolean) => { if (this.available() && enabled !== this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled)) this.request('aiAll', enabled.toString()); })
-          .accessibilityText(this.uiText("显示 AI 内容"))
+          .accessibilityText(this.uiText("pm_show_ai_content_409fe4d8"))
       }.width('100%').padding(16).borderRadius(18).backgroundColor($r('app.color.surface_muted')).margin({ top: 16, bottom: 16 })
-      Text(this.uiText("按主题管理 AI 内容")).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+      Text(this.uiText("pm_manage_ai_content_by_topic_ed79d1c5")).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
       ForEach(this.store.data?.topics || [], (topic: PinmonyAiTopic) => { this.aiTopic(topic) }, (topic: PinmonyAiTopic) => topic.key)
       if (this.store.data?.ready && !this.store.loading && !this.store.error && !this.store.data.topics.length) {
-        Text(this.uiText("暂无可调整的 AI 主题")).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("pm_no_ai_topics_available_to_adjust_2f24acde")).fontColor($r('app.color.secondary_text'))
       }
     } else {
-      Text(this.uiText("隐藏与你最近收藏或点击放大查看的 Pin 图相关的帖子。")).width('100%').textAlign(TextAlign.Center).fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 16 })
-      if (this.store.data?.ready && !this.store.loading && !this.store.error && !this.store.data.activities.length) { Text(this.uiText("暂无近期动态")).fontColor($r('app.color.secondary_text')) }
+      Text(this.uiText("pm_hide_pins_related_to_those_you_recently_saved_or_opened_2e744f08")).width('100%').textAlign(TextAlign.Center).fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 16 })
+      if (this.store.data?.ready && !this.store.loading && !this.store.error && !this.store.data.activities.length) { Text(this.uiText("pm_no_recent_activity_360e0904")).fontColor($r('app.color.secondary_text')) }
       Row({ space: 12 }) { this.activityColumn(0); this.activityColumn(1) }.width('100%').alignItems(VerticalAlign.Top)
     }
   }

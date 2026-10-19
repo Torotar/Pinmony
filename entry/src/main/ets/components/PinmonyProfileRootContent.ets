@@ -100,14 +100,14 @@ function PinmonyBuildProfileStatus(view: PinmonyProfileRootView) {
       Column({ space: 18 }) {
         if (view.profileStore.profileLoading) {
           LoadingProgress().width(36).height(36)
-          Text(PinmonyI18n.text(PinmonyI18n.message("正在加载个人资料…")))
+          Text(PinmonyI18n.text(PinmonyI18n.message("pm_loading_profile_503bfab4")))
             .fontSize(15)
             .fontColor($r('app.color.secondary_text'))
         } else {
           Text(view.profileStore.profileError)
             .fontSize(16)
             .fontColor($r('app.color.primary_text'))
-          Button(PinmonyI18n.text("重新读取"))
+          Button(PinmonyI18n.text("pm_reload_df7392cc"))
             .onClick(() => view.refreshProfile())
         }
       }

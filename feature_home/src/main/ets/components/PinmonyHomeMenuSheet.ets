@@ -42,7 +42,7 @@ export struct PinmonyHomeMenuSheet {
             Button({ type: ButtonType.Normal }) {
               Column({ space: 8 }) {
                 Image(this.platformIcon(option.label)).width(56).height(56).objectFit(ImageFit.Contain)
-                Text(option.label === '短信' ? this.uiText("消息") : option.label)
+                Text(option.label === '短信' ? this.uiText("pm_messages_4da199fa") : option.label)
                   .fontSize(13).fontColor($r('app.color.primary_text')).maxLines(1)
               }.width('100%')
             }
@@ -50,7 +50,7 @@ export struct PinmonyHomeMenuSheet {
             .backgroundColor(Color.Transparent)
             .enabled(option.enabled && !this.menu.busy)
             .onClick(() => { if (this.onAction) this.onAction(option.id); })
-            .accessibilityText(this.uiText("分享到") + option.label)
+            .accessibilityText(this.uiText("pm_share_to_5f41162f") + option.label)
           }, (option: PinmonyHomeMenuOption) => option.id + this.uiLanguage)
           ForEach(this.emptySlots(page.length), (slot: number) => {
             Blank().layoutWeight(1)
@@ -69,7 +69,7 @@ export struct PinmonyHomeMenuSheet {
       } else if (this.menu.error) {
         Text(PinmonyI18n.render(this.menu.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
         if (!/取消收藏|收藏校验/.test(this.menu.error)) {
-          Button(this.uiText("重试")).onClick(() => { if (this.onRetry) this.onRetry(); })
+          Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
         }
       } else {
         Column() {

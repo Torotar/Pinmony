@@ -67,10 +67,10 @@ export class PinmonySharePanelsController {
     this.searchTasks.invalidate(); this.lastSearchKey = '';
     this.generation++; this.searchToken++; this.refreshToken++; this.refreshing = false; this.tasks.invalidate();
     if (this.ports.activeSheetKind() === 'share' && this.store.shareLoading) {
-      this.store.shareLoading = false; this.store.shareError = PinmonyI18n.message('分享读取已暂停，请重试');
+      this.store.shareLoading = false; this.store.shareError = PinmonyI18n.message("pm_share_loading_paused_please_retry_1a0f4d77");
     }
     if (this.ports.activeSheetKind() === 'more' && this.store.moreLoading) {
-      this.store.moreLoading = false; this.store.moreError = PinmonyI18n.message('选项读取已暂停，请重试');
+      this.store.moreLoading = false; this.store.moreError = PinmonyI18n.message("pm_option_loading_paused_please_retry_aedb895b");
     }
   }
 
@@ -148,7 +148,7 @@ export class PinmonySharePanelsController {
       if (message.kind === 'failed') {
         if (message.session === this.store.shareSession && message.session !== this.store.ignoredShareSession) {
           this.store.shareLoading = false;
-          this.ports.showMessage(PinmonyI18n.message('无法读取 Pinterest 分享面板，请重新打开分享'));
+          this.ports.showMessage(PinmonyI18n.message("pm_unable_to_load_pinterest_share_panel_reopen_sharing_2f7f03b8"));
           this.ports.dismissShareSheet();
         }
         return;
@@ -197,14 +197,14 @@ export class PinmonySharePanelsController {
       this.store.shareFeedback = message.feedback || '';
       this.store.shareError = message.error || '';
       if (/Unexpected token|not valid JSON|JSON\.parse|Unexpected end of JSON/i.test(this.store.shareError)) {
-        this.store.shareError = PinmonyI18n.message('无法读取分享数据，请重试');
+        this.store.shareError = PinmonyI18n.message("pm_unable_to_load_share_data_please_retry_1f9affe6");
       }
       this.store.shareLoading = false;
       this.ports.setActiveSheetKind('share');
       this.ports.setShowNativeSheet(true);
       if (!this.store.shareSearchActive && this.store.shareOptions.length === 0 &&
           this.store.shareActions.length === 0 && !this.store.shareSearchId && this.store.shareContacts.length === 0) {
-        this.store.shareError = PinmonyI18n.message('暂时无法读取分享选项');
+        this.store.shareError = PinmonyI18n.message("pm_share_options_temporarily_unavailable_e5eb170e");
       } else {
         this.store.shareError = message.error || '';
       }
@@ -227,7 +227,7 @@ export class PinmonySharePanelsController {
       if (message.kind === 'closeFailed') {
         if (message.session === this.store.moreSession && message.pin === this.store.morePin &&
             this.ports.activeSheetKind() !== 'share') {
-          this.ports.showMessage(PinmonyI18n.message('无法关闭网页选项，请重试'));
+          this.ports.showMessage(PinmonyI18n.message("pm_unable_to_close_website_options_please_retry_4162f998"));
         }
         return;
       }
@@ -273,7 +273,7 @@ export class PinmonySharePanelsController {
         this.store.ignoredMoreSession = message.session;
         this.ports.setActiveSheetKind('');
         this.ports.setShowNativeSheet(false);
-        this.ports.showMessage(PinmonyI18n.message('无法读取 Pinterest 选项，请重新打开三点菜单'));
+        this.ports.showMessage(PinmonyI18n.message("pm_unable_to_load_pinterest_options_reopen_the_options_menu_16720c78"));
         return;
       }
       if (message.kind !== 'state') return;
@@ -284,7 +284,7 @@ export class PinmonySharePanelsController {
       this.store.moreOptions = (message.options || []).filter((option: MoreSheetOption) =>
         !!option.id && !!option.label);
       this.store.moreLoading = false;
-      this.store.moreError = this.store.moreOptions.length > 0 ? '' : PinmonyI18n.message('暂时无法读取选项');
+      this.store.moreError = this.store.moreOptions.length > 0 ? '' : PinmonyI18n.message("pm_options_temporarily_unavailable_839cbe86");
       this.ports.setActiveSheetKind('more');
       this.ports.setShowNativeSheet(true);
     } catch (error) {
@@ -323,11 +323,11 @@ export class PinmonySharePanelsController {
       if (!state || state.session !== session || state.pin !== detail.pinUrl || !Array.isArray(state.options) || state.options.length > 100) throw new Error('read');
       this.store.moreOptions = state.options.filter((item: MoreSheetOption): boolean => !!item.id && !!item.label);
       this.store.moreLoading = false;
-      this.store.moreError = this.store.moreOptions.length ? '' : PinmonyI18n.message('暂时无法读取选项');
+      this.store.moreError = this.store.moreOptions.length ? '' : PinmonyI18n.message("pm_options_temporarily_unavailable_839cbe86");
     } catch (_) {
       if (!current()) return;
       this.store.moreLoading = false;
-      this.store.moreError = PinmonyI18n.message('无法读取接口选项，请重试');
+      this.store.moreError = PinmonyI18n.message("pm_unable_to_load_service_options_please_retry_3b2d272d");
     }
   }
 
@@ -347,12 +347,12 @@ export class PinmonySharePanelsController {
       this.ports.runScript('window.PinmonyNativeShareOpen && window.PinmonyNativeShareOpen(' +
         session.toString() + ')').then((result: string) => {
         if (current() && result !== 'true' && result !== '"true"') {
-          this.ports.showMessage(PinmonyI18n.message('无法打开 Pinterest 分享选项，请重新打开分享'));
+          this.ports.showMessage(PinmonyI18n.message("pm_unable_to_open_pinterest_share_options_reopen_sharing_bc040277"));
           this.ports.dismissShareSheet();
         }
       }).catch(() => {
         if (current()) {
-          this.ports.showMessage(PinmonyI18n.message('无法打开 Pinterest 分享选项，请重新打开分享'));
+          this.ports.showMessage(PinmonyI18n.message("pm_unable_to_open_pinterest_share_options_reopen_sharing_bc040277"));
           this.ports.dismissShareSheet();
         }
       });
@@ -376,7 +376,7 @@ export class PinmonySharePanelsController {
     const token: number = ++this.searchToken;
     const current = (): boolean => token === this.searchToken && this.current(session, pin, page, generation, 'share');
     this.store.shareContacts = [];
-    this.store.shareFeedback = PinmonyI18n.message('正在加载联系人…');
+    this.store.shareFeedback = PinmonyI18n.message("pm_loading_contacts_6c983c5f");
     this.store.shareError = '';
     if (!await this.searchTasks.wait(300) || !current()) return;
     this.lastSearchKey = key;
@@ -384,11 +384,11 @@ export class PinmonySharePanelsController {
       const result: string = await this.ports.runScript('window.PinmonyNativeShareSearch && ' +
         'window.PinmonyNativeShareSearch(' + session.toString() + ',' + JSON.stringify(query) + ')');
       if (current() && result !== 'true' && result !== '"true"') {
-        this.lastSearchKey = ''; this.store.shareError = PinmonyI18n.message('联系人搜索不可用');
+        this.lastSearchKey = ''; this.store.shareError = PinmonyI18n.message("pm_contact_search_unavailable_00543593");
       }
     } catch (error) {
       if (current()) {
-        this.lastSearchKey = ''; this.store.shareError = PinmonyI18n.message('联系人搜索不可用');
+        this.lastSearchKey = ''; this.store.shareError = PinmonyI18n.message("pm_contact_search_unavailable_00543593");
       }
     }
   }
@@ -413,12 +413,12 @@ export class PinmonySharePanelsController {
         'window.PinmonyNativeShareRefresh(' + session.toString() + ')');
       if (current() && result !== 'true' && result !== '"true"') {
         this.store.shareLoading = false;
-        this.store.shareError = PinmonyI18n.message('无法重新读取分享选项，请关闭后重试');
+        this.store.shareError = PinmonyI18n.message("pm_unable_to_reload_share_options_close_and_retry_1cf702a7");
       }
     } catch (error) {
       if (!current()) return;
       this.store.shareLoading = false;
-      this.store.shareError = PinmonyI18n.message('无法重新读取分享选项');
+      this.store.shareError = PinmonyI18n.message("pm_unable_to_reload_share_options_ed329738");
     } finally {
       if (token === this.refreshToken) this.refreshing = false;
     }
@@ -440,7 +440,7 @@ export class PinmonySharePanelsController {
     const session: number = this.store.moreSession;
     const pin: string = this.store.morePin;
     if (!id || !session || !this.ports.isCurrentMorePin(pin)) {
-      this.store.moreError = PinmonyI18n.message('该选项不可用');
+      this.store.moreError = PinmonyI18n.message("pm_this_option_is_unavailable_9fcf4515");
       return;
     }
     if (/分享|share/i.test(option.label)) {
@@ -456,10 +456,10 @@ export class PinmonySharePanelsController {
           'window.PinmonyNativeMoreAction(' + session.toString() + ',' + JSON.stringify(pin) + ',' +
           JSON.stringify(id) + ')');
       if (current() && session === this.store.moreSession && result !== 'true' && result !== '"true"') {
-        this.store.moreError = PinmonyI18n.message('操作未能发出，请重试');
+        this.store.moreError = PinmonyI18n.message("pm_action_could_not_be_sent_please_retry_9ba04b0e");
       }
     } catch (error) {
-      if (current() && session === this.store.moreSession) this.store.moreError = PinmonyI18n.message('操作未能发出，请重试');
+      if (current() && session === this.store.moreSession) this.store.moreError = PinmonyI18n.message("pm_action_could_not_be_sent_please_retry_9ba04b0e");
     }
   }
 
@@ -484,19 +484,19 @@ export class PinmonySharePanelsController {
         if (!state || state.session !== capturedSession || state.pin !== capturedPin || !Array.isArray(state.options) || state.options.length > 100) throw new Error('Invalid');
         this.store.moreOptions = state && Array.isArray(state.options) ? state.options.filter((item: MoreSheetOption): boolean => !!item.id && !!item.label) : [];
         this.store.moreLoading = false;
-        this.store.moreError = this.store.moreOptions.length ? '' : PinmonyI18n.message('暂时无法读取选项');
+        this.store.moreError = this.store.moreOptions.length ? '' : PinmonyI18n.message("pm_options_temporarily_unavailable_839cbe86");
         return;
       }
       const result: string = await this.ports.runScript('window.PinmonyNativeMoreRefresh && ' +
         'window.PinmonyNativeMoreRefresh(' + session.toString() + ',' + JSON.stringify(pin) + ')');
       if (current() && session === this.store.moreSession && result !== 'true' && result !== '"true"') {
         this.store.moreLoading = false;
-        this.store.moreError = PinmonyI18n.message('无法重新读取选项，请关闭后重试');
+        this.store.moreError = PinmonyI18n.message("pm_unable_to_reload_options_close_and_retry_f384fda1");
       }
     } catch (error) {
       if (current() && session === this.store.moreSession) {
         this.store.moreLoading = false;
-        this.store.moreError = PinmonyI18n.message('无法重新读取选项');
+        this.store.moreError = PinmonyI18n.message("pm_unable_to_reload_options_5bae4308");
       }
     }
   }
@@ -516,15 +516,15 @@ export class PinmonySharePanelsController {
       if (id.indexOf('profile-contact:') === 0) {
         try {
           const result: string = await this.ports.runScript('window.PinmonyNativeShareAction && window.PinmonyNativeShareAction(' + session.toString() + ',' + JSON.stringify(id) + ')');
-          if (current() && result !== 'true' && result !== '"true"') this.store.shareError = PinmonyI18n.message('发送失败，请重试');
-        } catch (_) { if (current()) this.store.shareError = PinmonyI18n.message('发送失败，请重试'); }
+          if (current() && result !== 'true' && result !== '"true"') this.store.shareError = PinmonyI18n.message("pm_unable_to_send_please_retry_bbf944b6");
+        } catch (_) { if (current()) this.store.shareError = PinmonyI18n.message("pm_unable_to_send_please_retry_bbf944b6"); }
         return;
       }
       if (id.indexOf('profile-share:') === 0) {
         const raw: string = await this.ports.runScript('JSON.stringify(window.PinmonyProfilePanel && window.PinmonyProfilePanel.shareLink(' + JSON.stringify(objectPage) + ',' + session + '))');
         if (!current()) return;
         const link: string = this.ports.webJsonText(raw);
-        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = PinmonyI18n.message('分享链接尚未就绪'); return; }
+        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = PinmonyI18n.message("pm_share_link_not_ready_50227487"); return; }
         const platform: string = id.slice('profile-share:'.length);
         await this.ports.sharePinUrl(link, this.ports.profileTitle());
         return;
@@ -535,17 +535,17 @@ export class PinmonySharePanelsController {
         if (!current()) return;
         const link: string = this.ports.webJsonText(raw);
         if (session !== this.store.shareSession || this.ports.currentProfileUrl() !== objectPage || this.ports.activeSheetKind() !== 'share' || !this.ports.profileShareMode()) return;
-        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = PinmonyI18n.message('分享链接尚未就绪'); return; }
+        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = PinmonyI18n.message("pm_share_link_not_ready_50227487"); return; }
         await this.ports.copyText(link);
         if (current() && session === this.store.shareSession && this.ports.profileShareMode() && this.ports.activeSheetKind() === 'share') {
-          this.store.shareFeedback = PinmonyI18n.message('链接已复制'); this.ports.showShareFeedbackSnack();
+          this.store.shareFeedback = PinmonyI18n.message("pm_link_copied_6ce7dfa5"); this.ports.showShareFeedbackSnack();
         }
-      } catch (_) { if (current()) this.store.shareError = PinmonyI18n.message('复制链接失败，请重试'); }
+      } catch (_) { if (current()) this.store.shareError = PinmonyI18n.message("pm_unable_to_copy_link_please_retry_a34acdfe"); }
       return;
     }
     if (!PIN_POST_API_ENABLED) return;
     if (!id || !this.store.shareSession) {
-      this.store.shareError = PinmonyI18n.message('该分享选项不可用');
+      this.store.shareError = PinmonyI18n.message("pm_this_share_option_is_unavailable_1fb6c5df");
       return;
     }
     const session: number = this.store.shareSession;
@@ -553,11 +553,11 @@ export class PinmonySharePanelsController {
       const result: string = await this.ports.runScript('window.PinmonyNativeShareAction && ' +
         'window.PinmonyNativeShareAction(' + session.toString() + ',' + JSON.stringify(id) + ')');
       if (current() && session === this.store.shareSession && result !== 'true' && result !== '"true"') {
-        this.store.shareError = PinmonyI18n.message('操作未能完成，请重试');
+        this.store.shareError = PinmonyI18n.message("pm_action_incomplete_please_retry_bb26135d");
       }
     } catch (error) {
       if (current() && session === this.store.shareSession) {
-        this.store.shareError = PinmonyI18n.message('操作未能完成，请重试');
+        this.store.shareError = PinmonyI18n.message("pm_action_incomplete_please_retry_bb26135d");
       }
     }
   }

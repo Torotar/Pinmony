@@ -15,7 +15,7 @@ export struct PinmonyMoreSheet {
           LoadingProgress()
             .width(24)
             .height(24)
-          Text(this.uiText("正在读取选项…"))
+          Text(this.uiText("pm_loading_options_a22ab0b2"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
@@ -85,7 +85,7 @@ export struct PinmonyMoreSheet {
             .fontSize(14)
             .fontColor('#D94A4A')
             .layoutWeight(1)
-          Button(this.uiText("重试"))
+          Button(this.uiText("pm_retry_b8784c8d"))
             .onClick(() => this.onRetry())
         }
         .margin({ left: 20, right: 20, top: 12 })

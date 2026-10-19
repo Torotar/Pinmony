@@ -3,7 +3,7 @@ import { PinmonyI18n } from 'common_foundation';
 export struct PinmonyLoadingOverlay {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
-  @Prop message: string = PinmonyI18n.message("正在加载，请稍候…");
+  @Prop message: string = PinmonyI18n.message("pm_loading_please_wait_b6aaac70");
 
   build() {
     Stack({ alignContent: Alignment.Center }) {

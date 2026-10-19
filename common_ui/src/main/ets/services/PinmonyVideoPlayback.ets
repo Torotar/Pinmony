@@ -186,10 +186,10 @@ export class PinmonyVideoPlayback {
     this.record('event=failed stage=' + stage + ' candidate=' + this.sourceIndex.toString() + ' code=' + errorCode.toString() +
       ' reason=' + (timedOut ? 'timeout' : 'error') + ' elapsedMs=' + Math.max(0, Date.now() - this.candidateStarted).toString());
     const certificateFailure: boolean = errorCode === 1007900060 || errorCode === 2300060;
-    const reason: string = certificateFailure ? PinmonyI18n.message('服务器证书校验失败') : stage === 'download' ? PinmonyI18n.message('文件读取失败') :
-      timedOut ? (stage === 'prepare' ? '准备超时' : stage === 'first-frame' ? PinmonyI18n.message('画面加载超时') : PinmonyI18n.message('初始化超时')) :
-      errorCode === 5400103 ? PinmonyI18n.message('媒体读取失败') : errorCode === 5400106 ? PinmonyI18n.message('格式不支持') :
-      errorCode >= 5411008 && errorCode <= 5411010 ? PinmonyI18n.message('安全连接失败') : '播放失败';
+    const reason: string = certificateFailure ? PinmonyI18n.message("pm_server_certificate_validation_failed_4f25ad9c") : stage === 'download' ? PinmonyI18n.message("pm_file_read_failed_3d943f80") :
+      timedOut ? (stage === 'prepare' ? '准备超时' : stage === 'first-frame' ? PinmonyI18n.message("pm_video_frame_loading_timed_out_3a6409cf") : PinmonyI18n.message("pm_initialization_timed_out_4ed9caea")) :
+      errorCode === 5400103 ? PinmonyI18n.message("pm_media_read_failed_249712fb") : errorCode === 5400106 ? PinmonyI18n.message("pm_unsupported_format_c2cf10f3") :
+      errorCode >= 5411008 && errorCode <= 5411010 ? PinmonyI18n.message("pm_secure_connection_failed_3cb70417") : '播放失败';
     this.candidateFailures.push(kind + '：' + reason + (errorCode ? '（' + errorCode.toString() + '）' : ''));
     this.state.failureSummary = this.candidateFailures.slice(-4).join('；');
     this.failedGeneration = token; this.clearTimer(); this.clearErrorTimer();
@@ -205,15 +205,15 @@ export class PinmonyVideoPlayback {
       this.open(this.sourceIndex + 1); return;
     }
     this.state.phase = 'error'; this.state.buffering = false; this.state.rendered = false;
-    this.state.error = certificateFailure ? PinmonyI18n.message('视频服务器证书校验失败，请检查设备时间及网络或代理的证书配置后重试') : stage === 'download' ? (errorCode === 1007900035 ?
-      PinmonyI18n.message('视频安全连接失败，请检查网络或代理后重试') : PinmonyI18n.message('视频文件读取失败，请检查网络或代理后重试')) :
-      errorCode === 5400106 ? PinmonyI18n.message('当前视频格式不受支持，请重新读取视频地址') :
-      errorCode >= 5411008 && errorCode <= 5411010 ? PinmonyI18n.message('视频安全连接失败，请检查网络或代理后重试') :
-      errorCode >= 5411001 && errorCode <= 5411007 ? PinmonyI18n.message('视频网络请求失败，请检查连接后重试') :
-      errorCode === 5400103 ? PinmonyI18n.message('视频媒体读取失败，请检查网络或代理后重试') :
-      timedOut || errorCode === 5400104 ? (stage === 'prepare' ? PinmonyI18n.message('视频准备超时，请重试播放') :
-        stage === 'first-frame' ? PinmonyI18n.message('视频画面加载超时，请重试播放') : PinmonyI18n.message('播放器初始化超时，请重试播放')) :
-        PinmonyI18n.message('视频播放失败，请重试或重新读取地址');
+    this.state.error = certificateFailure ? PinmonyI18n.message("pm_video_certificate_validation_failed_check_device_time_and_networ_a74a0baf") : stage === 'download' ? (errorCode === 1007900035 ?
+      PinmonyI18n.message("pm_video_secure_connection_failed_check_your_network_or_proxy_and_r_778ace9e") : PinmonyI18n.message("pm_unable_to_read_video_file_check_your_network_or_proxy_and_retry_4b86bf25")) :
+      errorCode === 5400106 ? PinmonyI18n.message("pm_unsupported_video_format_reload_the_video_url_ff25eaf5") :
+      errorCode >= 5411008 && errorCode <= 5411010 ? PinmonyI18n.message("pm_video_secure_connection_failed_check_your_network_or_proxy_and_r_778ace9e") :
+      errorCode >= 5411001 && errorCode <= 5411007 ? PinmonyI18n.message("pm_video_request_failed_check_your_connection_and_retry_ef503f99") :
+      errorCode === 5400103 ? PinmonyI18n.message("pm_unable_to_read_video_media_check_your_network_or_proxy_and_retry_aaece788") :
+      timedOut || errorCode === 5400104 ? (stage === 'prepare' ? PinmonyI18n.message("pm_video_preparation_timed_out_retry_playback_b863b478") :
+        stage === 'first-frame' ? PinmonyI18n.message("pm_video_frame_loading_timed_out_retry_playback_4a0c6364") : PinmonyI18n.message("pm_player_initialization_timed_out_retry_playback_e12ca055")) :
+        PinmonyI18n.message("pm_video_playback_failed_retry_or_reload_the_url_fac62be1");
     this.wanted = false;
     this.record('event=candidates-exhausted count=' + this.candidateFailures.length.toString());
     this.generation++;

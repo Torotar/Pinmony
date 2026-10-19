@@ -32,14 +32,14 @@ export struct PinmonyBoardInvitationList {
           }
         }
       },
-      content: { title: { mainTitle: this.uiText("请求") }, backIcon: { action: () => this.onBack() } } };
+      content: { title: { mainTitle: this.uiText("pm_requests_393e1241") }, backIcon: { action: () => this.onBack() } } };
   }
   @Builder private content() {
     Column({ space: 12 }) {
       Row() {
-        Text(this.all ? this.uiText("图板邀请") : this.uiText("请求")).fontSize(18).fontWeight(FontWeight.Medium)
+        Text(this.all ? this.uiText("pm_board_invitations_c4c41664") : this.uiText("pm_requests_393e1241")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).layoutWeight(1)
-        if (!this.all) { Button(this.uiText("查看全部 ›")).backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text')).onClick(() => this.onAll()) }
+        if (!this.all) { Button(this.uiText("pm_view_all_b92c0ea9")).backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text')).onClick(() => this.onAll()) }
       }.width('100%')
       if (this.snapshot.loading) { LoadingProgress().width(24).height(24) }
       if (this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
@@ -50,17 +50,17 @@ export struct PinmonyBoardInvitationList {
             Image(item.inviterAvatar).width(24).height(24).borderRadius(12)
           }
           Column({ space: 8 }) {
-            Text(this.all ? item.inviter : this.uiText("图板邀请")).fontSize(16).fontColor($r('app.color.primary_text'))
+            Text(this.all ? item.inviter : this.uiText("pm_board_invitations_c4c41664")).fontSize(16).fontColor($r('app.color.primary_text'))
             Text(item.boardName).fontSize(15).fontColor($r('app.color.secondary_text'))
             Row({ space: 8 }) {
-              Button(this.uiText("拒绝")).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text')).enabled(false)
-              Button(this.uiText("预览")).backgroundColor($r('app.color.accent')).fontColor(Color.White).onClick(() => this.onPreview(item))
+              Button(this.uiText("pm_decline_136de7a8")).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text')).enabled(false)
+              Button(this.uiText("pm_preview_13d61fea")).backgroundColor($r('app.color.accent')).fontColor(Color.White).onClick(() => this.onPreview(item))
             }
           }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         }.width('100%').alignItems(VerticalAlign.Top)
       }, (item: PinmonyBoardInvitation) => item.boardId + ':' + item.invitedUser)
       if (this.all && !this.snapshot.loading && !this.snapshot.error && !this.snapshot.items.length) {
-        Text(this.uiText("暂无图板邀请")).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("pm_no_board_invitations_48691bd4")).fontColor($r('app.color.secondary_text'))
       }
     }.width('100%').padding(20).alignItems(HorizontalAlign.Start).backgroundColor($r('app.color.page_background'))
   }

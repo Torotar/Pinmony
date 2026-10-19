@@ -134,16 +134,16 @@ export class PinmonyShareNativeFlow {
     private key(target: string): string { return JSON.stringify([this.mode, this.id, target]); }
     private current(revision: number): boolean { const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.visible() && this.store.shareSession === this.session && this.ports.current(this.mode, this.page, this.id); }
     private contacts(): void { this.store.shareContacts = this.users.map((u: User): ShareSheetOption => ({ id: 'native-contact:' + u.id, label: ((u.full_name || u.label || u.username || '') + (u.username ? ' @' + u.username : '')).slice(0, 300), icon: /^https:\/\//.test(u.send_pin_image || u.image_medium_url || u.image || '') ? (u.send_pin_image || u.image_medium_url || u.image || '').slice(0, 4096) : '', enabled: !this.busy && !this.unknown.has(this.key(u.id)) && !this.sent.has(u.id) })); if (this.users.some((u: User): boolean => this.unknown.has(this.key(u.id))))
-        this.store.shareError = PinmonyI18n.message('发送结果未确认，请先核对会话，勿重复发送'); }
+        this.store.shareError = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238"); }
     // Cancelling a transport cannot prove that an already sent mutation was undone.
     pause(): void { if (this.busy && this.pending) {
         this.unknown.add(this.pending);
-        this.store.shareFeedback = PinmonyI18n.message('发送结果未确认，请先核对会话，勿重复发送');
+        this.store.shareFeedback = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238");
     } this.busy = false; this.pending = ''; this.contacts(); this.revision++; this.searchRevision++; if (this.timer >= 0)
         clearTimeout(this.timer); this.timer = -1; this.client.cancel(); this.contactsClient.cancel(); if (this.store.shareLoading || PinmonyI18n.isText(this.store.shareFeedback, '正在加载联系人…')) {
         this.store.shareLoading = false;
         this.store.shareFeedback = '';
-        this.store.shareError = PinmonyI18n.message('分享读取已暂停，请重试');
+        this.store.shareError = PinmonyI18n.message("pm_share_loading_paused_please_retry_1a0f4d77");
     } const s: PinmonyBusinessSessionContext = this.ports.session(); if (!s.authenticated || s.accountId !== this.account || s.generation !== this.generation) {
         this.users = [];
         this.store.shareContacts = [];
@@ -163,7 +163,7 @@ export class PinmonyShareNativeFlow {
         }
         if (!r || r.status !== 'success' || r.code !== 0 || r.error || p.client_context?.is_authenticated === false || this.viewer && p.client_context?.user && p.client_context.user.id !== this.viewer) {
             if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)
-                throw new PinmonyBusinessRejection(PinmonyI18n.message('网站拒绝了本次发送'));
+                throw new PinmonyBusinessRejection(PinmonyI18n.message("pm_the_website_rejected_this_send_action_bedc7ede"));
             throw new Error('resource');
         }
         return p;
@@ -186,11 +186,11 @@ export class PinmonyShareNativeFlow {
         this.store.ignoredShareSession = 0;
         this.store.sharePin = page;
         this.store.shareOnPinDetail = mode === 'pin';
-        this.store.shareTitle = PinmonyI18n.message('分享');
-        this.store.shareSectionLabel = mode === 'user' ? PinmonyI18n.message('发送给') : PinmonyI18n.message('发送给联系人');
+        this.store.shareTitle = PinmonyI18n.message("pm_share_7e564575");
+        this.store.shareSectionLabel = mode === 'user' ? PinmonyI18n.message("pm_send_to_5cf7607a") : PinmonyI18n.message("pm_send_to_contacts_8760742d");
         this.store.shareSearchActive = true;
         this.store.shareSearchId = 'native-search';
-        this.store.shareSearchLabel = PinmonyI18n.message('搜索用户');
+        this.store.shareSearchLabel = PinmonyI18n.message("pm_search_people_62eb3f93");
         this.store.shareSendId = '';
         this.store.shareQuery = '';
         this.store.shareFeedback = '';
@@ -231,7 +231,7 @@ export class PinmonyShareNativeFlow {
         catch (_) {
             if (this.current(revision)) {
                 this.store.shareLoading = false;
-                this.store.shareError = PinmonyI18n.message('分享数据读取失败，请重试');
+                this.store.shareError = PinmonyI18n.message("pm_unable_to_load_share_data_please_retry_0afbe6f0");
             }
         }
         return true;
@@ -250,7 +250,7 @@ export class PinmonyShareNativeFlow {
         }
         catch (_) {
             if (this.current(revision))
-                this.store.shareError = PinmonyI18n.message('分享链接读取失败，请重试');
+                this.store.shareError = PinmonyI18n.message("pm_unable_to_load_share_link_please_retry_677a539d");
         }
     }
     private async load(query: string, revision: number): Promise<void> {
@@ -259,7 +259,7 @@ export class PinmonyShareNativeFlow {
         this.users = [];
         this.contacts();
         this.store.shareError = '';
-        this.store.shareFeedback = PinmonyI18n.message('正在加载联系人…');
+        this.store.shareFeedback = PinmonyI18n.message("pm_loading_contacts_6c983c5f");
         const options: Suggestions | Search = query ? { count: 25, term: query, pin_scope: this.mode === 'pin' ? 'pins' : 'users' } : this.mode === 'pin' ? { field_set_key: 'default', hide_group_conversations: true } : { suggestion_type: 'share', hide_group_conversations: false };
         try {
             const p: Response = await this.request(query ? 'ShareSuggestionsTypeaheadResource' : 'ShareSuggestionsResource', 'get', options, revision, undefined, search);
@@ -270,17 +270,17 @@ export class PinmonyShareNativeFlow {
                 throw new Error('contacts');
             this.users = items.filter((u: User, i: number): boolean => !!u && /^\d{1,40}$/.test(u.id) && typeof u.username === 'string' && !!u.username && items.findIndex((v: User): boolean => v?.id === u.id) === i).slice(0, 100);
             this.contacts();
-            this.store.shareFeedback = this.users.length ? '' : PinmonyI18n.message('没有可用的联系人');
+            this.store.shareFeedback = this.users.length ? '' : PinmonyI18n.message("pm_no_contacts_available_5eaa443a");
         }
         catch (_) {
             if (this.current(revision) && search === this.searchRevision) {
                 this.store.shareFeedback = '';
-                this.store.shareError = PinmonyI18n.message('联系人读取失败，请重试');
+                this.store.shareError = PinmonyI18n.message("pm_unable_to_load_contacts_please_retry_9942b99b");
             }
         }
     }
     search(value: string): void { if (!this.current(this.revision) || this.busy)
-        return; this.store.shareQuery = value.slice(0, 200); const revision: number = this.revision, query: string = this.store.shareQuery.trim(); this.searchRevision++; this.contactsClient.cancel(); this.users = []; this.contacts(); this.store.shareFeedback = PinmonyI18n.message('正在加载联系人…'); if (this.timer >= 0)
+        return; this.store.shareQuery = value.slice(0, 200); const revision: number = this.revision, query: string = this.store.shareQuery.trim(); this.searchRevision++; this.contactsClient.cancel(); this.users = []; this.contacts(); this.store.shareFeedback = PinmonyI18n.message("pm_loading_contacts_6c983c5f"); if (this.timer >= 0)
         clearTimeout(this.timer); this.timer = setTimeout((): void => { this.timer = -1; if (this.current(revision))
         this.load(query, revision); }, 300); }
     async refresh(): Promise<void> { if (!this.current(this.revision) || this.busy)
@@ -303,13 +303,13 @@ export class PinmonyShareNativeFlow {
                 else
                     await this.ports.share(this.link);
                 if (this.current(revision) && id === 'native-copy') {
-                    this.store.shareFeedback = PinmonyI18n.message('链接已复制');
+                    this.store.shareFeedback = PinmonyI18n.message("pm_link_copied_6ce7dfa5");
                     this.ports.feedback();
                 }
             }
             catch (_) {
                 if (this.current(revision))
-                    this.store.shareError = PinmonyI18n.message('分享操作未完成，请重试');
+                    this.store.shareError = PinmonyI18n.message("pm_sharing_incomplete_please_retry_2a3623dc");
             }
             return;
         }
@@ -317,7 +317,7 @@ export class PinmonyShareNativeFlow {
         if (!this.users.some((u: User): boolean => u.id === target) || this.unknown.has(this.key(target)) || this.sent.has(target) || !this.store.shareContacts.some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
             return;
         if (this.mode === 'pin' && !this.tracking) {
-            this.store.shareError = PinmonyI18n.message('当前帖子缺少发送参数，请重新打开分享');
+            this.store.shareError = PinmonyI18n.message("pm_send_details_missing_for_this_pin_reopen_sharing_b785bbba");
             return;
         }
         const options: Send = { user_ids: [target] };
@@ -334,7 +334,7 @@ export class PinmonyShareNativeFlow {
         this.busy = true;
         this.pending = this.key(target);
         this.store.shareError = '';
-        this.store.shareFeedback = PinmonyI18n.message('正在处理…');
+        this.store.shareFeedback = PinmonyI18n.message("pm_processing_574ec751");
         this.contacts();
         try {
             const p: Response = await this.request('ConversationsResource', 'create', options, revision);
@@ -344,7 +344,7 @@ export class PinmonyShareNativeFlow {
             if (r.endpoint_name !== 'v3_create_conversation' || d?.id !== undefined && !/^\d{1,40}$/.test(d.id) || !Array.isArray(d.users) || !d.users.some((u: User): boolean => u.id === target) || !m || !/^\d{1,40}$/.test(m.id) || (this.mode === 'pin' ? m.pin?.id !== this.id : this.mode === 'board' ? m.board?.id !== this.id : m.user !== undefined && m.user.id !== this.id))
                 throw new Error('unconfirmed');
             this.sent.add(target);
-            this.store.shareFeedback = PinmonyI18n.message('已发送');
+            this.store.shareFeedback = PinmonyI18n.message("pm_sent_60823aae");
             PinmonyRuntimeLog.info('ShareNative: outcome=confirmed');
             this.ports.feedback();
         }
@@ -352,11 +352,11 @@ export class PinmonyShareNativeFlow {
             if (this.current(revision)) {
                 if (error instanceof PinmonyBusinessRejection) {
                     this.store.shareFeedback = '';
-                    this.store.shareError = PinmonyI18n.message('网站拒绝了本次发送');
+                    this.store.shareError = PinmonyI18n.message("pm_the_website_rejected_this_send_action_bedc7ede");
                 }
                 else {
                     this.unknown.add(this.key(target));
-                    this.store.shareFeedback = PinmonyI18n.message('发送结果未确认，请先核对会话，勿重复发送');
+                    this.store.shareFeedback = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238");
                 }
                 PinmonyRuntimeLog.info('ShareNative: outcome=' + (error instanceof PinmonyBusinessRejection ? 'rejected' : 'unknown'));
             }

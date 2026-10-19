@@ -85,7 +85,7 @@ export class PinmonyReleaseClient {
         }
         const oldest: PinmonyRelease = this.pageReleases[this.pageReleases.length - 1];
         if (!isNewerRelease(oldest.tag_name, installed)) break;
-        if (cursors.includes(oldest.tag_name) || cursors.length >= 100) throw new PinmonyReleaseFailure(PinmonyI18n.message('检查更新失败（历史版本读取不完整），点击重试'));
+        if (cursors.includes(oldest.tag_name) || cursors.length >= 100) throw new PinmonyReleaseFailure(PinmonyI18n.message("pm_update_check_failed_incomplete_release_history_tap_to_retry_59646f2e"));
         cursors.push(oldest.tag_name);
         await this.load(true, oldest.tag_name);
       }
@@ -145,7 +145,7 @@ export class PinmonyReleaseClient {
       const reason: string = timedOut ? '连接 GitHub 超过 12 秒' : status === 403 || status === 429 ? 'GitHub 访问受限，HTTP ' + status.toString() :
         status !== 0 && status !== 200 ? 'GitHub 返回 HTTP ' + status.toString() : stage !== 'request' ? '发布信息格式异常' :
         code !== 0 ? '网络错误 ' + code.toString() : '无法连接 GitHub';
-      throw new PinmonyReleaseFailure(PinmonyI18n.message('检查更新失败（') + reason + PinmonyI18n.message('），点击重试'), status);
+      throw new PinmonyReleaseFailure(PinmonyI18n.message("pm_update_check_failed_eaae93d1") + reason + PinmonyI18n.message("pm_tap_to_retry_66897f19"), status);
     } finally {
       if (deadline !== -1) clearTimeout(deadline);
       request.destroy();

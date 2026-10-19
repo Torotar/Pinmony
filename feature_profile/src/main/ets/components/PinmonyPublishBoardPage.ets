@@ -29,10 +29,10 @@ export struct PinmonyPublishBoardPage {
   @Builder
   private createForm() {
     Column({ space: 20 }) {
-      TextInput({ placeholder: this.uiText("图板名称"), text: this.name }).maxLength(100)
+      TextInput({ placeholder: this.uiText("pm_board_name_dd9a7122"), text: this.name }).maxLength(100)
         .enabled(!this.state.busy).onChange((value: string) => { this.name = value; })
       Row() {
-        Text(this.uiText("设为私密图板")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Text(this.uiText("pm_make_secret_228cf25e")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.state.busy)
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
@@ -43,7 +43,7 @@ export struct PinmonyPublishBoardPage {
 
   @Builder
   private createButton() {
-      Button(this.uiText("创建图板")).width('100%').height(48).backgroundColor($r('app.color.accent'))
+      Button(this.uiText("pm_create_board_513babc9")).width('100%').height(48).backgroundColor($r('app.color.accent'))
         .fontColor($r('app.color.detail_on_accent'))
         .enabled(!!this.name.trim() && !this.state.loading && !this.state.busy && !this.state.uncertain)
         .onClick(() => this.onAction('create', this.name.trim(), this.secret))
@@ -77,9 +77,9 @@ export struct PinmonyPublishBoardPage {
             }
           }
         },
-        content: { title: { mainTitle: this.uiText("创建图板") }, menu: { value: [{ content: {
+        content: { title: { mainTitle: this.uiText("pm_create_board_513babc9") }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
-          type: IconStyleMode.SMALL, label: this.uiText("关闭"), isEnabled: !this.state.busy,
+          type: IconStyleMode.SMALL, label: this.uiText("pm_close_3fd47edc"), isEnabled: !this.state.busy,
           action: () => { if (!this.state.busy) { this.createVisible = false; this.closeCreate(); } }
         } }] } } })
       .backgroundColor($r('app.color.page_background'))

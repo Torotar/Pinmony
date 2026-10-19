@@ -21,7 +21,7 @@ export struct PinmonyNotificationsPage {
         Column({ space: 16 }) {
           if (this.store.error) {
             Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("重试")).onClick(() => { if (this.onRetry) this.onRetry(); })
+            Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           ForEach(this.store.notifications, (group: NotificationGroup) => {
             Text(group.label).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
@@ -44,7 +44,7 @@ export struct PinmonyNotificationsPage {
               }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 8, bottom: 8 })
             })
           })
-          if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text(this.uiText("暂无通知设置")).fontColor($r('app.color.secondary_text')) }
+          if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text(this.uiText("pm_no_notification_settings_available_b02ac445")).fontColor($r('app.color.secondary_text')) }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, bottom: 28 })
       }.width('100%').height('100%').align(Alignment.TopStart)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
@@ -56,7 +56,7 @@ export struct PinmonyNotificationsPage {
       style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
         scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
-      content: { title: { mainTitle: this.uiText("通知") }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
+      content: { title: { mainTitle: this.uiText("pm_notifications_4b6ded8a") }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .onBackPressed(() => { if (this.onBack) this.onBack(); return true; })

@@ -62,7 +62,7 @@ export class PinmonyBoardPinNativeWrites {
   private publish(state: PinmonyBoardFlow): void {this.ports.changed(this.clone(state));}
   private unknown(state: PinmonyBoardFlow): void {
     if(this.operationKey)this.uncertainPins.add(this.operationKey);
-    state.busy = false;state.uncertain = true;state.error = PinmonyI18n.message('操作结果未确认，请关闭后刷新核对；不会重复提交');
+    state.busy = false;state.uncertain = true;state.error = PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_it_will_not_be_r_b66391e3");
     this.publish(state);PinmonyRuntimeLog.info('BoardPinNativeWrite: outcome=unknown');
   }
   pause(): void {

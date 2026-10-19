@@ -18,8 +18,8 @@ export struct PinmonyPublishSheet {
   }
 
   private groupLabel(group: string): string {
-    if (group === 'create') return this.uiText('创建');
-    if (group === 'add') return this.uiText('添加');
+    if (group === 'create') return this.uiText("pm_create_cde2cd07");
+    if (group === 'add') return this.uiText("pm_add_7a8a11ea");
     const item: PinmonyPublishOption | undefined = this.options.find((option: PinmonyPublishOption): boolean =>
       option.group === group);
     return item ? PinmonyI18n.render(item.groupLabel, this.uiLanguage) : '';
@@ -28,9 +28,9 @@ export struct PinmonyPublishSheet {
   private optionLabel(item: PinmonyPublishOption): string {
     // All supported publish commands have stable kinds, including bridge and
     // retained snapshots whose labels predate local message tokens.
-    if (item.kind === 'website') return this.uiText('网站');
-    if (item.kind === 'photo') return this.uiText('照片');
-    if (item.kind === 'board') return this.uiText('图板');
+    if (item.kind === 'website') return this.uiText("pm_website_fb8d739d");
+    if (item.kind === 'photo') return this.uiText("pm_photos_7b50017a");
+    if (item.kind === 'board') return this.uiText("pm_board_bd3f17ee");
     return PinmonyI18n.render(item.label, this.uiLanguage);
   }
 
@@ -56,7 +56,7 @@ export struct PinmonyPublishSheet {
     .opacity(item.enabled ? 1 : 0.5)
     .onClick(() => { if (item.enabled && this.onSelect) this.onSelect(item.id); })
     .accessibilityText(this.optionLabel(item))
-    .accessibilityDescription(item.enabled ? this.uiText("打开 Pinterest 创建流程") : this.uiText("当前网页未提供此选项"))
+    .accessibilityDescription(item.enabled ? this.uiText("pm_open_pinterest_creation_flow_006166f5") : this.uiText("pm_this_option_is_unavailable_on_the_current_page_423e6914"))
   }
 
   @Builder
@@ -80,22 +80,22 @@ export struct PinmonyPublishSheet {
       this.group('create')
       this.group('add')
       if (this.boardMode && !this.sectionMode && !this.loading) {
-        Text(this.uiText("添加")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-        Text(this.uiText("图板区块")).fontSize(17).fontWeight(FontWeight.Medium)
+        Text(this.uiText("pm_add_7a8a11ea")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+        Text(this.uiText("pm_section_6d4e3a60")).fontSize(17).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').height(58)
           .padding({ left: 16, right: 16 }).backgroundColor($r('app.color.surface_muted')).borderRadius(16)
           .onClick(() => { if (this.onSection) this.onSection(); })
       }
       if (this.loading) {
         LoadingProgress().width(28).height(28)
-        Text(this.uiText("正在准备发布…"))
+        Text(this.uiText("pm_preparing_to_publish_97f29dc9"))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
       } else if (this.options.length === 0) {
-        Text(this.uiText("发布入口尚未就绪，请重试"))
+        Text(this.uiText("pm_publishing_not_ready_please_retry_8ec4cc6d"))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
-        Button(this.uiText("重新读取"))
+        Button(this.uiText("pm_reload_df7392cc"))
           .onClick(() => { if (this.onRetry) this.onRetry(); })
       }
     }

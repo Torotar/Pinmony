@@ -70,8 +70,8 @@ export class PinmonyProfileReadController {
         return;
       }
       this.store.profileLoading = false;
-      this.store.profileError = this.ports.currentProfile() ? PinmonyI18n.message('无法读取当前 Pinterest 资料页') :
-        PinmonyI18n.message('网页未进入资料页，请重试');
+      this.store.profileError = this.ports.currentProfile() ? PinmonyI18n.message("pm_unable_to_load_the_current_pinterest_profile_a117bd19") :
+        PinmonyI18n.message("pm_profile_session_not_ready_please_retry_f72f27fd");
     }, 8000);
   }
 
@@ -98,7 +98,7 @@ export class PinmonyProfileReadController {
           this.store.profile = undefined;
         }
         this.store.profileLoading = !this.store.profile && message.kind === 'apiPending';
-        this.store.profileError = message.kind === 'apiFailed' ? PinmonyI18n.message('用户资料接口读取失败，请重试') : '';
+        this.store.profileError = message.kind === 'apiFailed' ? PinmonyI18n.message("pm_unable_to_load_profile_data_please_retry_c7797c89") : '';
         if (message.kind === 'apiFailed') this.finishPull();
         if (this.store.profileLoading) this.expect();
         return;
@@ -118,7 +118,7 @@ export class PinmonyProfileReadController {
           this.store.profileSessionReady = false;
           this.store.profileUrl = message.profileUrl;
           this.store.profileLoading = false;
-          this.store.profileError = PinmonyI18n.message('无法读取当前 Pinterest 资料页');
+          this.store.profileError = PinmonyI18n.message("pm_unable_to_load_the_current_pinterest_profile_a117bd19");
           this.finishPull();
         }
         return;
@@ -217,7 +217,7 @@ export class PinmonyProfileReadController {
       this.pullTasks.timeout((): void => {
         if (generation !== this.generation || !this.ports.authenticated() || !this.ports.foreground() || token !== this.store.profilePullToken || !this.store.profilePullRefreshing || this.ports.currentProfile() !== page || this.ports.document() !== document) return;
         this.finishPull();
-        this.store.profileError = PinmonyI18n.message('刷新超时，请重试');
+        this.store.profileError = PinmonyI18n.message("pm_refresh_timed_out_please_retry_371c624f");
       }, 20000);
     }
     if (!this.store.profile && !this.store.profileLoading) this.expect();
@@ -227,7 +227,7 @@ export class PinmonyProfileReadController {
         if (generation !== this.generation || request !== this.store.profileRequestToken || pullToken !== this.store.profilePullToken || page !== this.ports.document() || !this.ports.authenticated() || !this.ports.foreground()) return;
         this.finishPull();
         this.store.profileLoading = false;
-        this.store.profileError = PinmonyI18n.message('无法读取当前 Pinterest 资料页');
+        this.store.profileError = PinmonyI18n.message("pm_unable_to_load_the_current_pinterest_profile_a117bd19");
       });
   }
 

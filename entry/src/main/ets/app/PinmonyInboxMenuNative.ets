@@ -17,7 +17,7 @@ export class PinmonyInboxMenuNative {
   private revision: number = 0;private account: string = '';private pin: string = '';
   private readonly unknown: Set<string> = new Set<string>();private readonly unsubscribed: Set<string> = new Set<string>();
   constructor(ports: PinmonyInboxMenuNativePorts){this.ports = ports;this.client = new PinmonyBusinessAuxiliaryClient(ports);}
-  pause(): void {this.revision++;this.client.pause();const flow = this.ports.store().inboxFlow;if(flow?.screen === 'updatesMenu' && flow.messageBusy){const next: PinmonyInboxFlowSnapshot = JSON.parse(JSON.stringify(flow)) as PinmonyInboxFlowSnapshot;next.messageBusy = false;next.writeUncertain = true;next.error = PinmonyI18n.message('操作结果未确认，请刷新核对；不会重复提交');this.ports.store().inboxFlow = next;}}
+  pause(): void {this.revision++;this.client.pause();const flow = this.ports.store().inboxFlow;if(flow?.screen === 'updatesMenu' && flow.messageBusy){const next: PinmonyInboxFlowSnapshot = JSON.parse(JSON.stringify(flow)) as PinmonyInboxFlowSnapshot;next.messageBusy = false;next.writeUncertain = true;next.error = PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27");this.ports.store().inboxFlow = next;}}
   async open(id: string): Promise<boolean> {
     if(!id.startsWith('news-menu:'))return false;
     const target: PinmonyNewsTarget | undefined = this.ports.find(id),account: string = this.client.key();
@@ -34,7 +34,7 @@ export class PinmonyInboxMenuNative {
     if(store.inboxFlow?.messageBusy || !undo || undo.flow.newsId !== newsId || undo.account !== this.client.key() || undo.expires < Date.now() || undo.flow.pageUrl !== this.ports.page() || !this.ports.active() || store.inboxFlow && store.inboxFlow.newsId !== newsId)return undefined;
     this.pause();this.account = undo.account;this.pin = undo.pin;const next: PinmonyInboxFlowSnapshot = JSON.parse(JSON.stringify(undo.flow)) as PinmonyInboxFlowSnapshot;next.nativeToken = this.revision;next.messageBusy = false;next.newsUndoing = true;store.inboxFlow = next;store.flowDismissed = false;await this.action('undoNews');
     if(store.inboxFlow?.nativeToken === next.nativeToken) {
-      const error: string = store.inboxFlow.error || (store.inboxFlow.newsHidden ? PinmonyI18n.message('撤销结果未确认，请刷新核对；不会重复提交') : '');
+      const error: string = store.inboxFlow.error || (store.inboxFlow.newsHidden ? PinmonyI18n.message("pm_undo_result_not_confirmed_refresh_to_check_it_will_not_be_resubm_4a85600e") : '');
       store.inboxFlow = undefined;store.flowDismissed = true;return error;
     }
     return undefined;
@@ -64,7 +64,7 @@ export class PinmonyInboxMenuNative {
     }catch (error){
       const retry: boolean = error instanceof PinmonyAuxiliaryNotSent || error instanceof PinmonyAuxiliaryRejected;
       if(retry && account === this.client.key())this.unknown.delete(lock);
-      update({writeUncertain:!retry,error:retry ? '操作未提交成功，请重试' : PinmonyI18n.message('操作结果未确认，请刷新核对；不会重复提交')});
+      update({writeUncertain:!retry,error:retry ? '操作未提交成功，请重试' : PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27")});
     }finally {update({messageBusy:false});}return true;
   }
 }

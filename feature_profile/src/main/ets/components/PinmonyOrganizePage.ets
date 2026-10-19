@@ -58,20 +58,20 @@ export struct PinmonyOrganizePage {
         } }
       },
       content: {
-        title: { mainTitle: this.state.phase === 'select' ? (this.publishing ? this.uiText("选择 Pin 图") : this.uiText("整理到图板")) :
-          this.state.phase === 'create' ? this.uiText("创建图板") : this.uiText("收藏至图板") },
+        title: { mainTitle: this.state.phase === 'select' ? (this.publishing ? this.uiText("pm_select_pins_46854e37") : this.uiText("pm_organize_into_boards_ce266233")) :
+          this.state.phase === 'create' ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416") },
         backIcon: {
           icon: new SymbolGlyphModifier(this.state.phase === 'select' ?
             $r('sys.symbol.xmark') : $r('sys.symbol.chevron_left'))
             .fontColor([$r('app.color.primary_text')]),
-          label: this.state.phase === 'select' ? (this.publishing ? this.uiText("关闭发布") : this.uiText("关闭整理")) : this.uiText("返回"),
+          label: this.state.phase === 'select' ? (this.publishing ? this.uiText("pm_close_publisher_06b27c24") : this.uiText("pm_close_organizer_a3fa0809")) : this.uiText("pm_back_572cf45b"),
           isEnabled: !this.state.busy,
           action: () => this.back()
         },
         menu: { value: this.state.phase === 'select' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark'))
             .fontColor([$r('app.color.primary_text')]),
-          label: this.publishing ? (this.state.selectedIds.length ? this.uiText("完成") : this.uiText("跳过")) : this.uiText("下一步"),
+          label: this.publishing ? (this.state.selectedIds.length ? this.uiText("pm_done_c0b3fbff") : this.uiText("pm_skip_fc50a99c")) : this.uiText("pm_next_acfc4e74"),
           isEnabled: (this.publishing || this.state.selectedIds.length > 0) && !this.pinsLoading && !this.state.busy && !this.state.uncertain,
           action: () => {
             if ((this.publishing || this.state.selectedIds.length > 0) && !this.pinsLoading && !this.state.busy && !this.state.uncertain) this.act('next');
@@ -125,14 +125,14 @@ export struct PinmonyOrganizePage {
     .border({ width: this.selected(pin) ? 2 : 0, color: $r('app.color.primary_text') })
     .layoutWeight(1)
     .onClick(() => { if (!this.state.busy && !this.state.loading && !this.state.uncertain) this.act('toggle', pin.id); })
-    .accessibilityText(pin.title || this.uiText("选择 Pin"))
+    .accessibilityText(pin.title || this.uiText("pm_select_pins_09909cdf"))
     .accessibilitySelected(this.selected(pin))
   }
 
   @Builder
   private selection() {
     Column({ space: 16 }) {
-      Button(this.state.selectedIds.length === this.pins.length ? this.uiText("取消全选") : this.uiText("全选"))
+      Button(this.state.selectedIds.length === this.pins.length ? this.uiText("pm_deselect_all_f4d4bae5") : this.uiText("pm_select_all_3a5040b6"))
         .height(36).padding(0).fontSize(17).fontWeight(FontWeight.Bold)
         .backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
         .enabled(!this.state.busy && !this.state.loading && !this.state.uncertain)
@@ -149,7 +149,7 @@ export struct PinmonyOrganizePage {
       if (this.pinsLoading && this.pins.length > 0) { LoadingProgress().width(28).height(28) }
       else if (this.pinsError) {
         Text(PinmonyI18n.render(this.pinsError, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-        Button(this.uiText("重试")).onClick(() => this.act('retryPins'))
+        Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.act('retryPins'))
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
@@ -174,21 +174,21 @@ export struct PinmonyOrganizePage {
     .enabled(board.enabled && !this.state.busy && !this.state.uncertain && !this.state.loading)
     .opacity(board.enabled ? 1 : 0.4)
     .onClick(() => this.act('move', board.id))
-    .accessibilityText(board.title + (board.secret ? this.uiText("，私密图板") : ''))
+    .accessibilityText(board.title + (board.secret ? this.uiText("pm_secret_board_a61a7ae3") : ''))
   }
 
   @Builder
   private boardList() {
     Column({ space: 8 }) {
       if (!this.state.loading || this.state.boards.length > 0) {
-        Text(this.uiText("所有图板")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
+        Text(this.uiText("pm_all_boards_f1847589")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
       }
       ForEach(this.state.boards, (board: PinmonyOrganizeBoard) => { this.boardRow(board) },
         (board: PinmonyOrganizeBoard) => board.id)
       if (!this.state.loading && this.state.error && !this.state.uncertain) {
-        Button(this.uiText("重新读取图板")).enabled(!this.state.busy).onClick(() => this.act('retryBoards'))
+        Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.state.busy).onClick(() => this.act('retryBoards'))
       } else if (!this.state.loading && !this.state.boards.length && !this.state.error) {
-        Text(this.uiText("暂无图板")).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("pm_no_boards_yet_43790af9")).fontColor($r('app.color.secondary_text'))
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
@@ -196,14 +196,14 @@ export struct PinmonyOrganizePage {
   @Builder
   private createForm() {
     Column({ space: 20 }) {
-      TextInput({ placeholder: this.uiText("图板名称"), text: this.name }).maxLength(100)
+      TextInput({ placeholder: this.uiText("pm_board_name_dd9a7122"), text: this.name }).maxLength(100)
         .onChange((value: string) => { this.name = value; })
       Row({ space: 14 }) {
-        Text(this.uiText("设为私密图板")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Text(this.uiText("pm_make_secret_228cf25e")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.state.busy)
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
-      Button(this.uiText("创建图板")).width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
+      Button(this.uiText("pm_create_board_513babc9")).width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
         .enabled(!!this.name.trim() && !this.state.busy && !this.state.uncertain)
         .onClick(() => this.act('create', this.name.trim()))
     }.width('100%')
@@ -249,7 +249,7 @@ export struct PinmonyOrganizePage {
             Text('+').fontSize(26).width(44).height(44).textAlign(TextAlign.Center)
               .backgroundColor($r('app.color.surface_muted')).borderRadius(10)
               .fontColor($r('app.color.primary_text'))
-            Text(this.uiText("创建图板")).fontSize(19).fontWeight(FontWeight.Bold)
+            Text(this.uiText("pm_create_board_513babc9")).fontSize(19).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).layoutWeight(1)
           }.width('100%')
         }.width('calc(100% + 24vp)').height(76).margin({ left: -12, right: -12 }).padding({ left: 16, right: 16, top: 12, bottom: 20 }).borderRadius(0)
@@ -285,8 +285,8 @@ export struct PinmonyOrganizePage {
       .backgroundColor($r('app.color.page_background'))
       .accessibilityLevel(this.blockingLoading() ? 'no-hide-descendants' : 'auto')
       if (this.blockingLoading()) {
-        PinmonyLoadingOverlay({ message: this.state.busy ? this.uiText("正在提交，请稍候…") :
-          this.state.phase === 'boards' ? this.uiText("正在加载收藏图板…") : this.uiText("正在加载，请稍候…") })
+        PinmonyLoadingOverlay({ message: this.state.busy ? this.uiText("pm_submitting_please_wait_e7f123ba") :
+          this.state.phase === 'boards' ? this.uiText("pm_loading_saved_boards_4262c72d") : this.uiText("pm_loading_please_wait_b6aaac70") })
       }
     }.width('100%').height('100%')
   }

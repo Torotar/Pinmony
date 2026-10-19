@@ -35,11 +35,11 @@ export class PinmonyDetailController {
         if (store.detailApiError) return false;
         if (!await this.tasks.wait(150)) return false;
       }
-      store.detailApiError = PinmonyI18n.message('当前帖子状态尚未确认，请重试');
+      store.detailApiError = PinmonyI18n.message("pm_pin_status_not_confirmed_please_retry_1912a724");
       return false;
     } catch (_) {
       if (generation === this.generation && token === store.detailOpeningToken && this.ports.isAuthenticated() &&
-          this.ports.isForeground()) store.detailApiError = PinmonyI18n.message('当前帖子状态准备失败，请重试');
+          this.ports.isForeground()) store.detailApiError = PinmonyI18n.message("pm_unable_to_prepare_pin_status_please_retry_fc28066e");
       return false;
     } finally {
       if (token === store.detailOpeningToken) store.detailPreparing = false;
@@ -73,23 +73,23 @@ export class PinmonyDetailController {
     if (this.ports.postApiEnabled() && kind === 'share') {
       try {
         const result = await this.ports.openShare(detail.pinUrl);
-        if (result !== 'true' && result !== '"true"') this.ports.showMessage(PinmonyI18n.message('分享接口暂不可用，请重试'));
-      } catch (_) { this.ports.showMessage(PinmonyI18n.message('分享接口暂不可用，请重试')); }
+        if (result !== 'true' && result !== '"true"') this.ports.showMessage(PinmonyI18n.message("pm_sharing_unavailable_please_retry_3883cb6a"));
+      } catch (_) { this.ports.showMessage(PinmonyI18n.message("pm_sharing_unavailable_please_retry_3883cb6a")); }
       return;
     }
     if (this.ports.postApiEnabled() && kind === 'more') { await this.ports.openMore(); return; }
     if (this.ports.postApiEnabled() && kind === 'source') {
       const source = this.ports.externalSourceUrl(detail.sourceUrl || '');
-      if (!source) { this.ports.showMessage(PinmonyI18n.message('当前来源链接不可用')); return; }
+      if (!source) { this.ports.showMessage(PinmonyI18n.message("pm_source_link_unavailable_227bfbcd")); return; }
       try { await this.ports.openExternalLink(source); }
-      catch (_) { this.ports.showMessage(PinmonyI18n.message('无法打开来源链接，请重试')); }
+      catch (_) { this.ports.showMessage(PinmonyI18n.message("pm_unable_to_open_source_link_please_retry_4c76fd4e")); }
       return;
     }
     if (!this.ports.postApiEnabled() || kind !== 'like') return;
     try {
       const result = await this.ports.runScript('window.PinmonyDetailAction && window.PinmonyDetailAction(' +
         detail.session.toString() + ',' + JSON.stringify(detail.pinUrl) + ',' + JSON.stringify(id) + ')');
-      if (result !== 'true' && result !== '"true"') this.ports.showMessage(PinmonyI18n.message('当前操作暂不可用，请重试'));
-    } catch (_) { this.ports.showMessage(PinmonyI18n.message('当前操作暂不可用，请重试')); }
+      if (result !== 'true' && result !== '"true"') this.ports.showMessage(PinmonyI18n.message("pm_this_action_is_temporarily_unavailable_please_retry_2285ed75"));
+    } catch (_) { this.ports.showMessage(PinmonyI18n.message("pm_this_action_is_temporarily_unavailable_please_retry_2285ed75")); }
   }
 }

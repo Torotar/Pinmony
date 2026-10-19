@@ -28,11 +28,11 @@ export struct PinmonySettingsPage {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       if (await PinmonyRuntimeLog.export(context)) {
-        this.getUIContext().getPromptAction().showToast({ message: this.uiText("运行日志已导出"), duration: 4000 });
+        this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_logs_exported_2e45dbce"), duration: 4000 });
       }
     } catch (_) {
       PinmonyRuntimeLog.error('Runtime: log export failed');
-      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("日志导出失败，请重试"), duration: 4000 }); }
+      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_export_logs_please_retry_2a73568e"), duration: 4000 }); }
       catch (_) { PinmonyRuntimeLog.warn('Runtime: log export feedback unavailable'); }
     } finally { this.exportingLog = false; }
   }
@@ -55,9 +55,9 @@ export struct PinmonySettingsPage {
     const token: number = this.store.token;
     this.logoutConfirmOpen = true;
     this.getUIContext().showAlertDialog({
-      title: this.uiText("退出账号"), message: this.uiText("确定要退出当前账号吗？"),
-      primaryButton: { value: this.uiText("取消"), action: () => { this.logoutConfirmOpen = false; } },
-      secondaryButton: { value: this.uiText("退出账号"), action: () => {
+      title: this.uiText("pm_log_out_e7677436"), message: this.uiText("pm_log_out_of_this_account_ad88739b"),
+      primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: () => { this.logoutConfirmOpen = false; } },
+      secondaryButton: { value: this.uiText("pm_log_out_e7677436"), action: () => {
         this.logoutConfirmOpen = false;
         if (this.pageVisible && this.store.screen === 'root' && token === this.store.token &&
             !this.store.busy && !this.store.loading && this.onRequest) this.onRequest('logout', '');
@@ -78,7 +78,7 @@ export struct PinmonySettingsPage {
         } }
       },
       content: {
-        title: { mainTitle: this.uiText("设置") },
+        title: { mainTitle: this.uiText("pm_settings_df3d58c7") },
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } }
       }
     };
@@ -99,7 +99,7 @@ export struct PinmonySettingsPage {
           ListItem() {
             Button({ type: ButtonType.Normal }) {
               Row({ space: 16 }) {
-                Text(id === 'logout' && this.store.busy ? this.uiText("正在退出…") : id === 'logs' && this.exportingLog ? this.uiText("正在导出日志…") : this.optionLabel(id))
+                Text(id === 'logout' && this.store.busy ? this.uiText("pm_logging_out_0ae60dd3") : id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
                   .fontSize(17)
                   .fontColor($r('app.color.primary_text'))
                   .layoutWeight(1)
@@ -122,7 +122,7 @@ export struct PinmonySettingsPage {
               if (id === 'logout') this.confirmLogout();
               if (id === 'logs') this.exportLog();
               if (id === 'about') this.store.screen = 'about'; })
-            .accessibilityText(id === 'logs' && this.exportingLog ? this.uiText("正在导出日志…") : this.optionLabel(id))
+            .accessibilityText(id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
           }
         }, (id: string) => id + this.uiLanguage) }
       }

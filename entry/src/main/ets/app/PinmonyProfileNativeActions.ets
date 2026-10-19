@@ -233,24 +233,24 @@ export class PinmonyProfileNativeActions {
             if (this.store.panel) {
                 this.store.panel.avatarBusy = false;
                 this.store.panel.avatarAction = this.avatarAction();
-                this.store.panel.avatarError = this.store.panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : this.avatarPending ? '头像处理结果待确认，点“检查结果”只查询状态，不会重新上传' : PinmonyI18n.message('头像上传已暂停');
+                this.store.panel.avatarError = this.store.panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : this.avatarPending ? '头像处理结果待确认，点“检查结果”只查询状态，不会重新上传' : PinmonyI18n.message("pm_profile_picture_upload_paused_1d4af343");
             }
         }
         if (this.following) {
             this.followUnknown.set(this.following, this.desired);
             this.store.followUncertain = true;
             if (this.store.panel)
-                this.store.panel.error = PinmonyI18n.message('关注操作结果未确认，请重新读取核对');
+                this.store.panel.error = PinmonyI18n.message("pm_follow_result_not_confirmed_reload_to_check_dde5efc6");
         }
         if (this.saving && this.draft) {
             this.saveUnknown = this.draft;
             this.store.saveUncertain = true;
             if (this.store.panel)
-                this.store.panel.error = PinmonyI18n.message('保存结果未确认，请重新读取核对，勿重复提交');
+                this.store.panel.error = PinmonyI18n.message("pm_save_result_not_confirmed_reload_to_check_before_submitting_agai_b813e8b7");
         }
         if (this.organize?.busy) {
             this.organize.uncertain = true;
-            this.organize.error = PinmonyI18n.message('整理结果未确认，请关闭后刷新核对，勿重复提交');
+            this.organize.error = PinmonyI18n.message("pm_organize_result_not_confirmed_close_and_refresh_to_check_before__d161e558");
             if (this.moveDispatched)
                 this.organize.selectedIds.forEach((id: string): void => { this.organizeUnknown.add(id); });
             if (this.createName)
@@ -265,7 +265,7 @@ export class PinmonyProfileNativeActions {
         this.store.followingBusy = false;
         if (this.store.panel?.loading) {
             this.store.panel.loading = false;
-            this.store.panel.error = PinmonyI18n.message('读取已暂停，请重新读取');
+            this.store.panel.error = PinmonyI18n.message("pm_loading_paused_please_reload_06c5d032");
         }
         this.panel();
         if (this.organize) {
@@ -353,12 +353,12 @@ export class PinmonyProfileNativeActions {
                 panel.username = d.username;
                 panel.avatar = (d.profile_image_url || '').slice(0, 2000);
                 panel.avatarAction = this.avatarAction();
-                if (panel.avatarAction) panel.avatarError = panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : PinmonyI18n.message('头像处理结果待确认，可检查结果，不会重新上传');
+                if (panel.avatarAction) panel.avatarError = panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : PinmonyI18n.message("pm_profile_picture_processing_not_confirmed_check_status_without_up_f4547bd7");
                 if (this.saveUnknown && this.saveUnknown.username === panel.username && this.saveUnknown.firstName === panel.firstName && this.saveUnknown.lastName === panel.lastName && this.saveUnknown.about === panel.about && this.saveUnknown.websiteUrl === panel.website)
                     this.saveUnknown = undefined;
                 this.store.saveUncertain = !!this.saveUnknown;
                 if (this.saveUnknown)
-                    panel.error = PinmonyI18n.message('上次保存结果未确认，请核对当前资料，勿重复提交');
+                    panel.error = PinmonyI18n.message("pm_previous_save_not_confirmed_check_your_current_profile_before_su_2a81fa99");
             }
             else if (mode === 'followers') {
                 const vars: VariableUser = { userId: this.root!.id }, d: GraphData = await this.graph('369b31865237e1a2f57f1879be69a6c01ee4d6d2806cc4c624d73baea9546b08', vars, revision), user: FollowersData | undefined = d.v3GetUserHandlerQuery?.data, connection: Connection | undefined = user?.followers?.connection;
@@ -396,7 +396,7 @@ export class PinmonyProfileNativeActions {
         }
         catch (_) {
             if (this.current(revision) && this.store.panel)
-                this.store.panel.error = PinmonyI18n.message('读取失败，请重新读取');
+                this.store.panel.error = PinmonyI18n.message("pm_unable_to_load_please_reload_d84df6b3");
         }
         finally {
             if (this.current(revision) && this.store.panel) {
@@ -428,7 +428,7 @@ export class PinmonyProfileNativeActions {
             incoming.forEach((item: PinmonyProfilePanelItem): void => { if(!current.items.some((old: PinmonyProfilePanelItem): boolean => old.id === item.id))current.items.push(item); });
             const next: string = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 8192 ? connection.pageInfo.endCursor : '';
             this.followersCursor = next;current.hasMore = connection.pageInfo.hasNextPage === true && !!next && next !== cursor && !!incoming.length;
-        } catch (_) { if(this.current(revision) && this.store.panel)this.store.panel.moreError = PinmonyI18n.message('粉丝加载失败，请重试'); }
+        } catch (_) { if(this.current(revision) && this.store.panel)this.store.panel.moreError = PinmonyI18n.message("pm_unable_to_load_followers_please_retry_7ce0b640"); }
         finally { if(this.current(revision) && this.store.panel){this.store.panel.moreLoading = false;this.panel();} }
     }
     async follow(id: string): Promise<void> {
@@ -444,7 +444,7 @@ export class PinmonyProfileNativeActions {
                 if (recovering) {
                     this.overlay();
                     if (this.followUnknown.has(this.root!.id))
-                        this.ports.feedback(PinmonyI18n.message('关注结果仍未确认，请稍后核对'));
+                        this.ports.feedback(PinmonyI18n.message("pm_follow_result_still_not_confirmed_check_again_later_83effe90"));
                     return;
                 }
             }
@@ -487,12 +487,12 @@ export class PinmonyProfileNativeActions {
                 this.followUnknown.set(this.following, this.desired);
                 this.store.followUncertain = true;
                 if (this.store.panel) {
-                    this.store.panel.error = PinmonyI18n.message('关注操作结果未确认，请重新读取核对');
+                    this.store.panel.error = PinmonyI18n.message("pm_follow_result_not_confirmed_reload_to_check_dde5efc6");
                     this.store.panel.items.forEach((item): void => { if (item.id === this.following)
                         item.canFollow = false; });
                     this.panel();
                 }
-                this.ports.feedback(PinmonyI18n.message('关注操作结果未确认，请重新读取核对，勿重复提交'));
+                this.ports.feedback(PinmonyI18n.message("pm_follow_result_not_confirmed_reload_to_check_before_submitting_ag_002f7a05"));
             }
         }
         finally {
@@ -526,7 +526,7 @@ export class PinmonyProfileNativeActions {
             if(!current())return;
             if(!reply || reply.error || reply.status !== 200 || !reply.body || reply.body.length > 2000000)throw new Error('unconfirmed');
             const response: ProfileSettingsResponse = JSON.parse(reply.body) as ProfileSettingsResponse, r: ProfileSettingsResource | undefined = response.resource_response;
-            if(r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)throw new ProfileSettingsRejected(PinmonyI18n.message('网站拒绝本次操作'));
+            if(r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)throw new ProfileSettingsRejected(PinmonyI18n.message("pm_the_website_rejected_this_action_6d58f2a6"));
             if(!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_board' : 'v3_unfollow_board') ||
                 response.client_context?.user && response.client_context.user.id !== this.client.viewer)throw new Error('unconfirmed');
             const data: BoardFollowData | null = r.data as BoardFollowData | null;
@@ -534,14 +534,14 @@ export class PinmonyProfileNativeActions {
             this.boardFollowUnknown.delete(id);
             const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
             if(actual){actual.following = desired;actual.canFollow = true;}
-            this.store.profileCache.clear();this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message('已取消关注图板'));
+            this.store.profileCache.clear();this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
         }catch (error) {
             if(current()){
                 const rejected: boolean = error instanceof ProfileSettingsRejected;
                 if(rejected)this.boardFollowUnknown.delete(id);
                 const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
                 if(actual)actual.canFollow = rejected;
-                this.ports.feedback(rejected ? '网站拒绝本次图板关注操作，可以重试' : PinmonyI18n.message('图板关注结果未确认，请重新读取核对，勿重复提交'));
+                this.ports.feedback(rejected ? '网站拒绝本次图板关注操作，可以重试' : PinmonyI18n.message("pm_board_follow_result_not_confirmed_reload_to_check_before_submitt_44c2a0cd"));
             }
         }finally {
             if(current()){this.boardFollowJob = '';this.boardFollowRelease = undefined;this.store.followingBusy = false;this.panel();}
@@ -592,7 +592,7 @@ export class PinmonyProfileNativeActions {
                 this.panel();
             }
         } catch (_) {
-            if (ownsPanel()) this.store.panel!.avatarError = PinmonyI18n.message('无法读取照片，请选择不超过 4 MB 的 PNG、JPEG 或 WebP 图片');
+            if (ownsPanel()) this.store.panel!.avatarError = PinmonyI18n.message("pm_unable_to_read_photo_choose_a_png_jpeg_or_webp_image_of_4_mb_or__2ad5f56a");
             return;
         } finally {
             this.avatarPicking = false;
@@ -605,7 +605,7 @@ export class PinmonyProfileNativeActions {
         this.avatarJob = id;
         const current = (): boolean => ownsPanel() && this.current(revision) && this.avatarJob === id;
         this.store.panel!.avatarBusy = true;
-        this.store.panel!.avatarError = readOnlyRefresh ? '正在重新读取当前头像…' : this.avatarPending ? '正在检查头像处理结果…' : PinmonyI18n.message('正在上传头像…'); this.panel();
+        this.store.panel!.avatarError = readOnlyRefresh ? '正在重新读取当前头像…' : this.avatarPending ? '正在检查头像处理结果…' : PinmonyI18n.message("pm_uploading_profile_picture_dd6b1b58"); this.panel();
         const cancelled: Promise<string | undefined> = new Promise<string | undefined>((resolve): void => { this.avatarRelease = (): void => resolve(undefined); });
         const process = async (): Promise<string> => {
             if (readOnlyRefresh) return this.readCurrentAvatar(revision);
@@ -625,7 +625,7 @@ export class PinmonyProfileNativeActions {
                 if (!current()) throw new Error('stale');
                 if (status === 5) throw new Error('avatar-rejected');
                 if (status === 4) return this.readCurrentAvatar(revision);
-                this.store.panel!.avatarError = PinmonyI18n.message('照片已上传，正在处理头像…'); this.panel();
+                this.store.panel!.avatarError = PinmonyI18n.message("pm_photo_uploaded_processing_profile_picture_2fb3d576"); this.panel();
                 await new Promise<void>((resolve): void => {
                     const timer: number = setTimeout((): void => { this.avatarWake = undefined; resolve(); }, 500 * (attempt + 1));
                     this.avatarWake = (): void => { clearTimeout(timer); resolve(); };
@@ -638,20 +638,20 @@ export class PinmonyProfileNativeActions {
             if (!current() || !avatar) return;
             if (!readOnlyRefresh) this.avatarPending = undefined;
             this.store.panel!.avatar = avatar; this.store.panel!.avatarPreview = '';
-            this.store.panel!.avatarError = readOnlyRefresh ? PinmonyI18n.message('已重新读取当前头像；上次上传结果仍未确认，暂不能再次上传') : '';
+            this.store.panel!.avatarError = readOnlyRefresh ? PinmonyI18n.message("pm_profile_picture_reloaded_previous_upload_still_not_confirmed_upl_f11d47a5") : '';
             this.store.panel!.avatarAction = this.avatarAction();
             if (this.store.profile?.profileUrl === page) {
                 const profile: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.store.profile)) as PinmonyProfileSnapshot;
                 profile.avatarUrl = avatar; this.store.profile = profile;
             }
-            this.ports.avatarSaved?.(page, avatar); this.ports.refresh(); this.ports.feedback(readOnlyRefresh ? '已刷新当前头像' : PinmonyI18n.message('头像已更新'));
+            this.ports.avatarSaved?.(page, avatar); this.ports.refresh(); this.ports.feedback(readOnlyRefresh ? '已刷新当前头像' : PinmonyI18n.message("pm_profile_picture_updated_a938ed15"));
         } catch (error) {
             if (!current()) return;
             const rejected: boolean = (error as Error).message === 'avatar-rejected';
             if (rejected) this.avatarPending = undefined;
             this.store.panel!.avatarAction = this.avatarAction();
-            this.store.panel!.avatarError = rejected ? PinmonyI18n.message('网站未能完成头像处理，可以重新选择照片') :
-                this.store.panel!.avatarAction === 'refresh' ? PinmonyI18n.message('当前头像尚未确认，请点“刷新头像”重新读取；暂不重复上传') : this.avatarPending ? PinmonyI18n.message('头像处理结果待确认，点“检查结果”只查询状态，不会重新上传') : PinmonyI18n.message('头像尚未上传，可以重新选择照片');
+            this.store.panel!.avatarError = rejected ? PinmonyI18n.message("pm_the_website_could_not_process_your_profile_picture_you_can_selec_e9547476") :
+                this.store.panel!.avatarAction === 'refresh' ? PinmonyI18n.message("pm_profile_picture_not_confirmed_tap_refresh_profile_picture_before_d22d4fa3") : this.avatarPending ? PinmonyI18n.message("pm_profile_picture_processing_not_confirmed_tap_check_status_to_que_d349978e") : PinmonyI18n.message("pm_profile_picture_not_uploaded_you_can_select_another_photo_8eb8ddd3");
         } finally {
             if (this.avatarJob === id) {
                 this.avatarJob = ''; this.avatarRelease = undefined; this.avatarWake?.(); this.avatarWake = undefined;
@@ -684,7 +684,7 @@ export class PinmonyProfileNativeActions {
             if (outcome?.error?.message === '用户名已被使用。') {
                 this.saving = false;
                 this.store.saving = false;
-                this.ports.feedback(PinmonyI18n.message('用户名已被使用'));
+                this.ports.feedback(PinmonyI18n.message("pm_username_already_taken_b003d15d"));
                 return;
             }
             if (response.errors?.length || outcome?.__typename !== 'V3EditSettingsHandler' || user?.__typename !== 'User' || user.username !== input.username || user.id !== undefined && user.id !== this.relay(this.client.viewer))
@@ -704,7 +704,7 @@ export class PinmonyProfileNativeActions {
             if (this.current(revision)) {
                 this.saveUnknown = input;
                 this.store.saveUncertain = true;
-                p.error = PinmonyI18n.message('保存结果未确认，请重新读取核对，勿重复提交');
+                p.error = PinmonyI18n.message("pm_save_result_not_confirmed_reload_to_check_before_submitting_agai_b813e8b7");
                 this.panel();
             }
         }
@@ -755,7 +755,7 @@ export class PinmonyProfileNativeActions {
         }
         catch (_) {
             if (this.current(revision))
-                o.error = PinmonyI18n.message('图板读取失败，请重试');
+                o.error = PinmonyI18n.message("pm_unable_to_load_boards_please_retry_04bec826");
         }
         finally {
             if (this.current(revision)) {
@@ -785,7 +785,7 @@ export class PinmonyProfileNativeActions {
             }
             catch (_) {
                 if (this.current(revision))
-                    this.organize.error = PinmonyI18n.message('读取身份失败，请关闭后重试');
+                    this.organize.error = PinmonyI18n.message("pm_unable_to_verify_identity_close_and_retry_80632869");
             }
             finally {
                 if (this.current(revision)) {
@@ -839,7 +839,7 @@ export class PinmonyProfileNativeActions {
                 return;
             if (o.selectedIds.some((id: string): boolean => this.organizeUnknown.has(id)) || action === 'create' && this.createUnknown.has(value.trim())) {
                 o.uncertain = true;
-                o.error = PinmonyI18n.message('上次整理结果未确认，请刷新核对，勿重复提交');
+                o.error = PinmonyI18n.message("pm_previous_organize_result_not_confirmed_refresh_to_check_before_s_b7a64551");
                 this.syncOrganize();
                 return;
             }
@@ -884,7 +884,7 @@ export class PinmonyProfileNativeActions {
                         if (this.createName)
                             this.createUnknown.add(this.createName);
                     }
-                    o.error = o.uncertain ? PinmonyI18n.message('整理结果未确认，请关闭后刷新核对，勿重复提交') : (error as Error).message;
+                    o.error = o.uncertain ? PinmonyI18n.message("pm_organize_result_not_confirmed_close_and_refresh_to_check_before__d161e558") : (error as Error).message;
                 }
             }
             finally {

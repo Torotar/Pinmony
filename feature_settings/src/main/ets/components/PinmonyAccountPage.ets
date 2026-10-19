@@ -26,7 +26,7 @@ export struct PinmonyAccountPage {
     this.store.screen = screen; this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
     if (screen === 'country') this.request('countries');
   }
-  private title(): string { return this.store.screen === 'account' ? this.uiText("账户管理") : this.store.screen === 'personal' ? this.uiText("个人信息") : this.store.screen === 'birthdate' ? this.uiText("出生日期") : this.store.screen === 'gender' ? this.uiText("性别") : this.uiText("国家/地区"); }
+  private title(): string { return this.store.screen === 'account' ? this.uiText("pm_account_management_3c072712") : this.store.screen === 'personal' ? this.uiText("pm_personal_information_640803d8") : this.store.screen === 'birthdate' ? this.uiText("pm_date_of_birth_1c54caca") : this.store.screen === 'gender' ? this.uiText("pm_gender_a752a7d8") : this.uiText("pm_country_region_45e22a8a"); }
   private date(): string { return this.year.padStart(4, '0') + '-' + this.month.padStart(2, '0') + '-' + this.day.padStart(2, '0'); }
   private canSave(): boolean {
     if (!this.store.data || this.store.loading || this.store.busy || this.store.error) return false;
@@ -46,7 +46,7 @@ export struct PinmonyAccountPage {
         scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: ['birthdate', 'gender'].includes(this.store.screen) ? [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]), label: this.uiText("完成"), isEnabled: this.canSave(),
+          icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]), label: this.uiText("pm_done_c0b3fbff"), isEnabled: this.canSave(),
           action: () => { if (this.canSave()) this.save(this.store.screen === 'birthdate' ? 'birthdate' : 'customGender', this.store.screen === 'birthdate' ? this.date() : this.custom); }
         } }] : [] } } };
   }
@@ -66,15 +66,15 @@ export struct PinmonyAccountPage {
   }
   private birthday(): string {
     const p: string[] = (this.store.data?.birthdate || '').split('-');
-    return p.length === 3 ? p[0] + this.uiText("年") + Number(p[1]).toString() + this.uiText("月") + Number(p[2]).toString() + '日' : '';
+    return p.length === 3 ? p[0] + this.uiText("pm_y_62ef900a") + Number(p[1]).toString() + this.uiText("pm_month_1625179b") + Number(p[2]).toString() + '日' : '';
   }
-  private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("女") : this.store.data?.gender === 'male' ? this.uiText("男") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || '自定义' : ''; }
+  private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("pm_female_0ab4610b") : this.store.data?.gender === 'male' ? this.uiText("pm_male_4e79758a") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || '自定义' : ''; }
   @Builder
   private dateField(field: string, value: string) {
     Column({ space: 6 }) {
-      Text(this.uiText(field === 'year' ? '年' : field === 'month' ? '月' : '日')).fontSize(13).fontColor($r('app.color.secondary_text'))
+      Text(this.uiText(field === 'year' ? "pm_y_62ef900a" : field === 'month' ? "pm_month_1625179b" : "pm_day_85217f7a")).fontSize(13).fontColor($r('app.color.secondary_text'))
       TextInput({ text: value }).type(InputType.Number).maxLength(field === 'year' ? 4 : 2).fontColor($r('app.color.primary_text'))
-        .backgroundColor(Color.Transparent).enabled(!this.store.busy).accessibilityText(this.uiText(field === 'year' ? '年' : field === 'month' ? '月' : '日'))
+        .backgroundColor(Color.Transparent).enabled(!this.store.busy).accessibilityText(this.uiText(field === 'year' ? "pm_y_62ef900a" : field === 'month' ? "pm_month_1625179b" : "pm_day_85217f7a"))
         .onChange((v: string) => { if (field === 'year') this.year = v; else if (field === 'month') this.month = v; else this.day = v; })
     }.layoutWeight(1).padding(10).border({ width: 1, color: $r('app.color.secondary_text'), radius: 14 }).alignItems(HorizontalAlign.Start)
   }
@@ -94,47 +94,47 @@ export struct PinmonyAccountPage {
       Scroll(this.scroller) {
         Column({ space: 8 }) {
           if (this.store.loading || this.store.busy) {
-            Text(this.store.busy ? this.uiText("正在保存…") : this.uiText("正在读取…")).fontColor($r('app.color.secondary_text'))
+            Text(this.store.busy ? this.uiText("pm_saving_6bdb4435") : this.uiText("pm_loading_86b6d0d6")).fontColor($r('app.color.secondary_text'))
           }
           if (this.store.error) {
             Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("重新读取")).enabled(!this.store.loading && !this.store.busy).onClick(() => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); })
+            Button(this.uiText("pm_reload_df7392cc")).enabled(!this.store.loading && !this.store.busy).onClick(() => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); })
           }
           if (this.store.data?.ready && !this.store.loading) {
             if (this.store.screen === 'account') {
-              Text(this.uiText("你的帐户")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
-              this.row(this.uiText("个人信息"), '', 'personal')
-              this.row(this.uiText("电子邮件"), this.store.data.email)
-              this.row(this.uiText("密码"), this.uiText("更改密码"))
-              this.row(this.uiText("电话号码"), this.uiText("添加号码"))
-              this.row(this.uiText("转换为企业帐户"), '', '', this.uiText("拥有企业帐户后，你可以使用工具（例如广告和分析工具），以便在 Pinterest 上拓展业务"))
-              Text(this.uiText("停用和删除")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
-              this.row(this.uiText("停用你的帐户"), '', '', this.uiText("暂时隐藏你的个人资料、Pin 图和图板"))
-              this.row(this.uiText("删除你的数据和帐户"), '', '', this.uiText("永久删除你的数据以及与你的帐户关联的所有内容"))
+              Text(this.uiText("pm_your_account_d80b3d08")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
+              this.row(this.uiText("pm_personal_information_640803d8"), '', 'personal')
+              this.row(this.uiText("pm_email_1b2714b8"), this.store.data.email)
+              this.row(this.uiText("pm_password_a621ab60"), this.uiText("pm_change_password_946e28f6"))
+              this.row(this.uiText("pm_phone_number_8e87c0dd"), this.uiText("pm_add_number_9d820e33"))
+              this.row(this.uiText("pm_convert_to_a_business_account_4935be59"), '', '', this.uiText("pm_a_business_account_gives_you_tools_such_as_ads_and_analytics_to__50598c20"))
+              Text(this.uiText("pm_deactivation_and_deletion_75be0aea")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
+              this.row(this.uiText("pm_deactivate_your_account_06052a52"), '', '', this.uiText("pm_temporarily_hide_your_profile_pins_and_boards_a6d31140"))
+              this.row(this.uiText("pm_delete_your_data_and_account_ff4cef48"), '', '', this.uiText("pm_permanently_delete_your_data_and_everything_associated_with_your_2cb85273"))
             } else if (this.store.screen === 'personal') {
-              if (this.birthday()) { this.row(this.uiText("出生日期"), this.birthday()) }
-              this.row(this.uiText("性别"), this.gender())
-              this.row(this.uiText("国家/地区"), this.store.data.country)
+              if (this.birthday()) { this.row(this.uiText("pm_date_of_birth_1c54caca"), this.birthday()) }
+              this.row(this.uiText("pm_gender_a752a7d8"), this.gender())
+              this.row(this.uiText("pm_country_region_45e22a8a"), this.store.data.country)
             } else if (this.store.screen === 'birthdate') {
-              Text(this.uiText("出生日期有助于为你提供更加个性化的体验，例如相关推荐内容和广告，其还有助于维护 Pinterest 社区的安全。此信息在你的个人资料中不可见。")).fontSize(15).fontColor($r('app.color.secondary_text'))
-              Text(this.uiText("详细了解我们为什么要求你提供出生日期")).fontSize(14).fontColor($r('app.color.secondary_text')).decoration({ type: TextDecorationType.Underline }).onClick(() => {})
+              Text(this.uiText("pm_your_date_of_birth_helps_personalize_recommendations_and_ads_and_00165eee")).fontSize(15).fontColor($r('app.color.secondary_text'))
+              Text(this.uiText("pm_learn_why_we_ask_for_your_date_of_birth_09763a7d")).fontSize(14).fontColor($r('app.color.secondary_text')).decoration({ type: TextDecorationType.Underline }).onClick(() => {})
               Row({ space: 12 }) {
                 this.dateField('year', this.year)
                 this.dateField('month', this.month)
                 this.dateField('day', this.day)
               }.width('100%').margin({ top: 28 })
             } else if (this.store.screen === 'gender') {
-              this.genderRow(this.uiText("女"), 'female')
-              this.genderRow(this.uiText("男"), 'male')
-              this.genderRow(this.uiText("自定义"), 'unspecified')
+              this.genderRow(this.uiText("pm_female_0ab4610b"), 'female')
+              this.genderRow(this.uiText("pm_male_4e79758a"), 'male')
+              this.genderRow(this.uiText("pm_custom_4eafa9e9"), 'unspecified')
               if (this.store.data.gender === 'unspecified') {
-                TextInput({ text: this.custom, placeholder: this.uiText("输入你的性别") }).maxLength(500).enabled(!this.store.busy)
+                TextInput({ text: this.custom, placeholder: this.uiText("pm_enter_your_gender_e4d76c65") }).maxLength(500).enabled(!this.store.busy)
                   .fontColor($r('app.color.primary_text')).placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted'))
                   .onChange((v: string) => { this.custom = v; })
                 Text(this.custom.length.toString() + '/500').width('100%').textAlign(TextAlign.End).fontSize(12).fontColor($r('app.color.secondary_text'))
               }
             } else if (this.store.screen === 'country') {
-              TextInput({ text: this.query, placeholder: this.uiText("搜索国家/地区") }).fontColor($r('app.color.primary_text'))
+              TextInput({ text: this.query, placeholder: this.uiText("pm_search_countries_regions_79d74e48") }).fontColor($r('app.color.primary_text'))
                 .placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted')).onChange((v: string) => { this.query = v; })
               ForEach(this.store.data.countries.filter((c: PinmonyCountry) => (c.name + c.key).toLowerCase().includes(this.query.toLowerCase())).sort((a: PinmonyCountry, b: PinmonyCountry) => a.key === this.store.data?.country ? -1 : b.key === this.store.data?.country ? 1 : 0), (c: PinmonyCountry) => {
                 Button({ type: ButtonType.Normal }) {

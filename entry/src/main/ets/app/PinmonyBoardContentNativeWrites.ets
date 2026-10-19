@@ -36,7 +36,7 @@ export class PinmonyBoardContentNativeWrites {
   }
   private publish(f: PinmonyBoardFlow): void {this.displayed = this.clone(f);this.ports.changed(this.displayed);}
   private unknown(f: PinmonyBoardFlow): void {
-    f.busy = false;f.uncertain = true;f.error = PinmonyI18n.message('操作结果未确认，请关闭后刷新核对；不会重复提交');this.publish(f);
+    f.busy = false;f.uncertain = true;f.error = PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_it_will_not_be_r_b66391e3");this.publish(f);
     PinmonyRuntimeLog.info('BoardContentNative: outcome=unknown');
   }
   pause(): void {
@@ -64,7 +64,7 @@ export class PinmonyBoardContentNativeWrites {
   async submit(action: string, value: string, intentCurrent: () => boolean, initialPins: string[] = []): Promise<string> {
     const original: PinmonyBoardFlow | undefined = this.ports.state(), identity: PinmonyBoardContentIdentity | undefined = this.ports.identity();
     const session: PinmonyBusinessSessionContext = this.ports.session();
-    if(this.job || !original || !identity || !session.authenticated || !session.accountId || original.busy || original.loading || original.uncertain || original.error || original.phase && !(action === 'cancel' && original.phase === 'section') && !(action === 'section' && ['sectionSelect','targets'].includes(original.phase)) || !intentCurrent())return PinmonyI18n.message('当前图板操作不可用，请关闭后刷新核对');
+    if(this.job || !original || !identity || !session.authenticated || !session.accountId || original.busy || original.loading || original.uncertain || original.error || original.phase && !(action === 'cancel' && original.phase === 'section') && !(action === 'section' && ['sectionSelect','targets'].includes(original.phase)) || !intentCurrent())return PinmonyI18n.message("pm_board_action_unavailable_close_and_refresh_to_check_a98c4c4a");
     if(initialPins.length > 500 || new Set(initialPins).size !== initialPins.length || !initialPins.every((id: string): boolean => /^\d{1,30}$/.test(id) && !!identity?.loadedIds.includes(id)))return '所选 Pin 已失效，请重新选择';
     if(action === 'section') {if(!identity.canContribute || typeof value !== 'string' || !value.trim() || value.trim().length > 100)return '区块名称或图板权限无效';value = value.trim();}
     else if(action === 'cancel') {if(identity.ownerId !== identity.viewerId || !/^\d{1,30}$/.test(value) || !identity.loadedIds.includes(value))return '收藏校验失败，未执行取消收藏';}

@@ -45,7 +45,7 @@ export class PinmonyBoardManagementNativeWrites {
   }
   private publish(f: PinmonyBoardFlow): void {this.ports.changed(this.clone(f));}
   private unknown(f: PinmonyBoardFlow): void {
-    f.busy = false;f.uncertain = true;f.error = PinmonyI18n.message('操作结果未确认，请关闭后刷新核对；不会重复提交');
+    f.busy = false;f.uncertain = true;f.error = PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_it_will_not_be_r_b66391e3");
     this.publish(f);PinmonyRuntimeLog.info('BoardManagementNative: outcome=unknown');
   }
   pause(): void {

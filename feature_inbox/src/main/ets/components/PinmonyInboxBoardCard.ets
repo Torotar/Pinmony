@@ -11,9 +11,9 @@ export struct PinmonyInboxBoardCard {
 
   private countLabel(): string {
     const parts: string[] = [];
-    if (this.board.pinCount !== undefined) parts.push(this.board.pinCount.toString() + this.uiText(" 张 Pin 图"));
+    if (this.board.pinCount !== undefined) parts.push(this.board.pinCount.toString() + this.uiText("pm_pins_0a89904f"));
     if (this.board.sectionCount !== undefined && this.board.sectionCount > 0) {
-      parts.push(this.board.sectionCount.toString() + this.uiText(" 个图板区块"));
+      parts.push(this.board.sectionCount.toString() + this.uiText("pm_sections_68d526a8"));
     }
     return parts.join(' · ');
   }
@@ -44,7 +44,7 @@ export struct PinmonyInboxBoardCard {
           this.preview(this.board.cover)
         }
       }.width('100%').height(146).borderRadius(18).clip(true)
-      Text(this.board.title || this.uiText("图板")).fontSize(16).fontWeight(FontWeight.Bold)
+      Text(this.board.title || this.uiText("pm_board_bd3f17ee")).fontSize(16).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%').textAlign(TextAlign.Start).padding({ left: 8, right: 8 })
       if (this.countLabel()) {
@@ -52,11 +52,11 @@ export struct PinmonyInboxBoardCard {
           .width('100%').textAlign(TextAlign.Start).padding({ left: 8, right: 8 })
       }
       if (!this.board.url) {
-        Text(this.uiText("图板链接暂不可用")).fontSize(13).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("pm_board_link_unavailable_87c6bb44")).fontSize(13).fontColor($r('app.color.secondary_text'))
       }
     }.width(220).constraintSize({ maxWidth: '100%' }).alignItems(HorizontalAlign.Start)
       .padding({ bottom: 12 }).borderRadius(18)
-      .accessibilityGroup(true).accessibilityText((this.board.title || this.uiText("图板")) + '，' + this.countLabel())
+      .accessibilityGroup(true).accessibilityText((this.board.title || this.uiText("pm_board_bd3f17ee")) + '，' + this.countLabel())
       .onClick(() => { if (this.board.url && this.onOpen) this.onOpen(); })
   }
 }

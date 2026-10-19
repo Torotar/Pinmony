@@ -9,7 +9,7 @@ export struct PinmonyBoardSectionPage {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop ready: boolean = false;
   onClose: () => void = () => {};
-  onCreate: (name: string) => Promise<string> = async () => this.uiText("当前操作不可用");
+  onCreate: (name: string) => Promise<string> = async () => this.uiText("pm_this_action_is_unavailable_f3ea5b4e");
   @State private busy: boolean = false;
   @State private submitted: boolean = false;
   @State private error: string = '';
@@ -20,23 +20,23 @@ export struct PinmonyBoardSectionPage {
   @Builder
   private sectionForm() {
     Column({ space: 20 }) {
-      TextInput({ placeholder: this.uiText("区块名称"), text: this.name }).maxLength(100)
+      TextInput({ placeholder: this.uiText("pm_section_name_e63b3281"), text: this.name }).maxLength(100)
         .enabled(!this.busy && !this.submitted)
-        .accessibilityText(this.uiText("图板区块名称")).onChange((value: string) => { this.name = value; })
+        .accessibilityText(this.uiText("pm_section_name_0e25c295")).onChange((value: string) => { this.name = value; })
       if (this.busy) { LoadingProgress().width(24).height(24) }
-      if (!this.ready && !this.busy && !this.error) { Text(this.uiText("正在恢复图板，请稍候")).fontColor($r('app.color.secondary_text')).fontSize(14) }
+      if (!this.ready && !this.busy && !this.error) { Text(this.uiText("pm_restoring_board_please_wait_9e819a8a")).fontColor($r('app.color.secondary_text')).fontSize(14) }
       if (this.error) { Text(PinmonyI18n.render(this.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')).fontSize(14) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
   @Builder
   private nextButton() {
-      Button(this.uiText("下一步")).width('100%').height(48).backgroundColor($r('app.color.accent'))
+      Button(this.uiText("pm_next_acfc4e74")).width('100%').height(48).backgroundColor($r('app.color.accent'))
         .fontColor($r('app.color.detail_on_accent')).enabled(this.ready && !!this.name.trim() && !this.busy && !this.submitted)
         .onClick(async () => {
           if (!this.ready || this.busy || this.submitted || !this.name.trim()) return;
           this.busy = true; this.submitted = true;
           try { this.error = await this.onCreate(this.name.trim()); }
-          catch (_) { this.error = PinmonyI18n.message("创建结果未确认，请关闭后刷新核对，勿重复提交"); }
+          catch (_) { this.error = PinmonyI18n.message("pm_creation_not_confirmed_close_and_refresh_to_check_before_submitt_99e27f05"); }
           finally { this.busy = false; }
           if (this.error && !PinmonyI18n.isUnconfirmed(this.error)) this.submitted = false;
           if (!this.error) { this.visible = false; this.onClose(); }
@@ -71,9 +71,9 @@ export struct PinmonyBoardSectionPage {
             }
           }
         },
-        content: { title: { mainTitle: this.uiText("添加图板区块") }, menu: { value: [{ content: {
+        content: { title: { mainTitle: this.uiText("pm_add_section_779008ec") }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
-          type: IconStyleMode.SMALL, isEnabled: !this.busy, label: this.uiText("关闭"), action: () => { if (!this.busy) { this.visible = false; this.onClose(); } }
+          type: IconStyleMode.SMALL, isEnabled: !this.busy, label: this.uiText("pm_close_3fd47edc"), action: () => { if (!this.busy) { this.visible = false; this.onClose(); } }
         } }] } } })
       .backgroundColor($r('app.color.page_background'))
   }

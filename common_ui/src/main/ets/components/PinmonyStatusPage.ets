@@ -21,10 +21,10 @@ export struct PinmonyStatusPage {
           .textAlign(TextAlign.Center).maxLines(4).margin({ left: 24, right: 24 })
       }
       if (!this.loading) {
-        Button(this.uiText("重试")).onClick(() => this.onRetry())
+        Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.onRetry())
       }
       if (this.showBack) {
-        Button(this.uiText("返回")).onClick(() => this.onBack())
+        Button(this.uiText("pm_back_572cf45b")).onClick(() => this.onBack())
       }
     }
     .justifyContent(FlexAlign.Center)

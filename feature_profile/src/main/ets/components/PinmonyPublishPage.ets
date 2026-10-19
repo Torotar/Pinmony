@@ -47,11 +47,11 @@ export struct PinmonyPublishPage {
           }
         }
       },
-      content: { title: { mainTitle: this.state.phase === 'empty' ? this.uiText("选择图片") : this.state.kind === 'photo' ? this.uiText("照片") : this.uiText("网站") },
-        backIcon: { label: this.uiText("返回"), isEnabled: !this.state.busy, action: () => this.act(this.state.phase === 'empty' ? 'back' : 'close') },
+      content: { title: { mainTitle: this.state.phase === 'empty' ? this.uiText("pm_choose_image_9ad12a1a") : this.state.kind === 'photo' ? this.uiText("pm_photos_7b50017a") : this.uiText("pm_website_fb8d739d") },
+        backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: !this.state.busy, action: () => this.act(this.state.phase === 'empty' ? 'back' : 'close') },
         menu: { value: this.state.phase === 'website' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.arrow_right')).fontColor([$r('app.color.primary_text')]),
-          label: this.uiText("选择图片"), isEnabled: this.canReadWebsite(),
+          label: this.uiText("pm_choose_image_9ad12a1a"), isEnabled: this.canReadWebsite(),
           action: () => { if (this.canReadWebsite()) this.submitWebsite(); }
         } }] : [] } } };
   }
@@ -59,7 +59,7 @@ export struct PinmonyPublishPage {
   @Builder
   private websiteSheet() {
     Column() {
-      TextInput({ text: this.link, placeholder: this.uiText("输入链接以创建 Pin 图，https://…") })
+      TextInput({ text: this.link, placeholder: this.uiText("pm_enter_a_link_to_create_a_pin_https_89a0cd78") })
         .maxLength(4096).enabled(!this.state.loading)
         .onChange((v: string) => { this.link = v; })
     }.width('100%').backgroundColor($r('app.color.page_background'))
@@ -72,14 +72,14 @@ export struct PinmonyPublishPage {
           if (this.state.phase === 'website') {
             this.websiteSheet()
           } else if (this.state.phase === 'empty') {
-            Text(this.uiText("没有读取到可创建 Pin 的图片")).fontSize(17).fontColor($r('app.color.primary_text'))
-            Button(this.uiText("返回并重试")).onClick(() => this.act('back'))
+            Text(this.uiText("pm_no_images_available_to_create_a_pin_b7fe6e0c")).fontSize(17).fontColor($r('app.color.primary_text'))
+            Button(this.uiText("pm_go_back_and_retry_fa25b166")).onClick(() => this.act('back'))
           } else if (this.state.phase === 'photo' && !this.state.loading) {
-            Button(this.uiText("选择照片")).enabled(!this.state.loading).onClick(() => this.act('pickPhoto'))
+            Button(this.uiText("pm_choose_photo_cae3ab4b")).enabled(!this.state.loading).onClick(() => this.act('pickPhoto'))
           }
           if (this.state.error) {
             Text(PinmonyI18n.render(this.state.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("返回")).onClick(() => this.act('close'))
+            Button(this.uiText("pm_back_572cf45b")).onClick(() => this.act('close'))
           }
         }.width('100%').alignItems(HorizontalAlign.Start).padding(20)
       }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
@@ -99,7 +99,7 @@ export struct PinmonyPublishPage {
           .backgroundColor($r('app.color.page_background'))
           .accessibilityLevel(this.state.loading || this.state.busy ? 'no-hide-descendants' : 'auto')
         if (this.state.loading || this.state.busy) {
-          PinmonyLoadingOverlay({ message: this.state.kind === 'photo' ? this.uiText("正在读取照片…") : this.uiText("正在读取网站图片…") })
+          PinmonyLoadingOverlay({ message: this.state.kind === 'photo' ? this.uiText("pm_loading_photos_35b3ef9b") : this.uiText("pm_loading_website_images_4300f2d6") })
         }
       }.width('100%').height('100%')
     }

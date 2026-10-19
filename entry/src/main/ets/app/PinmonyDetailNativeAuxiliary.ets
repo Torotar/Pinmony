@@ -55,12 +55,12 @@ export class PinmonyDetailNativeAuxiliary {
   }
   pause(): void {
     this.revision++; this.cancelVisual(); this.cancel('native_detail_aux_');
-    if (this.mediaLoading && this.store.detail?.pinUrl === this.pin) { this.mediaLoading = false; this.mediaError = PinmonyI18n.message('媒体读取已暂停，请重试'); this.applyMedia(); }
+    if (this.mediaLoading && this.store.detail?.pinUrl === this.pin) { this.mediaLoading = false; this.mediaError = PinmonyI18n.message("pm_media_loading_paused_please_retry_67a4be3d"); this.applyMedia(); }
     this.pin = ''; this.account = ''; this.store.detailMediaRetryBusy = false;
   }
   cancelVisual(): void {
     this.visualRevision++; this.cancel('native_detail_aux_visual_');
-    if (this.store.visualResult.loading) this.store.visualResult = {pin:this.store.visualResult.pin,loading:false,error:PinmonyI18n.message('图片搜索已暂停，请重试'),ended:this.store.visualResult.ended,items:this.store.visualResult.items};
+    if (this.store.visualResult.loading) this.store.visualResult = {pin:this.store.visualResult.pin,loading:false,error:PinmonyI18n.message("pm_image_search_paused_please_retry_c19326c2"),ended:this.store.visualResult.ended,items:this.store.visualResult.items};
   }
   start(pin: string, token: number, body: string): void {
     this.pause();
@@ -141,7 +141,7 @@ export class PinmonyDetailNativeAuxiliary {
       if (!this.ready() || revision !== this.revision) return;
       if (r.resource_response?.status !== 'success' || r.resource_response.error || r.resource_response.code !== undefined && r.resource_response.code !== 0 || r.resource_response.data?.id !== this.pin.match(/\/pin\/(\d+)\/$/)?.[1]) throw new Error('pin');
       await this.resolve(r.resource_response.data,false,true);
-    } catch (_) { if (revision === this.revision && this.ready()) { this.mediaError = PinmonyI18n.message('媒体地址读取失败，请重试'); this.apply(); } }
+    } catch (_) { if (revision === this.revision && this.ready()) { this.mediaError = PinmonyI18n.message("pm_unable_to_load_media_url_please_retry_e2d8f3d2"); this.apply(); } }
     finally { if (revision === this.revision) this.store.detailMediaRetryBusy = false; }
   }
   private async resolve(raw: NativePin, graph: boolean, refresh: boolean): Promise<void> {
@@ -164,7 +164,7 @@ export class PinmonyDetailNativeAuxiliary {
       if (refresh) this.mediaVersion = (this.mediaVersion + 1) % 1000000;
       if (video) { video.readRevision = this.mediaVersion; this.video = video; }
       if (carousel) this.carousel = carousel;
-    } catch (_) { if (this.ready() && revision === this.revision) this.mediaError = this.mediaKind === 'video' ? '视频地址读取失败，请重试' : PinmonyI18n.message('多图内容读取失败，请重试'); }
+    } catch (_) { if (this.ready() && revision === this.revision) this.mediaError = this.mediaKind === 'video' ? '视频地址读取失败，请重试' : PinmonyI18n.message("pm_unable_to_load_carousel_please_retry_e43842b8"); }
     finally { if (revision === this.revision && this.ready()) { this.mediaLoading = false; this.apply(); } }
   }
   async search(crop: PinmonyImageCrop, append: boolean, first: boolean): Promise<void> {
@@ -193,7 +193,7 @@ export class PinmonyDetailNativeAuxiliary {
       const cursor: string = typeof response.bookmark === 'string' && response.bookmark.length <= 4096 ? response.bookmark : '';
       result.ended = !cursor || cursor === '-end-' || cursor === previous || result.items.length >= 400;
       this.bookmark = cursor;
-    } catch (_) { if (live()) result.error = PinmonyI18n.message('图片搜索失败，请重试'); }
+    } catch (_) { if (live()) result.error = PinmonyI18n.message("pm_image_search_failed_please_retry_a1c501c4"); }
     finally { if (live()) { result.loading = false; this.store.visualResult = {pin:result.pin,loading:result.loading,error:result.error,ended:result.ended,items:result.items.slice()}; } }
   }
   private async request(kind: string, options: ReadOptions, source: string, current: () => boolean): Promise<string> {

@@ -223,7 +223,7 @@ export struct SmartImage {
         SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
           .fontSize(24)
           .fontColor([$r('app.color.secondary_text')])
-          .accessibilityText(this.uiText("图片加载失败"))
+          .accessibilityText(this.uiText("pm_image_failed_to_load_572993f5"))
       }
     }
     .width('100%')

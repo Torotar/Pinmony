@@ -92,7 +92,7 @@ export class PinmonyDetailReadController {
         if (message.session === this.store.detailSession && message.pinUrl === this.store.detailPin) {
           this.ports.setPendingDetailLike(undefined);
           if (PIN_DETAIL_API_ENABLED) {
-            this.ports.showMessage(message.error || PinmonyI18n.message('尚未确认点赞生效，请重试'));
+            this.ports.showMessage(message.error || PinmonyI18n.message("pm_like_not_confirmed_please_retry_840b5e22"));
             this.ports.runScript('window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()')
               .catch(() => PinmonyRuntimeLog.warn('Pinmony: detail refresh unavailable'));
             return;
@@ -100,7 +100,7 @@ export class PinmonyDetailReadController {
           this.store.detailImageFailedPin = message.pinUrl;
           this.store.detail = undefined;
           this.store.detailActionsReady = false;
-          this.ports.showMessage(PinmonyI18n.message('点赞未生效，已切回网页详情'));
+          this.ports.showMessage(PinmonyI18n.message("pm_like_did_not_take_effect_returned_to_the_detail_session_e201c241"));
         }
         return;
       }

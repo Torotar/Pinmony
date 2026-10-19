@@ -50,7 +50,7 @@ export class PinmonyBoardCollaboratorsNativeWrites {
   private publish(state: PinmonyBoardCollaborators): void { this.ports.changed(this.clone(state)); }
   private unknown(state: PinmonyBoardCollaborators): void {
     state.busy = false; state.uncertain = true; state.feedback = '';
-    state.error = PinmonyI18n.message('操作结果未确认，请关闭后重新查看，勿重复提交');
+    state.error = PinmonyI18n.message("pm_result_not_confirmed_close_and_reopen_to_check_before_submitting_2fcbc18d");
     this.publish(state);
     PinmonyRuntimeLog.info('BoardCollaboratorNativeWrite: outcome=unknown');
   }
@@ -115,14 +115,14 @@ export class PinmonyBoardCollaboratorsNativeWrites {
         const user: PinmonyBoardCollaborator | undefined = state.suggestions.find((u: PinmonyBoardCollaborator): boolean => u.id === value);
         if(!user)throw new Error('user'); user.status = 'new';
         if(!state.users.some((u: PinmonyBoardCollaborator): boolean => u.id === value))state.users.push(this.cloneUser(user));
-        state.feedback = PinmonyI18n.message('已发送 1 个邀请！');
+        state.feedback = PinmonyI18n.message("pm_1_invitation_sent_9473de94");
       } else {
         const resource: WriteResource | undefined = response.resource_response, data: WriteBoard | undefined = resource?.data;
         if(resource?.status !== 'success' || resource.code !== 0 || resource.endpoint_name !== 'v3_edit_board' || !data ||
           data.id !== identity.boardId || data.owner && data.owner.id !== identity.ownerId ||
           data.collaborator_permissions_setting !== permission!.permission || data.collaborator_invites_enabled !== permission!.invites)throw new Error('permissions');
         state.permission = permission!.permission; state.invites = permission!.invites; state.canInvite = true;
-        state.phase = 'members'; state.feedback = PinmonyI18n.message('权限已更新');
+        state.phase = 'members'; state.feedback = PinmonyI18n.message("pm_permissions_updated_d72fbc80");
       }
       state.busy = false; this.ports.confirmed(state); this.publish(state); this.ports.feedback(state.feedback);
       PinmonyRuntimeLog.info('BoardCollaboratorNativeWrite: outcome=confirmed action=' + action);

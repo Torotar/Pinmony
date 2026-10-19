@@ -35,8 +35,8 @@ export class PinmonySettingsController {
   pause(): void {
     if(this.ports.nativeEnabled?.()){this.ports.nativePause?.();return;}
     this.generation++; this.tasks.invalidate();
-    if (this.writeDispatched) { this.store.writeUncertain = true; this.store.error = PinmonyI18n.message('保存结果未确认，请重新读取核对；不会自动重试保存'); }
-    else if (this.store.loading) this.store.error = PinmonyI18n.message('读取已暂停，请重试');
+    if (this.writeDispatched) { this.store.writeUncertain = true; this.store.error = PinmonyI18n.message("pm_save_result_not_confirmed_reload_to_check_saving_will_not_be_ret_f7c0a062"); }
+    else if (this.store.loading) this.store.error = PinmonyI18n.message("pm_loading_paused_please_retry_a1928a5f");
     this.store.loading = false;
     if (this.ownedRequest) { this.closeBridge(); this.store.busy = false; }
     this.ownedRequest = false;
@@ -83,8 +83,8 @@ export class PinmonySettingsController {
         }
         if (!await this.tasks.wait(250)) return;
       }
-      if (current()) this.store.error = PinmonyI18n.message('通知设置读取超时，请重试');
-    } catch (_) { if (current()) this.store.error = PinmonyI18n.message('通知设置读取失败，请重试'); }
+      if (current()) this.store.error = PinmonyI18n.message("pm_notification_settings_timed_out_please_retry_5b47d36f");
+    } catch (_) { if (current()) this.store.error = PinmonyI18n.message("pm_unable_to_load_notification_settings_please_retry_c76a03e7"); }
     finally { if (token === this.store.token && generation === this.generation) this.store.loading = false; }
   }
   async request(action: string, value: string): Promise<void> {
@@ -92,7 +92,7 @@ export class PinmonySettingsController {
     if (action === 'notifications') { await this.readNotifications(); return; }
     if (!this.allowed() || this.store.busy || this.store.loading) return;
     const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy'].includes(action);
-    if (write && this.store.writeUncertain) { this.store.error = PinmonyI18n.message('请先重新读取核对保存结果'); return; }
+    if (write && this.store.writeUncertain) { this.store.error = PinmonyI18n.message("pm_reload_to_check_the_save_result_first_ebb8aa60"); return; }
     const token: number = ++this.store.token, generation: number = this.generation, epoch: number = this.ports.epoch();
     let page: string = '';
     const current = (): boolean => this.current(token, generation, epoch, page);
@@ -100,12 +100,12 @@ export class PinmonySettingsController {
     this.store.busy = write; this.store.loading = !write; this.store.error = '';
     try {
       if (!await this.ports.prepare(current)) {
-        if (current()) this.store.error = PinmonyI18n.message('当前资料会话尚未就绪，请重试'); return;
+        if (current()) this.store.error = PinmonyI18n.message("pm_profile_session_not_ready_please_retry_fc9bf8b4"); return;
       }
       if (!current()) return;
       page = this.ports.document(); this.page = page;
       if (!this.ports.currentProfile() || this.ports.profileAddress(page) !== this.ports.currentProfile()) {
-        this.store.error = PinmonyI18n.message('当前资料会话尚未就绪，请重试'); return;
+        this.store.error = PinmonyI18n.message("pm_profile_session_not_ready_please_retry_fc9bf8b4"); return;
       }
       this.writeDispatched = write;
       await this.ports.runScript(this.ports.accountScript() + '\nwindow.PinmonyAccountSettings.start(' + JSON.stringify(page) + ',' +
@@ -131,7 +131,7 @@ export class PinmonySettingsController {
       throw new Error('Timeout');
     } catch (_) {
       if (current()) { if (write && this.writeDispatched) this.store.writeUncertain = true;
-        this.store.error = write ? '保存结果未确认，请重新读取核对；不会自动重试保存' : PinmonyI18n.message('读取失败，请重试'); }
+        this.store.error = write ? '保存结果未确认，请重新读取核对；不会自动重试保存' : PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1"); }
     } finally {
       if (token === this.store.token && generation === this.generation) { this.ownedRequest = false; this.writeDispatched = false; this.store.busy = false; this.store.loading = false; }
     }

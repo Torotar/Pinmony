@@ -196,7 +196,7 @@ export class PinmonyFailureRecoveryCoordinator {
       this.homeStore.homeLoading = false;
       this.homeStore.homeRefreshing = false;
       this.homeStore.homeActionsReady = false;
-      this.homeStore.homeError = message || PinmonyI18n.message('首页连接失败，请重试');
+      this.homeStore.homeError = message || PinmonyI18n.message("pm_home_connection_failed_please_retry_e3e24ceb");
     } else if (failedRoot === 1) {
       const pageKey: string = this.searchUrlFromAddress(url);
       const snapshot: PinmonySearchSnapshot | undefined = this.searchStore.search?.pageKey === pageKey ?
@@ -206,7 +206,7 @@ export class PinmonyFailureRecoveryCoordinator {
       this.searchStore.searchLoading = false;
       this.searchStore.searchActionsReady = false;
       this.searchStore.searchInputReady = false;
-      this.searchStore.searchError = message || PinmonyI18n.message('搜索连接失败，请重试');
+      this.searchStore.searchError = message || PinmonyI18n.message("pm_search_connection_failed_please_retry_33910319");
     } else if (failedRoot === 2) {
       const pageUrl: string = this.inboxUrlFromAddress(url);
       const snapshot: PinmonyInboxSnapshot | undefined = this.inboxStore.inbox?.pageUrl === pageUrl ?
@@ -215,7 +215,7 @@ export class PinmonyFailureRecoveryCoordinator {
       this.inboxStore.inboxLoading = false;
       this.inboxStore.inboxActionsReady = false;
       this.inboxStore.inboxRetainedContent = true;
-      this.inboxStore.inboxError = message || PinmonyI18n.message('收件箱连接失败，请重试');
+      this.inboxStore.inboxError = message || PinmonyI18n.message("pm_inbox_connection_failed_please_retry_252d0d5b");
     } else if (failedRoot === 3) {
       const profileUrl: string = this.profileUrlFromAddress(url);
       const snapshot: PinmonyProfileSnapshot | undefined = this.profileStore.profile?.profileUrl === profileUrl ?
@@ -224,7 +224,7 @@ export class PinmonyFailureRecoveryCoordinator {
       this.profileStore.profileSwitching = false;
       this.profileStore.profileLoading = false;
       this.profileStore.profileActionsReady = false;
-      this.profileStore.profileError = message || PinmonyI18n.message('资料连接失败，请重试');
+      this.profileStore.profileError = message || PinmonyI18n.message("pm_profile_connection_failed_please_retry_5023a1d2");
     } else {
       return false;
     }
@@ -265,7 +265,7 @@ export class PinmonyFailureRecoveryCoordinator {
         this.controller.loadUrl(page);
       } catch (_) {
         this.homeStore.homeLoading = false;
-        this.homeStore.homeError = PinmonyI18n.message('首页连接失败，请重试');
+        this.homeStore.homeError = PinmonyI18n.message("pm_home_connection_failed_please_retry_e3e24ceb");
         PinmonyRuntimeLog.warn('HomeRecovery: reload unavailable, manual retry retained');
       }
     }, 250);
@@ -278,7 +278,7 @@ export class PinmonyFailureRecoveryCoordinator {
     }
     PinmonyRuntimeLog.warn('NavigationFailureTrace: epoch=' + this.authEpoch + ' targetTab=' + this.effectiveRootDocumentTarget().toString() + ' preparing=' + (this.rootReadToken === this.tabRequestToken).toString() + ' foreground=' + (!this.businessSuspended).toString());
     this.rootContextCoordinator.failDocument(url);
-    this.showNetworkNotice(code === -200 ? '网站证书校验失败，请检查网络或代理后重试' : PinmonyI18n.message('网络不稳定，页面加载失败，请重试'));
+    this.showNetworkNotice(code === -200 ? '网站证书校验失败，请检查网络或代理后重试' : PinmonyI18n.message("pm_connection_unstable_unable_to_load_page_please_retry_4dc450df"));
     this.pageHistory.cancelBack();
     this.webPageLoading = false;
     this.webPageLoadFinishedAt = Date.now();
@@ -314,7 +314,7 @@ export class PinmonyFailureRecoveryCoordinator {
       this.boardStore.boardDetail.loading = false;
       this.boardStore.boardDetail.loadingMore = false;
       this.boardStore.boardDetail.refreshing = false;
-      this.boardStore.boardDetail.error = PinmonyI18n.message('图板连接失败，请重试');
+      this.boardStore.boardDetail.error = PinmonyI18n.message("pm_board_connection_failed_please_retry_1fec6693");
       this.loadFailed = false;
       this.failureDetails = '';
       PinmonyRuntimeLog.warn('BoardReturn: synchronization-failed snapshotRetained=true');
@@ -363,7 +363,7 @@ export class PinmonyFailureRecoveryCoordinator {
       this.homeStore.home = cachedHome;
       this.homeStore.homeActionsReady = false;
       this.homeStore.homeLoading = false;
-      if (failedRoot === 0) this.homeStore.homeError = PinmonyI18n.message('首页连接失败，请重试');
+      if (failedRoot === 0) this.homeStore.homeError = PinmonyI18n.message("pm_home_connection_failed_please_retry_e3e24ceb");
       if (!keepDetailForFailedPin) {
         this.clearDetail();
         this.nativeBackTarget = cachedHome.pageKey;

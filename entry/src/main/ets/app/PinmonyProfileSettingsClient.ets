@@ -71,7 +71,7 @@ export class PinmonyProfileSettingsClient {
                 const r: ProfileSettingsResource | undefined = body.resource_response;
                 if (!r || r.status !== 'success' || r.code !== 0 && !(r.code === undefined && r.endpoint_name === 'v3_get_settings_all_notifications') || r.error) {
                     if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)
-                        throw new ProfileSettingsRejected(PinmonyI18n.message('网站拒绝了本次操作'));
+                        throw new ProfileSettingsRejected(PinmonyI18n.message("pm_the_website_rejected_this_action_10efc2d0"));
                     throw new Error('business');
                 }
             }

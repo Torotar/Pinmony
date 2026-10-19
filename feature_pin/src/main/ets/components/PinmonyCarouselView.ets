@@ -38,8 +38,8 @@ export struct PinmonyCarouselView {
           Stack({ alignContent: Alignment.Center }) {
             if (this.failed.includes(item.id)) {
               Column({ space: 12 }) {
-                Text(this.uiText("图片加载失败")).fontColor($r('app.color.primary_text'))
-                Button(this.uiText("重试")).onClick(() => {
+                Text(this.uiText("pm_image_failed_to_load_572993f5")).fontColor($r('app.color.primary_text'))
+                Button(this.uiText("pm_retry_b8784c8d")).onClick(() => {
                   this.failed = this.failed.filter((id: string): boolean => id !== item.id);
                   this.revision++;
                 })
@@ -56,7 +56,7 @@ export struct PinmonyCarouselView {
                   if (!this.failed.includes(item.id)) this.failed = this.failed.concat(item.id);
                 })
                 .onClick(() => { if (this.onImageTap) this.onImageTap(item.imageUrl); })
-                .accessibilityText(this.uiFormat("第 {0} 张，共 {1} 张。{2}", [index + 1, this.carousel.items.length, item.title]))
+                .accessibilityText(this.uiFormat("pm_image_value_of_value_value_66dd48e8", [index + 1, this.carousel.items.length, item.title]))
             }
           }.width('100%').height('100%')
         }, (item: PinmonyCarouselItem): string => `${this.carousel.pinId}:${item.id}:${this.revision}`)
@@ -67,7 +67,7 @@ export struct PinmonyCarouselView {
         .color('#66000000').selectedColor('#EEFFFFFF'))
       .borderRadius(18).clip(true)
       .onChange((index: number) => { this.page = index; })
-      .accessibilityText(this.uiFormat("当前第 {0} 张，共 {1} 张", [this.page + 1, this.carousel.items.length]))
+      .accessibilityText(this.uiFormat("pm_image_value_of_value_2349ba46", [this.page + 1, this.carousel.items.length]))
     }.width('100%')
   }
 }

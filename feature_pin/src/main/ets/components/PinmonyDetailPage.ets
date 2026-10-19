@@ -154,7 +154,7 @@ export struct PinmonyDetailPage {
         style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE }, scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
           backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
-        content: { title: { mainTitle: this.uiText("图片搜索") }, menu: { value: [] }, backIcon: { label: this.uiText("返回"), isEnabled: true,
+        content: { title: { mainTitle: this.uiText("pm_image_search_74a83573") }, menu: { value: [] }, backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: true,
           action: () => { if (this.onImageLayer) this.onImageLayer(''); } } } };
     }
     return {
@@ -169,7 +169,7 @@ export struct PinmonyDetailPage {
       },
       content: {
         title: { mainTitle: '' },
-        backIcon: { isEnabled: true, label: this.uiText("返回"), action: () => { if (this.onBack) this.onBack(); } },
+        backIcon: { isEnabled: true, label: this.uiText("pm_back_572cf45b"), action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: share ? [{ content: {
           icon: $r('app.media.lucide_share_2'), label: share.label,
           isEnabled: this.acceptsActionIntent(share),
@@ -210,7 +210,7 @@ export struct PinmonyDetailPage {
 
   private action(kind: string): PinmonyDetailAction | undefined {
     const item: PinmonyDetailAction | undefined = this.detail.actions.find((value: PinmonyDetailAction): boolean => value.kind === kind);
-    if(!item && kind === 'share' && this.shareActionsReady)return {id:'native-share',kind:'share',label:this.uiText("分享"),countText:'',enabled:true,selected:false};
+    if(!item && kind === 'share' && this.shareActionsReady)return {id:'native-share',kind:'share',label:this.uiText("pm_share_7e564575"),countText:'',enabled:true,selected:false};
     return item;
   }
 
@@ -223,7 +223,7 @@ export struct PinmonyDetailPage {
       const real: PinmonyDetailAction | undefined = available.find((item: PinmonyDetailAction): boolean => item.kind === kind);
       if (real && (this.readsReady || this.detail.imageStageReady && (this.actionsReady || this.postActionsReady && kind === 'like' || this.commentActionsReady && kind === 'comment') ||
           this.detail.kind === 'cached' || this.detail.actionsRetained)) return real;
-      return { id: 'pending-' + kind, kind: kind, label: kind === 'like' ? this.uiText("点赞") : this.uiText("评论"),
+      return { id: 'pending-' + kind, kind: kind, label: kind === 'like' ? this.uiText("pm_like_aced5d7f") : this.uiText("pm_comments_6849b825"),
         countText: '', enabled: false, selected: false };
     });
     return result.concat(available.filter((item: PinmonyDetailAction): boolean => item.kind === 'more'));
@@ -442,7 +442,7 @@ export struct PinmonyDetailPage {
       if (((this.readsReady || this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions) && this.onRelated)
         this.onRelated(pin.id);
     })
-    .accessibilityText(pin.title.length > 0 ? pin.title : this.uiText("打开相关 Pin"))
+    .accessibilityText(pin.title.length > 0 ? pin.title : this.uiText("pm_open_related_pin_e1e5dfc7"))
   }
 
   private relatedColumn(index: number, columnCount: number): PinmonyRelatedPin[] {
@@ -499,11 +499,11 @@ export struct PinmonyDetailPage {
               if (this.detail.imageUrl) this.heroImage()
               if (this.detail.mediaLoading || this.mediaReadBusy) {
                 LoadingProgress().width(28).height(28).color($r('app.color.accent'))
-                  .accessibilityText(this.uiText("正在加载媒体内容"))
+                  .accessibilityText(this.uiText("pm_loading_media_01cf18eb"))
               } else {
                 Column({ space: 12 }) {
-                  Text(PinmonyI18n.render(this.detail.mediaError, this.uiLanguage) || this.uiText("多图内容暂不可用")).fontColor($r('app.color.primary_text'))
-                  Button(this.uiText("重新读取媒体")).onClick(() => { if (this.onVideoRetry) this.onVideoRetry(); })
+                  Text(PinmonyI18n.render(this.detail.mediaError, this.uiLanguage) || this.uiText("pm_carousel_unavailable_093874a4")).fontColor($r('app.color.primary_text'))
+                  Button(this.uiText("pm_reload_media_57dfcd7b")).onClick(() => { if (this.onVideoRetry) this.onVideoRetry(); })
                 }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
               }
             }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
@@ -530,8 +530,8 @@ export struct PinmonyDetailPage {
                 })
                 .onError(() => { if (this.onImageError) this.onImageError(this.detail.pinUrl); })
               Column({ space: 12 }) {
-                Text(PinmonyI18n.render(this.detail.videoError, this.uiLanguage) || this.uiText("暂无可播放视频地址")).fontColor($r('app.color.primary_text'))
-                Button(this.uiText("重新读取视频")).onClick(() => { if (this.onVideoRetry) this.onVideoRetry(); })
+                Text(PinmonyI18n.render(this.detail.videoError, this.uiLanguage) || this.uiText("pm_no_playable_video_url_available_a548116d")).fontColor($r('app.color.primary_text'))
+                Button(this.uiText("pm_reload_video_1472e7f1")).onClick(() => { if (this.onVideoRetry) this.onVideoRetry(); })
               }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
             }.width('100%').borderRadius(18).clip(true)
           } else {
@@ -551,7 +551,7 @@ export struct PinmonyDetailPage {
             }
             Button({ type: ButtonType.Normal }) {
               Row() {
-                Text(this.uiText("搜索图片")).fontSize(14).fontColor(Color.White)
+                Text(this.uiText("pm_search_image_8f938fb8")).fontSize(14).fontColor(Color.White)
                   .width(this.searchLabelVisible ? 64 : 0).opacity(this.searchLabelVisible ? 1 : 0)
                   .maxLines(1).clip(true).animation({ duration: 240, curve: Curve.EaseInOut })
                 SymbolGlyph($r('sys.symbol.circle_viewfinder')).fontSize(24).fontColor([Color.White])
@@ -560,7 +560,7 @@ export struct PinmonyDetailPage {
               .animation({ duration: 240, curve: Curve.EaseInOut }).borderRadius(16).margin(8)
               .backgroundColor('#77303030').enabled(this.actionsReady || this.auxiliaryReady || this.deferredActions)
               .onClick(() => { if (this.onImageLayer) this.onImageLayer('search'); })
-              .accessibilityText(this.uiText("搜索图片中的相关内容"))
+              .accessibilityText(this.uiText("pm_find_related_content_in_this_image_20372b79"))
           }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
           }
 
@@ -572,13 +572,13 @@ export struct PinmonyDetailPage {
     Column({ space: 18 }) {
           if (this.contentError) {
             Text(PinmonyI18n.render(this.contentError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-            if (this.contentRetryable) Button(this.uiText("重试详情")).onClick(() => { if (this.onContentRetry) this.onContentRetry(); })
+            if (this.contentRetryable) Button(this.uiText("pm_retry_loading_details_94912123")).onClick(() => { if (this.onContentRetry) this.onContentRetry(); })
           } else if (!this.actionsReady && !this.readsReady && !this.deferredActions) {
-            Text(this.detail.kind === 'cached' ? this.uiText("正在同步当前帖子状态…") : this.uiText("正在确认帖子内容…"))
+            Text(this.detail.kind === 'cached' ? this.uiText("pm_syncing_pin_status_e1429d05") : this.uiText("pm_verifying_pin_content_cbcfd002"))
               .fontSize(14).fontColor($r('app.color.secondary_text'))
           } else if ((this.detail.actionsRetained || this.detail.commentsRetained || this.detail.relatedRetained) &&
               (this.detail.commentLoading || this.detail.relatedLoading)) {
-            Text(this.uiText("正在同步互动和推荐…")).fontSize(14).fontColor($r('app.color.secondary_text'))
+            Text(this.uiText("pm_syncing_interactions_and_recommendations_d5a043fa")).fontSize(14).fontColor($r('app.color.secondary_text'))
           }
 
           this.videoRetryNotice()
@@ -591,7 +591,7 @@ export struct PinmonyDetailPage {
             }
             Blank()
             if (this.action('save')) {
-              Button(this.saveBusy ? this.uiText("取消中") : PinmonyI18n.render(this.action('save')!.label, this.uiLanguage), { type: ButtonType.Normal })
+              Button(this.saveBusy ? this.uiText("pm_cancelling_75dfaf26") : PinmonyI18n.render(this.action('save')!.label, this.uiLanguage), { type: ButtonType.Normal })
                 .height(44)
                 .padding({ left: 18, right: 18 })
                 .backgroundColor(this.action('save')!.selected ? $r('app.color.detail_saved_surface') : $r('app.color.detail_save_accent'))
@@ -606,7 +606,7 @@ export struct PinmonyDetailPage {
                     this.onAction(item.id, item.kind);
                   }
                 })
-                .accessibilityText(this.saveBusy ? this.uiText("正在取消收藏") : PinmonyI18n.render(this.action('save')!.label, this.uiLanguage))
+                .accessibilityText(this.saveBusy ? this.uiText("pm_unsaving_84e400ee") : PinmonyI18n.render(this.action('save')!.label, this.uiLanguage))
             }
           }
           .width('100%')
@@ -665,7 +665,7 @@ export struct PinmonyDetailPage {
             if (this.expanded || this.textOverflowing) {
               Row() {
                 Blank()
-              Button(this.expanded ? this.uiText("收起") : this.uiText("查看更多"))
+              Button(this.expanded ? this.uiText("pm_show_less_afd4b783") : this.uiText("pm_see_more_92b2b2de"))
                 .height(32)
                 .padding(0)
                 .backgroundColor(Color.Transparent)
@@ -679,21 +679,21 @@ export struct PinmonyDetailPage {
             Button({ type: ButtonType.Normal }) {
               Column({ space: 2 }) {
                 if (this.detail.commentLoading && !this.detail.commentsRetained) {
-                  Text(this.uiText("正在加载评论…")).fontSize(13).fontColor($r('app.color.secondary_text'))
+                  Text(this.uiText("pm_loading_comments_dded3fba")).fontSize(13).fontColor($r('app.color.secondary_text'))
                 } else if (this.detail.commentError) {
                   Text(PinmonyI18n.render(this.detail.commentError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
                 }
                 Text(this.detail.commentPreview || '').fontSize(13).lineHeight(18).maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .fontColor($r('app.color.primary_text')).width('100%')
-                Text(this.uiText("查看所有评论")).fontSize(13).lineHeight(18).fontWeight(FontWeight.Bold)
+                Text(this.uiText("pm_view_all_comments_11ef17e2")).fontSize(13).lineHeight(18).fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text')).width('100%')
               }.width('100%').alignItems(HorizontalAlign.Start)
             }.width('100%').padding(0).borderRadius(0).backgroundColor(Color.Transparent)
               .enabled((this.readsReady || (this.actionsReady && this.detail.kind !== 'cached' && !this.detail.commentsRetained) || this.deferredActions))
               .onClick(() => { if (this.onComments) this.onComments(); })
             if (this.detail.commentError && !this.detail.commentLoading) {
-              Button(this.uiText("重试评论预览"))
+              Button(this.uiText("pm_retry_loading_comment_preview_1703ef13"))
                 .height(32).padding(0).backgroundColor(Color.Transparent)
                 .fontColor($r('app.color.primary_text'))
                 .enabled((this.actionsReady || this.readsReady) && !this.detail.commentsRetained)
@@ -701,7 +701,7 @@ export struct PinmonyDetailPage {
             }
           }
             if (this.detail.sourceLabel.length > 0 && this.action('source')) {
-              Button(this.uiText("访问网站"))
+              Button(this.uiText("pm_visit_website_04913c22"))
                 .width('100%')
                 .height(50)
                 .backgroundColor($r('app.color.surface_muted'))
@@ -715,7 +715,7 @@ export struct PinmonyDetailPage {
                     this.onAction(item.id, item.kind);
                   }
                 })
-                .accessibilityText(this.uiText("访问网站，") + this.detail.sourceLabel)
+                .accessibilityText(this.uiText("pm_visit_website_ac9d562e") + this.detail.sourceLabel)
             }
           }
           .width('100%')
@@ -723,8 +723,8 @@ export struct PinmonyDetailPage {
 
           if (this.canUndoMore) {
             Row({ space: 12 }) {
-              Text(this.uiText("已提交查看更多反馈")).fontColor($r('app.color.primary_text')).layoutWeight(1)
-              Button(this.uiText("撤销")).enabled(!this.undoMoreBusy).onClick(() => { if (this.onUndoMore) this.onUndoMore(); })
+              Text(this.uiText("pm_see_more_feedback_submitted_a391370a")).fontColor($r('app.color.primary_text')).layoutWeight(1)
+              Button(this.uiText("pm_undo_926a50b9")).enabled(!this.undoMoreBusy).onClick(() => { if (this.onUndoMore) this.onUndoMore(); })
             }.width('100%')
           }
     }.width(this.detailPaneWidth()).alignItems(HorizontalAlign.Start)
@@ -746,15 +746,15 @@ export struct PinmonyDetailPage {
           if (this.detail.kind === 'cached' && !this.detail.relatedLoading && this.detail.relatedError) {
             Text(PinmonyI18n.render(this.detail.relatedError, this.uiLanguage))
               .fontSize(14).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("加载推荐")).enabled(this.deferredActions || this.readsReady || this.actionsReady)
+            Button(this.uiText("pm_load_recommendations_08df83f8")).enabled(this.deferredActions || this.readsReady || this.actionsReady)
               .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
           }
           if (this.detail.kind !== 'cached' && this.detail.dataSource === 'api' && (this.actionsReady || this.readsReady)) {
             if (!this.detail.relatedLoading && this.detail.relatedError) {
               Text(PinmonyI18n.render(this.detail.relatedError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-              Button(this.uiText("重试推荐")).onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+              Button(this.uiText("pm_retry_recommendations_83cd903e")).onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
             } else if (this.detail.relatedEnded && this.detail.related.length === 0) {
-              Text(this.uiText("暂无推荐内容")).fontSize(14).fontColor($r('app.color.secondary_text'))
+              Text(this.uiText("pm_no_recommendations_yet_841e1d2f")).fontSize(14).fontColor($r('app.color.secondary_text'))
             }
           }
 
@@ -803,11 +803,11 @@ export struct PinmonyDetailPage {
         Column({ space: 18 }) {
           this.detailHeader()
           if (this.detail.dataSource === 'api' && !this.isRecommendReady()) {
-            Text(this.uiText("更多探索内容")).fontSize(23).fontWeight(FontWeight.Bold)
+            Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
             this.recommendationSkeleton()
           } else if (this.detail.related.length > 0 && this.isRecommendReady()) {
-            Text(this.uiText("更多探索内容"))
+            Text(this.uiText("pm_more_to_explore_f7cba896"))
               .fontSize(23)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text'))
@@ -870,7 +870,7 @@ export struct PinmonyDetailPage {
       Row({ space: 8 }) {
         Text(PinmonyI18n.render(this.detail.videoError || this.videoFailure, this.uiLanguage)).fontSize(13)
           .fontColor($r('app.color.secondary_text')).maxLines(3).layoutWeight(1)
-        Button(this.uiText("重试")).fontSize(13).height(44).enabled(this.videoActive && (this.actionsReady || !!this.detail.videoError))
+        Button(this.uiText("pm_retry_b8784c8d")).fontSize(13).height(44).enabled(this.videoActive && (this.actionsReady || !!this.detail.videoError))
           .onClick(() => {
             if (this.detail.videoError) { if (this.onVideoRetry) this.onVideoRetry(); }
             else {
@@ -878,8 +878,8 @@ export struct PinmonyDetailPage {
               this.videoRetryRevision = (this.videoRetryRevision + 1) % 1000000;
             }
           })
-        Button(this.uiText("重读地址")).fontSize(13).height(44).enabled(this.videoActive && !!this.onVideoRetry)
-          .accessibilityText(this.uiText("重新读取视频地址"))
+        Button(this.uiText("pm_reload_url_84763306")).fontSize(13).height(44).enabled(this.videoActive && !!this.onVideoRetry)
+          .accessibilityText(this.uiText("pm_reload_video_url_f620176f"))
           .onClick(() => {
             PinmonyRuntimeLog.info('VideoTrace: openId=' + this.traceId.toString() + ' event=refresh-requested');
             if (this.onVideoRetry) this.onVideoRetry();

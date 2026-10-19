@@ -52,7 +52,7 @@ export struct PinmonyVideoCard {
       if (this.video.duration > 0) {
         Text(this.durationText()).fontSize(14).fontWeight(FontWeight.Medium).fontColor('#111111')
           .padding({ left: 6, right: 6, top: 2, bottom: 2 }).backgroundColor('#EFFFFFFF')
-          .borderRadius(7).margin({ left: 5, top: 5 }).accessibilityText(this.uiText("视频时长 ") + this.durationText())
+          .borderRadius(7).margin({ left: 5, top: 5 }).accessibilityText(this.uiText("pm_video_duration_9d94bbe8") + this.durationText())
       }
     }.width('100%').height('100%').borderRadius(18).clip(true)
       .backgroundColor($r('app.color.surface_muted'))

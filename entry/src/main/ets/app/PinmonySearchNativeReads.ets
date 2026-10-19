@@ -137,7 +137,7 @@ export class PinmonySearchNativeReads {
     const live = (): boolean => this.owned() && revision === this.suggestionRevision && page === this.page && this.term === '';
     item.deleting = true;this.apply();
     try {if(await this.auxiliary.deleteHistory(query,live) && live()){this.suggestions = this.suggestions.filter((s: PinmonySearchSuggestion): boolean => s.id !== id);this.apply();}}
-    catch (_) {if(live()){item.deleting = false;item.deletable = !this.auxiliary.historyLocked(query);this.suggestionError = item.deletable ? '删除未提交成功，请重试' : PinmonyI18n.message('删除结果未确认，请刷新历史核对；不会重复提交');this.apply();}}
+    catch (_) {if(live()){item.deleting = false;item.deletable = !this.auxiliary.historyLocked(query);this.suggestionError = item.deletable ? '删除未提交成功，请重试' : PinmonyI18n.message("pm_deletion_not_confirmed_refresh_history_to_check_it_will_not_be_r_c0622bda");this.apply();}}
   }
   eligible(): boolean {
     const session: PinmonyBusinessSessionContext = this.ports.session();
@@ -202,7 +202,7 @@ export class PinmonySearchNativeReads {
   async refresh(): Promise<void> { if (this.bind() && this.query(this.page) && !this.busy && !this.boardFollow.pending() && !this.userFollow.pending()) await this.read(false); }
   async more(): Promise<void> { if (!this.bind() || this.busy) return; const feed: ReadFeed | undefined = this.feeds.get(this.page); if (feed?.snapshot.apiEnded && !this.error) return; await this.read(!!feed?.cursor && feed.cursor !== '-end-'); }
   navigate(target: string): boolean {
-    if (!this.bind() || !this.supported(target) || !this.query(target)) { this.store.searchError = PinmonyI18n.message('当前筛选参数的原生契约尚未确认'); return false; }
+    if (!this.bind() || !this.supported(target) || !this.query(target)) { this.store.searchError = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); return false; }
     const previous: ReadFeed | undefined = this.feeds.get(this.page); const cached: number | undefined = this.store.searchCache.get(this.page)?.scrollOffset; if(previous && cached !== undefined) previous.scroll = cached;
     this.pause(false); this.ports.navigate(target); this.page = target; this.term = undefined; this.suggestions = []; this.error = '';
     const feed: ReadFeed | undefined = this.feeds.get(target); this.store.searchScrollOffset = feed?.scroll || 0;
@@ -289,7 +289,7 @@ export class PinmonySearchNativeReads {
   }
   private async read(append: boolean): Promise<void> {
     const revision: number = this.revision; const page: string = this.page; const live = (): boolean => revision === this.revision && this.owned() && page === this.page;
-    if (!this.supported(page)) { this.error = PinmonyI18n.message('当前筛选参数的原生契约尚未确认'); this.apply(); return; }
+    if (!this.supported(page)) { this.error = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); this.apply(); return; }
     const feed: ReadFeed | undefined = this.feeds.get(page); const cursor: string = append ? feed?.cursor || '' : '';
     this.busy = true; this.error = ''; this.apply();
     const options: SearchReadOptions = { query: this.query(page), scope: page.slice(this.origin.length).split('?')[0].split('/')[2] || 'pins', appliedProductFilters: '---', domains: null, user: null, seoDrawerEnabled: false, applied_unified_filters: null, auto_correction_disabled: false, filter_genai: false, journey_depth: null, source_id: this.param(page,'source_id'), source_module_id: null, source_url: page.slice(this.origin.length), static_feed: false, selected_one_bar_modules: null, query_pin_sigs: null, page_size: 25, gated: null, price_max: null, price_min: null, query_image_pins: null, request_params: null, top_pin_ids: this.param(page,'top_pin_ids') || null, article: null, corpus: null, filters: null, rs: this.param(page,'rs') || 'typed' };
@@ -318,7 +318,7 @@ export class PinmonySearchNativeReads {
       const value: ReadFeed = { product: resource.data.productFilters, snapshot: snapshot, cursor: next, filters: [], targets: new Map<string,string>(), modules: Array.isArray(resource.data.oneBarModules), filterCursor: next && next !== '-end-' ? next : feed?.filterCursor || '', scroll: this.store.searchScrollOffset };
       this.mapModules(resource.data.oneBarModules || [], value); this.feeds.set(page,value); if (this.feeds.size > 12) { const oldest: string | undefined = this.feeds.keys().next().value; if (oldest && oldest !== page) this.feeds.delete(oldest); }
       this.store.searchResultsResetPending = false; PinmonyRuntimeLog.info('SearchNativeTrace: results committed append=' + append.toString() + ' count=' + results.length.toString());
-    } catch (_) { if (live()) this.error = append ? '更多搜索结果读取失败，请重试' : PinmonyI18n.message('搜索结果读取失败，请重试'); }
+    } catch (_) { if (live()) this.error = append ? '更多搜索结果读取失败，请重试' : PinmonyI18n.message("pm_unable_to_load_search_results_please_retry_27aeffd1"); }
     finally { if (revision === this.revision && page === this.page) { this.busy = false; if (live()) this.apply(); this.ports.settled(); } }
   }
   async input(term: string, immediate: boolean = false): Promise<void> {
@@ -335,7 +335,7 @@ export class PinmonySearchNativeReads {
         if (!live()) return; if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error('suggestion-request');
         const resource: Resource = (JSON.parse(reply.body) as ResponseData).resource_response; if (resource?.status !== 'success' || !Array.isArray(resource.data?.items)) throw new Error('suggestion-response');
         const values: PinmonySearchSuggestion[] = []; resource.data.items.slice(0,40).forEach((item: Suggestion,index: number): void => { const label: string = item?.display_query || item?.query || item?.label || ''; if (!label.trim() || label.length > 300 || values.some((v: PinmonySearchSuggestion): boolean => v.label === label.trim())) return; values.push({ id: 'native-suggestion-' + version.toString() + '-' + index.toString(), label: label.trim(), query: typeof item.query === 'string' && item.query.length <= 300 ? item.query : '', enabled: true, historyType: item.type || '', deletable: term === '' && item.type === 'recent_query' && item.vertical === 'pins' && typeof item.query === 'string' && !!item.query.trim() && !this.auxiliary.historyLocked(item.query) }); }); this.suggestions = values;
-      } catch (_) { if (live()) this.suggestionError = PinmonyI18n.message('搜索建议读取失败，请重试'); }
+      } catch (_) { if (live()) this.suggestionError = PinmonyI18n.message("pm_unable_to_load_search_suggestions_please_retry_547b05bc"); }
       finally { if (live()) { this.suggestionBusy = false; this.apply(); } }
     };
     if (immediate || !term) await load(); else this.suggestionTimer = setTimeout((): void => { load(); },250);
@@ -356,14 +356,14 @@ export class PinmonySearchNativeReads {
   async filters(): Promise<void> {
     if (!this.bind()) return; const page: string = this.page; const feed: ReadFeed | undefined = this.feeds.get(page); const token: number = ++this.filterRevision; const panel: number = this.store.searchFilterToken; const revision: number = this.revision;
     const live = (): boolean => this.owned() && page === this.page && token === this.filterRevision && panel === this.store.searchFilterToken && revision === this.revision;
-    if (!feed) { this.store.searchFilterLoading = false; this.store.searchFilterError = PinmonyI18n.message('请等待搜索结果读取完成后重试'); return; }
+    if (!feed) { this.store.searchFilterLoading = false; this.store.searchFilterError = PinmonyI18n.message("pm_wait_for_search_results_to_finish_loading_then_retry_5baf3b75"); return; }
     this.store.searchProductDomains = [];this.store.searchProductCurrency = '';this.store.searchProductPrices = false;this.store.searchProductError = '';
     this.store.searchProductMin = this.param(page,'price_min');this.store.searchProductMax = this.param(page,'price_max');
     if(page.startsWith(this.origin + '/search/buyable_pins/')) {
       const chosen: string[] = this.param(page,'domains').split(',');
       (feed.product?.domainFilters || []).slice(0,50).forEach((domain: ProductDomain): void => {
         if(domain && typeof domain.domain === 'string' && /^[a-z0-9.-]+\.[a-z]{2,63}$/.test(domain.domain) && typeof domain.label === 'string')
-          this.store.searchProductDomains.push({id:domain.domain,label:domain.label.slice(0,100),selected:chosen.includes(domain.domain),enabled:true,group:PinmonyI18n.message('商家')});
+          this.store.searchProductDomains.push({id:domain.domain,label:domain.label.slice(0,100),selected:chosen.includes(domain.domain),enabled:true,group:PinmonyI18n.message("pm_merchants_d5bae996")});
       });
       const prices: ProductPrices | undefined = feed.product?.priceFilters;
       if(prices && /^[A-Z]{3}$/.test(prices.currency_type) && Number.isFinite(prices.min_value) && Number.isFinite(prices.max_value) && prices.min_value >= 0 && prices.max_value >= prices.min_value) {
@@ -384,8 +384,8 @@ export class PinmonySearchNativeReads {
         resource.data.slice(0,20).forEach((filter: FilterItem): void => { if(filter?.type !== 'filter' || !Array.isArray(filter.filter_options))return; filter.filter_options.slice(0,50).forEach((item: FilterItem): void => { if(item?.type !== 'filteroption' || !item.label?.trim())return; const scope: string = ['pins','videos','boards','users','buyable_pins'].includes(item.id || '') ? item.id || '' : labels[item.label] || ''; const id: string = 'native-filter-' + options.length.toString(); options.push({id:id,label:this.filterLabel(scope, item.label.trim().slice(0,70)),group:filter.title?.slice(0,70) || '',selected:item.is_selected === true,enabled:!!scope && !item.disabled && !item.is_disabled}); if(scope)targets.set(id,this.origin+'/search/'+scope+'/?q='+encodeURIComponent(this.query(page))+'&rs=content_type_filter'); }); });
         if(resource.data.length && !options.length)throw new Error('unknown-filters'); feed.filters = options; feed.targets = targets;
       }
-      if(live()) { this.store.searchFilterOptions = feed.filters.slice(); if(!feed.filters.length && !this.store.searchProductPrices && !this.store.searchProductDomains.length)this.store.searchFilterError = PinmonyI18n.message('当前搜索没有可用的筛选选项'); }
-    } catch (_) { if(live())this.store.searchFilterError = PinmonyI18n.message('筛选选项读取失败，请重试'); }
+      if(live()) { this.store.searchFilterOptions = feed.filters.slice(); if(!feed.filters.length && !this.store.searchProductPrices && !this.store.searchProductDomains.length)this.store.searchFilterError = PinmonyI18n.message("pm_no_filters_available_for_this_search_7a80df5e"); }
+    } catch (_) { if(live())this.store.searchFilterError = PinmonyI18n.message("pm_unable_to_load_filters_please_retry_7c8fa733"); }
     finally { if(live())this.store.searchFilterLoading = false; }
   }
   filterTarget(id: string): string {
@@ -404,7 +404,7 @@ export class PinmonySearchNativeReads {
         if(input.max)target += '&price_max=' + encodeURIComponent(input.max);
         if(!this.supported(target))throw new Error('range');
         this.store.searchProductError = '';return target;
-      } catch (_) {this.store.searchProductError = PinmonyI18n.message('请输入有效的整数价格范围，最低价不能高于最高价');return '';}
+      } catch (_) {this.store.searchProductError = PinmonyI18n.message("pm_enter_a_valid_whole_number_price_range_minimum_cannot_exceed_max_2a617055");return '';}
     }
     return this.owned() && feed?.filters.some((item: PinmonySearchFilterOption): boolean => item.id === id && item.enabled && !item.selected) ? feed.targets.get(id) || '' : '';
   }

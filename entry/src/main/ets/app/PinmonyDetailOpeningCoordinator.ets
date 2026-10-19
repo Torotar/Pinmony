@@ -53,7 +53,7 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
         token === this.pinStore.detailOpeningToken && (this.pinStore.detailOpeningPin === pinUrl || this.pinStore.detailPin === pinUrl) && !this.ports.nativeBackTarget();
     this.ports.coordinatorTasks().timeout(() => {
         if (current() && !this.pinStore.detailActionsReady && !this.pinStore.detailNativeReadsReady)
-            this.pinStore.detailApiError = PinmonyI18n.message('帖子加载超时，请重试');
+            this.pinStore.detailApiError = PinmonyI18n.message("pm_pin_loading_timed_out_please_retry_b940342e");
     }, 12000);
     this.pinStore.detailPrefetch.open(pinUrl, async (url: string, id: string, ownerCurrent: () => boolean): Promise<string> => {
         this.ports.detailRequestOwners().set(id, this.ports.detailJourney().current());
@@ -128,7 +128,7 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
             this.ports.detailJourney().mark('base.failed');
         if (current())
             this.pinStore.detailApiError = error.message === 'network-unavailable' ?
-                PinmonyI18n.message('网络连接失败，帖子未能加载，请重试') : PinmonyI18n.message('帖子加载失败，请重试');
+                PinmonyI18n.message("pm_connection_failed_pin_could_not_load_please_retry_3ed4ae9b") : PinmonyI18n.message("pm_unable_to_load_pin_please_retry_252ec41d");
     });
 }
 

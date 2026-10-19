@@ -113,7 +113,7 @@ export struct PinmonyVideoPlayer {
         if (this.state.phase === 'playing') {
           Button({ type: ButtonType.Normal }) { Column().width('100%').height('100%') }
             .width('100%').height('100%').padding(0).backgroundColor(Color.Transparent)
-            .enabled(this.active && this.sessionReady && !this.readingAddress).accessibilityText(this.uiText("暂停视频")).onClick(() => this.playback.toggle())
+            .enabled(this.active && this.sessionReady && !this.readingAddress).accessibilityText(this.uiText("pm_pause_video_550c18fe")).onClick(() => this.playback.toggle())
         }
         if (this.readingAddress || this.state.phase === 'loading' || this.state.buffering ||
             !this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
@@ -122,7 +122,7 @@ export struct PinmonyVideoPlayer {
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.video_play')).width(32).height(32)
           }.width(64).height(64).padding(0).backgroundColor('#66000000')
-            .accessibilityText(this.state.phase === 'error' ? this.uiText("重试播放") : this.state.phase === 'completed' ? this.uiText("重播") : this.uiText("播放"))
+            .accessibilityText(this.state.phase === 'error' ? this.uiText("pm_retry_playback_f867a4c8") : this.state.phase === 'completed' ? this.uiText("pm_replay_4c5a69ac") : this.uiText("pm_play_c3396195"))
             .enabled(this.active && this.sessionReady && !this.readingAddress).onClick(() => this.playback.toggle())
         }
       Column() {
@@ -138,12 +138,12 @@ export struct PinmonyVideoPlayer {
             if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
               this.dragging = false; this.playback.seek(value);
             }
-          }).accessibilityText(this.uiText("视频播放进度"))
+          }).accessibilityText(this.uiText("pm_video_progress_73fbb1f1"))
         Text(this.time(this.state.duration)).fontSize(12).fontColor(Color.White)
         Button({ type: ButtonType.Normal }) {
           Image(this.state.muted ? $r('app.media.video_muted') : $r('app.media.video_volume')).width(22).height(22)
         }.width(40).height(40).padding(0).backgroundColor(Color.Transparent)
-          .accessibilityText(this.state.muted ? this.uiText("取消静音") : this.uiText("静音")).onClick(() => this.playback.mute())
+          .accessibilityText(this.state.muted ? this.uiText("pm_unmute_8d01732e") : this.uiText("pm_mute_7db2e189")).onClick(() => this.playback.mute())
       }.width('100%').padding({ left: 12, right: 6, bottom: 4 })
         .backgroundColor('#22000000')
       }.width('100%').height('100%').justifyContent(FlexAlign.End)
@@ -152,13 +152,13 @@ export struct PinmonyVideoPlayer {
         Math.max(0.5, Math.min(2, this.video.width / this.video.height)) : 0.5625)
       .backgroundColor(Color.Black)
       if (this.readingAddress) {
-        Text(this.uiText("正在读取视频地址")).fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
-          .accessibilityText(this.uiText("正在读取视频地址，请稍候"))
+        Text(this.uiText("pm_loading_video_url_3669a32d")).fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
+          .accessibilityText(this.uiText("pm_loading_video_url_please_wait_3788d096"))
       } else if (this.state.phase === 'loading' && this.state.loadingStage !== 'download') {
-        Text(this.uiText("正在准备视频"))
+        Text(this.uiText("pm_preparing_video_d20d6092"))
           .fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
       } else if (!this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
-        Text(this.uiText("正在加载视频画面")).fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
+        Text(this.uiText("pm_loading_video_843966d2")).fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
       }
     }.width('100%').borderRadius(18).clip(true).backgroundColor($r('app.color.surface_muted'))
     .onVisibleAreaChange([0, 0.1], (visible: boolean, ratio: number) => {

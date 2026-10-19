@@ -54,14 +54,14 @@ export struct PinmonyCommentsSheet {
     const time: number = Date.parse(value);
     if (!Number.isFinite(time)) return '';
     const minutes: number = Math.max(0, Math.floor((Date.now() - time) / 60000));
-    if (minutes < 1) return this.uiText("刚刚");
-    if (minutes < 60) return minutes.toString() + this.uiText("分钟");
+    if (minutes < 1) return this.uiText("pm_just_now_de6785d9");
+    if (minutes < 60) return minutes.toString() + this.uiText("pm_m_bd957bc4");
     const hours: number = Math.floor(minutes / 60);
-    if (hours < 24) return hours.toString() + this.uiText("小时");
+    if (hours < 24) return hours.toString() + this.uiText("pm_h_3b6fefc5");
     const days: number = Math.floor(hours / 24);
-    if (days < 30) return days.toString() + this.uiText("天");
-    if (days < 365) return Math.floor(days / 30).toString() + this.uiText("个月");
-    return Math.floor(days / 365).toString() + this.uiText("年");
+    if (days < 30) return days.toString() + this.uiText("pm_d_49da61ce");
+    if (days < 365) return Math.floor(days / 30).toString() + this.uiText("pm_mo_e5afd16c");
+    return Math.floor(days / 365).toString() + this.uiText("pm_y_62ef900a");
   }
 
   private commentKey(item: PinmonyComment): string {
@@ -105,17 +105,17 @@ export struct PinmonyCommentsSheet {
           Button({ type: ButtonType.Normal }) {
             Row({ space: 5 }) {
               if (item.translationLoading) { LoadingProgress().width(14).height(14).color($r('app.color.accent')) }
-              Text(item.translationLoading ? this.uiText("翻译中…") : item.translationVisible ? this.uiText("显示原文") :
-                item.translatedText ? this.uiText("显示译文") : item.translationError ? this.uiText("重新翻译") : this.uiText("翻译"))
+              Text(item.translationLoading ? this.uiText("pm_translating_07f81963") : item.translationVisible ? this.uiText("pm_show_original_098e6618") :
+                item.translatedText ? this.uiText("pm_show_translation_7cd62999") : item.translationError ? this.uiText("pm_translate_again_496b5f08") : this.uiText("pm_translate_a52a0833"))
                 .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
             }
           }.height(32).padding({ left: 0, right: 4 }).backgroundColor(Color.Transparent)
             .enabled(!item.translationLoading && !this.result.loading && !this.result.busy && !this.result.uncertain)
             .onClick(() => { if (this.onTranslate) this.onTranslate(item.id); })
-            .accessibilityText(item.translationVisible ? this.uiText("显示评论原文") : this.uiText("翻译评论"))
+            .accessibilityText(item.translationVisible ? this.uiText("pm_show_original_comment_373f6052") : this.uiText("pm_translate_comment_8a5fdd65"))
         }
         if (item.canReply) {
-          Text(this.uiText("回复")).fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+          Text(this.uiText("pm_reply_cf945e21")).fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
             .onClick(() => {
               if (!this.result.busy && !this.result.uncertain) { this.target = item; this.editing = false; this.photoUri = ''; }
             })
@@ -132,14 +132,14 @@ export struct PinmonyCommentsSheet {
           }.height(32).padding({ left: 0, right: 8 }).backgroundColor(Color.Transparent)
             .enabled(!item.busy && !this.result.loading && !this.result.busy && !this.result.uncertain)
             .onClick(() => { if (this.onLike) this.onLike(item.id); })
-            .accessibilityText((item.liked ? this.uiText("取消点赞") : this.uiText("点赞")) + '，' + (item.likeCount || 0).toString())
+            .accessibilityText((item.liked ? this.uiText("pm_unlike_3ab399c7") : this.uiText("pm_like_aced5d7f")) + '，' + (item.likeCount || 0).toString())
         }
         if (item.canEdit || item.canDelete) {
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.lucide_ellipsis')).width(18).height(18).fillColor($r('app.color.primary_text'))
           }.width(28).height(28).backgroundColor(Color.Transparent).enabled(!this.result.busy && !this.result.uncertain)
             .onClick(() => { this.menuItem = item; this.deleteOpen = false; this.menuOpen = true; })
-            .accessibilityText(this.uiText("评论选项"))
+            .accessibilityText(this.uiText("pm_comment_options_8216ef81"))
         }
         }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -154,7 +154,7 @@ export struct PinmonyCommentsSheet {
       }
       if (this.result.items.length === 0 && this.result.loading) {
         LoadingProgress().width(32).height(32)
-        Text(this.uiText("正在加载评论…")).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("pm_loading_comments_dded3fba")).fontColor($r('app.color.secondary_text'))
         Blank().layoutWeight(1)
       } else {
         List({ space: 18 }) {
@@ -166,7 +166,7 @@ export struct PinmonyCommentsSheet {
                   Button({ type: ButtonType.Normal }) {
                     Row({ space: 8 }) {
                       Divider().width(28).color($r('app.color.secondary_text'))
-                      Text(item.repliesOpen ? this.uiText("收起回复") : this.uiText("查看 ") + item.replyCount + this.uiText(" 条回复"))
+                      Text(item.repliesOpen ? this.uiText("pm_hide_replies_c6edf966") : this.uiText("pm_view_9ae8f7e3") + item.replyCount + this.uiText("pm_replies_37b37671"))
                         .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
                     }
                   }.height(32).padding(0).backgroundColor(Color.Transparent).margin({ left: 42 })
@@ -183,9 +183,9 @@ export struct PinmonyCommentsSheet {
                     }, (reply: PinmonyComment) => this.commentKey(reply))
                     if (item.repliesError) {
                       Text(item.repliesError).fontSize(12).fontColor($r('app.color.secondary_text'))
-                      Button(this.uiText("重新读取回复")).onClick(() => { if (this.onReplies) this.onReplies(item.id); })
+                      Button(this.uiText("pm_reload_replies_e32b3f23")).onClick(() => { if (this.onReplies) this.onReplies(item.id); })
                     } else if (!item.repliesLoading && !(item.replies || []).length) {
-                      Text(this.uiText("暂无回复")).fontSize(12).fontColor($r('app.color.secondary_text'))
+                      Text(this.uiText("pm_no_replies_yet_1ff6ef41")).fontSize(12).fontColor($r('app.color.secondary_text'))
                     }
                   }.width('100%').padding({ left: 42 }).alignItems(HorizontalAlign.Start)
                 }
@@ -196,14 +196,14 @@ export struct PinmonyCommentsSheet {
             Column({ space: 12 }) {
               if (this.result.error) {
                 Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-                Button(this.uiText("重试")).onClick(() => {
+                Button(this.uiText("pm_retry_b8784c8d")).onClick(() => {
                   if (this.result.items.length && this.onMore) this.onMore();
                   else if (this.onRetry) this.onRetry();
                 })
               } else if (this.result.loading) {
                 LoadingProgress().width(28).height(28)
               } else if (this.result.items.length === 0) {
-                Text(this.uiText("写评论，分享反馈，或者击个掌开始对话")).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
+                Text(this.uiText("pm_write_a_comment_share_feedback_or_send_a_high_five_2ef32875")).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
                   .margin({ top: 140 })
 
               }
@@ -228,14 +228,14 @@ export struct PinmonyCommentsSheet {
       if (this.target) {
         Column({ space: 6 }) {
           Row() {
-            Text(this.editing ? this.uiText("编辑你的评论") : this.uiText("回复 ") + this.target.name).fontSize(13).fontWeight(FontWeight.Bold)
+            Text(this.editing ? this.uiText("pm_edit_your_comment_398c2214") : this.uiText("pm_reply_to_3376176c") + this.target.name).fontSize(13).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).layoutWeight(1)
             Button({ type: ButtonType.Circle }) {
               Image($r('app.media.image_close')).width(16).height(16)
             }.width(28).height(28).backgroundColor(Color.Transparent)
               .enabled(!this.result.busy)
               .onClick(() => { this.target = undefined; this.editing = false; this.draft = ''; })
-              .accessibilityText(this.uiText("取消回复"))
+              .accessibilityText(this.uiText("pm_cancel_reply_d346633d"))
           }
           if (!this.editing) { Text(this.target.text).fontSize(12).fontColor($r('app.color.secondary_text')).width('100%') }
         }.width('100%').padding(10).backgroundColor($r('app.color.surface_muted'))
@@ -249,13 +249,13 @@ export struct PinmonyCommentsSheet {
                 Image($r('app.media.image_close')).width(15).height(15)
               }.width(26).height(26).margin({ top: -2, right: -2 })
                 .backgroundColor('#CC303136').enabled(!this.result.busy)
-                .onClick(() => { this.photoUri = ''; }).accessibilityText(this.uiText("移除已选图片"))
+                .onClick(() => { this.photoUri = ''; }).accessibilityText(this.uiText("pm_remove_selected_image_37e8126a"))
             }.width(82).height(110)
             Blank()
           }.width('100%')
         }
         Row({ space: 8 }) {
-          TextInput({ text: this.draft, placeholder: this.editing ? this.uiText("编辑你的评论") : this.target ? this.uiText("回复 ") + this.target.name : this.uiText("添加评论") })
+          TextInput({ text: this.draft, placeholder: this.editing ? this.uiText("pm_edit_your_comment_398c2214") : this.target ? this.uiText("pm_reply_to_3376176c") + this.target.name : this.uiText("pm_add_a_comment_c56d162d") })
             .maxLength(5000).layoutWeight(1).backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
             .padding({ left: 4, right: 4 }).enabled(!this.result.busy && !this.result.uncertain)
             .onChange((value: string) => { this.draft = value; })
@@ -263,7 +263,7 @@ export struct PinmonyCommentsSheet {
             Button({ type: ButtonType.Circle }) {
               SymbolGlyph($r('sys.symbol.picture')).fontSize(24).fontColor([$r('app.color.primary_text')])
             }.width(32).height(32).backgroundColor(Color.Transparent).enabled(!this.result.busy && !this.result.uncertain && !this.choosing)
-              .onClick(() => this.pickImage()).accessibilityText(this.uiText("添加图片"))
+              .onClick(() => this.pickImage()).accessibilityText(this.uiText("pm_add_image_9f0d4e46"))
           }
           Button({ type: ButtonType.Normal }) {
             if (this.result.busy) { LoadingProgress().width(20).height(20) }
@@ -271,7 +271,7 @@ export struct PinmonyCommentsSheet {
               .fontSize(20).fontColor([$r('app.color.detail_on_accent')]) }
           }.width(32).height(32).borderRadius(10).backgroundColor($r('app.color.accent'))
             .enabled(!this.result.loading && !this.result.busy && !this.result.uncertain && !this.choosing && (!!this.draft.trim() || !!this.photoUri))
-            .onClick(() => this.send()).accessibilityText(this.editing ? this.uiText("保存评论") : this.uiText("发送评论"))
+            .onClick(() => this.send()).accessibilityText(this.editing ? this.uiText("pm_save_comment_80c50b4a") : this.uiText("pm_send_comment_d25f5715"))
         }.width('100%')
       }.width('100%').padding(10).borderRadius(24).border({ width: 1, color: $r('app.color.secondary_text') })
     }.width('100%')
@@ -281,12 +281,12 @@ export struct PinmonyCommentsSheet {
   private commentMenu() {
     Column({ space: 16 }) {
       if (this.deleteOpen) {
-        Text(this.uiText("你确定吗？")).fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-        Text(this.uiText("此评论将被删除")).fontSize(16).fontColor($r('app.color.primary_text'))
+        Text(this.uiText("pm_are_you_sure_8889016c")).fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text(this.uiText("pm_this_comment_will_be_deleted_0b66ff46")).fontSize(16).fontColor($r('app.color.primary_text'))
         Row({ space: 12 }) {
-          Button(this.uiText("取消")).layoutWeight(1).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+          Button(this.uiText("pm_cancel_2cd0f3be")).layoutWeight(1).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
             .onClick(() => { this.deleteOpen = false; })
-          Button(this.uiText("删除")).layoutWeight(1).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
+          Button(this.uiText("pm_delete_2f9daa82")).layoutWeight(1).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
             .onClick(() => {
               if (this.menuItem && this.onWrite && !this.result.busy && !this.result.uncertain)
                 this.onWrite(JSON.stringify({ action: 'delete', id: this.menuItem.id, text: '' }));
@@ -295,13 +295,13 @@ export struct PinmonyCommentsSheet {
         }.width('100%')
       } else {
         if (this.menuItem?.canEdit) {
-          Text(this.uiText("编辑")).width('100%').fontSize(17).fontColor($r('app.color.primary_text')).padding({ top: 10, bottom: 10 })
+          Text(this.uiText("pm_edit_05183656")).width('100%').fontSize(17).fontColor($r('app.color.primary_text')).padding({ top: 10, bottom: 10 })
             .onClick(() => {
               this.target = this.menuItem; this.editing = true; this.draft = this.menuItem?.text || ''; this.photoUri = ''; this.menuOpen = false;
             })
         }
         if (this.menuItem?.canDelete) {
-          Text(this.uiText("删除")).width('100%').fontSize(17).fontColor($r('app.color.primary_text')).padding({ top: 10, bottom: 10 })
+          Text(this.uiText("pm_delete_2f9daa82")).width('100%').fontSize(17).fontColor($r('app.color.primary_text')).padding({ top: 10, bottom: 10 })
             .onClick(() => { this.deleteOpen = true; })
         }
       }

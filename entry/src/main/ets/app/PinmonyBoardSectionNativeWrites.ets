@@ -30,7 +30,7 @@ export class PinmonyBoardSectionNativeWrites {
   pause(): void {
     this.revision++;if(this.job)this.ports.network().cancel(this.job);this.cancelWait?.();this.cancelWait = undefined;
     if(this.job && this.ports.state()?.busy){const flow: PinmonyBoardFlow = JSON.parse(JSON.stringify(this.ports.state())) as PinmonyBoardFlow;
-      flow.busy = false;flow.uncertain = true;flow.error = PinmonyI18n.message('操作结果未确认，请刷新核对；不会重复提交');this.ports.changed(flow);}
+      flow.busy = false;flow.uncertain = true;flow.error = PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27");this.ports.changed(flow);}
     this.job = '';
   }
   async submit(action: string, target: string = ''): Promise<void> {
@@ -40,7 +40,7 @@ export class PinmonyBoardSectionNativeWrites {
     if(action === 'rename' && (!target.trim() || target !== target.trim() || target.length > 100))return;
     const account: string = session.accountId + ':' + session.generation.toString();if(account !== this.account){this.uncertain.clear();this.account = account;}
     const key: string = identity.board + ':' + identity.section;
-    if(this.uncertain.has(key)){original.uncertain = true;original.error = PinmonyI18n.message('操作结果未确认，请刷新核对；不会重复提交');this.ports.changed(original);return;}
+    if(this.uncertain.has(key)){original.uncertain = true;original.error = PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27");this.ports.changed(original);return;}
     if(action === 'move' && (!identity.complete || !identity.selectedIds.length || !identity.targets.includes(target) ||
       identity.selectedIds.some((id: string): boolean => !identity.allIds.includes(id)) || new Set(identity.selectedIds).size !== identity.selectedIds.length))return;
     const parts: string[] = target.split(':');
@@ -72,7 +72,7 @@ export class PinmonyBoardSectionNativeWrites {
       if(r?.status !== 'success' || r.code !== 0 || r.endpoint_name !== (action === 'rename' ? 'v3_edit_section' : action === 'delete' ? 'v3_delete_board_section' : 'v3_board_bulk_move') || action !== 'rename' && r.data !== null || body.client_context?.user && body.client_context.user.id !== identity.viewer)throw new Error('business');
       if(action === 'rename'){const d: SectionResult = r.data as SectionResult;if(!d || d.id !== identity.section || d.type !== 'board_section' || d.title !== target || d.board?.id !== identity.board)throw new Error('section');}
       this.uncertain.delete(key);flow.busy = false;this.job = '';this.ports.changed(flow);this.ports.confirmed(action,action === 'rename' ? target : undefined);
-    }catch (_) {if(current()){flow.busy = false;flow.uncertain = true;flow.error = PinmonyI18n.message('操作结果未确认，请刷新核对；不会重复提交');this.ports.changed(flow);}}
+    }catch (_) {if(current()){flow.busy = false;flow.uncertain = true;flow.error = PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27");this.ports.changed(flow);}}
     finally {if(revision === this.revision){this.job = '';this.cancelWait = undefined;}}
   }
 }

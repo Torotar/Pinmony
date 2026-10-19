@@ -257,10 +257,10 @@ export struct PinmonyHomePage {
   }
 
   private emptyFeedMessage(): string {
-    if (this.offlinePreview) return this.uiText("当前离线，此分类暂无可显示的缓存照片，请连接网络后重试");
+    if (this.offlinePreview) return this.uiText("pm_you_are_offline_this_category_has_no_cached_images_connect_and_r_a67bd3fa");
     if (this.error) return this.error;
-    if (this.home.kind === 'loading') return this.uiText("内容加载已中断，请重试");
-    return this.uiText("当前分类暂无 Pin 图");
+    if (this.home.kind === 'loading') return this.uiText("pm_loading_interrupted_please_retry_6fe00867");
+    return this.uiText("pm_no_pins_in_this_category_yet_3202c6eb");
   }
 
   private updateCategories(): void {
@@ -329,7 +329,7 @@ export struct PinmonyHomePage {
               .maxLines(2)
               .layoutWeight(1)
             if (this.error) {
-              Button(this.uiText("重试")).fontSize(13)
+              Button(this.uiText("pm_retry_b8784c8d")).fontSize(13)
                 .onClick(() => { if (this.onRetry) this.onRetry(); })
             }
           }
@@ -337,16 +337,16 @@ export struct PinmonyHomePage {
         }
         if (this.offlinePreview) {
           Row({ space: 8 }) {
-            Text(this.uiText("当前离线，仅显示最近缓存"))
+            Text(this.uiText("pm_offline_showing_recent_cache_5bff694a"))
               .fontSize(13)
               .fontColor($r('app.color.secondary_text'))
               .maxLines(2)
               .layoutWeight(1)
-            Button(this.uiText("重试")).fontSize(13)
+            Button(this.uiText("pm_retry_b8784c8d")).fontSize(13)
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           .width('100%')
-          .accessibilityText(this.uiText("当前离线，仅显示最近缓存，可重试"))
+          .accessibilityText(this.uiText("pm_offline_showing_recent_cache_you_can_retry_236c20a9"))
         }
       }
       .width('calc(100% - 24vp)')
@@ -359,11 +359,11 @@ export struct PinmonyHomePage {
   }
 
   private feedStatusText(): string {
-    if (this.offlinePreview) return this.uiText("当前离线，仅显示最近缓存");
-    if (this.error) return this.home.categorySourceFailure ? this.error : this.error + this.uiText("，显示上次内容");
-    if (this.refreshing || this.home.refreshing) return this.uiText("正在刷新首页…");
-    if (this.loading) return this.uiText("正在加载首页…");
-    return this.uiText("正在恢复首页连接…");
+    if (this.offlinePreview) return this.uiText("pm_offline_showing_recent_cache_5bff694a");
+    if (this.error) return this.home.categorySourceFailure ? this.error : this.error + this.uiText("pm_showing_previous_content_f821f683");
+    if (this.refreshing || this.home.refreshing) return this.uiText("pm_refreshing_home_feed_eeb8a65d");
+    if (this.loading) return this.uiText("pm_loading_home_feed_1d83a335");
+    return this.uiText("pm_reconnecting_home_feed_58971515");
   }
 
   @Builder
@@ -392,7 +392,7 @@ export struct PinmonyHomePage {
           .fontColor($r('app.color.primary_text'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(this.uiFormat("{0} 张 Pin 图", [board.pinCount]))
+        Text(this.uiFormat("pm_value_pins_d1922567", [board.pinCount]))
           .fontSize(13)
           .fontColor($r('app.color.secondary_text'))
           .maxLines(1)
@@ -404,7 +404,7 @@ export struct PinmonyHomePage {
     .padding({ left: 16, right: 16, top: 8, bottom: 12 })
     .enabled(this.interactionReady && !!board.boardUrl && !!this.onBoard)
     .onClick(() => { if (this.onBoard) this.onBoard(board.id); })
-    .accessibilityText(this.uiFormat("打开图板：{0}，{1} 张 Pin 图", [board.name, board.pinCount]))
+    .accessibilityText(this.uiFormat("pm_open_board_value_value_pins_134006a7", [board.name, board.pinCount]))
   }
 
   @Builder
@@ -416,7 +416,7 @@ export struct PinmonyHomePage {
           .onClick(() => { if (this.onPin) this.onPin(pin.id); })
       } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
         Column() {
-          Text(this.uiText("图片加载失败"))
+          Text(this.uiText("pm_image_failed_to_load_572993f5"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
@@ -425,7 +425,7 @@ export struct PinmonyHomePage {
         .borderRadius(18)
         .backgroundColor($r('app.color.surface_muted'))
         .justifyContent(FlexAlign.Center)
-        .accessibilityText((pin.title || this.uiText("Pin 图")) + this.uiText("，图片加载失败，打开详情"))
+        .accessibilityText((pin.title || this.uiText("pm_pin_234ff540")) + this.uiText("pm_image_failed_to_load_open_details_8406e8c5"))
         .onClick(() => { if (this.onPin) this.onPin(pin.id); })
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
@@ -458,7 +458,7 @@ export struct PinmonyHomePage {
             .onClick(() => { if (this.onPin) this.onPin(pin.id); })
           if (pin.saved === true) {
             Column() {
-              Text(this.uiText("已收藏")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
+              Text(this.uiText("pm_saved_471dd4d7")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
                 .padding({ left: 14, right: 14, top: 16 })
               Blank()
             }.width('100%').height(this.imageHeight(pin)).backgroundColor('#55000000')
@@ -496,7 +496,7 @@ export struct PinmonyHomePage {
         .onClick(() => {
           if (this.onMore) this.onMore(pin.id);
         })
-        .accessibilityText(this.uiText("更多选项"))
+        .accessibilityText(this.uiText("pm_more_options_c611656f"))
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
@@ -504,7 +504,7 @@ export struct PinmonyHomePage {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .enabled(this.navigationReady)
-    .accessibilityText(pin.title || this.uiText("打开 Pin 图"))
+    .accessibilityText(pin.title || this.uiText("pm_open_pin_e0bdd278"))
   }
 
   private uniquePrefetchImages(): string[] {
@@ -560,7 +560,7 @@ export struct PinmonyHomePage {
               .textAlign(TextAlign.Center)
               .fontSize(16)
               .fontColor($r('app.color.primary_text'))
-            Button(this.offlinePreview ? this.uiText("连接后重试") : this.uiText("重新读取"))
+            Button(this.offlinePreview ? this.uiText("pm_connect_and_retry_a25c5d3e") : this.uiText("pm_reload_df7392cc"))
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           .width('100%')
@@ -585,10 +585,10 @@ export struct PinmonyHomePage {
                     if (this.home.loadingMore) {
                       LoadingProgress().width(24).height(24)
                     } else if (this.home.sourceError) {
-                      Button(this.uiText("重试加载"))
+                      Button(this.uiText("pm_retry_loading_8924c788"))
                         .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
                     } else if (this.home.endReached) {
-                      Text(this.uiText("暂无更多 Pin 图"))
+                      Text(this.uiText("pm_no_more_pins_dda147ad"))
                         .fontSize(12)
                         .fontColor($r('app.color.secondary_text'))
                     }

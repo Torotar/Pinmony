@@ -101,7 +101,7 @@ export class PinmonyHomeController {
       if (token !== this.homeStore.homeRequestToken || !this.homeStore.pendingHomeTab || !this.homeStore.homeLoading) return;
       this.homeStore.pendingHomeTab = '';
       this.homeStore.homeLoading = false;
-      this.homeStore.homeError = PinmonyI18n.message('分类内容加载超时，请重试');
+      this.homeStore.homeError = PinmonyI18n.message("pm_category_loading_timed_out_please_retry_221c2005");
     }, 30000);
   }
 
@@ -137,7 +137,7 @@ export class PinmonyHomeController {
       if (token !== this.homeStore.homeRequestToken || this.homeStore.homeActionsReady || this.homeStore.homeError) return;
       this.homeStore.homeLoading = false;
       this.homeStore.homeError = this.homeStore.home?.pins.length ?
-        PinmonyI18n.message('首页内容同步超时，请重试') : PinmonyI18n.message('无法读取当前 Pinterest 首页');
+        PinmonyI18n.message("pm_home_feed_sync_timed_out_please_retry_4743a0b5") : PinmonyI18n.message("pm_unable_to_load_the_current_pinterest_home_feed_534c116d");
     }, 20000);
   }
 
@@ -175,7 +175,7 @@ export class PinmonyHomeController {
           this.homeStore.homeActionsReady = false;
           this.homeStore.homeLoading = false;
           this.homeStore.pendingHomeTab = '';
-          this.homeStore.homeError = message.error || PinmonyI18n.message('首页内容加载失败，请下拉重试');
+          this.homeStore.homeError = message.error || PinmonyI18n.message("pm_unable_to_load_home_feed_pull_down_to_retry_8109cb8c");
           if (this.homeStore.diskCacheRestoredAt > 0) {
             PinmonyRuntimeLog.warn('HomeCache: refresh failed snapshotRetained=true actionsReady=false');
           }
@@ -187,7 +187,7 @@ export class PinmonyHomeController {
         this.homeStore.pendingHomeTab = '';
         this.homeStore.homeTabNeedsRedispatch = false;
         this.homeStore.homeLoading = false;
-        this.homeStore.homeError = message.error || PinmonyI18n.message('分类内容加载失败，请重试');
+        this.homeStore.homeError = message.error || PinmonyI18n.message("pm_unable_to_load_category_please_retry_b9d681bc");
         return;
       }
       if (message.kind === 'loading') {
@@ -292,7 +292,7 @@ export class PinmonyHomeController {
         this.homeStore.pendingHomeTab = '';
         this.homeStore.homeLoading = false;
         this.homeStore.homeRefreshing = !!message.refreshing;
-        this.homeStore.homeError = message.categorySourceFailure === true ? PinmonyI18n.message('已收藏图板分类读取失败，请重试') : '';
+        this.homeStore.homeError = message.categorySourceFailure === true ? PinmonyI18n.message("pm_unable_to_load_saved_board_categories_please_retry_9898146b") : '';
         const committedHome: PinmonyHomeSnapshot | undefined = this.homeStore.home;
         if (message.kind === 'state' && confirmed && !message.refreshing && !message.loadingMore && !message.sourceError &&
             this.homeStore.homeActionsReady && committedHome) this.ports.persistSnapshot(committedHome);
@@ -350,7 +350,7 @@ export class PinmonyHomeController {
       if (token !== this.homeStore.homeRequestToken || this.homeStore.pendingHomeTab !== id) return;
       this.homeStore.pendingHomeTab = '';
       this.homeStore.homeLoading = false;
-      this.ports.showMessage(PinmonyI18n.message('分类暂不可用，请重试'));
+      this.ports.showMessage(PinmonyI18n.message("pm_category_unavailable_please_retry_ffd3c0c8"));
       return;
     }
     this.tasks.timeout(() => {
@@ -358,8 +358,8 @@ export class PinmonyHomeController {
       this.homeStore.pendingHomeTab = '';
       this.homeStore.homeLoading = false;
       this.homeStore.homeRefreshing = false;
-      if (restoring) this.ports.showMessage(PinmonyI18n.message('分类同步超时，请下拉重试'));
-      else this.homeStore.homeError = PinmonyI18n.message('分类内容加载超时，请重试');
+      if (restoring) this.ports.showMessage(PinmonyI18n.message("pm_category_sync_timed_out_pull_down_to_retry_0ef0ac15"));
+      else this.homeStore.homeError = PinmonyI18n.message("pm_category_loading_timed_out_please_retry_221c2005");
     }, 30000);
   }
 
@@ -420,11 +420,11 @@ export class PinmonyHomeController {
         if (generation !== this.generation || token !== this.homeStore.homeRequestToken || pageKey !== this.ports.currentPageKey()) return;
         if (result === 'true' || result === '"true"') return;
         this.homeStore.homeLoading = false;
-        this.homeStore.homeError = PinmonyI18n.message('已收藏图板分类重试暂不可用，请重试');
+        this.homeStore.homeError = PinmonyI18n.message("pm_saved_board_category_retry_unavailable_please_retry_b497b177");
       }).catch(() => {
         if (generation !== this.generation || token !== this.homeStore.homeRequestToken || pageKey !== this.ports.currentPageKey()) return;
         this.homeStore.homeLoading = false;
-        this.homeStore.homeError = PinmonyI18n.message('已收藏图板分类重试失败，请重试');
+        this.homeStore.homeError = PinmonyI18n.message("pm_saved_board_category_retry_failed_please_retry_8dd349ed");
       });
       return;
     }
@@ -459,14 +459,14 @@ export class PinmonyHomeController {
             this.homeStore.homeRefreshAwaitingPage = false;
             this.homeStore.homeActionsReady = true;
             PinmonyRuntimeLog.warn('HomeRefresh: failed reason=bridge-fallback-load');
-            this.ports.showMessage(PinmonyI18n.message('首页刷新失败，请重试'));
+            this.ports.showMessage(PinmonyI18n.message("pm_unable_to_refresh_home_feed_please_retry_2a2d3d08"));
           }
         }).catch(() => {
           if (token !== this.homeStore.homeRefreshToken) return;
           this.homeStore.homeRefreshing = false;
           this.homeStore.homeActionsReady = true;
           PinmonyRuntimeLog.warn('HomeRefresh: failed reason=bridge-error');
-          this.ports.showMessage(PinmonyI18n.message('首页刷新失败，请重试'));
+          this.ports.showMessage(PinmonyI18n.message("pm_unable_to_refresh_home_feed_please_retry_2a2d3d08"));
         });
       } else if (currentPageKey === pageKey) {
         this.ports.reloadPage(pageKey, true);
@@ -479,7 +479,7 @@ export class PinmonyHomeController {
       this.homeStore.homeRefreshAwaitingPage = false;
       this.homeStore.homeLoading = false;
       PinmonyRuntimeLog.warn('HomeRefresh: failed reason=exception');
-      this.ports.showMessage(PinmonyI18n.message('首页刷新失败，请重试'));
+      this.ports.showMessage(PinmonyI18n.message("pm_unable_to_refresh_home_feed_please_retry_2a2d3d08"));
     }
     this.tasks.timeout(() => {
       if (token !== this.homeStore.homeRefreshToken || !this.homeStore.homeRefreshing) return;
@@ -488,10 +488,10 @@ export class PinmonyHomeController {
       this.homeStore.pendingHomeTab = '';
       if (this.homeStore.home?.pins.length) {
         PinmonyRuntimeLog.warn('HomeRefresh: failed reason=timeout snapshotRetained=true');
-        this.ports.showMessage(PinmonyI18n.message('首页刷新超时，请下拉重试'));
+        this.ports.showMessage(PinmonyI18n.message("pm_home_refresh_timed_out_pull_down_to_retry_e58a0305"));
       } else {
         this.homeStore.homeLoading = false;
-        this.homeStore.homeError = PinmonyI18n.message('无法读取当前 Pinterest 首页');
+        this.homeStore.homeError = PinmonyI18n.message("pm_unable_to_load_the_current_pinterest_home_feed_534c116d");
         PinmonyRuntimeLog.warn('HomeRefresh: failed reason=timeout snapshotRetained=false');
       }
     }, 20000);

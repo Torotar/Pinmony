@@ -102,7 +102,7 @@ export class PinmonyBoardStateController {
         this.store.boardDetail = { kind: board.kind, session: board.session, pageKey: board.pageKey,
           boardId: board.boardId, title: board.title, pinCount: board.pinCount,
           ownerName: board.ownerName, ownerAvatar: board.ownerAvatar, ownerUrl: board.ownerUrl, loading: false,
-          loadingMore: board.loadingMore, ready: board.ready, error: PinmonyI18n.message('图板接口尚未就绪，请重试'),
+          loadingMore: board.loadingMore, ready: board.ready, error: PinmonyI18n.message("pm_board_service_not_ready_please_retry_c1a3998b"),
           hasMore: board.hasMore, pins: board.pins };
       }, 20000);
   }
@@ -199,12 +199,12 @@ export class PinmonyBoardStateController {
       if (message.ready) PinmonyRuntimeLog.info('BoardReturn: session-confirmed');
       if (changed) this.ports.invalidateProfile();
       if (message.flow?.phase === 'unfollowed') {
-        this.ports.feedback(PinmonyI18n.message('已取消关注'));
+        this.ports.feedback(PinmonyI18n.message("pm_unfollowed_07fa3b45"));
         this.ports.closeFlow();
         return;
       }
       if (message.flow?.phase === 'deleted' || message.flow?.phase === 'left') {
-        if (message.flow.phase === 'left') this.ports.feedback(PinmonyI18n.message('已离开图板'));
+        if (message.flow.phase === 'left') this.ports.feedback(PinmonyI18n.message("pm_left_board_af0547a0"));
         this.store.boardDetail.flow = undefined;
         this.ports.back();
         return;

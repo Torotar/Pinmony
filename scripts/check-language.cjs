@@ -16,7 +16,7 @@ function boot(system = 'zh-CN') {
   }, { AppStorage: { get: key => memory.get(key), setOrCreate: (k,v) => memory.set(k,v) },
     PersistentStorage: { persistProp: (k,v) => { if (!memory.has(k)) memory.set(k,v); } } });
   const api = loader.loadFile('common_foundation/src/main/ets/services/PinmonyI18n.ets').PinmonyI18n;
-  api.initialize({}); return { api, memory, system: value => currentSystem = value };
+  api.initialize({ resourceManager: { getConfigurationSync: () => ({}), getOverrideResourceManager: config => ({ getStringByNameSync: key => { const rows = JSON.parse(fs.readFileSync('common_foundation/src/main/resources/' + (config.locale === 'en-US' ? 'en_US' : 'zh_CN') + '/element/string.json', 'utf8')).string; const row = rows.find(row => row.name === key); if (!row) throw Error('Missing resource: ' + key); return row.value; } }) } }); return { api, memory, system: value => currentSystem = value };
 }
 let f = boot(); assert.equal(f.memory.get('pinmonyLanguage'), 'zh');
 f.api.select('en'); assert.equal(flushes, 1); assert.equal(disk.get('language'), 'en');
@@ -148,3 +148,19 @@ const Publish = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyPublishNati
  assert.deepEqual(Array.from(publish.store.publishOptions,o=>o.id),['native-website','native-photo','native-board']);
  console.log('Language: persistence, reversible snapshots, publish menu, fixed search types, segment refresh and website/user text boundaries passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Validate the shipped resource sets, not a parallel test dictionary.
+const resourceRows = locale => JSON.parse(fs.readFileSync('common_foundation/src/main/resources/' + locale + '/element/string.json', 'utf8')).string;
+const baseRows = resourceRows('base');
+const names = baseRows.map(row => row.name).sort();
+assert.equal(new Set(names).size, names.length, 'Duplicate resource names');
+for (const locale of ['zh_CN', 'en_US']) {
+  const rows = resourceRows(locale);
+  assert.deepEqual(rows.map(row => row.name).sort(), names, 'Locale key parity: ' + locale);
+  const values = new Map(rows.map(row => [row.name, row.value]));
+  for (const row of baseRows) assert.deepEqual((values.get(row.name).match(/\{\d+\}/g) || []).sort(), (row.value.match(/\{\d+\}/g) || []).sort(), 'Placeholder parity: ' + row.name);
+}
+const saveKey = baseRows.find(row => row.value === '收藏').name;
+assert.equal(f.api.text(saveKey, 'en'), 'Save');
+assert.equal(f.api.message('收藏'), f.api.message(saveKey), 'New tokens normalize legacy identifiers');
+assert.equal(f.api.render(f.api.message(saveKey), 'zh'), '收藏');

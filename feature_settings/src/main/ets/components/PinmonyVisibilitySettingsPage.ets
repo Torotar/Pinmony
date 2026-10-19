@@ -29,8 +29,8 @@ export struct PinmonyVisibilitySettingsPage {
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
     this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
-      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("重新读取") : this.uiText("重试"),
-      contentAccessibilityText: this.uiText("重新读取当前设置"),
+      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
+      contentAccessibilityText: this.uiText("pm_reload_current_settings_d2b82d8a"),
       onContentClick: () => {
         if (!this.pageVisible || key !== this.errorSnackKey || this.store.busy || this.store.loading) return;
         this.dismissErrorSnack();
@@ -38,7 +38,7 @@ export struct PinmonyVisibilitySettingsPage {
       }
     }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
-  private title(): string { return this.uiText("个人资料可见性"); }
+  private title(): string { return this.uiText("pm_profile_visibility_6fedc091"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private async confirmPrivacy(): Promise<void> {
@@ -73,39 +73,39 @@ export struct PinmonyVisibilitySettingsPage {
   @Builder
   private visibilityContent() {
     Row() {
-      Text(this.uiText("私密个人资料")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Text(this.uiText("pm_private_profile_b16cc2bf")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.store.data?.privateProfile || false }).enabled(this.available() && this.store.data?.canChangePrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.privateProfile) { this.store.pendingPrivate = value; this.store.confirmOpen = true; } })
-        .accessibilityText(this.uiText("私密个人资料"))
+        .accessibilityText(this.uiText("pm_private_profile_b16cc2bf"))
     }.width('100%')
-    Text(this.uiText("当你的个人资料为私密状态时，仅获得你批准的用户可以查看你的个人资料、Pin 图、图板、粉丝和关注列表。了解更多"))
+    Text(this.uiText("pm_with_a_private_profile_only_people_you_approve_can_see_your_prof_5be21c6f"))
       .fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 24 })
     Row() {
-      Text(this.uiText("搜索隐私")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Text(this.uiText("pm_search_privacy_d041067d")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.store.data?.searchPrivacy || false }).enabled(this.available() && this.store.data?.canEditSearchPrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.searchPrivacy) this.request('searchPrivacy', value.toString()); })
-        .accessibilityText(this.uiText("搜索隐私"))
+        .accessibilityText(this.uiText("pm_search_privacy_d041067d"))
     }.width('100%')
-    Text(this.uiText("在搜索引擎（例如，Google）中隐藏你的个人资料和图板。了解更多")).fontSize(15).fontColor($r('app.color.secondary_text'))
+    Text(this.uiText("pm_hide_your_profile_and_boards_from_search_engines_such_as_google__8bb0a7fb")).fontSize(15).fontColor($r('app.color.secondary_text'))
   }
   @Builder
   private privacySheet() {
     Scroll() {
       Column({ space: 24 }) {
-        Text(this.store.pendingPrivate ? this.uiText("将个人资料设为私密？") : this.uiText("公开个人资料？")).width('100%').fontSize(23).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text(this.store.pendingPrivate ? this.uiText("pm_make_profile_private_5d577229") : this.uiText("pm_make_profile_public_147d123a")).width('100%').fontSize(23).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         Row({ space: 16 }) {
           SymbolGlyph($r('sys.symbol.person_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
-          Text(this.store.pendingPrivate ? this.uiText("只有你的粉丝可以查看你的个人资料及其内容。") : this.uiText("任何人都可以查看你的个人资料、Pin 图、粉丝和图板。")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
+          Text(this.store.pendingPrivate ? this.uiText("pm_only_your_followers_can_see_your_profile_and_its_content_0ca3b7cb") : this.uiText("pm_anyone_can_see_your_profile_pins_followers_and_boards_44055147")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
         }
         Row({ space: 16 }) {
           SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(24).fontColor([$r('app.color.primary_text')])
-          Text(this.store.pendingPrivate ? this.uiText("你的个人资料不会显示在 Pinterest 上的搜索结果中。") : this.uiText("你的个人资料将显示在 Pinterest 上的搜索结果中。")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
+          Text(this.store.pendingPrivate ? this.uiText("pm_your_profile_will_not_appear_in_pinterest_search_results_20307e8e") : this.uiText("pm_your_profile_will_appear_in_pinterest_search_results_ca924e80")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
         }
         if (this.store.error) {
           Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-          Button(this.uiText("重新读取")).enabled(!this.store.busy).onClick(() => { this.store.confirmOpen = false; this.request('read'); })
+          Button(this.uiText("pm_reload_df7392cc")).enabled(!this.store.busy).onClick(() => { this.store.confirmOpen = false; this.request('read'); })
         }
-        Button(this.store.busy ? this.uiText("正在保存…") : this.store.pendingPrivate ? this.uiText("设为私密") : this.uiText("公开"))
+        Button(this.store.busy ? this.uiText("pm_saving_6bdb4435") : this.store.pendingPrivate ? this.uiText("pm_make_private_c25c078d") : this.uiText("pm_make_public_7a73baf0"))
           .width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
           .enabled(this.available()).onClick(() => { this.confirmPrivacy(); })
       }.width('100%').padding({ left: 20, right: 20, top: 48, bottom: 24 }).alignItems(HorizontalAlign.Start)

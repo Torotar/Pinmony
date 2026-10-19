@@ -23,12 +23,12 @@ export struct PinmonyInboxPage {
   private segmentUpdateLabel: string = '';
   private segmentInboxLabel: string = '';
   private readonly segmentItems: SegmentButtonV2Items = new SegmentButtonV2Items([
-    { text: this.uiText("更新") }, { text: this.uiText("收件箱") }
+    { text: this.uiText("pm_updates_3055a035") }, { text: this.uiText("pm_inbox_63a5e7b7") }
   ]);
 
   private syncSegmentItems(): void {
-    const update: string = PinmonyI18n.render(this.snapshot.updateLabel || PinmonyI18n.message('更新'), this.uiLanguage);
-    const inbox: string = PinmonyI18n.render(this.snapshot.inboxLabel || PinmonyI18n.message('收件箱'), this.uiLanguage);
+    const update: string = PinmonyI18n.render(this.snapshot.updateLabel || PinmonyI18n.message("pm_updates_3055a035"), this.uiLanguage);
+    const inbox: string = PinmonyI18n.render(this.snapshot.inboxLabel || PinmonyI18n.message("pm_inbox_63a5e7b7"), this.uiLanguage);
     if (this.segmentUpdateLabel === update && this.segmentInboxLabel === inbox) return;
     this.segmentUpdateLabel = update;
     this.segmentInboxLabel = inbox;
@@ -128,9 +128,9 @@ export struct PinmonyInboxPage {
     const date: number = Date.parse(item.updatedAt);
     const minutes: number = Math.floor((Date.now() - date) / 60000);
     if (!Number.isFinite(date) || minutes < 0) return '';
-    if (minutes < 60) return minutes.toString() + this.uiText(" 分钟");
-    if (minutes < 1440) return Math.floor(minutes / 60).toString() + this.uiText(" 小时");
-    return Math.floor(minutes / 1440).toString() + this.uiText(" 天");
+    if (minutes < 60) return minutes.toString() + this.uiText("pm_minutes_40de5434");
+    if (minutes < 1440) return Math.floor(minutes / 60).toString() + this.uiText("pm_hours_8f82ece0");
+    return Math.floor(minutes / 1440).toString() + this.uiText("pm_days_4ce3054e");
   }
 
   @Builder
@@ -221,7 +221,7 @@ export struct PinmonyInboxPage {
               }
             }
               .padding(0).backgroundColor(Color.Transparent).width(40).height(40)
-              .accessibilityText(this.uiText("更多操作"))
+              .accessibilityText(this.uiText("pm_more_actions_9f07d2ce"))
               .onClick(() => {
                 if (item.moreId && this.onAction) this.onAction(item.moreId);
               })
@@ -238,7 +238,7 @@ export struct PinmonyInboxPage {
     .width('100%')
     .padding({ left: 20, right: 20, top: 12, bottom: 12 })
     .opacity(item.subdued ? 0.45 : 1)
-    .accessibilityDescription(item.enabled ? '' : this.uiText("当前接口入口不可用"))
+    .accessibilityDescription(item.enabled ? '' : this.uiText("pm_service_unavailable_87f44469"))
     .accessibilityText(item.title + (item.subtitle ? '，' + item.subtitle : ''))
   }
 
@@ -307,7 +307,7 @@ export struct PinmonyInboxPage {
             LoadingProgress()
               .width(28)
               .height(28)
-            Text(this.uiText("正在读取收件箱…"))
+            Text(this.uiText("pm_loading_inbox_b0cbe6ba"))
               .fontSize(15)
               .fontColor($r('app.color.secondary_text'))
           } else {
@@ -315,7 +315,7 @@ export struct PinmonyInboxPage {
               .fontSize(15)
               .fontColor($r('app.color.primary_text'))
               .textAlign(TextAlign.Center)
-            Button(this.uiText("重试"))
+            Button(this.uiText("pm_retry_b8784c8d"))
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
         }
@@ -327,7 +327,7 @@ export struct PinmonyInboxPage {
         if (this.error) {
           Row({ space: 12 }) {
             Text(PinmonyI18n.render(this.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).layoutWeight(1)
-            Button(this.uiText("重试")).onClick(() => { if (this.onRetry) this.onRetry(); })
+            Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
           }.padding({ left: 20, right: 20, bottom: 12 }).width('100%')
         }
         Scroll(this.scroller) {
@@ -344,7 +344,7 @@ export struct PinmonyInboxPage {
                   .height(54)
                   .borderRadius(18)
                   .backgroundColor($r('app.color.detail_accent'))
-                Text(PinmonyI18n.render(this.snapshot.composeLabel, this.uiLanguage) || this.uiText("新消息"))
+                Text(PinmonyI18n.render(this.snapshot.composeLabel, this.uiLanguage) || this.uiText("pm_new_message_3fc957bf"))
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text'))
@@ -367,15 +367,15 @@ export struct PinmonyInboxPage {
                 bottom: this.snapshot.section === 'updates' ? 48 : 12 })
             } else if (this.snapshot.section === 'messages') {
               if (this.snapshot.items.length > 0) {
-                this.groupTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("消息"))
+                this.groupTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("pm_messages_4da199fa"))
               }
               ForEach(this.snapshot.items, (item: PinmonyInboxItem) => {
                 this.itemRow(item, false)
               }, (item: PinmonyInboxItem) => item.id)
             } else {
-              this.updatesGroup(PinmonyI18n.render(this.snapshot.unreadLabel || '', this.uiLanguage) || this.uiText("未读"),
+              this.updatesGroup(PinmonyI18n.render(this.snapshot.unreadLabel || '', this.uiLanguage) || this.uiText("pm_unread_4d0680f9"),
                 this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === true))
-              this.updatesGroup(PinmonyI18n.render(this.snapshot.readLabel || '', this.uiLanguage) || this.uiText("已读"),
+              this.updatesGroup(PinmonyI18n.render(this.snapshot.readLabel || '', this.uiLanguage) || this.uiText("pm_read_efdd1a47"),
                 this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === false))
               this.updatesGroup('', this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === undefined))
             }
@@ -384,16 +384,16 @@ export struct PinmonyInboxPage {
               if (this.snapshot.moreLoading) {
                 LoadingProgress().width(28).height(28).alignSelf(ItemAlign.Center)
               } else if (this.snapshot.hasMore || this.snapshot.moreError) {
-                Button(this.snapshot.moreError || this.uiText("加载更多")).alignSelf(ItemAlign.Center)
+                Button(this.snapshot.moreError || this.uiText("pm_load_more_af90a08f")).alignSelf(ItemAlign.Center)
                   .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
               } else if (this.snapshot.items.length === 0 && !PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {
-                Text(this.uiText("暂无更新")).fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
+                Text(this.uiText("pm_no_updates_yet_7891215d")).fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
               }
             }
             if (this.snapshot.section === 'messages' &&
               (PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) || this.snapshot.contacts.length > 0)) {
               Text(PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) ||
-                (this.snapshot.inboxLabel.toLowerCase() === 'inbox' ? 'Contacts' : this.uiText("联系人")))
+                (this.snapshot.inboxLabel.toLowerCase() === 'inbox' ? 'Contacts' : this.uiText("pm_contacts_3303b569")))
                 .fontSize(18)
                 .fontColor($r('app.color.primary_text'))
                 .width('100%')
@@ -403,19 +403,19 @@ export struct PinmonyInboxPage {
               if (this.snapshot.contactsLoading) {
                 Row({ space: 12 }) {
                   LoadingProgress().width(24).height(24)
-                  Text(this.uiText("正在读取联系人…")).fontSize(14).fontColor($r('app.color.secondary_text'))
+                  Text(this.uiText("pm_loading_contacts_54858f2d")).fontSize(14).fontColor($r('app.color.secondary_text'))
                 }.padding({ left: 20, top: 12, bottom: 12 })
               } else if (this.snapshot.contactsError) {
                 Column({ space: 8 }) {
                   Text(PinmonyI18n.render(this.snapshot.contactsError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-                  Button(this.uiText("重试")).onClick(() => { if (this.onContactsRetry) this.onContactsRetry(); })
+                  Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onContactsRetry) this.onContactsRetry(); })
                 }.alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 12 })
               } else if (this.snapshot.contacts.length > 0) {
                 ForEach(this.snapshot.contacts, (item: PinmonyInboxItem) => {
                   this.itemRow(item)
                 }, (item: PinmonyInboxItem) => item.id)
               } else if (this.snapshot.contactsDataSource === 'api') {
-                Text(this.uiText("暂无推荐联系人")).fontSize(14).fontColor($r('app.color.secondary_text'))
+                Text(this.uiText("pm_no_suggested_contacts_03b9d232")).fontSize(14).fontColor($r('app.color.secondary_text'))
                   .padding({ left: 20, top: 12, bottom: 12 })
               }
             }

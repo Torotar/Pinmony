@@ -23,7 +23,7 @@ export class PinmonyConfirmedSaves {
     if (saved === undefined) return actions;
     return actions.map((item: PinmonyDetailAction): PinmonyDetailAction => {
       if (item.kind !== 'save') return item;
-      return { id: item.id, kind: item.kind, label: saved ? PinmonyI18n.message('已收藏') : PinmonyI18n.message('收藏'),
+      return { id: item.id, kind: item.kind, label: saved ? PinmonyI18n.message("pm_saved_471dd4d7") : PinmonyI18n.message("pm_save_60a53514"),
         countText: item.countText, enabled: item.enabled, selected: saved };
     });
   }
