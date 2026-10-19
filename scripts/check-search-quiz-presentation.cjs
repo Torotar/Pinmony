@@ -7,9 +7,10 @@ function method(name) {
   assert(start >= 0);
   return page.slice(start, page.indexOf('\n  @Builder', start)).replace('private ', '');
 }
-const Host = vm.runInNewContext(ts.transpileModule('class Host {' + method('syncQuizPresentation()') + '}',
+const Host = vm.runInNewContext(ts.transpileModule('class Host {' + method('syncQuizPresentation()') + page.slice(page.indexOf('  private contentColumns()'), page.indexOf('\n  }', page.indexOf('  private contentColumns()')) + 4) + '}',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText + '\nHost;');
 const host = new Host();
+host.contentWidth = 360;
 let sections = [], updates = 0;
 host.flowSections = { length: () => sections.length, splice: (_start, _count, next) => { sections = next; updates++; } };
 host.flowShape = '';

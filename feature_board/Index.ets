@@ -1,4 +1,4 @@
-export { PinmonyBoardPin, PinmonyBoardDetail, PinmonyBoardFlow, PinmonyBoardTarget, PinmonyBoardSection } from './src/main/ets/models/PinmonyBoardDetail';
+export { PinmonyBoardPin, PinmonyBoardDetail, PinmonyBoardFlow, PinmonyBoardTarget, PinmonyBoardSection, PinmonyBoardCreator } from './src/main/ets/models/PinmonyBoardDetail';
 export { PinmonyBoardPage } from './src/main/ets/components/PinmonyBoardPage';
 export { boardVisiblePins } from './src/main/ets/services/PinmonyBoardPresentation';
 export { PinmonyBoardSectionPage } from './src/main/ets/components/PinmonyBoardSectionPage';

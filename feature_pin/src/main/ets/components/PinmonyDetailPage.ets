@@ -65,6 +65,8 @@ export struct PinmonyDetailPage {
   }
   @State private expanded: boolean = false;
   @State private contentWidth: number = 360;
+  @State private viewportWidth: number = 360;
+  @State private viewportHeight: number = 800;
   private readonly detailScroller: Scroller = new Scroller();
   private readonly detailPathStack: NavPathStack = new NavPathStack();
   private lastReportedScrollOffset: number = 0;
@@ -238,11 +240,11 @@ export struct PinmonyDetailPage {
   }
 
   private recommendCardWidth(): number {
-    return getRecommendCardWidth();
+    return Math.max(0, (this.contentWidth - 36 - (this.recommendColumnCount() - 1) * 12) / this.recommendColumnCount());
   }
 
   private recommendColumnCount(): number {
-    return getRecommendColumnCount();
+    return Math.max(2, Math.floor((this.contentWidth - 24) / 192));
   }
 
   private isMainImageReady(): boolean {
@@ -273,8 +275,8 @@ export struct PinmonyDetailPage {
 
   private auditRecommendationGate(reason: string): void {
     const ready: boolean = this.isRecommendReady();
-    const columns: number = getRecommendColumnCount();
-    const width: number = getRecommendCardWidth();
+    const columns: number = this.recommendColumnCount();
+    const width: number = this.recommendCardWidth();
     const key: string = reason + ':' + (ready ? '1' : '0') + ':' + columns.toString() + ':' + width.toFixed(2) +
       ':' + (this.detail.imageStageReady === true ? '1' : '0') + ':' + (this.detail.interactionsSettled === true ? '1' : '0');
     if (key === this.lastRecommendAuditKey) return;
@@ -287,8 +289,8 @@ export struct PinmonyDetailPage {
   }
 
   private auditRecommendationLayout(): void {
-    const columns: number = getRecommendColumnCount();
-    const width: number = getRecommendCardWidth();
+    const columns: number = this.recommendColumnCount();
+    const width: number = this.recommendCardWidth();
     const key: string = 'layout:' + columns.toString() + ':' + width.toFixed(2);
     if (key === this.lastRecommendAuditKey) return;
     this.lastRecommendAuditKey = key;
@@ -317,7 +319,7 @@ export struct PinmonyDetailPage {
 
   private measureTextOverflow(): void {
     const utils = this.getUIContext().getMeasureUtils();
-    const width: string = Math.max(1, this.contentWidth - 36).toString() + 'vp';
+    const width: string = this.detailPaneWidth().toString() + 'vp';
     const title = utils.measureTextSize({ textContent: this.detail.title, fontSize: '26fp',
       fontWeight: FontWeight.Bold, constraintWidth: width });
     const shortTitle = utils.measureTextSize({ textContent: this.detail.title, fontSize: '26fp',
@@ -331,7 +333,7 @@ export struct PinmonyDetailPage {
   }
 
   private heroHeight(): number {
-    const width: number = this.contentWidth - 36;
+    const width: number = this.detailPaneWidth();
     if (this.detail.imageWidth <= 0 || this.detail.imageHeight <= 0) return width * 1.15;
     return Math.min(1200, width * this.detail.imageHeight / this.detail.imageWidth);
   }
@@ -347,7 +349,7 @@ export struct PinmonyDetailPage {
   private creatorFontSize(): number {
     try {
       const utils = this.getUIContext().getMeasureUtils();
-      const width: string = Math.max(1, this.contentWidth - 36 - (this.detail.creatorAvatar ? 42 : 0)).toString() + 'vp';
+      const width: string = Math.max(1, this.detailPaneWidth() - (this.detail.creatorAvatar ? 42 : 0)).toString() + 'vp';
       const full = utils.measureTextSize({ textContent: this.detail.creator, fontSize: '18fp',
         fontWeight: FontWeight.Medium, constraintWidth: width });
       const single = utils.measureTextSize({ textContent: this.detail.creator, fontSize: '18fp',
@@ -460,7 +462,7 @@ export struct PinmonyDetailPage {
 
   @Builder
   private recommendationSkeleton() {
-    Row({ space: this.recommendColumnCount() === 3 ? RECOMMEND_WIDE_GAP_VP : RECOMMEND_PHONE_GAP_VP }) {
+    Row({ space: RECOMMEND_PHONE_GAP_VP }) {
       ForEach(Array.from({ length: this.recommendColumnCount() }), () => {
         Column({ space: 18 }) {
           Column().width('100%').height(260).backgroundColor('#F0F0F0')
@@ -471,11 +473,19 @@ export struct PinmonyDetailPage {
     }.width('100%').alignItems(VerticalAlign.Top)
   }
 
+  private wideDetail(): boolean {
+    return this.viewportWidth >= 840 && this.viewportWidth > this.viewportHeight;
+  }
+
+  private detailPaneWidth(): number {
+    return Math.max(1, this.wideDetail() ? (this.contentWidth - 56) / 2 : this.contentWidth - 36);
+  }
+
   @Builder
-  private detailHeader() {
-        Column({ space: 18 }) {
+  private detailMedia() {
+    Column() {
           if (this.detail.carousel) {
-            PinmonyCarouselView({ carousel: this.detail.carousel, contentWidth: this.contentWidth - 36,
+            PinmonyCarouselView({ carousel: this.detail.carousel, contentWidth: this.detailPaneWidth(),
               onFirstImageSettled: (failed: boolean) => {
                 if (failed) { if (this.onImageError) this.onImageError(this.detail.pinUrl); }
                 else this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
@@ -551,6 +561,12 @@ export struct PinmonyDetailPage {
           }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
           }
 
+    }.width(this.detailPaneWidth())
+  }
+
+  @Builder
+  private detailInformation() {
+    Column({ space: 18 }) {
           if (this.contentError) {
             Text(this.contentError).fontSize(14).fontColor($r('app.color.secondary_text'))
             if (this.contentRetryable) Button('重试详情').onClick(() => { if (this.onContentRetry) this.onContentRetry(); })
@@ -708,7 +724,17 @@ export struct PinmonyDetailPage {
               Button('撤销').enabled(!this.undoMoreBusy).onClick(() => { if (this.onUndoMore) this.onUndoMore(); })
             }.width('100%')
           }
-        }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 8, bottom: 18 })
+    }.width(this.detailPaneWidth()).alignItems(HorizontalAlign.Start)
+      .margin({ top: this.wideDetail() ? 0 : 18 })
+  }
+
+  @Builder
+  private detailHeader() {
+    Flex({ direction: this.wideDetail() ? FlexDirection.Row : FlexDirection.Column,
+      alignItems: ItemAlign.Start, justifyContent: FlexAlign.SpaceBetween }) {
+      this.detailMedia()
+      this.detailInformation()
+    }.width('100%').padding({ top: 8, bottom: 18 })
   }
 
   @Builder
@@ -784,15 +810,10 @@ export struct PinmonyDetailPage {
               .fontColor($r('app.color.primary_text'))
               .width('100%')
               .margin({ top: 4 })
-            Row({ space: this.recommendColumnCount() === 3 ? RECOMMEND_WIDE_GAP_VP : RECOMMEND_PHONE_GAP_VP }) {
-              if (this.recommendColumnCount() === 3) {
-                this.relatedCards(0, 3)
-                this.relatedCards(1, 3)
-                this.relatedCards(2, 3)
-              } else {
-                this.relatedCards(0, 2)
-                this.relatedCards(1, 2)
-              }
+            Row({ space: RECOMMEND_PHONE_GAP_VP }) {
+              ForEach(Array.from({ length: this.recommendColumnCount() }, (_value: number, index: number) => index), (index: number) => {
+                this.relatedCards(index, this.recommendColumnCount())
+              }, (index: number) => this.recommendColumnCount().toString() + ':' + index.toString())
             }
             .width('100%')
             .alignItems(VerticalAlign.Top)
@@ -914,6 +935,15 @@ export struct PinmonyDetailPage {
           onDownload: this.onDownload, onSave: this.onViewerSave,
           onControlsChange: (visible: boolean) => { this.viewerControls = visible; } })
       }
-    }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+    }.width('100%').height('100%')
+      .onAreaChange((_old: Area, area: Area) => {
+        const width: number = Number(area.width);
+        const height: number = Number(area.height);
+        if (width > 0 && height > 0) {
+          this.viewportWidth = width;
+          this.viewportHeight = height;
+          this.updateDetailLayout();
+        }
+      }).backgroundColor($r('app.color.page_background'))
   }
 }

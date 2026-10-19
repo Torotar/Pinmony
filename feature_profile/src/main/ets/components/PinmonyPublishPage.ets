@@ -2,7 +2,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
 import { PinmonyPublishBoardPage } from './PinmonyPublishBoardPage';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 
 @Component
 export struct PinmonyPublishPage {
@@ -25,8 +25,25 @@ export struct PinmonyPublishPage {
 
   private titleBar(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
-        backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+      style: {
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        originalStyle: {
+          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+          contentStyle: {
+            backIconStyle: { iconColor: $r('app.color.primary_text') },
+            menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+          }
+        },
+        scrollEffectStyle: {
+          contentStyle: {
+            backIconStyle: { iconColor: $r('app.color.primary_text') },
+            menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+          }
+        }
+      },
       content: { title: { mainTitle: this.state.phase === 'empty' ? '选择图片' : this.state.kind === 'photo' ? '照片' : '网站' },
         backIcon: { label: '返回', isEnabled: !this.state.busy, action: () => this.act(this.state.phase === 'empty' ? 'back' : 'close') },
         menu: { value: this.state.phase === 'website' ? [{ content: {

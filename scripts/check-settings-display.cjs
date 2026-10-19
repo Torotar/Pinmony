@@ -8,7 +8,7 @@ function method(source, name, endName) {
   return source.slice(start, end);
 }
 const ability = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8');
-const component = fs.readFileSync('feature_settings/src/main/ets/components/PinmonyPreferencesPage.ets', 'utf8');
+const component = fs.readFileSync('feature_settings/src/main/ets/components/PinmonyDisplaySettingsPage.ets', 'utf8');
 const selected = [];
 let preference = 'system', resourceMode = 1;
 const context = { ConfigurationConstant: { ColorMode: { COLOR_MODE_LIGHT: 1, COLOR_MODE_DARK: 0, COLOR_MODE_NOT_SET: -1 } },

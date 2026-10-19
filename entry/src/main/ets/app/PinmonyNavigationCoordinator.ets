@@ -595,10 +595,6 @@ onBackPress(): boolean {
     }
     else if (this.searchStore.searchInputFocused && !!this.ports.currentSearchPageKey() &&
         !this.pinStore.detail && !this.ports.currentPinUrl()) {
-        if (this.searchStore.searchInputStopEditing)
-            this.searchStore.searchInputStopEditing();
-        this.searchStore.searchInputFocused = false;
-        this.searchStore.searchInputStopEditing = undefined;
         this.ports.backFromSearch();
     }
     else if (this.pinStore.detailWebFlow) {

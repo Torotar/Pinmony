@@ -2,7 +2,7 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyCreatedPin, PinmonyOrganizeSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
-import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 
 // Publish owns this entry point so its board flow can evolve independently
@@ -34,24 +34,46 @@ export struct PinmonyPublishBoardPage {
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
       if (this.state.error) { Text(this.state.error).fontColor($r('app.color.secondary_text')) }
-      Button('创建图板').width('100%').height(48).backgroundColor($r('app.color.accent'))
-        .fontColor($r('app.color.detail_on_accent'))
-        .enabled(!!this.name.trim() && !this.state.loading && !this.state.busy && !this.state.uncertain)
-        .onClick(() => this.onAction('create', this.name.trim(), this.secret))
       if (this.state.loading || this.state.busy) { LoadingProgress().width(28).height(28) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
 
   @Builder
+  private createButton() {
+      Button('创建图板').width('100%').height(48).backgroundColor($r('app.color.accent'))
+        .fontColor($r('app.color.detail_on_accent'))
+        .enabled(!!this.name.trim() && !this.state.loading && !this.state.busy && !this.state.uncertain)
+        .onClick(() => this.onAction('create', this.name.trim(), this.secret))
+  }
+  @Builder
   private createSheet() {
     HdsNavigation() {
-      Scroll(this.createScroller) { this.createForm() }
-        .width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
+      Column() {
+        Scroll(this.createScroller) { this.createForm() }
+          .width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
+        Column() { this.createButton() }
+          .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
+      }.width('100%').height('100%')
     }.width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.createScroller])
       .titleBar({ enableComponentSafeArea: true,
-        style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
-          backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+        style: {
+          scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+          systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+          originalStyle: {
+            backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+            contentStyle: {
+              menuStyle: { iconColor: $r('app.color.primary_text') },
+              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+            }
+          },
+          scrollEffectStyle: {
+            contentStyle: {
+              menuStyle: { iconColor: $r('app.color.primary_text') },
+              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+            }
+          }
+        },
         content: { title: { mainTitle: '创建图板' }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, label: '关闭', isEnabled: !this.state.busy,

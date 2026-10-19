@@ -2156,6 +2156,12 @@ struct Index {
 
   private startNativeVerification(): void {
     if(!this.nativeLoginEnabled || this.businessSuspended || this.nativeVerificationPending)return;
+    // This non-credential hint only chooses presentation; it never grants access.
+    if (!this.loginHostMounted && AppStorage.get<boolean>('pinmonySessionConfirmed') !== true) {
+      PinmonyRuntimeLog.info('NativeSession: login required reason=no-confirmed-history');
+      this.openNativeLogin();
+      return;
+    }
     try {
       if (!connection.hasDefaultNetSync()) {
         this.sessionVerification.cancel('offline'); this.nativeSessionEpoch++;
@@ -2185,6 +2191,7 @@ struct Index {
 
   private openNativeLogin(): void {
     if(!this.nativeLoginEnabled)return;
+    AppStorage.setOrCreate<boolean>('pinmonySessionConfirmed', false);
     this.sessionVerification.cancel('login-required');this.nativeVerificationPending = false;
     this.nativeSessionEpoch++;this.authEpoch++;this.nativeLoginEvidenceKey = '';
     this.loginStartUrl = this.nativeSessionOrigin + '/login/';
@@ -2213,6 +2220,7 @@ struct Index {
         current.generation !== session.generation || current.origin !== session.origin)return;
     this.nativeSessionOrigin = session.origin;
     AppStorage.setOrCreate<string>('pinmonySessionOrigin',session.origin);
+    AppStorage.setOrCreate<boolean>('pinmonySessionConfirmed',true);
     this.nativeVerificationPending = false;this.nativeSessionEpoch++;this.authEpoch++;
     this.logoutAwaitingLogin = false;this.nativeLoginEvidenceKey = '';this.loginHostMounted = false;
     PinmonyRuntimeLog.info('NativeSession: native account confirmed webMounted=false');
@@ -2773,6 +2781,11 @@ struct Index {
       return;
     }
     if (!this.currentSearchPageKey()) return;
+    if (/[?&]q=[^&#]+/.test(this.currentSearchPageKey()) && !this.searchStore.searchInputFocused &&
+      this.searchStore.searchOpenHistory) {
+      this.searchStore.searchOpenHistory();
+      return;
+    }
     if (this.searchStore.searchInputFocused && this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();
     this.searchStore.searchInputFocused = false;
     this.searchStore.searchInputStopEditing = undefined;
@@ -5806,7 +5819,8 @@ struct Index {
 
   @Builder
   private buildMoreSheet() {
-    PinmonyMoreSheet({ pinStore: this.pinStore, onAction: (id: string) => this.performMoreAction(id), onRetry: () => this.refreshMoreSheet() })
+    PinmonyMoreSheet({ pinStore: this.pinStore, onAction: (id: string) => this.performMoreAction(id),
+      onRetry: () => this.refreshMoreSheet() })
   }
 
   @Builder
@@ -6513,7 +6527,7 @@ struct Index {
             loading: this.offlineCacheLoading || this.authStatus !== 'error', onRetry: () => this.retryLogin(),
           })
           if(this.nativeLoginEnabled && this.authStatus === 'error') {
-            Button('重新登录').onClick(() => this.openNativeLogin()).margin({bottom:80})
+            Button('前往登录').onClick(() => this.openNativeLogin()).margin({bottom:80})
           }
         }
         if (this.authStatus !== 'authenticated') { this.networkNoticeView() }
@@ -6537,8 +6551,8 @@ struct Index {
      height: ['save', 'edit', 'comments'].includes(this.activeSheetKind) ? SheetSize.LARGE :
         this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu && this.pinStore.shareSearchActive ? SheetSize.LARGE : SheetSize.FIT_CONTENT,
       dragBar: true,
-      showClose: this.activeSheetKind !== 'comments',
-      title: this.activeSheetKind === 'comments' ? undefined : { title: this.nativeModalLabel() },
+      showClose: true,
+      title: { title: this.nativeModalLabel() },
       backgroundColor: $r('app.color.page_background'),
       maskColor: '#66000000',
       onDisappear: (): void => {

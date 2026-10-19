@@ -1,6 +1,6 @@
 import { PinmonyBoardSectionNativeWrites, BoardSectionWriteIdentity } from './PinmonyBoardSectionNativeWrites';
 import { PinmonyBoardFollowNativeWrites, PinmonyBoardFollowNativeWritesPorts } from './PinmonyBoardFollowNativeWrites';
-import { PinmonyBoardStore, PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardFlow, PinmonyBoardSection, PinmonyBoardTarget, PinmonyBoardCollaborators, PinmonyBoardCollaborator } from 'feature_board';
+import { PinmonyBoardCreator, PinmonyBoardStore, PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardFlow, PinmonyBoardSection, PinmonyBoardTarget, PinmonyBoardCollaborators, PinmonyBoardCollaborator } from 'feature_board';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -17,7 +17,7 @@ interface BoardFeatured { curator?: BoardUser; board_tag?: string | number; is_s
 interface BoardHeader { large_image_url?: string; small_image_url?: string; }
 interface BoardData { type: string; id: string; url: string; name: string; owner: BoardUser; pin_count?: number;
   privacy?: string; description?: string; section_count?: number; is_collaborative?: boolean; collaborated_by_me?: boolean;
-  followed_by_me?: boolean; collaborating_users?: BoardUser[]; collaborator_count?: number; access?: string[]; featured_board_metadata?: BoardFeatured; header?: BoardHeader; isOwn?: boolean; allow_homefeed_recommendations?: boolean; collaborator_invites_enabled?: boolean; collaborator_requests_enabled?: boolean; collaborator_permissions_setting?: number; }
+  followed_by_me?: boolean; collaborating_users?: BoardUser[]; collaborator_count?: number; should_show_board_collaborators?: boolean; access?: string[]; featured_board_metadata?: BoardFeatured; header?: BoardHeader; isOwn?: boolean; allow_homefeed_recommendations?: boolean; collaborator_invites_enabled?: boolean; collaborator_requests_enabled?: boolean; collaborator_permissions_setting?: number; }
 interface BoardImage { url: string; width: number; height: number; }
 interface BoardDimensions { width: number; height: number; }
 interface BoardVideo { duration?: number; }
@@ -189,6 +189,8 @@ export class PinmonyBoardNativeReads {
     const members: BoardUser[] = b?.is_collaborative ? [owner!].concat(b.collaborating_users || []).filter((u: BoardUser,index: number,all: BoardUser[]): boolean => !!u && this.digits(u.id) && all.findIndex((v: BoardUser): boolean => !!v && v.id === u.id) === index).slice(0,100) : [];
     const peer: BoardUser | undefined = members.length === 2 && members.some((u: BoardUser): boolean => u.id === this.viewer) ? members.find((u: BoardUser): boolean => u.id !== this.viewer) : undefined;
     const count: number | undefined = this.count(b?.pin_count), tag: string | number | undefined = b?.featured_board_metadata?.board_tag;
+    const creators: PinmonyBoardCreator[] = b?.featured_board_metadata && !curator && b.should_show_board_collaborators === true ?
+      (owner ? [owner] : []).concat(b.collaborating_users || []).filter((u: BoardUser, i: number, all: BoardUser[]): boolean => !!u && this.digits(u.id) && !!this.clean(u.full_name || u.username) && all.findIndex((v: BoardUser): boolean => !!v && v.id === u.id) === i).slice(0, 6).map((u: BoardUser): PinmonyBoardCreator => ({ id:u.id, name:this.clean(u.full_name || u.username), avatar:this.image(u.image_medium_url || u.image_small_url), url:/^[A-Za-z0-9_]+$/.test(u.username) ? this.origin + '/' + u.username + '/' : '', verified:u.verified_identity?.verified === true })) : [];
     const snapshot: PinmonyBoardDetail = {kind:'state',nativeWriteIntent:this.flowEpoch,nativeAccountGeneration:this.generation,nativeVersion:this.version,nativeRecoveryVersion:this.recoveryVersion,nativeReadsReady:this.verified && this.ready,
       session:existing?.session || 0,pageKey:this.page,boardId:b?.id || '',title:this.clean(b?.name) || existing?.title || '图板',
       pinCount:count === undefined ? existing?.pinCount || '' : count.toString() + ' 张 Pin 图',
@@ -201,7 +203,7 @@ export class PinmonyBoardNativeReads {
       following:typeof b?.followed_by_me === 'boolean' ? b.followed_by_me : undefined,followBusy:this.followWrites.busy(b?.id || ''),
       canFollow:this.verified && this.ready && !own && !this.collection() && typeof b?.followed_by_me === 'boolean' && !this.followWrites.pending() && !this.followWrites.locked(b.id),
       editable:this.verified && own && !this.collection(),collaborator:member,canContribute:this.verified && !this.collection() && (own || member && !!b?.access?.includes('write')),
-      featured:!!b?.featured_board_metadata,featuredCreator:tag !== undefined && /^\d+$/.test(tag.toString()) && Number.isInteger(Number(tag)) && Number(tag) >= 0,
+      featuredCreators:creators,featured:!!b?.featured_board_metadata,featuredCreator:tag !== undefined && /^\d+$/.test(tag.toString()) && Number.isInteger(Number(tag)) && Number(tag) >= 0,
       sponsored:b?.featured_board_metadata?.is_sponsored_content === true,ownerVerified:display?.verified_identity?.verified === true,
       sectionCount:Number.isInteger(b?.section_count) && (b?.section_count || 0) > 0 ? b?.section_count : 0,
       sections:this.sections.slice(),sectionsError:this.sectionsError,subtitle:this.clean(b?.featured_board_metadata?.board_subtitle),description:this.clean(b?.description,2000),headerImage:this.image(b?.header?.large_image_url || b?.header?.small_image_url),

@@ -121,6 +121,7 @@ export struct PinmonySettingsPage {
       }
       .width('100%').height('100%')
       .padding({ bottom: 28 })
+      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
         LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
       }

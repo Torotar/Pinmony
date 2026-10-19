@@ -22,9 +22,9 @@ page.loadNextPageAtEnd(); assert.equal(loads,0); assert.equal(page.pendingEnd,tr
 page.paginationReady=true; page.resumePendingEnd(); assert.equal(loads,1,'read readiness is independent of write actions');
 page.resumePendingEnd(); assert.equal(loads,1,'pending edge resumes once');
 page.home.sourceError='category error';page.home.categorySourceFailure=true;page.loadNextPageAtEnd();assert.equal(loads,2);
-page.home.loadingMore=true;page.loadNextPageAtEnd();page.home.loadingMore=false;page.resumePendingEnd();assert.equal(loads,2,'busy edges cannot produce automatic failure retry loops');
-page.loading=true;page.loadNextPageAtEnd();page.loading=false;atEnd=false;page.resumePendingEnd();assert.equal(loads,2,'scrolling away cancels the pending edge');
-page.home.endReached=true;page.loadNextPageAtEnd();assert.equal(loads,2);
+page.home.loadingMore=true;page.loadNextPageAtEnd();page.home.loadingMore=false;page.resumePendingEnd();assert.equal(loads,3,'busy edge resumes after successful page completion');page.home.categorySourceFailure=false;page.home.sourceError='';page.home.loadingMore=true;page.loadNextPageAtEnd();page.home.loadingMore=false;page.error='page failed';page.resumePendingEnd();assert.equal(loads,3,'failed pagination does not automatically retry');page.error='';page.home.sourceError='';
+page.loading=true;page.loadNextPageAtEnd();page.loading=false;atEnd=false;page.resumePendingEnd();assert.equal(loads,3,'scrolling away cancels the pending edge');
+page.home.endReached=true;page.loadNextPageAtEnd();assert.equal(loads,3);
 const Index = methods('entry/src/main/ets/pages/Index.ets',['updateLoginPresentation','authWebVisible'], {
   isPinterestAuthRoute:url=>/^https:\/\/(?:www|uk)\.pinterest\.com\/(?:login|signup|auth|challenge)\//.test(url)
 });

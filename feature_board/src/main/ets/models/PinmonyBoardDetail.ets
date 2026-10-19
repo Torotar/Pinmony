@@ -22,6 +22,7 @@ export interface PinmonyBoardDetail {
   canFollow?: boolean;
   editable?: boolean;
   featured?: boolean;
+  featuredCreators?: PinmonyBoardCreator[];
   featuredCreator?: boolean;
   sponsored?: boolean;
   ownerVerified?: boolean;
@@ -87,5 +88,6 @@ export interface PinmonyBoardFlow {
 }
 
 export interface PinmonyBoardChatPeer { id: string; name: string; avatar: string; username: string; }
+export interface PinmonyBoardCreator { id: string; name: string; avatar: string; url: string; verified: boolean; }
 
 export interface PinmonyBoardSection { id: string; title: string; pinCount?: number; images: string[]; pins?: PinmonyBoardPin[]; }

@@ -1,5 +1,5 @@
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavigationTitleMode, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonyBoard, PinmonyCreatedPin, PinmonyProfileAction, PinmonyProfileSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 
@@ -22,6 +22,7 @@ export struct PinmonyProfilePage {
   private activeSection: string = '';
   private backRequested: boolean = false;
   private readonly compactTitleBuilder: () => void = (): void => { this.compactTitle(); };
+  private readonly rootCompactTitleBuilder: () => void = (): void => { this.rootCompactTitle(); };
   private readonly scroller: Scroller = new Scroller();
   onTab?: (section: string) => void;
   onBack?: () => void;
@@ -96,14 +97,28 @@ export struct PinmonyProfilePage {
     if (this.onSettings) this.onSettings();
   }
 
+  private contentColumns(): number {
+    return Math.max(2, Math.floor((this.contentWidth - 20) / 192));
+  }
+
+  private columnSlots(): number[] {
+    const slots: number[] = [];
+    for (let index: number = 0; index < this.contentColumns(); index++) slots.push(index);
+    return slots;
+  }
+
+  private contentColumnsTemplate(): string {
+    return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
   private rowStarts(length: number): number[] {
     const starts: number[] = [];
-    for (let index: number = 0; index < length; index += 2) starts.push(index);
+    for (let index: number = 0; index < length; index += this.contentColumns()) starts.push(index);
     return starts;
   }
 
   private pinHeight(pin: PinmonyCreatedPin): number {
-    const cardWidth: number = Math.max(130, (this.contentWidth - 44) / 2);
+    const cardWidth: number = Math.max(130, (this.contentWidth - 32 - (this.contentColumns() - 1) * 12) / this.contentColumns());
     if (pin.imageWidth <= 0 || pin.imageHeight <= 0) return cardWidth * 1.15;
     return Math.max(160, Math.min(280, cardWidth * pin.imageHeight / pin.imageWidth));
   }
@@ -481,18 +496,18 @@ export struct PinmonyProfilePage {
     } else if (this.profile.section === 'saved' && this.profile.boards.length > 0) {
       ForEach(this.rowStarts(this.profile.boards.length), (start: number) => {
         Row({ space: 12 }) {
-          this.boardCard(this.profile.boards[start])
-          if (start + 1 < this.profile.boards.length) {
-            this.boardCard(this.profile.boards[start + 1])
-          } else {
-            Blank().layoutWeight(1)
-          }
+          ForEach(this.columnSlots(), (column: number) => {
+            if (start + column < this.profile.boards.length) {
+              this.boardCard(this.profile.boards[start + column])
+            } else {
+              Blank().layoutWeight(1)
+            }
+          }, (column: number) => column.toString())
         }
         .width('100%')
         .alignItems(VerticalAlign.Top)
         .margin({ bottom: 24 })
-      }, (start: number) => this.profile.boards[start].id + ':' +
-        (start + 1 < this.profile.boards.length ? this.profile.boards[start + 1].id : ''))
+      }, (start: number) => this.contentColumns().toString() + ':' + start.toString() + ':' + this.profile.boards[start].id)
     } else if (this.profile.section === 'created' && this.profile.createdPins.length > 0) {
       WaterFlow() {
         ForEach(this.profile.createdPins, (pin: PinmonyCreatedPin) => {
@@ -503,7 +518,7 @@ export struct PinmonyProfilePage {
         }, (pin: PinmonyCreatedPin) => pin.id)
       }
       .width('100%')
-      .columnsTemplate('1fr 1fr')
+      .columnsTemplate(this.contentColumnsTemplate())
       .columnsGap(12)
       .rowsGap(14)
     } else {
@@ -536,7 +551,18 @@ export struct PinmonyProfilePage {
 
   private profileTitleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
+      style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        scrollEffectStyle: { contentStyle: {
+          backIconStyle: { iconColor: $r('app.color.primary_text') },
+          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+          titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+        } },
+        originalStyle: { contentStyle: {
+          backIconStyle: { iconColor: $r('app.color.primary_text') },
+          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+          titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+        }, backgroundStyle: {
         backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
       content: { title: { mainTitle: '' }, stackBuilder: this.compactTitleBuilder,
         backIcon: { isEnabled: true, action: () => this.requestProfileBack() },
@@ -578,27 +604,50 @@ export struct PinmonyProfilePage {
   }
 
   @Builder
+  private rootCompactTitle() {
+    if (this.compactHeader) {
+      Row({ space: 10 }) {
+        if (this.profile.avatarUrl) {
+          Image(this.profile.avatarUrl).width(32).height(32).borderRadius(16)
+            .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
+        }
+        Text(this.profile.displayName || this.profile.handle)
+          .fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+      }.width('100%').padding({ left: 18, right: 120 }).constraintSize({ maxHeight: 48 })
+    }
+  }
+
+  @Builder
+  private rootTitleBar() {
+    // Keep the existing 56vp root toolbar slot; Index owns its system safe area.
+    HdsNavigation() { Column().height(0) }
+      .width('100%').height(56)
+      .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
+      .titleBar({ avoidLayoutSafeArea: false, enableComponentSafeArea: false,
+        style: {
+          scrollEffectOpts: { enableScrollEffect: false },
+          systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+          originalStyle: {
+            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 },
+            contentStyle: {
+              menuStyle: { iconColor: $r('app.color.primary_text') },
+              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+            }
+          }
+        },
+        content: { title: { mainTitle: '' }, stackBuilder: this.rootCompactTitleBuilder,
+          menu: { value: [{ content: { icon: $r('sys.symbol.plus'), label: '发布',
+            action: () => { if (this.onPublish) this.onPublish(); } } },
+            { content: { icon: $r('sys.symbol.gearshape'), label: '设置', action: () => this.openSettings() } }] } }
+      })
+  }
+  @Builder
   private profileBody() {
 
     Column() {
       if (!this.onBack) {
-      Row() {
-        if (this.compactHeader) {
-          if (this.profile.avatarUrl) { Image(this.profile.avatarUrl).width(32).height(32).borderRadius(16)
-            .margin({ right: 10 })
-            .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); }) }
-          Text(this.profile.displayName || this.profile.handle).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(1)
-        } else { Blank() }
-        this.titleAction($r('sys.symbol.plus'), '发布', true, () => {
-          if (this.onPublish) this.onPublish();
-        })
-        this.titleAction($r('sys.symbol.gearshape'), '设置', true,
-          () => this.openSettings())
-      }
-      .height(56)
-      .padding({ left: 18, right: 12 })
-      .width('100%')
+      this.rootTitleBar()
 
       }
       Refresh({ refreshing: this.refreshing }) {
@@ -608,7 +657,9 @@ export struct PinmonyProfilePage {
             Image(this.profile.coverUrl).width('100%').height(this.profileCoverHeight()).objectFit(ImageFit.Cover)
               .accessibilityText('个人资料封面')
           }
-          this.profileHeader()
+          Column() {
+            this.profileHeader()
+          }.width('100%').constraintSize({ maxWidth: 760 })
           Row({ space: 38 }) {
             this.sectionTab('created', '已创建')
             this.sectionTab('saved', '已收藏')
@@ -628,7 +679,6 @@ export struct PinmonyProfilePage {
           .padding({ left: 16, right: 16, bottom: 116 })
         }
         .width('100%')
-        .constraintSize({ maxWidth: 760 })
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const width: number = Number(newArea.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
@@ -674,12 +724,13 @@ export struct PinmonyProfilePage {
         }.width('100%')
         ForEach(this.rowStarts(Math.min(4, (this.profile.unorganizedPins || []).length)), (start: number) => {
           Row({ space: 12 }) {
-            this.createdPinCard((this.profile.unorganizedPins || [])[start])
-            if (start + 1 < (this.profile.unorganizedPins || []).length) {
-              this.createdPinCard((this.profile.unorganizedPins || [])[start + 1])
-            } else { Blank().layoutWeight(1) }
+            ForEach(this.columnSlots(), (column: number) => {
+              if (start + column < Math.min(4, (this.profile.unorganizedPins || []).length)) {
+                this.createdPinCard((this.profile.unorganizedPins || [])[start + column])
+              } else { Blank().layoutWeight(1) }
+            }, (column: number) => column.toString())
           }.width('100%').alignItems(VerticalAlign.Top)
-        }, (start: number) => start.toString())
+        }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
         if (this.profile.unorganizedLoading) { LoadingProgress().width(28).height(28) }
         else if (this.profile.unorganizedError) {
           Text(this.profile.unorganizedError).fontSize(14).fontColor($r('app.color.secondary_text'))

@@ -1,5 +1,5 @@
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyInboxBoardCard } from './PinmonyInboxBoardCard';
@@ -643,8 +643,9 @@ export struct PinmonyInboxFlowPage {
     }.width('100%').height('100%')
       .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
         style: {
-          scrollEffectOpts: { enableScrollEffect: false },
-          scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
+          scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+          systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+          scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 }, contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
             backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
           } }
         },
@@ -655,6 +656,7 @@ export struct PinmonyInboxFlowPage {
           menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: '消息设置', action: () => this.act('settings') } }] :
             this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: '下一步', isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
+      .backgroundColor($r('app.color.page_background'))
       .bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .onBackPressed(() => { this.act('back'); return true; })

@@ -36,7 +36,7 @@ let saveCookies = () => Promise.resolve();
 let online = true;
 const globals = { connection: {hasDefaultNetSync: () => online}, webview: { WebviewController: Controller, WebCookieManager: {saveCookieAsync: () => saveCookies()} }, PinmonyRuntimeLog: log,
   PINTEREST_LOGIN_URL: login, PIN_NATIVE_HOME_READS_ENABLED: false, PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: false,
-  AppStorage: { setOrCreate: (key, value) => storage.set(key, value) } };
+  AppStorage: { get: key => storage.get(key), setOrCreate: (key, value) => storage.set(key, value) } };
 const names = ['sessionDocumentUrl','runSessionScript','loadSessionDocument','startNativeVerification',
   'openNativeLogin','releaseNativeLogin','handleNativeSessionExpired','updateAuthState','syncAuthentication',
   'retryLogin','confirmBusinessSession','nativeBusinessSessionContext','enterAuthenticatedRoot'];
@@ -55,6 +55,7 @@ function productionPorts(name, type) {
 const sessionPorts = productionPorts('sessionCoordinator','PinmonySessionCoordinator');
 const verificationPorts = productionPorts('sessionVerification','PinmonySessionVerification');
 function fixture() {
+  storage.set('pinmonySessionConfirmed', true);
   const host = new Host(), jobs = [], timers = [];
   const stores = ['home','profile','inbox','pin','board','settings'];
   for (const name of stores) host[name + 'Store'] = {};
@@ -89,6 +90,10 @@ function reply(status = 'authenticated') {
       data: { id: '123', username: 'fixture_user', type: 'user_settings' } } }) };
 }
 async function main() {
+  let guest = fixture(); storage.delete('pinmonySessionConfirmed'); guest.host.startNativeVerification();
+  assert.equal(guest.jobs.length,0,'first use and legacy upgrades open login without relying on arbitrary visitor cookies');
+  assert.equal(guest.host.loginHostMounted,true); assert.equal(guest.host.authStatus,'unauthenticated');
+  assert.equal(storage.get('pinmonySessionConfirmed'),false);
   let f = fixture(); rawCalls.length = 0; f.host.startNativeVerification();
   f.host.authEpoch += 100; // Web document lifetime is unrelated to this attempt.
   f.jobs[0].resolve(reply()); await flush();
@@ -97,6 +102,7 @@ async function main() {
   assert.equal(rawCalls.length, 0, 'cold-start confirmation never reads or navigates a Web document');
   assert.equal(f.host.businessSession.context('authenticated').appVersion, 'fixture.2');
   assert(events.includes('NativeSession: cookie store saved'));
+  assert.equal(storage.get('pinmonySessionConfirmed'),true,'only current validated identity and saved cookies establish startup reuse');
   f.host.updateAuthState(JSON.stringify({ status: 'unauthenticated', pageUrl: home, epoch: f.host.authEpoch }));
   assert.equal(f.host.authStatus, 'authenticated', 'a released host cannot change native authentication');
   f = fixture(); f.host.startNativeVerification(); f.jobs[0].resolve({ status: 0, error: 'missing-session', body: '' }); await flush();
@@ -116,6 +122,7 @@ async function main() {
   f.host.handleNativeSessionExpired('https://www.pinterest.com', generation);
   f.timers.filter(t => t.delay === 0).forEach(t => t.fn()); assert.equal(f.host.loginHostMounted, true);
   assert.notEqual(f.host.controller, firstController, 'each login gets a distinct controller to reject retired host callbacks');
+  assert.equal(storage.get('pinmonySessionConfirmed'),false,'explicit expiry returns future launches to login');
   f = fixture(); f.host.startNativeVerification(); f.jobs[0].resolve({ status: 0, error: 'network-unavailable', body: '' }); await flush();
   assert.equal(f.host.authStatus, 'error'); assert.equal(f.host.loginHostMounted, false, 'network failure is not logout or automatic Web fallback');
   f.host.retryLogin(); assert.equal(f.jobs.length, 2); f.jobs[1].resolve(reply()); await flush(); assert.equal(f.host.authStatus, 'authenticated');
@@ -130,8 +137,9 @@ async function main() {
   f.host.nativeSessionEpoch++; f.host.authStatus = 'unauthenticated'; completeSave(); await flush();
   assert.equal(f.host.loginHostMounted,true,'a stale save completion cannot release a newer login host');
   saveCookies = () => Promise.reject(Error('synthetic persistence error'));
-  f = fixture(); f.host.loginHostMounted = true; f.host.startNativeVerification(); f.jobs[0].resolve(reply()); await flush();
+  f = fixture(); storage.set('pinmonySessionConfirmed',false); f.host.loginHostMounted = true; f.host.startNativeVerification(); f.jobs[0].resolve(reply()); await flush();
   assert.equal(f.host.loginHostMounted,true,'failed persistence must not claim release success');
+  assert.equal(storage.get('pinmonySessionConfirmed'),false,'failed persistence cannot enable silent reuse');
   assert(events.includes('NativeSession: cookie store save unavailable'));
   online = false; saveCookies = () => Promise.resolve(); f = fixture(); f.host.startNativeVerification();
   assert.equal(f.jobs.length,0,'offline startup does not dispatch a request or wait for timeout');

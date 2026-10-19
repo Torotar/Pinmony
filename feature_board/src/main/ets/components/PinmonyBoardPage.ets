@@ -1,17 +1,17 @@
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardTarget, PinmonyBoardSection } from '../models/PinmonyBoardDetail';
+import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardTarget, PinmonyBoardSection, PinmonyBoardCreator } from '../models/PinmonyBoardDetail';
 import { boardSectionPreviewImages } from '../services/PinmonyBoardPresentation';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
-  HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType } from '@kit.UIDesignKit';
+  HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 
 interface BoardTitleMenuItem {
   content: BoardTitleMenuContent;
 }
 
 interface BoardTitleMenuContent {
-  icon: Resource;
+  icon: Resource | SymbolGlyphModifier;
   label: string;
   isEnabled: boolean;
   action: () => void;
@@ -215,7 +215,9 @@ export struct PinmonyBoardPage {
     } };
     if (this.snapshot.editable !== true) {
       const follow: BoardTitleMenuItem = { content: {
-        icon: $r('app.media.board_follow_outline'), label: this.snapshot.followBusy ? '处理中…' : this.snapshot.following ? '取消关注' : '关注',
+        icon: new SymbolGlyphModifier(this.snapshot.following ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+          .fontColor([this.snapshot.following ? $r('app.color.accent') : $r('app.color.primary_text')]),
+        label: this.snapshot.followBusy ? '处理中…' : this.snapshot.following ? '取消关注' : '关注',
         isEnabled: this.snapshot.ready && this.snapshot.canFollow === true && !this.snapshot.followBusy,
         action: () => { if (this.snapshot.canFollow && !this.snapshot.followBusy) this.act('followToggle'); }
       } };
@@ -234,7 +236,8 @@ export struct PinmonyBoardPage {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
-        scrollEffectOpts: { enableScrollEffect: false },
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
         scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: {  backgroundStyle: {
           backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
         }, contentStyle: this.isDiscoveryBoard() ? {
@@ -274,9 +277,35 @@ export struct PinmonyBoardPage {
 
   private selectionPins(): PinmonyBoardPin[] { return this.snapshot.flow?.sectionId && this.selectingPins() || this.snapshot.flow?.sectionId && this.phase() === 'targets' ? this.snapshot.flow?.pins || [] : this.snapshot.pins; }
 
+  @State private contentWidth: number = 360;
+
+  private contentColumns(): number {
+    return Math.max(2, Math.floor((this.contentWidth - 32 + 12) / 192));
+  }
+
+  private columnSlots(): number[] {
+    const slots: number[] = [];
+    for (let i: number = 0; i < this.contentColumns(); i++) slots.push(i);
+    return slots;
+  }
+
+  private contentColumnsTemplate(): string {
+    return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
+  private selectionColumns(): number {
+    return Math.max(3, Math.floor((this.contentWidth - 20) / 122));
+  }
+
+  private selectionSlots(): number[] {
+    const slots: number[] = [];
+    for (let i: number = 0; i < this.selectionColumns(); i++) slots.push(i);
+    return slots;
+  }
+
   private rows(): number[] {
     const result: number[] = [];
-    for (let index: number = 0; index < this.selectionPins().length; index += 3) result.push(index);
+    for (let index: number = 0; index < this.selectionPins().length; index += this.selectionColumns()) result.push(index);
     return result;
   }
 
@@ -459,7 +488,7 @@ export struct PinmonyBoardPage {
 
   private sectionRows(): number[] {
     const rows: number[] = [];
-    for (let index: number = 0; index < (this.snapshot.sections?.length || 0); index += 2) rows.push(index);
+    for (let index: number = 0; index < (this.snapshot.sections?.length || 0); index += this.contentColumns()) rows.push(index);
     return rows;
   }
 
@@ -674,7 +703,7 @@ export struct PinmonyBoardPage {
           if (start + 2 < this.selectionPins().length) { this.card(this.selectionPins()[start + 2]) }
           else { Blank().layoutWeight(1) }
         }.width('100%').alignItems(VerticalAlign.Top)
-      }, (start: number) => start.toString())
+      }, (start: number) => this.selectionColumns().toString() + ':' + start.toString())
       if (this.snapshot.loadingMore) { LoadingProgress().width(28).height(28) }
       if (this.snapshot.error) {
         Text(this.snapshot.error).fontColor($r('app.color.secondary_text'))
@@ -778,7 +807,7 @@ export struct PinmonyBoardPage {
                   .backgroundColor($r('app.color.surface_muted')).accessibilityText('私密图板')
                 Text('·').fontSize(14).fontColor($r('app.color.secondary_text'))
               }
-              if (this.snapshot.featuredCreator) { Text('精选创建者 ·').fontSize(14).fontColor($r('app.color.accent')) }
+              if (this.snapshot.featured) { Text('特色图板 ·').fontSize(14).fontColor($r('app.color.primary_text')) }
               Text(this.snapshot.pinCount).fontSize(14).fontColor($r('app.color.secondary_text'))
               if (this.isDiscoveryBoard() && (this.snapshot.sectionCount || 0) > 0) {
                 Text('· ' + this.snapshot.sectionCount + ' 个图板区块').fontSize(14).fontColor($r('app.color.secondary_text'))
@@ -788,7 +817,28 @@ export struct PinmonyBoardPage {
           if (!this.phase() && this.snapshot.featured && this.snapshot.description) {
             Text(this.snapshot.description).fontSize(16).fontColor($r('app.color.primary_text')).width('100%')
           }
-          if (!this.phase() && this.snapshot.ownerName && !this.joinedAvatar) {
+          if (!this.phase() && this.snapshot.featuredCreators?.length) {
+            Row({ space: 6 }) {
+              ForEach(this.snapshot.featuredCreators || [], (creator: PinmonyBoardCreator, index: number) => {
+                if (creator.avatar) { Image(creator.avatar).width(30).height(30).borderRadius(15).margin({ left: index > 0 ? -12 : 0 }) }
+              }, (creator: PinmonyBoardCreator) => creator.id)
+              Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
+              Text('来自 ').fontSize(15).fontColor($r('app.color.primary_text'))
+              ForEach(this.snapshot.featuredCreators || [], (creator: PinmonyBoardCreator, index: number) => {
+                Row({ space: 4 }) {
+                if (index > 0) { Text(index === (this.snapshot.featuredCreators?.length || 0) - 1 ? '和' : '、').fontSize(15).fontColor($r('app.color.primary_text')) }
+                Text(creator.name).fontSize(15).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+                  .onClick(() => { if (creator.url && this.onUser) this.onUser(creator.url); })
+                if (creator.verified) {
+                  SymbolGlyph($r('sys.symbol.checkmark')).fontSize(10).fontColor([Color.White])
+                    .padding(3).backgroundColor($r('app.color.accent')).borderRadius(8).accessibilityText('已认证')
+                }
+                }.margin({ right: 4, bottom: 4 })
+              }, (creator: PinmonyBoardCreator) => creator.id)
+              }.layoutWeight(1)
+            }.width('100%')
+          }
+          if (!this.phase() && !this.snapshot.featuredCreators?.length && this.snapshot.ownerName && !this.joinedAvatar) {
             Row({ space: 8 }) {
               if (this.snapshot.ownerAvatar) {
                 Image(this.snapshot.ownerAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(32).height(32).borderRadius(16)
@@ -868,7 +918,7 @@ export struct PinmonyBoardPage {
                       ForEach(section.pins || [], (pin: PinmonyBoardPin) => {
                         FlowItem() { this.card(pin) }.width('100%')
                       }, (pin: PinmonyBoardPin) => pin.id)
-                    }.width('100%').columnsTemplate('1fr 1fr').columnsGap(12).rowsGap(12)
+                    }.width('100%').columnsTemplate(this.contentColumnsTemplate()).columnsGap(12).rowsGap(12)
                   }
                   if (!section.pins?.length || section.pinCount === undefined || section.pinCount > (section.pins?.length || 0)) {
                     Button('查看区块' + (section.pinCount === undefined ? '' : ' · ' + section.pinCount + ' 张 Pin 图')).backgroundColor($r('app.color.surface_muted'))
@@ -883,12 +933,12 @@ export struct PinmonyBoardPage {
             Column({ space: 24 }) {
               ForEach(this.sectionRows(), (index: number) => {
                 Row({ space: 16 }) {
-                  this.sectionCard(this.snapshot.sections![index])
-                  if (index + 1 < (this.snapshot.sections?.length || 0)) {
-                    this.sectionCard(this.snapshot.sections![index + 1])
-                  } else { Blank().layoutWeight(1) }
+                  ForEach(this.columnSlots(), (slot: number) => {
+                    if (index + slot < (this.snapshot.sections?.length || 0)) { this.sectionCard(this.snapshot.sections![index + slot]) }
+                    else { Blank().layoutWeight(1) }
+                  }, (slot: number) => slot.toString())
                 }.width('100%').alignItems(VerticalAlign.Top)
-              }, (index: number) => this.snapshot.sections![index].id)
+              }, (index: number) => this.contentColumns().toString() + ':' + this.snapshot.sections![index].id)
             }.width('100%')
             }
           }
@@ -935,7 +985,7 @@ export struct PinmonyBoardPage {
               }, (pin: PinmonyBoardPin) => pin.id)
             }
             .width('100%')
-            .columnsTemplate('1fr 1fr')
+            .columnsTemplate(this.contentColumnsTemplate())
             .columnsGap(12)
             .rowsGap(12)
           }
@@ -952,7 +1002,11 @@ export struct PinmonyBoardPage {
             Button('重试').onClick(() => { if (this.onRetry) this.onRetry(); })
           }
         }
-        .width('100%').constraintSize({ maxWidth: 760 })
+        .width('100%')
+        .onAreaChange((_old: Area, area: Area) => {
+          const width: number = Number(area.width);
+          if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
+        })
         .padding({ left: 16, right: 16, top: 18, bottom: 40 })
       }
       .width('100%').height('100%').scrollBar(BarState.Off)

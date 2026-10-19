@@ -89,6 +89,9 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
                 view.searchStore.searchInputFocused = visible && focused;
                 view.searchStore.searchInputStopEditing = visible && focused ? stopEditing : undefined;
                 view.syncFloatingTabsMotion();
+              },
+              onHistoryReturnReady: (openHistory?: () => void) => {
+                view.searchStore.searchOpenHistory = openHistory;
               }
             })
             .width('100%')

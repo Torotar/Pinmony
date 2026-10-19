@@ -11,8 +11,22 @@ export struct PinmonySearchQuizPanel {
   onAction: (kind: string, id: string) => void = () => {};
   onPin: (url: string) => void = () => {};
 
+  private contentColumns(): number {
+    return Math.max(2, Math.floor((this.contentWidth - 0 + 8) / 188));
+  }
+
+  private columnSlots(): number[] {
+    const slots: number[] = [];
+    for (let i: number = 0; i < this.contentColumns(); i++) slots.push(i);
+    return slots;
+  }
+
+  private contentColumnsTemplate(): string {
+    return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
   private cardWidth(): number {
-    return Math.max(1, (this.contentWidth - 8) / 2);
+    return Math.max(1, (this.contentWidth - (this.contentColumns() - 1) * 8) / this.contentColumns());
   }
 
   private cardHeight(item: PinmonySearchQuizCard): number {
@@ -49,9 +63,9 @@ export struct PinmonySearchQuizPanel {
               .onClick(() => this.onAction('topic', item.id)).accessibilityText(item.query)
           }
         }, (item: PinmonySearchQuizTopic) => item.id)
-      }.columnsTemplate('1fr 1fr').columnsGap(8).rowsGap(8)
+      }.columnsTemplate(this.contentColumnsTemplate()).columnsGap(8).rowsGap(8)
         .enableScrollInteraction(false).scrollBar(BarState.Off)
-        .height(Math.ceil(Math.min(4, this.quiz.topics.length) / 2) * (this.contentWidth + 8) / 2)
+        .height(Math.ceil(Math.min(4, this.quiz.topics.length) / this.contentColumns()) * (this.cardWidth() + 8))
     }.width('100%').padding(12).borderRadius(16).backgroundColor($r('app.color.surface_muted'))
       .onAreaChange((_old: Area, area: Area) => {
         const width: number = Number(area.width) - 24;
@@ -87,7 +101,7 @@ export struct PinmonySearchQuizPanel {
                   .accessibilitySelected(item.selected)
               }.width(this.cardWidth()).height(this.cardHeight(item))
             }, (item: PinmonySearchQuizCard) => item.id)
-          }.columnsTemplate('1fr 1fr').columnsGap(8).rowsGap(8).width('100%').height('100%')
+          }.columnsTemplate(this.contentColumnsTemplate()).columnsGap(8).rowsGap(8).width('100%').height('100%')
             .clip(true).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
             .onReachEnd(() => {
               if (this.quiz.mode === 'picker' && this.quiz.canMore && !this.quiz.busy && !this.quiz.error) this.onAction('more', '');

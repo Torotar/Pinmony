@@ -228,8 +228,8 @@ export struct PinmonyHomePage {
       this.home.endReached ? 'end-finished' : this.home.sourceError && !this.home.categorySourceFailure ? 'end-error' :
       !this.feedActive || this.loading || this.refreshing || !!this.pendingTabId ? 'end-inactive' : 'end-dispatch');
     if (this.home.dataSource !== 'api' || this.home.endReached ||
-        this.home.sourceError && !this.home.categorySourceFailure) { this.pendingEnd = false; return; }
-    if (this.home.loadingMore) { this.pendingEnd = false; return; }
+        (this.home.sourceError || this.error) && !this.home.categorySourceFailure) { this.pendingEnd = false; return; }
+    if (this.home.loadingMore) { this.pendingEnd = true; return; }
     if (!this.feedActive || !this.paginationReady || this.loading || this.refreshing ||
         this.pendingTabId || this.home.loadingMore || this.home.refreshing) { this.pendingEnd = true; return; }
     this.pendingEnd = false;
@@ -281,8 +281,22 @@ export struct PinmonyHomePage {
     this.onTab(tab.id);
   }
 
+  private contentColumns(): number {
+    return Math.max(2, Math.floor((this.contentWidth - 24 + 12) / 192));
+  }
+
+  private columnSlots(): number[] {
+    const slots: number[] = [];
+    for (let i: number = 0; i < this.contentColumns(); i++) slots.push(i);
+    return slots;
+  }
+
+  private contentColumnsTemplate(): string {
+    return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
   private imageHeight(pin: PinmonyHomePin): number {
-    const width: number = Math.max(130, (this.contentWidth - 36) / 2);
+    const width: number = Math.max(130, (this.contentWidth - 24 - (this.contentColumns() - 1) * 12) / this.contentColumns());
     if (pin.imageWidth <= 0 || pin.imageHeight <= 0) return width * 1.2;
     return width * Math.max(0.55, Math.min(3.2, pin.imageHeight / pin.imageWidth));
   }
@@ -586,7 +600,7 @@ export struct PinmonyHomePage {
               }
               .width('100%')
             }
-            .columnsTemplate('1fr 1fr')
+            .columnsTemplate(this.contentColumnsTemplate())
             .columnsGap(12)
             .rowsGap(12)
             .width('100%')
@@ -609,6 +623,7 @@ export struct PinmonyHomePage {
             .onScrollStop(() => {
               this.updateHomeChrome(0, ScrollState.Idle);
               this.reportScrollPosition(true);
+              try { if (this.feedScroller.isAtEnd()) this.loadNextPageAtEnd(); } catch (_) { }
             })
             .onReachEnd(() => {
               this.loadNextPageAtEnd();

@@ -145,13 +145,6 @@ export struct PinmonyCommentsSheet {
 
   build() {
     Column({ space: 12 }) {
-      Row({ space: 16 }) {
-        Text('你觉得怎么样？').fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-        Button({ type: ButtonType.Circle }) {
-          SymbolGlyph($r('sys.symbol.xmark')).fontSize(24).fontColor([$r('app.color.primary_text')])
-        }.width(36).height(36).backgroundColor(Color.Transparent).onClick(() => { if (this.onClose) this.onClose(); })
-          .accessibilityText('关闭评论')
-      }.width('100%').padding({ bottom: 12 })
       Divider().color($r('app.color.secondary_text')).opacity(0.2)
       if (this.result.actionError) {
         Text(this.result.actionError).fontColor($r('app.color.secondary_text'))

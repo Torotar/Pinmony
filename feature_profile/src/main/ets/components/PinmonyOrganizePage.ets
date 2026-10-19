@@ -1,6 +1,6 @@
 import { PinmonyCreatedPin, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard } from '../models/PinmonyProfile';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
-  HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+  HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay } from 'common_ui';
 
@@ -38,8 +38,19 @@ export struct PinmonyOrganizePage {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
-        scrollEffectOpts: { enableScrollEffect: false },
-        originalStyle: { backgroundStyle: {
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        scrollEffectStyle: { contentStyle: {
+          backIconStyle: { iconColor: $r('app.color.primary_text') },
+          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+          titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+        } },
+
+        originalStyle: { contentStyle: {
+          backIconStyle: { iconColor: $r('app.color.primary_text') },
+          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+          titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+        }, backgroundStyle: {
           backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
         } }
       },
@@ -73,9 +84,25 @@ export struct PinmonyOrganizePage {
 
   private selected(pin: PinmonyCreatedPin): boolean { return this.state.selectedIds.includes(pin.id); }
 
+  @State private contentWidth: number = 360;
+
+  private contentColumns(): number {
+    return Math.max(3, Math.floor((this.contentWidth - 32 + 12) / 122));
+  }
+
+  private columnSlots(): number[] {
+    const slots: number[] = [];
+    for (let i: number = 0; i < this.contentColumns(); i++) slots.push(i);
+    return slots;
+  }
+
+  private contentColumnsTemplate(): string {
+    return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
   private rows(): number[] {
     const result: number[] = [];
-    for (let i: number = 0; i < this.pins.length; i += 3) result.push(i);
+    for (let i: number = 0; i < this.pins.length; i += this.contentColumns()) result.push(i);
     return result;
   }
 
@@ -115,7 +142,7 @@ export struct PinmonyOrganizePage {
           if (start + 2 < this.pins.length) { this.thumb(this.pins[start + 2]) }
           else { Blank().layoutWeight(1) }
         }.width('100%').alignItems(VerticalAlign.Top)
-      }, (start: number) => start.toString())
+      }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
       if (this.pinsLoading && this.pins.length > 0) { LoadingProgress().width(28).height(28) }
       else if (this.pinsError) {
         Text(this.pinsError).fontColor($r('app.color.secondary_text'))

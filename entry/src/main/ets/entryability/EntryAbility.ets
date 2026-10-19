@@ -3,6 +3,7 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { webview } from '@kit.ArkWeb';
 import { NetworkManager } from 'common_network';
 
@@ -67,7 +68,9 @@ export default class EntryAbility extends UIAbility {
       errorManager.on('globalUnhandledRejectionDetected', this.rejectionObserver);
     } catch (_) { PinmonyRuntimeLog.warn('Runtime: exception observer unavailable'); }
     PersistentStorage.persistProp('themePreference', 'system');
+    PersistentStorage.persistProp('screenOrientationPreference', 'system');
     PersistentStorage.persistProp('pinmonySessionOrigin', 'https://www.pinterest.com');
+    PersistentStorage.persistProp('pinmonySessionConfirmed', false);
     try {
       const preference: string = AppStorage.get<string>('themePreference') || 'system';
       this.context.getApplicationContext().setColorMode(preference === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : preference === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
@@ -111,6 +114,15 @@ export default class EntryAbility extends UIAbility {
 
     try {
       this.mainWindow = windowStage.getMainWindowSync();
+      if (deviceInfo.deviceType === 'tablet') {
+        const preference: string = AppStorage.get<string>('screenOrientationPreference') || 'system';
+        const orientation: window.Orientation = preference === 'auto' ? window.Orientation.AUTO_ROTATION :
+          preference === 'portrait' ? window.Orientation.PORTRAIT : preference === 'landscape' ?
+            window.Orientation.LANDSCAPE : window.Orientation.AUTO_ROTATION_RESTRICTED;
+        this.mainWindow.setPreferredOrientation(orientation).catch(() => {
+          PinmonyRuntimeLog.warn('Settings: saved orientation unavailable');
+        });
+      }
       this.mainWindow.on('avoidAreaChange', (data) => {
         if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
           PinmonyRuntimeLog.info('AbilityLifecycle: avoid-area type=system topPx=' +

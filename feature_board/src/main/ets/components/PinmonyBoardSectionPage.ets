@@ -1,5 +1,5 @@
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 
 @Component
@@ -20,6 +20,13 @@ export struct PinmonyBoardSectionPage {
       TextInput({ placeholder: '区块名称', text: this.name }).maxLength(100)
         .enabled(!this.busy && !this.submitted)
         .accessibilityText('图板区块名称').onChange((value: string) => { this.name = value; })
+      if (this.busy) { LoadingProgress().width(24).height(24) }
+      if (!this.ready && !this.busy && !this.error) { Text('正在恢复图板，请稍候').fontColor($r('app.color.secondary_text')).fontSize(14) }
+      if (this.error) { Text(this.error).fontColor($r('app.color.secondary_text')).fontSize(14) }
+    }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
+  }
+  @Builder
+  private nextButton() {
       Button('下一步').width('100%').height(48).backgroundColor($r('app.color.accent'))
         .fontColor($r('app.color.detail_on_accent')).enabled(this.ready && !!this.name.trim() && !this.busy && !this.submitted)
         .onClick(async () => {
@@ -31,21 +38,36 @@ export struct PinmonyBoardSectionPage {
           if (this.error && !this.error.includes('未确认')) this.submitted = false;
           if (!this.error) { this.visible = false; this.onClose(); }
         })
-      if (this.busy) { LoadingProgress().width(24).height(24) }
-      if (!this.ready && !this.busy && !this.error) { Text('正在恢复图板，请稍候').fontColor($r('app.color.secondary_text')).fontSize(14) }
-      if (this.error) { Text(this.error).fontColor($r('app.color.secondary_text')).fontSize(14) }
-    }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
   @Builder
   private sectionSheet() {
     HdsNavigation() {
-      Scroll(this.scroller) { this.sectionForm() }
-        .width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
+      Column() {
+        Scroll(this.scroller) { this.sectionForm() }
+          .width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
+        Column() { this.nextButton() }
+          .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
+      }.width('100%').height('100%')
     }.width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.scroller])
       .titleBar({ enableComponentSafeArea: true,
-        style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
-          backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+        style: {
+          scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+          systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+          originalStyle: {
+            backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+            contentStyle: {
+              menuStyle: { iconColor: $r('app.color.primary_text') },
+              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+            }
+          },
+          scrollEffectStyle: {
+            contentStyle: {
+              menuStyle: { iconColor: $r('app.color.primary_text') },
+              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+            }
+          }
+        },
         content: { title: { mainTitle: '添加图板区块' }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, isEnabled: !this.busy, label: '关闭', action: () => { if (!this.busy) { this.visible = false; this.onClose(); } }

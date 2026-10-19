@@ -1,5 +1,5 @@
 import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 @Component
 export struct PinmonyBoardInvitationList {
   @Prop snapshot: PinmonyBoardInvitations;
@@ -12,8 +12,23 @@ export struct PinmonyBoardInvitationList {
   aboutToAppear(): void { if (this.all) this.stack.pushPath({ name: 'board-requests' }, false); }
   private titleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
-        backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+      style: {
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        originalStyle: {
+          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+          contentStyle: {
+            backIconStyle: { iconColor: $r('app.color.primary_text') },
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+          }
+        },
+        scrollEffectStyle: {
+          contentStyle: {
+            backIconStyle: { iconColor: $r('app.color.primary_text') },
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+          }
+        }
+      },
       content: { title: { mainTitle: '请求' }, backIcon: { action: () => this.onBack() } } };
   }
   @Builder private content() {
