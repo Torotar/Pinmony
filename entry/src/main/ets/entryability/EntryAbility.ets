@@ -1,4 +1,5 @@
 import { PINMONY_BUILD_IDENTITY } from '../app/PinmonyBuildIdentity';
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -44,6 +45,10 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     PinmonyRuntimeLog.initialize(this.context.filesDir);
+    try { PinmonyI18n.initialize(this.context); }
+    catch (_) { PinmonyRuntimeLog.warn('LanguagePreference: restore failed'); PinmonyI18n.syncSystemLanguage(); }
+    PinmonyRuntimeLog.info('LanguagePreference: restored=' + (AppStorage.get<string>('pinmonyLanguagePreference') || 'system') +
+      ' effective=' + (AppStorage.get<string>('pinmonyLanguage') || 'unknown'));
     PinmonyRuntimeLog.info('RuntimeBuild: ' + PINMONY_BUILD_IDENTITY);
     this.lifecycleStartedAt = Date.now();
     this.lifecycleLastEventAt = this.lifecycleStartedAt;
@@ -100,6 +105,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
+    PinmonyI18n.syncSystemLanguage();
     this.logLifecycle('configuration-update', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString() + ' colorMode=' +
       (typeof newConfig.colorMode === 'number' ? newConfig.colorMode.toString() : 'undefined'));

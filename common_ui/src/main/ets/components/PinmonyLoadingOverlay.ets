@@ -1,6 +1,9 @@
+import { PinmonyI18n } from 'common_foundation';
 @Component
 export struct PinmonyLoadingOverlay {
-  @Prop message: string = '正在加载，请稍候…';
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  @Prop message: string = PinmonyI18n.message("正在加载，请稍候…");
 
   build() {
     Stack({ alignContent: Alignment.Center }) {

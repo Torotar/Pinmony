@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyControllerLifecycle } from './PinmonyControllerLifecycle';
 import { PinmonyReturnCoordinator } from './PinmonyReturnCoordinator';
 import { PinmonySearchController } from 'feature_search';
@@ -389,7 +390,7 @@ syncAuthentication(): void {
         if (this.ports.tryEnterOfflinePreview(this.ports.navigationAddress() || this.ports.lastPageUrl() || PINTEREST_URL, 'auth-timeout'))
             return;
         this.ports.setAuthStatus('error');
-        this.ports.setFailureDetails('无法确认当前会话，请重试读取');
+        this.ports.setFailureDetails(PinmonyI18n.message('无法确认当前会话，请重试读取'));
     }, 15000));
 }
 
@@ -398,7 +399,7 @@ retryLogin(): void {
         return;
     const now: number = Date.now();
     if (this.ports.lastLoginRetryAt() >= 0 && now - this.ports.lastLoginRetryAt() < 5000) {
-        this.ports.showNetworkNotice('会话页面正在重试，请稍后再试');
+        this.ports.showNetworkNotice(PinmonyI18n.message('会话页面正在重试，请稍后再试'));
         PinmonyRuntimeLog.info('RequestPolicy: login-retry-paused');
         return;
     }
@@ -416,7 +417,7 @@ retryLogin(): void {
     }
     catch (_) {
         this.ports.setAuthStatus('error');
-        this.ports.setFailureDetails('当前会话页面暂时无法加载，请重试');
+        this.ports.setFailureDetails(PinmonyI18n.message('当前会话页面暂时无法加载，请重试'));
     }
 }
 }

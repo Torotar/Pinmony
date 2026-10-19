@@ -1,8 +1,11 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideo } from '../models/PinmonyVideo';
 import { PinmonyPlaybackState, PinmonyVideoPlayback } from '../services/PinmonyVideoPlayback';
 
 @Component
 export struct PinmonyVideoCard {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('sourceChanged') video: PinmonyVideo = { pinId: '', sources: [], width: 0, height: 0, duration: 0 };
   @Prop poster: string = '';
   @Prop @Watch('activeChanged') active: boolean = false;
@@ -49,7 +52,7 @@ export struct PinmonyVideoCard {
       if (this.video.duration > 0) {
         Text(this.durationText()).fontSize(14).fontWeight(FontWeight.Medium).fontColor('#111111')
           .padding({ left: 6, right: 6, top: 2, bottom: 2 }).backgroundColor('#EFFFFFFF')
-          .borderRadius(7).margin({ left: 5, top: 5 }).accessibilityText('视频时长 ' + this.durationText())
+          .borderRadius(7).margin({ left: 5, top: 5 }).accessibilityText(this.uiText("视频时长 ") + this.durationText())
       }
     }.width('100%').height('100%').borderRadius(18).clip(true)
       .backgroundColor($r('app.color.surface_muted'))

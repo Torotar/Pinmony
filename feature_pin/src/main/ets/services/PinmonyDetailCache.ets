@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyDetailSnapshot, PinmonyDetailAction, PinmonyRelatedPin } from '../models/PinmonyDetail';
 
 const MAX_DETAIL_CACHE_ENTRIES: number = 10;
@@ -79,7 +80,7 @@ export class PinmonyDetailCache {
       // No request runs while displaying a retained parent. Offer a fresh read instead of a spinner.
       mediaLoading: false,
       mediaError: detail.mediaError,
-      videoError: detail.isVideo ? '视频地址需要重新读取' : '',
+      videoError: detail.isVideo ? PinmonyI18n.message('视频地址需要重新读取') : '',
       actions: detail.actions.map((item: PinmonyDetailAction, index: number): PinmonyDetailAction => ({
         id: `cached-${identity}-action-${index}`,
         kind: item.kind,

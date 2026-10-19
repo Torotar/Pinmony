@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxStore, PinmonyBoardInvitation, PinmonyBoardInvitations } from 'feature_inbox';
 import { PinmonyAuxiliaryPorts, PinmonyBusinessAuxiliaryClient, PinmonyAuxiliaryNotSent, PinmonyAuxiliaryRejected } from './PinmonyBusinessAuxiliaryClient';
 interface User { id: string; username?: string; full_name?: string; image_medium_url?: string; image_large_url?: string; image_small_url?: string; }
@@ -50,7 +51,7 @@ export class PinmonyBoardInvitationNative {
         const items: PinmonyBoardInvitation[] = data.filter((v: Invite): boolean => v.status === 'new' && v.invited_user?.id === viewer.id).slice(0,100).map((v: Invite): PinmonyBoardInvitation => this.map(v));
         store.boardInvitations = {token:token,page:this.page,loading:false,busy:false,uncertain:false,error:'',feedback:'',items:items};
       }
-    }catch (_) {if(this.live(revision)){if(preview){store.invitationBusy = true;this.ports.feedback('邀请状态读取失败，请重新预览');}else if(store.boardInvitations){const next: PinmonyBoardInvitations = JSON.parse(JSON.stringify(store.boardInvitations)) as PinmonyBoardInvitations;next.loading = false;next.error = '图板邀请读取失败，请重试';store.boardInvitations = next;}}}
+    }catch (_) {if(this.live(revision)){if(preview){store.invitationBusy = true;this.ports.feedback(PinmonyI18n.message('邀请状态读取失败，请重新预览'));}else if(store.boardInvitations){const next: PinmonyBoardInvitations = JSON.parse(JSON.stringify(store.boardInvitations)) as PinmonyBoardInvitations;next.loading = false;next.error = PinmonyI18n.message('图板邀请读取失败，请重试');store.boardInvitations = next;}}}
   }
   async accept(): Promise<void> {
     const store: PinmonyInboxStore = this.ports.store(),item: PinmonyBoardInvitation | undefined = store.boardInvitationPreview;
@@ -60,7 +61,7 @@ export class PinmonyBoardInvitationNative {
     try {
       const p: Response = await this.request('update',{board_id:item.boardId,invited_user_id:item.invitedUser},target,revision),r: Resource = p.resource_response,data: Invite = r.data as Invite;
       if(r.endpoint_name !== 'v3_accept_board_collaborator_invite' || data?.status !== 'accepted' || data.board?.id !== item.boardId || data.invited_user?.id !== item.invitedUser || p.client_context?.user && p.client_context.user.id !== this.viewer)throw new Error('unconfirmed');
-      if(!this.live(revision))return;this.uncertain.delete(target);store.boardInvitationPreview = JSON.parse(JSON.stringify(item)) as PinmonyBoardInvitation;store.boardInvitationPreview.status = 'accepted';store.invitationBusy = false;store.invitationBannerVisible = false;store.joinedBoardAvatar = item.invitedAvatar || this.ports.avatar();this.ports.feedback('你已加入！收藏 Pin 图，与合作用户一起制定计划，还有更多乐趣！');
-    }catch (error){const retry: boolean = error instanceof PinmonyAuxiliaryNotSent || error instanceof PinmonyAuxiliaryRejected;if(retry && account === this.client.key())this.uncertain.delete(target);if(this.live(revision)){store.invitationBusy = !retry;this.ports.feedback(retry ? '邀请未接受成功，请重试' : '加入结果未确认，请重新预览核对；不会重复接受');}}
+      if(!this.live(revision))return;this.uncertain.delete(target);store.boardInvitationPreview = JSON.parse(JSON.stringify(item)) as PinmonyBoardInvitation;store.boardInvitationPreview.status = 'accepted';store.invitationBusy = false;store.invitationBannerVisible = false;store.joinedBoardAvatar = item.invitedAvatar || this.ports.avatar();this.ports.feedback(PinmonyI18n.message('你已加入！收藏 Pin 图，与合作用户一起制定计划，还有更多乐趣！'));
+    }catch (error){const retry: boolean = error instanceof PinmonyAuxiliaryNotSent || error instanceof PinmonyAuxiliaryRejected;if(retry && account === this.client.key())this.uncertain.delete(target);if(this.live(revision)){store.invitationBusy = !retry;this.ports.feedback(retry ? '邀请未接受成功，请重试' : PinmonyI18n.message('加入结果未确认，请重新预览核对；不会重复接受'));}}
   }
 }

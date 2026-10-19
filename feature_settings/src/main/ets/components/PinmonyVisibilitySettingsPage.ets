@@ -1,9 +1,12 @@
+import { PinmonyI18n } from 'common_foundation';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyVisibilitySettingsPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
@@ -24,10 +27,10 @@ export struct PinmonyVisibilitySettingsPage {
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
-    this.errorSnack.show({}, { title: this.store.error }, {
+    this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
-      content: this.store.error.includes('未确认') ? '重新读取' : '重试',
-      contentAccessibilityText: '重新读取当前设置',
+      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("重新读取") : this.uiText("重试"),
+      contentAccessibilityText: this.uiText("重新读取当前设置"),
       onContentClick: () => {
         if (!this.pageVisible || key !== this.errorSnackKey || this.store.busy || this.store.loading) return;
         this.dismissErrorSnack();
@@ -35,7 +38,7 @@ export struct PinmonyVisibilitySettingsPage {
       }
     }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
-  private title(): string { return "个人资料可见性"; }
+  private title(): string { return this.uiText("个人资料可见性"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private async confirmPrivacy(): Promise<void> {
@@ -70,39 +73,39 @@ export struct PinmonyVisibilitySettingsPage {
   @Builder
   private visibilityContent() {
     Row() {
-      Text('私密个人资料').fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Text(this.uiText("私密个人资料")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.store.data?.privateProfile || false }).enabled(this.available() && this.store.data?.canChangePrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.privateProfile) { this.store.pendingPrivate = value; this.store.confirmOpen = true; } })
-        .accessibilityText('私密个人资料')
+        .accessibilityText(this.uiText("私密个人资料"))
     }.width('100%')
-    Text('当你的个人资料为私密状态时，仅获得你批准的用户可以查看你的个人资料、Pin 图、图板、粉丝和关注列表。了解更多')
+    Text(this.uiText("当你的个人资料为私密状态时，仅获得你批准的用户可以查看你的个人资料、Pin 图、图板、粉丝和关注列表。了解更多"))
       .fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 24 })
     Row() {
-      Text('搜索隐私').fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Text(this.uiText("搜索隐私")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.store.data?.searchPrivacy || false }).enabled(this.available() && this.store.data?.canEditSearchPrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.searchPrivacy) this.request('searchPrivacy', value.toString()); })
-        .accessibilityText('搜索隐私')
+        .accessibilityText(this.uiText("搜索隐私"))
     }.width('100%')
-    Text('在搜索引擎（例如，Google）中隐藏你的个人资料和图板。了解更多').fontSize(15).fontColor($r('app.color.secondary_text'))
+    Text(this.uiText("在搜索引擎（例如，Google）中隐藏你的个人资料和图板。了解更多")).fontSize(15).fontColor($r('app.color.secondary_text'))
   }
   @Builder
   private privacySheet() {
     Scroll() {
       Column({ space: 24 }) {
-        Text(this.store.pendingPrivate ? '将个人资料设为私密？' : '公开个人资料？').width('100%').fontSize(23).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text(this.store.pendingPrivate ? this.uiText("将个人资料设为私密？") : this.uiText("公开个人资料？")).width('100%').fontSize(23).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         Row({ space: 16 }) {
           SymbolGlyph($r('sys.symbol.person_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
-          Text(this.store.pendingPrivate ? '只有你的粉丝可以查看你的个人资料及其内容。' : '任何人都可以查看你的个人资料、Pin 图、粉丝和图板。').layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
+          Text(this.store.pendingPrivate ? this.uiText("只有你的粉丝可以查看你的个人资料及其内容。") : this.uiText("任何人都可以查看你的个人资料、Pin 图、粉丝和图板。")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
         }
         Row({ space: 16 }) {
           SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(24).fontColor([$r('app.color.primary_text')])
-          Text(this.store.pendingPrivate ? '你的个人资料不会显示在 Pinterest 上的搜索结果中。' : '你的个人资料将显示在 Pinterest 上的搜索结果中。').layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
+          Text(this.store.pendingPrivate ? this.uiText("你的个人资料不会显示在 Pinterest 上的搜索结果中。") : this.uiText("你的个人资料将显示在 Pinterest 上的搜索结果中。")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
         }
         if (this.store.error) {
-          Text(this.store.error).fontColor($r('app.color.secondary_text'))
-          Button('重新读取').enabled(!this.store.busy).onClick(() => { this.store.confirmOpen = false; this.request('read'); })
+          Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
+          Button(this.uiText("重新读取")).enabled(!this.store.busy).onClick(() => { this.store.confirmOpen = false; this.request('read'); })
         }
-        Button(this.store.busy ? '正在保存…' : this.store.pendingPrivate ? '设为私密' : '公开')
+        Button(this.store.busy ? this.uiText("正在保存…") : this.store.pendingPrivate ? this.uiText("设为私密") : this.uiText("公开"))
           .width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
           .enabled(this.available()).onClick(() => { this.confirmPrivacy(); })
       }.width('100%').padding({ left: 20, right: 20, top: 48, bottom: 24 }).alignItems(HorizontalAlign.Start)

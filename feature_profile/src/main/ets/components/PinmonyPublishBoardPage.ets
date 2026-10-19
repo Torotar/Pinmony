@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyCreatedPin, PinmonyOrganizeSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
@@ -9,6 +10,8 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 // from the profile's ordinary "整理到图板" flow.
 @Component
 export struct PinmonyPublishBoardPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncCreate') state: PinmonyPublishFlow = {} as PinmonyPublishFlow;
   @State private createVisible: boolean = false;
   @State private name: string = '';
@@ -26,21 +29,21 @@ export struct PinmonyPublishBoardPage {
   @Builder
   private createForm() {
     Column({ space: 20 }) {
-      TextInput({ placeholder: '图板名称', text: this.name }).maxLength(100)
+      TextInput({ placeholder: this.uiText("图板名称"), text: this.name }).maxLength(100)
         .enabled(!this.state.busy).onChange((value: string) => { this.name = value; })
       Row() {
-        Text('设为私密图板').fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Text(this.uiText("设为私密图板")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.state.busy)
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
-      if (this.state.error) { Text(this.state.error).fontColor($r('app.color.secondary_text')) }
+      if (this.state.error) { Text(PinmonyI18n.render(this.state.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
       if (this.state.loading || this.state.busy) { LoadingProgress().width(28).height(28) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
 
   @Builder
   private createButton() {
-      Button('创建图板').width('100%').height(48).backgroundColor($r('app.color.accent'))
+      Button(this.uiText("创建图板")).width('100%').height(48).backgroundColor($r('app.color.accent'))
         .fontColor($r('app.color.detail_on_accent'))
         .enabled(!!this.name.trim() && !this.state.loading && !this.state.busy && !this.state.uncertain)
         .onClick(() => this.onAction('create', this.name.trim(), this.secret))
@@ -74,9 +77,9 @@ export struct PinmonyPublishBoardPage {
             }
           }
         },
-        content: { title: { mainTitle: '创建图板' }, menu: { value: [{ content: {
+        content: { title: { mainTitle: this.uiText("创建图板") }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
-          type: IconStyleMode.SMALL, label: '关闭', isEnabled: !this.state.busy,
+          type: IconStyleMode.SMALL, label: this.uiText("关闭"), isEnabled: !this.state.busy,
           action: () => { if (!this.state.busy) { this.createVisible = false; this.closeCreate(); } }
         } }] } } })
       .backgroundColor($r('app.color.page_background'))

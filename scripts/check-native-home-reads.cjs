@@ -1,6 +1,7 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
 const ts=require(process.argv[2]||'typescript');
-function load(file,deps){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps||(()=>({})),console});return exports;}
+function load(file,deps){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps||(()=>({}))),console});return exports;}
 const {PinmonyHomeNativeReads}=load('entry/src/main/ets/app/PinmonyHomeNativeReads.ets', name=>name==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const flush=()=>new Promise(r=>setImmediate(r));
 const pins=(ids,cursor)=>JSON.stringify({resource_response:{status:'success',data:ids.map(id=>({id:String(id),type:'pin',grid_title:'grid',title:'other',images:{'474x':{url:'https://i.pinimg.com/'+id+'.jpg',width:474,height:700}}})),bookmark:cursor}});

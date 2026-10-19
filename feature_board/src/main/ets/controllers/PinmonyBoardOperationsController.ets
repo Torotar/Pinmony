@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardStore } from '../stores/PinmonyBoardStore';
 import { PinmonyBoardDetail, PinmonyBoardPin } from '../models/PinmonyBoardDetail';
 import { boardVisiblePins } from '../services/PinmonyBoardPresentation';
@@ -45,7 +46,7 @@ export class PinmonyBoardOperationsController {
     }
     if (this.store.pendingBoardUrl) {
       if (method === 'retry' && board) {
-        try { this.ports.load(board.pageKey); } catch (_) { this.ports.feedback('无法重新打开图板，请重试'); }
+        try { this.ports.load(board.pageKey); } catch (_) { this.ports.feedback(PinmonyI18n.message('无法重新打开图板，请重试')); }
       }
       return;
     }
@@ -66,8 +67,8 @@ export class PinmonyBoardOperationsController {
     this.ports.runScript('window.PinmonyBoardApi && window.PinmonyBoardApi.' + method + '(' + session.toString() + ',' +
       JSON.stringify(board.pageKey) + (method === 'open' || method === 'flow' ? ',' + JSON.stringify(id) : '') + ')')
       .then((result: string): void => {
-        if (current() && method === 'open' && result !== 'true' && result !== '"true"') this.ports.feedback('当前 Pin 图不可用，请重试');
-      }).catch((): void => { if (current()) this.ports.feedback('图板接口不可用，请重试'); })
+        if (current() && method === 'open' && result !== 'true' && result !== '"true"') this.ports.feedback(PinmonyI18n.message('当前 Pin 图不可用，请重试'));
+      }).catch((): void => { if (current()) this.ports.feedback(PinmonyI18n.message('图板接口不可用，请重试')); })
       .finally((): void => { if (generation === this.generation) this.dispatching = false; });
   }
 }

@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileStore, PinmonyProfilePanel, PinmonyProfilePanelItem, PinmonyProfileSnapshot, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard, PIN_PROFILE_ORGANIZE_ENABLED, pickPublishPhotoUris, readProfileAvatarPhoto, PinmonyProfileAvatarPhoto } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -232,24 +233,24 @@ export class PinmonyProfileNativeActions {
             if (this.store.panel) {
                 this.store.panel.avatarBusy = false;
                 this.store.panel.avatarAction = this.avatarAction();
-                this.store.panel.avatarError = this.store.panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : this.avatarPending ? '头像处理结果待确认，点“检查结果”只查询状态，不会重新上传' : '头像上传已暂停';
+                this.store.panel.avatarError = this.store.panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : this.avatarPending ? '头像处理结果待确认，点“检查结果”只查询状态，不会重新上传' : PinmonyI18n.message('头像上传已暂停');
             }
         }
         if (this.following) {
             this.followUnknown.set(this.following, this.desired);
             this.store.followUncertain = true;
             if (this.store.panel)
-                this.store.panel.error = '关注操作结果未确认，请重新读取核对';
+                this.store.panel.error = PinmonyI18n.message('关注操作结果未确认，请重新读取核对');
         }
         if (this.saving && this.draft) {
             this.saveUnknown = this.draft;
             this.store.saveUncertain = true;
             if (this.store.panel)
-                this.store.panel.error = '保存结果未确认，请重新读取核对，勿重复提交';
+                this.store.panel.error = PinmonyI18n.message('保存结果未确认，请重新读取核对，勿重复提交');
         }
         if (this.organize?.busy) {
             this.organize.uncertain = true;
-            this.organize.error = '整理结果未确认，请关闭后刷新核对，勿重复提交';
+            this.organize.error = PinmonyI18n.message('整理结果未确认，请关闭后刷新核对，勿重复提交');
             if (this.moveDispatched)
                 this.organize.selectedIds.forEach((id: string): void => { this.organizeUnknown.add(id); });
             if (this.createName)
@@ -264,7 +265,7 @@ export class PinmonyProfileNativeActions {
         this.store.followingBusy = false;
         if (this.store.panel?.loading) {
             this.store.panel.loading = false;
-            this.store.panel.error = '读取已暂停，请重新读取';
+            this.store.panel.error = PinmonyI18n.message('读取已暂停，请重新读取');
         }
         this.panel();
         if (this.organize) {
@@ -352,12 +353,12 @@ export class PinmonyProfileNativeActions {
                 panel.username = d.username;
                 panel.avatar = (d.profile_image_url || '').slice(0, 2000);
                 panel.avatarAction = this.avatarAction();
-                if (panel.avatarAction) panel.avatarError = panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : '头像处理结果待确认，可检查结果，不会重新上传';
+                if (panel.avatarAction) panel.avatarError = panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : PinmonyI18n.message('头像处理结果待确认，可检查结果，不会重新上传');
                 if (this.saveUnknown && this.saveUnknown.username === panel.username && this.saveUnknown.firstName === panel.firstName && this.saveUnknown.lastName === panel.lastName && this.saveUnknown.about === panel.about && this.saveUnknown.websiteUrl === panel.website)
                     this.saveUnknown = undefined;
                 this.store.saveUncertain = !!this.saveUnknown;
                 if (this.saveUnknown)
-                    panel.error = '上次保存结果未确认，请核对当前资料，勿重复提交';
+                    panel.error = PinmonyI18n.message('上次保存结果未确认，请核对当前资料，勿重复提交');
             }
             else if (mode === 'followers') {
                 const vars: VariableUser = { userId: this.root!.id }, d: GraphData = await this.graph('369b31865237e1a2f57f1879be69a6c01ee4d6d2806cc4c624d73baea9546b08', vars, revision), user: FollowersData | undefined = d.v3GetUserHandlerQuery?.data, connection: Connection | undefined = user?.followers?.connection;
@@ -395,7 +396,7 @@ export class PinmonyProfileNativeActions {
         }
         catch (_) {
             if (this.current(revision) && this.store.panel)
-                this.store.panel.error = '读取失败，请重新读取';
+                this.store.panel.error = PinmonyI18n.message('读取失败，请重新读取');
         }
         finally {
             if (this.current(revision) && this.store.panel) {
@@ -427,7 +428,7 @@ export class PinmonyProfileNativeActions {
             incoming.forEach((item: PinmonyProfilePanelItem): void => { if(!current.items.some((old: PinmonyProfilePanelItem): boolean => old.id === item.id))current.items.push(item); });
             const next: string = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 8192 ? connection.pageInfo.endCursor : '';
             this.followersCursor = next;current.hasMore = connection.pageInfo.hasNextPage === true && !!next && next !== cursor && !!incoming.length;
-        } catch (_) { if(this.current(revision) && this.store.panel)this.store.panel.moreError = '粉丝加载失败，请重试'; }
+        } catch (_) { if(this.current(revision) && this.store.panel)this.store.panel.moreError = PinmonyI18n.message('粉丝加载失败，请重试'); }
         finally { if(this.current(revision) && this.store.panel){this.store.panel.moreLoading = false;this.panel();} }
     }
     async follow(id: string): Promise<void> {
@@ -443,7 +444,7 @@ export class PinmonyProfileNativeActions {
                 if (recovering) {
                     this.overlay();
                     if (this.followUnknown.has(this.root!.id))
-                        this.ports.feedback('关注结果仍未确认，请稍后核对');
+                        this.ports.feedback(PinmonyI18n.message('关注结果仍未确认，请稍后核对'));
                     return;
                 }
             }
@@ -486,12 +487,12 @@ export class PinmonyProfileNativeActions {
                 this.followUnknown.set(this.following, this.desired);
                 this.store.followUncertain = true;
                 if (this.store.panel) {
-                    this.store.panel.error = '关注操作结果未确认，请重新读取核对';
+                    this.store.panel.error = PinmonyI18n.message('关注操作结果未确认，请重新读取核对');
                     this.store.panel.items.forEach((item): void => { if (item.id === this.following)
                         item.canFollow = false; });
                     this.panel();
                 }
-                this.ports.feedback('关注操作结果未确认，请重新读取核对，勿重复提交');
+                this.ports.feedback(PinmonyI18n.message('关注操作结果未确认，请重新读取核对，勿重复提交'));
             }
         }
         finally {
@@ -525,7 +526,7 @@ export class PinmonyProfileNativeActions {
             if(!current())return;
             if(!reply || reply.error || reply.status !== 200 || !reply.body || reply.body.length > 2000000)throw new Error('unconfirmed');
             const response: ProfileSettingsResponse = JSON.parse(reply.body) as ProfileSettingsResponse, r: ProfileSettingsResource | undefined = response.resource_response;
-            if(r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)throw new ProfileSettingsRejected('网站拒绝本次操作');
+            if(r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)throw new ProfileSettingsRejected(PinmonyI18n.message('网站拒绝本次操作'));
             if(!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_board' : 'v3_unfollow_board') ||
                 response.client_context?.user && response.client_context.user.id !== this.client.viewer)throw new Error('unconfirmed');
             const data: BoardFollowData | null = r.data as BoardFollowData | null;
@@ -533,14 +534,14 @@ export class PinmonyProfileNativeActions {
             this.boardFollowUnknown.delete(id);
             const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
             if(actual){actual.following = desired;actual.canFollow = true;}
-            this.store.profileCache.clear();this.ports.feedback(desired ? '已关注图板' : '已取消关注图板');
+            this.store.profileCache.clear();this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message('已取消关注图板'));
         }catch (error) {
             if(current()){
                 const rejected: boolean = error instanceof ProfileSettingsRejected;
                 if(rejected)this.boardFollowUnknown.delete(id);
                 const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
                 if(actual)actual.canFollow = rejected;
-                this.ports.feedback(rejected ? '网站拒绝本次图板关注操作，可以重试' : '图板关注结果未确认，请重新读取核对，勿重复提交');
+                this.ports.feedback(rejected ? '网站拒绝本次图板关注操作，可以重试' : PinmonyI18n.message('图板关注结果未确认，请重新读取核对，勿重复提交'));
             }
         }finally {
             if(current()){this.boardFollowJob = '';this.boardFollowRelease = undefined;this.store.followingBusy = false;this.panel();}
@@ -591,7 +592,7 @@ export class PinmonyProfileNativeActions {
                 this.panel();
             }
         } catch (_) {
-            if (ownsPanel()) this.store.panel!.avatarError = '无法读取照片，请选择不超过 4 MB 的 PNG、JPEG 或 WebP 图片';
+            if (ownsPanel()) this.store.panel!.avatarError = PinmonyI18n.message('无法读取照片，请选择不超过 4 MB 的 PNG、JPEG 或 WebP 图片');
             return;
         } finally {
             this.avatarPicking = false;
@@ -604,7 +605,7 @@ export class PinmonyProfileNativeActions {
         this.avatarJob = id;
         const current = (): boolean => ownsPanel() && this.current(revision) && this.avatarJob === id;
         this.store.panel!.avatarBusy = true;
-        this.store.panel!.avatarError = readOnlyRefresh ? '正在重新读取当前头像…' : this.avatarPending ? '正在检查头像处理结果…' : '正在上传头像…'; this.panel();
+        this.store.panel!.avatarError = readOnlyRefresh ? '正在重新读取当前头像…' : this.avatarPending ? '正在检查头像处理结果…' : PinmonyI18n.message('正在上传头像…'); this.panel();
         const cancelled: Promise<string | undefined> = new Promise<string | undefined>((resolve): void => { this.avatarRelease = (): void => resolve(undefined); });
         const process = async (): Promise<string> => {
             if (readOnlyRefresh) return this.readCurrentAvatar(revision);
@@ -624,7 +625,7 @@ export class PinmonyProfileNativeActions {
                 if (!current()) throw new Error('stale');
                 if (status === 5) throw new Error('avatar-rejected');
                 if (status === 4) return this.readCurrentAvatar(revision);
-                this.store.panel!.avatarError = '照片已上传，正在处理头像…'; this.panel();
+                this.store.panel!.avatarError = PinmonyI18n.message('照片已上传，正在处理头像…'); this.panel();
                 await new Promise<void>((resolve): void => {
                     const timer: number = setTimeout((): void => { this.avatarWake = undefined; resolve(); }, 500 * (attempt + 1));
                     this.avatarWake = (): void => { clearTimeout(timer); resolve(); };
@@ -637,20 +638,20 @@ export class PinmonyProfileNativeActions {
             if (!current() || !avatar) return;
             if (!readOnlyRefresh) this.avatarPending = undefined;
             this.store.panel!.avatar = avatar; this.store.panel!.avatarPreview = '';
-            this.store.panel!.avatarError = readOnlyRefresh ? '已重新读取当前头像；上次上传结果仍未确认，暂不能再次上传' : '';
+            this.store.panel!.avatarError = readOnlyRefresh ? PinmonyI18n.message('已重新读取当前头像；上次上传结果仍未确认，暂不能再次上传') : '';
             this.store.panel!.avatarAction = this.avatarAction();
             if (this.store.profile?.profileUrl === page) {
                 const profile: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.store.profile)) as PinmonyProfileSnapshot;
                 profile.avatarUrl = avatar; this.store.profile = profile;
             }
-            this.ports.avatarSaved?.(page, avatar); this.ports.refresh(); this.ports.feedback(readOnlyRefresh ? '已刷新当前头像' : '头像已更新');
+            this.ports.avatarSaved?.(page, avatar); this.ports.refresh(); this.ports.feedback(readOnlyRefresh ? '已刷新当前头像' : PinmonyI18n.message('头像已更新'));
         } catch (error) {
             if (!current()) return;
             const rejected: boolean = (error as Error).message === 'avatar-rejected';
             if (rejected) this.avatarPending = undefined;
             this.store.panel!.avatarAction = this.avatarAction();
-            this.store.panel!.avatarError = rejected ? '网站未能完成头像处理，可以重新选择照片' :
-                this.store.panel!.avatarAction === 'refresh' ? '当前头像尚未确认，请点“刷新头像”重新读取；暂不重复上传' : this.avatarPending ? '头像处理结果待确认，点“检查结果”只查询状态，不会重新上传' : '头像尚未上传，可以重新选择照片';
+            this.store.panel!.avatarError = rejected ? PinmonyI18n.message('网站未能完成头像处理，可以重新选择照片') :
+                this.store.panel!.avatarAction === 'refresh' ? PinmonyI18n.message('当前头像尚未确认，请点“刷新头像”重新读取；暂不重复上传') : this.avatarPending ? PinmonyI18n.message('头像处理结果待确认，点“检查结果”只查询状态，不会重新上传') : PinmonyI18n.message('头像尚未上传，可以重新选择照片');
         } finally {
             if (this.avatarJob === id) {
                 this.avatarJob = ''; this.avatarRelease = undefined; this.avatarWake?.(); this.avatarWake = undefined;
@@ -683,7 +684,7 @@ export class PinmonyProfileNativeActions {
             if (outcome?.error?.message === '用户名已被使用。') {
                 this.saving = false;
                 this.store.saving = false;
-                this.ports.feedback('用户名已被使用');
+                this.ports.feedback(PinmonyI18n.message('用户名已被使用'));
                 return;
             }
             if (response.errors?.length || outcome?.__typename !== 'V3EditSettingsHandler' || user?.__typename !== 'User' || user.username !== input.username || user.id !== undefined && user.id !== this.relay(this.client.viewer))
@@ -703,7 +704,7 @@ export class PinmonyProfileNativeActions {
             if (this.current(revision)) {
                 this.saveUnknown = input;
                 this.store.saveUncertain = true;
-                p.error = '保存结果未确认，请重新读取核对，勿重复提交';
+                p.error = PinmonyI18n.message('保存结果未确认，请重新读取核对，勿重复提交');
                 this.panel();
             }
         }
@@ -754,7 +755,7 @@ export class PinmonyProfileNativeActions {
         }
         catch (_) {
             if (this.current(revision))
-                o.error = '图板读取失败，请重试';
+                o.error = PinmonyI18n.message('图板读取失败，请重试');
         }
         finally {
             if (this.current(revision)) {
@@ -784,7 +785,7 @@ export class PinmonyProfileNativeActions {
             }
             catch (_) {
                 if (this.current(revision))
-                    this.organize.error = '读取身份失败，请关闭后重试';
+                    this.organize.error = PinmonyI18n.message('读取身份失败，请关闭后重试');
             }
             finally {
                 if (this.current(revision)) {
@@ -838,7 +839,7 @@ export class PinmonyProfileNativeActions {
                 return;
             if (o.selectedIds.some((id: string): boolean => this.organizeUnknown.has(id)) || action === 'create' && this.createUnknown.has(value.trim())) {
                 o.uncertain = true;
-                o.error = '上次整理结果未确认，请刷新核对，勿重复提交';
+                o.error = PinmonyI18n.message('上次整理结果未确认，请刷新核对，勿重复提交');
                 this.syncOrganize();
                 return;
             }
@@ -883,7 +884,7 @@ export class PinmonyProfileNativeActions {
                         if (this.createName)
                             this.createUnknown.add(this.createName);
                     }
-                    o.error = o.uncertain ? '整理结果未确认，请关闭后刷新核对，勿重复提交' : (error as Error).message;
+                    o.error = o.uncertain ? PinmonyI18n.message('整理结果未确认，请关闭后刷新核对，勿重复提交') : (error as Error).message;
                 }
             }
             finally {

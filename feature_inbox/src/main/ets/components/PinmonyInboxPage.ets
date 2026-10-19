@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
 import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
@@ -6,6 +7,8 @@ import { PinmonyUserAvatar } from 'common_ui';
 
 @Component
 export struct PinmonyInboxPage {
+  @StorageLink('pinmonyLanguage') @Watch('syncSegmentItems') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('onSnapshotChanged') snapshot: PinmonyInboxSnapshot = {} as PinmonyInboxSnapshot;
   @Prop actionsReady: boolean = true;
   @Prop sectionReady: boolean = true;
@@ -19,18 +22,20 @@ export struct PinmonyInboxPage {
   private activeSection: string = '';
   private segmentUpdateLabel: string = '';
   private segmentInboxLabel: string = '';
-  private segmentItems: SegmentButtonV2Items = new SegmentButtonV2Items([
-    { text: '更新' }, { text: '收件箱' }
+  private readonly segmentItems: SegmentButtonV2Items = new SegmentButtonV2Items([
+    { text: this.uiText("更新") }, { text: this.uiText("收件箱") }
   ]);
 
   private syncSegmentItems(): void {
-    if (this.segmentUpdateLabel === this.snapshot.updateLabel && this.segmentInboxLabel === this.snapshot.inboxLabel) return;
-    this.segmentUpdateLabel = this.snapshot.updateLabel;
-    this.segmentInboxLabel = this.snapshot.inboxLabel;
-    this.segmentItems = new SegmentButtonV2Items([
-      { text: this.snapshot.updateLabel }, { text: this.snapshot.inboxLabel }
-    ]);
+    const update: string = PinmonyI18n.render(this.snapshot.updateLabel || PinmonyI18n.message('更新'), this.uiLanguage);
+    const inbox: string = PinmonyI18n.render(this.snapshot.inboxLabel || PinmonyI18n.message('收件箱'), this.uiLanguage);
+    if (this.segmentUpdateLabel === update && this.segmentInboxLabel === inbox) return;
+    this.segmentUpdateLabel = update;
+    this.segmentInboxLabel = inbox;
+    this.segmentItems[0].text = update;
+    this.segmentItems[1].text = inbox;
   }
+
   @State private sectionOpacity: number = 1;
   private restoringScroll: boolean = false;
   private contentHeight: number = 0;
@@ -123,9 +128,9 @@ export struct PinmonyInboxPage {
     const date: number = Date.parse(item.updatedAt);
     const minutes: number = Math.floor((Date.now() - date) / 60000);
     if (!Number.isFinite(date) || minutes < 0) return '';
-    if (minutes < 60) return minutes.toString() + ' 分钟';
-    if (minutes < 1440) return Math.floor(minutes / 60).toString() + ' 小时';
-    return Math.floor(minutes / 1440).toString() + ' 天';
+    if (minutes < 60) return minutes.toString() + this.uiText(" 分钟");
+    if (minutes < 1440) return Math.floor(minutes / 60).toString() + this.uiText(" 小时");
+    return Math.floor(minutes / 1440).toString() + this.uiText(" 天");
   }
 
   @Builder
@@ -216,7 +221,7 @@ export struct PinmonyInboxPage {
               }
             }
               .padding(0).backgroundColor(Color.Transparent).width(40).height(40)
-              .accessibilityText('更多操作')
+              .accessibilityText(this.uiText("更多操作"))
               .onClick(() => {
                 if (item.moreId && this.onAction) this.onAction(item.moreId);
               })
@@ -233,7 +238,7 @@ export struct PinmonyInboxPage {
     .width('100%')
     .padding({ left: 20, right: 20, top: 12, bottom: 12 })
     .opacity(item.subdued ? 0.45 : 1)
-    .accessibilityDescription(item.enabled ? '' : '当前接口入口不可用')
+    .accessibilityDescription(item.enabled ? '' : this.uiText("当前接口入口不可用"))
     .accessibilityText(item.title + (item.subtitle ? '，' + item.subtitle : ''))
   }
 
@@ -246,20 +251,20 @@ export struct PinmonyInboxPage {
         .height(this.snapshot.section === 'updates' ? 220 : 190)
         .objectFit(ImageFit.Contain)
         .accessibilityLevel('no')
-      Text(this.snapshot.emptyTitle)
+      Text(PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage))
         .fontSize(22)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text'))
         .textAlign(TextAlign.Center)
         .margin({ top: 4 })
-      Text(this.snapshot.emptyDescription)
+      Text(PinmonyI18n.render(this.snapshot.emptyDescription, this.uiLanguage))
         .fontSize(15)
         .lineHeight(23)
         .fontColor($r('app.color.primary_text'))
         .textAlign(TextAlign.Center)
         .maxLines(5)
-      if (this.snapshot.section === 'updates' && this.snapshot.homeId && this.snapshot.homeLabel) {
-        Button(this.snapshot.homeLabel)
+      if (this.snapshot.section === 'updates' && this.snapshot.homeId && PinmonyI18n.render(this.snapshot.homeLabel, this.uiLanguage)) {
+        Button(PinmonyI18n.render(this.snapshot.homeLabel, this.uiLanguage))
           .fontSize(15)
           .fontColor($r('app.color.primary_text'))
           .backgroundColor($r('app.color.surface_muted'))
@@ -302,15 +307,15 @@ export struct PinmonyInboxPage {
             LoadingProgress()
               .width(28)
               .height(28)
-            Text('正在读取收件箱…')
+            Text(this.uiText("正在读取收件箱…"))
               .fontSize(15)
               .fontColor($r('app.color.secondary_text'))
           } else {
-            Text(this.error)
+            Text(PinmonyI18n.render(this.error, this.uiLanguage))
               .fontSize(15)
               .fontColor($r('app.color.primary_text'))
               .textAlign(TextAlign.Center)
-            Button('重试')
+            Button(this.uiText("重试"))
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
         }
@@ -321,8 +326,8 @@ export struct PinmonyInboxPage {
       } else {
         if (this.error) {
           Row({ space: 12 }) {
-            Text(this.error).fontSize(14).fontColor($r('app.color.secondary_text')).layoutWeight(1)
-            Button('重试').onClick(() => { if (this.onRetry) this.onRetry(); })
+            Text(PinmonyI18n.render(this.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).layoutWeight(1)
+            Button(this.uiText("重试")).onClick(() => { if (this.onRetry) this.onRetry(); })
           }.padding({ left: 20, right: 20, bottom: 12 }).width('100%')
         }
         Scroll(this.scroller) {
@@ -339,21 +344,21 @@ export struct PinmonyInboxPage {
                   .height(54)
                   .borderRadius(18)
                   .backgroundColor($r('app.color.detail_accent'))
-                Text(this.snapshot.composeLabel || '新消息')
+                Text(PinmonyI18n.render(this.snapshot.composeLabel, this.uiLanguage) || this.uiText("新消息"))
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text'))
               }
               .width('100%')
               .padding({ left: 18, right: 18, top: 18, bottom: 18 })
-              .accessibilityText(this.snapshot.composeLabel)
+              .accessibilityText(PinmonyI18n.render(this.snapshot.composeLabel, this.uiLanguage))
               .enabled(!!this.snapshot.composeId)
               .onClick(() => {
                 if (this.interactionReady && this.snapshot.composeId && this.onAction) this.onAction(this.snapshot.composeId);
               })
             }
 
-            if (this.snapshot.items.length === 0 && this.snapshot.emptyTitle) {
+            if (this.snapshot.items.length === 0 && PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {
               Column() {
                 this.emptyState()
               }
@@ -362,15 +367,15 @@ export struct PinmonyInboxPage {
                 bottom: this.snapshot.section === 'updates' ? 48 : 12 })
             } else if (this.snapshot.section === 'messages') {
               if (this.snapshot.items.length > 0) {
-                this.groupTitle(this.snapshot.messagesLabel || '消息')
+                this.groupTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("消息"))
               }
               ForEach(this.snapshot.items, (item: PinmonyInboxItem) => {
                 this.itemRow(item, false)
               }, (item: PinmonyInboxItem) => item.id)
             } else {
-              this.updatesGroup(this.snapshot.unreadLabel || '未读',
+              this.updatesGroup(PinmonyI18n.render(this.snapshot.unreadLabel || '', this.uiLanguage) || this.uiText("未读"),
                 this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === true))
-              this.updatesGroup(this.snapshot.readLabel || '已读',
+              this.updatesGroup(PinmonyI18n.render(this.snapshot.readLabel || '', this.uiLanguage) || this.uiText("已读"),
                 this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === false))
               this.updatesGroup('', this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === undefined))
             }
@@ -379,16 +384,16 @@ export struct PinmonyInboxPage {
               if (this.snapshot.moreLoading) {
                 LoadingProgress().width(28).height(28).alignSelf(ItemAlign.Center)
               } else if (this.snapshot.hasMore || this.snapshot.moreError) {
-                Button(this.snapshot.moreError || '加载更多').alignSelf(ItemAlign.Center)
+                Button(this.snapshot.moreError || this.uiText("加载更多")).alignSelf(ItemAlign.Center)
                   .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
-              } else if (this.snapshot.items.length === 0 && !this.snapshot.emptyTitle) {
-                Text('暂无更新').fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
+              } else if (this.snapshot.items.length === 0 && !PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {
+                Text(this.uiText("暂无更新")).fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
               }
             }
             if (this.snapshot.section === 'messages' &&
-              (this.snapshot.contactsLabel || this.snapshot.contacts.length > 0)) {
-              Text(this.snapshot.contactsLabel ||
-                (this.snapshot.inboxLabel.toLowerCase() === 'inbox' ? 'Contacts' : '联系人'))
+              (PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) || this.snapshot.contacts.length > 0)) {
+              Text(PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) ||
+                (this.snapshot.inboxLabel.toLowerCase() === 'inbox' ? 'Contacts' : this.uiText("联系人")))
                 .fontSize(18)
                 .fontColor($r('app.color.primary_text'))
                 .width('100%')
@@ -398,19 +403,19 @@ export struct PinmonyInboxPage {
               if (this.snapshot.contactsLoading) {
                 Row({ space: 12 }) {
                   LoadingProgress().width(24).height(24)
-                  Text('正在读取联系人…').fontSize(14).fontColor($r('app.color.secondary_text'))
+                  Text(this.uiText("正在读取联系人…")).fontSize(14).fontColor($r('app.color.secondary_text'))
                 }.padding({ left: 20, top: 12, bottom: 12 })
               } else if (this.snapshot.contactsError) {
                 Column({ space: 8 }) {
-                  Text(this.snapshot.contactsError).fontSize(14).fontColor($r('app.color.secondary_text'))
-                  Button('重试').onClick(() => { if (this.onContactsRetry) this.onContactsRetry(); })
+                  Text(PinmonyI18n.render(this.snapshot.contactsError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
+                  Button(this.uiText("重试")).onClick(() => { if (this.onContactsRetry) this.onContactsRetry(); })
                 }.alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 12 })
               } else if (this.snapshot.contacts.length > 0) {
                 ForEach(this.snapshot.contacts, (item: PinmonyInboxItem) => {
                   this.itemRow(item)
                 }, (item: PinmonyInboxItem) => item.id)
               } else if (this.snapshot.contactsDataSource === 'api') {
-                Text('暂无推荐联系人').fontSize(14).fontColor($r('app.color.secondary_text'))
+                Text(this.uiText("暂无推荐联系人")).fontSize(14).fontColor($r('app.color.secondary_text'))
                   .padding({ left: 20, top: 12, bottom: 12 })
               }
             }

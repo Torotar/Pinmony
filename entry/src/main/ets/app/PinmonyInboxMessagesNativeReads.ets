@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxStore, PinmonyInboxSnapshot, PinmonyInboxItem, PinmonyInboxFlowSnapshot, InboxFlowUser, InboxFlowMessage, InboxFlowBoard } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
@@ -99,7 +100,7 @@ export class PinmonyInboxMessagesNativeReads {
   pause(): void {
     this.writes.pause();this.writePreparing = false;this.revision++; this.flowRevision++; this.jobs.forEach((id: string): void => this.ports.network().cancel(id)); this.jobs.clear();
     this.listBusy = false; this.contactsBusy = false; this.flowBusy = false; this.store.inboxNativeMessagesReady = false;
-    if(this.flow?.loading) { this.flow.loading = false; this.flow.error = '读取已暂停，请重试'; this.publish(); }
+    if(this.flow?.loading) { this.flow.loading = false; this.flow.error = PinmonyI18n.message('读取已暂停，请重试'); this.publish(); }
   }
   reset(): void {
     this.pause(); if(this.account) { this.store.inboxCache.clear(); if(this.store.inbox?.section === 'messages')this.store.inbox = undefined; if(this.flow?.nativeToken === this.store.inboxFlow?.nativeToken)this.store.inboxFlow = undefined; }
@@ -116,7 +117,7 @@ export class PinmonyInboxMessagesNativeReads {
   }
   apply(): void {
     if(!this.owned())return;
-    const snapshot: PinmonyInboxSnapshot = {kind:'state',session:this.store.inboxSession,pageUrl:this.page,section:'messages',updateLabel:'更新',inboxLabel:'收件箱',messagesLabel:'消息',readLabel:'已读',unreadLabel:'未读',emptyTitle:this.listReady && !this.rows.length ? '开始对话' : '',emptyDescription:this.listReady && !this.rows.length ? '你的对话会显示在此处。' : '',homeLabel:'',homeId:'',composeLabel:'新消息',composeId:'compose',contactsLabel:'联系人',items:this.rows,contacts:this.contacts,dataSource:'api',contactsDataSource:'api',contactsLoading:this.contactsBusy && !this.contactsReady,contactsError:this.contactsError,apiError:this.listError,hasMore:false};
+    const snapshot: PinmonyInboxSnapshot = {kind:'state',session:this.store.inboxSession,pageUrl:this.page,section:'messages',updateLabel:PinmonyI18n.message('更新'),inboxLabel:PinmonyI18n.message('收件箱'),messagesLabel:PinmonyI18n.message('消息'),readLabel:PinmonyI18n.message('已读'),unreadLabel:PinmonyI18n.message('未读'),emptyTitle:this.listReady && !this.rows.length ? PinmonyI18n.message('开始对话') : '',emptyDescription:this.listReady && !this.rows.length ? PinmonyI18n.message('你的对话会显示在此处。') : '',homeLabel:'',homeId:'',composeLabel:PinmonyI18n.message('新消息'),composeId:'compose',contactsLabel:PinmonyI18n.message('联系人'),items:this.rows,contacts:this.contacts,dataSource:'api',contactsDataSource:'api',contactsLoading:this.contactsBusy && !this.contactsReady,contactsError:this.contactsError,apiError:this.listError,hasMore:false};
     this.store.inbox = snapshot; this.store.inboxUrl = this.page; this.store.inboxSectionReady = true; this.store.inboxNativeMessagesReady = this.listReady;
     this.store.inboxLoading = !this.listReady && this.listBusy; this.store.inboxError = this.listError; this.store.inboxWebFlow = false; this.store.pendingInboxSection = ''; this.store.restoringInboxSection = '';
     if(this.listReady && !this.listBusy && !this.listError)this.store.inboxCache.put(snapshot,this.store.inboxScrollOffset);
@@ -193,7 +194,7 @@ export class PinmonyInboxMessagesNativeReads {
       });
       if(!live())return; this.rows = rows; this.conversations = conversations; this.listReady = true; this.listError = '';
       PinmonyRuntimeLog.info('InboxMessagesNativeTrace: list committed count=' + rows.length.toString());
-    } catch (_) { if(live() && !quiet)this.listError = '消息列表读取失败，请重试'; }
+    } catch (_) { if(live() && !quiet)this.listError = PinmonyI18n.message('消息列表读取失败，请重试'); }
     finally { if(revision === this.revision){this.listBusy = false; if(live())this.apply(); if(!this.listBusy && !this.contactsBusy)this.ports.settled();} }
   }
   private async readContacts(): Promise<void> {
@@ -205,7 +206,7 @@ export class PinmonyInboxMessagesNativeReads {
       const ids: Set<string> = new Set<string>(); const rows: NativeContact[] = [];
       data.forEach((u: RawUser): void => { const user: InboxFlowUser = this.user(u); const username: string = this.clean(u.username); if(u.type !== 'user_share_suggestion' || !username)throw new Error('contact-format'); if(ids.has(u.id) || user.self)return; ids.add(u.id); rows.push({id:'contact:' + u.id,userId:u.id,username:username,title:user.name,subtitle:'@' + username,imageUrl:user.avatar,profileUrl:user.profileUrl,enabled:true}); });
       if(!live())return; this.contacts = rows; this.contactsReady = true;
-    } catch (_) { if(live())this.contactsError = '联系人读取失败，请重试'; }
+    } catch (_) { if(live())this.contactsError = PinmonyI18n.message('联系人读取失败，请重试'); }
     finally { if(revision === this.revision){this.contactsBusy = false; if(live())this.apply(); this.ports.settled();} }
   }
   private newFlow(screen: string,conversation: string = ''): PinmonyInboxFlowSnapshot {
@@ -272,10 +273,10 @@ export class PinmonyInboxMessagesNativeReads {
         const existing: string = this.matchConversation(flow.selectedIds,this.conversations);
         if(existing){this.newFlow('chat',existing);await this.readChat();return true;}
         const key: string = flow.selectedIds.slice().sort().join(',');
-        if(this.uncertainCreations.has(key)){flow.writeUncertain = true;flow.writeAction = 'next';flow.writeTarget = key;flow.error = '会话创建结果未确认，请重新读取核对；不会重复创建';this.publish();return true;}
+        if(this.uncertainCreations.has(key)){flow.writeUncertain = true;flow.writeAction = 'next';flow.writeTarget = key;flow.error = PinmonyI18n.message('会话创建结果未确认，请重新读取核对；不会重复创建');this.publish();return true;}
       }
       if((action === 'blockUser' || action === 'unblockUser') && this.uncertainBlocks.has(value)) {
-        flow.writeUncertain = true;flow.writeAction = action;flow.writeTarget = value;flow.error = '屏蔽结果未确认，暂时无法核对状态；不会重复提交';this.publish();return true;
+        flow.writeUncertain = true;flow.writeAction = action;flow.writeTarget = value;flow.error = PinmonyI18n.message('屏蔽结果未确认，暂时无法核对状态；不会重复提交');this.publish();return true;
       }
       const revision: number = this.flowRevision;this.writePreparing = true;
       try {if(/^\d{1,40}$/.test(this.viewer))await this.writes.submit(action,value);else if(await this.ensureWriteIdentity())await this.writes.submit(action,value);}
@@ -283,7 +284,7 @@ export class PinmonyInboxMessagesNativeReads {
       return true;
     }
     if(action === 'settings' && flow.screen === 'chat' && !flow.loading){this.chat = flow; const settings: PinmonyInboxFlowSnapshot = this.newFlow('settings'); settings.title = '消息设置'; settings.users = flow.users;settings.conversationId = flow.conversationId; settings.blockedUserId = flow.users.find((u: InboxFlowUser): boolean => !u.self)?.id || ''; settings.blocked = this.knownBlocks.get(settings.blockedUserId) === true; settings.blockRevision = 0;
-      if(this.uncertainBlocks.has(settings.blockedUserId)){settings.writeUncertain = true;settings.error = '屏蔽结果未确认，暂时无法核对状态；不会重复提交';} settings.loading = false; this.publish(); return true;}
+      if(this.uncertainBlocks.has(settings.blockedUserId)){settings.writeUncertain = true;settings.error = PinmonyI18n.message('屏蔽结果未确认，暂时无法核对状态；不会重复提交');} settings.loading = false; this.publish(); return true;}
     if(action === 'select' && flow.screen === 'compose' && !flow.loading){if(flow.users.some((u: InboxFlowUser): boolean => u.id === value && !u.self))flow.selectedIds = flow.selectedIds.includes(value) ? flow.selectedIds.filter((id: string): boolean => id !== value) : flow.selectedIds.concat([value]); this.publish(); return true;}
     if(action === 'search' && flow.screen === 'compose'){await this.readCompose(value.trim().slice(0,500)); return true;}
     if(action === 'more' && flow.screen === 'chat'){if(flow.hasMore && !this.flowBusy)await this.readMessages(true,false); return true;}
@@ -308,7 +309,7 @@ export class PinmonyInboxMessagesNativeReads {
       const rows: RawConversation[] = r.data as RawConversation[];if(!Array.isArray(rows) || rows.length > 2000)throw new Error('identity');
       rows.forEach((c: RawConversation): void => {if(!Array.isArray(c.users) || c.users.length > 1000)throw new Error('users');c.users.forEach((u: RawUser): void => {this.self(u);});});
       if(!live() || !/^\d{1,40}$/.test(this.viewer))throw new Error('identity');return true;
-    }catch (_) {if(live())flow.error = '当前账号身份尚未确认，请重新读取后再操作';return false;}
+    }catch (_) {if(live())flow.error = PinmonyI18n.message('当前账号身份尚未确认，请重新读取后再操作');return false;}
     finally {if(live()){flow.loading = false;this.publish();}}
   }
   private writeConfirmed(action: string,value: string,raw: string): void {
@@ -341,7 +342,7 @@ export class PinmonyInboxMessagesNativeReads {
   }
   private async recoverWrite(): Promise<void> {
     const flow: PinmonyInboxFlowSnapshot | undefined = this.flow;if(!flow || !this.ownsFlow() || this.flowBusy)return;
-    if(flow.screen === 'settings'){flow.error = '屏蔽结果未确认，暂时无法核对状态；不会重复提交';this.publish();return;}
+    if(flow.screen === 'settings'){flow.error = PinmonyI18n.message('屏蔽结果未确认，暂时无法核对状态；不会重复提交');this.publish();return;}
     if(flow.screen === 'chat') {
       await this.readChat();
       if(this.ownsFlow() && this.flow === flow && !flow.error){flow.writeUncertain = false;flow.sendError = '';this.publish();}
@@ -356,8 +357,8 @@ export class PinmonyInboxMessagesNativeReads {
       rows.forEach((c: RawConversation): void => {if(!c || !/^\d{1,40}$/.test(c.id) || !Array.isArray(c.users) || c.users.length > 1000)throw new Error('conversation');c.users.forEach((u: RawUser): void => {this.user(u);});});
       const id: string = this.matchConversation(flow.selectedIds,rows);if(!live())return;
       if(id){this.uncertainCreations.delete(flow.writeTarget || '');this.newFlow('chat',id);this.readChat();return;}
-      flow.error = '未找到可确认的会话，请稍后重新读取；不会重复创建';
-    }catch (_) {if(live())flow.error = '会话结果仍未确认，请稍后重新读取；不会重复创建';}
+      flow.error = PinmonyI18n.message('未找到可确认的会话，请稍后重新读取；不会重复创建');
+    }catch (_) {if(live())flow.error = PinmonyI18n.message('会话结果仍未确认，请稍后重新读取；不会重复创建');}
     finally {if(live()){this.flowBusy = false;flow.loading = false;this.publish();}}
   }
   private async readChat(): Promise<void> {
@@ -370,7 +371,7 @@ export class PinmonyInboxMessagesNativeReads {
       const users: InboxFlowUser[] = data.users.map((u: RawUser): InboxFlowUser => this.user(u)); if(!live())return;
       flow.users = users; const peers: InboxFlowUser[] = users.filter((u: InboxFlowUser): boolean => !u.self); flow.title = (peers.length === 1 ? peers[0].name : this.clean(data.name)) || peers.map((u: InboxFlowUser): string => u.name).join('、'); this.flowBusy = false;
       await this.readMessages(false,false);
-    } catch (_) { if(live()){flow.loading = false; flow.error = '会话读取失败，请重试'; this.publish();} }
+    } catch (_) { if(live()){flow.loading = false; flow.error = PinmonyI18n.message('会话读取失败，请重试'); this.publish();} }
     finally { if(revision === this.flowRevision)this.flowBusy = false; }
   }
   private async readMessages(append: boolean,quiet: boolean): Promise<void> {
@@ -390,7 +391,7 @@ export class PinmonyInboxMessagesNativeReads {
       if(!quiet || !previous){this.cursor = cursor; flow.hasMore = !!cursor && cursor !== '-end-' && cursor !== (append ? previous : '') && !!fresh.length && flow.messages.length < 2000;}
       if(!quiet){flow.sendError = ''; flow.loading = false;} flow.error = ''; this.publish();
       PinmonyRuntimeLog.info('InboxMessagesNativeTrace: chat committed append=' + append.toString() + ' count=' + flow.messages.length.toString());
-    } catch (_) { if(live() && !quiet){flow.loading = false; flow.error = '会话消息读取失败，请重试'; this.publish();} }
+    } catch (_) { if(live() && !quiet){flow.loading = false; flow.error = PinmonyI18n.message('会话消息读取失败，请重试'); this.publish();} }
     finally { if(revision === this.flowRevision)this.flowBusy = false; }
   }
   private async readCompose(query: string): Promise<void> {
@@ -402,7 +403,7 @@ export class PinmonyInboxMessagesNativeReads {
       const data: RawUser[] = query ? (resource.data as TypeaheadData)?.items : resource.data as RawUser[]; if(!Array.isArray(data) || data.length > 1000)throw new Error('compose-format');
       const users: Map<string,InboxFlowUser> = new Map<string,InboxFlowUser>(); data.forEach((u: RawUser): void => {const user: InboxFlowUser = this.user(u); if(!user.self)users.set(user.id,user);}); if(!live())return;
       flow.users = Array.from(users.values()); flow.selectedIds = flow.selectedIds.filter((id: string): boolean => users.has(id)); flow.loading = false; this.publish();
-    } catch (_) { if(live()){flow.loading = false; flow.error = '联系人读取失败，请重试'; this.publish();} }
+    } catch (_) { if(live()){flow.loading = false; flow.error = PinmonyI18n.message('联系人读取失败，请重试'); this.publish();} }
     finally { if(revision === this.flowRevision)this.flowBusy = false; }
   }
   // Called only after the existing controller validates document epoch, page and action session.

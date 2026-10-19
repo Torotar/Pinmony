@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardFlow } from 'feature_board';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -44,7 +45,7 @@ export class PinmonyBoardManagementNativeWrites {
   }
   private publish(f: PinmonyBoardFlow): void {this.ports.changed(this.clone(f));}
   private unknown(f: PinmonyBoardFlow): void {
-    f.busy = false;f.uncertain = true;f.error = '操作结果未确认，请关闭后刷新核对；不会重复提交';
+    f.busy = false;f.uncertain = true;f.error = PinmonyI18n.message('操作结果未确认，请关闭后刷新核对；不会重复提交');
     this.publish(f);PinmonyRuntimeLog.info('BoardManagementNative: outcome=unknown');
   }
   pause(): void {

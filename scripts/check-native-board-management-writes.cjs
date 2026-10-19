@@ -1,8 +1,9 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 function load(file, deps = () => ({})) {
   const exports = {}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,
-    {exports,require:deps,setTimeout,clearTimeout,console});return exports;
+    {exports,require:withLocalMessages(name => { const dependency = deps(name); return name.startsWith('./') && Object.keys(dependency).length === 0 ? load(require('node:path').resolve(require('node:path').dirname(file), name) + '.ets') : dependency; }),setTimeout,clearTimeout,console});return exports;
 }
 const logs=[], log={PinmonyRuntimeLog:{info:s=>logs.push(s)}};
 const management=load('entry/src/main/ets/app/PinmonyBoardManagementNativeWrites.ets',n=>n==='common_foundation'?log:{}), Writer=management.PinmonyBoardManagementNativeWrites;
@@ -111,15 +112,15 @@ async function webAndDialogs(){
   const View=vm.runInNewContext(ts.transpileModule('class View {'+['confirmationKey','confirmDelete','confirmLeave','confirmArchive'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{});
   for(const name of ['confirmDelete','confirmLeave','confirmArchive'])for(const change of ['web','account','intent','page']){
     const dialogs=[],actions=[],view=new View();view.snapshot={session:0,pageKey:page,title:'Board',collaborator:true,editable:false,nativeAccountGeneration:1,nativeWriteIntent:7,flow:{...flow,phase:name==='confirmArchive'?'archive':'edit',busy:false}};
-    view.phase=()=>view.snapshot.flow.phase;view.getUIContext=()=>({showAlertDialog:d=>dialogs.push(d)});view.act=a=>actions.push(a);view[name]();assert.equal(dialogs.length,1);
+    view.uiText = source => source; view.phase=()=>view.snapshot.flow.phase;view.getUIContext=()=>({showAlertDialog:d=>dialogs.push(d)});view.act=a=>actions.push(a);view[name]();assert.equal(dialogs.length,1);
     if(change==='web')view.snapshot.session=99;else if(change==='account')view.snapshot.nativeAccountGeneration++;else if(change==='intent')view.snapshot.nativeWriteIntent++;else view.snapshot.pageKey=origin+'/sample/other/';
     dialogs[0].secondaryButton.action();assert.equal(actions.length,change==='web'?1:0,name+':'+change);
   }
   // Execute the actual product rename/exit ports, native route selector, and old-Web route guard.
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');function indexMethod(name){const i=index.indexOf('  private '+name+'(');assert(i>=0);return index.slice(i,index.indexOf('\n  private ',i+1));}
   const rename=index.match(/    renamed: \(previous: string, next: string\): void => \{([\s\S]*?)\n    \},/)[1],exit=index.match(/    exited: \(action: string\): void => \{([\s\S]*?)\n    \},/)[1];
-  const Host=vm.runInNewContext(ts.transpileModule('class Host {rename(previous:string,next:string){'+rename+'} exit(action:string){'+exit+'}'+['currentBoardUrl','syncBoardRoute'].map(indexMethod).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_BOARD_READS_ENABLED:true});
-  const n=new Host(),next=origin+'/sample/renamed/';let back=0,sync=0,loads=0;
+  const Host=vm.runInNewContext(ts.transpileModule('class Host {rename(previous:string,next:string){'+rename+'} exit(action:string){'+exit+'}'+['currentBoardUrl','syncBoardRoute'].map(indexMethod).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_BOARD_READS_ENABLED:true, PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages});
+  Host.prototype.uiText = source => source; const n=new Host(),next=origin+'/sample/renamed/';let back=0,sync=0,loads=0;
   Object.assign(n,{nativeRootOnly:false,pinStore:{},boardStore:{boardDetail:{pageKey:next,nativeReadsReady:false,nativeVersion:1},boardReturnPage:page},cancelledBoardPins:new Set(),returnCoordinator:{cancel(){}},pageBackToken:0,pageHistory:{visit(){}},boardUrlFromAddress:s=>s,controller:{getUrl:()=>page,loadUrl(){loads++}},backFromBoard(){back++},showMessage(){},boardStateController:{syncRoute(){sync++}},boardNativeReads:{eligible:()=>true,demand(){},pause(){}},pagePerformance:{beginSecondary(){}}});
   n.rename(page,next);assert.equal(n.currentBoardUrl(),next);assert.equal(n.boardStore.boardReturnPage,next);n.syncBoardRoute(page);assert.equal(sync,0);assert.equal(loads,0);n.exit('leave');assert.equal(back,1);
   assert(index.includes('window.PinmonyNativeBoardManagementWritesEnabled')===false);assert(fs.readFileSync('entry/src/main/ets/app/PinmonyScriptRegistry.ets','utf8').includes('window.PinmonyNativeBoardManagementWritesEnabled'));

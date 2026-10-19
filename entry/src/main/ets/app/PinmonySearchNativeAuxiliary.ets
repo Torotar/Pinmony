@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchStore, PinmonySearchQuiz, PinmonySearchQuizCard, PinmonySearchQuizTopic, PIN_SEARCH_QUIZ_API_ENABLED } from 'feature_search';
 import { PinmonyBusinessAuxiliaryClient, PinmonyAuxiliaryPorts, PinmonyAuxiliaryNotSent, PinmonyAuxiliaryRejected } from './PinmonyBusinessAuxiliaryClient';
 interface QuizModule { quiz: QuizText; related_query_items: Topic[]; }
@@ -25,7 +26,7 @@ export class PinmonySearchNativeAuxiliary {
   private cards: PinmonySearchQuizCard[] = [];private selected: string[] = [];private busy: boolean = false;private error: string = '';
   private readonly unknownHistory: Set<string> = new Set<string>();
   constructor(ports: PinmonySearchAuxiliaryPorts,publish: () => void){this.ports = ports;this.client = new PinmonyBusinessAuxiliaryClient(ports);this.publish = publish;}
-  pause(): void {this.revision++;this.client.pause();if(this.busy){this.busy = false;if(this.mode === 'entry')this.attempted = false;else this.error = '读取已中断，请重试';}}
+  pause(): void {this.revision++;this.client.pause();if(this.busy){this.busy = false;if(this.mode === 'entry')this.attempted = false;else this.error = PinmonyI18n.message('读取已中断，请重试');}}
   reset(): void {this.pause();this.account = '';this.page = '';this.attempted = false;this.module = undefined;this.cards = [];this.selected = [];this.mode = 'entry';this.error = '';this.cursor = '';this.ended = true;this.unknownHistory.clear();}
   private bind(): boolean {
     const account: string = this.client.key(),page: string = this.ports.page();
@@ -76,7 +77,7 @@ export class PinmonySearchNativeAuxiliary {
         this.cursor = typeof r.bookmark === 'string' && r.bookmark.length <= 4096 ? r.bookmark : '';
         this.ended = !this.cursor || this.cursor === '-end-' || append && this.cursor === previous || !items.length;
       }
-    }catch (_) {if(this.live(revision))this.error = '灵感推荐读取失败，请重试';}
+    }catch (_) {if(this.live(revision))this.error = PinmonyI18n.message('灵感推荐读取失败，请重试');}
     finally {if(this.live(revision)){this.busy = false;this.publish();}}
   }
   async action(kind: string,id: string = ''): Promise<void> {

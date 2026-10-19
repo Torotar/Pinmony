@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySettingsStore, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory } from 'feature_settings';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { ProfileSettingsPorts, PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
@@ -128,10 +129,10 @@ export class PinmonySettingsNativeFlow {
         if (this.owned && this.sent && this.pending) {
             this.uncertain.set(this.pending, this.uncertain.get(this.pending) || '');
             this.store.writeUncertain = true;
-            this.store.error = '保存结果未确认，请重新读取核对；不会自动重试保存';
+            this.store.error = PinmonyI18n.message('保存结果未确认，请重新读取核对；不会自动重试保存');
         }
         else if (this.owned && this.store.loading)
-            this.store.error = '读取已暂停，请重试';
+            this.store.error = PinmonyI18n.message('读取已暂停，请重试');
         this.revision++;
         this.client.cancel();
         this.sent = false;
@@ -164,7 +165,7 @@ export class PinmonySettingsNativeFlow {
     private commit(revision: number): void {
         if (!this.current(revision) || !this.value)
             return;
-        if(this.uncertain.size > 0 && !this.value.error){this.value.error = '上次保存结果仍未确认，已读取当前设置，请勿重复提交';this.store.error = this.value.error;}
+        if(this.uncertain.size > 0 && !this.value.error){this.value.error = PinmonyI18n.message('上次保存结果仍未确认，已读取当前设置，请勿重复提交');this.store.error = this.value.error;}
         this.store.data = JSON.parse(JSON.stringify(this.value)) as PinmonyAccountSettings;
         this.store.writeUncertain = this.uncertain.size > 0;
     }
@@ -249,7 +250,7 @@ export class PinmonySettingsNativeFlow {
         this.bind();
         if (write && this.uncertain.size) {
             this.store.writeUncertain = true;
-            this.store.error = '请先重新读取核对保存结果';
+            this.store.error = PinmonyI18n.message('请先重新读取核对保存结果');
             return;
         }
         this.revision++;
@@ -465,7 +466,7 @@ export class PinmonySettingsNativeFlow {
                         this.activityUnknown.delete(this.pending.slice(9));
                     this.sent = false;
                 }
-                this.store.error = this.sent ? '保存结果未确认，请重新读取核对；不会自动重试保存' : error instanceof ProfileSettingsRejected ? '网站拒绝了本次操作' : write ? '未能确认当前设置或权限，请重新读取后重试' : '读取失败，请重试';
+                this.store.error = this.sent ? '保存结果未确认，请重新读取核对；不会自动重试保存' : error instanceof ProfileSettingsRejected ? '网站拒绝了本次操作' : write ? '未能确认当前设置或权限，请重新读取后重试' : PinmonyI18n.message('读取失败，请重试');
                 if (this.value) {
                     this.value.error = this.store.error;
                     this.commit(revision);

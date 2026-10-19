@@ -1,5 +1,6 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]||'typescript');
-function load(path,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps});return exports;}
+function load(path,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps)});return exports;}
 const Writer=load('entry/src/main/ets/app/PinmonyBoardSectionNativeWrites.ets').PinmonyBoardSectionNativeWrites;
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',page=origin+'/sample/board/';

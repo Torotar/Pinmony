@@ -1,4 +1,5 @@
 export { PinmonyRuntimeLog } from './src/main/ets/services/PinmonyRuntimeLog';
+export { PinmonyI18n } from './src/main/ets/services/PinmonyI18n';
 export { PinmonyTaskRegistry } from './src/main/ets/services/PinmonyTaskRegistry';
 export { LruCache } from './src/main/ets/cache/LruCache';
 export { DiskCache } from './src/main/ets/cache/DiskCache';

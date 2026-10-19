@@ -1,5 +1,6 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const {PinmonyPinMenuNative:Menu,PIN_NATIVE_PIN_MENUS_ENABLED}=load('entry/src/main/ets/app/PinmonyPinMenuNative.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='feature_pin'?{PIN_EDIT_API_ENABLED:true,PIN_POST_API_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',pin=origin+'/pin/11/',image='https://i.pinimg.com/menu-original.jpg';

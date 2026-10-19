@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { window } from '@kit.ArkUI';
@@ -6,11 +7,14 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyDisplaySettingsPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
   @StorageLink('bottomBarScrollCollapseEnabled') private collapseEnabled: boolean = true;
   @StorageLink('themePreference') private themePreference: string = 'system';
+  @StorageLink('pinmonyLanguagePreference') private languagePreference: string = 'system';
   @StorageLink('screenOrientationPreference') private orientationPreference: string = 'system';
   @State private orientationBusy: boolean = false;
   private readonly isTablet: boolean = deviceInfo.deviceType === 'tablet';
@@ -30,10 +34,10 @@ export struct PinmonyDisplaySettingsPage {
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
-    this.errorSnack.show({}, { title: this.store.error }, {
+    this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
-      content: this.store.error.includes('未确认') ? '重新读取' : '重试',
-      contentAccessibilityText: '重新读取当前设置',
+      content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("重新读取") : this.uiText("重试"),
+      contentAccessibilityText: this.uiText("重新读取当前设置"),
       onContentClick: () => {
         if (!this.pageVisible || key !== this.errorSnackKey || this.store.busy || this.store.loading) return;
         this.dismissErrorSnack();
@@ -41,8 +45,8 @@ export struct PinmonyDisplaySettingsPage {
       }
     }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
-  private title(): string { return this.store.screen === 'theme' ? '主题' : '显示设置'; }
-  private themeLabel(): string { return this.themePreference === 'dark' ? '深色' : this.themePreference === 'light' ? '浅色' : '跟随系统'; }
+  private title(): string { return this.store.screen === 'theme' ? this.uiText("主题") : this.uiText("显示设置"); }
+  private themeLabel(): string { return this.themePreference === 'dark' ? this.uiText("深色") : this.themePreference === 'light' ? this.uiText("浅色") : this.uiText("跟随系统"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private selectTheme(value: string): void {
@@ -54,7 +58,7 @@ export struct PinmonyDisplaySettingsPage {
       context.getApplicationContext().setColorMode(value === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : value === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     } catch (_) {
       this.themePreference = previous;
-      try { this.getUIContext().getPromptAction().showToast({ message: '主题切换失败，请重试', duration: 3000 }); }
+      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("主题切换失败，请重试"), duration: 3000 }); }
       catch (_) { PinmonyRuntimeLog.warn('Settings: theme failure feedback unavailable'); }
     }
   }
@@ -72,7 +76,7 @@ export struct PinmonyDisplaySettingsPage {
       await mainWindow.setPreferredOrientation(orientations[index]);
       this.orientationPreference = value;
     } catch (_) {
-      this.getUIContext().getPromptAction().showToast({ message: '屏幕方向切换失败，请重试', duration: 3000 });
+      this.getUIContext().getPromptAction().showToast({ message: this.uiText("屏幕方向切换失败，请重试"), duration: 3000 });
     } finally { this.orientationBusy = false; }
   }
   private options(): HdsNavigationTitleBarOptions {
@@ -102,9 +106,32 @@ export struct PinmonyDisplaySettingsPage {
   @Builder
   private display() {
     Row({ space: 12 }) {
-      Text('主题').fontSize(18).fontWeight(FontWeight.Bold)
+      Text(this.uiText('语言')).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Select([{ value: '跟随系统' }, { value: '浅色' }, { value: '深色' }])
+      Select([{ value: this.uiText('跟随系统') }, { value: '中文' }, { value: 'English' }])
+        .selected(Math.max(0, ['system', 'zh', 'en'].indexOf(this.languagePreference)))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'en' ? 'English' : this.uiText('跟随系统'))
+        .font({ size: 15 }).fontColor($r('app.color.primary_text'))
+        .backgroundColor($r('app.color.surface_muted'))
+        .selectedOptionBgColor($r('app.color.surface_muted'))
+        .selectedOptionFontColor($r('app.color.primary_text'))
+        .optionFontColor($r('app.color.primary_text'))
+        .accessibilityText(this.uiText('语言'))
+        .onSelect((index: number) => {
+          if (index >= 0 && index < 3) {
+            const value: string = ['system', 'zh', 'en'][index];
+            try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
+            catch (_) {
+              PinmonyRuntimeLog.warn('LanguagePreference: save failed');
+              this.getUIContext().getPromptAction().showToast({ message: this.uiText('语言切换失败，请重试') });
+            }
+          }
+        })
+    }.width('100%').padding({ top: 16, bottom: 16 })
+    Row({ space: 12 }) {
+      Text(this.uiText("主题")).fontSize(18).fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Select([{ value: this.uiText("跟随系统") }, { value: this.uiText("浅色") }, { value: this.uiText("深色") }])
         .selected(this.themePreference === 'light' ? 1 : this.themePreference === 'dark' ? 2 : 0)
         .value(this.themeLabel())
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
@@ -112,39 +139,39 @@ export struct PinmonyDisplaySettingsPage {
         .selectedOptionBgColor($r('app.color.surface_muted'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
-        .accessibilityText('主题，' + this.themeLabel())
+        .accessibilityText(this.uiText("主题，") + this.themeLabel())
         .onSelect((index: number) => {
           if (index >= 0 && index < 3) this.selectTheme(['system', 'light', 'dark'][index]);
         })
     }.width('100%').padding({ top: 16, bottom: 16 })
     if (this.isTablet) {
       Row({ space: 12 }) {
-        Text('屏幕方向').fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-        Select([{ value: '跟随系统' }, { value: '始终自动旋转' }, { value: '竖屏' }, { value: '横屏' }])
+        Text(this.uiText("屏幕方向")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Select([{ value: this.uiText("跟随系统") }, { value: this.uiText("始终自动旋转") }, { value: this.uiText("竖屏") }, { value: this.uiText("横屏") }])
           .selected(Math.max(0, ['system', 'auto', 'portrait', 'landscape'].indexOf(this.orientationPreference)))
-          .value(this.orientationPreference === 'auto' ? '始终自动旋转' : this.orientationPreference === 'portrait' ? '竖屏' : this.orientationPreference === 'landscape' ? '横屏' : '跟随系统')
+          .value(this.orientationPreference === 'auto' ? this.uiText("始终自动旋转") : this.orientationPreference === 'portrait' ? this.uiText("竖屏") : this.orientationPreference === 'landscape' ? this.uiText("横屏") : this.uiText("跟随系统"))
           .font({ size: 15 }).fontColor($r('app.color.primary_text'))
           .backgroundColor($r('app.color.surface_muted')).enabled(!this.orientationBusy)
-          .accessibilityText('屏幕方向')
+          .accessibilityText(this.uiText("屏幕方向"))
           .onSelect((index: number) => { this.selectOrientation(index); })
       }.width('100%').padding({ top: 16, bottom: 16 })
     }
     Row({ space: 16 }) {
       Column({ space: 6 }) {
-        Text('底栏收起动画').fontSize(17).fontColor($r('app.color.primary_text'))
+        Text(this.uiText("底栏收起动画")).fontSize(17).fontColor($r('app.color.primary_text'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled }).onChange((value: boolean) => { this.collapseEnabled = value; })
-        .accessibilityText('底栏收起动画')
+        .accessibilityText(this.uiText("底栏收起动画"))
     }.width('100%').padding({ top: 16, bottom: 16 })
   }
   @Builder
   private theme() {
     ForEach(['system', 'light', 'dark'], (value: string) => {
       Row() {
-        Text(value === 'system' ? '跟随系统' : value === 'light' ? '浅色' : '深色').fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Text(value === 'system' ? this.uiText("跟随系统") : value === 'light' ? this.uiText("浅色") : this.uiText("深色")).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Radio({ group: 'pinweb-theme', value }).checked(this.themePreference === value)
           .onChange((selected: boolean) => { if (selected) this.selectTheme(value); })
-          .accessibilityText(value === 'system' ? '跟随系统' : value === 'light' ? '浅色' : '深色')
+          .accessibilityText(value === 'system' ? this.uiText("跟随系统") : value === 'light' ? this.uiText("浅色") : this.uiText("深色"))
       }.width('100%').constraintSize({ minHeight: 56 })
     }, (value: string) => value)
   }

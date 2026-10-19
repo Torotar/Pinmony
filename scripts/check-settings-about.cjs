@@ -1,10 +1,11 @@
+const { rawLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('feature_settings/src/main/ets/components/PinmonyAboutPage.ets', 'utf8');
 const methods = source.slice(source.indexOf('  private async readVersion'), source.indexOf('  @Builder'));
-const sandbox = { bundleManager: { BundleFlag: { GET_BUNDLE_INFO_DEFAULT: 0 },
+const sandbox = { PinmonyI18n: rawLocalMessages, bundleManager: { BundleFlag: { GET_BUNDLE_INFO_DEFAULT: 0 },
   getBundleInfoForSelfSync: () => ({ versionName: '9.8.7', versionCode: 987 }) }, PinmonyRuntimeLog: { warn() {}, info() {} } };
 vm.runInNewContext(ts.transpileModule('class About {' + methods + '} globalThis.About = About;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, sandbox);
@@ -27,14 +28,14 @@ const httpMock = { RequestMethod: { GET: 'GET' }, HttpDataType: { STRING: 0 }, H
 }) };
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('feature_settings/src/main/ets/services/PinmonyRelease.ets', 'utf8'),
   { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText,
-  { exports: releaseExports, require: () => ({ http: httpMock, PinmonyRuntimeLog: sandbox.PinmonyRuntimeLog }),
+  { exports: releaseExports, require: () => ({ PinmonyI18n: rawLocalMessages, http: httpMock, PinmonyRuntimeLog: sandbox.PinmonyRuntimeLog }),
     setTimeout: (callback, ms) => { assert.equal(ms, 12000); timeoutCallback = callback; return 1; },
     clearTimeout: () => { timerCleared = true; } });
 sandbox.isNewerRelease = releaseExports.isNewerRelease;
 sandbox.PinmonyReleaseFailure = releaseExports.PinmonyReleaseFailure;
 vm.runInNewContext(ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports: storeExports });
 (async () => {
-  const page = new sandbox.About(); page.visible = true;
+  const page = new sandbox.About(); page.uiText = source => source; page.visible = true;
   page.releaseClient = { latest: async () => undefined };
   await page.readVersion(); assert.equal(page.version, '9.8.7 (987)');
   sandbox.bundleManager.getBundleInfoForSelfSync = () => { throw Error('unavailable'); };

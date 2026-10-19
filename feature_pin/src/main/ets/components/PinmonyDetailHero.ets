@@ -1,9 +1,12 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
 export interface DetailHeroSource { key: string; url: string; pinUrl: string; revision: number; }
 
 @Component
 export struct PinmonyDetailHero {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   // The parent ForEach replaces this component only on a source change or retry.
   @Prop source: DetailHeroSource = { key: '', url: '', pinUrl: '', revision: 0 };
   @Prop heightVp: number = 300;
@@ -97,15 +100,15 @@ export struct PinmonyDetailHero {
         .onComplete((event) => this.completeImage(event?.loadingStatus ?? -1))
         .onError((event) => this.failImage(event?.error?.code || 0))
         .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); })
-        .accessibilityText(this.label || 'Pin 图片')
+        .accessibilityText(this.label || this.uiText("Pin 图片"))
       if (!this.blocked && !this.previewAvailable && this.imageState === 'loading') {
         LoadingProgress().width(28).height(28).color($r('app.color.accent'))
-          .hitTestBehavior(HitTestMode.None).accessibilityText('正在加载图片')
+          .hitTestBehavior(HitTestMode.None).accessibilityText(this.uiText("正在加载图片"))
       } else if (!this.blocked && (this.imageState === 'timeout' || this.imageState === 'failed')) {
         Column({ space: 8 }) {
-          Text(this.imageState === 'failed' ? '图片加载失败' : '图片加载超时')
+          Text(this.imageState === 'failed' ? this.uiText("图片加载失败") : this.uiText("图片加载超时"))
             .fontSize(14).fontColor($r('app.color.secondary_text'))
-          Button('重新加载图片').onClick(() => this.retryImage())
+          Button(this.uiText("重新加载图片")).onClick(() => this.retryImage())
         }.padding(12).borderRadius(12).backgroundColor($r('app.color.page_background'))
       }
     }.width('100%').height(this.heightVp)

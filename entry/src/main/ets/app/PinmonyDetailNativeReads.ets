@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyRelatedPin, readRelatedPresentation, RelatedPresentation, PinmonyComment, PinmonyCommentResult } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -123,7 +124,7 @@ export class PinmonyDetailNativeReads {
       next.actions = next.actions.filter((item): boolean => !['like','comment','save','more','share'].includes(item.kind));
       next.actions.push({id:'native-like',kind:'like',label:'点赞',countText:count(likes),enabled:reaction.reaction_by_me === 0,selected:reaction.reaction_by_me === 1});
       next.actions.push({id:'native-comment',kind:'comment',label:'评论',countText:count(comments),enabled:!!this.aggregate,selected:false});
-      next.actions.push({id:'native-save',kind:'save',label:'收藏',countText:'',enabled:true,selected:false});
+      next.actions.push({id:'native-save',kind:'save',label:PinmonyI18n.message('收藏'),countText:'',enabled:true,selected:false});
       next.actions.push({id:'native-more',kind:'more',label:'更多选项',countText:'',enabled:true,selected:false});
       next.actions.push({id:'native-share',kind:'share',label:'分享',countText:'',enabled:true,selected:false});
       next.actions = this.store.confirmedSaves ? this.store.confirmedSaves.actions(resource.data.id,next.actions) : next.actions;
@@ -132,7 +133,7 @@ export class PinmonyDetailNativeReads {
     this.ports.mark(this.aggregate ? 'comments.native.identity.ready' : 'comments.native.identity.missing');
     const existing: PinmonyDetailSnapshot | undefined = this.store.detail;
     this.bookmark = ''; this.related = existing?.pinUrl === pin ? existing.related.slice() : []; this.relatedLoading = true; this.relatedEnded = false; this.relatedError = '';
-    this.previewText = ''; this.previewError = this.aggregate ? '' : '缺少评论标识，请重试评论预览'; this.previewEmpty = false;
+    this.previewText = ''; this.previewError = this.aggregate ? '' : PinmonyI18n.message('缺少评论标识，请重试评论预览'); this.previewEmpty = false;
     this.previewAvailable = !!this.aggregate; this.previewLoading = !!this.aggregate; this.apply();
     const revision: number = this.revision;
     await this.readPreview();
@@ -150,19 +151,19 @@ export class PinmonyDetailNativeReads {
     const listLoading: boolean = this.commentsBusy;
     this.commentsRevision++; this.commentsBusy = false;
     this.store.commentResult?.items.forEach((item: PinmonyComment): void => {
-      if (item.repliesLoading) { item.repliesLoading = false; item.repliesError = '回复读取已中断，请重试'; }
+      if (item.repliesLoading) { item.repliesLoading = false; item.repliesError = PinmonyI18n.message('回复读取已中断，请重试'); }
       this.cancelTranslation(item);
       item.replies?.forEach((reply: PinmonyComment): void => this.cancelTranslation(reply));
     });
     const result: PinmonyCommentResult = this.store.commentResult;
     if (result?.pin === this.pin) {
-      if (listLoading && result.loading) { result.loading = false; result.error = '评论读取已中断，请重试'; }
+      if (listLoading && result.loading) { result.loading = false; result.error = PinmonyI18n.message('评论读取已中断，请重试'); }
       this.publishComments(result);
     }
     this.requests.forEach((id: string): void => { if (id.startsWith('native_comments_') || id.startsWith('native_replies_') || id.startsWith('native_translation_')) this.ports.network().cancel(id); });
   }
   private cancelTranslation(item: PinmonyComment): void {
-    if (item.translationLoading) { item.translationLoading = false; item.translationError = '翻译已中断，请重试'; }
+    if (item.translationLoading) { item.translationLoading = false; item.translationError = PinmonyI18n.message('翻译已中断，请重试'); }
   }
   // PinStore is observed, but the nested result/items are plain objects.
   // Replace its root property to notify the sheet, retaining item identity for
@@ -188,7 +189,7 @@ export class PinmonyDetailNativeReads {
     if (!current() || this.commentsBusy) return;
     if (!this.owned()) {
       const result: PinmonyCommentResult = this.store.commentResult;
-      result.loading = false; result.error = '评论会话尚未就绪，请重新打开帖子'; this.publishComments(result); return;
+      result.loading = false; result.error = PinmonyI18n.message('评论会话尚未就绪，请重新打开帖子'); this.publishComments(result); return;
     }
     const revision: number = this.revision;
     const token: number = this.store.commentToken;
@@ -205,19 +206,19 @@ export class PinmonyDetailNativeReads {
       uncertain: prior.uncertain, actionError: prior.actionError, mutationVersion: prior.mutationVersion };
     this.publishComments(result);
     try {
-      if (!this.aggregate) { this.ports.mark('comments.native.identity.missing'); throw new Error('缺少评论标识，请返回帖子重试评论预览'); }
-      if (!this.ports.session().appVersion) { this.ports.mark('comments.native.metadata.missing'); throw new Error('评论请求信息尚未就绪，请重试'); }
+      if (!this.aggregate) { this.ports.mark('comments.native.identity.missing'); throw new Error(PinmonyI18n.message('缺少评论标识，请返回帖子重试评论预览')); }
+      if (!this.ports.session().appVersion) { this.ports.mark('comments.native.metadata.missing'); throw new Error(PinmonyI18n.message('评论请求信息尚未就绪，请重试')); }
       const options: CommentsOptions = { aggregated_pin_id: this.aggregate, comment_featured_ids: [], page_size: 25,
         redux_normalize_feed: true, is_reversed: false };
       if (previous) options.bookmarks = [previous];
       const reply: PinmonyNetworkReply = await this.request('UnifiedCommentsResource', options, 'native_comments_', live);
       if (!live()) return;
-      if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error('评论读取失败，请重试');
+      if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error(PinmonyI18n.message('评论读取失败，请重试'));
       const data: CommentsResource = (JSON.parse(reply.body) as CommentsResponse).resource_response;
       if (data?.status !== 'success' || data.error || data.code !== undefined && data.code !== 0 || !Array.isArray(data.data) || data.data.length > 2000)
-        throw new Error('评论返回格式无效，请重试');
+        throw new Error(PinmonyI18n.message('评论返回格式无效，请重试'));
       const viewer: string | undefined = (JSON.parse(reply.body) as CommentsResponse).client_context?.user?.id;
-      if (viewer !== undefined) { if (!/^\d{1,30}$/.test(viewer) || this.commentViewer && this.commentViewer !== viewer) throw new Error('评论账号校验失败'); this.commentViewer = viewer; }
+      if (viewer !== undefined) { if (!/^\d{1,30}$/.test(viewer) || this.commentViewer && this.commentViewer !== viewer) throw new Error(PinmonyI18n.message('评论账号校验失败')); this.commentViewer = viewer; }
       if (!append) { result.items = []; this.commentAuthors.clear(); }
       let recognized: number = 0;
       data.data.forEach((item: NativeCommentData): void => {
@@ -225,7 +226,7 @@ export class PinmonyDetailNativeReads {
         if (value) recognized++;
         if (value && !result.items.some((old: PinmonyComment): boolean => old.id === value.id) && result.items.length < 2000) result.items.push(value);
       });
-      if (data.data.length && !recognized) throw new Error('评论内容格式无法识别，请重试');
+      if (data.data.length && !recognized) throw new Error(PinmonyI18n.message('评论内容格式无法识别，请重试'));
       PinmonyRuntimeLog.info('CommentsTrace: list parsed incoming=' + data.data.length.toString() + ' recognized=' + recognized.toString() +
         ' count=' + result.items.length.toString() + ' append=' + append.toString());
       const cursor: string = typeof data.bookmark === 'string' && data.bookmark.length <= 4096 ? data.bookmark : '';
@@ -235,7 +236,7 @@ export class PinmonyDetailNativeReads {
     } catch (error) { if (live()) {
       result.items = retainedItems; this.commentAuthors.clear();
       retainedAuthors.forEach((author: string, id: string): void => { this.commentAuthors.set(id,author); });
-      result.error = error instanceof Error ? error.message : '评论读取失败，请重试'; this.ports.mark('comments.list.native.failed');
+      result.error = error instanceof Error ? error.message : PinmonyI18n.message('评论读取失败，请重试'); this.ports.mark('comments.list.native.failed');
     } }
     finally { if (revision === this.revision && commentsRevision === this.commentsRevision) this.commentsBusy = false; if (live()) { result.loading = false; this.publishComments(result); } }
   }
@@ -272,28 +273,28 @@ export class PinmonyDetailNativeReads {
       this.store.commentResult.pin === result.pin && this.store.commentResult.items === result.items && result.items.includes(item);
     item.repliesLoading = true; item.repliesError = ''; this.publishComments(result);
     try {
-      if (!this.ports.session().appVersion) throw new Error('回复请求信息尚未就绪，请重试');
+      if (!this.ports.session().appVersion) throw new Error(PinmonyI18n.message('回复请求信息尚未就绪，请重试'));
       const options: RepliesOptions = { isUnifiedComment: true, objectId: commentId, redux_normalize_feed: true };
       const resource: string = item.type === 'userdiditdata' ? 'DidItCommentsResource' : 'AggregatedCommentReplyFeedResource';
       const reply: PinmonyNetworkReply = await this.request(resource, options, 'native_replies_', live, commentId);
       if (!live()) return;
       this.ports.mark('comments.replies.response status=' + reply.status.toString() + ' parentType=' + (item.type || 'unknown'));
-      if (reply.status === 404) throw new Error('该评论的回复暂不可读取（HTTP 404）');
-      if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error('回复读取失败，请重试');
+      if (reply.status === 404) throw new Error(PinmonyI18n.message('该评论的回复暂不可读取（HTTP 404）'));
+      if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error(PinmonyI18n.message('回复读取失败，请重试'));
       const data: CommentsResource = (JSON.parse(reply.body) as CommentsResponse).resource_response;
       if (data?.status !== 'success' || data.error || data.code !== undefined && data.code !== 0 || !Array.isArray(data.data) || data.data.length > 2000)
-        throw new Error('回复返回格式无效，请重试');
+        throw new Error(PinmonyI18n.message('回复返回格式无效，请重试'));
       const endpoint: string = item.type === 'userdiditdata' ? 'v3_get_user_did_it_data_comments' : 'v3_get_aggregated_comment_replies';
-      if (data.endpoint_name && data.endpoint_name !== endpoint) throw new Error('回复返回合同不匹配，请重试');
+      if (data.endpoint_name && data.endpoint_name !== endpoint) throw new Error(PinmonyI18n.message('回复返回合同不匹配，请重试'));
       const replies: PinmonyComment[] = [];
       data.data.forEach((raw: NativeCommentData): void => {
         const value: PinmonyComment | undefined = this.mapComment(raw);
         if (value && !replies.some((old: PinmonyComment): boolean => old.id === value.id)) replies.push(value);
       });
       item.replies = replies;
-      if (data.bookmark && data.bookmark !== '-end-') item.repliesError = '还有更多回复，分页接口尚未确认';
+      if (data.bookmark && data.bookmark !== '-end-') item.repliesError = PinmonyI18n.message('还有更多回复，分页接口尚未确认');
       this.ports.mark('comments.replies.native.committed');
-    } catch (error) { if (live()) item.repliesError = error instanceof Error ? error.message : '回复读取失败，请重试'; }
+    } catch (error) { if (live()) item.repliesError = error instanceof Error ? error.message : PinmonyI18n.message('回复读取失败，请重试'); }
     finally { if (live()) { item.repliesLoading = false; this.publishComments(result); } }
   }
   async translateComment(commentId: string, current: () => boolean): Promise<void> {
@@ -316,7 +317,7 @@ export class PinmonyDetailNativeReads {
       (this.store.commentResult.items.includes(selected) || this.store.commentResult.items.some((parent: PinmonyComment): boolean => !!parent.replies?.includes(selected)));
     selected.translationLoading = true; selected.translationError = ''; this.publishComments(result);
     try {
-      if (!this.ports.session().appVersion) throw new Error('翻译请求信息尚未就绪，请重试');
+      if (!this.ports.session().appVersion) throw new Error(PinmonyI18n.message('翻译请求信息尚未就绪，请重试'));
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request');
       const options: TranslationOptions = { url: '/v3/aggregated_comments/' + commentId + '/translate/' };
       const reply: PinmonyNetworkReply = await this.request('ApiResource', options, 'native_translation_', live, commentId);
@@ -329,14 +330,14 @@ export class PinmonyDetailNativeReads {
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=response shape=' + shape + ' textLength=' + (typeof resource.data === 'string' ? resource.data.trim().length.toString() : '0'));
       if (resource.data === null || typeof resource.data === 'string' && !resource.data.trim()) {
         PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=empty');
-        selected.translationError = '暂无可用译文'; return;
+        selected.translationError = PinmonyI18n.message('暂无可用译文'); return;
       }
       // The supplied HAR proves only null. Accept bounded plain text; never render
       // an unconfirmed object shape or treat HTTP success alone as a translation.
       if (typeof resource.data !== 'string' || resource.data.length > 10000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=unsupported-format'); throw new Error('暂无法识别译文格式'); }
       selected.translatedText = resource.data.trim(); selected.translationVisible = true;
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=committed');
-    } catch (error) { if (live()) selected.translationError = error instanceof Error ? error.message : '评论翻译失败，请重试'; }
+    } catch (error) { if (live()) selected.translationError = error instanceof Error ? error.message : PinmonyI18n.message('评论翻译失败，请重试'); }
     finally { if (live()) { selected.translationLoading = false; this.publishComments(this.store.commentResult); } }
   }
   private async request(resource: string, options: Object, prefix: string, extraCurrent: () => boolean = (): boolean => true, commentId: string = ''): Promise<PinmonyNetworkReply> {
@@ -379,7 +380,7 @@ export class PinmonyDetailNativeReads {
       this.ports.mark('comments.native.committed');
     } catch (_) {
       if (revision === this.revision && this.owned()) { this.previewText = ''; this.previewError = this.ports.session().appVersion ?
-        '评论预览加载失败，请重试' : '评论预览请求信息尚未就绪，请重试'; }
+        PinmonyI18n.message('评论预览加载失败，请重试') : PinmonyI18n.message('评论预览请求信息尚未就绪，请重试'); }
     } finally { if (revision === this.revision && this.owned()) { this.previewLoading = false; this.apply(); } }
   }
   private async readRelated(append: boolean): Promise<PinmonyNetworkReply> {
@@ -401,7 +402,7 @@ export class PinmonyDetailNativeReads {
       this.related = merged; this.bookmark = mapped.bookmark || '';
       this.relatedEnded = mapped.ended || append && this.bookmark === previous;
       this.ports.mark('related.native.committed');
-    } catch (_) { if (revision === this.revision && this.owned()) { this.relatedError = '推荐内容加载失败，请重试'; reply.error = reply.error || 'invalid-response'; } }
+    } catch (_) { if (revision === this.revision && this.owned()) { this.relatedError = PinmonyI18n.message('推荐内容加载失败，请重试'); reply.error = reply.error || 'invalid-response'; } }
     finally { if (revision === this.revision && this.owned()) { this.relatedLoading = false; this.apply(); } }
     PinmonyRuntimeLog.info('DetailTrace: native-read-chain settled');
     return reply;

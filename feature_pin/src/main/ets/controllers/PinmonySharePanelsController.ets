@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PIN_EDIT_API_ENABLED } from '../services/PinmonyEditPinApiScript';
 import { PinmonyTaskRegistry, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
@@ -66,10 +67,10 @@ export class PinmonySharePanelsController {
     this.searchTasks.invalidate(); this.lastSearchKey = '';
     this.generation++; this.searchToken++; this.refreshToken++; this.refreshing = false; this.tasks.invalidate();
     if (this.ports.activeSheetKind() === 'share' && this.store.shareLoading) {
-      this.store.shareLoading = false; this.store.shareError = '分享读取已暂停，请重试';
+      this.store.shareLoading = false; this.store.shareError = PinmonyI18n.message('分享读取已暂停，请重试');
     }
     if (this.ports.activeSheetKind() === 'more' && this.store.moreLoading) {
-      this.store.moreLoading = false; this.store.moreError = '选项读取已暂停，请重试';
+      this.store.moreLoading = false; this.store.moreError = PinmonyI18n.message('选项读取已暂停，请重试');
     }
   }
 
@@ -147,7 +148,7 @@ export class PinmonySharePanelsController {
       if (message.kind === 'failed') {
         if (message.session === this.store.shareSession && message.session !== this.store.ignoredShareSession) {
           this.store.shareLoading = false;
-          this.ports.showMessage('无法读取 Pinterest 分享面板，请重新打开分享');
+          this.ports.showMessage(PinmonyI18n.message('无法读取 Pinterest 分享面板，请重新打开分享'));
           this.ports.dismissShareSheet();
         }
         return;
@@ -196,14 +197,14 @@ export class PinmonySharePanelsController {
       this.store.shareFeedback = message.feedback || '';
       this.store.shareError = message.error || '';
       if (/Unexpected token|not valid JSON|JSON\.parse|Unexpected end of JSON/i.test(this.store.shareError)) {
-        this.store.shareError = '无法读取分享数据，请重试';
+        this.store.shareError = PinmonyI18n.message('无法读取分享数据，请重试');
       }
       this.store.shareLoading = false;
       this.ports.setActiveSheetKind('share');
       this.ports.setShowNativeSheet(true);
       if (!this.store.shareSearchActive && this.store.shareOptions.length === 0 &&
           this.store.shareActions.length === 0 && !this.store.shareSearchId && this.store.shareContacts.length === 0) {
-        this.store.shareError = '暂时无法读取分享选项';
+        this.store.shareError = PinmonyI18n.message('暂时无法读取分享选项');
       } else {
         this.store.shareError = message.error || '';
       }
@@ -226,7 +227,7 @@ export class PinmonySharePanelsController {
       if (message.kind === 'closeFailed') {
         if (message.session === this.store.moreSession && message.pin === this.store.morePin &&
             this.ports.activeSheetKind() !== 'share') {
-          this.ports.showMessage('无法关闭网页选项，请重试');
+          this.ports.showMessage(PinmonyI18n.message('无法关闭网页选项，请重试'));
         }
         return;
       }
@@ -272,7 +273,7 @@ export class PinmonySharePanelsController {
         this.store.ignoredMoreSession = message.session;
         this.ports.setActiveSheetKind('');
         this.ports.setShowNativeSheet(false);
-        this.ports.showMessage('无法读取 Pinterest 选项，请重新打开三点菜单');
+        this.ports.showMessage(PinmonyI18n.message('无法读取 Pinterest 选项，请重新打开三点菜单'));
         return;
       }
       if (message.kind !== 'state') return;
@@ -283,7 +284,7 @@ export class PinmonySharePanelsController {
       this.store.moreOptions = (message.options || []).filter((option: MoreSheetOption) =>
         !!option.id && !!option.label);
       this.store.moreLoading = false;
-      this.store.moreError = this.store.moreOptions.length > 0 ? '' : '暂时无法读取选项';
+      this.store.moreError = this.store.moreOptions.length > 0 ? '' : PinmonyI18n.message('暂时无法读取选项');
       this.ports.setActiveSheetKind('more');
       this.ports.setShowNativeSheet(true);
     } catch (error) {
@@ -322,11 +323,11 @@ export class PinmonySharePanelsController {
       if (!state || state.session !== session || state.pin !== detail.pinUrl || !Array.isArray(state.options) || state.options.length > 100) throw new Error('read');
       this.store.moreOptions = state.options.filter((item: MoreSheetOption): boolean => !!item.id && !!item.label);
       this.store.moreLoading = false;
-      this.store.moreError = this.store.moreOptions.length ? '' : '暂时无法读取选项';
+      this.store.moreError = this.store.moreOptions.length ? '' : PinmonyI18n.message('暂时无法读取选项');
     } catch (_) {
       if (!current()) return;
       this.store.moreLoading = false;
-      this.store.moreError = '无法读取接口选项，请重试';
+      this.store.moreError = PinmonyI18n.message('无法读取接口选项，请重试');
     }
   }
 
@@ -346,12 +347,12 @@ export class PinmonySharePanelsController {
       this.ports.runScript('window.PinmonyNativeShareOpen && window.PinmonyNativeShareOpen(' +
         session.toString() + ')').then((result: string) => {
         if (current() && result !== 'true' && result !== '"true"') {
-          this.ports.showMessage('无法打开 Pinterest 分享选项，请重新打开分享');
+          this.ports.showMessage(PinmonyI18n.message('无法打开 Pinterest 分享选项，请重新打开分享'));
           this.ports.dismissShareSheet();
         }
       }).catch(() => {
         if (current()) {
-          this.ports.showMessage('无法打开 Pinterest 分享选项，请重新打开分享');
+          this.ports.showMessage(PinmonyI18n.message('无法打开 Pinterest 分享选项，请重新打开分享'));
           this.ports.dismissShareSheet();
         }
       });
@@ -375,7 +376,7 @@ export class PinmonySharePanelsController {
     const token: number = ++this.searchToken;
     const current = (): boolean => token === this.searchToken && this.current(session, pin, page, generation, 'share');
     this.store.shareContacts = [];
-    this.store.shareFeedback = '正在加载联系人…';
+    this.store.shareFeedback = PinmonyI18n.message('正在加载联系人…');
     this.store.shareError = '';
     if (!await this.searchTasks.wait(300) || !current()) return;
     this.lastSearchKey = key;
@@ -383,11 +384,11 @@ export class PinmonySharePanelsController {
       const result: string = await this.ports.runScript('window.PinmonyNativeShareSearch && ' +
         'window.PinmonyNativeShareSearch(' + session.toString() + ',' + JSON.stringify(query) + ')');
       if (current() && result !== 'true' && result !== '"true"') {
-        this.lastSearchKey = ''; this.store.shareError = '联系人搜索不可用';
+        this.lastSearchKey = ''; this.store.shareError = PinmonyI18n.message('联系人搜索不可用');
       }
     } catch (error) {
       if (current()) {
-        this.lastSearchKey = ''; this.store.shareError = '联系人搜索不可用';
+        this.lastSearchKey = ''; this.store.shareError = PinmonyI18n.message('联系人搜索不可用');
       }
     }
   }
@@ -412,12 +413,12 @@ export class PinmonySharePanelsController {
         'window.PinmonyNativeShareRefresh(' + session.toString() + ')');
       if (current() && result !== 'true' && result !== '"true"') {
         this.store.shareLoading = false;
-        this.store.shareError = '无法重新读取分享选项，请关闭后重试';
+        this.store.shareError = PinmonyI18n.message('无法重新读取分享选项，请关闭后重试');
       }
     } catch (error) {
       if (!current()) return;
       this.store.shareLoading = false;
-      this.store.shareError = '无法重新读取分享选项';
+      this.store.shareError = PinmonyI18n.message('无法重新读取分享选项');
     } finally {
       if (token === this.refreshToken) this.refreshing = false;
     }
@@ -439,7 +440,7 @@ export class PinmonySharePanelsController {
     const session: number = this.store.moreSession;
     const pin: string = this.store.morePin;
     if (!id || !session || !this.ports.isCurrentMorePin(pin)) {
-      this.store.moreError = '该选项不可用';
+      this.store.moreError = PinmonyI18n.message('该选项不可用');
       return;
     }
     if (/分享|share/i.test(option.label)) {
@@ -455,10 +456,10 @@ export class PinmonySharePanelsController {
           'window.PinmonyNativeMoreAction(' + session.toString() + ',' + JSON.stringify(pin) + ',' +
           JSON.stringify(id) + ')');
       if (current() && session === this.store.moreSession && result !== 'true' && result !== '"true"') {
-        this.store.moreError = '操作未能发出，请重试';
+        this.store.moreError = PinmonyI18n.message('操作未能发出，请重试');
       }
     } catch (error) {
-      if (current() && session === this.store.moreSession) this.store.moreError = '操作未能发出，请重试';
+      if (current() && session === this.store.moreSession) this.store.moreError = PinmonyI18n.message('操作未能发出，请重试');
     }
   }
 
@@ -483,19 +484,19 @@ export class PinmonySharePanelsController {
         if (!state || state.session !== capturedSession || state.pin !== capturedPin || !Array.isArray(state.options) || state.options.length > 100) throw new Error('Invalid');
         this.store.moreOptions = state && Array.isArray(state.options) ? state.options.filter((item: MoreSheetOption): boolean => !!item.id && !!item.label) : [];
         this.store.moreLoading = false;
-        this.store.moreError = this.store.moreOptions.length ? '' : '暂时无法读取选项';
+        this.store.moreError = this.store.moreOptions.length ? '' : PinmonyI18n.message('暂时无法读取选项');
         return;
       }
       const result: string = await this.ports.runScript('window.PinmonyNativeMoreRefresh && ' +
         'window.PinmonyNativeMoreRefresh(' + session.toString() + ',' + JSON.stringify(pin) + ')');
       if (current() && session === this.store.moreSession && result !== 'true' && result !== '"true"') {
         this.store.moreLoading = false;
-        this.store.moreError = '无法重新读取选项，请关闭后重试';
+        this.store.moreError = PinmonyI18n.message('无法重新读取选项，请关闭后重试');
       }
     } catch (error) {
       if (current() && session === this.store.moreSession) {
         this.store.moreLoading = false;
-        this.store.moreError = '无法重新读取选项';
+        this.store.moreError = PinmonyI18n.message('无法重新读取选项');
       }
     }
   }
@@ -515,15 +516,15 @@ export class PinmonySharePanelsController {
       if (id.indexOf('profile-contact:') === 0) {
         try {
           const result: string = await this.ports.runScript('window.PinmonyNativeShareAction && window.PinmonyNativeShareAction(' + session.toString() + ',' + JSON.stringify(id) + ')');
-          if (current() && result !== 'true' && result !== '"true"') this.store.shareError = '发送失败，请重试';
-        } catch (_) { if (current()) this.store.shareError = '发送失败，请重试'; }
+          if (current() && result !== 'true' && result !== '"true"') this.store.shareError = PinmonyI18n.message('发送失败，请重试');
+        } catch (_) { if (current()) this.store.shareError = PinmonyI18n.message('发送失败，请重试'); }
         return;
       }
       if (id.indexOf('profile-share:') === 0) {
         const raw: string = await this.ports.runScript('JSON.stringify(window.PinmonyProfilePanel && window.PinmonyProfilePanel.shareLink(' + JSON.stringify(objectPage) + ',' + session + '))');
         if (!current()) return;
         const link: string = this.ports.webJsonText(raw);
-        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = '分享链接尚未就绪'; return; }
+        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = PinmonyI18n.message('分享链接尚未就绪'); return; }
         const platform: string = id.slice('profile-share:'.length);
         await this.ports.sharePinUrl(link, this.ports.profileTitle());
         return;
@@ -534,17 +535,17 @@ export class PinmonySharePanelsController {
         if (!current()) return;
         const link: string = this.ports.webJsonText(raw);
         if (session !== this.store.shareSession || this.ports.currentProfileUrl() !== objectPage || this.ports.activeSheetKind() !== 'share' || !this.ports.profileShareMode()) return;
-        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = '分享链接尚未就绪'; return; }
+        if (!/^https:\/\/pin\.it\/[A-Za-z0-9]+\/?$/.test(link)) { this.store.shareError = PinmonyI18n.message('分享链接尚未就绪'); return; }
         await this.ports.copyText(link);
         if (current() && session === this.store.shareSession && this.ports.profileShareMode() && this.ports.activeSheetKind() === 'share') {
-          this.store.shareFeedback = '链接已复制'; this.ports.showShareFeedbackSnack();
+          this.store.shareFeedback = PinmonyI18n.message('链接已复制'); this.ports.showShareFeedbackSnack();
         }
-      } catch (_) { if (current()) this.store.shareError = '复制链接失败，请重试'; }
+      } catch (_) { if (current()) this.store.shareError = PinmonyI18n.message('复制链接失败，请重试'); }
       return;
     }
     if (!PIN_POST_API_ENABLED) return;
     if (!id || !this.store.shareSession) {
-      this.store.shareError = '该分享选项不可用';
+      this.store.shareError = PinmonyI18n.message('该分享选项不可用');
       return;
     }
     const session: number = this.store.shareSession;
@@ -552,11 +553,11 @@ export class PinmonySharePanelsController {
       const result: string = await this.ports.runScript('window.PinmonyNativeShareAction && ' +
         'window.PinmonyNativeShareAction(' + session.toString() + ',' + JSON.stringify(id) + ')');
       if (current() && session === this.store.shareSession && result !== 'true' && result !== '"true"') {
-        this.store.shareError = '操作未能完成，请重试';
+        this.store.shareError = PinmonyI18n.message('操作未能完成，请重试');
       }
     } catch (error) {
       if (current() && session === this.store.shareSession) {
-        this.store.shareError = '操作未能完成，请重试';
+        this.store.shareError = PinmonyI18n.message('操作未能完成，请重试');
       }
     }
   }

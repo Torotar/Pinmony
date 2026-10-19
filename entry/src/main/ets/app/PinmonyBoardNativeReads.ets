@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardSectionNativeWrites, BoardSectionWriteIdentity } from './PinmonyBoardSectionNativeWrites';
 import { PinmonyBoardFollowNativeWrites, PinmonyBoardFollowNativeWritesPorts } from './PinmonyBoardFollowNativeWrites';
 import { PinmonyBoardCreator, PinmonyBoardStore, PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardFlow, PinmonyBoardSection, PinmonyBoardTarget, PinmonyBoardCollaborators, PinmonyBoardCollaborator } from 'feature_board';
@@ -156,8 +157,8 @@ export class PinmonyBoardNativeReads {
     this.preparing = false; this.revision++; this.version++; this.sectionEpoch++; this.flowEpoch++; this.collabEpoch++;
     this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear(); this.sectionRequests.clear(); this.flowRequests.clear(); this.collabRequests.clear();
     this.busy = false; this.sectionsBusy = false; this.sectionsQueued = false; this.refreshing = false; if(!this.ready)this.attempted = false; if(this.flow?.phase === 'section')this.flow = undefined;
-    else if(this.flow?.loading){this.flow.loading = false;this.flow.error = '读取已中断，请重试';}
-    if(this.store.collaborators?.loading){this.store.collaborators.loading = false;this.store.collaborators.error = '读取已中断，请重试';}
+    else if(this.flow?.loading){this.flow.loading = false;this.flow.error = PinmonyI18n.message('读取已中断，请重试');}
+    if(this.store.collaborators?.loading){this.store.collaborators.loading = false;this.store.collaborators.error = PinmonyI18n.message('读取已中断，请重试');}
     this.refreshQueued = false;
     if(this.store.boardDetail) {this.store.boardDetail.session = 0; this.store.boardDetail.loadingMore = false; this.store.boardDetail.refreshing = false; if(this.store.boardDetail.flow?.phase === 'section')this.store.boardDetail.flow = undefined;}
   }
@@ -193,7 +194,7 @@ export class PinmonyBoardNativeReads {
       (owner ? [owner] : []).concat(b.collaborating_users || []).filter((u: BoardUser, i: number, all: BoardUser[]): boolean => !!u && this.digits(u.id) && !!this.clean(u.full_name || u.username) && all.findIndex((v: BoardUser): boolean => !!v && v.id === u.id) === i).slice(0, 6).map((u: BoardUser): PinmonyBoardCreator => ({ id:u.id, name:this.clean(u.full_name || u.username), avatar:this.image(u.image_medium_url || u.image_small_url), url:/^[A-Za-z0-9_]+$/.test(u.username) ? this.origin + '/' + u.username + '/' : '', verified:u.verified_identity?.verified === true })) : [];
     const snapshot: PinmonyBoardDetail = {kind:'state',nativeWriteIntent:this.flowEpoch,nativeAccountGeneration:this.generation,nativeVersion:this.version,nativeRecoveryVersion:this.recoveryVersion,nativeReadsReady:this.verified && this.ready,
       session:existing?.session || 0,pageKey:this.page,boardId:b?.id || '',title:this.clean(b?.name) || existing?.title || '图板',
-      pinCount:count === undefined ? existing?.pinCount || '' : count.toString() + ' 张 Pin 图',
+      pinCount:count === undefined ? existing?.pinCount || '' : count.toString() + PinmonyI18n.message(' 张 Pin 图'),
       privacy:!this.collection() && ['public','secret'].includes(b?.privacy || '') ? b?.privacy : undefined,
       ownerName:curator || showOwner ? this.clean(display?.full_name || display?.username) : '',ownerAvatar:curator || showOwner ? this.image(display?.image_medium_url || display?.image_small_url) : '',
       ownerUrl:display && /^[A-Za-z0-9_]+$/.test(display.username) ? this.origin + '/' + display.username + '/' : '',
@@ -311,7 +312,7 @@ export class PinmonyBoardNativeReads {
       const data: BoardCreatedSection = JSON.parse(raw) as BoardCreatedSection;
       if(this.sectionDraftPins.length)this.pins = this.pins.filter((pin: PinmonyBoardPin): boolean => !this.sectionDraftPins.includes(pin.id));
       this.sectionDraftPins = [];this.selectedIds = [];this.sectionSource = undefined;
-      if(this.ports.feedback)this.ports.feedback(data.title + '图板区块已添加！');
+      if(this.ports.feedback)this.ports.feedback(data.title + PinmonyI18n.message('图板区块已添加！'));
       if(!this.sections.some((section: PinmonyBoardSection): boolean => section.id === data.id))this.sections.push({id:data.id,title:data.title,
         pinCount:this.count(data.pin_count === null ? undefined : data.pin_count),images:[],pins:[]});
       this.board.section_count = this.count(data.board.section_count) === undefined ? Math.max(this.sections.length,(this.board.section_count || 0) + 1) : data.board.section_count;
@@ -342,7 +343,7 @@ export class PinmonyBoardNativeReads {
       if(this.store.boardDetail){this.store.boardDetail.pageKey = next;this.store.boardDetail.session = 0;}
       if(next !== previous && this.ports.renamed)this.ports.renamed(previous,next);
     }else if(action === 'archive')this.flow.phase = 'archived';
-    else if(action === 'unfollow'){this.board.followed_by_me = false;if(this.ports.feedback)this.ports.feedback('已取消关注');}
+    else if(action === 'unfollow'){this.board.followed_by_me = false;if(this.ports.feedback)this.ports.feedback(PinmonyI18n.message('已取消关注'));}
     else {
       this.pins = [];this.sections = [];this.ended = true;this.cursor = '';
       if(action === 'leave')this.board.collaborated_by_me = false;
@@ -405,7 +406,7 @@ export class PinmonyBoardNativeReads {
       if(!this.current() || this.flow !== f || f.error)return;
       const known: PinmonyBoardSection | undefined = this.sections.find((s: PinmonyBoardSection): boolean => s.id === f.sectionId);
       this.sectionComplete = this.sectionEnumerationValid && !f.hasMore && (!this.sectionCursor || this.sectionCursor === '-end-') && (known?.pinCount === undefined || known.pinCount === f.pins.length);
-      if(!this.sectionComplete){f.error = '区块内容尚未完整读取，暂不能安全整理';this.syncAuxiliary();return;}
+      if(!this.sectionComplete){f.error = PinmonyI18n.message('区块内容尚未完整读取，暂不能安全整理');this.syncAuxiliary();return;}
     }
     this.sectionSource = JSON.parse(JSON.stringify(f)) as PinmonyBoardFlow;this.cancelFlow();
     f.phase = a.action === 'sectionEdit' ? 'sectionEdit' : 'select';this.selectedIds = [];this.syncAuxiliary();
@@ -413,11 +414,11 @@ export class PinmonyBoardNativeReads {
   private sectionWriteConfirmed(action: string, renamed?: string): void {
     if(!this.current() || !this.board)return;
     const source: PinmonyBoardFlow | undefined = this.sectionSource || this.flow, id: string = source?.sectionId || '', title: string = source?.sectionTitle || '';
-    if(action === 'rename' && source && renamed){this.pause();source.sectionTitle = renamed;source.phase = 'section';source.busy = false;source.error = '';this.flow = source;this.sectionSource = undefined;const section: PinmonyBoardSection | undefined = this.sections.find((s: PinmonyBoardSection): boolean => s.id === id);if(section)section.title = renamed;this.ports.invalidateProfile?.();this.syncAuxiliary();this.readSections(true);this.ports.feedback?.('图板区块名称已更新');return;}
+    if(action === 'rename' && source && renamed){this.pause();source.sectionTitle = renamed;source.phase = 'section';source.busy = false;source.error = '';this.flow = source;this.sectionSource = undefined;const section: PinmonyBoardSection | undefined = this.sections.find((s: PinmonyBoardSection): boolean => s.id === id);if(section)section.title = renamed;this.ports.invalidateProfile?.();this.syncAuxiliary();this.readSections(true);this.ports.feedback?.(PinmonyI18n.message('图板区块名称已更新'));return;}
     this.pause();this.sectionSource = undefined;this.selectedIds = [];this.flow = this.emptyFlow();
     if(this.ports.invalidateProfile)this.ports.invalidateProfile();
-    if(action === 'delete'){this.sections = this.sections.filter((s: PinmonyBoardSection): boolean => s.id !== id);if(this.ports.feedback)this.ports.feedback(title + '图板区块已删除');}
-    else if(this.ports.feedback)this.ports.feedback('已移动所选 Pin 图');
+    if(action === 'delete'){this.sections = this.sections.filter((s: PinmonyBoardSection): boolean => s.id !== id);if(this.ports.feedback)this.ports.feedback(title + PinmonyI18n.message('图板区块已删除'));}
+    else if(this.ports.feedback)this.ports.feedback(PinmonyI18n.message('已移动所选 Pin 图'));
     this.sectionsReady = false;this.syncAuxiliary();this.readSections(true);
     if(action === 'move')this.readSection(id,false);else this.read(false,true);
   }
@@ -477,7 +478,7 @@ export class PinmonyBoardNativeReads {
         if(!Array.isArray(b.access))b.access = board.access;
         this.board = b;f.description = this.clean(b.description,500);f.privacy = b.privacy!;f.recommend = b.allow_homefeed_recommendations === true;f.invites = b.collaborator_invites_enabled === true;f.requests = b.collaborator_requests_enabled === true;
       }
-    }catch (_) {if(live())f.error = '读取失败，请重试';}
+    }catch (_) {if(live())f.error = PinmonyI18n.message('读取失败，请重试');}
     finally {if(live()){f.loading = false;this.syncAuxiliary();}}
   }
   private async readTargetSections(target: string): Promise<void> {
@@ -489,7 +490,7 @@ export class PinmonyBoardNativeReads {
     try {const body: BoardResponse = await this.sectionRead('targets',this.sectionSource.sectionId || '', '',live,target),rows: BoardSectionData[] = body.resource_response.data as BoardSectionData[];
       if(!Array.isArray(rows) || rows.length > 500 || !rows.every((v: BoardSectionData): boolean => v?.type === 'board_section' && this.digits(v.id) && v.board?.id === target && !!this.clean(v.title)))throw new Error('target-section');
       const sections: PinmonyBoardSection[] = [];rows.forEach((v: BoardSectionData): void => {if(v.id !== this.sectionSource?.sectionId && !sections.some((s: PinmonyBoardSection): boolean => s.id === v.id))sections.push({id:v.id,title:this.clean(v.title),images:[this.image(v.preview_pins?.[0]?.image_medium_url) || this.image(v.preview_pins?.[0]?.images?.['236x']?.url)].filter((u: string): boolean => !!u)});});f.targetSections = sections;
-    }catch (_) {if(live())f.error = '目标图板区块读取失败，请重试';}
+    }catch (_) {if(live())f.error = PinmonyI18n.message('目标图板区块读取失败，请重试');}
     finally {if(live()){f.loading = false;this.syncAuxiliary();}}
   }
   private async sectionRead(kind: string, id: string, path: string, live: () => boolean, targetBoard: string = ''): Promise<BoardResponse> {
@@ -532,7 +533,7 @@ export class PinmonyBoardNativeReads {
       const pins: PinmonyBoardPin[] = [], sources: BoardSourcePin[] = [];rows.forEach((row: BoardPinData): void => {try {const pin: PinmonyBoardPin = this.mapPin(row);if(!pins.some((p: PinmonyBoardPin): boolean => p.id === pin.id)){pins.push(pin);sources.push({id:pin.id,tracking_params:typeof row.tracking_params === 'string' && row.tracking_params.length <= 16384 ? row.tracking_params : undefined});}}catch (_) {}});
       this.sources = sources;f.saved = this.pinWrites.savedIds();
       if(rows.some((p: BoardPinData): boolean => p?.type === 'pin') && !pins.length)throw new Error('unsupported');f.pins = pins;
-    }catch (_) {if(live())f.error = stage + '读取失败，请重试';}
+    }catch (_) {if(live())f.error = stage + PinmonyI18n.message('读取失败，请重试');}
     finally {if(live()){f.loading = false;this.syncAuxiliary();}}
   }
   private validateAuxiliaryBoard(b: BoardData, requireUrl: boolean): void {
@@ -581,7 +582,7 @@ export class PinmonyBoardNativeReads {
       const users: PinmonyBoardCollaborator[] = [owner];invites.forEach((i: BoardInviteData): void => {if(!i || i.board?.id !== this.board?.id || !['new','accepted','contact_request_not_approved','pending_approval'].includes(i.status))throw new Error('invite');const user: PinmonyBoardCollaborator = this.collaborator(i.invited_user,i.status);if(!users.some((u: PinmonyBoardCollaborator): boolean => u.id === user.id))users.push(user);});
       const suggestions: PinmonyBoardCollaborator[] = [];suggested.slice(0,100).forEach((u: BoardUser): void => {const user: PinmonyBoardCollaborator = this.collaborator(u,users.find((v: PinmonyBoardCollaborator): boolean => v.id === u.id)?.status || '');if(user.id !== this.viewer && !suggestions.some((v: PinmonyBoardCollaborator): boolean => v.id === user.id))suggestions.push(user);});
       state.owner = b.owner.id === this.viewer;state.permission = b.collaborator_permissions_setting;state.invites = b.collaborator_invites_enabled === true;state.canInvite = state.owner || member && state.invites;state.users = users.slice(0,500);state.suggestions = suggestions;
-    }catch (_) {if(live()){state.error = '合作用户读取失败，请重试';this.collabRequests.forEach((id: string): void => this.ports.network().cancel(id));this.collabRequests.clear();}}
+    }catch (_) {if(live()){state.error = PinmonyI18n.message('合作用户读取失败，请重试');this.collabRequests.forEach((id: string): void => this.ports.network().cancel(id));this.collabRequests.clear();}}
     finally {if(live()){state.loading = false;this.syncAuxiliary();}}
   }
   async collaboratorsAction(action: string, value: string): Promise<boolean> {
@@ -653,7 +654,7 @@ export class PinmonyBoardNativeReads {
         const viewer: string | undefined = body.client_context?.user?.id;
         if(!this.digits(viewer))throw new Error('identity');
         let b: BoardData;
-        if(this.collection()) {const u: BoardUser = body.resource_response.data as BoardUser; if(!u || u.type !== 'user' || !this.digits(u.id) || this.clean(u.username).toLowerCase() !== decodeURIComponent(parts[0]).toLowerCase())throw new Error('user'); b = {type:'board',id:u.id,url:this.page,name:'所有 Pin 图',pin_count:u.pin_count,owner:u,isOwn:u.id === viewer};}
+        if(this.collection()) {const u: BoardUser = body.resource_response.data as BoardUser; if(!u || u.type !== 'user' || !this.digits(u.id) || this.clean(u.username).toLowerCase() !== decodeURIComponent(parts[0]).toLowerCase())throw new Error('user'); b = {type:'board',id:u.id,url:this.page,name:PinmonyI18n.message('所有 Pin 图'),pin_count:u.pin_count,owner:u,isOwn:u.id === viewer};}
         else {b = body.resource_response.data as BoardData; if(!b || b.type !== 'board' || !this.digits(b.id) || !this.matchesBoardPage(b.url) || !b.owner || !this.digits(b.owner.id))throw new Error('board');}
         if(b.id === this.board?.id && viewer === this.viewer && b.followed_by_me === undefined)b.followed_by_me = this.board.followed_by_me;
         if (typeof b.followed_by_me === 'boolean') this.followWrites.reconcile(b.id,b.followed_by_me);
@@ -683,7 +684,7 @@ export class PinmonyBoardNativeReads {
       if(!Array.isArray(rows) || rows.length > 500)throw new Error('sections');
       const sections: PinmonyBoardSection[] = rows.slice(0,100).map((s: BoardSectionData): PinmonyBoardSection => {if(!s || s.type !== 'board_section' || !this.digits(s.id) || !this.clean(s.title) || s.pin_count !== null && s.pin_count !== undefined && this.count(s.pin_count) === undefined)throw new Error('section'); const previews: BoardPinData[] = Array.isArray(s.preview_pins) ? s.preview_pins.slice(0,2) : []; const pins: PinmonyBoardPin[] = []; previews.forEach((p: BoardPinData): void => {try {pins.push(this.mapPin(p));}catch (_) {}});return {id:s.id,title:this.clean(s.title),pinCount:s.pin_count === null || s.pin_count === undefined ? undefined : s.pin_count,images:previews.map((p: BoardPinData): string => this.image(p.image_medium_url) || this.image(p.images?.['236x']?.url) || this.image(p.images?.['474x']?.url) || this.image(p.images?.['orig']?.url)).filter((u: string): boolean => !!u),pins:pins};});
       this.sections = sections;if(force && this.board)this.board.section_count = sections.length;this.sectionsReady = true;this.version++;
-    }catch (_) {if(this.current() && revision === this.revision)this.sectionsError = '图板区块读取失败，请重试';}
+    }catch (_) {if(this.current() && revision === this.revision)this.sectionsError = PinmonyI18n.message('图板区块读取失败，请重试');}
     finally {if(this.current() && revision === this.revision){this.sectionsBusy = false;this.apply();this.ports.install(this.installScript());if(this.sectionsQueued){this.sectionsQueued = false;this.readSections(true);}}}
   }
   private cancelSection(): void {this.sectionEpoch++;this.sectionRequests.forEach((id: string): void => this.ports.network().cancel(id));this.sectionRequests.clear();}
@@ -698,7 +699,7 @@ export class PinmonyBoardNativeReads {
       const raw: BoardPinData[] = body.resource_response.data as BoardPinData[];
       if(!Array.isArray(raw) || !raw.filter((p: BoardPinData): boolean => p?.type !== 'story').every((p: BoardPinData): boolean => p?.type === 'pin' && this.digits(p.id) && pins.some((pin: PinmonyBoardPin): boolean => pin.id === p.id)))this.sectionEnumerationValid = false;
       const merged: PinmonyBoardPin[] = append ? f.pins.slice() : [];pins.forEach((p: PinmonyBoardPin): void => {if(!merged.some((v: PinmonyBoardPin): boolean => v.id === p.id))merged.push(p);}); if(merged.length > 500)this.sectionEnumerationValid = false;f.pins = merged.slice(0,500); f.hasMore = !!next && next !== '-end-' && next !== previous && !!pins.length && merged.length < 500; this.sectionCursor = next;this.version++;
-    } catch (_) {if(this.current() && revision === this.revision && epoch === this.sectionEpoch)f.error = '图板区块内容读取失败，请重试';}
+    } catch (_) {if(this.current() && revision === this.revision && epoch === this.sectionEpoch)f.error = PinmonyI18n.message('图板区块内容读取失败，请重试');}
     finally {if(this.current() && revision === this.revision && epoch === this.sectionEpoch){f.loading = false;this.apply();this.ports.install(this.installScript());}}
   }
   installScript(): string { if(!this.current() || !this.verified || !this.board || !this.ready)return '';return 'window.PinmonyBoardApi && window.PinmonyBoardApi.installNative && window.PinmonyBoardApi.installNative(' + JSON.stringify(this.page) + ',' + JSON.stringify(this.board) + ',' + JSON.stringify(this.viewer) + ',' + JSON.stringify(this.store.boardDetail) + ',' + JSON.stringify(this.cursor) + ',' + JSON.stringify(this.auxiliarySnapshot()) + ');'; }

@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileStore, PinmonyPublishFlow, PinmonyPublishPhoto, PinmonyCreatedPin, PinmonyOrganizeBoard } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -140,10 +141,10 @@ export class PinmonyPublishNativeFlow {
         this.flow.uncertain = true;
         if (this.writeKey)
             this.unknown.add(this.writeKey);
-        this.flow.error = '操作结果未确认，请关闭后刷新核对，勿重复提交';
+        this.flow.error = PinmonyI18n.message('操作结果未确认，请关闭后刷新核对，勿重复提交');
     } if (this.flow) {
         if (this.flow.loading && !this.flow.error)
-            this.flow.error = '读取已暂停，请返回重试';
+            this.flow.error = PinmonyI18n.message('读取已暂停，请返回重试');
         this.flow.busy = false;
         this.flow.loading = false;
         this.commit();
@@ -161,7 +162,7 @@ export class PinmonyPublishNativeFlow {
         const p: Response = JSON.parse(raw) as Response, r: Resource = p.resource_response;
         if (!r || r.status !== 'success' || r.code !== 0 || r.error || !r.data || p.client_context?.is_authenticated === false || this.viewer && p.client_context?.user && p.client_context.user.id !== this.viewer) {
             if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)
-                throw new PinmonyBusinessRejection('网站拒绝了本次操作');
+                throw new PinmonyBusinessRejection(PinmonyI18n.message('网站拒绝了本次操作'));
             throw new Error('unconfirmed');
         }
         return p;
@@ -183,11 +184,11 @@ export class PinmonyPublishNativeFlow {
             await this.identity(revision, true);
             if (!current() || !this.current(revision, true))
                 return false;
-            this.store.publishTitle = '创建';
+            this.store.publishTitle = PinmonyI18n.message('创建');
             this.store.publishOptions = [
-                { id: 'native-website', kind: 'website', group: 'create', groupLabel: '创建', label: '网站', enabled: true },
-                { id: 'native-photo', kind: 'photo', group: 'create', groupLabel: '创建', label: '照片', enabled: true },
-                { id: 'native-board', kind: 'board', group: 'add', groupLabel: '添加', label: '图板', enabled: true }
+                { id: 'native-website', kind: 'website', group: 'create', groupLabel: PinmonyI18n.message('创建'), label: PinmonyI18n.message('网站'), enabled: true },
+                { id: 'native-photo', kind: 'photo', group: 'create', groupLabel: PinmonyI18n.message('创建'), label: PinmonyI18n.message('照片'), enabled: true },
+                { id: 'native-board', kind: 'board', group: 'add', groupLabel: PinmonyI18n.message('添加'), label: PinmonyI18n.message('图板'), enabled: true }
             ];
             return true;
         }
@@ -220,7 +221,7 @@ export class PinmonyPublishNativeFlow {
         catch (_) {
             if (this.current(revision)) {
                 this.flow.loading = false;
-                this.flow.error = '无法确认当前账号，请返回刷新后重试';
+                this.flow.error = PinmonyI18n.message('无法确认当前账号，请返回刷新后重试');
                 this.commit();
             }
             return false;
@@ -257,7 +258,7 @@ export class PinmonyPublishNativeFlow {
         }
         catch (_) {
             if (this.current(revision))
-                f.error = '图板读取失败，请重试';
+                f.error = PinmonyI18n.message('图板读取失败，请重试');
         }
         finally {
             if (this.current(revision)) {
@@ -286,7 +287,7 @@ export class PinmonyPublishNativeFlow {
         }
         catch (_) {
             if (this.current(revision))
-                f.error = '读取图片失败，请重试';
+                f.error = PinmonyI18n.message('读取图片失败，请重试');
         }
         finally {
             if (this.current(revision)) {
@@ -317,7 +318,7 @@ export class PinmonyPublishNativeFlow {
                 f.boards.push(mapped);
                 target = mapped;
                 f.phase = 'boards';
-                f.feedback = '图板已创建';
+                f.feedback = PinmonyI18n.message('图板已创建');
                 if (f.kind === 'board') {
                     f.completed = 1;
                     f.phase = 'done';
@@ -364,7 +365,7 @@ export class PinmonyPublishNativeFlow {
                 f.uncertain = !(error instanceof PinmonyBusinessRejection);
                 if (f.uncertain && this.writeKey)
                     this.unknown.add(this.writeKey);
-                f.error = (f.completed ? '已确认发布 ' + f.completed.toString() + ' 张。' : '') + (f.uncertain ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : (error as Error).message);
+                f.error = (f.completed ? PinmonyI18n.message('已确认发布 ') + f.completed.toString() + ' 张。' : '') + (f.uncertain ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : (error as Error).message);
                 PinmonyRuntimeLog.info('PublishNative: outcome=' + (f.uncertain ? 'unknown' : 'rejected'));
             }
         }

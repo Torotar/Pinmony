@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideoCard } from 'common_ui';
 import { allowsSpeculativeReads, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
@@ -5,6 +6,9 @@ import { PinmonyHomeSkeleton } from './PinmonyHomeSkeleton';
 
 @Component
 export struct PinmonyHomePage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
   @Prop @Watch('onImageRecovery') imageRecovery: PinmonyHomeImageRecovery | undefined = undefined;
   @State private recoveredSources: Record<string, string> = {};
   @State private recoveredRevisions: Record<string, number> = {};
@@ -253,10 +257,10 @@ export struct PinmonyHomePage {
   }
 
   private emptyFeedMessage(): string {
-    if (this.offlinePreview) return '当前离线，此分类暂无可显示的缓存照片，请连接网络后重试';
+    if (this.offlinePreview) return this.uiText("当前离线，此分类暂无可显示的缓存照片，请连接网络后重试");
     if (this.error) return this.error;
-    if (this.home.kind === 'loading') return '内容加载已中断，请重试';
-    return '当前分类暂无 Pin 图';
+    if (this.home.kind === 'loading') return this.uiText("内容加载已中断，请重试");
+    return this.uiText("当前分类暂无 Pin 图");
   }
 
   private updateCategories(): void {
@@ -325,7 +329,7 @@ export struct PinmonyHomePage {
               .maxLines(2)
               .layoutWeight(1)
             if (this.error) {
-              Button('重试').fontSize(13)
+              Button(this.uiText("重试")).fontSize(13)
                 .onClick(() => { if (this.onRetry) this.onRetry(); })
             }
           }
@@ -333,16 +337,16 @@ export struct PinmonyHomePage {
         }
         if (this.offlinePreview) {
           Row({ space: 8 }) {
-            Text('当前离线，仅显示最近缓存')
+            Text(this.uiText("当前离线，仅显示最近缓存"))
               .fontSize(13)
               .fontColor($r('app.color.secondary_text'))
               .maxLines(2)
               .layoutWeight(1)
-            Button('重试').fontSize(13)
+            Button(this.uiText("重试")).fontSize(13)
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           .width('100%')
-          .accessibilityText('当前离线，仅显示最近缓存，可重试')
+          .accessibilityText(this.uiText("当前离线，仅显示最近缓存，可重试"))
         }
       }
       .width('calc(100% - 24vp)')
@@ -355,11 +359,11 @@ export struct PinmonyHomePage {
   }
 
   private feedStatusText(): string {
-    if (this.offlinePreview) return '当前离线，仅显示最近缓存';
-    if (this.error) return this.home.categorySourceFailure ? this.error : this.error + '，显示上次内容';
-    if (this.refreshing || this.home.refreshing) return '正在刷新首页…';
-    if (this.loading) return '正在加载首页…';
-    return '正在恢复首页连接…';
+    if (this.offlinePreview) return this.uiText("当前离线，仅显示最近缓存");
+    if (this.error) return this.home.categorySourceFailure ? this.error : this.error + this.uiText("，显示上次内容");
+    if (this.refreshing || this.home.refreshing) return this.uiText("正在刷新首页…");
+    if (this.loading) return this.uiText("正在加载首页…");
+    return this.uiText("正在恢复首页连接…");
   }
 
   @Builder
@@ -388,7 +392,7 @@ export struct PinmonyHomePage {
           .fontColor($r('app.color.primary_text'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(`${board.pinCount} 张 Pin 图`)
+        Text(this.uiFormat("{0} 张 Pin 图", [board.pinCount]))
           .fontSize(13)
           .fontColor($r('app.color.secondary_text'))
           .maxLines(1)
@@ -400,7 +404,7 @@ export struct PinmonyHomePage {
     .padding({ left: 16, right: 16, top: 8, bottom: 12 })
     .enabled(this.interactionReady && !!board.boardUrl && !!this.onBoard)
     .onClick(() => { if (this.onBoard) this.onBoard(board.id); })
-    .accessibilityText(`打开图板：${board.name}，${board.pinCount} 张 Pin 图`)
+    .accessibilityText(this.uiFormat("打开图板：{0}，{1} 张 Pin 图", [board.name, board.pinCount]))
   }
 
   @Builder
@@ -412,7 +416,7 @@ export struct PinmonyHomePage {
           .onClick(() => { if (this.onPin) this.onPin(pin.id); })
       } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
         Column() {
-          Text('图片加载失败')
+          Text(this.uiText("图片加载失败"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
@@ -421,7 +425,7 @@ export struct PinmonyHomePage {
         .borderRadius(18)
         .backgroundColor($r('app.color.surface_muted'))
         .justifyContent(FlexAlign.Center)
-        .accessibilityText((pin.title || 'Pin 图') + '，图片加载失败，打开详情')
+        .accessibilityText((pin.title || this.uiText("Pin 图")) + this.uiText("，图片加载失败，打开详情"))
         .onClick(() => { if (this.onPin) this.onPin(pin.id); })
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
@@ -454,7 +458,7 @@ export struct PinmonyHomePage {
             .onClick(() => { if (this.onPin) this.onPin(pin.id); })
           if (pin.saved === true) {
             Column() {
-              Text('已收藏').fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
+              Text(this.uiText("已收藏")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
                 .padding({ left: 14, right: 14, top: 16 })
               Blank()
             }.width('100%').height(this.imageHeight(pin)).backgroundColor('#55000000')
@@ -492,7 +496,7 @@ export struct PinmonyHomePage {
         .onClick(() => {
           if (this.onMore) this.onMore(pin.id);
         })
-        .accessibilityText('更多选项')
+        .accessibilityText(this.uiText("更多选项"))
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
@@ -500,7 +504,7 @@ export struct PinmonyHomePage {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .enabled(this.navigationReady)
-    .accessibilityText(pin.title || '打开 Pin 图')
+    .accessibilityText(pin.title || this.uiText("打开 Pin 图"))
   }
 
   private uniquePrefetchImages(): string[] {
@@ -556,7 +560,7 @@ export struct PinmonyHomePage {
               .textAlign(TextAlign.Center)
               .fontSize(16)
               .fontColor($r('app.color.primary_text'))
-            Button(this.offlinePreview ? '连接后重试' : '重新读取')
+            Button(this.offlinePreview ? this.uiText("连接后重试") : this.uiText("重新读取"))
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           .width('100%')
@@ -581,10 +585,10 @@ export struct PinmonyHomePage {
                     if (this.home.loadingMore) {
                       LoadingProgress().width(24).height(24)
                     } else if (this.home.sourceError) {
-                      Button('重试加载')
+                      Button(this.uiText("重试加载"))
                         .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
                     } else if (this.home.endReached) {
-                      Text('暂无更多 Pin 图')
+                      Text(this.uiText("暂无更多 Pin 图"))
                         .fontSize(12)
                         .fontColor($r('app.color.secondary_text'))
                     }

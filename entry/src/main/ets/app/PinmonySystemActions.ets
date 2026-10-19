@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { webview } from '@kit.ArkWeb';
@@ -45,17 +46,17 @@ export class PinmonySystemActions {
       selectionMode: systemShare.SelectionMode.SINGLE,
       previewMode: systemShare.SharePreviewMode.DEFAULT
     });
-    } catch (_) { throw new Error('分享面板打开失败'); }
+    } catch (_) { throw new Error(PinmonyI18n.message('分享面板打开失败')); }
   }
 
   async copyText(value: string): Promise<void> {
     try { await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, value)); }
-    catch (_) { throw new Error('无法复制链接，请重试'); }
+    catch (_) { throw new Error(PinmonyI18n.message('无法复制链接，请重试')); }
   }
 
   async openLink(url: string): Promise<void> {
     try { await this.context().openLink(url); }
-    catch (_) { throw new Error('无法打开链接，请重试'); }
+    catch (_) { throw new Error(PinmonyI18n.message('无法打开链接，请重试')); }
   }
 
   exportRuntimeLog(): Promise<boolean> { return PinmonyRuntimeLog.export(this.context()); }
@@ -67,7 +68,7 @@ export class PinmonySystemActions {
     options.maxSelectNumber = 1;
     const selected: photoAccessHelper.PhotoSelectResult = await new photoAccessHelper.PhotoViewPicker().select(options);
     return selected.photoUris[0] || '';
-    } catch (_) { throw new Error('无法选择照片，请重试'); }
+    } catch (_) { throw new Error(PinmonyI18n.message('无法选择照片，请重试')); }
   }
 
   async readJpeg(uri: string): Promise<ArrayBuffer> {
@@ -81,7 +82,7 @@ export class PinmonySystemActions {
         finally { await packer.release(); }
       } finally { await source.release(); }
     } finally { await fileIo.close(file); }
-    } catch (_) { throw new Error('无法读取照片，请重试'); }
+    } catch (_) { throw new Error(PinmonyI18n.message('无法读取照片，请重试')); }
   }
 
   async downloadImage(source: string): Promise<void> {
@@ -92,15 +93,15 @@ export class PinmonySystemActions {
       const selected: string[] = await new picker.DocumentViewPicker().save(options);
       if(!this.active || generation !== this.generation || !selected[0])return;
       const directory: string = new fileUri.FileUri(selected[0]).path;if(!directory)throw new Error('directory');
-      this.showMessage('正在下载到所选目录');
+      this.showMessage(PinmonyI18n.message('正在下载到所选目录'));
       const result: PinmonyDownloadedImage = await this.imageDownload.read(source,(): boolean => this.active && generation === this.generation);
       if(!this.active || generation !== this.generation)return;
       output = directory + '/pin-' + Date.now().toString() + '-' + (++this.imageDownloadSequence).toString() + '.' + result.extension;
       const file: fileIo.File = await fileIo.open(output,fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
       try {let offset: number = 0;while(offset < result.data.byteLength){const written: number = await fileIo.write(file.fd,result.data.slice(offset));if(written <= 0)throw new Error('write');offset += written;}}
       finally {await fileIo.close(file);}
-      if(this.active && generation === this.generation)this.showMessage('下载完成，请在所选目录查看');
-    }catch (_) {if(output){try {await fileIo.unlink(output);}catch (_) {}}if(this.active && generation === this.generation)this.showMessage('下载失败，请重试');}
+      if(this.active && generation === this.generation)this.showMessage(PinmonyI18n.message('下载完成，请在所选目录查看'));
+    }catch (_) {if(output){try {await fileIo.unlink(output);}catch (_) {}}if(this.active && generation === this.generation)this.showMessage(PinmonyI18n.message('下载失败，请重试'));}
     finally {if(generation === this.generation)this.imageDownloadBusy = false;}
   }
 
@@ -125,7 +126,7 @@ export class PinmonySystemActions {
       const directory: string = new fileUri.FileUri(selected[0]).path;
       if (!directory) {
         this.cancelDownload(item);
-        this.showMessage('无法访问下载目录');
+        this.showMessage(PinmonyI18n.message('无法访问下载目录'));
         return;
       }
       let name: string = item.getSuggestedFileName().replace(/[\\/\x00-\x1f:*?"<>|]/g, '_');
@@ -134,7 +135,7 @@ export class PinmonySystemActions {
       }
       item.start(directory + '/pin-' + Date.now().toString() + '-' + name);
       PinmonyRuntimeLog.info('PhotoDownload: file-started');
-      this.showMessage('正在下载到所选目录');
+      this.showMessage(PinmonyI18n.message('正在下载到所选目录'));
     } catch (error) {
       if (!this.active || generation !== this.generation) return;
       PinmonyRuntimeLog.error('Pinmony: download setup failed');
@@ -143,7 +144,7 @@ export class PinmonySystemActions {
       } catch (cancelError) {
         PinmonyRuntimeLog.error('Pinmony: download cancellation failed');
       }
-      this.showMessage('无法开始下载');
+      this.showMessage(PinmonyI18n.message('无法开始下载'));
     } finally { this.selectingDownloads.delete(item.getGuid()); }
   }
 
@@ -154,7 +155,7 @@ export class PinmonySystemActions {
     });
     this.downloadDelegate.onDownloadFinish((_item: webview.WebDownloadItem) => {
       PinmonyRuntimeLog.info('PhotoDownload: completed');
-      if (this.active) this.showMessage('下载完成，请在所选目录查看');
+      if (this.active) this.showMessage(PinmonyI18n.message('下载完成，请在所选目录查看'));
     });
     this.downloadDelegate.onDownloadFailed((item: webview.WebDownloadItem) => {
       if (this.cancelledDownloads.delete(item.getGuid())) {
@@ -163,7 +164,7 @@ export class PinmonySystemActions {
       }
       PinmonyRuntimeLog.error('Pinmony: download failed, code ' + item.getLastErrorCode());
       PinmonyRuntimeLog.warn('PhotoDownload: failed reason=delegate-error');
-      if (this.active) this.showMessage('下载失败，请重试');
+      if (this.active) this.showMessage(PinmonyI18n.message('下载失败，请重试'));
     });
     try {
       controller.setDownloadDelegate(this.downloadDelegate);

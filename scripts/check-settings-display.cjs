@@ -16,6 +16,7 @@ const context = { ConfigurationConstant: { ColorMode: { COLOR_MODE_LIGHT: 1, COL
 vm.runInNewContext(ts.transpileModule('class Theme {' + method(ability, 'syncSystemColorMode', '  onForeground(') +
   method(component, 'selectTheme', '  private options(') + '} globalThis.Theme = Theme;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const native = new context.Theme();
+native.uiText = source => source;
 native.context = { resourceManager: { getConfigurationSync: () => ({ colorMode: resourceMode }) } };
 native.mainWindow = { setWindowSystemBarProperties: properties => selected.push(properties) };
 preference = 'system'; native.syncSystemColorMode(0); assert.equal(selected.at(-1).statusBarContentColor, '#F7F8FA');

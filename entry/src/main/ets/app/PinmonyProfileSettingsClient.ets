@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 export const PIN_NATIVE_PROFILE_SETTINGS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
@@ -70,7 +71,7 @@ export class PinmonyProfileSettingsClient {
                 const r: ProfileSettingsResource | undefined = body.resource_response;
                 if (!r || r.status !== 'success' || r.code !== 0 && !(r.code === undefined && r.endpoint_name === 'v3_get_settings_all_notifications') || r.error) {
                     if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)
-                        throw new ProfileSettingsRejected('网站拒绝了本次操作');
+                        throw new ProfileSettingsRejected(PinmonyI18n.message('网站拒绝了本次操作'));
                     throw new Error('business');
                 }
             }

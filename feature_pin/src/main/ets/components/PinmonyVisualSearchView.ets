@@ -1,9 +1,12 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyImageCrop, PinmonyVisualResult } from '../models/PinmonyVisualSearch';
 import { PinmonyRelatedPin } from '../models/PinmonyDetail';
 
 @Component
 export struct PinmonyVisualSearchView {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop pin: string = '';
   @Prop imageUrl: string = '';
   @Prop imageWidth: number = 1;
@@ -72,14 +75,14 @@ export struct PinmonyVisualSearchView {
       .position({ x: this.photoX() + (this.crop.x + (index === 1 || index === 3 ? this.crop.w : 0)) * this.photoWidth() - 14,
         y: this.photoY() + (this.crop.y + (index > 1 ? this.crop.h : 0)) * this.photoHeight() - 14 })
       .hitTestBehavior(HitTestMode.None)
-      .accessibilityText('调整搜索区域角点')
+      .accessibilityText(this.uiText("调整搜索区域角点"))
   }
   @Builder
   private card(p: PinmonyRelatedPin) {
     Image(p.imageUrl).width('100%').height(Math.max(100, Math.min(430, (this.widthValue - 30) / 2 * p.imageHeight / p.imageWidth)))
       .objectFit(ImageFit.Cover).borderRadius(16)
       .onClick(() => { this.sheetVisible = false; if (this.onRelated) this.onRelated(p.id); })
-      .accessibilityText(p.title || '打开相关 Pin')
+      .accessibilityText(p.title || this.uiText("打开相关 Pin"))
   }
   @Builder
   private resultsPanel() {
@@ -97,10 +100,10 @@ export struct PinmonyVisualSearchView {
             }.layoutWeight(1)
           }.width('100%').alignItems(VerticalAlign.Top)
           if (this.result.error) {
-            Text(this.result.error).fontSize(14).fontColor($r('app.color.secondary_text'))
-            Button('重试').onClick(() => { if (this.onSearch) this.onSearch(this.crop, this.result.items.length > 0, false); })
+            Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
+            Button(this.uiText("重试")).onClick(() => { if (this.onSearch) this.onSearch(this.crop, this.result.items.length > 0, false); })
           } else if (!this.result.loading && this.result.items.length === 0) {
-            Text('暂无相关图片').fontColor($r('app.color.secondary_text')).fontSize(14)
+            Text(this.uiText("暂无相关图片")).fontColor($r('app.color.secondary_text')).fontSize(14)
           }
         }.width('100%')
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
@@ -128,7 +131,7 @@ export struct PinmonyVisualSearchView {
         .border({ width: 1, color: Color.White }).borderRadius(12).backgroundColor(Color.Transparent)
         .position({ x: this.photoX() + this.crop.x * this.photoWidth(), y: this.photoY() + this.crop.y * this.photoHeight() })
         .hitTestBehavior(HitTestMode.None)
-        .accessibilityText('移动搜索区域')
+        .accessibilityText(this.uiText("移动搜索区域"))
       this.corner(0)
       this.corner(1)
       this.corner(2)
@@ -160,7 +163,7 @@ export struct PinmonyVisualSearchView {
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
         radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
-        height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: '更多此类 Pin 图' },
+        height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: this.uiText("更多此类 Pin 图") },
         scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,
         onHeightDidChange: (height: number) => { this.expanded = this.getUIContext().px2vp(height) > this.heightValue * 0.7; },

@@ -1,9 +1,10 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 function load(file, deps = () => ({})) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021}}).outputText,
-    {exports, require: deps, setTimeout, clearTimeout, console});
+    {exports, require: withLocalMessages(deps), setTimeout, clearTimeout, console});
   return exports;
 }
 const logs = [], log = {PinmonyRuntimeLog: {info: s => logs.push(s)}};

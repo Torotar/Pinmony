@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyReadinessGate } from './PinmonyReadinessGate';
 import { PinmonyPinStore } from 'feature_pin';
 import { PinmonyBoardStore } from 'feature_board';
@@ -85,7 +86,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
     this.pinStore.moreSession = token;
     this.pinStore.shareTitle = !inboxAction && !profilePin &&
         (pageKey === this.ports.currentHomePageKey() || this.ports.isCurrentBoardMenuPin(pinUrl, pageKey) ||
-            this.ports.isCurrentSearchMenuPin(pinUrl, pageKey)) ? '选项' : '分享';
+            this.ports.isCurrentSearchMenuPin(pinUrl, pageKey)) ? PinmonyI18n.message('选项') : PinmonyI18n.message('分享');
     this.pinStore.shareSearchActive = false;
     this.ports.setActiveSheetKind('share');
     this.homeStore.customHomeMenu = { session: token, pinUrl: pinUrl, loading: true, busy: false,
@@ -178,7 +179,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
         if (generation !== this.menuGeneration || token !== this.homeStore.customHomeMenuToken || !this.homeStore.customHomeMenu)
             return;
         this.homeStore.customHomeMenu = { session: token, pinUrl: pinUrl, loading: false, busy: false,
-            error: '无法读取帖子操作，请重试', feedback: '', options: [], actions: [] };
+            error: PinmonyI18n.message('无法读取帖子操作，请重试'), feedback: '', options: [], actions: [] };
     }
 }
 
@@ -205,9 +206,9 @@ async performCustomHomeAction(id: string): Promise<void> {
             else {
               this.ports.cancelledBoardPins().add(menu.pinUrl);
               this.ports.setRetainedBoardContent(this.boardStore.boardDetail);
-              this.ports.dismissShareSheet();this.ports.showMessage('已取消收藏');
+              this.ports.dismissShareSheet();this.ports.showMessage(PinmonyI18n.message('已取消收藏'));
             }
-          }catch (_) {if(nativeCurrent())menu.error = '取消收藏结果未确认，请关闭后刷新核对；不会重复提交';}
+          }catch (_) {if(nativeCurrent())menu.error = PinmonyI18n.message('取消收藏结果未确认，请关闭后刷新核对；不会重复提交');}
           finally {if(nativeCurrent()){menu.busy = false;menu.actions.forEach((option: PinmonyHomeMenuOption): void => {option.enabled = false;});}}
           return;
         }
@@ -232,7 +233,7 @@ async performCustomHomeAction(id: string): Promise<void> {
                 if (!result)
                     throw new Error('stale');
                 if (!result.busy) {
-                    if (result.feedback === '已取消收藏') {
+                    if (PinmonyI18n.isText(result.feedback, '已取消收藏')) {
                         this.ports.cancelledBoardPins().add(menu.pinUrl);
                         board.pins = board.pins.map((pin: PinmonyBoardPin): PinmonyBoardPin => {
                             if (pin.pinUrl === menu.pinUrl)
@@ -242,10 +243,10 @@ async performCustomHomeAction(id: string): Promise<void> {
                         this.boardStore.boardDetail = JSON.parse(JSON.stringify(board)) as PinmonyBoardDetail;
                         this.ports.setRetainedBoardContent(board);
                         this.ports.dismissShareSheet();
-                        this.ports.showMessage('已取消收藏');
+                        this.ports.showMessage(PinmonyI18n.message('已取消收藏'));
                     }
                     else {
-                        menu.error = result.error || '取消收藏结果未确认，请关闭后刷新核对';
+                        menu.error = result.error || PinmonyI18n.message('取消收藏结果未确认，请关闭后刷新核对');
                     }
                     return;
                 }
@@ -256,7 +257,7 @@ async performCustomHomeAction(id: string): Promise<void> {
         }
         catch (_) {
             if (current())
-                menu.error = '取消收藏结果未确认，请关闭后刷新核对；不会重复提交';
+                menu.error = PinmonyI18n.message('取消收藏结果未确认，请关闭后刷新核对；不会重复提交');
         }
         finally {
             if (current()) {
@@ -313,10 +314,10 @@ async performCustomHomeAction(id: string): Promise<void> {
         if (menu.session !== this.homeStore.customHomeMenu?.session)
             return;
         if (result !== 'true' && result !== '"true"')
-            this.ports.showMessage('该操作暂不可用，请重试');
+            this.ports.showMessage(PinmonyI18n.message('该操作暂不可用，请重试'));
     }
     catch (error) {
-        if (menu.session === this.homeStore.customHomeMenu?.session && this.ports.activeSheetKind() === 'share') this.ports.showMessage('操作失败，请重试');
+        if (menu.session === this.homeStore.customHomeMenu?.session && this.ports.activeSheetKind() === 'share') this.ports.showMessage(PinmonyI18n.message('操作失败，请重试'));
     }
 }
 
@@ -359,13 +360,13 @@ async openHomeMoreViaDetail(pinUrl: string, returnUrl: string): Promise<void> {
         this.cancelHomeDetailMore();
         if (dispatched)
             return;
-        this.ports.showMessage('这张 Pin 的网页选项未能加载，请在详情页重试');
+        this.ports.showMessage(PinmonyI18n.message('这张 Pin 的网页选项未能加载，请在详情页重试'));
     }
     catch (error) {
         if (token !== this.homeStore.homeDetailMoreToken)
             return;
         this.cancelHomeDetailMore();
-        this.ports.showMessage('无法加载这张 Pin 的详情选项，请重试');
+        this.ports.showMessage(PinmonyI18n.message('无法加载这张 Pin 的详情选项，请重试'));
     }
 }
 

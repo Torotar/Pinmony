@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from 'feature_pin';
 import { PinmonyProfileStore } from 'feature_profile';
 import { PinmonyInboxStore } from 'feature_inbox';
@@ -260,7 +261,7 @@ pageBegin(url: string): void {
             if (this.ports.tryEnterOfflinePreview(url, 'page-timeout'))
                 return;
             this.ports.setAuthStatus('error');
-            this.ports.setFailureDetails('当前会话页面加载超时，请重试');
+            this.ports.setFailureDetails(PinmonyI18n.message('当前会话页面加载超时，请重试'));
         }, 20000));
     }
     this.ports.syncBoardRoute(url);

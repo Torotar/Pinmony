@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideo } from '../models/PinmonyDetail';
 import { PinmonyPlaybackState, PinmonyVideoPlayback, PIN_VIDEO_FILE_RECOVERY_ENABLED } from '../services/PinmonyVideoPlayback';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -7,6 +8,8 @@ import { common } from '@kit.AbilityKit';
 
 @Component
 export struct PinmonyVideoPlayer {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('sourceChanged') video: PinmonyVideo = {} as PinmonyVideo;
   @Prop poster: string = '';
   @Prop openId: number = 0;
@@ -110,7 +113,7 @@ export struct PinmonyVideoPlayer {
         if (this.state.phase === 'playing') {
           Button({ type: ButtonType.Normal }) { Column().width('100%').height('100%') }
             .width('100%').height('100%').padding(0).backgroundColor(Color.Transparent)
-            .enabled(this.active && this.sessionReady && !this.readingAddress).accessibilityText('暂停视频').onClick(() => this.playback.toggle())
+            .enabled(this.active && this.sessionReady && !this.readingAddress).accessibilityText(this.uiText("暂停视频")).onClick(() => this.playback.toggle())
         }
         if (this.readingAddress || this.state.phase === 'loading' || this.state.buffering ||
             !this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
@@ -119,7 +122,7 @@ export struct PinmonyVideoPlayer {
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.video_play')).width(32).height(32)
           }.width(64).height(64).padding(0).backgroundColor('#66000000')
-            .accessibilityText(this.state.phase === 'error' ? '重试播放' : this.state.phase === 'completed' ? '重播' : '播放')
+            .accessibilityText(this.state.phase === 'error' ? this.uiText("重试播放") : this.state.phase === 'completed' ? this.uiText("重播") : this.uiText("播放"))
             .enabled(this.active && this.sessionReady && !this.readingAddress).onClick(() => this.playback.toggle())
         }
       Column() {
@@ -135,12 +138,12 @@ export struct PinmonyVideoPlayer {
             if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
               this.dragging = false; this.playback.seek(value);
             }
-          }).accessibilityText('视频播放进度')
+          }).accessibilityText(this.uiText("视频播放进度"))
         Text(this.time(this.state.duration)).fontSize(12).fontColor(Color.White)
         Button({ type: ButtonType.Normal }) {
           Image(this.state.muted ? $r('app.media.video_muted') : $r('app.media.video_volume')).width(22).height(22)
         }.width(40).height(40).padding(0).backgroundColor(Color.Transparent)
-          .accessibilityText(this.state.muted ? '取消静音' : '静音').onClick(() => this.playback.mute())
+          .accessibilityText(this.state.muted ? this.uiText("取消静音") : this.uiText("静音")).onClick(() => this.playback.mute())
       }.width('100%').padding({ left: 12, right: 6, bottom: 4 })
         .backgroundColor('#22000000')
       }.width('100%').height('100%').justifyContent(FlexAlign.End)
@@ -149,13 +152,13 @@ export struct PinmonyVideoPlayer {
         Math.max(0.5, Math.min(2, this.video.width / this.video.height)) : 0.5625)
       .backgroundColor(Color.Black)
       if (this.readingAddress) {
-        Text('正在读取视频地址').fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
-          .accessibilityText('正在读取视频地址，请稍候')
+        Text(this.uiText("正在读取视频地址")).fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
+          .accessibilityText(this.uiText("正在读取视频地址，请稍候"))
       } else if (this.state.phase === 'loading' && this.state.loadingStage !== 'download') {
-        Text('正在准备视频')
+        Text(this.uiText("正在准备视频"))
           .fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
       } else if (!this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
-        Text('正在加载视频画面').fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
+        Text(this.uiText("正在加载视频画面")).fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
       }
     }.width('100%').borderRadius(18).clip(true).backgroundColor($r('app.color.surface_muted'))
     .onVisibleAreaChange([0, 0.1], (visible: boolean, ratio: number) => {

@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { PinmonyCommentResult, PinmonySaveResult } from '../models/PinmonyComments';
@@ -65,7 +66,7 @@ export class PinmonyPostPanelsController {
     try {
       await this.ports.runScript('window.PinmonyPostApi && window.PinmonyPostApi.' + method + '(' + JSON.stringify(this.pin) + ')');
       if (this.current(token, generation)) this.poll();
-    } catch (_) { if (this.current(token, generation)) this.fail('接口不可用，请重新读取'); }
+    } catch (_) { if (this.current(token, generation)) this.fail(PinmonyI18n.message('接口不可用，请重新读取')); }
   }
   async openComments(): Promise<void> {
     const pin: string = this.store.detail?.pinUrl || '';
@@ -157,7 +158,7 @@ export class PinmonyPostPanelsController {
           const busy: boolean = this.mode === 'comments' ? this.store.commentResult.busy === true :
             this.mode === 'save' ? this.store.saveResult.busy : this.store.editResult.busy || this.store.editResult.picker.busy;
           if (this.pendingWrite || busy) this.uncertain = true;
-          this.fail('状态读取失败，请重新读取核对');
+          this.fail(PinmonyI18n.message('状态读取失败，请重新读取核对'));
         }
       }).finally((): void => { if (generation === this.generation) this.reading = false; });
   }
@@ -178,7 +179,7 @@ export class PinmonyPostPanelsController {
       else this.store.editResult.busy = true;
     }
     try { await this.ports.runScript('window.PinmonyPostApi && window.PinmonyPostApi.' + method + '(' + JSON.stringify(pin) + args + ')'); }
-    catch (_) { if (this.mode === mode && this.context(token)) { if (write) this.uncertain = true; this.fail(write ? '操作结果未确认，请关闭后重新读取核对' : '读取操作失败，请重试'); } }
+    catch (_) { if (this.mode === mode && this.context(token)) { if (write) this.uncertain = true; this.fail(write ? '操作结果未确认，请关闭后重新读取核对' : PinmonyI18n.message('读取操作失败，请重试')); } }
     finally { if (this.mode === mode && this.context(token)) { this.pendingWrite = false; this.poll(); } }
   }
   async commentAction(method: string, id: string = ''): Promise<void> {
@@ -236,7 +237,7 @@ export class PinmonyPostPanelsController {
         return;
       }
       await this.ports.runScript('window.PinmonyPostApi && window.PinmonyPostApi.commentWrite(' + JSON.stringify(pin) + ',' + JSON.stringify(prepared) + ')');
-    } catch (_) { if (this.mode === 'comments' && this.pin === pin && this.context(token)) { this.uncertain = true; this.fail('评论提交结果未确认，请重新读取核对'); } }
+    } catch (_) { if (this.mode === 'comments' && this.pin === pin && this.context(token)) { this.uncertain = true; this.fail(PinmonyI18n.message('评论提交结果未确认，请重新读取核对')); } }
     finally { if (this.mode === 'comments' && this.pin === pin && this.context(token)) { this.pendingWrite = false; this.poll(); } }
   }
   dismiss(kind: string, force: boolean = false): void {

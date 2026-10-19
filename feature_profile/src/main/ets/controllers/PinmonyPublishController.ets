@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyProfileStore } from '../stores/PinmonyProfileStore';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
@@ -95,7 +96,7 @@ export class PinmonyPublishController {
       this.ports.menuVisible() && this.ports.activeProfileTab();
     PinmonyRuntimeLog.info('PublishTrace: entry accepted');
     if(this.ports.nativeFlow?.() && this.ports.nativeMenu){
-      this.ports.nativeMenu(current).then((ready: boolean): void => {if(current() && !ready)this.ports.feedback('发布入口尚未就绪，请关闭后重试');}).finally((): void => {if(current())this.store.publishPreparing = false;});return;
+      this.ports.nativeMenu(current).then((ready: boolean): void => {if(current() && !ready)this.ports.feedback(PinmonyI18n.message('发布入口尚未就绪，请关闭后重试'));}).finally((): void => {if(current())this.store.publishPreparing = false;});return;
     }
     this.ports.prepareContext(current).then((ready: boolean): void => {
       if (!current()) return;
@@ -103,12 +104,12 @@ export class PinmonyPublishController {
         this.readMenuWhenReady(url, Date.now() + 8000, token);
       } else {
         this.store.publishLoading = false;
-        this.ports.feedback('发布入口尚未就绪，请关闭后重试');
+        this.ports.feedback(PinmonyI18n.message('发布入口尚未就绪，请关闭后重试'));
       }
     }).catch((): void => {
       if (!current()) return;
       this.store.publishLoading = false;
-      this.ports.feedback('发布入口尚未就绪，请关闭后重试');
+      this.ports.feedback(PinmonyI18n.message('发布入口尚未就绪，请关闭后重试'));
     }).finally((): void => {
       if (generation === this.menuGeneration && token === this.store.publishRequestToken) this.store.publishPreparing = false;
     });
@@ -117,7 +118,7 @@ export class PinmonyPublishController {
   private menuError(token: number, url: string, generation: number): void {
     if (!this.currentMenu(token, url, generation)) return;
     this.store.publishLoading = false;
-    this.ports.feedback('发布入口尚未就绪，请关闭后重试');
+    this.ports.feedback(PinmonyI18n.message('发布入口尚未就绪，请关闭后重试'));
   }
 
   readMenuWhenReady(url: string, deadline: number, token: number): void {
@@ -205,7 +206,7 @@ export class PinmonyPublishController {
       } else this.poll(token, page);
     } catch (_) {
       if (generation === this.flowGeneration && this.isCurrent(token, page)) {
-        this.store.publishFlow!.loading = false; this.store.publishFlow!.error = '发布接口不可用，请返回重试';
+        this.store.publishFlow!.loading = false; this.store.publishFlow!.error = PinmonyI18n.message('发布接口不可用，请返回重试');
         this.commit(this.store.publishFlow!);
       }
     }
@@ -247,7 +248,7 @@ export class PinmonyPublishController {
       if (value.phase === 'done') {
         const completed: number = value.completed, boardOnly: boolean = value.kind === 'board';
         this.close();
-        if (completed > 0) this.ports.feedback(boardOnly ? '图板已创建' : '已发布 ' + completed.toString() + ' 张 Pin 图');
+        if (completed > 0) this.ports.feedback(boardOnly ? '图板已创建' : '已发布 ' + completed.toString() + PinmonyI18n.message(' 张 Pin 图'));
         return;
       }
       if (value.phase === 'photo' && !value.loading && !value.error && !this.store.publishPicking) this.ports.pickPhotos(token, page);
@@ -256,7 +257,7 @@ export class PinmonyPublishController {
       if (generation !== this.flowGeneration || !this.ports.foreground() || !this.isCurrent(token, page)) return;
       const flow: PinmonyPublishFlow = this.store.publishFlow!;
       flow.uncertain = flow.busy; flow.busy = false; flow.loading = false;
-      flow.error = flow.uncertain ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : '发布状态读取失败，请返回重试';
+      flow.error = flow.uncertain ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : PinmonyI18n.message('发布状态读取失败，请返回重试');
       this.commit(flow);
     }).finally((): void => { if (generation === this.flowGeneration) this.polling = false; });
   }
@@ -292,7 +293,7 @@ export class PinmonyPublishController {
       if (!this.isCurrent(token, page)) return;
       const latest: PinmonyPublishFlow = this.store.publishFlow!;
       latest.busy = false; latest.uncertain = write;
-      latest.error = write ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : '操作不可用，请返回重试';
+      latest.error = write ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : PinmonyI18n.message('操作不可用，请返回重试');
       this.commit(latest);
     });
   }

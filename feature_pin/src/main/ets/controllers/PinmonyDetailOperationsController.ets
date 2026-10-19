@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyTaskRegistry, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { PinmonyDetailSnapshot, PinmonyMediaReadResult } from '../models/PinmonyDetail';
@@ -61,7 +62,7 @@ export class PinmonyDetailOperationsController {
     this.visualTasks.invalidate(); this.store.visualToken++;
     if (this.store.visualResult.loading) {
       this.store.visualResult.loading = false;
-      this.store.visualResult.error = '图片搜索已暂停，请重试';
+      this.store.visualResult.error = PinmonyI18n.message('图片搜索已暂停，请重试');
     }
   }
 
@@ -98,13 +99,13 @@ export class PinmonyDetailOperationsController {
           if (Date.now() > until) throw new Error('Timeout');
           this.visualTasks.timeout((): void => { poll(); }, 180);
         } catch (_) {
-          if (current()) this.store.visualResult = { pin: pin, loading: false, error: '图片搜索未完成，请重试',
+          if (current()) this.store.visualResult = { pin: pin, loading: false, error: PinmonyI18n.message('图片搜索未完成，请重试'),
             ended: false, items: this.store.visualResult.items };
         }
       };
       poll();
     } catch (_) {
-      if (current()) this.store.visualResult = { pin: pin, loading: false, error: '图片搜索暂不可用，请重试', ended: false, items: [] };
+      if (current()) this.store.visualResult = { pin: pin, loading: false, error: PinmonyI18n.message('图片搜索暂不可用，请重试'), ended: false, items: [] };
     }
   }
 
@@ -190,7 +191,7 @@ export class PinmonyDetailOperationsController {
           this.store.confirmedSaves.confirm(this.ports.pinIdentity(pin), false);
           if (this.store.detail) this.store.detail = this.store.confirmedSaves.apply(this.ports.pinIdentity(pin), this.store.detail);
           this.store.detailCache.remove(this.ports.pinIdentity(pin));
-          this.ports.showMessage('已取消收藏'); return;
+          this.ports.showMessage(PinmonyI18n.message('已取消收藏')); return;
         }
         if (!result.loading && !result.busy && !sent) {
           sent = true; deleteSent = true;
@@ -202,7 +203,7 @@ export class PinmonyDetailOperationsController {
     } catch (_) {
       if (current()) {
         this.ports.mark(deleteSent ? 'save.cancel.delete.unconfirmed' : 'save.cancel.verify.failed');
-        this.ports.showMessage(deleteSent ? '取消收藏结果未确认，请重新读取帖子后检查' : '取消收藏未确认，请重新读取后检查');
+        this.ports.showMessage(deleteSent ? '取消收藏结果未确认，请重新读取帖子后检查' : PinmonyI18n.message('取消收藏未确认，请重新读取后检查'));
       }
     } finally {
       if (this.ports.authEpoch() === epoch && page === this.ports.document()) this.ports.runScript('window.PinmonyPostApi && window.PinmonyPostApi.savedRestoreClose(' +
@@ -239,7 +240,7 @@ export class PinmonyDetailOperationsController {
       const started: string = await this.ports.runScript('window.PinmonyDetailApi && window.PinmonyDetailApi.retryMedia(' +
         JSON.stringify(pin) + ',' + operation.toString() + ')');
       if (!current()) return;
-      if (started !== 'true' && started !== '"true"') { this.ports.showMessage('视频地址读取暂不可用，请重试'); return; }
+      if (started !== 'true' && started !== '"true"') { this.ports.showMessage(PinmonyI18n.message('视频地址读取暂不可用，请重试')); return; }
       this.ports.mark('video.refresh.accepted');
       const until: number = Date.now() + 17000;
       while (current() && Date.now() < until) {
@@ -253,11 +254,11 @@ export class PinmonyDetailOperationsController {
         if (result.status !== 'pending') throw new Error('Unconfirmed');
         if (!await this.tasks.wait(200)) return;
       }
-      if (current()) this.ports.showMessage('视频地址读取结果未确认，请重试');
+      if (current()) this.ports.showMessage(PinmonyI18n.message('视频地址读取结果未确认，请重试'));
     } catch (_) {
       if (generation === this.generation && this.ports.authEpoch() === epoch && this.ports.authStatus() === 'authenticated' && !this.ports.businessSuspended() &&
           this.store.detailMediaRetryToken === operation && this.store.detail?.pinUrl === pin && this.ports.currentPinUrl() === pin)
-        this.ports.showMessage('视频接口暂不可用，请重试');
+        this.ports.showMessage(PinmonyI18n.message('视频接口暂不可用，请重试'));
     } finally {
       if (this.store.detailMediaRetryToken === operation) this.store.detailMediaRetryBusy = false;
     }

@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyBoardDetail } from '../models/PinmonyBoardDetail';
 import { PinmonyBoardCollaborators } from '../models/PinmonyBoardCollaborators';
@@ -59,7 +60,7 @@ export class PinmonyBoardCollaboratorsController {
     } catch (_) {
       const state: PinmonyBoardCollaborators | undefined = this.ports.state();
       if (state && this.current(token, generation)) {
-        state.loading = false; state.error = '合作用户入口暂不可用，请返回重试';
+        state.loading = false; state.error = PinmonyI18n.message('合作用户入口暂不可用，请返回重试');
         this.ports.setState(state);
       }
     }
@@ -85,8 +86,8 @@ export class PinmonyBoardCollaboratorsController {
       }).catch((): void => {
         const state: PinmonyBoardCollaborators | undefined = this.ports.state();
         if (state && this.current(token, generation)) {
-          if(state.busy){state.busy = false;state.uncertain = true;state.error = '操作结果未确认，请关闭后重新查看，勿重复提交';}
-          else state.error = '合作用户状态读取失败，请返回重新查看';
+          if(state.busy){state.busy = false;state.uncertain = true;state.error = PinmonyI18n.message('操作结果未确认，请关闭后重新查看，勿重复提交');}
+          else state.error = PinmonyI18n.message('合作用户状态读取失败，请返回重新查看');
           state.loading = false;
           this.ports.setState(state);
         }

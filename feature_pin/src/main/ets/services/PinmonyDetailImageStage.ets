@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyDetailSnapshot } from '../models/PinmonyDetail';
 
 export interface PinmonyDetailImageStagePorts {
@@ -67,7 +68,7 @@ export class PinmonyDetailImageStage {
       if (!this.isCurrent(token, binding)) return;
       this.signalKey = '';
       this.ports.markJourney('main.image.bridge.failed');
-      this.ports.setError('详情连接暂不可用，请重试');
+      this.ports.setError(PinmonyI18n.message('详情连接暂不可用，请重试'));
     };
     try {
       this.ports.runScript('window.PinmonyDetailImageStage && window.PinmonyDetailImageStage(' +
@@ -84,7 +85,7 @@ export class PinmonyDetailImageStage {
             }, 250));
             else {
               this.ports.markJourney('main.image.bridge.unavailable');
-              this.ports.setError('详情连接尚未就绪，请重试');
+              this.ports.setError(PinmonyI18n.message('详情连接尚未就绪，请重试'));
             }
           }
         }).catch(bridgeFailed);

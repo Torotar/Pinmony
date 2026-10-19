@@ -1,7 +1,11 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyCarousel, PinmonyCarouselItem } from '../models/PinmonyDetail';
 
 @Component
 export struct PinmonyCarouselView {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
   @Prop @Watch('onCarouselChanged') carousel: PinmonyCarousel;
   @Prop contentWidth: number = 324;
   @State private page: number = 0;
@@ -34,8 +38,8 @@ export struct PinmonyCarouselView {
           Stack({ alignContent: Alignment.Center }) {
             if (this.failed.includes(item.id)) {
               Column({ space: 12 }) {
-                Text('图片加载失败').fontColor($r('app.color.primary_text'))
-                Button('重试').onClick(() => {
+                Text(this.uiText("图片加载失败")).fontColor($r('app.color.primary_text'))
+                Button(this.uiText("重试")).onClick(() => {
                   this.failed = this.failed.filter((id: string): boolean => id !== item.id);
                   this.revision++;
                 })
@@ -52,7 +56,7 @@ export struct PinmonyCarouselView {
                   if (!this.failed.includes(item.id)) this.failed = this.failed.concat(item.id);
                 })
                 .onClick(() => { if (this.onImageTap) this.onImageTap(item.imageUrl); })
-                .accessibilityText(`第 ${index + 1} 张，共 ${this.carousel.items.length} 张。${item.title}`)
+                .accessibilityText(this.uiFormat("第 {0} 张，共 {1} 张。{2}", [index + 1, this.carousel.items.length, item.title]))
             }
           }.width('100%').height('100%')
         }, (item: PinmonyCarouselItem): string => `${this.carousel.pinId}:${item.id}:${this.revision}`)
@@ -63,7 +67,7 @@ export struct PinmonyCarouselView {
         .color('#66000000').selectedColor('#EEFFFFFF'))
       .borderRadius(18).clip(true)
       .onChange((index: number) => { this.page = index; })
-      .accessibilityText(`当前第 ${this.page + 1} 张，共 ${this.carousel.items.length} 张`)
+      .accessibilityText(this.uiFormat("当前第 {0} 张，共 {1} 张", [this.page + 1, this.carousel.items.length]))
     }.width('100%')
   }
 }

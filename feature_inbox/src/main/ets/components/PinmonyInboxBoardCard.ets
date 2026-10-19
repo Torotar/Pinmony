@@ -1,16 +1,19 @@
+import { PinmonyI18n } from 'common_foundation';
 import { InboxFlowBoard } from '../models/PinmonyInboxFlow';
 
 @Component
 export struct PinmonyInboxBoardCard {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop board: InboxFlowBoard;
   onOpen?: () => void;
   @State private failedImages: string[] = [];
 
   private countLabel(): string {
     const parts: string[] = [];
-    if (this.board.pinCount !== undefined) parts.push(this.board.pinCount.toString() + ' 张 Pin 图');
+    if (this.board.pinCount !== undefined) parts.push(this.board.pinCount.toString() + this.uiText(" 张 Pin 图"));
     if (this.board.sectionCount !== undefined && this.board.sectionCount > 0) {
-      parts.push(this.board.sectionCount.toString() + ' 个图板区块');
+      parts.push(this.board.sectionCount.toString() + this.uiText(" 个图板区块"));
     }
     return parts.join(' · ');
   }
@@ -41,7 +44,7 @@ export struct PinmonyInboxBoardCard {
           this.preview(this.board.cover)
         }
       }.width('100%').height(146).borderRadius(18).clip(true)
-      Text(this.board.title || '图板').fontSize(16).fontWeight(FontWeight.Bold)
+      Text(this.board.title || this.uiText("图板")).fontSize(16).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%').textAlign(TextAlign.Start).padding({ left: 8, right: 8 })
       if (this.countLabel()) {
@@ -49,11 +52,11 @@ export struct PinmonyInboxBoardCard {
           .width('100%').textAlign(TextAlign.Start).padding({ left: 8, right: 8 })
       }
       if (!this.board.url) {
-        Text('图板链接暂不可用').fontSize(13).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("图板链接暂不可用")).fontSize(13).fontColor($r('app.color.secondary_text'))
       }
     }.width(220).constraintSize({ maxWidth: '100%' }).alignItems(HorizontalAlign.Start)
       .padding({ bottom: 12 }).borderRadius(18)
-      .accessibilityGroup(true).accessibilityText((this.board.title || '图板') + '，' + this.countLabel())
+      .accessibilityGroup(true).accessibilityText((this.board.title || this.uiText("图板")) + '，' + this.countLabel())
       .onClick(() => { if (this.board.url && this.onOpen) this.onOpen(); })
   }
 }

@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PIN_NATIVE_PROFILE_SETTINGS_ENABLED } from '../app/PinmonyProfileSettingsClient';
 import { PinmonyProfileNativeActions, PinmonyProfileNativeActionsPorts } from '../app/PinmonyProfileNativeActions';
 import { PinmonySettingsNativeFlow, PinmonySettingsNativePorts } from '../app/PinmonySettingsNativeFlow';
@@ -151,6 +152,8 @@ interface PinmonyBoardOperationAction {
 @Entry
 @Component
 struct Index {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private nativeChildBackUntil: number = 0;
 
   private traceAction(name: string, detail: string = ''): void {
@@ -279,7 +282,7 @@ struct Index {
     detailReadCache: (): PinmonyDetailReadCache => this.detailReadCache,
     detailJourney: (): PinmonyDetailTrace => this.detailJourney,
     detailRequestOwners: (): Map<string, number> => this.detailRequestOwners,
-    showNetworkNotice: (message: string = '网络不稳定，正在重试…'): void => this.showNetworkNotice(message),
+    showNetworkNotice: (message: string = PinmonyI18n.message("网络不稳定，正在重试…")): void => this.showNetworkNotice(message),
     clearNetworkNotice: (): void => this.clearNetworkNotice(),
     nativeNetwork: (): PinmonyNativeNetwork => this.nativeNetwork,
     openingRelated: (): Promise<PinmonyNetworkReply> | undefined => this.openingRelated,
@@ -341,7 +344,7 @@ struct Index {
     controller: (): webview.WebviewController => this.controller,
     businessSuspended: (): boolean => this.businessSuspended,
     setBusinessSuspended: (value: boolean): void => { this.businessSuspended = value; },
-    showNetworkNotice: (message: string = '网络不稳定，正在重试…'): void => this.showNetworkNotice(message),
+    showNetworkNotice: (message: string = PinmonyI18n.message("网络不稳定，正在重试…")): void => this.showNetworkNotice(message),
     webPageLoading: (): boolean => this.webPageLoading,
     setWebPageLoading: (value: boolean): void => { this.webPageLoading = value; },
     webPageLoadFinishedAt: (): number => this.webPageLoadFinishedAt,
@@ -591,7 +594,7 @@ struct Index {
     nativePause: (): void => this.shareNativeFlow.pause(),
     copyText: (value: string): Promise<void> => this.systemActions.copyText(value),
     currentProfileUrl: (): string => this.currentProfileUrl(),
-    profileTitle: (): string => this.profileStore.profile?.displayName || this.profileStore.profile?.handle || 'Pinterest 个人资料',
+    profileTitle: (): string => this.profileStore.profile?.displayName || this.profileStore.profile?.handle || this.uiText("Pinterest 个人资料"),
     dismissMoreSheet: (): void => this.dismissMoreSheet(),
     sharePinUrl: (pin: string, title: string): Promise<void> => this.sharePinUrl(pin, title),
     traceAction: (name: string, id: string): void => this.traceAction(name, id),
@@ -846,7 +849,7 @@ struct Index {
   private readonly sessionVerification: PinmonySessionVerification = new PinmonySessionVerification({
     detached: (): boolean => this.nativeLoginEnabled,
     origin: (): string => this.nativeSessionOrigin,
-    unavailable: (): void => { if(this.nativeLoginEnabled){this.offlineCacheLoading = false;this.authStatus = 'error';this.failureDetails = '无法确认当前会话，请重试；也可以重新登录';} },
+    unavailable: (): void => { if(this.nativeLoginEnabled){this.offlineCacheLoading = false;this.authStatus = 'error';this.failureDetails = PinmonyI18n.message("无法确认当前会话，请重试；也可以重新登录");} },
     network: (): PinmonyNativeNetwork => this.nativeNetwork,
     status: (): PinmonyAuthStatus => this.authStatus,
     profile: (): string => this.authenticatedProfileUrl,
@@ -1444,7 +1447,7 @@ struct Index {
     },
     exited: (action: string): void => {
       this.retainedBoardContent = undefined;this.cancelledBoardPins.clear();this.singlePinMovePage = '';
-      if(action === 'leave')this.showMessage('已离开图板');
+      if(action === 'leave')this.showMessage(PinmonyI18n.message("已离开图板"));
       this.backFromBoard();
     },
     feedback: (message: string): void => this.showMessage(message),
@@ -1559,7 +1562,7 @@ struct Index {
       this.pinStore.detailCache.remove(this.pinIdentity(pin));
       if (deleted) { this.pinStore.detail = undefined; await this.handleBack(); }
       this.runSessionScript('window.PinmonyProfileRefresh && window.PinmonyProfileRefresh(); window.PinmonyBoardRefresh && window.PinmonyBoardRefresh(); window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()').catch(() => {});
-      this.showMessage(deleted ? '已从你的图板移除 Pin 图' : '已保存修改');
+      this.showMessage(deleted ? this.uiText("已从你的图板移除 Pin 图") : this.uiText("已保存修改"));
     },
     prepareComment: (encoded: string, pin: string, current: () => boolean): Promise<string> => this.prepareCommentWrite(encoded, pin, current)
   } as PinmonyPostPanelsPorts);
@@ -1622,7 +1625,7 @@ struct Index {
     store: (): PinmonyProfileStore => this.profileStore,session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),network: (): PinmonyNativeNetwork => this.nativeNetwork,
     active: (): boolean => this.authStatus === 'authenticated' && (this.activeTab === 3 || !!this.publishBoardReturn),foreground: (): boolean => !this.businessSuspended,
     page: (): string => this.profileUrlFromAddress(this.authenticatedProfileUrl),
-    done: (): void => {const flow: PinmonyPublishFlow | undefined = this.profileStore.publishFlow;if(!flow)return;const count: number = flow.completed,board: boolean = flow.kind === 'board';this.closePublishFlow();if(count)this.showMessage(board ? '图板已创建' : '已发布 ' + count.toString() + ' 张 Pin 图');}
+    done: (): void => {const flow: PinmonyPublishFlow | undefined = this.profileStore.publishFlow;if(!flow)return;const count: number = flow.completed,board: boolean = flow.kind === 'board';this.closePublishFlow();if(count)this.showMessage(board ? this.uiText("图板已创建") : this.uiText("已发布 ") + count.toString() + this.uiText(" 张 Pin 图"));}
   } as PinmonyPublishNativePorts);
   private readonly publishController: PinmonyPublishController = new PinmonyPublishController(this.profileStore, {
     nativeFlow: (): boolean => PIN_NATIVE_SHARE_PUBLISH_ENABLED,
@@ -1796,8 +1799,8 @@ struct Index {
       if (pinUrl) this.beginDetailOpening(pinUrl, source);
       try {
         if (pinUrl && !PIN_NATIVE_DETAIL_READS_ENABLED) this.loadSessionDocument(pinUrl);
-        else if(!pinUrl) { this.pinStore.detailOpeningPin = ''; this.showMessage('无法打开 Pin 图，请重试'); }
-      } catch (_) { this.pinStore.detailOpeningPin = ''; this.showMessage('无法打开 Pin 图，请重试'); }
+        else if(!pinUrl) { this.pinStore.detailOpeningPin = ''; this.showMessage(PinmonyI18n.message("无法打开 Pin 图，请重试")); }
+      } catch (_) { this.pinStore.detailOpeningPin = ''; this.showMessage(PinmonyI18n.message("无法打开 Pin 图，请重试")); }
     },
     traceAction: (name: string, detail: string): void => this.traceAction(name, detail),
     showMessage: (message: string): void => this.showMessage(message)
@@ -1943,12 +1946,12 @@ struct Index {
     this.nativeNetwork.onReadTrace = readTrace;
     this.detailReadNetwork.onReadTrace = readTrace;
     this.nativeNetwork.onTransientRetry = (_resource: string, speculative: boolean) => {
-      if (!speculative) this.showNetworkNotice('网络不稳定，正在重试…');
+      if (!speculative) this.showNetworkNotice(PinmonyI18n.message("网络不稳定，正在重试…"));
     };
     const rateLimited = (remainingMs: number): void => {
       this.pinStore.detailPrefetch.pause();
-      this.showNetworkNotice(remainingMs > 0 ? '请求过于频繁，请在 ' +
-        Math.ceil(remainingMs / 1000).toString() + ' 秒后重试' : '正在确认服务恢复，请稍后重试');
+      this.showNetworkNotice(remainingMs > 0 ? this.uiText("请求过于频繁，请在 ") +
+        Math.ceil(remainingMs / 1000).toString() + ' 秒后重试' : this.uiText("正在确认服务恢复，请稍后重试"));
     };
     this.nativeNetwork.onRateLimited = rateLimited;
     this.detailReadNetwork.onRateLimited = rateLimited;
@@ -2166,7 +2169,7 @@ struct Index {
       if (!connection.hasDefaultNetSync()) {
         this.sessionVerification.cancel('offline'); this.nativeSessionEpoch++;
         this.authStatus = 'error'; this.offlineCacheLoading = false; this.loadFailed = false;
-        this.failureDetails = '当前无网络，请连接网络后重试';
+        this.failureDetails = PinmonyI18n.message("当前无网络，请连接网络后重试");
         PinmonyRuntimeLog.info('NativeSession: verification deferred reason=offline');
         return;
       }
@@ -2175,7 +2178,7 @@ struct Index {
       try {this.sessionEnvironment.capture(webview.WebviewController.getDefaultUserAgent());}catch (_) {}
     }
     if(!this.sessionEnvironment.userAgent()){
-      this.authStatus = 'error';this.failureDetails = '会话环境尚未就绪，请重试';return;
+      this.authStatus = 'error';this.failureDetails = PinmonyI18n.message("会话环境尚未就绪，请重试");return;
     }
     this.sessionVerification.cancel('native-attempt');
     const epoch: number = ++this.nativeSessionEpoch;
@@ -2185,7 +2188,7 @@ struct Index {
     this.coordinatorTasks.timeout((): void => {
       if(epoch !== this.nativeSessionEpoch || this.authStatus !== 'checking')return;
       this.sessionVerification.cancel('verification-timeout');this.nativeVerificationPending = false;
-      this.authStatus = 'error';this.failureDetails = '会话核验超时，请重试';
+      this.authStatus = 'error';this.failureDetails = PinmonyI18n.message("会话核验超时，请重试");
     },15000);
   }
 
@@ -2273,7 +2276,7 @@ struct Index {
 
   private confirmBusinessSession(appVersion: string = ''): void {
     if (this.authStatus !== 'authenticated') return;
-    if (this.networkNotice === '该登录方式暂不可用') this.clearNetworkNotice();
+    if (PinmonyI18n.isText(this.networkNotice, "该登录方式暂不可用")) this.clearNetworkNotice();
     const userAgent: string = this.sessionEnvironment?.userAgent() || '';
     this.businessSession.confirm(this.homeCacheAccountId, this.authenticatedProfileUrl, userAgent, appVersion);
     if (PIN_NATIVE_HOME_READS_ENABLED) this.coordinatorTasks.timeout((): void => { this.homeNativeReads.demand(); }, 80);
@@ -2296,7 +2299,7 @@ struct Index {
 
   private requestNativeNetwork(value: string): void { return this.networkBridgeCoordinator.requestNativeNetwork(value); }
 
-  private showNetworkNotice(message: string = '网络不稳定，正在重试…'): void {
+  private showNetworkNotice(message: string = PinmonyI18n.message("网络不稳定，正在重试…")): void {
     this.networkNotice = message;
     if (this.networkNoticeTimer !== -1) this.pageTasks.cancelTimeout(this.networkNoticeTimer);
     this.networkNoticeTimer = this.pageTasks.timeout(() => {
@@ -2307,7 +2310,7 @@ struct Index {
 
   private showUnsupportedLogin(): void {
     if (this.authStatus === 'authenticated' || !this.authWebVisible()) return;
-    const message: string = '该登录方式暂不可用';
+    const message: string = PinmonyI18n.message("该登录方式暂不可用");
     if (this.networkNotice === message) return;
     this.showNetworkNotice(message);
   }
@@ -2363,7 +2366,7 @@ struct Index {
       const key: string = this.pinStore.shareSession.toString();
       if (session !== this.pinStore.shareSession || kind !== 'share') this.pagePerformance.beginSecondary('share', key);
       if (!this.pinStore.shareLoading && !this.pinStore.shareError &&
-          !['正在加载联系人…', '正在处理…'].includes(this.pinStore.shareFeedback))
+          !['正在加载联系人…', '正在处理…'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source)))
         this.pagePerformance.markSecondary('share', key, 'content-ready');
     }
   }
@@ -2508,7 +2511,7 @@ struct Index {
     const english: RegExpMatchArray | null = label.match(/^Share\s+(?:via|through|on)\s+(.+)$/i);
     const name: string = chinese ? chinese[1].trim() : english ? english[1].trim() : label.trim();
     if (/^(?:Facebook\s+)?Messenger$/i.test(name)) return 'Messenger';
-    if (/^(?:消息|信息|短信|Message|Messages|SMS)$/i.test(name)) return '短信';
+    if (/^(?:消息|信息|短信|Message|Messages|SMS)$/i.test(name)) return this.uiText("短信");
     if (/^(?:Twitter|X)$/i.test(name)) return 'X';
     return name;
   }
@@ -2846,7 +2849,7 @@ struct Index {
       this.coordinatorTasks.timeout(() => { if (token === this.pageBackToken) this.pageHistory.cancelBack(); }, 2500);
     } catch (error) {
       this.pageHistory.cancelBack();
-      this.showMessage('无法返回搜索页，请重试');
+      this.showMessage(PinmonyI18n.message("无法返回搜索页，请重试"));
     }
   }
 
@@ -2932,7 +2935,7 @@ struct Index {
     try { this.loadSessionDocument(target); }
     catch (_) {
       this.searchStore.searchLoading = false;
-      this.searchStore.searchError = '无法打开标签搜索，请重试';
+      this.searchStore.searchError = PinmonyI18n.message("无法打开标签搜索，请重试");
     }
   }
 
@@ -2976,7 +2979,7 @@ struct Index {
       catch (_) {
         this.boardStore.pendingBoardSource = ''; this.boardStore.pendingBoardUrl = '';
         this.boardStore.boardReturnPage = '';
-        this.showMessage('无法打开图板，请重试');
+        this.showMessage(PinmonyI18n.message("无法打开图板，请重试"));
       }
       return;
     }
@@ -3005,8 +3008,8 @@ struct Index {
       this.finishRootPull(kind);
       const current: string = kind === 'search' ? this.currentSearchPageKey() : this.currentInboxUrl();
       if (current !== page) return;
-      if (kind === 'search') { this.searchStore.searchLoading = false; this.searchStore.searchError = '刷新超时，请重试'; }
-      else { this.inboxStore.inboxLoading = false; this.inboxStore.inboxError = '刷新超时，请重试'; }
+      if (kind === 'search') { this.searchStore.searchLoading = false; this.searchStore.searchError = PinmonyI18n.message("刷新超时，请重试"); }
+      else { this.inboxStore.inboxLoading = false; this.inboxStore.inboxError = PinmonyI18n.message("刷新超时，请重试"); }
     }, 20000);
     if (kind === 'search') await this.refreshSearch();
     else await this.retryInbox();
@@ -3021,7 +3024,7 @@ struct Index {
   private inboxPlaceholder(): PinmonyInboxSnapshot {
     return {
       kind: 'state', session: 0, pageUrl: '', section: 'updates',
-      updateLabel: '更新', inboxLabel: '收件箱', emptyTitle: '', emptyDescription: '',
+      updateLabel: this.uiText("更新"), inboxLabel: this.uiText("收件箱"), emptyTitle: '', emptyDescription: '',
       homeLabel: '', homeId: '', composeLabel: '', composeId: '', contactsLabel: '',
       items: [], contacts: []
     };
@@ -3322,9 +3325,9 @@ struct Index {
       const pageEndGrace: boolean = this.webPageLoadFinishedAt > requestedAt &&
         now - this.webPageLoadFinishedAt < 1800;
       if (now - requestedAt >= 12000) {
-        this.failRootPreparation(index, '页面数据准备超时，请重试');
+        this.failRootPreparation(index, this.uiText("页面数据准备超时，请重试"));
         PinmonyRuntimeLog.warn('RootTabTrace: preparation-timeout targetTab=' + index.toString());
-        this.showMessage('页面数据准备超时，请重试'); return;
+        this.showMessage(PinmonyI18n.message("页面数据准备超时，请重试")); return;
       }
       if (this.webPageLoading || now - requestedAt < 6500 || pageEndGrace) {
         this.waitForWebTabConfirmation(index, token, requestedAt);
@@ -3339,8 +3342,8 @@ struct Index {
         return;
       }
       if (index === 3 && !this.currentProfileUrl()) this.clearProfile();
-      this.failRootPreparation(index, '页面数据尚未准备好，请重试');
-      this.showMessage('页面数据尚未准备好，请重试');
+      this.failRootPreparation(index, this.uiText("页面数据尚未准备好，请重试"));
+      this.showMessage(PinmonyI18n.message("页面数据尚未准备好，请重试"));
     }, 500);
   }
 
@@ -3496,7 +3499,7 @@ struct Index {
         if (this.homeStore.diskCacheRestoredAt === 0) this.clearOfflineHomeMarker();
         this.authStatus = 'error';
         this.loadFailed = true;
-        this.failureDetails = '最近缓存不可用，请连接网络后重试';
+        this.failureDetails = PinmonyI18n.message("最近缓存不可用，请连接网络后重试");
         return;
       }
       this.offlinePreviewMode = true;
@@ -3655,7 +3658,7 @@ struct Index {
     if (!home || !this.homeMenuReady() || !PIN_NATIVE_PIN_MENUS_ENABLED && this.homeStore.homeMoreLoadingId) return;
     const pin: PinmonyHomePin | undefined = home.pins.find((item: PinmonyHomePin): boolean => item.id === id);
     if (!pin) {
-      this.showMessage('Pin 已不可用，请刷新首页后重试');
+      this.showMessage(PinmonyI18n.message("Pin 已不可用，请刷新首页后重试"));
       return;
     }
     if (!PIN_POST_API_ENABLED) return;
@@ -3692,7 +3695,7 @@ struct Index {
     this.boardStore.boardReturnUrl = flow.pageUrl; this.boardStore.boardReturnPage = target;
     this.boardStore.pendingBoardSource = flow.pageUrl; this.boardStore.pendingBoardUrl = target;
     this.boardStore.presentationPage = target; this.boardStore.presentationOnly = false;
-    this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: card.id, title: card.title || '图板',
+    this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: card.id, title: card.title || this.uiText("图板"),
       pinCount: card.pinCount === undefined ? '' : card.pinCount.toString(), ownerName: '', ownerAvatar: '',
       loading: true, loadingMore: false, ready: false, error: '', hasMore: false, pins: [] };
     this.pagePerformance.beginSecondary('board', target);
@@ -3703,7 +3706,7 @@ struct Index {
       this.boardStore.pendingBoardUrl = ''; this.boardStore.pendingBoardSource = '';
       this.boardStore.boardReturnUrl = ''; this.boardStore.boardReturnPage = ''; this.boardStore.presentationPage = '';
       this.boardStore.boardDetail = undefined; this.inboxStore.retainedChat = undefined; this.inboxStore.chatReturnConversation = '';
-      this.showMessage('无法打开图板，请重试'); return;
+      this.showMessage(PinmonyI18n.message("无法打开图板，请重试")); return;
     }
     this.coordinatorTasks.timeout(() => {
       const detail = this.boardStore.boardDetail;
@@ -3711,10 +3714,10 @@ struct Index {
       const opening: boolean = token === this.boardStore.boardOpeningToken && this.boardStore.pendingBoardUrl === target;
       const awaiting: boolean = token + 1 === this.boardStore.boardOpeningToken && this.currentBoardUrl() === target;
       if (!opening && !awaiting) return;
-      this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: card.id, title: card.title || '图板',
+      this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: card.id, title: card.title || this.uiText("图板"),
         pinCount: card.pinCount === undefined ? '' : card.pinCount.toString(), ownerName: '', ownerAvatar: '',
         loading: false, loadingMore: false, ready: false,
-        error: opening ? '网页尚未进入图板，请重试' : '图板接口尚未就绪，请重试', hasMore: false, pins: [] };
+        error: opening ? this.uiText("网页尚未进入图板，请重试") : this.uiText("图板接口尚未就绪，请重试"), hasMore: false, pins: [] };
     }, 20000);
   }
 
@@ -3839,9 +3842,9 @@ struct Index {
     this.detailReturnJourney?.mark('return.target.load.once');
     try { this.loadSessionDocument(target); }
     catch (error) {
-      if (!this.boardUrlFromAddress(target) || this.boardStore.boardDetail?.pageKey !== target) throw new Error('无法加载返回目标');
+      if (!this.boardUrlFromAddress(target) || this.boardStore.boardDetail?.pageKey !== target) throw new Error(this.uiText("无法加载返回目标"));
       this.boardStore.boardDetail.loading = false;
-      this.boardStore.boardDetail.error = '无法同步图板，请重试';
+      this.boardStore.boardDetail.error = PinmonyI18n.message("无法同步图板，请重试");
       PinmonyRuntimeLog.warn('BoardReturn: navigation-dispatch-failed');
       return;
     }
@@ -3849,7 +3852,7 @@ struct Index {
       if (token !== this.pageBackToken || this.boardStore.boardDetail?.pageKey !== target ||
           !this.boardStore.presentationOnly || this.pinStore.detail || this.pinStore.detailOpeningPin) return;
       this.boardStore.boardDetail.loading = false;
-      this.boardStore.boardDetail.error = '图板同步超时，请重试';
+      this.boardStore.boardDetail.error = PinmonyI18n.message("图板同步超时，请重试");
       PinmonyRuntimeLog.warn('BoardReturn: synchronization-timeout');
     }, 20000);
   }
@@ -3919,7 +3922,7 @@ struct Index {
       return true;
     } catch (error) {
       this.pageHistory.cancelBack();
-      this.showMessage('无法返回上一页，请重试');
+      this.showMessage(PinmonyI18n.message("无法返回上一页，请重试"));
       return true;
     }
   }
@@ -4006,19 +4009,19 @@ struct Index {
       await this.systemActions.openLink(PINTEREST_URL);
     } catch (error) {
       PinmonyRuntimeLog.error('Pinmony: failed to open Pinterest in browser');
-      this.showMessage('无法打开浏览器');
+      this.showMessage(PinmonyI18n.message("无法打开浏览器"));
     }
   }
 
   private showMessage(message: string): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: message });
+      this.getUIContext().getPromptAction().showToast({ message: PinmonyI18n.render(message, this.uiLanguage) });
     } catch (error) {
       PinmonyRuntimeLog.warn('Pinmony: message unavailable');
     }
   }
 
-  private rejectOfflineAction(action: string, message: string = '当前离线，暂不可操作'): boolean {
+  private rejectOfflineAction(action: string, message: string = PinmonyI18n.message("当前离线，暂不可操作")): boolean {
     if (!this.offlinePreviewMode) return false;
     PinmonyRuntimeLog.info('ActionGate: ' + action + ' blocked reason=offline-preview');
     this.showMessage(message);
@@ -4147,13 +4150,13 @@ struct Index {
   private async openBoardChat(): Promise<void> {
     const board = this.boardStore.boardDetail;
     if (!board?.ready || this.currentBoardUrl() !== board.pageKey || !(board.editable || board.collaborator)) return;
-    if (board.chatMemberCount !== 2 || !board.chatPeer) { this.showMessage('当前图板消息不可用，仅支持两人聊天'); return; }
+    if (board.chatMemberCount !== 2 || !board.chatPeer) { this.showMessage(PinmonyI18n.message("当前图板消息不可用，仅支持两人聊天")); return; }
     const peer = board.chatPeer;
     this.traceAction('board.chat');
     this.selectNativeRootTab(2);
     if(PIN_NATIVE_INBOX_MESSAGES_ENABLED) {
       await this.selectInboxSection('messages');
-      if(!await this.inboxMessagesNativeReads.direct(peer.id,peer.name,peer.avatar,peer.username || ''))this.showMessage('当前聊天入口不可用，请重试');
+      if(!await this.inboxMessagesNativeReads.direct(peer.id,peer.name,peer.avatar,peer.username || ''))this.showMessage(PinmonyI18n.message("当前聊天入口不可用，请重试"));
       return;
     }
     if (!await this.ensureRootActionContext(2)) return;
@@ -4163,13 +4166,13 @@ struct Index {
       if (this.inboxStore.inbox?.section === 'messages' && this.inboxStore.inboxActionsReady && !this.inboxStore.inboxLoading) break;
       if (!await this.coordinatorTasks.wait(100)) return;
     }
-    if (this.inboxStore.inbox?.section !== 'messages' || !this.inboxStore.inboxActionsReady || this.inboxStore.inboxLoading) { this.showMessage('当前聊天入口不可用，请重试'); return; }
+    if (this.inboxStore.inbox?.section !== 'messages' || !this.inboxStore.inboxActionsReady || this.inboxStore.inboxLoading) { this.showMessage(PinmonyI18n.message("当前聊天入口不可用，请重试")); return; }
     try {
       this.inboxStore.flowDismissed = false;
       const result = await this.runSessionScript('window.PinmonyInboxConversations && window.PinmonyInboxConversations.direct(' + JSON.stringify(peer) + ',' + this.inboxStore.inboxSession.toString() + ')');
       if (result === 'true' || result === '"true"') return;
     } catch (_) {}
-    this.showMessage('当前聊天入口不可用，请重试');
+    this.showMessage(PinmonyI18n.message("当前聊天入口不可用，请重试"));
   }
 
   private async openBoardCollaborators(): Promise<void> {
@@ -4210,7 +4213,7 @@ struct Index {
       this.boardStore.pendingBoardSource = ''; this.boardStore.pendingBoardUrl = '';
       this.boardStore.boardReturnPage = ''; this.boardStore.presentationPage = '';
       this.boardStore.boardDetail = undefined;
-      this.showMessage('无法打开邀请图板，请重试');
+      this.showMessage(PinmonyI18n.message("无法打开邀请图板，请重试"));
     }
   }
 
@@ -4241,8 +4244,8 @@ struct Index {
     try {
       const result: string = await this.runSessionScript('window.PinmonyNativeShareApiOpen && ' +
         'window.PinmonyNativeShareApiOpen(' + JSON.stringify(board.pageKey) + ')');
-      if (result !== 'true' && result !== '"true"') this.showMessage('分享接口暂不可用，请重试');
-    } catch (_) { this.showMessage('分享接口暂不可用，请重试'); }
+      if (result !== 'true' && result !== '"true"') this.showMessage(PinmonyI18n.message("分享接口暂不可用，请重试"));
+    } catch (_) { this.showMessage(PinmonyI18n.message("分享接口暂不可用，请重试")); }
   }
 
   private syncBoardRoute(address: string): void {
@@ -4287,7 +4290,7 @@ struct Index {
     this.nativeRootOnly = false;this.navigationAddress = target;this.nativeBackTarget = target;
     this.boardStore.rootTab = this.activeTab;this.boardStore.boardReturnUrl = source;this.boardStore.boardReturnPage = target;
     this.boardStore.boardOpeningToken++;this.boardStore.pendingBoardUrl = target;this.boardStore.pendingBoardSource = source;
-    this.boardStore.boardDetail = {kind:'state',session:0,pageKey:target,boardId:'',title:'图板',pinCount:'',ownerName:'',ownerAvatar:'',loading:true,loadingMore:false,ready:false,error:'',hasMore:false,pins:[]};
+    this.boardStore.boardDetail = {kind:'state',session:0,pageKey:target,boardId:'',title:this.uiText("图板"),pinCount:'',ownerName:'',ownerAvatar:'',loading:true,loadingMore:false,ready:false,error:'',hasMore:false,pins:[]};
     this.pageHistory.visit(source,'load');this.pageHistory.visit(target,'push');this.boardNativeReads.demand();this.syncFloatingTabsMotion();
   }
 
@@ -4358,7 +4361,7 @@ struct Index {
     this.boardStore.boardReturnPage = target;
     this.pagePerformance.beginSecondary('board', target);
     this.boardStore.pendingBoardUrl = target;
-    const initialTitle: string = /\/pins\/$/i.test(target) ? '所有 Pin 图' : (card!.title || '图板');
+    const initialTitle: string = /\/pins\/$/i.test(target) ? this.uiText("所有 Pin 图") : (card!.title || this.uiText("图板"));
     this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: '', title: initialTitle,
       pinCount: card!.pinCount, ownerName: '', ownerAvatar: '', loading: true, loadingMore: false,
       ready: false, error: '', hasMore: false, pins: [] };
@@ -4372,7 +4375,7 @@ struct Index {
       this.loadSessionDocument(target);
       dispatched = true;
     } catch (_) {
-      this.showMessage('无法打开图板，请重试');
+      this.showMessage(PinmonyI18n.message("无法打开图板，请重试"));
     }
     if (!dispatched && token === this.boardStore.boardOpeningToken && this.boardStore.pendingBoardUrl === target) {
       this.boardStore.pendingBoardUrl = ''; this.boardStore.pendingBoardSource = ''; this.boardStore.boardDetail = undefined;
@@ -4387,7 +4390,7 @@ struct Index {
       if (!stillOpening && !awaitingBridge) return;
       this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: '', title: initialTitle,
         pinCount: card!.pinCount, ownerName: '', ownerAvatar: '', loading: false, loadingMore: false,
-        ready: false, error: stillOpening ? '网页尚未进入图板，请重试' : '图板接口尚未就绪，请重试', hasMore: false, pins: [] };
+        ready: false, error: stillOpening ? this.uiText("网页尚未进入图板，请重试") : this.uiText("图板接口尚未就绪，请重试"), hasMore: false, pins: [] };
     }, 20000);
   }
 
@@ -4426,7 +4429,7 @@ struct Index {
       if (source) {
         if(PIN_NATIVE_DETAIL_READS_ENABLED && PIN_NATIVE_BOARD_READS_ENABLED && this.completeNativeBack(source))return;
         try { this.loadSessionDocument(source); }
-        catch (_) { this.showMessage('无法返回资料页，请重试'); }
+        catch (_) { this.showMessage(PinmonyI18n.message("无法返回资料页，请重试")); }
       }
       return;
     }
@@ -4512,7 +4515,7 @@ struct Index {
       source = PIN_NATIVE_PROFILE_READS_ENABLED ? (pinSource ||
         (boardSource && (boardSource === this.nativeBackTarget || boardSource === this.navigationAddress) ? boardSource : searchSource || this.nativeDisplayAddress())) : this.sessionDocumentUrl();
     }
-    catch (_) { this.showMessage('当前页面尚未就绪，请重试'); return; }
+    catch (_) { this.showMessage(PinmonyI18n.message("当前页面尚未就绪，请重试")); return; }
     if(PIN_NATIVE_PROFILE_READS_ENABLED){
       if(!this.profileStore.origins.length)this.profileBoardOrigins.clear();
       this.profileBoardOrigins.set(this.profileStore.origins.length,{board:this.boardStore.boardDetail,returnUrl:this.boardStore.boardReturnUrl,returnPage:this.boardStore.boardReturnPage,rootTab:this.boardStore.rootTab,cancelledPins:Array.from(this.cancelledBoardPins)});
@@ -4551,7 +4554,7 @@ struct Index {
       this.profileStore.profileActionsReady = false;
       this.profileStore.profileLoading = false;
       this.syncFloatingTabsMotion();
-      this.showMessage('无法打开个人资料，请重试');
+      this.showMessage(PinmonyI18n.message("无法打开个人资料，请重试"));
     }
   }
   private backFromUserProfile(): void {
@@ -4627,7 +4630,7 @@ struct Index {
   private openProfileWebsite(value: string): void {
     const url: string = value.trim();
     if (!/^https?:\/\/[^\s/]+(?:\/[^\s]*)?$/i.test(url)) return;
-    this.systemActions.openLink(url).catch(() => this.showMessage('无法打开网站，请重试'));
+    this.systemActions.openLink(url).catch(() => this.showMessage(PinmonyI18n.message("无法打开网站，请重试")));
   }
 
   private async changeProfileAvatar(): Promise<void> {
@@ -4638,7 +4641,7 @@ struct Index {
     const account: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
     let source: string = '';
     try { if(!PIN_NATIVE_PROFILE_SETTINGS_ENABLED)source = this.sessionDocumentUrl(); }
-    catch (_) { this.showMessage('当前页面尚未就绪，请重试'); return; }
+    catch (_) { this.showMessage(PinmonyI18n.message("当前页面尚未就绪，请重试")); return; }
     if (!panel || panel.mode !== 'edit' || panel.loading || this.profileStore.saving || this.authStatus !== 'authenticated') return;
     const ownsPreview = (): boolean => {const actual: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();return token === this.profileStore.panelToken && this.profileStore.panel?.page === page && this.authStatus === 'authenticated' && (PIN_NATIVE_PROFILE_SETTINGS_ENABLED ? this.currentProfileUrl() === page && actual.accountId === account.accountId && actual.generation === account.generation && actual.origin === account.origin : this.isCurrentWebDocument(source));};
     try {
@@ -4649,12 +4652,12 @@ struct Index {
       if (!ownsPreview()) return;
       const current: PinmonyProfilePanel = JSON.parse(JSON.stringify(this.profileStore.panel)) as PinmonyProfilePanel;
       current.avatarPreview = photo.data;
-      current.avatarError = '已选择照片，但头像上传接口信息不完整，尚未上传或保存';
+      current.avatarError = this.uiText("已选择照片，但头像上传接口信息不完整，尚未上传或保存");
       this.profileStore.panel = current;
     } catch (error) {
       if (ownsPreview()) {
         const current: PinmonyProfilePanel = JSON.parse(JSON.stringify(this.profileStore.panel)) as PinmonyProfilePanel;
-        current.avatarError = (error as Error).message || '无法选择此照片，请重试';
+        current.avatarError = (error as Error).message || this.uiText("无法选择此照片，请重试");
         this.profileStore.panel = current;
       }
     }
@@ -4686,7 +4689,7 @@ struct Index {
       PinmonyRuntimeLog.warn('Pinmony: profile action unavailable');
     }
     this.profileStore.profileWebFlow = false;
-    this.showMessage('当前网页操作不可用，请重试');
+    this.showMessage(PinmonyI18n.message("当前网页操作不可用，请重试"));
     return false;
   }
 
@@ -4698,8 +4701,8 @@ struct Index {
     this.profileShareMode = true; this.pinStore.shareSession = 0; this.pinStore.ignoredShareSession = 0;
     try {
       const result: string = await this.runSessionScript('window.PinmonyNativeShareApiOpen && window.PinmonyNativeShareApiOpen(' + JSON.stringify(profile.profileUrl) + ',true)');
-      if (result !== 'true' && result !== '"true"') { this.profileShareMode = false; this.showMessage('分享数据尚未就绪，请重试'); }
-    } catch (_) { this.profileShareMode = false; this.showMessage('分享数据读取失败，请重试'); }
+      if (result !== 'true' && result !== '"true"') { this.profileShareMode = false; this.showMessage(PinmonyI18n.message("分享数据尚未就绪，请重试")); }
+    } catch (_) { this.profileShareMode = false; this.showMessage(PinmonyI18n.message("分享数据读取失败，请重试")); }
   }
 
   private openProfileMenu(): void {
@@ -4718,15 +4721,15 @@ struct Index {
   @Builder
   private buildProfileMenuSheet() {
     Column({ space: 4 }) {
-      Text('个人资料选项').fontSize(20).fontWeight(FontWeight.Bold)
+      Text(this.uiText("个人资料选项")).fontSize(20).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).width('100%')
         .padding({ left: 24, right: 24, top: 18, bottom: 12 })
-      Text('屏蔽').fontSize(17).fontColor($r('app.color.primary_text'))
+      Text(this.uiText("屏蔽")).fontSize(17).fontColor($r('app.color.primary_text'))
         .width('100%').height(56).padding({ left: 24, right: 24 })
-        .onClick(() => {}).accessibilityText('屏蔽')
-      Text('关闭').fontSize(17).fontColor($r('app.color.primary_text'))
+        .onClick(() => {}).accessibilityText(this.uiText("屏蔽"))
+      Text(this.uiText("关闭")).fontSize(17).fontColor($r('app.color.primary_text'))
         .width('100%').height(56).padding({ left: 24, right: 24 })
-        .onClick(() => this.dismissProfileMenu()).accessibilityText('关闭')
+        .onClick(() => this.dismissProfileMenu()).accessibilityText(this.uiText("关闭"))
     }.width('100%').backgroundColor($r('app.color.page_background'))
       .alignItems(HorizontalAlign.Start)
   }
@@ -4791,8 +4794,8 @@ struct Index {
 
   private async createBoardSection(name: string): Promise<string> {
     if(PIN_NATIVE_BOARD_READS_ENABLED) {
-      if(!this.boardSectionReady())return '图板尚未就绪，请关闭面板后重试';
-      if(this.boardSectionSubmitting)return '创建正在进行，请稍候';
+      if(!this.boardSectionReady())return this.uiText("图板尚未就绪，请关闭面板后重试");
+      if(this.boardSectionSubmitting)return this.uiText("创建正在进行，请稍候");
       const token: number = this.boardSectionToken;this.boardSectionSubmitting = true;
       try {return this.boardNativeReads.beginSectionSelection(name);}
       finally {if(token === this.boardSectionToken)this.boardSectionSubmitting = false;}
@@ -4800,9 +4803,9 @@ struct Index {
     const board = this.boardStore.boardDetail;
     if (!board || !this.boardSectionReady()) {
       PinmonyRuntimeLog.info('BoardSectionTrace: submit blocked reason=context-not-ready');
-      return '图板尚未就绪，请关闭面板后重试';
+      return this.uiText("图板尚未就绪，请关闭面板后重试");
     }
-    if (this.boardSectionSubmitting) return '创建正在进行，请稍候';
+    if (this.boardSectionSubmitting) return this.uiText("创建正在进行，请稍候");
     this.boardSectionSubmitting = true;
     PinmonyRuntimeLog.info('BoardSectionTrace: submit start');
     try {
@@ -4822,9 +4825,9 @@ struct Index {
       }
       PinmonyRuntimeLog.info('BoardSectionTrace: submit confirmed=' + (result === 'created').toString());
       if (result === 'created') return '';
-      return result === 'unavailable' ? '当前图板不可创建区块，请关闭面板后重试' :
-        '创建结果未确认，请关闭后刷新核对，勿重复提交';
-    } catch (_) { return '创建结果未确认，请关闭后刷新核对，勿重复提交'; }
+      return result === 'unavailable' ? this.uiText("当前图板不可创建区块，请关闭面板后重试") :
+        this.uiText("创建结果未确认，请关闭后刷新核对，勿重复提交");
+    } catch (_) { return this.uiText("创建结果未确认，请关闭后刷新核对，勿重复提交"); }
     finally { this.boardSectionSubmitting = false; }
   }
 
@@ -4862,20 +4865,20 @@ struct Index {
       for (const uri of uris) {
         if (!this.isCurrentPublish(token, page)) return;
         const photo: PinmonyPublishPhoto = await readPublishPhoto(uri);
-        if(PIN_NATIVE_SHARE_PUBLISH_ENABLED){if(!this.publishNativeFlow.photo(token,page,photo))throw new Error('图片读取未完成');continue;}
+        if(PIN_NATIVE_SHARE_PUBLISH_ENABLED){if(!this.publishNativeFlow.photo(token,page,photo))throw new Error(this.uiText("图片读取未完成"));continue;}
         for (let offset: number = 0; offset < photo.data.length; offset += 60000) {
           if (!this.isCurrentPublish(token, page)) return;
           const chunk: string = photo.data.slice(offset, offset + 60000);
           const result: string = await this.runSessionScript('window.PinmonyPublishApi.photoChunk(' + token.toString() + ',' +
             JSON.stringify(chunk) + ',' + JSON.stringify(photo.uri) + ',' + (offset + 60000 >= photo.data.length).toString() + ')');
-          if (result !== 'true' && result !== '"true"') throw new Error('图片传输未完成');
+          if (result !== 'true' && result !== '"true"') throw new Error(this.uiText("图片传输未完成"));
         }
       }
     } catch (error) {
       if (this.isCurrentPublish(token, page)) {
         this.profileStore.publishPicking = false;
         this.closePublishFlow();
-        this.showMessage((error as Error).message || '图片选择未完成，请重试');
+        this.showMessage((error as Error).message || this.uiText("图片选择未完成，请重试"));
       }
     } finally { if (token === this.profileStore.publishFlowToken) this.profileStore.publishPicking = false; }
   }
@@ -5064,7 +5067,7 @@ struct Index {
           (this.pinStore.detail.kind === 'cached' || this.pinStore.detail.relatedRetained === true ||
             this.pinStore.detail.imageStageReady === true);
         if (!this.pinStore.detailActionsReady && !hasCachedPresentation) {
-          this.pinStore.detailApiError = '帖子加载超时，请重试';
+          this.pinStore.detailApiError = PinmonyI18n.message("帖子加载超时，请重试");
         }
       } else this.pinStore.detailOpeningPin = '';
     }, 12000);
@@ -5200,9 +5203,9 @@ struct Index {
     this.pinStore.detailOpeningPin = '';
     this.pinStore.detailPreparing = false;
     this.pinStore.detailActionsReady = false;
-    this.pinStore.detailApiError = '无法打开相关 Pin，请重试';
+    this.pinStore.detailApiError = PinmonyI18n.message("无法打开相关 Pin，请重试");
     this.pinStore.detailApiRetryable = true;
-    this.showMessage('无法打开相关 Pin，请重试');
+    this.showMessage(PinmonyI18n.message("无法打开相关 Pin，请重试"));
   }
 
   private isCurrentWebDocument(address: string): boolean {
@@ -5232,11 +5235,11 @@ struct Index {
         PinmonyRuntimeLog.info('PhotoDownload: dispatched');
       } else {
         PinmonyRuntimeLog.warn('PhotoDownload: blocked reason=invalid-media-url');
-        this.showMessage('当前图片暂时无法下载');
+        this.showMessage(PinmonyI18n.message("当前图片暂时无法下载"));
       }
     } catch (_) {
       PinmonyRuntimeLog.warn('PhotoDownload: failed reason=resolve-error');
-      this.showMessage('下载未能开始，请重试');
+      this.showMessage(PinmonyI18n.message("下载未能开始，请重试"));
     }
   }
 
@@ -5301,7 +5304,7 @@ struct Index {
       const selectedUri: string = await this.systemActions.pickImage();
       if (token !== this.pinStore.commentToken || this.activeSheetKind !== 'comments') return '';
       return selectedUri;
-    } catch (_) { this.showMessage('图片选择未完成'); return ''; }
+    } catch (_) { this.showMessage(PinmonyI18n.message("图片选择未完成")); return ''; }
   }
 
   private async writeComment(encoded: string): Promise<void> { await this.postPanelsController.writeComment(encoded); }
@@ -5396,7 +5399,7 @@ struct Index {
   }
 
   private showShareLinkSnack(): void {
-    if (this.pinStore.shareError !== '分享链接尚未就绪，请重试') return;
+    if (!PinmonyI18n.isText(this.pinStore.shareError, "分享链接尚未就绪，请重试")) return;
     const session: number = this.pinStore.shareSession;
     const pin: string = this.pinStore.sharePin;
     const key: string = session.toString() + ':' + pin + ':' + this.pinStore.shareError;
@@ -5404,9 +5407,9 @@ struct Index {
     this.pinStore.shareSnackKey = key;
     const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: this.pinStore.shareError }, {
-      operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: '重试',
-      contentAccessibilityText: '重新读取分享链接', closeButtonAccessibilityText: '关闭提示',
+    snack.show({}, { title: PinmonyI18n.render(this.pinStore.shareError, this.uiLanguage) }, {
+      operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("重试"),
+      contentAccessibilityText: this.uiText("重新读取分享链接"), closeButtonAccessibilityText: this.uiText("关闭提示"),
       onContentClick: () => {
         if (!this.isCurrentPostSnack(token) || session !== this.pinStore.shareSession || pin !== this.pinStore.sharePin ||
             this.activeSheetKind !== 'share' || !this.showNativeSheet) return;
@@ -5418,8 +5421,8 @@ struct Index {
   }
 
   private showShareFeedbackSnack(): void {
-    if (!this.pinStore.shareFeedback || this.pinStore.shareFeedback === '正在加载联系人…' ||
-        this.pinStore.shareFeedback === '正在处理…' || this.pinStore.shareFeedback === '没有可用的联系人') {
+    if (!this.pinStore.shareFeedback || PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…") ||
+        PinmonyI18n.isText(this.pinStore.shareFeedback, "正在处理…") || PinmonyI18n.isText(this.pinStore.shareFeedback, "没有可用的联系人")) {
       this.pinStore.shareFeedbackSnackKey = '';
       return;
     }
@@ -5428,9 +5431,9 @@ struct Index {
     this.pinStore.shareFeedbackSnackKey = key;
     const snack: HdsSnackBar = this.preparePostSnack(5000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: this.pinStore.shareFeedback }, {
+    snack.show({}, { title: PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage) }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
-      closeButtonAccessibilityText: '关闭提示',
+      closeButtonAccessibilityText: this.uiText("关闭提示"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
     }, { duration: 5000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
@@ -5439,9 +5442,9 @@ struct Index {
     PinmonyRuntimeLog.info('PinmonyReturn: undo snackbar shown');
     const snack: HdsSnackBar = this.preparePostSnack(8000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: message }, {
-      operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: '撤销',
-      contentAccessibilityText: '撤销本次操作', closeButtonAccessibilityText: '关闭提示',
+    snack.show({}, { title: PinmonyI18n.render(message, this.uiLanguage) }, {
+      operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("撤销"),
+      contentAccessibilityText: this.uiText("撤销本次操作"), closeButtonAccessibilityText: this.uiText("关闭提示"),
       onContentClick: () => {
         if (!this.isCurrentPostSnack(token) || !(this.pinStore.saveUndoPin === pin && this.postNativeOperations?.owns(pin)) && this.pinIdentity(pin) !== this.pinIdentity(this.currentPinUrl())) return;
         PinmonyRuntimeLog.info('PinmonyReturn: snackbar undo clicked');
@@ -5457,9 +5460,9 @@ struct Index {
     PinmonyRuntimeLog.info('PinmonyInbox: update hidden, undo snackbar shown');
     const snack: HdsSnackBar = this.preparePostSnack(8000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: '已删除更新' }, {
-      operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: '撤销',
-      contentAccessibilityText: '撤销删除更新', closeButtonAccessibilityText: '关闭提示',
+    snack.show({}, { title: this.uiText("已删除更新") }, {
+      operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("撤销"),
+      contentAccessibilityText: this.uiText("撤销删除更新"), closeButtonAccessibilityText: this.uiText("关闭提示"),
       onContentClick: () => {
         if(PIN_NATIVE_INBOX_UPDATES_ENABLED){if(this.isCurrentPostSnack(token)){this.dismissPostSnack();this.inboxMenuNative.undoNews(newsId).then((error: string | undefined): void => { if(error === undefined)return;this.inboxUpdatesNativeReads.demand();if(error)this.showMessage(error);else this.showInboxRestoredSnack(); });}return;}
         if (!this.isCurrentPostSnack(token) || !this.inboxStore.inboxFlow ||
@@ -5475,9 +5478,9 @@ struct Index {
   private showInboxRestoredSnack(): void {
     const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: '已撤销删除更新' }, {
+    snack.show({}, { title: this.uiText("已撤销删除更新") }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
-      closeButtonAccessibilityText: '关闭提示',
+      closeButtonAccessibilityText: this.uiText("关闭提示"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
     }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
@@ -5485,9 +5488,9 @@ struct Index {
   private showInboxUnsubscribedSnack(): void {
     const snack: HdsSnackBar = this.preparePostSnack(8000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: '你不会再收到有关此 Pin 图的通知。' }, {
+    snack.show({}, { title: this.uiText("你不会再收到有关此 Pin 图的通知。") }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
-      closeButtonAccessibilityText: '关闭提示',
+      closeButtonAccessibilityText: this.uiText("关闭提示"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
     }, { duration: 8000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
@@ -5500,8 +5503,8 @@ struct Index {
     try {
       const result: string = await this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.saveUndo(' +
         JSON.stringify(pin) + ',' + JSON.stringify(copyId) + ')');
-      if (result !== 'true' && result !== '"true"') this.showUndoSnack('撤销未完成，请重试', pin, () => this.undoSavedPin());
-    } catch (_) { this.showUndoSnack('撤销失败，请重试', pin, () => this.undoSavedPin()); }
+      if (result !== 'true' && result !== '"true"') this.showUndoSnack(this.uiText("撤销未完成，请重试"), pin, () => this.undoSavedPin());
+    } catch (_) { this.showUndoSnack(this.uiText("撤销失败，请重试"), pin, () => this.undoSavedPin()); }
   }
 
   private async undoMoreFeedback(): Promise<void> {
@@ -5514,11 +5517,11 @@ struct Index {
         JSON.stringify(pin) + ',' + this.pinStore.feedbackUndoSession.toString() + ')');
       if (result !== 'true' && result !== '"true"') {
         this.pinStore.feedbackUndoBusy = false;
-        this.showUndoSnack('撤销未完成，请重试', pin, () => this.undoMoreFeedback());
+        this.showUndoSnack(this.uiText("撤销未完成，请重试"), pin, () => this.undoMoreFeedback());
       }
     } catch (_) {
       this.pinStore.feedbackUndoBusy = false;
-      this.showUndoSnack('撤销失败，请重试', pin, () => this.undoMoreFeedback());
+      this.showUndoSnack(this.uiText("撤销失败，请重试"), pin, () => this.undoMoreFeedback());
     }
   }
 
@@ -5544,7 +5547,7 @@ struct Index {
         if (targetPinUrl && this.pinStore.detailOpeningPin === targetPinUrl) {
           this.loadSessionDocument(targetPinUrl);
         } else {
-          this.showMessage('无法打开相关 Pin');
+          this.showMessage(PinmonyI18n.message("无法打开相关 Pin"));
         }
       }
     } catch (error) {
@@ -5553,10 +5556,10 @@ struct Index {
           this.loadSessionDocument(targetPinUrl);
         } catch (_) {
           this.pinStore.detailOpeningPin = '';
-          this.showMessage('无法打开相关 Pin');
+          this.showMessage(PinmonyI18n.message("无法打开相关 Pin"));
         }
       } else {
-        this.showMessage('无法打开相关 Pin');
+        this.showMessage(PinmonyI18n.message("无法打开相关 Pin"));
       }
     }
   }
@@ -5622,7 +5625,7 @@ struct Index {
     this.runSessionScript('window.PinmonyDetailApiRetry && window.PinmonyDetailApiRetry(' +
       this.pinStore.detailSession.toString() + ',' + JSON.stringify(this.pinStore.detailPin) + ',' + restart.toString() + ');' +
       'window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()')
-      .catch(() => { this.pinStore.detailApiError = '帖子接口不可用，请重新进入'; });
+      .catch(() => { this.pinStore.detailApiError = PinmonyI18n.message("帖子接口不可用，请重新进入"); });
   }
 
   private async returnFromDetailWebFlow(): Promise<void> {
@@ -5664,7 +5667,7 @@ struct Index {
     const url: string = this.extractPinUrl(targetUrl) || this.extractPinUrl(pinUrl) ||
       this.pinStore.sharePin || this.currentPinUrl();
     if (!url) {
-      this.showMessage('无法获取这张 Pin 的链接');
+      this.showMessage(PinmonyI18n.message("无法获取这张 Pin 的链接"));
       return;
     }
     this.sharePinUrl(url);
@@ -5715,7 +5718,7 @@ struct Index {
       PinmonyRuntimeLog.info('SystemShareTrace: phase=present-returned');
     } catch (error) {
       PinmonyRuntimeLog.error('Pinmony: system share failed');
-      this.showMessage('分享面板打开失败');
+      this.showMessage(PinmonyI18n.message("分享面板打开失败"));
     }
   }
 
@@ -5746,7 +5749,7 @@ struct Index {
     const business: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
     if(!business.authenticated || !business.accountId)return;
     const account: string = business.accountId + ':' + business.generation.toString() + ':' + business.origin;
-    if(this.logoutUnknownAccount === account){this.settingsStore.error = '退出结果未确认，请等待会话核对；不会重复提交';return;}
+    if(this.logoutUnknownAccount === account){this.settingsStore.error = PinmonyI18n.message("退出结果未确认，请等待会话核对；不会重复提交");return;}
     const context: PinmonyNetworkContext = {authenticated:true,epoch:business.generation,page:business.origin + '/',userAgent:business.userAgent};
     const origin: RegExpMatchArray | null = context.page.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
     if (!origin) return;
@@ -5766,7 +5769,7 @@ struct Index {
           this.nativeBusinessSessionContext().generation !== business.generation || this.nativeBusinessSessionContext().accountId !== business.accountId) return;
       if (reply.error || !logoutResponseSucceeded(reply.status, reply.body)) {
         if(['request-unavailable','background'].includes(reply.error))this.logoutUnknownAccount = '';
-        this.settingsStore.error = this.logoutUnknownAccount ? '退出结果未确认，请等待会话核对；不会重复提交' : '退出未发送，请重试';
+        this.settingsStore.error = this.logoutUnknownAccount ? this.uiText("退出结果未确认，请等待会话核对；不会重复提交") : this.uiText("退出未发送，请重试");
         PinmonyRuntimeLog.warn('SessionLogout: result not confirmed');
         return;
       }
@@ -5785,8 +5788,8 @@ struct Index {
     } catch (_) {
       if (this.authStatus === 'unauthenticated') {
         this.authStatus = 'error';
-        this.failureDetails = '已退出，登录页面暂时无法加载，请重试';
-      } else if (token === this.settingsStore.token) this.settingsStore.error = '退出结果未确认，请稍后重试';
+        this.failureDetails = PinmonyI18n.message("已退出，登录页面暂时无法加载，请重试");
+      } else if (token === this.settingsStore.token) this.settingsStore.error = PinmonyI18n.message("退出结果未确认，请稍后重试");
       PinmonyRuntimeLog.warn('SessionLogout: operation unavailable');
     } finally {
       if (token === this.settingsStore.token) this.settingsStore.busy = false;
@@ -5829,10 +5832,10 @@ struct Index {
   }
 
   private nativeModalLabel(): string {
-    return this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? '添加至图板区块' : '添加 Pin 图或图板区块') : this.profileStore.publishTitle || '添加到个人资料') :
-        this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? '创建图板' : '收藏至图板') : '编辑 Pin 图') : this.activeSheetKind === 'comments' ? '你觉得怎么样？' : this.activeSheetKind === 'save' ?
-          (this.pinStore.saveCreating ? '创建图板' : '收藏至图板') : this.activeSheetKind === 'more' ? '选项' :
-          this.activeSheetKind === 'searchFilter' ? '筛选器' : this.pinStore.shareTitle;
+    return this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? this.uiText("添加至图板区块") : this.uiText("添加 Pin 图或图板区块")) : PinmonyI18n.render(this.profileStore.publishTitle, this.uiLanguage) || this.uiText("添加到个人资料")) :
+        this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? this.uiText("创建图板") : this.uiText("收藏至图板")) : this.uiText("编辑 Pin 图")) : this.activeSheetKind === 'comments' ? this.uiText("你觉得怎么样？") : this.activeSheetKind === 'save' ?
+          (this.pinStore.saveCreating ? this.uiText("创建图板") : this.uiText("收藏至图板")) : this.activeSheetKind === 'more' ? this.uiText("选项") :
+          this.activeSheetKind === 'searchFilter' ? this.uiText("筛选器") : PinmonyI18n.render(this.pinStore.shareTitle, this.uiLanguage);
   }
 
   private closeNativeModal(): void {
@@ -5858,10 +5861,10 @@ struct Index {
       if (this.homeStore.inboxMenuPending) {
         Column({ space: 12 }) {
           if (this.homeStore.customHomeMenu.error) {
-            Text(this.homeStore.customHomeMenu.error).fontColor($r('app.color.secondary_text'))
+            Text(PinmonyI18n.render(this.homeStore.customHomeMenu.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
           } else {
             LoadingProgress().width(28).height(28)
-            Text('正在加载…').fontColor($r('app.color.secondary_text'))
+            Text(this.uiText("正在加载…")).fontColor($r('app.color.secondary_text'))
           }
         }.width('100%').padding(24)
       } else {
@@ -6035,9 +6038,9 @@ struct Index {
   private showInboxBlockSnack(blocked: boolean, userName: string): void {
     const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: blocked ? '已屏蔽 ' + userName : '已取消屏蔽 ' + userName }, {
+    snack.show({}, { title: blocked ? this.uiText("已屏蔽 ") + userName : this.uiText("已取消屏蔽 ") + userName }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
-      closeButtonAccessibilityText: '关闭提示',
+      closeButtonAccessibilityText: this.uiText("关闭提示"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
     }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
@@ -6079,8 +6082,8 @@ struct Index {
   @Builder
   private buildRootStatus(index: number) {
     if (!(index === 1 && this.shouldKeepSearchRootMounted() && this.nativeSearchPageVisible()) && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.extractPinUrl(this.nativeDisplayAddress())) {
-            PinmonyStatusPage({ title: ['主页', '搜索', '收件箱', '我的'][index],
-              message: this.rootStatusError(index) || (this.loadFailed ? this.failureDetails : '正在加载内容…'),
+            PinmonyStatusPage({ title: [this.uiText("主页"), this.uiText("搜索"), this.uiText("收件箱"), this.uiText("我的")][index],
+              message: this.rootStatusError(index) || (this.loadFailed ? this.failureDetails : this.uiText("正在加载内容…")),
               loading: this.rootStatusLoading(index),
               showBack: !this.nativeRootTabsVisible(),
               onRetry: () => this.requestRootPage(index), onBack: () => this.backOnePage(),
@@ -6093,16 +6096,16 @@ struct Index {
   private buildRootError(index: number) {
           if (this.loadFailed) {
             Column({ space: 16 }) {
-              Text(['主页', '搜索', '收件箱', '我的'][index] + '加载失败')
+              Text([this.uiText("主页"), this.uiText("搜索"), this.uiText("收件箱"), this.uiText("我的")][index] + this.uiText("加载失败"))
                 .fontSize(16)
                 .fontColor($r('app.color.primary_text'))
-              Text(this.failureDetails)
+              Text(PinmonyI18n.render(this.failureDetails, this.uiLanguage))
                 .fontSize(12)
                 .fontColor($r('app.color.secondary_text'))
                 .textAlign(TextAlign.Center)
                 .maxLines(3)
                 .margin({ left: 24, right: 24 })
-              Button($r('app.string.retry'))
+              Button(this.uiText("重试"))
                 .onClick(() => {
                   this.reload();
                 })
@@ -6126,7 +6129,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(0, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab('主页', $r('sys.symbol.house'), 0))
+      }.tabBar(this.buildNativeTab(this.uiText("主页"), $r('sys.symbol.house'), 0))
       TabContent() {
         Stack() {
           this.buildRootStatus(1)
@@ -6136,7 +6139,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(1, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab('搜索', $r('sys.symbol.magnifyingglass'), 1))
+      }.tabBar(this.buildNativeTab(this.uiText("搜索"), $r('sys.symbol.magnifyingglass'), 1))
       TabContent() {
         Stack() {
           this.buildRootStatus(2)
@@ -6146,7 +6149,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(2, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab('收件箱', $r('sys.symbol.ellipsis_bubble'), 2))
+      }.tabBar(this.buildNativeTab(this.uiText("收件箱"), $r('sys.symbol.ellipsis_bubble'), 2))
       TabContent() {
         Stack() {
           this.buildRootStatus(3)
@@ -6156,7 +6159,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(3, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab('我的', $r('sys.symbol.person'), 3))
+      }.tabBar(this.buildNativeTab(this.uiText("我的"), $r('sys.symbol.person'), 3))
     }
             .width('100%')
             .height('100%')
@@ -6198,7 +6201,7 @@ struct Index {
     Row({ space: 8 }) {
       Text('!').fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.detail_on_accent'))
-      Text(this.networkNotice).fontSize(14).fontColor($r('app.color.detail_on_accent'))
+      Text(PinmonyI18n.render(this.networkNotice, this.uiLanguage)).fontSize(14).fontColor($r('app.color.detail_on_accent'))
         .maxLines(2).layoutWeight(1)
     }
     .width('calc(100% - 32vp)')
@@ -6207,7 +6210,7 @@ struct Index {
     .borderRadius(10)
     .margin({ bottom: 18 })
     .visibility(this.networkNotice.length > 0 ? Visibility.Visible : Visibility.None)
-    .accessibilityText(this.networkNotice)
+    .accessibilityText(PinmonyI18n.render(this.networkNotice, this.uiLanguage))
   }
 
   build() {
@@ -6300,8 +6303,8 @@ struct Index {
               this.activeTab === 2 && !!this.inboxStore.retainedChat)) {
             PinmonyInboxFlowPage({ onUser: (url: string) => this.openUserProfile(url), snapshot: this.inboxStore.inboxFlow,
               onCopyText: async (text: string): Promise<boolean> => {
-                try { await this.systemActions.copyText(text); this.showMessage('已复制'); return true; }
-                catch (_) { this.showMessage('复制失败，请重试'); return false; }
+                try { await this.systemActions.copyText(text); this.showMessage(PinmonyI18n.message("已复制")); return true; }
+                catch (_) { this.showMessage(PinmonyI18n.message("复制失败，请重试")); return false; }
               },
               onBoard: (messageId: string) => this.openInboxBoard(messageId),
               active: !this.pinStore.detail && !this.pinStore.detailOpeningPin && this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl(),
@@ -6329,7 +6332,7 @@ struct Index {
                 this.inboxStore.chatReturnConversation = this.inboxStore.inboxFlow?.conversationId || '';
                 this.beginDetailOpening(target, this.currentInboxUrl());
                 try { if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(target); }
-                catch (_) { this.pinStore.detailOpeningPin = ''; this.showMessage('无法打开 Pin 图，请重试'); }
+                catch (_) { this.pinStore.detailOpeningPin = ''; this.showMessage(PinmonyI18n.message("无法打开 Pin 图，请重试")); }
               },
               onAction: (action: string, value: string) => this.inboxFlowAction(action, value) })
               .width(this.inboxStore.inboxFlow.screen === 'updatesMenu' ? 1 : '100%')
@@ -6480,14 +6483,14 @@ struct Index {
               if (this.pinStore.detailOpeningPin && !this.pinStore.detail && !this.pinStore.detailWebFlow && !this.loadFailed) {
                 Column({ space: 16 }) {
                   if (this.pinStore.detailApiError) {
-                    Text(this.pinStore.detailApiError).fontSize(14).fontColor($r('app.color.secondary_text'))
+                    Text(PinmonyI18n.render(this.pinStore.detailApiError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
                     if (this.pinStore.detailApiRetryable) {
-                      Button('重试').onClick(() => this.retryDetailApi())
+                      Button(this.uiText("重试")).onClick(() => this.retryDetailApi())
                     }
-                    Button('返回').onClick(() => this.backFromDetail())
+                    Button(this.uiText("返回")).onClick(() => this.backFromDetail())
                   } else {
                     LoadingProgress().width(36).height(36).color($r('app.color.accent'))
-                    Text('正在加载帖子…').fontSize(14).fontColor($r('app.color.secondary_text'))
+                    Text(this.uiText("正在加载帖子…")).fontSize(14).fontColor($r('app.color.secondary_text'))
                   }
                 }
                 .justifyContent(FlexAlign.Center)
@@ -6503,10 +6506,10 @@ struct Index {
           if (this.homeStore.pendingHomeMorePin && !this.loadFailed) {
             Column({ space: 16 }) {
               LoadingProgress().width(36).height(36).color($r('app.color.accent'))
-              Text('正在读取 Pin 选项…')
+              Text(this.uiText("正在读取 Pin 选项…"))
                 .fontSize(14)
                 .fontColor($r('app.color.secondary_text'))
-              Button('返回').onClick(() => {
+              Button(this.uiText("返回")).onClick(() => {
                 this.cancelHomeDetailMore();
                 this.backFromDetail();
               })
@@ -6521,13 +6524,13 @@ struct Index {
           this.buildOfflinePreviewContent()
         } else if (!this.authWebVisible()) {
           PinmonyStatusPage({
-            title: this.offlineCacheLoading ? '正在读取最近缓存…' :
-              this.authStatus === 'error' ? '当前会话加载失败' : '正在读取已有会话…',
+            title: this.offlineCacheLoading ? this.uiText("正在读取最近缓存…") :
+              this.authStatus === 'error' ? this.uiText("当前会话加载失败") : this.uiText("正在读取已有会话…"),
             message: this.offlineCacheLoading ? '' : this.authStatus === 'error' ? this.failureDetails : '',
             loading: this.offlineCacheLoading || this.authStatus !== 'error', onRetry: () => this.retryLogin(),
           })
           if(this.nativeLoginEnabled && this.authStatus === 'error') {
-            Button('前往登录').onClick(() => this.openNativeLogin()).margin({bottom:80})
+            Button(this.uiText("前往登录")).onClick(() => this.openNativeLogin()).margin({bottom:80})
           }
         }
         if (this.authStatus !== 'authenticated') { this.networkNoticeView() }

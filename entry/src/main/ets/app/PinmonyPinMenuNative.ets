@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, MoreSheetOption, PIN_EDIT_API_ENABLED, PIN_POST_API_ENABLED } from 'feature_pin';
 import { PinmonyHomeMenuState } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -76,7 +77,7 @@ export class PinmonyPinMenuNative {
       state.actions = [{id:'home-save',label:'收藏',enabled:true},{id:'home-download',label:'下载图片',enabled:!!this.image()},
         {id:'home-see-more',label:'查看更多',enabled:this.enabled('more')},{id:'home-see-less',label:'查看更少',enabled:this.enabled('less')}];
       if(this.canOpenEdit())state.actions.unshift({id:'home-edit',label:'编辑 Pin 图',enabled:true});
-    } catch (_) {state.error = '无法读取帖子操作，请重试';}
+    } catch (_) {state.error = PinmonyI18n.message('无法读取帖子操作，请重试');}
     return state;
   }
   private option(id: string,label: string,enabled: boolean = true): MoreSheetOption {return {id:id,label:label,enabled:enabled,subtitle:'',icon:'',group:0};}
@@ -91,7 +92,7 @@ export class PinmonyPinMenuNative {
       options.push(this.option('detail-see-more','查看更多',this.enabled('more')),this.option('detail-see-less','减少推荐',this.enabled('less')),this.option('detail-share','系统分享'));
       if(this.raw?.ai_disclosures?.includes(1) || this.raw?.gen_ai_topics?.some((t: Topic): boolean => typeof t.name === 'string' && !!t.name.trim()))options.push(this.option('detail-ai-help','详细了解 AI 标签'));
       this.store.moreOptions = options;
-    } catch (_) {if(this.current(revision))this.store.moreError = '无法读取接口选项，请重试';}
+    } catch (_) {if(this.current(revision))this.store.moreError = PinmonyI18n.message('无法读取接口选项，请重试');}
     finally {if(this.current(revision))this.store.moreLoading = false;}
   }
   async action(id: string): Promise<void> {
@@ -129,7 +130,7 @@ export class PinmonyPinMenuNative {
     } catch (error) {
       const retry: boolean = error instanceof PinMenuNotSent || error instanceof PinMenuRejected;
       if(retry && this.key() === this.account)this.submitted.delete(pin + ':' + action);
-      if(this.current(revision)){const message: string = retry ? '反馈未提交成功，请重试' : '反馈结果未确认，请刷新核对；不会重复提交';this.store.moreError = message;this.ports.message(message);}
+      if(this.current(revision)){const message: string = retry ? '反馈未提交成功，请重试' : PinmonyI18n.message('反馈结果未确认，请刷新核对；不会重复提交');this.store.moreError = message;this.ports.message(message);}
     }
     finally {if(revision === this.revision)this.busy = false;}
   }
@@ -143,7 +144,7 @@ export class PinmonyPinMenuNative {
     try {const r: Resource = await this.request({url:'/v3/pin/' + this.id() + '/feedback/see_more/undo/',data:data},revision,true);
       if(r.code !== 0 || r.endpoint_name !== 'v3_pin_see_more_undo_user_feedback' || r.data?.id !== this.id())throw new Error('unconfirmed');
       if(revision !== this.revision || state.account !== this.key())return;
-      this.submitted.delete(lock);this.undo = undefined;this.store.feedbackUndoPin = '';this.ports.message('已撤销查看更多反馈');
+      this.submitted.delete(lock);this.undo = undefined;this.store.feedbackUndoPin = '';this.ports.message(PinmonyI18n.message('已撤销查看更多反馈'));
     } catch (error) {
       const retry: boolean = error instanceof PinMenuNotSent || error instanceof PinMenuRejected;
       if(retry && state.account === this.key())this.submitted.delete(lock);

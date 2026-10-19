@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { media } from '@kit.MediaKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { audio } from '@kit.AudioKit';
@@ -185,10 +186,10 @@ export class PinmonyVideoPlayback {
     this.record('event=failed stage=' + stage + ' candidate=' + this.sourceIndex.toString() + ' code=' + errorCode.toString() +
       ' reason=' + (timedOut ? 'timeout' : 'error') + ' elapsedMs=' + Math.max(0, Date.now() - this.candidateStarted).toString());
     const certificateFailure: boolean = errorCode === 1007900060 || errorCode === 2300060;
-    const reason: string = certificateFailure ? '服务器证书校验失败' : stage === 'download' ? '文件读取失败' :
-      timedOut ? (stage === 'prepare' ? '准备超时' : stage === 'first-frame' ? '画面加载超时' : '初始化超时') :
-      errorCode === 5400103 ? '媒体读取失败' : errorCode === 5400106 ? '格式不支持' :
-      errorCode >= 5411008 && errorCode <= 5411010 ? '安全连接失败' : '播放失败';
+    const reason: string = certificateFailure ? PinmonyI18n.message('服务器证书校验失败') : stage === 'download' ? PinmonyI18n.message('文件读取失败') :
+      timedOut ? (stage === 'prepare' ? '准备超时' : stage === 'first-frame' ? PinmonyI18n.message('画面加载超时') : PinmonyI18n.message('初始化超时')) :
+      errorCode === 5400103 ? PinmonyI18n.message('媒体读取失败') : errorCode === 5400106 ? PinmonyI18n.message('格式不支持') :
+      errorCode >= 5411008 && errorCode <= 5411010 ? PinmonyI18n.message('安全连接失败') : '播放失败';
     this.candidateFailures.push(kind + '：' + reason + (errorCode ? '（' + errorCode.toString() + '）' : ''));
     this.state.failureSummary = this.candidateFailures.slice(-4).join('；');
     this.failedGeneration = token; this.clearTimer(); this.clearErrorTimer();
@@ -204,15 +205,15 @@ export class PinmonyVideoPlayback {
       this.open(this.sourceIndex + 1); return;
     }
     this.state.phase = 'error'; this.state.buffering = false; this.state.rendered = false;
-    this.state.error = certificateFailure ? '视频服务器证书校验失败，请检查设备时间及网络或代理的证书配置后重试' : stage === 'download' ? (errorCode === 1007900035 ?
-      '视频安全连接失败，请检查网络或代理后重试' : '视频文件读取失败，请检查网络或代理后重试') :
-      errorCode === 5400106 ? '当前视频格式不受支持，请重新读取视频地址' :
-      errorCode >= 5411008 && errorCode <= 5411010 ? '视频安全连接失败，请检查网络或代理后重试' :
-      errorCode >= 5411001 && errorCode <= 5411007 ? '视频网络请求失败，请检查连接后重试' :
-      errorCode === 5400103 ? '视频媒体读取失败，请检查网络或代理后重试' :
-      timedOut || errorCode === 5400104 ? (stage === 'prepare' ? '视频准备超时，请重试播放' :
-        stage === 'first-frame' ? '视频画面加载超时，请重试播放' : '播放器初始化超时，请重试播放') :
-        '视频播放失败，请重试或重新读取地址';
+    this.state.error = certificateFailure ? PinmonyI18n.message('视频服务器证书校验失败，请检查设备时间及网络或代理的证书配置后重试') : stage === 'download' ? (errorCode === 1007900035 ?
+      PinmonyI18n.message('视频安全连接失败，请检查网络或代理后重试') : PinmonyI18n.message('视频文件读取失败，请检查网络或代理后重试')) :
+      errorCode === 5400106 ? PinmonyI18n.message('当前视频格式不受支持，请重新读取视频地址') :
+      errorCode >= 5411008 && errorCode <= 5411010 ? PinmonyI18n.message('视频安全连接失败，请检查网络或代理后重试') :
+      errorCode >= 5411001 && errorCode <= 5411007 ? PinmonyI18n.message('视频网络请求失败，请检查连接后重试') :
+      errorCode === 5400103 ? PinmonyI18n.message('视频媒体读取失败，请检查网络或代理后重试') :
+      timedOut || errorCode === 5400104 ? (stage === 'prepare' ? PinmonyI18n.message('视频准备超时，请重试播放') :
+        stage === 'first-frame' ? PinmonyI18n.message('视频画面加载超时，请重试播放') : PinmonyI18n.message('播放器初始化超时，请重试播放')) :
+        PinmonyI18n.message('视频播放失败，请重试或重新读取地址');
     this.wanted = false;
     this.record('event=candidates-exhausted count=' + this.candidateFailures.length.toString());
     this.generation++;

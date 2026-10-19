@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyInboxStore } from '../stores/PinmonyInboxStore';
 import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
@@ -56,7 +57,7 @@ export class PinmonyBoardInvitationController {
       await this.ports.runScript(this.ports.script() + 'window.PinmonyBoardInvitations.open(' + token.toString() + ',' +
         JSON.stringify(preview ? this.store.boardInvitationPreview : null) + ',' + JSON.stringify(this.ports.username()) + ')');
       if (this.current(token, page, generation)) this.poll(token, preview);
-    } catch (_) { if (this.current(token, page, generation)) this.fail(preview, '图板邀请读取失败'); }
+    } catch (_) { if (this.current(token, page, generation)) this.fail(preview, PinmonyI18n.message('图板邀请读取失败')); }
   }
   resume(): void {
     if(this.ports.nativeEnabled?.()){if(this.store.invitationReadPage === this.ports.page())this.ports.nativeOpen?.(!!this.store.boardInvitationPreview);return;}
@@ -70,7 +71,7 @@ export class PinmonyBoardInvitationController {
       (item.status === 'new' || item.status === 'accepted');
   }
   private fail(preview: boolean, error: string): void {
-    if (preview) { this.store.invitationBusy = true; this.ports.feedback(error + '，请重新预览'); }
+    if (preview) { this.store.invitationBusy = true; this.ports.feedback(error + PinmonyI18n.message('，请重新预览')); }
     else if (this.store.boardInvitations) {
       const state: PinmonyBoardInvitations = this.store.boardInvitations;
       this.store.boardInvitations = { token: state.token, page: state.page, loading: false, busy: state.busy,
@@ -89,13 +90,13 @@ export class PinmonyBoardInvitationController {
         if (!state || state.token !== token || state.page !== page || typeof state.loading !== 'boolean' || typeof state.busy !== 'boolean' ||
             typeof state.uncertain !== 'boolean' || typeof state.error !== 'string' || typeof state.feedback !== 'string' ||
             !Array.isArray(state.items) || state.items.length > 100 || !state.items.every((item: PinmonyBoardInvitation): boolean => this.validItem(item))) {
-          this.fail(preview, '邀请状态读取失败'); return;
+          this.fail(preview, PinmonyI18n.message('邀请状态读取失败')); return;
         }
         if (preview) {
           const item: PinmonyBoardInvitation | undefined = state.items[0];
           const expected: PinmonyBoardInvitation | undefined = this.store.boardInvitationPreview;
           if (!item || !expected || item.boardId !== expected.boardId || item.boardUrl !== expected.boardUrl || item.invitedUser !== expected.invitedUser) {
-            this.fail(true, '邀请状态不匹配'); return;
+            this.fail(true, PinmonyI18n.message('邀请状态不匹配')); return;
           }
           this.store.invitationBusy = state.loading || state.busy || state.uncertain || !!state.error;
           if (item.status === 'accepted' && expected.status !== 'accepted') {
@@ -106,7 +107,7 @@ export class PinmonyBoardInvitationController {
           if (state.error) { this.ports.feedback(state.error); return; }
         } else this.store.boardInvitations = state;
         if (state.loading || state.busy) this.tasks.timeout((): void => this.poll(token, preview), 250);
-      }).catch((): void => { if (this.current(token, page, generation)) this.fail(preview, '邀请状态读取失败'); })
+      }).catch((): void => { if (this.current(token, page, generation)) this.fail(preview, PinmonyI18n.message('邀请状态读取失败')); })
       .finally((): void => { if (generation === this.generation) this.reading = false; });
   }
   accept(): void {
@@ -119,6 +120,6 @@ export class PinmonyBoardInvitationController {
     this.store.invitationBusy = true;
     this.ports.runScript('window.PinmonyBoardInvitations && window.PinmonyBoardInvitations.accept(' + token.toString() + ')')
       .then((): void => { if (this.current(token, page, generation)) this.poll(token, true); })
-      .catch((): void => { if (this.current(token, page, generation)) this.fail(true, '接受邀请结果未确认'); });
+      .catch((): void => { if (this.current(token, page, generation)) this.fail(true, PinmonyI18n.message('接受邀请结果未确认')); });
   }
 }

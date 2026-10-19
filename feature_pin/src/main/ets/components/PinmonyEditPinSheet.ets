@@ -1,8 +1,11 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyEditPinResult } from '../models/PinmonyEditPin';
 import { PinmonySaveSheet } from './PinmonySaveSheet';
 
 @Component
 export struct PinmonyEditPinSheet {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncDraft') result: PinmonyEditPinResult;
   @State private draftTitle: string = '';
   @State private draftDescription: string = '';
@@ -45,18 +48,18 @@ export struct PinmonyEditPinSheet {
             Column({ space: 20 }) {
               if (this.result.loading || this.result.busy) { LoadingProgress().width(28).height(28) }
               if (this.result.error) {
-                Text(this.result.error).fontColor($r('app.color.secondary_text'))
-                Button('重新读取').enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
+                Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
+                Button(this.uiText("重新读取")).enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
               }
               if (!this.result.loading && !this.result.error) {
           Image(this.result.imageUrl).width(110).height(110).objectFit(ImageFit.Cover)
-            .borderRadius(14).alignSelf(ItemAlign.Start).accessibilityText('当前收藏的 Pin 图')
+            .borderRadius(14).alignSelf(ItemAlign.Start).accessibilityText(this.uiText("当前收藏的 Pin 图"))
           if (this.result.editableContent) Column({ space: 8 }) {
-            Text('Pin 图标题').fontSize(14).fontColor($r('app.color.primary_text')).width('100%')
+            Text(this.uiText("Pin 图标题")).fontSize(14).fontColor($r('app.color.primary_text')).width('100%')
             TextInput({ text: this.draftTitle }).width('100%').height(52).fontSize(16)
               .fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.page_background'))
               .border({ width: 1, color: $r('app.color.secondary_text'), radius: 16 })
-              .maxLength(10000).accessibilityText('Pin 图标题')
+              .maxLength(10000).accessibilityText(this.uiText("Pin 图标题"))
               .enabled(!this.result.busy && !this.result.uncertain && this.result.phase === 'edit')
               .onChange((value: string) => {
                 this.draftTitle = value;
@@ -64,18 +67,18 @@ export struct PinmonyEditPinSheet {
               })
           }.width('100%')
           if (this.result.editableContent) Column({ space: 8 }) {
-            Text('描述').fontSize(14).fontColor($r('app.color.primary_text')).width('100%')
+            Text(this.uiText("描述")).fontSize(14).fontColor($r('app.color.primary_text')).width('100%')
             TextArea({ text: this.draftDescription }).width('100%').height(76).fontSize(16)
               .fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.page_background'))
               .border({ width: 1, color: $r('app.color.secondary_text'), radius: 16 })
-              .maxLength(10000).accessibilityText('Pin 图描述')
+              .maxLength(10000).accessibilityText(this.uiText("Pin 图描述"))
               .enabled(!this.result.busy && !this.result.uncertain && this.result.phase === 'edit')
               .onChange((value: string) => {
                 this.draftDescription = value;
                 this.act('editText', ',"description",' + JSON.stringify(value));
               })
           }.width('100%')
-          Text('图板').fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+          Text(this.uiText("图板")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
           Button({ type: ButtonType.Normal }) {
             Row({ space: 12 }) {
               if (this.result.board.imageUrl) {
@@ -91,18 +94,18 @@ export struct PinmonyEditPinSheet {
             Toggle({ type: ToggleType.Switch, isOn: this.result.ai }).enabled(!this.result.busy && this.result.phase === 'edit')
               .onChange((value: boolean) => { if (value !== this.result.ai) this.act('editAi', ',' + value.toString()); })
             Column({ space: 8 }) {
-              Text('标记为 AI 修改').fontSize(17).fontWeight(FontWeight.Bold)
+              Text(this.uiText("标记为 AI 修改")).fontSize(17).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text')).width('100%')
-              Text('完全或部分由 AI 制作的内容').fontSize(14)
+              Text(this.uiText("完全或部分由 AI 制作的内容")).fontSize(14)
                 .fontColor($r('app.color.secondary_text')).width('100%')
             }.layoutWeight(1)
           }.width('100%')
-          Text('操作').fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+          Text(this.uiText("操作")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
           Button({ type: ButtonType.Normal }) {
             Column({ space: 8 }) {
-              Text('删除 Pin 图').fontSize(18).fontWeight(FontWeight.Bold)
+              Text(this.uiText("删除 Pin 图")).fontSize(18).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text')).width('100%')
-              Text('从你的图板移除此 Pin 图').fontSize(14)
+              Text(this.uiText("从你的图板移除此 Pin 图")).fontSize(14)
                 .fontColor($r('app.color.secondary_text')).width('100%')
             }.width('100%')
           }.padding(0).backgroundColor(Color.Transparent).enabled(!this.result.busy && this.result.phase === 'edit')
@@ -111,7 +114,7 @@ export struct PinmonyEditPinSheet {
               }
             }.width('100%').padding({ right: 28 })
           }.width('100%').layoutWeight(1).clip(true)
-          Button('完成').width('100%').height(48)
+          Button(this.uiText("完成")).width('100%').height(48)
             .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent'))
             .enabled(this.result.phase === 'edit' && !this.result.loading && !this.result.busy &&
               !this.result.error && !this.result.uncertain && !this.result.picker.busy)
@@ -124,13 +127,13 @@ export struct PinmonyEditPinSheet {
         }
           if (this.result.phase === 'confirm' && !this.result.error) {
             Column({ space: 16 }) {
-              Text('确定删除 Pin 图？').fontSize(20).fontWeight(FontWeight.Bold)
+              Text(this.uiText("确定删除 Pin 图？")).fontSize(20).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text')).width('100%')
-              Text('你将无法恢复此操作。').fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
-              Button('删除').width('100%').backgroundColor($r('app.color.surface_muted'))
+              Text(this.uiText("你将无法恢复此操作。")).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
+              Button(this.uiText("删除")).width('100%').backgroundColor($r('app.color.surface_muted'))
                 .fontColor($r('app.color.primary_text')).enabled(!this.result.busy)
                 .onClick(() => this.act('editCommit', ',true'))
-              Button('取消').width('100%').backgroundColor($r('app.color.detail_accent'))
+              Button(this.uiText("取消")).width('100%').backgroundColor($r('app.color.detail_accent'))
                 .fontColor($r('app.color.detail_on_accent')).enabled(!this.result.busy)
                 .onClick(() => this.act('editPhase', ',"edit"'))
             }.padding(20).borderRadius(24).backgroundColor($r('app.color.input_surface'))

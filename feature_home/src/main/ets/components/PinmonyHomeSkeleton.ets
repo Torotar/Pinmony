@@ -1,5 +1,8 @@
+import { PinmonyI18n } from 'common_foundation';
 @Component
 export struct PinmonyHomeSkeleton {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop showCategories: boolean = true;
 
   @Builder
@@ -40,14 +43,14 @@ export struct PinmonyHomeSkeleton {
       }
       Row({ space: 8 }) {
         LoadingProgress().width(20).height(20).color($r('app.color.accent'))
-        Text('正在加载首页内容…')
+        Text(this.uiText("正在加载首页内容…"))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
           .layoutWeight(1)
       }
       .width('100%')
       .padding({ left: 16, right: 16 })
-      .accessibilityText('正在加载首页内容')
+      .accessibilityText(this.uiText("正在加载首页内容"))
       Row({ space: 12 }) {
         Column({ space: 18 }) {
           this.card(200)

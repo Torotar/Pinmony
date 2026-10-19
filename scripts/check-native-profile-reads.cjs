@@ -1,5 +1,6 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const {PinmonyProfileCache:Cache}=load('feature_profile/src/main/ets/services/PinmonyProfileCache.ets');
 const {PinmonyProfileNativeReads:Reader}=load('entry/src/main/ets/app/PinmonyProfileNativeReads.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
@@ -65,7 +66,7 @@ while(timers.length)timers.shift()();assert.equal(f.store.profile.organize.phase
 
 // Execute the actual Index read entrypoints while hidden Web stays on home.
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\(')),end=index.indexOf('\n  private ',start+1);assert(start>=0,name);return index.slice(start,end);}
-const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['usesNativeProfileReads','currentProfileUrl','refreshProfile','loadMoreProfile','prepareProfileInteraction','onRootPageVisible'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_PROFILE_READS_ENABLED:true});
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['usesNativeProfileReads','currentProfileUrl','refreshProfile','loadMoreProfile','prepareProfileInteraction','onRootPageVisible'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_PROFILE_READS_ENABLED:true, PinmonyRuntimeLog:{info(){},warn(){}}});
 const host=new Host();let nativeCalls=0;Object.assign(host,{profileStore:{origins:[]},authStatus:'authenticated',profileNativeReads:{eligible:()=>true,refresh:()=>nativeCalls++,more:()=>nativeCalls++},authenticatedProfileUrl:page,profileUrlFromAddress:a=>a,controller:{getUrl(){throw Error('hidden Web must not gate own root')}},profileReadController:{refresh(){throw Error('legacy read')},loadMore(){throw Error('legacy paging')}}});assert.equal(host.currentProfileUrl(),page);host.refreshProfile(true);host.loadMoreProfile();assert.equal(nativeCalls,2);
 let legacyReads=0,visibleDemands=0;Object.assign(host,{activeTab:3,tabRequestToken:1,nativeRootTabsVisible:()=>true,pagePerformance:{mark(){}},markRootPerformance(){},requestRootPage(){legacyReads++},coordinatorTasks:{timeout:fn=>fn()}});
 host.profileNativeReads.demand=()=>{visibleDemands++};host.onRootPageVisible(3,true);assert.equal(visibleDemands,1);assert.equal(legacyReads,0,'waiting for business identity never prepares hidden Web');
@@ -76,6 +77,7 @@ host.ensureRootActionContext=async(index,data)=>{while(timers.length)timers.shif
 Object.assign(host,{businessSuspended:false,activeSheetKind:'',pinStore:{},nativeBusinessSessionContext:()=>({generation:1})});
 host.bindNativeNetwork=()=>{window.PinmonyNetwork.isReady=()=>true;};
 host.controller={getUrl:()=>page,runJavaScript:async script=>{installed=true;vm.runInNewContext(script,ctx);return 'true';}};
+host.sessionDocumentUrl = () => page; host.runSessionScript = script => host.controller.runJavaScript(script); host.loadSessionDocument = () => { throw Error('unexpected navigation'); }; host.coordinatorTasks.wait = async () => true;
 assert.equal(await host.prepareProfileInteraction(),true);assert(f.store.profileActionsReady);assert.equal(f.store.profile.section,'created');assert.equal(f.store.profile.session,f.store.profileSession);
 
 const beforeSync = states.length;

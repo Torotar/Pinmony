@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchResult } from 'feature_search';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -64,13 +65,13 @@ export class PinmonySearchUserFollow {
       if (!reply || reply.error || reply.status !== 200 || !reply.body || reply.body.length > 2000000) throw new Error('unknown');
       const response: FollowResponse = JSON.parse(reply.body) as FollowResponse, r: FollowResource | undefined = response.resource_response;
       if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0) {
-        this.unknown.delete(id); this.ports.feedback('网站拒绝本次用户关注操作，可以重试'); return;
+        this.unknown.delete(id); this.ports.feedback(PinmonyI18n.message('网站拒绝本次用户关注操作，可以重试')); return;
       }
       if (!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_user_method' : 'v3_unfollow_user_method') ||
           response.client_context?.user && response.client_context.user.id !== viewer ||
           (!r.data || r.data.id !== id || r.data.type !== 'user' || r.data.username !== profile.slice(session.origin.length).split('/')[1])) throw new Error('unknown');
-      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? '已关注用户' : '已取消关注用户');
-    } catch (_) { if (current()) this.ports.feedback('用户关注结果未确认，请刷新核对，勿重复提交'); }
+      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? '已关注用户' : PinmonyI18n.message('已取消关注用户'));
+    } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message('用户关注结果未确认，请刷新核对，勿重复提交')); }
     finally { if (this.job === job.id) { this.job = ''; this.targetId = ''; this.release = undefined; this.ports.changed(); } }
   }
 }

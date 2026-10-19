@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PIN_NATIVE_DETAIL_READS_ENABLED } from './PinmonyDetailNativeReads';
 import { mapPrefetchedDetail, readRelatedPresentation, RelatedPresentation } from 'feature_pin';
 import { PinmonyPinStore } from 'feature_pin';
@@ -52,7 +53,7 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
         token === this.pinStore.detailOpeningToken && (this.pinStore.detailOpeningPin === pinUrl || this.pinStore.detailPin === pinUrl) && !this.ports.nativeBackTarget();
     this.ports.coordinatorTasks().timeout(() => {
         if (current() && !this.pinStore.detailActionsReady && !this.pinStore.detailNativeReadsReady)
-            this.pinStore.detailApiError = '帖子加载超时，请重试';
+            this.pinStore.detailApiError = PinmonyI18n.message('帖子加载超时，请重试');
     }, 12000);
     this.pinStore.detailPrefetch.open(pinUrl, async (url: string, id: string, ownerCurrent: () => boolean): Promise<string> => {
         this.ports.detailRequestOwners().set(id, this.ports.detailJourney().current());
@@ -127,7 +128,7 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
             this.ports.detailJourney().mark('base.failed');
         if (current())
             this.pinStore.detailApiError = error.message === 'network-unavailable' ?
-                '网络连接失败，帖子未能加载，请重试' : '帖子加载失败，请重试';
+                PinmonyI18n.message('网络连接失败，帖子未能加载，请重试') : PinmonyI18n.message('帖子加载失败，请重试');
     });
 }
 

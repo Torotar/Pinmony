@@ -1,7 +1,10 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeMenuOption, PinmonyHomeMenuState } from '../models/PinmonyHomeMenu';
 
 @Component
 export struct PinmonyHomeMenuSheet {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop menu: PinmonyHomeMenuState = {} as PinmonyHomeMenuState;
   @State private shareColumns: number = 4;
   onAction?: (id: string) => void;
@@ -39,7 +42,7 @@ export struct PinmonyHomeMenuSheet {
             Button({ type: ButtonType.Normal }) {
               Column({ space: 8 }) {
                 Image(this.platformIcon(option.label)).width(56).height(56).objectFit(ImageFit.Contain)
-                Text(option.label === '短信' ? '消息' : option.label)
+                Text(option.label === '短信' ? this.uiText("消息") : option.label)
                   .fontSize(13).fontColor($r('app.color.primary_text')).maxLines(1)
               }.width('100%')
             }
@@ -47,8 +50,8 @@ export struct PinmonyHomeMenuSheet {
             .backgroundColor(Color.Transparent)
             .enabled(option.enabled && !this.menu.busy)
             .onClick(() => { if (this.onAction) this.onAction(option.id); })
-            .accessibilityText('分享到' + option.label)
-          }, (option: PinmonyHomeMenuOption) => option.id)
+            .accessibilityText(this.uiText("分享到") + option.label)
+          }, (option: PinmonyHomeMenuOption) => option.id + this.uiLanguage)
           ForEach(this.emptySlots(page.length), (slot: number) => {
             Blank().layoutWeight(1)
           }, (slot: number) => slot.toString())
@@ -64,9 +67,9 @@ export struct PinmonyHomeMenuSheet {
       if (this.menu.loading) {
         LoadingProgress().width(28).height(28)
       } else if (this.menu.error) {
-        Text(this.menu.error).fontSize(14).fontColor($r('app.color.secondary_text'))
+        Text(PinmonyI18n.render(this.menu.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
         if (!/取消收藏|收藏校验/.test(this.menu.error)) {
-          Button('重试').onClick(() => { if (this.onRetry) this.onRetry(); })
+          Button(this.uiText("重试")).onClick(() => { if (this.onRetry) this.onRetry(); })
         }
       } else {
         Column() {
@@ -84,7 +87,7 @@ export struct PinmonyHomeMenuSheet {
                 option.id === 'home-system-share' ? $r('app.media.lucide_share_2') : $r('app.media.lucide_eye_off'))
                 .width(28).height(28).objectFit(ImageFit.Contain)
               }
-              Text(option.label).fontSize(17).fontWeight(FontWeight.Medium)
+              Text(PinmonyI18n.optionLabel(option.id, option.label, this.uiLanguage)).fontSize(17).fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(2)
             }.width('100%').padding({ left: 24, right: 20, top: 14, bottom: 14 })
           }
@@ -96,7 +99,7 @@ export struct PinmonyHomeMenuSheet {
       }
       if (this.menu.busy) { LoadingProgress().width(24).height(24) }
       if (this.menu.feedback) {
-        Text(this.menu.feedback).fontSize(13).fontColor($r('app.color.secondary_text'))
+        Text(PinmonyI18n.render(this.menu.feedback, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
       }
     }.width('100%').padding({ left: this.menu.options.length > 0 ? 20 : 0,
       right: this.menu.options.length > 0 ? 20 : 0, top: this.menu.options.length > 0 ? 16 : 0, bottom: 20 })

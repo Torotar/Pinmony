@@ -1,7 +1,10 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchQuiz, PinmonySearchQuizTopic, PinmonySearchQuizCard } from '../models/PinmonySearch';
 
 @Component
 export struct PinmonySearchQuizPanel {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop quiz: PinmonySearchQuiz;
   @StorageProp('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
   @State private contentWidth: number = 328;
@@ -38,8 +41,8 @@ export struct PinmonySearchQuizPanel {
   private requestState() {
     if (this.quiz.busy) { LoadingProgress().width(28).height(28).alignSelf(ItemAlign.Center) }
     if (this.quiz.error) {
-      Text(this.quiz.error).fontColor($r('app.color.secondary_text')).padding(12)
-      Button('重试').onClick(() => this.onAction('retry', ''))
+      Text(PinmonyI18n.render(this.quiz.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')).padding(12)
+      Button(this.uiText("重试")).onClick(() => this.onAction('retry', ''))
     }
   }
 
@@ -51,7 +54,7 @@ export struct PinmonySearchQuizPanel {
         Button({ type: ButtonType.Circle }) {
           SymbolGlyph($r('sys.symbol.xmark')).fontSize(18).fontColor([$r('app.color.primary_text')])
         }.width(32).height(32).padding(0).backgroundColor(Color.Transparent)
-          .accessibilityText('关闭创意推荐').onClick(() => this.onAction('dismiss', ''))
+          .accessibilityText(this.uiText("关闭创意推荐")).onClick(() => this.onAction('dismiss', ''))
       }.width('100%')
       Text(this.quiz.title).fontSize(22).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).width('100%')
@@ -97,7 +100,7 @@ export struct PinmonySearchQuizPanel {
                     if (this.quiz.busy) return;
                     if (this.quiz.mode === 'picker') this.onAction('select', item.id);
                     else if (item.targetUrl) this.onPin(item.targetUrl);
-                  }).accessibilityText(item.title + (item.selected ? '，已选择' : ''))
+                  }).accessibilityText(item.title + (item.selected ? this.uiText("，已选择") : ''))
                   .accessibilitySelected(item.selected)
               }.width(this.cardWidth()).height(this.cardHeight(item))
             }, (item: PinmonySearchQuizCard) => item.id)
@@ -111,7 +114,7 @@ export struct PinmonySearchQuizPanel {
           LoadingProgress().width(32).height(32).hitTestBehavior(HitTestMode.None)
         } else if (this.quiz.cards.length === 0) {
           if (this.quiz.error) { Column({ space: 8 }) { this.requestState() }.width('100%') }
-          else { Text('暂无推荐内容').fontColor($r('app.color.secondary_text')) }
+          else { Text(this.uiText("暂无推荐内容")).fontColor($r('app.color.secondary_text')) }
         }
       }.width('100%').layoutWeight(1)
         .onAreaChange((_old: Area, area: Area) => {
@@ -120,10 +123,10 @@ export struct PinmonySearchQuizPanel {
         })
       if (this.quiz.cards.length > 0 && this.quiz.error) { this.requestState() }
       if (this.quiz.mode === 'picker') {
-        Button('查看结果').width('100%').height(48).borderRadius(16)
+        Button(this.uiText("查看结果")).width('100%').height(48).borderRadius(16)
           .fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
           .enabled(this.quiz.count > 0 && !this.quiz.busy)
-          .accessibilityDescription('已选择' + this.quiz.count.toString() + '张，最多10张')
+          .accessibilityDescription(this.uiText("已选择") + this.quiz.count.toString() + this.uiText("张，最多10张"))
           .onClick(() => this.onAction('submit', ''))
       }
     }.width('100%').height('100%')

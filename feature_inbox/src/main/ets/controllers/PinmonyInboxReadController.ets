@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyInboxStore } from '../stores/PinmonyInboxStore';
 import { PinmonyInboxSnapshot, PinmonyInboxItem } from '../models/PinmonyInbox';
@@ -142,7 +143,7 @@ export class PinmonyInboxReadController {
       this.store.inboxLoading = false;
       this.refreshAwaiting = false;
       this.store.pendingInboxSection = '';
-      if (this.ports.currentInbox()) this.store.inboxError = '无法读取当前 Pinterest 收件箱，请重试';
+      if (this.ports.currentInbox()) this.store.inboxError = PinmonyI18n.message('无法读取当前 Pinterest 收件箱，请重试');
       else this.clear();
     }, 8000);
   }
@@ -221,7 +222,7 @@ export class PinmonyInboxReadController {
         this.store.inboxRequestToken++;
         this.store.inbox = undefined;
         this.store.inboxLoading = false;
-        this.store.inboxError = '无法识别当前收件箱内容，请重试';
+        this.store.inboxError = PinmonyI18n.message('无法识别当前收件箱内容，请重试');
         return;
       }
       if ((message.kind !== 'state' && message.kind !== 'apiPending' && message.kind !== 'apiFailed') ||
@@ -246,18 +247,18 @@ export class PinmonyInboxReadController {
             if (!this.matches(generation, document) || token !== this.store.inboxRequestToken || this.store.inboxSession !== message.session || this.ports.currentInbox() !== message.pageUrl) return;
             if (result !== 'true' && result !== '"true"') {
               this.store.pendingInboxSection = '';
-              this.store.inboxError = '无法恢复收件箱分段，请重试';
+              this.store.inboxError = PinmonyI18n.message('无法恢复收件箱分段，请重试');
             }
           }).catch(() => {
             if (!this.matches(generation, document) || token !== this.store.inboxRequestToken || this.store.inboxSession !== message.session || this.ports.currentInbox() !== message.pageUrl) return;
             this.store.pendingInboxSection = '';
-            this.store.inboxError = '无法恢复收件箱分段，请重试';
+            this.store.inboxError = PinmonyI18n.message('无法恢复收件箱分段，请重试');
           });
         this.sectionTasks.timeout(() => {
           if (!this.matches(generation, document) || token !== this.store.inboxRequestToken || this.store.inboxSession !== message.session || this.ports.currentInbox() !== message.pageUrl ||
               this.store.pendingInboxSection !== section) return;
           this.store.pendingInboxSection = '';
-          this.store.inboxError = '收件箱分段恢复超时，请重试';
+          this.store.inboxError = PinmonyI18n.message('收件箱分段恢复超时，请重试');
         }, 8000);
         return;
       }
@@ -276,7 +277,7 @@ export class PinmonyInboxReadController {
       this.store.inboxError = '';
       this.store.inboxWebFlow = false;
       this.store.inboxLoading = !retainingInbox && message.kind === 'apiPending';
-      this.store.inboxError = message.kind === 'apiFailed' ? (message.apiError || (message.section === 'updates' ? '更新接口读取失败，请重试' : '会话列表读取失败，请重试')) : '';
+      this.store.inboxError = message.kind === 'apiFailed' ? (message.apiError || (message.section === 'updates' ? '更新接口读取失败，请重试' : PinmonyI18n.message('会话列表读取失败，请重试'))) : '';
       this.store.inbox = {
         kind: 'state', session: message.session, pageUrl: message.pageUrl, section: message.section,
         updateLabel: message.updateLabel, inboxLabel: message.inboxLabel,
@@ -349,7 +350,7 @@ export class PinmonyInboxReadController {
           if (!this.matches(generation, document) || this.store.inboxRequestToken !== token || this.store.pendingInboxSection !== section) return;
           this.store.pendingInboxSection = '';
           this.store.inboxLoading = false;
-          this.ports.feedback('收件箱接口切换超时，请重试');
+          this.ports.feedback(PinmonyI18n.message('收件箱接口切换超时，请重试'));
         }, 4500);
         return;
       }
@@ -359,7 +360,7 @@ export class PinmonyInboxReadController {
     if (!this.matches(generation, document) || this.store.inboxRequestToken !== token) return;
     this.store.pendingInboxSection = '';
     this.store.inboxLoading = false;
-    this.ports.feedback('当前分段不可用，请重试');
+    this.ports.feedback(PinmonyI18n.message('当前分段不可用，请重试'));
   }
 
 
@@ -372,7 +373,7 @@ export class PinmonyInboxReadController {
     this.loadingMore = true;
     this.ports.readStarted();
     try { await this.ports.runScript('window.PinmonyInboxApiMore && window.PinmonyInboxApiMore(' + this.store.inboxSession.toString() + ')'); }
-    catch (error) { if (this.matches(generation, document)) this.ports.feedback('无法加载更多更新，请重试'); }
+    catch (error) { if (this.matches(generation, document)) this.ports.feedback(PinmonyI18n.message('无法加载更多更新，请重试')); }
     finally { if (generation === this.generation) this.loadingMore = false; }
   }
 
@@ -394,7 +395,7 @@ export class PinmonyInboxReadController {
     this.refreshTasks.timeout((): void => {
       if (!this.matches(generation, document) || !this.refreshAwaiting) return;
       this.refreshAwaiting = false; this.store.inboxLoading = false;
-      this.store.inboxError = '刷新超时，请重试'; this.ports.finishPull();
+      this.store.inboxError = PinmonyI18n.message('刷新超时，请重试'); this.ports.finishPull();
     }, 20000);
     try {
       const result: string = await this.ports.runScript('window.PinmonyInboxApiRefresh && window.PinmonyInboxApiRefresh()');
@@ -402,12 +403,12 @@ export class PinmonyInboxReadController {
       if (result !== 'true' && result !== '"true"') {
         this.refreshAwaiting = false;
         this.store.inboxLoading = false;
-        this.store.inboxError = '无法重新读取收件箱，请稍后重试';
+        this.store.inboxError = PinmonyI18n.message('无法重新读取收件箱，请稍后重试');
       }
     } catch (error) {
       if (this.matches(generation, document) && token === this.store.inboxRequestToken) {
         this.refreshAwaiting = false;
-        this.store.inboxLoading = false; this.store.inboxError = '无法重新读取收件箱，请稍后重试';
+        this.store.inboxLoading = false; this.store.inboxError = PinmonyI18n.message('无法重新读取收件箱，请稍后重试');
       }
     } finally { if (generation === this.generation) this.refreshing = false; }
   }
@@ -425,7 +426,7 @@ export class PinmonyInboxReadController {
     try {
       await this.ports.runScript('window.PinmonyInboxContactsApiRefresh && window.PinmonyInboxContactsApiRefresh(' +
         this.store.inboxSession.toString() + ')');
-    } catch (error) { if (this.matches(generation, document)) this.ports.feedback('无法重新读取联系人，请重试'); }
+    } catch (error) { if (this.matches(generation, document)) this.ports.feedback(PinmonyI18n.message('无法重新读取联系人，请重试')); }
     finally { if (generation === this.generation) this.contactsReading = false; }
   }
 

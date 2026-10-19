@@ -1,5 +1,6 @@
+const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const logs=[],log={PinmonyRuntimeLog:{info:s=>logs.push(s)}};
 const Native=load('entry/src/main/ets/app/PinmonyPostNativeOperations.ets',n=>n==='feature_profile'?{PIN_PROFILE_ORGANIZE_ENABLED:true}:n==='feature_pin'?{PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_EDIT_API_ENABLED:true}:n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?log:{}).PinmonyPostNativeOperations;
 const Confirmed=load('feature_pin/src/main/ets/services/PinmonyConfirmedSaves.ets').PinmonyConfirmedSaves;

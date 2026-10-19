@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxStore, PinmonyInboxSnapshot, PinmonyInboxItem } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
@@ -64,7 +65,7 @@ export class PinmonyInboxUpdatesNativeReads {
   }
   apply(): void {
     if (!this.owned()) return;
-    const snapshot: PinmonyInboxSnapshot = { kind: 'state', session: this.store.inboxSession, pageUrl: this.page, section: 'updates', updateLabel: '更新', inboxLabel: '收件箱', messagesLabel: '消息', readLabel: '已读', unreadLabel: '未读', emptyTitle: this.ready && !this.rows.length ? '暂无更新' : '', emptyDescription: '', homeLabel: '浏览主页', homeId: 'home', composeLabel: '', composeId: '', contactsLabel: '', items: this.rows.map((row: NativeNews): NativeNews => {const next: NativeNews = JSON.parse(JSON.stringify(row)) as NativeNews;next.subdued = this.hidden.has(row.newsId) || row.notificationMuted === true || this.muted.has(row.notificationPinId);if(this.hidden.has(row.newsId)){next.enabled = false;next.moreId = '';}return next;}), contacts: [], dataSource: 'api', hasMore: !this.ended && !!this.cursor, moreLoading: this.ready && this.busy, moreError: this.moreError, apiError: this.error };
+    const snapshot: PinmonyInboxSnapshot = { kind: 'state', session: this.store.inboxSession, pageUrl: this.page, section: 'updates', updateLabel: PinmonyI18n.message('更新'), inboxLabel: PinmonyI18n.message('收件箱'), messagesLabel: PinmonyI18n.message('消息'), readLabel: PinmonyI18n.message('已读'), unreadLabel: PinmonyI18n.message('未读'), emptyTitle: this.ready && !this.rows.length ? PinmonyI18n.message('暂无更新') : '', emptyDescription: '', homeLabel: PinmonyI18n.message('浏览主页'), homeId: 'home', composeLabel: '', composeId: '', contactsLabel: '', items: this.rows.map((row: NativeNews): NativeNews => {const next: NativeNews = JSON.parse(JSON.stringify(row)) as NativeNews;next.subdued = this.hidden.has(row.newsId) || row.notificationMuted === true || this.muted.has(row.notificationPinId);if(this.hidden.has(row.newsId)){next.enabled = false;next.moreId = '';}return next;}), contacts: [], dataSource: 'api', hasMore: !this.ended && !!this.cursor, moreLoading: this.ready && this.busy, moreError: this.moreError, apiError: this.error };
     this.store.inbox = snapshot; this.store.inboxUrl = this.page; this.store.inboxSectionReady = true; this.store.inboxNativeUpdatesReady = this.ready;
     this.store.pendingInboxSection = ''; this.store.restoringInboxSection = ''; this.store.inboxLoading = !this.ready && this.busy; this.store.inboxError = this.error;
     if (this.ready && !this.busy && !this.error && !this.moreError) this.store.inboxCache.put(snapshot,this.store.inboxScrollOffset);
@@ -109,7 +110,7 @@ export class PinmonyInboxUpdatesNativeReads {
       });
       this.rows = merged; this.cursor = cursor; this.ended = !cursor || cursor === '-end-' || cursor === previous || !resource.data.length; this.ready = true;
       PinmonyRuntimeLog.info('InboxUpdatesNativeTrace: committed append='+append.toString()+' count='+merged.length.toString());
-    } catch (_) { if(live()){ if(append)this.moreError = '加载更多更新失败，请重试'; else this.error = '更新读取失败，请重试'; } }
+    } catch (_) { if(live()){ if(append)this.moreError = PinmonyI18n.message('加载更多更新失败，请重试'); else this.error = PinmonyI18n.message('更新读取失败，请重试'); } }
     finally { if(revision === this.revision){ this.busy = false; this.requestId = ''; if(live())this.apply(); this.ports.settled(); } }
   }
 }

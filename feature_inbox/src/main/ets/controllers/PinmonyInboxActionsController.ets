@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxStore } from '../stores/PinmonyInboxStore';
 
 export interface PinmonyInboxActionsPorts {
@@ -53,8 +54,8 @@ export class PinmonyInboxActionsController {
       const result: string = await this.ports.runScript('window.PinmonyInboxApiAction && window.PinmonyInboxApiAction(' +
         JSON.stringify(target) + ',' + session.toString() + ')');
       if (current() && page === this.ports.document() && session === this.store.inboxSession && result !== 'true' && result !== '"true"')
-        this.ports.feedback('收件箱接口入口不可用，请重试');
-    } catch (_) { if (current()) this.ports.feedback('收件箱接口入口不可用，请重试'); }
+        this.ports.feedback(PinmonyI18n.message('收件箱接口入口不可用，请重试'));
+    } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message('收件箱接口入口不可用，请重试')); }
     finally { if (generation === this.generation) this.opening = false; }
   }
   async action(action: string, value: string = ''): Promise<void> {
@@ -68,7 +69,7 @@ export class PinmonyInboxActionsController {
       try {
         if(!await this.ports.prepare(current) || !current() || !this.store.inboxActionsReady || this.store.inboxUrl !== this.ports.currentInbox())return;
         await this.ports.runScript('window.PinmonyInboxConversations && window.PinmonyInboxConversations.action(' + JSON.stringify(action) + ',' + JSON.stringify(value) + ',' + this.store.inboxSession.toString() + ')');
-      } catch (_) {if(current())this.ports.feedback('当前消息操作不可用，请重试');}
+      } catch (_) {if(current())this.ports.feedback(PinmonyI18n.message('当前消息操作不可用，请重试'));}
       finally {if(generation === this.generation)this.acting = false;}
       return;
     }
@@ -98,7 +99,7 @@ export class PinmonyInboxActionsController {
     if (!interrupt) this.acting = true;
     try { await this.ports.runScript('window.PinmonyInboxConversations && window.PinmonyInboxConversations.action(' +
       JSON.stringify(action) + ',' + JSON.stringify(value) + ',' + session.toString() + ')'); }
-    catch (_) { if (current()) this.ports.feedback('当前消息操作不可用，请重试'); }
+    catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message('当前消息操作不可用，请重试')); }
     finally { if (!interrupt && generation === this.generation) this.acting = false; }
   }
 }

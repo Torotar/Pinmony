@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { display } from '@kit.ArkUI';
 
 /** A Pinterest image candidate keyed by the size name returned by Pinterest. */
@@ -136,6 +137,8 @@ export interface SmartImageOptions {
 
 @Component
 export struct SmartImage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('resetImage') url: string = '';
   @Prop @Watch('resetImage') images: PinImageSources = {};
   @Prop @Watch('resetImage') widthVp: number = 0;
@@ -220,7 +223,7 @@ export struct SmartImage {
         SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
           .fontSize(24)
           .fontColor([$r('app.color.secondary_text')])
-          .accessibilityText('图片加载失败')
+          .accessibilityText(this.uiText("图片加载失败"))
       }
     }
     .width('100%')

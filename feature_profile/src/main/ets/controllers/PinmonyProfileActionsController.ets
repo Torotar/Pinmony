@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyProfileStore } from '../stores/PinmonyProfileStore';
 import { PinmonyProfilePanel } from '../models/PinmonyProfilePanel';
@@ -95,7 +96,7 @@ export class PinmonyProfileActionsController {
     const intent: number = ++this.intent, generation: number = this.generation;
     const prepared: boolean = await this.ports.prepare();
     if (generation !== this.generation || intent !== this.intent || !this.available()) return;
-    if (!prepared) { this.ports.feedback('资料会话尚未就绪，请重试'); return; }
+    if (!prepared) { this.ports.feedback(PinmonyI18n.message('资料会话尚未就绪，请重试')); return; }
     const page: string = this.ports.currentProfile(); if (!page) return;
     this.closePanel(); this.panelDocument = this.ports.document();
     const token: number = ++this.store.panelToken;
@@ -127,7 +128,7 @@ export class PinmonyProfileActionsController {
         if (!await this.delay(generation)) return;
       }
       throw new Error('timeout');
-    } catch (_) { if (generation === this.generation && this.matches(context)) this.panelError('读取失败，请重新读取'); }
+    } catch (_) { if (generation === this.generation && this.matches(context)) this.panelError(PinmonyI18n.message('读取失败，请重新读取')); }
     finally { if (generation === this.generation) this.panelReading = false; }
   }
   closePanel(): void {
@@ -152,7 +153,7 @@ export class PinmonyProfileActionsController {
       await this.readFollow(context);
     } catch (_) { if (generation === this.generation && this.matches(context)) this.followFailed(); }
   }
-  private followFailed(): void { this.uncertainSession = this.store.profileSession; this.following = undefined; this.store.followingBusy = false; this.store.followUncertain = true; this.ports.feedback('关注操作结果未确认，请刷新核对'); }
+  private followFailed(): void { this.uncertainSession = this.store.profileSession; this.following = undefined; this.store.followingBusy = false; this.store.followUncertain = true; this.ports.feedback(PinmonyI18n.message('关注操作结果未确认，请刷新核对')); }
   private async readFollow(context: ProfileOperation): Promise<void> {
     const generation: number = this.generation;
     if (this.followReading || !this.matches(context)) return;
@@ -189,7 +190,7 @@ export class PinmonyProfileActionsController {
     try {
       await this.ports.runScript('if (window.PinmonyProfilePanel) window.PinmonyProfilePanel.update(' + JSON.stringify(panel.page) + ',' + panel.token.toString() + ',' + input + '); true');
       if (generation === this.generation && this.matches(context)) await this.readSave(context);
-    } catch (_) { if (generation === this.generation && this.matches(context)) this.saveFailed('保存结果未确认，请重新读取资料核对'); }
+    } catch (_) { if (generation === this.generation && this.matches(context)) this.saveFailed(PinmonyI18n.message('保存结果未确认，请重新读取资料核对')); }
   }
   private saveFailed(message: string): void { this.uncertainSession = this.store.profileSession; this.saving = undefined; this.store.saving = false; this.store.saveUncertain = true; this.panelError(message); this.ports.feedback(message); }
   private async readSave(context: ProfileOperation): Promise<void> {
@@ -207,11 +208,11 @@ export class PinmonyProfileActionsController {
           const username: string = typeof result.username === 'string' && /^\w+$/.test(result.username) ? result.username : '';
           this.closePanel(); this.ports.feedback('修改完成'); this.ports.saved(context.page, username); return;
         }
-        if (result?.duplicate === true) { this.saving = undefined; this.store.saving = false; this.ports.feedback('用户名已被使用'); return; }
-        this.saveFailed(typeof result?.message === 'string' ? result.message.slice(0,200) : '保存结果未确认，请重新读取资料核对'); return;
+        if (result?.duplicate === true) { this.saving = undefined; this.store.saving = false; this.ports.feedback(PinmonyI18n.message('用户名已被使用')); return; }
+        this.saveFailed(typeof result?.message === 'string' ? result.message.slice(0,200) : PinmonyI18n.message('保存结果未确认，请重新读取资料核对')); return;
       }
-      this.saveFailed('保存结果未确认，请重新读取资料核对');
-    } catch (_) { if (generation === this.generation && this.matches(context)) this.saveFailed('保存结果未确认，请重新读取资料核对'); }
+      this.saveFailed(PinmonyI18n.message('保存结果未确认，请重新读取资料核对'));
+    } catch (_) { if (generation === this.generation && this.matches(context)) this.saveFailed(PinmonyI18n.message('保存结果未确认，请重新读取资料核对')); }
     finally { if (generation === this.generation) this.saveReading = false; }
   }
   async changeTab(section: string): Promise<void> {
@@ -229,7 +230,7 @@ export class PinmonyProfileActionsController {
     }
     if (ticket !== this.tabTicket) return;
     if (!ready || generation !== this.generation || !this.available() || !this.store.profileActionsReady) {
-      if (generation === this.generation && this.available()) this.ports.feedback('资料页签尚未就绪，请重试');
+      if (generation === this.generation && this.available()) this.ports.feedback(PinmonyI18n.message('资料页签尚未就绪，请重试'));
       return;
     }
     const profile = this.store.profile, context: ProfileOperation = this.operation();
@@ -238,7 +239,7 @@ export class PinmonyProfileActionsController {
     this.tasks.timeout((): void => {
       if (generation !== this.generation || ticket !== this.tabTicket || !this.store.profileSwitching) return;
       this.store.profileSwitching = false;
-      if (this.available() && this.store.profile?.section !== section) this.ports.feedback('资料接口尚未切换页签，请重试');
+      if (this.available() && this.store.profile?.section !== section) this.ports.feedback(PinmonyI18n.message('资料接口尚未切换页签，请重试'));
     }, 20000);
     try {
       const result: string = await this.ports.runScript('window.PinmonyProfileTab && window.PinmonyProfileTab(' + profile.session.toString() + ',' + JSON.stringify(profile.profileUrl) + ',' + JSON.stringify(section) + ')');
@@ -247,7 +248,7 @@ export class PinmonyProfileActionsController {
         return;
       }
     } catch (_) { if (generation !== this.generation || !this.matches(context)) return; }
-    this.store.profileSwitching = false; this.ports.feedback('无法切换个人资料页签，请重试');
+    this.store.profileSwitching = false; this.ports.feedback(PinmonyI18n.message('无法切换个人资料页签，请重试'));
   }
   async organize(action: string, value: string = '', secret: boolean = false): Promise<void> {
     if(this.ports.nativeEnabled?.()){await this.ports.nativeOrganize?.(action,value,secret);return;}
@@ -263,8 +264,8 @@ export class PinmonyProfileActionsController {
     this.organizePending = true; const ticket: number = ++this.organizeTicket;
     try {
       const result: string = await this.ports.runScript('window.PinmonyProfileOrganizeAction && window.PinmonyProfileOrganizeAction(' + profile.session.toString() + ',' + JSON.stringify(profile.profileUrl) + ',' + JSON.stringify(action) + ',' + JSON.stringify(value) + ',' + secret.toString() + ')');
-      if (generation === this.generation && this.matches(context) && result !== 'true' && result !== '"true"') this.ports.feedback('当前操作不可用，请刷新后重试');
-    } catch (_) { if (this.bound(context)) { if (write) this.store.organizeUncertain = true; if (generation === this.generation) this.ports.feedback(write ? '整理结果未确认，请刷新核对' : '无法执行整理操作，请刷新后重试'); } }
+      if (generation === this.generation && this.matches(context) && result !== 'true' && result !== '"true"') this.ports.feedback(PinmonyI18n.message('当前操作不可用，请刷新后重试'));
+    } catch (_) { if (this.bound(context)) { if (write) this.store.organizeUncertain = true; if (generation === this.generation) this.ports.feedback(write ? '整理结果未确认，请刷新核对' : PinmonyI18n.message('无法执行整理操作，请刷新后重试')); } }
     finally { if (ticket === this.organizeTicket) this.organizePending = false; }
   }
 }

@@ -1,12 +1,15 @@
+import { PinmonyI18n } from 'common_foundation';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } from '@kit.ArkUI';
 import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyProfilePanel';
 import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyProfilePanelPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncUsername') snapshot: PinmonyProfilePanel;
   private readonly followingSegments: SegmentButtonV2Items = new SegmentButtonV2Items([
-    { text: '用户' }, { text: '图板' }
+    { text: this.uiText("用户") }, { text: this.uiText("图板") }
   ]);
   private displayedSection: string = '';
   private sectionMotionToken: number = 0;
@@ -75,16 +78,16 @@ export struct PinmonyProfilePanelPage {
       style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE }, scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
         backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
-      content: { title: { mainTitle: this.snapshot.mode === 'edit' ? '编辑个人资料' : this.snapshot.mode === 'followers' ? '粉丝' : '关注中' },
+      content: { title: { mainTitle: this.snapshot.mode === 'edit' ? this.uiText("编辑个人资料") : this.snapshot.mode === 'followers' ? this.uiText("粉丝") : this.uiText("关注中") },
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.snapshot.mode === 'edit' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),
-          label: '完成', isEnabled: !this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy, action: () => { if (!this.saving && !this.snapshot.avatarBusy && this.onSave) this.onSave(JSON.stringify({ firstName: this.firstNameDraft, lastName: this.lastNameDraft, about: this.aboutDraft, websiteUrl: this.websiteDraft, username: this.usernameDraft })); } } }] : [] } } };
+          label: this.uiText("完成"), isEnabled: !this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy, action: () => { if (!this.saving && !this.snapshot.avatarBusy && this.onSave) this.onSave(JSON.stringify({ firstName: this.firstNameDraft, lastName: this.lastNameDraft, about: this.aboutDraft, websiteUrl: this.websiteDraft, username: this.usernameDraft })); } } }] : [] } } };
   }
   @Builder
   private field(label: string, value: string, placeholder: string = '') {
     Column({ space: 8 }) {
-      Text(label).fontSize(14).fontColor($r('app.color.secondary_text'))
+      Text(this.uiText(label)).fontSize(14).fontColor($r('app.color.secondary_text'))
       TextInput({ text: value, placeholder: placeholder }).width('100%').height(40).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0).fontSize(17)
         .placeholderColor($r('app.color.secondary_text')).fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent)
         .enabled(!this.saving)
@@ -111,29 +114,29 @@ export struct PinmonyProfilePanelPage {
             }.width('100%').height(48).justifyContent(FlexAlign.Center)
           }
           Column({ space: 20 }) {
-          if (!this.snapshot.loading && this.snapshot.error) { Text(this.snapshot.error).fontColor($r('app.color.secondary_text')) }
+          if (!this.snapshot.loading && this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
           else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
             if (this.snapshot.avatarPreview || this.snapshot.avatar) { Image(this.snapshot.avatarPreview || this.snapshot.avatar).width(120).height(120).borderRadius(60) }
-            Button(this.snapshot.avatarBusy ? '处理中…' : this.snapshot.avatarAction === 'refresh' ? '刷新头像' : this.snapshot.avatarAction === 'check' ? '检查结果' : '更改').height(40).fontSize(16).fontColor($r('app.color.primary_text'))
+            Button(this.snapshot.avatarBusy ? this.uiText("处理中…") : this.snapshot.avatarAction === 'refresh' ? this.uiText("刷新头像") : this.snapshot.avatarAction === 'check' ? this.uiText("检查结果") : this.uiText("更改")).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
               .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
-            if (this.snapshot.avatarError) { Text(this.snapshot.avatarError).fontSize(13).fontColor($r('app.color.secondary_text')) }
+            if (this.snapshot.avatarError) { Text(PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')) }
             this.field('名字', this.firstNameDraft)
             this.field('姓氏', this.lastNameDraft)
             Column({ space: 8 }) {
-              Text('关于').fontSize(14).fontColor($r('app.color.secondary_text'))
-              TextArea({ text: this.aboutDraft, placeholder: '讲述你的故事' }).width('100%').height(64).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0)
+              Text(this.uiText("关于")).fontSize(14).fontColor($r('app.color.secondary_text'))
+              TextArea({ text: this.aboutDraft, placeholder: this.uiText("讲述你的故事") }).width('100%').height(64).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0)
                 .enabled(!this.saving).onChange((text: string) => { this.aboutDraft = text; })
                 .fontSize(17).fontColor($r('app.color.primary_text')).placeholderColor($r('app.color.secondary_text'))
                 .backgroundColor(Color.Transparent)
             }.width('100%').constraintSize({ minHeight: 128 }).padding(18).alignItems(HorizontalAlign.Start)
               .border({ width: 1, color: $r('app.color.surface_muted'), radius: 20 })
             this.field('网站', this.websiteDraft, 'https://')
-            Text('添加链接以为你的网站吸引流量').width('100%').fontSize(12).fontColor($r('app.color.secondary_text'))
+            Text(this.uiText("添加链接以为你的网站吸引流量")).width('100%').fontSize(12).fontColor($r('app.color.secondary_text'))
             this.field('用户名', this.usernameDraft)
             Text('www.pinterest.com/' + this.usernameDraft).width('100%').fontSize(12).fontColor($r('app.color.secondary_text'))
           } else if (!this.snapshot.loading) {
             if (this.snapshot.items.length === 0) {
-              Text(this.snapshot.mode === 'followers' ? '暂无粉丝' : this.snapshot.section === 'boards' ? '你尚未关注任何图板' : '你尚未关注任何用户').fontColor($r('app.color.primary_text'))
+              Text(this.snapshot.mode === 'followers' ? this.uiText("暂无粉丝") : this.snapshot.section === 'boards' ? this.uiText("你尚未关注任何图板") : this.uiText("你尚未关注任何用户")).fontColor($r('app.color.primary_text'))
             }
             if (this.snapshot.section === 'boards') {
               Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
@@ -154,7 +157,7 @@ export struct PinmonyProfilePanelPage {
                   Text(item.name).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
                     .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
                   Text((item.pinCount || '') + (item.updated ? ' · ' + item.updated : '')).fontSize(13).fontColor($r('app.color.secondary_text'))
-                  Button(item.following ? '关注中' : '关注').fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
+                  Button(item.following ? this.uiText("关注中") : this.uiText("关注")).fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
                     .enabled(!this.followingBusy && item.canFollow === true).onClick(() => { if(this.onFollow)this.onFollow(item.id); })
                 }.width('48%').margin({ bottom: 24 }).alignItems(HorizontalAlign.Start)
               }, (item: PinmonyProfilePanelItem) => item.id)
@@ -165,17 +168,17 @@ export struct PinmonyProfilePanelPage {
                 PinmonyUserAvatar({ image: item.avatar || '', name: item.name, avatarSize: 48 })
                   .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
                 Text(item.name).layoutWeight(1).fontColor($r('app.color.primary_text'))
-                Button(item.following ? '关注中' : '关注').enabled(!this.followingBusy && item.canFollow !== false).onClick(() => { if (this.onFollow) this.onFollow(item.id); })
+                Button(item.following ? this.uiText("关注中") : this.uiText("关注")).enabled(!this.followingBusy && item.canFollow !== false).onClick(() => { if (this.onFollow) this.onFollow(item.id); })
               }.width('100%')
             }, (item: PinmonyProfilePanelItem) => item.id)
             }
           }
           if (this.snapshot.mode === 'followers' && this.snapshot.hasMore) {
-            Button(this.snapshot.moreLoading ? '加载中…' : this.snapshot.moreError ? '重试加载粉丝' : '加载更多粉丝')
+            Button(this.snapshot.moreLoading ? this.uiText("加载中…") : this.snapshot.moreError ? this.uiText("重试加载粉丝") : this.uiText("加载更多粉丝"))
               .enabled(!this.snapshot.moreLoading && !this.followingBusy && !this.saving)
               .onClick(() => { if(this.onLoadMore)this.onLoadMore(); })
           }
-          if (this.snapshot.moreError) { Text(this.snapshot.moreError).fontColor($r('app.color.secondary_text')) }
+          if (this.snapshot.moreError) { Text(PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
         }.width('100%').padding({ left: 24, right: 24, top: this.snapshot.mode === 'following' ? 0 : 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').height('100%').align(Alignment.Top).clip(true)

@@ -1,7 +1,10 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { MoreSheetOption } from '../models/PinmonySheets';
 @Component
 export struct PinmonyMoreSheet {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink pinStore: PinmonyPinStore;
   onAction: (id: string) => void = (): void => {};
   onRetry: () => void = (): void => {};
@@ -12,7 +15,7 @@ export struct PinmonyMoreSheet {
           LoadingProgress()
             .width(24)
             .height(24)
-          Text('正在读取选项…')
+          Text(this.uiText("正在读取选项…"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
@@ -46,7 +49,7 @@ export struct PinmonyMoreSheet {
                     .objectFit(ImageFit.Contain)
                 }
                 Column() {
-                  Text(option.label)
+                  Text(PinmonyI18n.optionLabel(option.id, option.label, this.uiLanguage))
                     .fontSize(17)
                     .fontWeight(FontWeight.Medium)
                     .fontColor($r('app.color.primary_text'))
@@ -65,11 +68,11 @@ export struct PinmonyMoreSheet {
               .width('100%')
               .padding({ left: 24, right: 20, top: 14, bottom: 14 })
               .opacity(option.enabled ? 1 : 0.4)
-              .accessibilityText(option.label)
+              .accessibilityText(PinmonyI18n.optionLabel(option.id, option.label, this.uiLanguage))
               .onClick(() => {
                 if (option.enabled) this.onAction(option.id);
               })
-            }, (option: MoreSheetOption) => option.id)
+            }, (option: MoreSheetOption) => option.id + this.uiLanguage)
           }
           .width('100%')
         }
@@ -78,11 +81,11 @@ export struct PinmonyMoreSheet {
       }
       if (this.pinStore.moreError) {
         Row({ space: 12 }) {
-          Text(this.pinStore.moreError)
+          Text(PinmonyI18n.render(this.pinStore.moreError, this.uiLanguage))
             .fontSize(14)
             .fontColor('#D94A4A')
             .layoutWeight(1)
-          Button('重试')
+          Button(this.uiText("重试"))
             .onClick(() => this.onRetry())
         }
         .margin({ left: 20, right: 20, top: 12 })

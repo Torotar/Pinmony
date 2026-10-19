@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxFlowSnapshot } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -43,7 +44,7 @@ export class PinmonyInboxNativeWrites {
   private unknown(f: PinmonyInboxFlowSnapshot): void {
     f.sending = false;f.messageBusy = false;f.loading = false;f.writeUncertain = true;
     const text: string = '操作结果未确认，请重新读取核对；不会自动重复提交';
-    if(f.writeAction === 'send')f.sendError = '发送结果未确认，请重新读取会话核对；不会自动重发';else f.error = text;
+    if(f.writeAction === 'send')f.sendError = PinmonyI18n.message('发送结果未确认，请重新读取会话核对；不会自动重发');else f.error = text;
     this.publish(f);PinmonyRuntimeLog.info('InboxNativeWrite: outcome=unknown');
   }
   pause(): void {

@@ -1,5 +1,8 @@
+import { PinmonyI18n } from 'common_foundation';
 @Component
 export struct PinmonyStatusPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop title: string = '';
   @Prop message: string = '';
   @Prop loading: boolean = false;
@@ -12,16 +15,16 @@ export struct PinmonyStatusPage {
       if (this.loading) {
         LoadingProgress().width(36).height(36).color($r('app.color.accent'))
       }
-      Text(this.title).fontSize(18).fontColor($r('app.color.primary_text'))
+      Text(PinmonyI18n.render(this.title, this.uiLanguage)).fontSize(18).fontColor($r('app.color.primary_text'))
       if (this.message) {
-        Text(this.message).fontSize(14).fontColor($r('app.color.secondary_text'))
+        Text(PinmonyI18n.render(this.message, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
           .textAlign(TextAlign.Center).maxLines(4).margin({ left: 24, right: 24 })
       }
       if (!this.loading) {
-        Button('重试').onClick(() => this.onRetry())
+        Button(this.uiText("重试")).onClick(() => this.onRetry())
       }
       if (this.showBack) {
-        Button('返回').onClick(() => this.onBack())
+        Button(this.uiText("返回")).onClick(() => this.onBack())
       }
     }
     .justifyContent(FlexAlign.Center)

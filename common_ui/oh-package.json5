@@ -3,5 +3,5 @@
   "version": "1.0.0",
   "description": "Pinmony common_ui",
   "main": "Index.ets",
-  "dependencies": {}
+  "dependencies": { "common_foundation": "file:../common_foundation" }
 }

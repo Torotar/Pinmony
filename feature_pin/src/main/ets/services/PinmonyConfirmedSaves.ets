@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyDetailAction, PinmonyDetailSnapshot } from '../models/PinmonyDetail';
 
 // Current authenticated app session only: evidence is a validated write result.
@@ -22,7 +23,7 @@ export class PinmonyConfirmedSaves {
     if (saved === undefined) return actions;
     return actions.map((item: PinmonyDetailAction): PinmonyDetailAction => {
       if (item.kind !== 'save') return item;
-      return { id: item.id, kind: item.kind, label: saved ? '已收藏' : '收藏',
+      return { id: item.id, kind: item.kind, label: saved ? PinmonyI18n.message('已收藏') : PinmonyI18n.message('收藏'),
         countText: item.countText, enabled: item.enabled, selected: saved };
     });
   }

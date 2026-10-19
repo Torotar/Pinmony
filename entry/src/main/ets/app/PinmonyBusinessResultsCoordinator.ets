@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySystemActions } from './PinmonySystemActions';
 import { PinmonyPinStore } from 'feature_pin';
 import { PinmonySearchStore } from 'feature_search';
@@ -65,7 +66,7 @@ async handlePostResult(value: string): Promise<void> {
             this.pinStore.feedbackUndoSession = result.session;
             if (this.ports.activeSheetKind() === 'more')
                 this.ports.dismissMoreSheet();
-            this.ports.showUndoSnack('将为你显示更多此类 Pin', result.pinUrl, () => this.ports.undoMoreFeedback());
+            this.ports.showUndoSnack(PinmonyI18n.message('将为你显示更多此类 Pin'), result.pinUrl, () => this.ports.undoMoreFeedback());
         }
         else if (result.kind === 'saveReady' && result.objectId && this.ports.activeSheetKind() === 'save' &&
             this.pinStore.saveResult.pin === result.pinUrl) {
@@ -118,7 +119,7 @@ async handlePostResult(value: string): Promise<void> {
             catch (_) {
                 if (current() && result.session === this.pinStore.shareSession && this.ports.activeSheetKind() === 'share' && this.ports.isCurrentMorePin(result.pinUrl)) {
                     this.pinStore.shareFeedback = '';
-                    this.pinStore.shareError = '复制链接失败，请重试';
+                    this.pinStore.shareError = PinmonyI18n.message('复制链接失败，请重试');
                     this.ports.showMessage(this.pinStore.shareError);
                 }
                 return;
@@ -126,7 +127,7 @@ async handlePostResult(value: string): Promise<void> {
             if (result.session === this.pinStore.shareSession && this.ports.activeSheetKind() === 'share' && this.ports.isCurrentMorePin(result.pinUrl)) {
                 this.pinStore.shareError = '';
                 this.pinStore.shareSnackKey = '';
-                this.pinStore.shareFeedback = '链接已复制';
+                this.pinStore.shareFeedback = PinmonyI18n.message('链接已复制');
                 this.ports.showShareFeedbackSnack();
             }
         }
@@ -148,7 +149,7 @@ async handlePostResult(value: string): Promise<void> {
             if (!current() || result.session !== this.pinStore.shareSession || this.ports.activeSheetKind() !== 'share' ||
                 !this.ports.isCurrentMorePin(result.pinUrl))
                 return;
-            this.ports.showMessage('请在系统分享中选择 ' + result.platform);
+            this.ports.showMessage(PinmonyI18n.message('请在系统分享中选择 ') + result.platform);
             await this.ports.sharePinUrl(result.value, result.title || 'Pinterest Pin');
         }
         else if (result.kind === 'external' && /^https:\/\/(?:[^/]+\.)?(?:twitter\.com|x\.com|facebook\.com|messenger\.com|whatsapp\.com)\//.test(result.value)) {
@@ -160,7 +161,7 @@ async handlePostResult(value: string): Promise<void> {
         }
     }
     catch (error) {
-        if (current()) this.ports.showMessage('操作失败，请重试');
+        if (current()) this.ports.showMessage(PinmonyI18n.message('操作失败，请重试'));
     }
 }
 

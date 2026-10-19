@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
@@ -8,6 +9,8 @@ interface ReactionPopupState { isVisible: boolean; }
 
 @Component
 export struct PinmonyInboxFlowPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('snapshotChanged') snapshot: PinmonyInboxFlowSnapshot = {} as PinmonyInboxFlowSnapshot;
   onUser?: (url: string) => void;
   onAction?: (action: string, value: string) => void;
@@ -135,7 +138,7 @@ export struct PinmonyInboxFlowPage {
       const target: InboxFlowUser | undefined = this.snapshot.users.filter((user: InboxFlowUser) => user.id === this.snapshot.blockedUserId)[0];
       this.showMessageMenu = false;
       this.blockTarget = undefined;
-      if (this.onBlockChanged) this.onBlockChanged(!!this.snapshot.blocked, target ? target.name : '联系人');
+      if (this.onBlockChanged) this.onBlockChanged(!!this.snapshot.blocked, target ? target.name : this.uiText("联系人"));
     }
     if ((this.snapshot.sentRevision || 0) < this.sentRevision) this.sentRevision = this.snapshot.sentRevision || 0;
     if ((this.snapshot.sentRevision || 0) > this.sentRevision) {
@@ -151,7 +154,7 @@ export struct PinmonyInboxFlowPage {
   }
 
   private blockTargetName(): string {
-    return this.blockTarget ? this.blockTarget.name : '联系人';
+    return this.blockTarget ? this.blockTarget.name : this.uiText("联系人");
   }
 
   private messageTime(value: string): string {
@@ -160,7 +163,7 @@ export struct PinmonyInboxFlowPage {
     const today: Date = new Date();
     const time: string = date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
     return date.toDateString() === today.toDateString() ? time :
-      ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][date.getDay()] + time;
+      [this.uiText("星期日"), this.uiText("星期一"), this.uiText("星期二"), this.uiText("星期三"), this.uiText("星期四"), this.uiText("星期五"), this.uiText("星期六")][date.getDay()] + time;
   }
 
   @Builder
@@ -170,7 +173,7 @@ export struct PinmonyInboxFlowPage {
       if (this.snapshot.users.some((user: InboxFlowUser) => !user.self)) {
         this.avatar(this.snapshot.users.filter((user: InboxFlowUser) => !user.self)[0], 32)
       }
-      Text(this.snapshot.title || '聊天')
+      Text(this.snapshot.title || this.uiText("聊天"))
         .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
         .onClick(() => {
@@ -202,9 +205,9 @@ export struct PinmonyInboxFlowPage {
             if (this.snapshot.selectedIds.includes(user.id) !== selected) this.act('select', user.id);
           })
           .hitTestBehavior(HitTestMode.None)
-          .accessibilityText('选择 ' + user.name)
+          .accessibilityText(this.uiText("选择 ") + user.name)
       } else if (!user.self) {
-        Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? '取消屏蔽' : '屏蔽')
+        Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? this.uiText("取消屏蔽") : this.uiText("屏蔽"))
           .height(36).borderRadius(12).fontSize(14).fontWeight(FontWeight.Normal)
           .padding({ left: 14, right: 14 })
           .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
@@ -222,12 +225,12 @@ export struct PinmonyInboxFlowPage {
       Button({ type: ButtonType.Circle }) {
         Image($r('app.media.lucide_share_2')).width(20).height(20).fillColor($r('app.color.primary_text'))
       }.width(40).height(40).backgroundColor($r('app.color.page_background'))
-        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText('分享 Pin 图')
+        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText(this.uiText("分享 Pin 图"))
         .onClick(() => { if (message.pinUrl && this.onPinAction) this.onPinAction('share', message.pinUrl); })
       Button({ type: ButtonType.Circle }) {
         Image($r('app.media.lucide_bookmark')).width(20).height(20)
       }.width(40).height(40).backgroundColor($r('app.color.page_background'))
-        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText('收藏 Pin 图')
+        .border({ width: 1, color: $r('app.color.surface_muted') }).accessibilityText(this.uiText("收藏 Pin 图"))
         .onClick(() => { if (message.pinUrl && this.onPinAction) this.onPinAction('save', message.pinUrl); })
     }
   }
@@ -269,30 +272,30 @@ export struct PinmonyInboxFlowPage {
           Row({ space: 10 }) {
             SymbolGlyph($r('sys.symbol.rectangle_on_rectangle')).fontSize(20)
               .fontColor([$r('app.color.primary_text')])
-            Text('复制').fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+            Text(this.uiText("复制")).fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
           }.width('100%').justifyContent(FlexAlign.Start)
         }.width('100%').height(48).padding({ left: 8, right: 8 })
-          .backgroundColor(Color.Transparent).accessibilityText('复制消息文字')
+          .backgroundColor(Color.Transparent).accessibilityText(this.uiText("复制消息文字"))
           .onClick(async () => {
             const text: string = this.selectedMessage?.text || '';
             if (text && this.onCopyText && await this.onCopyText(text)) this.showMessageMenu = false;
           })
       }
       if (this.selectedMessage?.pinUrl) {
-        Button('收藏').width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
+        Button(this.uiText("收藏")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('save', this.selectedMessage.pinUrl); this.showMessageMenu = false; })
-        Button('分享').width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
+        Button(this.uiText("分享")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('share', this.selectedMessage.pinUrl); this.showMessageMenu = false; })
       }
       if (this.selectedMessage?.own) {
-        Button('删除').width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.accent'))
+        Button(this.uiText("删除")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.accent'))
           .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
           .onClick(() => {
             const id: string = this.selectedMessage?.id || '';
             const intent: string = this.messageConfirmationKey();
-            this.getUIContext().showAlertDialog({ title: '删除消息', message: '确认删除这条消息？',
-              primaryButton: { value: '取消', action: (): void => {} },
-              secondaryButton: { value: '删除', action: (): void => { if(this.messageConfirmationKey() === intent)this.act('deleteMessage', id); this.showMessageMenu = false; } } });
+            this.getUIContext().showAlertDialog({ title: this.uiText("删除消息"), message: this.uiText("确认删除这条消息？"),
+              primaryButton: { value: this.uiText("取消"), action: (): void => {} },
+              secondaryButton: { value: this.uiText("删除"), action: (): void => { if(this.messageConfirmationKey() === intent)this.act('deleteMessage', id); this.showMessageMenu = false; } } });
           })
       }
     }.padding({ left: 16, right: 16, bottom: 24 }).width('100%')
@@ -301,18 +304,18 @@ export struct PinmonyInboxFlowPage {
   @Builder
   private blockSheetContent() {
     Column({ space: 16 }) {
-      Text((this.snapshot.blocked ? '取消屏蔽' : '屏蔽') + this.blockTargetName() + '？')
+      Text((this.snapshot.blocked ? this.uiText("取消屏蔽") : this.uiText("屏蔽")) + this.blockTargetName() + '？')
         .fontSize(24).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         .alignSelf(ItemAlign.Start)
       Text(this.snapshot.blocked ?
-        '你可以查看、关注、发送消息或收藏对方的 Pin 图。取消屏蔽后，对方可以再次与你互动。' :
-        '你将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。屏蔽后，对方不会收到通知。')
+        this.uiText("你可以查看、关注、发送消息或收藏对方的 Pin 图。取消屏蔽后，对方可以再次与你互动。") :
+        this.uiText("你将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。屏蔽后，对方不会收到通知。"))
         .fontSize(16).fontColor($r('app.color.primary_text')).lineHeight(26)
         .textAlign(TextAlign.Start)
       Row({ space: 12 }) {
-        Button('算了').backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+        Button(this.uiText("算了")).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
           .onClick(() => { this.showMessageMenu = false; this.blockTarget = undefined; })
-        Button(this.snapshot.blocked ? '取消屏蔽' : '屏蔽')
+        Button(this.snapshot.blocked ? this.uiText("取消屏蔽") : this.uiText("屏蔽"))
           .backgroundColor(this.snapshot.blocked ? Color.Black : $r('app.color.accent'))
           .fontColor(Color.White).enabled(!this.snapshot.messageBusy && !!this.blockTarget)
           .onClick(() => {
@@ -403,7 +406,7 @@ export struct PinmonyInboxFlowPage {
               Text(message.profile.name).fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
             }.width('100%').alignItems(HorizontalAlign.Center).hitTestBehavior(HitTestMode.None)
             }.width(240).padding(0).borderRadius(18).backgroundColor(Color.Transparent)
-              .accessibilityText('查看 ' + message.profile.name + ' 的个人资料')
+              .accessibilityText(this.uiText("查看 ") + message.profile.name + this.uiText(" 的个人资料"))
               .onClick(() => this.openSharedProfile(message.id))
           } else if (message.board && !message.deleted) {
             PinmonyInboxBoardCard({ board: message.board,
@@ -425,7 +428,7 @@ export struct PinmonyInboxFlowPage {
               .onClick(() => { this.captureChatOffset(); if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
           }
           if (message.deleted) {
-            Text(message.own ? '你删除了一条消息' : this.snapshot.title + ' 删除了一条消息')
+            Text(message.own ? this.uiText("你删除了一条消息") : this.snapshot.title + this.uiText(" 删除了一条消息"))
               .fontColor($r('app.color.secondary_text')).fontSize(14).padding(12).borderRadius(24)
               .border({ width: 1, color: $r('app.color.surface_muted'), style: BorderStyle.Dashed })
           } else if (message.text === '❤️') {
@@ -446,7 +449,7 @@ export struct PinmonyInboxFlowPage {
                 }
               })
           } else if (message.pinUrl && !message.image) {
-            Text('Pin 图图片暂不可读取').fontColor($r('app.color.secondary_text'))
+            Text(this.uiText("Pin 图图片暂不可读取")).fontColor($r('app.color.secondary_text'))
           }
           if (!message.deleted && !message.board && !message.profile) {
             Button({ type: ButtonType.Normal }) {
@@ -461,7 +464,7 @@ export struct PinmonyInboxFlowPage {
             }.constraintSize({ minWidth: 40 }).height(30).padding({ left: 6, right: 6 }).borderRadius(18)
               .backgroundColor($r('app.color.surface_muted'))
               .alignSelf(ItemAlign.End).margin({ top: -16, right: 4 }).zIndex(1)
-              .accessibilityText('选择消息表情')
+              .accessibilityText(this.uiText("选择消息表情"))
               .onClick(() => { this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id; })
               .bindPopup(this.reactionMessageId === message.id, {
                 builder: this.reactionChoices, placement: Placement.Top, showInSubWindow: false,
@@ -481,34 +484,34 @@ export struct PinmonyInboxFlowPage {
     Column({ space: 4 }) {
       if (this.snapshot.canUnsubscribePin) {
         Button({ type: ButtonType.Normal }) {
-          Text('关闭此 Pin 图的更新').fontSize(18).fontWeight(FontWeight.Medium)
+          Text(this.uiText("关闭此 Pin 图的更新")).fontSize(18).fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
         }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
           .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.unsubscribedPin)
           .onClick(() => this.act('unsubscribePin'))
       }
       Button({ type: ButtonType.Normal }) {
-        Text('删除更新').fontSize(18).fontWeight(FontWeight.Medium)
+        Text(this.uiText("删除更新")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
         .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
         .onClick(() => this.act('hideNews'))
       Button({ type: ButtonType.Normal }) {
-        Text('查看通知设置').fontSize(18).fontWeight(FontWeight.Medium)
+        Text(this.uiText("查看通知设置")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
         .backgroundColor(Color.Transparent).onClick(() => { if (this.onNotifications) this.onNotifications(); })
       if (this.snapshot.unsubscribedPin) {
-        Text('你不会再收到有关此 Pin 图的通知。').fontSize(14).fontColor($r('app.color.secondary_text'))
+        Text(this.uiText("你不会再收到有关此 Pin 图的通知。")).fontSize(14).fontColor($r('app.color.secondary_text'))
       }
-      if (this.snapshot.error) { Text(this.snapshot.error).fontSize(14).fontColor($r('app.color.secondary_text')) }
+      if (this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')) }
     }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 24 })
   }
 
   build() {
     if (this.snapshot.screen === 'updatesMenu' && this.snapshot.newsUndoing) {
       Column().width(1).height(1).hitTestBehavior(HitTestMode.Transparent)
-      if (this.snapshot.error) { Text(this.snapshot.error).fontColor($r('app.color.secondary_text')) }
+      if (this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
     } else if (this.snapshot.screen === 'updatesMenu') {
       Column().width(1).height(1)
         .hitTestBehavior(HitTestMode.Transparent)
@@ -519,7 +522,7 @@ export struct PinmonyInboxFlowPage {
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
           showClose: true,
-          title: { title: '更新选项' },
+          title: { title: this.uiText("更新选项") },
           backgroundColor: $r('app.color.page_background'),
           maskColor: '#66000000',
           onDisappear: () => {
@@ -544,7 +547,7 @@ export struct PinmonyInboxFlowPage {
     HdsNavDestination() {
     Column() {
       if (this.snapshot.screen === 'compose') {
-        TextInput({ text: this.query, placeholder: '按姓名或电子邮箱搜索' }).margin({ left: 16, right: 16, bottom: 8 })
+        TextInput({ text: this.query, placeholder: this.uiText("按姓名或电子邮箱搜索") }).margin({ left: 16, right: 16, bottom: 8 })
           .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain)
           .onChange((value: string) => {
             this.query = value;
@@ -555,9 +558,9 @@ export struct PinmonyInboxFlowPage {
       }
       if (this.snapshot.error) {
         Column({ space: 8 }) {
-          Text(this.snapshot.error).fontColor($r('app.color.secondary_text'))
+          Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
           if (!(this.snapshot.screen === 'settings' && this.snapshot.writeUncertain)) {
-            Button(this.snapshot.writeUncertain ? '重新读取' : '重试').onClick(() => this.act('retry'))
+            Button(this.snapshot.writeUncertain ? this.uiText("重新读取") : this.uiText("重试")).onClick(() => this.act('retry'))
           }
         }.padding(16)
       }
@@ -576,7 +579,7 @@ export struct PinmonyInboxFlowPage {
                 }
                 Text(this.snapshot.title).fontSize(18).fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text'))
-                Text('美好的事情可能即将发生').fontSize(14).fontColor($r('app.color.secondary_text'))
+                Text(this.uiText("美好的事情可能即将发生")).fontSize(14).fontColor($r('app.color.secondary_text'))
               }.width('100%').padding({ top: 40, bottom: 40 }).alignItems(HorizontalAlign.Center)
             }
             ForEach(this.snapshot.messages, (message: InboxFlowMessage) => { this.messageRow(message) },
@@ -608,12 +611,12 @@ export struct PinmonyInboxFlowPage {
         })
       if (this.snapshot.screen === 'chat') {
         Row({ space: 8 }) {
-          TextInput({ text: this.draft, placeholder: '输入消息…' }).layoutWeight(1).maxLength(2000)
+          TextInput({ text: this.draft, placeholder: this.uiText("输入消息…") }).layoutWeight(1).maxLength(2000)
             .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
             .onChange((value: string) => { this.draft = value; })
             .onSubmit(() => { if (this.draft.trim()) this.act('send', this.draft); })
           if (this.draft.trim()) {
-            Button('发送').enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
+            Button(this.uiText("发送")).enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
               .onClick(() => this.act('send', this.draft))
           } else {
           Button({ type: ButtonType.Circle }) {
@@ -621,14 +624,14 @@ export struct PinmonyInboxFlowPage {
               .fontColor([$r('app.color.accent')])
           }.width(44).height(44).backgroundColor($r('app.color.page_background'))
             .border({ width: 1, color: $r('app.color.surface_muted') })
-            .accessibilityText('发送爱心')
+            .accessibilityText(this.uiText("发送爱心"))
             .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.sendError && !this.snapshot.writeUncertain)
             .onClick(() => this.act('send', '❤️'))
           }
         }.padding({ left: 16, right: 16, top: 8, bottom: 24 })
         if (this.snapshot.sendError) {
-          Text(this.snapshot.sendError).fontSize(13).fontColor($r('app.color.secondary_text')).padding(12)
-          Button('重新读取会话').onClick(() => this.act('retry'))
+          Text(PinmonyI18n.render(this.snapshot.sendError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')).padding(12)
+          Button(this.uiText("重新读取会话")).onClick(() => this.act('retry'))
         }
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
@@ -636,7 +639,7 @@ export struct PinmonyInboxFlowPage {
         radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyInboxFlowPage.showMessageMenu radius=four-corners-32vp'); },
         height: SheetSize.FIT_CONTENT, showClose: true,
-        title: { title: this.snapshot.screen === 'settings' ? (this.snapshot.blocked ? '取消屏蔽联系人' : '屏蔽联系人') : '' }, dragBar: true,
+        title: { title: this.snapshot.screen === 'settings' ? (this.snapshot.blocked ? this.uiText("取消屏蔽联系人") : this.uiText("屏蔽联系人")) : '' }, dragBar: true,
         backgroundColor: $r('app.color.page_background'),
         onWillDismiss: (action: DismissSheetAction) => { action.dismiss(); this.showMessageMenu = false; this.selectedMessage = undefined; this.blockTarget = undefined; }
       })
@@ -650,11 +653,11 @@ export struct PinmonyInboxFlowPage {
           } }
         },
         content: { title: { mainTitle: this.snapshot.screen === 'chat' ? '' :
-          this.snapshot.screen === 'compose' ? '新消息' : this.snapshot.title || '消息设置' },
+          this.snapshot.screen === 'compose' ? this.uiText("新消息") : this.snapshot.title || this.uiText("消息设置") },
           stackBuilder: this.conversationTitleBuilder,
           backIcon: { isEnabled: true, action: () => this.act('back') },
-          menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: '消息设置', action: () => this.act('settings') } }] :
-            this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: '下一步', isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
+          menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: this.uiText("消息设置"), action: () => this.act('settings') } }] :
+            this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: this.uiText("下一步"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
       .backgroundColor($r('app.color.page_background'))
       .bindToScrollable([this.scroller])

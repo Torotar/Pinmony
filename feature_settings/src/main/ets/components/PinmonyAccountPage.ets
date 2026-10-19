@@ -1,9 +1,12 @@
+import { PinmonyI18n } from 'common_foundation';
 import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyCountry } from '../models/PinmonyAccountSettings';
 @Component
 export struct PinmonyAccountPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
@@ -23,7 +26,7 @@ export struct PinmonyAccountPage {
     this.store.screen = screen; this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
     if (screen === 'country') this.request('countries');
   }
-  private title(): string { return this.store.screen === 'account' ? '账户管理' : this.store.screen === 'personal' ? '个人信息' : this.store.screen === 'birthdate' ? '出生日期' : this.store.screen === 'gender' ? '性别' : '国家/地区'; }
+  private title(): string { return this.store.screen === 'account' ? this.uiText("账户管理") : this.store.screen === 'personal' ? this.uiText("个人信息") : this.store.screen === 'birthdate' ? this.uiText("出生日期") : this.store.screen === 'gender' ? this.uiText("性别") : this.uiText("国家/地区"); }
   private date(): string { return this.year.padStart(4, '0') + '-' + this.month.padStart(2, '0') + '-' + this.day.padStart(2, '0'); }
   private canSave(): boolean {
     if (!this.store.data || this.store.loading || this.store.busy || this.store.error) return false;
@@ -43,7 +46,7 @@ export struct PinmonyAccountPage {
         scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: ['birthdate', 'gender'].includes(this.store.screen) ? [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]), label: '完成', isEnabled: this.canSave(),
+          icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]), label: this.uiText("完成"), isEnabled: this.canSave(),
           action: () => { if (this.canSave()) this.save(this.store.screen === 'birthdate' ? 'birthdate' : 'customGender', this.store.screen === 'birthdate' ? this.date() : this.custom); }
         } }] : [] } } };
   }
@@ -63,16 +66,16 @@ export struct PinmonyAccountPage {
   }
   private birthday(): string {
     const p: string[] = (this.store.data?.birthdate || '').split('-');
-    return p.length === 3 ? p[0] + '年' + Number(p[1]).toString() + '月' + Number(p[2]).toString() + '日' : '';
+    return p.length === 3 ? p[0] + this.uiText("年") + Number(p[1]).toString() + this.uiText("月") + Number(p[2]).toString() + '日' : '';
   }
-  private gender(): string { return this.store.data?.gender === 'female' ? '女' : this.store.data?.gender === 'male' ? '男' : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || '自定义' : ''; }
+  private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("女") : this.store.data?.gender === 'male' ? this.uiText("男") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || '自定义' : ''; }
   @Builder
-  private dateField(label: string, value: string) {
+  private dateField(field: string, value: string) {
     Column({ space: 6 }) {
-      Text(label).fontSize(13).fontColor($r('app.color.secondary_text'))
-      TextInput({ text: value }).type(InputType.Number).maxLength(label === '年' ? 4 : 2).fontColor($r('app.color.primary_text'))
-        .backgroundColor(Color.Transparent).enabled(!this.store.busy).accessibilityText(label)
-        .onChange((v: string) => { if (label === '年') this.year = v; else if (label === '月') this.month = v; else this.day = v; })
+      Text(this.uiText(field === 'year' ? '年' : field === 'month' ? '月' : '日')).fontSize(13).fontColor($r('app.color.secondary_text'))
+      TextInput({ text: value }).type(InputType.Number).maxLength(field === 'year' ? 4 : 2).fontColor($r('app.color.primary_text'))
+        .backgroundColor(Color.Transparent).enabled(!this.store.busy).accessibilityText(this.uiText(field === 'year' ? '年' : field === 'month' ? '月' : '日'))
+        .onChange((v: string) => { if (field === 'year') this.year = v; else if (field === 'month') this.month = v; else this.day = v; })
     }.layoutWeight(1).padding(10).border({ width: 1, color: $r('app.color.secondary_text'), radius: 14 }).alignItems(HorizontalAlign.Start)
   }
   @Builder
@@ -91,47 +94,47 @@ export struct PinmonyAccountPage {
       Scroll(this.scroller) {
         Column({ space: 8 }) {
           if (this.store.loading || this.store.busy) {
-            Text(this.store.busy ? '正在保存…' : '正在读取…').fontColor($r('app.color.secondary_text'))
+            Text(this.store.busy ? this.uiText("正在保存…") : this.uiText("正在读取…")).fontColor($r('app.color.secondary_text'))
           }
           if (this.store.error) {
-            Text(this.store.error).fontColor($r('app.color.secondary_text'))
-            Button('重新读取').enabled(!this.store.loading && !this.store.busy).onClick(() => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); })
+            Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
+            Button(this.uiText("重新读取")).enabled(!this.store.loading && !this.store.busy).onClick(() => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); })
           }
           if (this.store.data?.ready && !this.store.loading) {
             if (this.store.screen === 'account') {
-              Text('你的帐户').fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
-              this.row('个人信息', '', 'personal')
-              this.row('电子邮件', this.store.data.email)
-              this.row('密码', '更改密码')
-              this.row('电话号码', '添加号码')
-              this.row('转换为企业帐户', '', '', '拥有企业帐户后，你可以使用工具（例如广告和分析工具），以便在 Pinterest 上拓展业务')
-              Text('停用和删除').fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
-              this.row('停用你的帐户', '', '', '暂时隐藏你的个人资料、Pin 图和图板')
-              this.row('删除你的数据和帐户', '', '', '永久删除你的数据以及与你的帐户关联的所有内容')
+              Text(this.uiText("你的帐户")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
+              this.row(this.uiText("个人信息"), '', 'personal')
+              this.row(this.uiText("电子邮件"), this.store.data.email)
+              this.row(this.uiText("密码"), this.uiText("更改密码"))
+              this.row(this.uiText("电话号码"), this.uiText("添加号码"))
+              this.row(this.uiText("转换为企业帐户"), '', '', this.uiText("拥有企业帐户后，你可以使用工具（例如广告和分析工具），以便在 Pinterest 上拓展业务"))
+              Text(this.uiText("停用和删除")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
+              this.row(this.uiText("停用你的帐户"), '', '', this.uiText("暂时隐藏你的个人资料、Pin 图和图板"))
+              this.row(this.uiText("删除你的数据和帐户"), '', '', this.uiText("永久删除你的数据以及与你的帐户关联的所有内容"))
             } else if (this.store.screen === 'personal') {
-              if (this.birthday()) { this.row('出生日期', this.birthday()) }
-              this.row('性别', this.gender())
-              this.row('国家/地区', this.store.data.country)
+              if (this.birthday()) { this.row(this.uiText("出生日期"), this.birthday()) }
+              this.row(this.uiText("性别"), this.gender())
+              this.row(this.uiText("国家/地区"), this.store.data.country)
             } else if (this.store.screen === 'birthdate') {
-              Text('出生日期有助于为你提供更加个性化的体验，例如相关推荐内容和广告，其还有助于维护 Pinterest 社区的安全。此信息在你的个人资料中不可见。').fontSize(15).fontColor($r('app.color.secondary_text'))
-              Text('详细了解我们为什么要求你提供出生日期').fontSize(14).fontColor($r('app.color.secondary_text')).decoration({ type: TextDecorationType.Underline }).onClick(() => {})
+              Text(this.uiText("出生日期有助于为你提供更加个性化的体验，例如相关推荐内容和广告，其还有助于维护 Pinterest 社区的安全。此信息在你的个人资料中不可见。")).fontSize(15).fontColor($r('app.color.secondary_text'))
+              Text(this.uiText("详细了解我们为什么要求你提供出生日期")).fontSize(14).fontColor($r('app.color.secondary_text')).decoration({ type: TextDecorationType.Underline }).onClick(() => {})
               Row({ space: 12 }) {
-                this.dateField('年', this.year)
-                this.dateField('月', this.month)
-                this.dateField('日', this.day)
+                this.dateField('year', this.year)
+                this.dateField('month', this.month)
+                this.dateField('day', this.day)
               }.width('100%').margin({ top: 28 })
             } else if (this.store.screen === 'gender') {
-              this.genderRow('女', 'female')
-              this.genderRow('男', 'male')
-              this.genderRow('自定义', 'unspecified')
+              this.genderRow(this.uiText("女"), 'female')
+              this.genderRow(this.uiText("男"), 'male')
+              this.genderRow(this.uiText("自定义"), 'unspecified')
               if (this.store.data.gender === 'unspecified') {
-                TextInput({ text: this.custom, placeholder: '输入你的性别' }).maxLength(500).enabled(!this.store.busy)
+                TextInput({ text: this.custom, placeholder: this.uiText("输入你的性别") }).maxLength(500).enabled(!this.store.busy)
                   .fontColor($r('app.color.primary_text')).placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted'))
                   .onChange((v: string) => { this.custom = v; })
                 Text(this.custom.length.toString() + '/500').width('100%').textAlign(TextAlign.End).fontSize(12).fontColor($r('app.color.secondary_text'))
               }
             } else if (this.store.screen === 'country') {
-              TextInput({ text: this.query, placeholder: '搜索国家/地区' }).fontColor($r('app.color.primary_text'))
+              TextInput({ text: this.query, placeholder: this.uiText("搜索国家/地区") }).fontColor($r('app.color.primary_text'))
                 .placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted')).onChange((v: string) => { this.query = v; })
               ForEach(this.store.data.countries.filter((c: PinmonyCountry) => (c.name + c.key).toLowerCase().includes(this.query.toLowerCase())).sort((a: PinmonyCountry, b: PinmonyCountry) => a.key === this.store.data?.country ? -1 : b.key === this.store.data?.country ? 1 : 0), (c: PinmonyCountry) => {
                 Button({ type: ButtonType.Normal }) {

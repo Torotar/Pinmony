@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchStore, PinmonySearchSnapshot, PinmonySearchHero, PinmonySearchIdeaSection, PinmonySearchIdea } from 'feature_search';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -159,7 +160,7 @@ export class PinmonySearchDiscoveryNativeReads {
       this.ended = !connection.pageInfo.hasNextPage || !cursor || !!previous && cursor === previous || connection.edges.length === 0;
       this.ready = true; this.ports.committed(page);
       PinmonyRuntimeLog.info('SearchNativeTrace: discovery committed append=' + append.toString() + ' sections=' + sections.length.toString());
-    } catch (_) { if (live()) this.error = '搜索发现读取失败，请重试'; }
+    } catch (_) { if (live()) this.error = PinmonyI18n.message('搜索发现读取失败，请重试'); }
     finally { if (revision === this.revision) { this.requestId = ''; this.busy = false; if (live()) this.apply(); this.ports.settled(); } }
   }
 }

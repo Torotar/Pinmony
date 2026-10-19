@@ -1,8 +1,11 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { ShareSheetOption } from '../models/PinmonySheets';
 import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyShareSheet {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink pinStore: PinmonyPinStore;
   onAction: (id: string) => void = (): void => {};
   onSearch: (value: string) => void = (): void => {};
@@ -10,6 +13,10 @@ export struct PinmonyShareSheet {
   onReady: () => void = (): void => {};
   hasCopyLink: () => boolean = (): boolean => false;
   isCopyLink: (label: string) => boolean = (): boolean => false;
+  private shareActionKey(option: ShareSheetOption): string {
+    return JSON.stringify([this.pinStore.shareSession, option.id, option.enabled,
+      option.label, option.subtitle || '', this.uiLanguage]);
+  }
   @Builder
   private buildShareActionRow(option: ShareSheetOption) {
     Column() {
@@ -31,6 +38,7 @@ export struct PinmonyShareSheet {
     .alignItems(HorizontalAlign.Start)
     .justifyContent(FlexAlign.Center)
     .opacity(option.enabled ? 1 : 0.4)
+    .enabled(option.enabled)
     .accessibilityText(option.label)
     .onClick(() => {
       if (option.enabled) this.onAction(option.id);
@@ -66,27 +74,27 @@ export struct PinmonyShareSheet {
           LoadingProgress()
             .width(24)
             .height(24)
-          Text('正在读取分享选项…')
+          Text(this.uiText("正在读取分享选项…"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
         .height(72)
         .padding({ left: 20, right: 20 })
       }
-      if (!this.pinStore.shareLoading && (this.pinStore.shareSectionLabel || this.pinStore.shareSearchId || this.pinStore.shareSearchActive ||
+      if (!this.pinStore.shareLoading && (PinmonyI18n.render(this.pinStore.shareSectionLabel, this.uiLanguage) || this.pinStore.shareSearchId || this.pinStore.shareSearchActive ||
           this.pinStore.shareSendId || this.pinStore.shareContacts.length > 0)) {
         Divider()
           .color('#4D8A8A8A')
           .margin({ left: 20, right: 20, top: 8, bottom: 18 })
-        if (this.pinStore.shareSectionLabel) {
-          Text(this.pinStore.shareSectionLabel)
+        if (PinmonyI18n.render(this.pinStore.shareSectionLabel, this.uiLanguage)) {
+          Text(PinmonyI18n.render(this.pinStore.shareSectionLabel, this.uiLanguage))
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.primary_text'))
             .margin({ left: 20, right: 20, bottom: 14 })
         }
         if (this.pinStore.shareSearchActive) {
-          TextInput({ text: this.pinStore.shareQuery, placeholder: this.pinStore.shareSearchLabel })
+          TextInput({ text: this.pinStore.shareQuery, placeholder: PinmonyI18n.render(this.pinStore.shareSearchLabel, this.uiLanguage) })
             .width('90%')
             .height(48)
             .margin({ bottom: 12 })
@@ -94,11 +102,11 @@ export struct PinmonyShareSheet {
             .onChange((value: string) => {
               this.onSearch(value);
             })
-          if (this.pinStore.shareFeedback === '正在加载联系人…') {
+          if (PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) {
             Column({ space: 12 }) {
               LoadingProgress().width(32).height(32).color($r('app.color.accent'))
-                .accessibilityText('正在加载联系人')
-              Text(this.pinStore.shareFeedback).fontSize(14).fontColor($r('app.color.secondary_text'))
+                .accessibilityText(this.uiText("正在加载联系人"))
+              Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
             }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
           } else {
           Scroll() {
@@ -124,14 +132,14 @@ export struct PinmonyShareSheet {
                 .height(48)
                 .borderRadius(14)
                 .backgroundColor('#338A8A8A')
-              Text(this.pinStore.shareSearchLabel)
+              Text(PinmonyI18n.render(this.pinStore.shareSearchLabel, this.uiLanguage))
                 .fontSize(16)
                 .fontColor($r('app.color.primary_text'))
             }
             .width('100%')
             .height(64)
             .padding({ left: 20, right: 20 })
-            .accessibilityText(this.pinStore.shareSearchLabel)
+            .accessibilityText(PinmonyI18n.render(this.pinStore.shareSearchLabel, this.uiLanguage))
             .onClick(() => this.onAction(this.pinStore.shareSearchId))
           }
           ForEach(this.pinStore.shareContacts, (contact: ShareSheetOption) => {
@@ -155,23 +163,23 @@ export struct PinmonyShareSheet {
           !this.pinStore.shareOnPinDetail || !this.hasCopyLink() ||
           !this.isCopyLink(option.label)), (option: ShareSheetOption) => {
           this.buildShareActionRow(option)
-        }, (option: ShareSheetOption) => option.id)
+        }, (option: ShareSheetOption) => this.shareActionKey(option))
       }
 
-      if (this.pinStore.shareError && this.pinStore.shareError !== '分享链接尚未就绪，请重试') {
+      if (this.pinStore.shareError && !PinmonyI18n.isText(this.pinStore.shareError, "分享链接尚未就绪，请重试")) {
         Row({ space: 12 }) {
-          Text(this.pinStore.shareError)
+          Text(PinmonyI18n.render(this.pinStore.shareError, this.uiLanguage))
             .fontSize(14)
             .fontColor('#D94A4A')
             .layoutWeight(1)
-          Button('重试')
+          Button(this.uiText("重试"))
             .onClick(() => this.onRetry())
         }
         .margin({ left: 20, right: 20, top: 12 })
       }
-      if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && this.pinStore.shareFeedback === '正在加载联系人…') &&
-          ['正在加载联系人…', '正在处理…', '没有可用的联系人'].includes(this.pinStore.shareFeedback)) {
-        Text(this.pinStore.shareFeedback)
+      if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) &&
+          ['正在加载联系人…', '正在处理…', '没有可用的联系人'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source))) {
+        Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
           .margin({ left: 20, right: 20, top: 12 })

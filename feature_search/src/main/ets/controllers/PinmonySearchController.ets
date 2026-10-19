@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchCategory, PinmonySearchFilterOption, PinmonySearchFilterSnapshot,
   PinmonySearchHero, PinmonySearchIdea, PinmonySearchIdeaSection, PinmonySearchResult,
   PinmonySearchSnapshot, PinmonySearchSuggestion } from '../models/PinmonySearch';
@@ -28,7 +29,7 @@ export class PinmonySearchController {
     this.cancelTimers();
     if (this.searchStore.searchFilterLoading) {
       this.searchStore.searchFilterLoading = false;
-      this.searchStore.searchFilterError = '筛选读取已取消，请重试';
+      this.searchStore.searchFilterError = PinmonyI18n.message('筛选读取已取消，请重试');
     }
   }
 
@@ -197,7 +198,7 @@ export class PinmonySearchController {
     }
     if (!this.searchStore.searchActionsReady) {
       PinmonyRuntimeLog.warn('SearchFilter: entry rejected reason=actions-not-ready');
-      this.ports.showMessage('搜索操作尚未就绪，请稍后重试');
+      this.ports.showMessage(PinmonyI18n.message('搜索操作尚未就绪，请稍后重试'));
       return;
     }
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
@@ -220,14 +221,14 @@ export class PinmonySearchController {
       if (token !== this.searchStore.searchFilterToken) return;
       if (opened !== 'true' && opened !== '"true"') {
         this.searchStore.searchFilterLoading = false;
-        this.searchStore.searchFilterError = '无法读取当前 Pinterest 页面的筛选入口';
+        this.searchStore.searchFilterError = PinmonyI18n.message('无法读取当前 Pinterest 页面的筛选入口');
         return;
       }
       await this.refreshSearchFilters(token);
     } catch (error) {
       if (token !== this.searchStore.searchFilterToken) return;
       this.searchStore.searchFilterLoading = false;
-      this.searchStore.searchFilterError = '筛选器读取失败，请重试';
+      this.searchStore.searchFilterError = PinmonyI18n.message('筛选器读取失败，请重试');
     }
   }
 
@@ -244,15 +245,15 @@ export class PinmonySearchController {
       if (PIN_SEARCH_UI_API_ENABLED && (!snapshot || !Array.isArray(snapshot.options) ||
           typeof snapshot.loading !== 'boolean' || typeof snapshot.error !== 'string')) {
         this.searchStore.searchFilterOptions = [];
-        this.searchStore.searchFilterError = '筛选接口桥接响应无效，请重试';
+        this.searchStore.searchFilterError = PinmonyI18n.message('筛选接口桥接响应无效，请重试');
         this.searchStore.searchFilterLoading = false;
         return;
       }
       if (snapshot && snapshot.loading) {
         if (attempt === 0) PinmonyRuntimeLog.info('SearchFilter: waiting status=' + (snapshot.status || 'loading'));
         if (attempt >= 60) {
-          this.searchStore.searchFilterError = snapshot.status === 'session-sync' ? '搜索会话尚未同步，请重新打开筛选器' :
-            '筛选接口尚未取得当前搜索数据，请重试';
+          this.searchStore.searchFilterError = snapshot.status === 'session-sync' ? PinmonyI18n.message('搜索会话尚未同步，请重新打开筛选器') :
+            PinmonyI18n.message('筛选接口尚未取得当前搜索数据，请重试');
           this.searchStore.searchFilterLoading = false;
           return;
         }
@@ -267,10 +268,10 @@ export class PinmonySearchController {
       PinmonyRuntimeLog.info('SearchFilter: options received count=' + this.searchStore.searchFilterOptions.length.toString());
       this.searchStore.searchFilterError = snapshot && snapshot.error ? snapshot.error :
         this.searchStore.searchFilterOptions.length ? '' : PIN_SEARCH_UI_API_ENABLED ?
-          snapshot?.status === 'empty' ? '当前搜索没有可用的筛选选项' : '筛选接口返回空列表，请重试' : '当前网页没有可用的筛选选项';
+          snapshot?.status === 'empty' ? PinmonyI18n.message('当前搜索没有可用的筛选选项') : PinmonyI18n.message('筛选接口返回空列表，请重试') : PinmonyI18n.message('当前网页没有可用的筛选选项');
     } catch (error) {
       if (token !== this.searchStore.searchFilterToken) return;
-      this.searchStore.searchFilterError = '筛选选项读取失败，请重试';
+      this.searchStore.searchFilterError = PinmonyI18n.message('筛选选项读取失败，请重试');
     }
     this.searchStore.searchFilterLoading = false;
   }
@@ -286,7 +287,7 @@ export class PinmonySearchController {
       const opened: string = await this.ports.runScript(this.searchFilterScript('PinmonySearchOpenFilters'));
       if (token !== this.searchStore.searchFilterToken) return;
       if (opened !== 'true' && opened !== '"true"') {
-        this.searchStore.searchFilterError = '无法读取当前 Pinterest 页面的筛选入口';
+        this.searchStore.searchFilterError = PinmonyI18n.message('无法读取当前 Pinterest 页面的筛选入口');
         this.searchStore.searchFilterLoading = false;
         return;
       }
@@ -294,7 +295,7 @@ export class PinmonySearchController {
     } catch (error) {
       if (token === this.searchStore.searchFilterToken) {
         this.searchStore.searchFilterLoading = false;
-        this.searchStore.searchFilterError = '筛选器读取失败，请重试';
+        this.searchStore.searchFilterError = PinmonyI18n.message('筛选器读取失败，请重试');
       }
     }
   }
@@ -332,7 +333,7 @@ export class PinmonySearchController {
       this.ports.navigateSearch(target, '');
       PinmonyRuntimeLog.info('SearchFilterTrace: type-navigation');
     } catch (_) {
-      if (token === this.searchStore.searchFilterToken) this.searchStore.searchFilterError = '筛选导航失败，请重试';
+      if (token === this.searchStore.searchFilterToken) this.searchStore.searchFilterError = PinmonyI18n.message('筛选导航失败，请重试');
     }
   }
 
@@ -359,7 +360,7 @@ export class PinmonySearchController {
     this.tasks.timeout(() => {
       if (token !== this.searchStore.searchRequestToken || !this.searchStore.searchLoading) return;
       this.searchStore.searchLoading = false;
-      this.searchStore.searchError = '无法读取当前 Pinterest 搜索内容';
+      this.searchStore.searchError = PinmonyI18n.message('无法读取当前 Pinterest 搜索内容');
     }, 8000);
   }
 
@@ -416,7 +417,7 @@ export class PinmonySearchController {
         this.searchStore.searchRequestToken++;
         this.searchStore.search = undefined;
         this.searchStore.searchLoading = false;
-        this.searchStore.searchError = '无法识别当前 Pinterest 搜索内容';
+        this.searchStore.searchError = PinmonyI18n.message('无法识别当前 Pinterest 搜索内容');
         this.searchStore.searchReturnPageKey = '';
         this.ports.setDetailReturn('');
         return;
@@ -561,13 +562,13 @@ export class PinmonySearchController {
       if (token === this.searchStore.searchQueryToken && result !== 'true' && result !== '"true"') {
         this.searchStore.searchRequestToken++;
         this.searchStore.searchLoading = false;
-        this.searchStore.searchError = '搜索输入暂不可用，请重试';
+        this.searchStore.searchError = PinmonyI18n.message('搜索输入暂不可用，请重试');
       }
     } catch (error) {
       if (token === this.searchStore.searchQueryToken) {
         this.searchStore.searchRequestToken++;
         this.searchStore.searchLoading = false;
-        this.searchStore.searchError = '搜索输入暂不可用，请重试';
+        this.searchStore.searchError = PinmonyI18n.message('搜索输入暂不可用，请重试');
       }
     }
   }
@@ -597,7 +598,7 @@ export class PinmonySearchController {
     } catch (_) {
       this.ports.cancelNavigation(false);
       this.searchStore.searchLoading = false;
-      this.searchStore.searchError = '无法提交搜索，请重试';
+      this.searchStore.searchError = PinmonyI18n.message('无法提交搜索，请重试');
       this.searchStore.searchResultsResetPending = false;
     }
   }
@@ -629,7 +630,7 @@ export class PinmonySearchController {
         await this.ports.runScript('window.PinmonySearchDeleteHistory && window.PinmonySearchDeleteHistory(' + search.session + ',' + JSON.stringify(search.pageKey) + ',' + JSON.stringify(id) + ')');
       } catch (_) {
         if (generation === this.generation && search.pageKey === this.ports.currentPageKey())
-          this.searchStore.searchError = '删除搜索历史未能确认成功，请刷新历史后检查';
+          this.searchStore.searchError = PinmonyI18n.message('删除搜索历史未能确认成功，请刷新历史后检查');
       }
       return;
     }
@@ -661,7 +662,7 @@ export class PinmonySearchController {
         this.ports.cancelNavigation(true);
         this.searchStore.searchLoading = false;
         this.searchStore.searchResultsResetPending = false;
-        this.ports.showMessage('无法打开此搜索分类，请重试');
+        this.ports.showMessage(PinmonyI18n.message('无法打开此搜索分类，请重试'));
       }
       return;
     }
@@ -673,7 +674,7 @@ export class PinmonySearchController {
     if (kind === 'result') {
       const targetUrl: string = resultItem ? resultItem.targetUrl : id;
       if (!/^https:\/\/(?:[^/]+\.)?pinterest\.com\//i.test(targetUrl)) {
-        this.ports.showMessage('这张帖子的链接暂不可用，请重新读取搜索结果');
+        this.ports.showMessage(PinmonyI18n.message('这张帖子的链接暂不可用，请重新读取搜索结果'));
         return;
       }
       this.searchStore.retainedSearch = search;
@@ -688,7 +689,7 @@ export class PinmonySearchController {
         this.ports.navigateResult(targetUrl, search.pageKey);
       } catch (error) {
         this.ports.clearOpeningDetail();
-        this.ports.showMessage('无法打开此 Pinterest 内容，请重试');
+        this.ports.showMessage(PinmonyI18n.message('无法打开此 Pinterest 内容，请重试'));
       }
       return;
     }
@@ -717,7 +718,7 @@ export class PinmonySearchController {
       }
       // Use only the API URL attached to a card in the current page snapshot.
       if (!/^https:\/\/(?:[^/]+\.)?pinterest\.com\/search\/pins\//i.test(targetUrl)) {
-        this.ports.showMessage('这个主题的链接已失效，请重新读取');
+        this.ports.showMessage(PinmonyI18n.message('这个主题的链接已失效，请重新读取'));
         return;
       }
       this.searchStore.retainedSearch = search;
@@ -731,7 +732,7 @@ export class PinmonySearchController {
       } catch (error) {
         this.ports.cancelNavigation(true);
         this.searchStore.searchLoading = false;
-        this.ports.showMessage('无法打开此 Pinterest 内容，请重试');
+        this.ports.showMessage(PinmonyI18n.message('无法打开此 Pinterest 内容，请重试'));
       }
       return;
     }
@@ -755,7 +756,7 @@ export class PinmonySearchController {
         this.tasks.timeout(() => {
           if (token !== this.searchStore.searchRequestToken || !this.searchStore.searchLoading) return;
           this.searchStore.searchLoading = false;
-          this.searchStore.searchError = '搜索分类尚未更新，请重试';
+          this.searchStore.searchError = PinmonyI18n.message('搜索分类尚未更新，请重试');
         }, 5000);
         return;
       }
@@ -765,8 +766,8 @@ export class PinmonySearchController {
     if (token !== this.searchStore.searchRequestToken) return;
     this.searchStore.searchLoading = false;
     this.searchStore.searchResultsResetPending = false;
-    if (navigationAction) this.ports.showMessage('无法打开此 Pinterest 内容，请重试');
-    else this.searchStore.searchError = '当前搜索选项暂不可用，请重试';
+    if (navigationAction) this.ports.showMessage(PinmonyI18n.message('无法打开此 Pinterest 内容，请重试'));
+    else this.searchStore.searchError = PinmonyI18n.message('当前搜索选项暂不可用，请重试');
   }
 
   loadMoreSearch(): void {
@@ -801,13 +802,13 @@ export class PinmonySearchController {
       if (generation !== this.generation || token !== this.searchStore.searchRequestToken || pageKey !== this.ports.currentPageKey()) return;
       if (result === 'false' || result === '"false"') {
         this.searchStore.searchLoading = false;
-        this.searchStore.searchError = '无法重新读取搜索内容';
+        this.searchStore.searchError = PinmonyI18n.message('无法重新读取搜索内容');
         this.searchStore.searchResultsResetPending = false;
       }
     } catch (error) {
       if (generation !== this.generation || token !== this.searchStore.searchRequestToken || pageKey !== this.ports.currentPageKey()) return;
       this.searchStore.searchLoading = false;
-      this.searchStore.searchError = '无法重新读取搜索内容';
+      this.searchStore.searchError = PinmonyI18n.message('无法重新读取搜索内容');
       this.searchStore.searchResultsResetPending = false;
     }
   }
@@ -822,9 +823,9 @@ export class PinmonySearchController {
         current.session.toString() + ',' + JSON.stringify(current.pageKey) + ',' +
         JSON.stringify(kind) + ',' + JSON.stringify(id) + ')');
       if (generation !== this.generation || current.pageKey !== this.ports.currentPageKey()) return;
-      if (result !== 'true' && result !== '"true"') this.ports.showMessage('灵感推荐操作尚未就绪，请重试');
+      if (result !== 'true' && result !== '"true"') this.ports.showMessage(PinmonyI18n.message('灵感推荐操作尚未就绪，请重试'));
     } catch (_) {
-      if (generation === this.generation && current.pageKey === this.ports.currentPageKey()) this.ports.showMessage('无法操作灵感推荐，请重试');
+      if (generation === this.generation && current.pageKey === this.ports.currentPageKey()) this.ports.showMessage(PinmonyI18n.message('无法操作灵感推荐，请重试'));
     }
   }
 }

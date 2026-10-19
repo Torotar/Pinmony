@@ -1,3 +1,4 @@
+import { PinmonyI18n } from 'common_foundation';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyNotificationsPage } from './PinmonyNotificationsPage';
 import { PinmonyPreferencesPage } from './PinmonyPreferencesPage';
@@ -10,6 +11,8 @@ import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNav
 
 @Component
 export struct PinmonySettingsPage {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @State private exportingLog: boolean = false;
   private logoutConfirmOpen: boolean = false;
   private pageVisible: boolean = false;
@@ -25,17 +28,21 @@ export struct PinmonySettingsPage {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       if (await PinmonyRuntimeLog.export(context)) {
-        this.getUIContext().getPromptAction().showToast({ message: '运行日志已导出', duration: 4000 });
+        this.getUIContext().getPromptAction().showToast({ message: this.uiText("运行日志已导出"), duration: 4000 });
       }
     } catch (_) {
       PinmonyRuntimeLog.error('Runtime: log export failed');
-      try { this.getUIContext().getPromptAction().showToast({ message: '日志导出失败，请重试', duration: 4000 }); }
+      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("日志导出失败，请重试"), duration: 4000 }); }
       catch (_) { PinmonyRuntimeLog.warn('Runtime: log export feedback unavailable'); }
     } finally { this.exportingLog = false; }
   }
   private readonly pathStack: NavPathStack = new NavPathStack();
   private readonly contentScroller: Scroller = new Scroller();
-  private readonly options: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', '通知', '退出账号', '日志', '关于'];
+  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'notifications', 'logout', 'logs', 'about'];
+  private optionLabel(id: string): string {
+    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', '通知', '退出账号', '日志', '关于'];
+    return this.uiText(labels[this.options.indexOf(id)] || '');
+  }
 
   aboutToAppear(): void {
     this.pageVisible = true;
@@ -48,9 +55,9 @@ export struct PinmonySettingsPage {
     const token: number = this.store.token;
     this.logoutConfirmOpen = true;
     this.getUIContext().showAlertDialog({
-      title: '退出账号', message: '确定要退出当前账号吗？',
-      primaryButton: { value: '取消', action: () => { this.logoutConfirmOpen = false; } },
-      secondaryButton: { value: '退出账号', action: () => {
+      title: this.uiText("退出账号"), message: this.uiText("确定要退出当前账号吗？"),
+      primaryButton: { value: this.uiText("取消"), action: () => { this.logoutConfirmOpen = false; } },
+      secondaryButton: { value: this.uiText("退出账号"), action: () => {
         this.logoutConfirmOpen = false;
         if (this.pageVisible && this.store.screen === 'root' && token === this.store.token &&
             !this.store.busy && !this.store.loading && this.onRequest) this.onRequest('logout', '');
@@ -71,7 +78,7 @@ export struct PinmonySettingsPage {
         } }
       },
       content: {
-        title: { mainTitle: '设置' },
+        title: { mainTitle: this.uiText("设置") },
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } }
       }
     };
@@ -84,15 +91,15 @@ export struct PinmonySettingsPage {
       List({ space: 0, scroller: this.contentScroller }) {
         if (this.store.error) {
           ListItem() {
-            Text(this.store.error).fontSize(14).fontColor($r('app.color.secondary_text'))
+            Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
               .padding({ left: 20, right: 20, top: 12, bottom: 12 })
           }
         }
-        if (!this.store.loading) { ForEach(this.options, (label: string) => {
+        if (!this.store.loading) { ForEach(this.options, (id: string) => {
           ListItem() {
             Button({ type: ButtonType.Normal }) {
               Row({ space: 16 }) {
-                Text(label === '退出账号' && this.store.busy ? '正在退出…' : label === '日志' && this.exportingLog ? '正在导出日志…' : label)
+                Text(id === 'logout' && this.store.busy ? this.uiText("正在退出…") : id === 'logs' && this.exportingLog ? this.uiText("正在导出日志…") : this.optionLabel(id))
                   .fontSize(17)
                   .fontColor($r('app.color.primary_text'))
                   .layoutWeight(1)
@@ -106,18 +113,18 @@ export struct PinmonySettingsPage {
             }
             .width('100%')
             .backgroundColor(Color.Transparent)
-            .enabled(!this.store.busy && !this.store.loading && (label !== '日志' || !this.exportingLog))
-            .onClick(() => { if (label === '编辑个人资料' && this.onEditProfile) this.onEditProfile();
-              if (label === '通知') { this.store.screen = 'notifications'; if (this.onRequest) this.onRequest('notifications', ''); }
-              if (label === '显示设置') this.store.screen = 'display';
-              if (label === '优化你的推荐' || label === '个人资料可见性') { this.store.screen = label === '优化你的推荐' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(label === '优化你的推荐' ? 'aiRead' : 'read', ''); }
-              if (label === '帐户管理') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
-              if (label === '退出账号') this.confirmLogout();
-              if (label === '日志') this.exportLog();
-              if (label === '关于') this.store.screen = 'about'; })
-            .accessibilityText(label === '日志' && this.exportingLog ? '正在导出日志…' : label)
+            .enabled(!this.store.busy && !this.store.loading && (id !== 'logs' || !this.exportingLog))
+            .onClick(() => { if (id === 'profile' && this.onEditProfile) this.onEditProfile();
+              if (id === 'notifications') { this.store.screen = 'notifications'; if (this.onRequest) this.onRequest('notifications', ''); }
+              if (id === 'display') this.store.screen = 'display';
+              if (id === 'recommend' || id === 'visibility') { this.store.screen = id === 'recommend' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(id === 'recommend' ? 'aiRead' : 'read', ''); }
+              if (id === 'account') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
+              if (id === 'logout') this.confirmLogout();
+              if (id === 'logs') this.exportLog();
+              if (id === 'about') this.store.screen = 'about'; })
+            .accessibilityText(id === 'logs' && this.exportingLog ? this.uiText("正在导出日志…") : this.optionLabel(id))
           }
-        }, (label: string) => label) }
+        }, (id: string) => id + this.uiLanguage) }
       }
       .width('100%').height('100%')
       .padding({ bottom: 28 })
