@@ -2,11 +2,19 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
 const ts = require(process.argv[2] || 'typescript');
 const files = new Map(), timers = new Map(); let destinations = [], opens = 0, closes = 0, next = 0, fail = false, partial = false;
 let delayedRead;
+const sessionPath = '/internal/pinweb-session-current.log', previousPath = '/internal/pinweb-session-previous.log';
+const modes = [];
 const io = {
-  OpenMode: { CREATE: 1, READ_WRITE: 2, TRUNC: 4, APPEND: 8 },
+  OpenMode: { CREATE: 1, READ_WRITE: 2, TRUNC: 4, APPEND: 8, READ_ONLY: 16 },
   async readText(path, options) { if (delayedRead) { const waiting=delayedRead;delayedRead=undefined;await waiting; } if (!files.has(path)) throw Error('missing');return Buffer.from(files.get(path)).subarray(0,options?.length).toString('utf8'); },
   async copyFile(src, dst) { if (!files.has(src)) throw Error('missing'); files.set(dst, files.get(src)); },
-  async open(path, mode) { if (fail) throw Error('disk unavailable'); opens++; if (mode & 4) files.set(path, ''); return { fd: { path, mode } }; },
+  async open(path, mode) { if (fail) throw Error('disk unavailable'); if (mode & 16 && !files.has(path)) throw Error('missing');
+    opens++; modes.push({path,mode}); if (mode & 4) files.set(path, ''); return { fd: { path, mode, position: 0 } }; },
+  async read(fd, buffer) {
+    if (delayedRead) { const waiting = delayedRead; delayedRead = undefined; await waiting; }
+    const source = Buffer.from(files.get(fd.path)); const part = source.subarray(fd.position, fd.position + buffer.byteLength);
+    new Uint8Array(buffer).set(part); fd.position += part.length; return part.length;
+  },
   async write(fd, bytes) { const data = Buffer.from(bytes); const count = partial ? Math.min(7, data.length) : data.length;
     files.set(fd.path, Buffer.concat([Buffer.from(files.get(fd.path) || '', 'utf8'), data.subarray(0, count)]).toString('utf8')); return count; },
   async close() { closes++; },
@@ -21,21 +29,25 @@ function compile(path, requireFn) { const exports = {}; vm.runInNewContext(ts.tr
 const buffer = compile('common_foundation/src/main/ets/services/PinmonyLogBuffer.ets', () => ({}));
 const { PinmonyRuntimeLog: log } = compile('common_foundation/src/main/ets/services/PinmonyRuntimeLog.ets', name =>
   name.includes('LogBuffer') ? buffer : { fileIo: io, picker: { DocumentViewPicker: class { async save() { return destinations; } } },
-    util: { TextEncoder: class { encodeInto(text) { return new Uint8Array(Buffer.from(text)); } } } });
+    util: { TextEncoder: class { encodeInto(text) { return new Uint8Array(Buffer.from(text)); } },
+      TextDecoder: { create() { const decoder = new TextDecoder(); return { decodeToString: (bytes, options) => decoder.decode(bytes, options) }; } } } });
 (async () => {
   assert.match(log.savedStatus(), /尚未成功/); log.initialize('/internal'); await log.flush(); assert.match(log.savedStatus(), /已自动保存/);
   const before = opens;
   log.info('cookie=secret token=hidden https://example.test/?csrf=private account_id=1234567890123');
   assert.equal(opens, before, 'record performs no synchronous or immediate disk I/O'); await log.flush();
   assert(!/secret|hidden|private|1234567890123/.test(files.get('/internal/pinweb-runtime.log')));
-  log.initialize('/internal'); await log.flush(); assert(files.get('/internal/pinweb-session-previous.log').includes('[credential]'));
+  const firstLaunch = files.get(sessionPath); files.set(previousPath, 'legacy-preserved\n');
+  log.initialize('/internal'); await log.flush();
+  assert(files.get(sessionPath).startsWith(firstLaunch), 'restart appends without truncating the existing archive');
+  assert.equal(files.get(previousPath), 'legacy-preserved\n', 'legacy history is never overwritten');
   const batchOpens = opens; for (let i = 0; i < 450; i++) log.info('event ' + i); await log.flush();
   assert(opens - batchOpens < 10, 'hundreds of records share batch writes');
   assert(files.get('/internal/pinweb-session-current.log').includes('event 0'));
   assert.equal(await log.export({}), false); destinations = ['/export.txt'];
   log.info('latest-before-export'); const exporting = log.export({}); assert.equal(await log.export({}), false, 'duplicate picker suppressed'); assert.equal(await exporting, true);
   assert(files.get('/export.txt').includes('event 449')); assert(files.get('/export.txt').includes('latest-before-export'));
-  assert(files.get('/export.txt').includes('Previous session'));
+  assert(files.get('/export.txt').includes('Continuous application history')); assert(files.get('/export.txt').includes('legacy-preserved'));
   await log.flush();let releaseSnapshot;delayedRead=new Promise(resolve=>releaseSnapshot=resolve);
   const lockedExport=log.export({});await new Promise(resolve=>setImmediate(resolve));
   assert.equal(delayedRead,undefined,'export is reading its snapshot');
@@ -44,11 +56,17 @@ const { PinmonyRuntimeLog: log } = compile('common_foundation/src/main/ets/servi
   assert.equal(files.get('/internal/pinweb-session-current.log'),frozenSession,'snapshot read blocks session append/rotation');
   releaseSnapshot();await Promise.all([lockedExport,queuedWrite]);
   assert(!files.get('/export.txt').includes('during-locked-export'));assert(files.get('/internal/pinweb-session-current.log').includes('during-locked-export'));
-  log.MAX_SESSION_BYTES = 20000;
   for (let group = 0; group < 10; group++) { for (let i = 0; i < 150; i++) log.info('rotation ' + (group * 150 + i) + ' ' + 'x'.repeat(100)); await log.flush(); }
-  assert(files.get('/internal/pinweb-session-previous.log').length > 0);
+  assert.equal(files.get(previousPath), 'legacy-preserved\n');
+  assert(files.get(sessionPath).includes('rotation 0 '), 'older records survive archive growth');
   assert(files.get('/internal/pinweb-session-current.log').includes('rotation 1499'));
   assert.equal(files.get('/internal/pinweb-runtime.log').trim().split('\n').length, 1000);
+  // The old implementation lost history beyond its 8 MiB rotation/read limit.
+  const large = 'x'.repeat(8 * 1024 * 1024 + 65500) + '😀中文\n2026-01-01 INFO archive-tail-marker\n';
+  files.set(sessionPath, files.get(sessionPath) + large);
+  await log.export({}); assert(files.get('/export.txt').includes(large), 'all history including UTF-8 chunk boundaries is exported');
+  assert(!files.get('/export.txt').includes('�'), 'streaming export does not split UTF-8 code points');
+  assert(!modes.some(x => [sessionPath, previousPath].includes(x.path) && x.mode & 4), 'history files are never opened with TRUNC');
   const unicode='x'.repeat(65535)+'😀中文'+'z'.repeat(70000);
   await log.writeFile('/unicode.txt',unicode,false);assert.equal(files.get('/unicode.txt'),unicode,'chunk boundaries preserve surrogate pairs and UTF-8');
   assert.equal(opens, closes, 'every asynchronous handle is closed including exports');
@@ -62,5 +80,5 @@ const { PinmonyRuntimeLog: log } = compile('common_foundation/src/main/ets/servi
   for (let i = 0; i < 1300; i++) log.info('bounded-queue ' + i); await log.flush();
   assert(files.get('/internal/pinweb-session-current.log').includes('dropped=300'));
   assert.equal(timers.size, 0);
-  console.log('Runtime log: async batching, privacy, order, partial writes, bounded queue, rotation, failure and export passed');
+  console.log('Runtime log: append across restarts, preserved legacy, complete >8MiB streaming export, privacy, partial writes, bounded memory and failure passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

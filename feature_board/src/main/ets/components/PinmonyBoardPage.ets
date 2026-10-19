@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardTarget, PinmonyBoardSection } from '../models/PinmonyBoardDetail';
 import { boardSectionPreviewImages } from '../services/PinmonyBoardPresentation';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
@@ -234,12 +235,12 @@ export struct PinmonyBoardPage {
       enableComponentSafeArea: true,
       style: {
         scrollEffectOpts: { enableScrollEffect: false },
-        originalStyle: { backgroundStyle: {
+        scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: {  backgroundStyle: {
           backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
         }, contentStyle: this.isDiscoveryBoard() ? {
           backIconStyle: { backgroundColor: Color.Transparent, iconColor: $r('app.color.primary_text') },
           menuStyle: { backgroundColor: Color.Transparent, iconColor: $r('app.color.primary_text') }
-        } : undefined }
+        } : { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text') } } }
       },
       content: {
         title: { mainTitle: this.creatingTarget ? '添加图板区块' : this.selectingPins() ? '选择 Pin 图' : this.phase() === 'targets' ? '选择图板区块' :
@@ -991,6 +992,8 @@ export struct PinmonyBoardPage {
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .backgroundColor($r('app.color.page_background'))
     .bindSheet($$this.menuOpen, this.optionsSheet(), {
+      radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+      onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardPage.menuOpen radius=four-corners-32vp'); },
       height: SheetSize.FIT_CONTENT, showClose: true, dragBar: true,
       title: { title: this.phase() === 'section' ? '图板区块选项' : '图板选项' }, maskColor: '#66000000',
       backgroundColor: $r('app.color.page_background'),

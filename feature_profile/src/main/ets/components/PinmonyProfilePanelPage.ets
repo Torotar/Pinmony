@@ -1,5 +1,5 @@
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyProfilePanel';
 import { PinmonyUserAvatar } from 'common_ui';
 @Component
@@ -72,7 +72,8 @@ export struct PinmonyProfilePanelPage {
   aboutToAppear(): void { this.syncUsername(); this.paths.pushPath({ name: 'profile-panel' }, false); }
   private options(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
+      style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE }, scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
         backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
       content: { title: { mainTitle: this.snapshot.mode === 'edit' ? '编辑个人资料' : this.snapshot.mode === 'followers' ? '粉丝' : '关注中' },
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } },
@@ -178,6 +179,7 @@ export struct PinmonyProfilePanelPage {
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
         }.width('100%').padding({ left: 24, right: 24, top: this.snapshot.mode === 'following' ? 0 : 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').height('100%').align(Alignment.Top).clip(true)
+        .edgeEffect(this.snapshot.mode === 'edit' ? EdgeEffect.Spring : EdgeEffect.None, { alwaysEnabled: true })
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
           .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))
       if (this.snapshot.loading) {

@@ -166,13 +166,24 @@ async function main() {
     { error: { code: 1007900028 }, elapsed: 5026, timeInfo: { nameLookupTimeMs: 0, connectTimeMs: 0, tlsHandshakeTimeMs: 0, startTransferTimeMs: 0 } },
     { error: { code: 1007900028 }, elapsed: 5026, timeInfo: { nameLookupTimeMs: 8, connectTimeMs: 10, tlsHandshakeTimeMs: 30, startTransferTimeMs: 0 } },
     { error: { code: 1007900028 }, elapsed: 5026, partialError: true, chunks: [mp4.subarray(0, 5)] },
-    { error: { code: 1007900028 }, elapsed: 8500 },
-    { error: { code: 1007900060 }, elapsed: 1000 }
+    { error: { code: 1007900028 }, elapsed: 8500 }
   ]) {
     const blocked = harness(plan); await assert.rejects(blocked.read());
     assert.equal(blocked.requests.length, 1, 'DNS/transfer/partial/budget/certificate failures do not trigger TLS compatibility');
     assert.equal(blocked.files.size, 0); assert(blocked.sessions.every(session => session.closed));
   }
+  const cert = harness({ attempts: [{ error: { code: 1007900060 }, elapsed: 700 }, {}] });
+  const certLease = await cert.read();
+  assert.equal(cert.requests.length, 2, 'RCP certificate rejection permits one independently verified native request');
+  assert.equal(cert.requests[1].nativeOptions.usingProxy, true);
+  assert.equal(cert.requests[1].nativeOptions.caPath, undefined);
+  assert.equal(cert.requests[1].nativeOptions.clientCert, undefined);
+  assert(!Object.keys(cert.requests[1].headers).some(key => /cookie|authorization|csrf/i.test(key)));
+  certLease.release();
+  const certRejected = harness({ attempts: [{ error: { code: 1007900060 } }, { error: { code: 2300060 } }] });
+  await assert.rejects(certRejected.read(), error => error.code === 2300060);
+  assert.equal(certRejected.requests.length, 2);assert.equal(certRejected.files.size, 0);assert.equal(certRejected.handles.size, 0);
+  assert(certRejected.traces.some(event => /reason=certificate-validation/.test(event)));
   for (const config of [{ error: { code: 1007900035 } }, { error: { code: 1007900007 } },
     { error: { code: 1007900035 }, partialError: true, chunks: [mp4.subarray(0, 5)] },
     { error: { code: 1007900035 }, elapsed: 20001 }]) {

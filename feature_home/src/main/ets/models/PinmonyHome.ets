@@ -8,6 +8,7 @@ export interface PinmonyHomeTab {
 }
 
 export interface PinmonyHomeBoard {
+  boardUrl?: string;
   id: string;
   name: string;
   pinCount: number;

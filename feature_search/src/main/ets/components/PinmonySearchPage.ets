@@ -907,42 +907,17 @@ export struct PinmonySearchPage {
           .backgroundColor(Color.Transparent).onClick(() => { this.closeInputPanel(true); })
       } else if (this.committedQuery()) {
         Button({ type: ButtonType.Circle }) {
-          SymbolGlyph($r('sys.symbol.slider_horizontal_2'))
-            .fontSize(24)
-            .fontColor([$r('app.color.primary_text')])
-        }
-        .width(44)
-        .height(44)
-        .padding(0)
-
-        .backgroundColor($r('app.color.surface_muted'))
-        .enabled(this.interactionReady)
-        .accessibilityText('显示筛选器')
-        .onClick(() => { if (this.interactionReady && this.onFilters) this.onFilters(); })
+          SymbolGlyph($r('sys.symbol.slider_horizontal_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
+        }.width(44).height(44).padding(0).backgroundColor($r('app.color.surface_muted'))
+          .enabled(this.interactionReady).accessibilityText('显示筛选器')
+          .onClick(() => { if (this.interactionReady && this.onFilters) this.onFilters(); })
       }
-
     }.width('100%').height(56).padding({ left: 8, right: 8 }).alignItems(VerticalAlign.Center)
   }
 
   @Builder
   private searchResultsContent() {
     Column() {
-      if (this.visibleCategories().length > 0) {
-        Scroll() {
-          Row({ space: 10 }) {
-            ForEach(this.visibleCategories(), (item: PinmonySearchCategory) => {
-              this.categoryChip(item)
-            }, (item: PinmonySearchCategory) => item.id)
-          }
-          .padding({ left: 16, right: 8 })
-        }
-        .width('100%')
-        .height(54)
-        .scrollable(ScrollDirection.Horizontal)
-        .align(Alignment.Start)
-        .scrollBar(BarState.Off)
-      }
-
       if (this.snapshot.api && this.snapshot.results.length > 0 && this.error) {
         Row({ space: 12 }) {
           Text(this.error)
@@ -1071,8 +1046,8 @@ export struct PinmonySearchPage {
   private searchDestination(_name?: string, _param?: Object) {
     HdsNavDestination() {
       Column() {
-        // Lay out the compact search row directly; HDS stackBuilder reserves extra title-bar space.
         this.searchHeader()
+
         if (this.automaticLoadingEnabled && this.committedQuery()) {
           Row() {
             ForEach(this.upcomingImageUrls, (url: string) => {
@@ -1080,7 +1055,7 @@ export struct PinmonySearchPage {
             }, (url: string) => url)
           }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         }
-        if (!this.inputEditing && !this.committedQuery() && this.visibleCategories().length > 0) {
+        if (this.visibleCategories().length > 0) {
           Scroll() {
             Row({ space: 10 }) {
               ForEach(this.visibleCategories(), (item: PinmonySearchCategory) => {
@@ -1090,7 +1065,7 @@ export struct PinmonySearchPage {
             .padding({ left: 16, right: 8 })
           }
           .width('100%').height(54).scrollable(ScrollDirection.Horizontal)
-            .scrollBar(BarState.Off)
+          .align(Alignment.Start).scrollBar(BarState.Off)
         }
         Refresh({ refreshing: this.refreshing }) {
         Column() {
@@ -1115,8 +1090,9 @@ export struct PinmonySearchPage {
       }
       .width('100%')
       .height('100%')
-      .padding({ top: this.getUIContext().px2vp(this.statusBarHeightPx) })
+
     }
+    .padding({ top: this.getUIContext().px2vp(this.statusBarHeightPx) })
     .hideTitleBar(true)
     .hideBackButton(true)
     .onBackPressed(() => {
@@ -1140,6 +1116,8 @@ export struct PinmonySearchPage {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
     .backgroundColor($r('app.color.page_background'))
     .bindSheet($$this.quizSheetOpen, this.quizSheet(), {
+      radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+      onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonySearchPage.quizSheetOpen radius=four-corners-32vp'); },
       height: '85%', preferType: SheetType.BOTTOM, dragBar: false, showClose: true,
       title: { title: this.snapshot.quiz?.mode === 'picker' ? '选择灵感（最多10张）' : '灵感结果' },
       backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
@@ -1149,6 +1127,10 @@ export struct PinmonySearchPage {
         if (this.snapshot.quiz && this.snapshot.quiz.mode !== 'entry' && this.onQuizAction) this.onQuizAction('back', '');
       }
     })
+  }
+
+  private searchBackVisible(): boolean {
+    return this.inputEditing || !!this.committedQuery();
   }
 
   private handleSearchBack(): void {

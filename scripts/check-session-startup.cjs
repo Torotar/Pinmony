@@ -14,7 +14,7 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readF
   { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, { exports: auth });
 const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: login,
   PinmonyRuntimeLog: { info() {}, warn() {} }, clearTimeout() {} };
-require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure', 'confirmBusinessSession', 'usesNativeProfileReads'].map(method).join('\n') +
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure', 'enterAuthenticatedRoot', 'nativeRootTabsVisible', 'confirmBusinessSession', 'usesNativeProfileReads'].map(method).join('\n') +
   '} globalThis.Native=Native;', { target: ts.ScriptTarget.ES2020 }), context);
 function harness() {
   const native = new context.Native(), loads = [], scripts = [], effects = [];
@@ -33,8 +33,9 @@ function harness() {
       native.updateAuthState(JSON.stringify({ status, epoch, pageUrl: current, profileUrl: '' }));
     } };
 }
-assert.ok(source.includes('Web({ src: PINTEREST_URL, controller: this.controller })'), 'cold start requests home, not login');
-assert.ok(!source.includes('Web({ src: PINTEREST_LOGIN_URL'), 'no unconditional login document at startup');
+const loginSource = fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets', 'utf8');
+assert.ok(loginSource.includes('Web({ src: view.url || PINTEREST_URL, controller: view.controller })'), 'login host has explicit URL with legacy home default');
+assert.ok(!loginSource.includes('Web({ src: PINTEREST_LOGIN_URL'), 'no unconditional login document at startup');
 const existing = harness();
 const failedAck = harness();
 failedAck.native.controller.runJavaScript = script => {
@@ -93,3 +94,18 @@ assert.equal(username,'fixture_owner','regional authentication must supply the h
 assert.deepEqual(regional.loads,[],'regional homepage stays in its current document');
 assert.ok(regional.effects.includes('bind'));
 console.log('Regional authentication: current profile supplies nonempty home identity and binds without navigation');
+const relogin = harness();
+Object.assign(relogin.native, { nativeBusinessRoutesEnabled: true, rootTabAddresses: new Map(),
+  publishPageVisible: () => false, nativeSearchPageVisible: () => false, boardUrlFromAddress: () => '', inboxUrlFromAddress: () => '',
+  extractPinUrl: () => '', nativeDisplayAddress() { return this.navigationAddress; },
+  syncFloatingTabsMotion() {}, bottomBarCoordinator: { resetForSession() { relogin.effects.push('bar-reset'); } } });
+relogin.emit('authenticated'); assert.equal(relogin.native.nativeRootTabsVisible(), true);
+relogin.setUrl(login); relogin.native.authEpoch++; relogin.native.authStatus = 'unauthenticated'; relogin.native.nativeRootOnly = false;
+assert.equal(relogin.native.nativeRootTabsVisible(), false);
+relogin.emit('authenticated', 0); assert.equal(relogin.native.navigationAddress, login, 'stale evidence cannot restore a root');
+relogin.emit('authenticated');
+assert.equal(relogin.native.navigationAddress, home, 'login document does not remain the native display route');
+assert.equal(relogin.native.nativeRootTabsVisible(), true, 'relogin restores the actual root visibility predicate without a process restart');
+const resets = relogin.effects.filter(x => x === 'bar-reset').length;
+relogin.emit('authenticated'); assert.equal(relogin.effects.filter(x => x === 'bar-reset').length, resets, 'repeated evidence preserves scroll preferences and current presentation');
+console.log('Relogin: current native root, visible bottom bar, stale evidence and duplicate confirmation passed');

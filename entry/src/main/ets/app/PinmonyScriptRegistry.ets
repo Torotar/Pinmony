@@ -19,7 +19,7 @@ import { BOTTOM_BAR_SCRIPT } from '../app/PinmonyBottomBarScript';
 import { PIN_MORE_MENU_BRIDGE_SCRIPT } from 'feature_pin';
 import { SHARE_PANEL_BRIDGE_SCRIPT } from 'feature_pin';
 import { SHARE_LINK_SCRIPT } from 'feature_pin';
-import { PIN_AUTH_BRIDGE_SCRIPT } from 'common_session';
+import { PIN_AUTH_BRIDGE_SCRIPT, PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT } from 'common_session';
 import { PIN_BOARD_API_ENABLED, PIN_BOARD_API_SCRIPT, PIN_BOARD_SHARE_BRIDGE_SCRIPT } from 'feature_board';
 import { PIN_DETAIL_BRIDGE_SCRIPT } from 'feature_pin';
 import { PIN_DETAIL_API_ENABLED, PIN_DETAIL_API_SCRIPT } from 'feature_pin';
@@ -77,6 +77,7 @@ export function pinWebDocumentStartScripts(): ScriptItem[] {
                 'window.PinmonyReadMergingEnabled = ' + PIN_READ_MERGING_ENABLED.toString() + ';' +
                 'window.PinmonyNativeNetworkEnabled = ' + PIN_NATIVE_NETWORK_ENABLED.toString() + ';' + PIN_NATIVE_NETWORK_SCRIPT, scriptRules: ['*'] },
               { script: PIN_AUTH_BRIDGE_SCRIPT, scriptRules: ['*'] },
+              { script: PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, scriptRules: ['*'] },
               { script: PIN_NAVIGATION_BRIDGE_SCRIPT, scriptRules: ['*'] },
               { script: nonBoardDomScript(SHARE_LINK_SCRIPT), scriptRules: ['*'] },
               { script: 'window.PinmonyPostApiEnabled = ' + PIN_POST_API_ENABLED.toString() + ';' + useNativeTransport(PIN_POST_API_SCRIPT) +

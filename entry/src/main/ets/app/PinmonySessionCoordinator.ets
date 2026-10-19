@@ -25,6 +25,13 @@ interface PendingDetailLike {
 }
 const PINTEREST_URL: string = 'https://www.pinterest.com/';
 export interface PinmonySessionCoordinatorPorts {
+  nativeLogin?: () => boolean;
+  nativeEpoch?: () => number;
+  loginRequired?: () => void;
+  verifyLoginEvidence?: (message: PinmonyAuthMessage) => void;
+  releaseLogin?: () => void;
+  enterAuthenticatedRoot?: (home: string) => void;
+  verifySession?: () => void;
   activeSheetKind: () => string;
   setActiveSheetKind: (value: string) => string;
   activeTab: () => number;
@@ -153,15 +160,22 @@ export class PinmonySessionCoordinator {
   private readonly settingsStore: PinmonySettingsStore;
   private readonly ports: PinmonySessionCoordinatorPorts;
   constructor(ports: PinmonySessionCoordinatorPorts) { this.ports = ports; this.homeStore = ports.homeStore(); this.profileStore = ports.profileStore(); this.inboxStore = ports.inboxStore(); this.pinStore = ports.pinStore(); this.boardStore = ports.boardStore(); this.settingsStore = ports.settingsStore(); }
-updateAuthState(value: string): void {
+updateAuthState(value: string, nativeEvidence: boolean = false): void {
     try {
         const message: PinmonyAuthMessage = JSON.parse(value) as PinmonyAuthMessage;
-        const currentUrl: string = this.ports.controller().getUrl();
-        if (!acceptsAuthMessage(message, currentUrl, this.ports.authEpoch()))
+        const nativeLogin: boolean = this.ports.nativeLogin?.() === true;
+        const currentUrl: string = nativeEvidence && nativeLogin ? message.pageUrl : this.ports.controller().getUrl();
+        if (!acceptsAuthMessage(message, currentUrl, nativeEvidence && nativeLogin ? this.ports.nativeEpoch?.() ?? -1 : this.ports.authEpoch()))
             return;
-        if (this.ports.logoutAwaitingLogin() && !isPinterestAuthRoute(currentUrl))
+        if (!nativeEvidence && this.ports.logoutAwaitingLogin() && !isPinterestAuthRoute(currentUrl))
             return;
-        try {
+        if (nativeLogin && !nativeEvidence && message.status === 'authenticated') {
+            this.ports.verifyLoginEvidence?.(message);
+            return;
+        }
+        // The independent native attempt owns the result once Web evidence starts it.
+        if (nativeLogin && !nativeEvidence && this.ports.authStatus() === 'checking') return;
+        if (!nativeEvidence) try {
             this.ports.controller().runJavaScript('window.PinmonyAuthAcknowledge && window.PinmonyAuthAcknowledge(' +
                 JSON.stringify(value) + ')').catch(() => PinmonyRuntimeLog.warn('Pinmony: authentication acknowledgement unavailable'));
         }
@@ -175,6 +189,7 @@ updateAuthState(value: string): void {
             this.ports.setAuthStatus('unauthenticated');
             this.ports.setLoadFailed(false);
             this.ports.setFailureDetails('');
+            if (nativeLogin) { this.ports.loginRequired?.(); return; }
             if (!isPinterestAuthRoute(currentUrl) && this.ports.loginRedirectEpoch() !== this.ports.authEpoch()) {
                 // Repeated evidence callbacks must not queue multiple login navigations.
                 this.ports.setLoginRedirectEpoch(this.ports.authEpoch());
@@ -220,7 +235,7 @@ updateAuthState(value: string): void {
         this.ports.setHomeCacheIdentityEpoch(message.epoch);
         const authenticatedHomePage: string = this.ports.homePageKeyFromAddress(currentUrl);
         this.ports.tryRestoreAuthenticatedHome(accountId, authenticatedHomePage);
-        if (entering)
+        if (entering && !nativeLogin)
             this.ports.configureDocumentRetention(true);
         if (entering)
             PinmonyRuntimeLog.info('StartupTrace: authenticated session confirmed');
@@ -238,13 +253,16 @@ updateAuthState(value: string): void {
         const homeUsername: string = usernameMatch ? usernameMatch[1] : '';
         PinmonyRuntimeLog.info('StartupTrace: home identity ready=' + (!!homeUsername).toString() +
             ' profilePresent=' + (!!authenticatedProfile).toString());
-        this.ports.controller().runJavaScript('window.PinmonyHomeSetUsername && window.PinmonyHomeSetUsername(' +
+        if (!nativeLogin) this.ports.controller().runJavaScript('window.PinmonyHomeSetUsername && window.PinmonyHomeSetUsername(' +
             JSON.stringify(homeUsername) + ')').catch(() => PinmonyRuntimeLog.warn('Pinmony: home identity bridge unavailable'));
-        this.ports.bindNativeNetwork();
+        if (!nativeLogin) this.ports.bindNativeNetwork();
         if (entering) {
             this.ports.setActiveTab(0);
+            const origin: RegExpMatchArray | null = currentUrl.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
+            if (origin) this.ports.enterAuthenticatedRoot?.(origin[0] + '/');
             this.ports.tabsController().changeIndex(0);
             this.ports.pageHistory().reset();
+            if (nativeLogin) { this.ports.releaseLogin?.(); return; }
             if (!this.ports.isHomeRootAddress(currentUrl))
                 this.ports.controller().loadUrl(PINTEREST_URL);
             else {
@@ -255,10 +273,12 @@ updateAuthState(value: string): void {
             }
         }
         else if (accountChanged && authenticatedHomePage) {
+            if (nativeLogin) { this.ports.enterAuthenticatedRoot?.(authenticatedHomePage); this.ports.releaseLogin?.(); return; }
             this.ports.expectHome();
             this.ports.controller().runJavaScript('window.PinmonyHomeRefresh && window.PinmonyHomeRefresh()')
                 .catch(() => PinmonyRuntimeLog.warn('Pinmony: account home sync unavailable'));
         }
+        if (nativeLogin) this.ports.releaseLogin?.();
     }
     catch (_) {
         PinmonyRuntimeLog.warn('Pinmony: invalid authentication state');
@@ -357,6 +377,7 @@ resetAuthenticatedContent(): void {
 }
 
 syncAuthentication(): void {
+    this.ports.verifySession?.();
     const epoch: number = this.ports.authEpoch();
     this.ports.controller().runJavaScript('window.PinmonyAuthSync && window.PinmonyAuthSync(' + epoch.toString() + ')')
         .catch(() => PinmonyRuntimeLog.warn('Pinmony: authentication bridge unavailable'));

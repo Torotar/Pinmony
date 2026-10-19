@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 
@@ -54,6 +55,8 @@ export struct PinmonyBoardSectionPage {
   build() {
     Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
       .bindSheet($$this.visible, this.sectionSheet(), {
+        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardSectionPage.visible radius=four-corners-32vp'); },
         height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
         backgroundColor: $r('app.color.page_background'),
         onWillDismiss: (action: DismissSheetAction) => {

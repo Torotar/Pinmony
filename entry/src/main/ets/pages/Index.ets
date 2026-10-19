@@ -79,12 +79,15 @@ import { PinmonyHomeController, PinmonyHomePorts, readHomeCache, writeHomeCache,
 
 import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply,
   PIN_NATIVE_NETWORK_ENABLED, useNativeTransport } from 'common_network';
+import { PinmonyBuildLoginPage } from '../components/PinmonyLoginPage';
 import { PinmonyShareBridge } from '../app/PinmonyShareBridge';
 
 import { webview } from '@kit.ArkWeb';
+import { connection } from '@kit.NetworkKit';
 import { PinmonyDetailNativeAuxiliary, PIN_NATIVE_DETAIL_AUXILIARY_ENABLED, PinmonyDetailNativeAuxiliaryPorts } from '../app/PinmonyDetailNativeAuxiliary';
 import { PIN_NATIVE_DETAIL_READS_ENABLED, PinmonyDetailNativeReads, PinmonyDetailNativeReadsPorts } from '../app/PinmonyDetailNativeReads';
-import { PinmonyBusinessSession, PinmonyBusinessSessionContext, PinmonyAuthStatus, isPinterestAuthRoute, PINTEREST_LOGIN_URL } from 'common_session';
+import { PinmonyBusinessSession, PinmonySessionEnvironment, PinmonyBusinessSessionContext, PinmonyAuthStatus, PinmonyAuthMessage, PIN_AUTH_BRIDGE_SCRIPT, PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, isPinterestAuthRoute, PINTEREST_LOGIN_URL } from 'common_session';
+import { PinmonySessionVerification, PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED } from '../app/PinmonySessionVerification';
 
 import { PinmonyStatusPage } from 'common_ui';
 
@@ -156,6 +159,8 @@ struct Index {
     if (/^detail\.action\.(like|comment|save|share|more)$/.test(name)) this.detailJourney.mark(name + '.clicked', false);
     PinmonyRuntimeLog.info('ActionTrace: click ' + name + (detail ? ' detailLength=' + detail.length.toString() : ''));
   }
+  private readonly loginScripts: ScriptItem[] = [{ script: PIN_AUTH_BRIDGE_SCRIPT, scriptRules: ['*'] },
+    { script: PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, scriptRules: ['*'] }];
   private readonly documentStartScripts: ScriptItem[] = pinWebDocumentStartScripts();
   private readonly nativeBusinessRoutesEnabled: boolean = PIN_NATIVE_POST_OPERATIONS_ENABLED && PIN_NATIVE_COMMENT_WRITES_ENABLED && PIN_NATIVE_DETAIL_AUXILIARY_ENABLED && PIN_NATIVE_SEARCH_DISCOVERY_ENABLED && PIN_NATIVE_DETAIL_READS_ENABLED && PIN_NATIVE_HOME_READS_ENABLED && PIN_NATIVE_SEARCH_READS_ENABLED && PIN_NATIVE_PROFILE_READS_ENABLED && PIN_NATIVE_INBOX_MESSAGES_ENABLED && PIN_NATIVE_INBOX_UPDATES_ENABLED && PIN_NATIVE_BOARD_READS_ENABLED && PIN_NATIVE_SHARE_PUBLISH_ENABLED && PIN_NATIVE_PROFILE_SETTINGS_ENABLED && PIN_NATIVE_PIN_MENUS_ENABLED;
   private readonly nativeNetwork: PinmonyNativeNetwork = new PinmonyNativeNetwork();
@@ -168,8 +173,8 @@ struct Index {
       this.pageHistory.key(this.nativeBackTarget) === this.pageHistory.key(target),
     isHome: (target: string): boolean => this.isHomeRootAddress(target),
     isBoard: (target: string): boolean => !!this.boardUrlFromAddress(target),
-    documentMatches: (target: string): boolean => this.pageHistory.key(this.controller.getUrl()) === this.pageHistory.key(target),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    documentMatches: (target: string): boolean => this.pageHistory.key(this.sessionDocumentUrl()) === this.pageHistory.key(target),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     useHistory: (target: string): boolean => this.returnToHistoryEntry(target),
     load: (target: string, token: number): void => this.loadReturnTarget(target, token),
     confirm: (target: string, bindDetail: boolean): void => {
@@ -190,7 +195,7 @@ struct Index {
     setState: (state: PinmonyBoardCollaborators | undefined): void => { this.boardStore.collaborators = state; },
     token: (): number => this.boardStore.collaboratorsToken,
     nextToken: (): number => ++this.boardStore.collaboratorsToken,
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     jsonText: (value: string): string => this.webJsonText(value),
     feedback: (value: string): void => this.showMessage(value),
     trace: (): void => this.traceAction('board.collaborators')
@@ -208,7 +213,7 @@ struct Index {
     actionsReady: (): boolean => this.pinStore.detailActionsReady,
     openingToken: (): number => this.pinStore.detailOpeningToken,
     hasNativeBackTarget: (): boolean => !!this.nativeBackTarget,
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     schedule: (callback: () => void, delayMs: number): number => this.pageTasks.timeout(callback, delayMs),
     cancel: (id: number): void => this.pageTasks.cancelTimeout(id),
     markJourney: (event: string): void => this.detailJourney.mark(event),
@@ -235,7 +240,7 @@ struct Index {
     detailReturnedToRoot: (): boolean => this.detailReturnedToRoot,
     businessSuspended: (): boolean => this.businessSuspended,
     networkContext: (): PinmonyNetworkContext => this.nativeNetworkContext(),
-    runJavaScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runJavaScript: (script: string): Promise<string> => this.runSessionScript(script),
     schedule: (callback: () => void, delayMs: number): number => this.pageTasks.timeout(callback, delayMs),
     cancel: (id: number): void => this.pageTasks.cancelTimeout(id),
     markJourney: (event: string): void => this.detailJourney.mark(event),
@@ -400,10 +405,19 @@ struct Index {
   @State private offlineCacheLoading: boolean = false;
   @State @Watch('syncFloatingTabsMotion') private authStatus: PinmonyAuthStatus = 'checking';
   private authEpoch: number = 0;
+  private readonly sessionEnvironment: PinmonySessionEnvironment = new PinmonySessionEnvironment();
   private readonly businessSession: PinmonyBusinessSession = new PinmonyBusinessSession();
   private authCheckTimer: number = -1;
   private loginRedirectEpoch: number = -1;
   private lastLoginRetryAt: number = -1;
+  @State private loginHostMounted: boolean = false;
+  @State private loginPageVisible: boolean = true;
+  @State private loginStartUrl: string = PINTEREST_LOGIN_URL;
+  private nativeSessionEpoch: number = 0;
+  private nativeVerificationPending: boolean = false;
+  private nativeLoginEvidenceKey: string = '';
+  private nativeSessionOrigin: string = 'https://www.pinterest.com';
+  private readonly nativeLoginEnabled: boolean = PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED && this.nativeBusinessRoutesEnabled;
   private logoutAwaitingLogin: boolean = false;
   private logoutUnknownAccount: string = '';
   private retainedHomeAwaitingAuth: boolean = false;
@@ -523,7 +537,7 @@ struct Index {
     detailRelatedMeasured: (): boolean => this.detailRelatedMeasured,
     setDetailRelatedMeasured: (value: boolean): void => { this.detailRelatedMeasured = value; },
     detailImageLoadedUrl: (): string => this.detailImageLoadedUrl,
-    document: (): string => this.controller.getUrl(),
+    document: (): string => this.sessionDocumentUrl(),
     addressKey: (value: string): string => this.pageHistory.key(value),
     currentPinUrl: (): string => this.currentPinUrl(),
     mark: (event: string, once: boolean = true, duration: number = 0): void => {
@@ -541,7 +555,7 @@ struct Index {
     syncDetailImageStage: (): void => this.syncDetailImageStage(),
     updateSearchPinTitle: (pin: string, title: string): void => this.updateSearchPinTitle(pin, title),
     updateHomePinTitle: (pin: string, title: string): void => this.updateHomePinTitle(pin, title),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     foreground: (): boolean => !this.businessSuspended && this.authStatus === 'authenticated',
   } as PinmonyDetailReadControllerPorts);
 
@@ -553,9 +567,9 @@ struct Index {
     authEpoch: (): number => this.authEpoch,
     authStatus: (): string => this.authStatus,
     businessSuspended: (): boolean => this.businessSuspended,
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     visualStart: (): string => useNativeTransport(PIN_VISUAL_SEARCH_API_SCRIPT),
-    document: (): string => this.controller.getUrl(),
+    document: (): string => this.sessionDocumentUrl(),
     webJsonText: (value: string): string => this.webJsonText(value),
     mark: (event: string): void => this.detailJourney.mark(event),
     pinIdentity: (value: string): string => this.pinIdentity(value),
@@ -589,7 +603,7 @@ struct Index {
     customMenu: (): boolean => !!this.homeStore.customHomeMenu,
     pendingHomeMorePin: (): string => this.homeStore.pendingHomeMorePin,
     clearHomeMenuPin: (): void => { this.homeStore.homeMenuPin = ''; },
-    document: (): string => this.controller.getUrl(),
+    document: (): string => this.sessionDocumentUrl(),
     foreground: (): boolean => !this.businessSuspended && this.authStatus === 'authenticated',
     currentShareObjectUrl: (): string => this.currentShareObjectUrl(),
     shareObjectReady: (): boolean => this.shareObjectReady(),
@@ -604,7 +618,7 @@ struct Index {
     showShareFeedbackSnack: (): void => this.showShareFeedbackSnack(),
     pinIdentity: (value: string): string => this.pinIdentity(value),
     cancelHomeDetailMore: (): void => this.cancelHomeDetailMore(),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     webJsonText: (value: string): string => this.webJsonText(value),
     rejectOfflineAction: (value: string): boolean => this.rejectOfflineAction(value),
   } as PinmonySharePanelsControllerPorts);
@@ -615,10 +629,10 @@ struct Index {
     nativePause: (): void => this.settingsNativeFlow.pause(),
     authenticated: (): boolean => this.authStatus === 'authenticated', foreground: (): boolean => !this.businessSuspended,
     epoch: (): number => this.authEpoch, visible: (): boolean => this.profileSettingsVisible,
-    document: (): string => this.controller.getUrl(), currentProfile: (): string => this.currentProfileUrl(),
+    document: (): string => this.sessionDocumentUrl(), currentProfile: (): string => this.currentProfileUrl(),
     profileAddress: (page: string): string => this.profileUrlFromAddress(page),
     prepare: (current: () => boolean): Promise<boolean> => this.ensureRootActionContext(3, true, '', current),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     accountScript: (): string => useNativeTransport(PIN_ACCOUNT_SETTINGS_SCRIPT),
     notificationsScript: (): string => useNativeTransport(PIN_NOTIFICATIONS_READ_SCRIPT), jsonText: (raw: string): string => this.webJsonText(raw)
   } as PinmonySettingsPorts);
@@ -627,10 +641,10 @@ struct Index {
     nativeAction: (action: string,value: string): Promise<boolean> => PIN_NATIVE_INBOX_UPDATES_ENABLED && this.inboxStore.inboxFlow?.screen === 'updatesMenu' ? this.inboxMenuNative.action(action) : this.inboxMessagesNativeReads.action(action,value),
     nativeWrites: (): boolean => this.inboxMessagesNativeReads.ownsFlow(),
     allowed: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 2,
-    epoch: (): number => this.authEpoch, document: (): string => this.controller.getUrl(), currentInbox: (): string => this.currentInboxUrl(),
+    epoch: (): number => this.authEpoch, document: (): string => this.sessionDocumentUrl(), currentInbox: (): string => this.currentInboxUrl(),
     enabled: (): boolean => PIN_INBOX_CONVERSATIONS_API_ENABLED,
     prepare: (current: () => boolean): Promise<boolean> => this.ensureRootActionContext(2, true, '', current),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(this.inboxUpdatesNativeReads.installScript() + this.inboxMessagesNativeReads.installScript() + script), feedback: (message: string): void => this.showMessage(message)
+    runScript: (script: string): Promise<string> => this.runSessionScript(this.inboxUpdatesNativeReads.installScript() + this.inboxMessagesNativeReads.installScript() + script), feedback: (message: string): void => this.showMessage(message)
   } as PinmonyInboxActionsPorts);
 
   private readonly rootContextCoordinator: PinmonyRootContextCoordinator = new PinmonyRootContextCoordinator({
@@ -693,6 +707,7 @@ struct Index {
   } as PinmonyRootContextCoordinatorPorts);
 
   private readonly navigationCoordinator: PinmonyNavigationCoordinator = new PinmonyNavigationCoordinator({
+    rootPresented: (index: number): void => this.markReturnedHome?.(index),
     nativeBusinessOnly: (): boolean => this.nativeBusinessRoutesEnabled,
     activeSheetKind: (): string => this.activeSheetKind,
     activeTab: (): number => this.activeTab,
@@ -828,7 +843,37 @@ struct Index {
     setWebPageLoading: (value: boolean): boolean => { this.webPageLoading = value; return value; },
   } as PinmonyNavigationCoordinatorPorts);
 
+  private readonly sessionVerification: PinmonySessionVerification = new PinmonySessionVerification({
+    detached: (): boolean => this.nativeLoginEnabled,
+    origin: (): string => this.nativeSessionOrigin,
+    unavailable: (): void => { if(this.nativeLoginEnabled){this.offlineCacheLoading = false;this.authStatus = 'error';this.failureDetails = '无法确认当前会话，请重试；也可以重新登录';} },
+    network: (): PinmonyNativeNetwork => this.nativeNetwork,
+    status: (): PinmonyAuthStatus => this.authStatus,
+    profile: (): string => this.authenticatedProfileUrl,
+    epoch: (): number => this.nativeLoginEnabled ? this.nativeSessionEpoch : this.authEpoch,
+    page: (): string => this.sessionDocumentUrl(),
+    userAgent: (): string => this.sessionEnvironment.userAgent(),
+    active: (): boolean => !this.businessSuspended,
+    accept: (message: PinmonyAuthMessage): void => this.sessionCoordinator.updateAuthState(JSON.stringify(message), this.nativeLoginEnabled),
+  });
+
   private readonly sessionCoordinator: PinmonySessionCoordinator = new PinmonySessionCoordinator({
+    nativeLogin: (): boolean => this.nativeLoginEnabled,
+    nativeEpoch: (): number => this.nativeSessionEpoch,
+    loginRequired: (): void => {if(!this.loginHostMounted)this.openNativeLogin();},
+    releaseLogin: (): void => { void this.releaseNativeLogin(); },
+    verifyLoginEvidence: (message: PinmonyAuthMessage): void => {
+      const origin: RegExpMatchArray | null = message.pageUrl.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
+      if(!origin)return;
+      const key: string = this.authEpoch.toString() + ':' + message.profileUrl;
+      if(this.nativeVerificationPending && key === this.nativeLoginEvidenceKey)return;
+      this.loginPageVisible = false;
+      this.nativeLoginEvidenceKey = key;this.nativeSessionOrigin = origin[0];
+      this.nativeVerificationPending = false;
+      this.startNativeVerification();
+    },
+    enterAuthenticatedRoot: (home: string): void => this.enterAuthenticatedRoot?.(home),
+    verifySession: (): void => { void this.sessionVerification?.demand(); },
     activeSheetKind: (): string => this.activeSheetKind,
     setActiveSheetKind: (value: string): string => { this.activeSheetKind = value; return value; },
     activeTab: (): number => this.activeTab,
@@ -1044,7 +1089,7 @@ struct Index {
 
   private readonly businessResultsCoordinator: PinmonyBusinessResultsCoordinator = new PinmonyBusinessResultsCoordinator({
     foreground: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended,
-    epoch: (): number => this.authEpoch, document: (): string => this.controller.getUrl(),
+    epoch: (): number => this.authEpoch, document: (): string => this.sessionDocumentUrl(),
     activeSheetKind: (): string => this.activeSheetKind,
     controller: (): webview.WebviewController => this.controller,
     dismissApiBoards: (): void => this.dismissApiBoards(),
@@ -1069,19 +1114,19 @@ struct Index {
 
   private readonly boardOperationsController: PinmonyBoardOperationsController = new PinmonyBoardOperationsController(this.boardStore, {
     foreground: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended,
-    epoch: (): number => this.authEpoch, document: (): string => this.controller.getUrl(), currentBoard: (): string => this.currentBoardUrl(),
+    epoch: (): number => this.authEpoch, document: (): string => this.sessionDocumentUrl(), currentBoard: (): string => this.currentBoardUrl(),
     movePage: (): string => this.singlePinMovePage, clearMovePage: (): void => { this.singlePinMovePage = ''; },
     hasDetail: (): boolean => !!this.pinStore.detail || !!this.pinStore.detailOpeningPin,
     returnTarget: (page: string): void => { this.loadFailed = false; const token: number = ++this.pageBackToken; this.nativeBackTarget = page; this.loadReturnTarget(page, token); },
-    load: (page: string): void => this.controller.loadUrl(page), reload: (): void => this.reload(),
+    load: (page: string): void => this.loadSessionDocument(page), reload: (): void => this.reload(),
     cancelled: (pin: string): boolean => this.cancelledBoardPins.has(pin), retain: (board: PinmonyBoardDetail): void => { this.retainedBoardContent = board; },
     rememberPin: (pin: string, page: string): void => { this.pinStore.detailReturnUrl = page; if (pin) { const identity: string = this.pinIdentity(pin); this.pinStore.rememberDetailOrigin(identity, page); this.pinStore.confirmedSaves.confirm(identity, true); } },
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script), feedback: (message: string): void => this.showMessage(message)
+    runScript: (script: string): Promise<string> => this.runSessionScript(script), feedback: (message: string): void => this.showMessage(message)
   } as PinmonyBoardOperationsPorts);
 
   private readonly webLifecycleCoordinator: PinmonyWebLifecycleCoordinator = new PinmonyWebLifecycleCoordinator({
     nativeBusinessOnly: (): boolean => this.nativeBusinessRoutesEnabled,
-    navigationBegun: (url: string): void => this.returnCoordinator.navigationBegun(url),
+    navigationBegun: (url: string): void => { this.updateLoginPresentation(url); this.returnCoordinator.navigationBegun(url); },
     notifyMenuStateChanged: (): void => this.photoMenuCoordinator.notify(),
     activeSheetKind: (): string => this.activeSheetKind,
     setActiveSheetKind: (value: string): string => { this.activeSheetKind = value; return value; },
@@ -1227,7 +1272,7 @@ struct Index {
     this.rootContextCoordinator.notify();
     if (this.businessSuspended || this.authStatus !== 'authenticated') return;
     try {
-      const address: string = this.controller.getUrl();
+      const address: string = this.sessionDocumentUrl();
       if (this.rootTabIndexFromAddress(address) === this.activeTab &&
           this.pageHistory.key(address) === this.pageHistory.key(this.rootPresentationAddress(this.activeTab))) {
         this.pagePerformance.mark(this.activeTab, 'document-ready');
@@ -1245,8 +1290,9 @@ struct Index {
       this.businessSuspended = false;
       const readNeeded: boolean = this.nativeNetwork.setForeground(true);
       const detailReadNeeded: boolean = this.detailReadNetwork.setForeground(true);
-      this.controller.runJavaScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(true)').catch(() => {});
+      this.runSessionScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(true)').catch(() => {});
       this.controllerLifecycle().resume();
+      if (this.authStatus === 'checking' || this.authStatus === 'authenticated' && !this.authenticatedProfileUrl) this.syncAuthentication();
       PinmonyRuntimeLog.info('BusinessLifecycle: resumed readNeeded=' + readNeeded.toString() + ' targetTab=' + this.activeTab.toString());
       if (this.boardStore.collaborators) this.pollBoardCollaborators(this.boardStore.collaboratorsToken);
       if (this.authStatus === 'authenticated' && !this.activeSheetKind) {
@@ -1258,6 +1304,8 @@ struct Index {
     this.scheduleInterruptedHomeRecovery();
   }
   onPageHide(): void {
+    this.sessionVerification?.cancel('background');
+    if(this.nativeLoginEnabled){this.nativeSessionEpoch++;this.nativeVerificationPending = false;}
     this.returnCoordinator.cancel();
     this.controllerLifecycle().pause();
     this.pagePerformance.cancel();
@@ -1269,7 +1317,7 @@ struct Index {
     this.inboxMenuNative.pause();this.boardInvitationNative.pause();
     this.nativeNetwork.setForeground(false); this.detailReadNetwork.setForeground(false);
     this.tabRequestToken++; this.rootReadToken = -1; this.pendingWebTab = -1;
-    this.controller.runJavaScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(false)').catch(() => {});
+    this.runSessionScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(false)').catch(() => {});
     PinmonyRuntimeLog.info('BusinessLifecycle: suspended reads-cancelled=true writes-replay=false');
     this.pinStore.detailPrefetch.pause();
     this.detailReadNetwork.invalidate(); this.openingRelated = undefined;
@@ -1330,11 +1378,11 @@ struct Index {
     nativeUpdatesMore: (): Promise<void> => this.inboxUpdatesNativeReads.more(),
     nativeUpdatesVisibility: (newsId: string,hidden: boolean): void => this.inboxUpdatesNativeReads.confirmedVisibility(newsId,hidden),
     authenticated: (): boolean => this.authStatus === 'authenticated', foreground: (): boolean => !this.businessSuspended,
-    document: (): string => this.controller.getUrl(), addressKey: (address: string): string => this.pageHistory.key(address),
+    document: (): string => this.sessionDocumentUrl(), addressKey: (address: string): string => this.pageHistory.key(address),
     inboxAddress: (address: string): string => this.inboxUrlFromAddress(address), currentInbox: (): string => this.currentInboxUrl(),
     activeTab: (): number => this.activeTab, pendingTab: (): number => this.pendingWebTab, rootAddress: (): string => this.rootTabAddresses.get(2) || '',
     rootOnly: (): boolean => this.nativeRootOnly, interacted: (): boolean => this.rootContentInteracted, backTarget: (): string => this.nativeBackTarget,
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script), finishPull: (): void => this.finishRootPull('inbox'),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script), finishPull: (): void => this.finishRootPull('inbox'),
     readInvitations: (): void => { this.readBoardInvitations(); }, recordAddress: (address: string): void => { this.rootTabAddresses.set(2, address); },
     confirmed: (): void => this.markRootPerformance(2), prepareContext: (): Promise<boolean> => this.ensureRootActionContext(2, false),
     readStarted: (): void => this.pagePerformance.count(2, 'read'),
@@ -1362,14 +1410,14 @@ struct Index {
     nativeOrganize: (action: string,value: string,secret: boolean): Promise<void> => this.profileNativeActions.organizeAction(action,value,secret),
     authenticated: (): boolean => this.authStatus === 'authenticated', foreground: (): boolean => !this.businessSuspended,
     visible: (): boolean => this.activeTab === 3 || this.profileStore.origins.length > 0,
-    document: (): string => this.controller.getUrl(), currentProfile: (): string => this.currentProfileUrl(),
-    prepare: (): Promise<boolean> => this.prepareProfileInteraction(), runScript: (script: string): Promise<string> => this.controller.runJavaScript(this.profileNativeReads.installScript() + script),
+    document: (): string => this.sessionDocumentUrl(), currentProfile: (): string => this.currentProfileUrl(),
+    prepare: (): Promise<boolean> => this.prepareProfileInteraction(), runScript: (script: string): Promise<string> => this.runSessionScript(this.profileNativeReads.installScript() + script),
     jsonText: (raw: string): string => this.webJsonText(raw), feedback: (message: string): void => this.showMessage(message),
     syncMotion: (): void => this.syncFloatingTabsMotion(), markInteracted: (): void => { this.rootContentInteracted = true; },
     saved: (page: string, username: string): void => {
       const origin: RegExpMatchArray | null = page.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
       const target: string = username && origin ? origin[0] + '/' + username + '/' : page;
-      if (target !== page) { this.clearProfile(); this.controller.loadUrl(target); }
+      if (target !== page) { this.clearProfile(); this.loadSessionDocument(target); }
       else this.refreshProfile(true);
     }
   } as PinmonyProfileActionsPorts);
@@ -1379,9 +1427,9 @@ struct Index {
     session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
     network: (): PinmonyNativeNetwork => this.nativeNetwork,
     active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && !this.nativeRootOnly && !!this.boardStore.boardDetail && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.profileStore.publishFlow && !this.publishBoardReturn,
-    document: (): string => this.controller.getUrl(), documentEpoch: (): number => this.authEpoch,
+    document: (): string => this.sessionDocumentUrl(), documentEpoch: (): number => this.authEpoch,
     bridge: (value: string): void => this.boardStateController.update(value),
-    install: (script: string): void => { if(script && !this.nativeBusinessRoutesEnabled) this.controller.runJavaScript(script).catch((): void => {}); },
+    install: (script: string): void => { if(script && !this.nativeBusinessRoutesEnabled) this.runSessionScript(script).catch((): void => {}); },
     committed: (): void => {const b: PinmonyBoardDetail | undefined = this.boardStore.boardDetail; if(b && !b.error) this.pagePerformance.markSecondary('board',b.pageKey,'content-ready');},
     prepareDocument: (): Promise<boolean> => this.prepareBoardNativeDocument(),
     invalidateProfile: (): void => {this.profileNativeReads.reset();this.profileStore.profileCache.clear();this.profileStore.profileActionsReady = false;},
@@ -1400,13 +1448,13 @@ struct Index {
       this.backFromBoard();
     },
     feedback: (message: string): void => this.showMessage(message),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script), jsonText: (value: string): string => this.webJsonText(value),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script), jsonText: (value: string): string => this.webJsonText(value),
     openPin: (pin: PinmonyBoardPin, board: PinmonyBoardDetail): void => {
       if(this.cancelledBoardPins.has(pin.pinUrl))return;
       this.retainedBoardContent = board; this.pinStore.detailReturnUrl = board.pageKey;
       this.pinStore.rememberDetailOrigin(this.pinIdentity(pin.pinUrl),board.pageKey);
       this.pinStore.confirmedSaves.confirm(this.pinIdentity(pin.pinUrl),true);
-      this.beginDetailOpening(pin.pinUrl,board.pageKey); if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.controller.loadUrl(pin.pinUrl);
+      this.beginDetailOpening(pin.pinUrl,board.pageKey); if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(pin.pinUrl);
     }
   } as PinmonyBoardNativeReadsPorts);
 
@@ -1421,14 +1469,14 @@ struct Index {
     selected: (): boolean => this.usesNativeProfileReads(),
     active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && (this.activeTab === 3 || this.profileStore.origins.length > 0) && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.boardStore.boardDetail && !this.boardStore.pendingBoardUrl && !this.profileStore.profileWebFlow,
     network: (): PinmonyNativeNetwork => this.nativeNetwork,
-    document: (): string => this.controller.getUrl(), documentEpoch: (): number => this.authEpoch,
+    document: (): string => this.sessionDocumentUrl(), documentEpoch: (): number => this.authEpoch,
     recordAddress: (address: string): void => {if(this.profileStore.origins.length > 0){this.navigationAddress = address;this.nativeBackTarget = address;}else this.rootTabAddresses.set(3,address);},
     settled: (): void => {this.finishProfilePull(); this.pagePerformance.mark(3,'content-ready'); this.rootContextCoordinator.notify();}
   } as PinmonyProfileNativeReadsPorts);
 
   private readonly profileReadController: PinmonyProfileReadController = new PinmonyProfileReadController(this.profileStore, {
     authenticated: (): boolean => this.authStatus === 'authenticated', foreground: (): boolean => !this.businessSuspended,
-    document: (): string => this.controller.getUrl(), addressKey: (address: string): string => this.pageHistory.key(address),
+    document: (): string => this.sessionDocumentUrl(), addressKey: (address: string): string => this.pageHistory.key(address),
     profileAddress: (address: string): string => this.profileUrlFromAddress(address), currentProfile: (): string => this.currentProfileUrl(),
     rootOnly: (): boolean => this.nativeRootOnly, interacted: (): boolean => this.rootContentInteracted, backTarget: (): string => this.nativeBackTarget,
     apiEnabled: (): boolean => PIN_PROFILE_API_ENABLED, activeTab: (): number => this.activeTab, pendingTab: (): number => this.pendingWebTab,
@@ -1436,7 +1484,7 @@ struct Index {
     selectProfile: (): void => { this.currentWebTab = 3; this.activeTab = 3; this.tabsController.changeIndex(3); },
     confirmPending: (): void => { this.pendingWebTab = -1; }, recordAddress: (address: string): void => { this.rootTabAddresses.set(3, address); },
     clearProfile: (preserve: boolean): void => this.clearProfile(preserve), prepareRead: (): boolean => this.prepareRootPageRead(3),
-    requestRead: (): void => this.requestRootPage(3), runScript: (script: string): Promise<string> => this.controller.runJavaScript(script)
+    requestRead: (): void => this.requestRootPage(3), runScript: (script: string): Promise<string> => this.runSessionScript(script)
   } as PinmonyProfileReadPorts);
 
   private readonly postNativeOperations: PinmonyPostNativeOperations = new PinmonyPostNativeOperations({
@@ -1483,18 +1531,18 @@ struct Index {
     adoptComments: async (): Promise<boolean> => {
       if (!await this.ensureDetailActionContext() || this.activeSheetKind !== 'comments') return false;
       const pin: string = this.pinStore.commentResult.pin;
-      const raw: string = await this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.commentsAdopt(' + JSON.stringify(pin) + ',' + JSON.stringify(this.detailNativeReads.commentsSeed()) + ')');
+      const raw: string = await this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.commentsAdopt(' + JSON.stringify(pin) + ',' + JSON.stringify(this.detailNativeReads.commentsSeed()) + ')');
       return this.webJsonText(raw) === 'true';
     },
     authenticated: (): boolean => this.authStatus === 'authenticated', foreground: (): boolean => !this.businessSuspended,
-    document: (): string => this.controller.getUrl(), sheet: (): string => this.activeSheetKind,
+    document: (): string => this.sessionDocumentUrl(), sheet: (): string => this.activeSheetKind,
     show: (kind: string): void => {
       this.showNativeSheet = !!kind;
       if (kind) this.activeSheetKind = kind;
     },
     currentPin: (): string => PIN_NATIVE_DETAIL_READS_ENABLED && this.detailNativeReads.owned() ? this.pinStore.detailPin : this.currentPinUrl(), pinIdentity: (pin: string): string => this.pinIdentity(pin),
     moreCurrent: (pin: string): boolean => this.isCurrentMorePin(pin),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script), jsonText: (raw: string): string => this.webJsonText(raw),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script), jsonText: (raw: string): string => this.webJsonText(raw),
     feedback: (message: string): void => this.showMessage(message),
     saveDismissed: (): void => {
       PinmonyRuntimeLog.info('PinmonyReturn: save sheet dismissed'); this.pinStore.shareBackHandledUntil = Date.now() + 500; this.lastRootBackAt = 0;
@@ -1504,13 +1552,13 @@ struct Index {
         if (closingSave) this.activeSheetKind = 'save';
         return;
       }
-      this.controller.runJavaScript('window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()').catch(() => {});
+      this.runSessionScript('window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()').catch(() => {});
     },
     editCompleted: async (pin: string, deleted: boolean): Promise<void> => {
       if (deleted) this.pinStore.confirmedSaves.confirm(this.pinIdentity(pin), false);
       this.pinStore.detailCache.remove(this.pinIdentity(pin));
       if (deleted) { this.pinStore.detail = undefined; await this.handleBack(); }
-      this.controller.runJavaScript('window.PinmonyProfileRefresh && window.PinmonyProfileRefresh(); window.PinmonyBoardRefresh && window.PinmonyBoardRefresh(); window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()').catch(() => {});
+      this.runSessionScript('window.PinmonyProfileRefresh && window.PinmonyProfileRefresh(); window.PinmonyBoardRefresh && window.PinmonyBoardRefresh(); window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()').catch(() => {});
       this.showMessage(deleted ? '已从你的图板移除 Pin 图' : '已保存修改');
     },
     prepareComment: (encoded: string, pin: string, current: () => boolean): Promise<string> => this.prepareCommentWrite(encoded, pin, current)
@@ -1530,10 +1578,10 @@ struct Index {
     },
     invalidateProfile: (): void => {
       this.profileStore.profileActionsReady = false; this.clearProfile(); this.profileStore.profileCache.clear();
-      this.controller.runJavaScript('window.PinmonyProfileApi && window.PinmonyProfileApi.reset()').catch(() => {});
+      this.runSessionScript('window.PinmonyProfileApi && window.PinmonyProfileApi.reset()').catch(() => {});
     },
     feedback: (message: string): void => this.showMessage(message), closeFlow: (): void => this.boardOperation('flow', JSON.stringify({ action: 'close' })),
-    back: (): void => this.backFromBoard(), navigate: (page: string): void => this.controller.loadUrl(page)
+    back: (): void => this.backFromBoard(), navigate: (page: string): void => this.loadSessionDocument(page)
   } as PinmonyBoardStatePorts);
 
   private readonly boardInvitationController: PinmonyBoardInvitationController = new PinmonyBoardInvitationController(this.inboxStore, {
@@ -1541,11 +1589,11 @@ struct Index {
     nativeOpen: (preview: boolean): Promise<void> => this.boardInvitationNative.open(preview),nativePause: (): void => this.boardInvitationNative.pause(),nativeAccept: (): Promise<void> => this.boardInvitationNative.accept(),
     authenticated: (): boolean => this.authStatus === 'authenticated',
     foreground: (): boolean => !this.businessSuspended,
-    page: (): string => PIN_NATIVE_INBOX_UPDATES_ENABLED ? this.nativeDisplayAddress().split('#')[0] : this.controller.getUrl().split('#')[0],
+    page: (): string => PIN_NATIVE_INBOX_UPDATES_ENABLED ? this.nativeDisplayAddress().split('#')[0] : this.sessionDocumentUrl().split('#')[0],
     username: (): string => this.authenticatedProfileUrl.split('/')[3] || '',
     avatar: (): string => this.profileStore.profile?.avatarUrl || '',
     script: (): string => useNativeTransport(PIN_BOARD_INVITATION_SCRIPT),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     jsonText: (value: string): string => this.webJsonText(value),
     feedback: (message: string): void => this.showMessage(message)
   } as PinmonyBoardInvitationPorts);
@@ -1600,12 +1648,12 @@ struct Index {
     profileAddress: (): string => this.profileUrlFromAddress(this.authenticatedProfileUrl),
     openSection: (): void => this.openBoardSection(),
     documentMatches: (profile: string): boolean => this.profileDocumentMatches(profile),
-    currentDocument: (): string => PIN_NATIVE_SHARE_PUBLISH_ENABLED ? this.profileUrlFromAddress(this.authenticatedProfileUrl) : this.controller.getUrl(),
+    currentDocument: (): string => PIN_NATIVE_SHARE_PUBLISH_ENABLED ? this.profileUrlFromAddress(this.authenticatedProfileUrl) : this.sessionDocumentUrl(),
     normalizeProfile: (address: string): string => this.profileUrlFromAddress(address),
     prepareContext: (current: () => boolean): Promise<boolean> => this.prepareProfileInteraction('publish', current),
     nativeEnabled: (): boolean => PIN_NATIVE_NETWORK_ENABLED,
     publishScript: (): string => useNativeTransport(PIN_PUBLISH_API_SCRIPT),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     jsonText: (value: string): string => this.webJsonText(value),
     captureBoardReturn: (): void => {
       this.publishBoardReturn = this.nativeBoardVisible() ? this.boardStore.boardDetail?.pageKey || '' : '';
@@ -1661,12 +1709,14 @@ struct Index {
     active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 0 &&
       !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.activeSheetKind && !this.profileStore.origins.length && !this.boardStore.pendingBoardUrl && !this.profileSettingsVisible && !this.profileStore.panel && !this.inboxStore.inboxFlow,
     saved: (id: string): boolean => this.pinStore.confirmedSaves.isSaved(id),
-    committed: (snapshot: PinmonyHomeSnapshot): void => {
+    committed: (snapshot: PinmonyHomeSnapshot, kind: 'feed' | 'pagination' | 'cache' | 'metadata' = 'feed'): void => {
       this.rootTabAddresses.set(0, snapshot.pageKey); this.retainedHomeAwaitingFeed = false; this.interruptedHomePage = '';
       this.homeRecoveryAttempted = false; this.homeRecoveryToken++;
-      this.pagePerformance.mark(0, 'content-ready'); this.detailReturnJourney?.mark('return.home.feed.confirmed');
+      if (kind === 'feed') {
+        this.pagePerformance.mark(0, 'content-ready'); this.detailReturnJourney?.mark('return.home.feed.confirmed');
+      }
       if (!snapshot.sourceError) this.persistHomeDiskCache(snapshot); this.rootContextCoordinator.notify();
-      try { this.controller.runJavaScript('window.PinmonyHomeDemand && window.PinmonyHomeDemand()').catch(() => {}); } catch (_) {}
+      try { this.runSessionScript('window.PinmonyHomeDemand && window.PinmonyHomeDemand()').catch(() => {}); } catch (_) {}
     }
   } as PinmonyHomeNativeReadsPorts);
 
@@ -1680,7 +1730,7 @@ struct Index {
     canAcceptMessages: (): boolean => {
       if (this.nativeRootOnly && !this.rootContentInteracted || this.retainedHomeAwaitingAuth) return false;
       if (this.nativeBackTarget) {
-        try { return this.pageHistory.key(this.controller.getUrl()) === this.pageHistory.key(this.nativeBackTarget); }
+        try { return this.pageHistory.key(this.sessionDocumentUrl()) === this.pageHistory.key(this.nativeBackTarget); }
         catch (_) { return false; }
       }
       return true;
@@ -1692,7 +1742,7 @@ struct Index {
     isOtherRoot: (url: string): boolean => !!(this.searchUrlFromAddress(url) || this.inboxUrlFromAddress(url) || this.profileUrlFromAddress(url)),
     isActive: (): boolean => this.activeTab === 0,
     isAuthenticated: (): boolean => this.authStatus === 'authenticated',
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     ensureContext: (requireData: boolean, isCurrent: () => boolean): Promise<boolean> =>
       this.ensureRootActionContext(0, requireData, '', isCurrent),
     rejectOffline: (operation: string): boolean => this.rejectOfflineAction(operation),
@@ -1707,7 +1757,7 @@ struct Index {
     requestRead: (): void => this.requestRootPage(0),
     reloadPage: (pageKey: string, refreshCurrent: boolean): void => {
       if (refreshCurrent) this.controller.refresh();
-      else this.controller.loadUrl(pageKey);
+      else this.loadSessionDocument(pageKey);
     },
     pinIdentity: (url: string): string => this.pinIdentity(url),
     knownPinTitle: (identity: string): string => this.searchStore.knownSearchPinTitles.get(identity) || '',
@@ -1745,7 +1795,7 @@ struct Index {
       this.pinStore.detailReturnUrl = source;
       if (pinUrl) this.beginDetailOpening(pinUrl, source);
       try {
-        if (pinUrl && !PIN_NATIVE_DETAIL_READS_ENABLED) this.controller.loadUrl(pinUrl);
+        if (pinUrl && !PIN_NATIVE_DETAIL_READS_ENABLED) this.loadSessionDocument(pinUrl);
         else if(!pinUrl) { this.pinStore.detailOpeningPin = ''; this.showMessage('无法打开 Pin 图，请重试'); }
       } catch (_) { this.pinStore.detailOpeningPin = ''; this.showMessage('无法打开 Pin 图，请重试'); }
     },
@@ -1775,7 +1825,7 @@ struct Index {
     currentPageKey: (): string => this.currentSearchPageKey(),
     isActive: (): boolean => this.authStatus === 'authenticated' && this.activeTab === 1,
     preservingPinSearch: (): boolean => this.preservingSearchForPin(),
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     ensureContext: (requireData: boolean, allowedSheet: string = '', isCurrent: () => boolean = (): boolean => true): Promise<boolean> =>
       this.ensureRootActionContext(1, requireData, allowedSheet, isCurrent),
     markInteracted: (): void => { this.rootContentInteracted = true; },
@@ -1787,13 +1837,13 @@ struct Index {
       if (source) this.pageHistory.visit(source, 'load');
       if (this.searchNativeReads.eligible() && (!this.searchStore.search?.quiz || this.searchStore.search.quiz.mode === 'entry')) { this.searchNativeReads.navigate(target); return; }
       this.prepareSearchNavigation(target);
-      this.controller.loadUrl(target);
+      this.loadSessionDocument(target);
     },
     navigateResult: (target: string, source: string): void => {
       if(PIN_NATIVE_SEARCH_READS_ENABLED){this.openNativeSearchResult(target,source);return;}
       this.pageHistory.visit(source, 'load');
       this.beginDetailOpening(this.extractPinUrl(target), source);
-      if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.controller.loadUrl(this.extractPinUrl(target) || target);
+      if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(this.extractPinUrl(target) || target);
     },
     cancelNavigation: (clearRetained: boolean): void => {
       this.rootReadToken = -1; this.pendingWebTab = -1;
@@ -1827,13 +1877,13 @@ struct Index {
     currentPinUrl: (): string => this.currentPinUrl(),
     pinIdentity: (url: string): string => this.pinIdentity(url),
     beginDetailOpening: (pin: string): void => this.beginDetailOpening(pin),
-    loadDetailUrl: (pin: string): void => {if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.controller.loadUrl(pin);},
-    runScript: (script: string): Promise<string> => this.controller.runJavaScript(script),
+    loadDetailUrl: (pin: string): void => {if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(pin);},
+    runScript: (script: string): Promise<string> => this.runSessionScript(script),
     markJourney: (event: string): void => this.detailJourney.mark(event),
     openComments: (): void => { this.openApiComments(); },
     cancelSave: (pin: string): Promise<void> => this.cancelDetailSave(pin),
     openBoards: (): Promise<void> => this.openApiBoards(),
-    openShare: (pin: string): Promise<string> => this.controller.runJavaScript('window.PinmonyNativeShareApiOpen && ' +
+    openShare: (pin: string): Promise<string> => this.runSessionScript('window.PinmonyNativeShareApiOpen && ' +
       'window.PinmonyNativeShareApiOpen(' + JSON.stringify(pin) + ')'),
     openMore: (): Promise<void> => this.openApiDetailMore(),
     externalSourceUrl: (url: string): string => this.externalSourceUrl(url),
@@ -1863,13 +1913,20 @@ struct Index {
     if (!flow && this.inboxPollTick % 3 !== 0) return;
     try {
       const script: string = 'window.PinmonyInboxPoll && window.PinmonyInboxPoll(' +
-        JSON.stringify(this.controller.getUrl()) + ',' + this.inboxStore.inboxSession.toString() + ',' + (!!flow).toString() + ')';
+        JSON.stringify(this.sessionDocumentUrl()) + ',' + this.inboxStore.inboxSession.toString() + ',' + (!!flow).toString() + ')';
       this.inboxPollPending = true;
-      this.controller.runJavaScript(script).catch(() => {}).finally(() => { this.inboxPollPending = false; });
+      this.runSessionScript(script).catch(() => {}).finally(() => { this.inboxPollPending = false; });
     } catch (_) { this.inboxPollPending = false; }
   }
 
   aboutToAppear(): void {
+    PinmonyRuntimeLog.info('NativeSession: lifecycle enabled=' + this.nativeLoginEnabled.toString());
+    if(this.nativeLoginEnabled){
+      try {this.sessionEnvironment.capture(webview.WebviewController.getDefaultUserAgent());}catch (_) {}
+      const stored: string = AppStorage.get<string>('pinmonySessionOrigin') || '';
+      if(/^https:\/\/(?:www|uk)\.pinterest\.com$/.test(stored))this.nativeSessionOrigin = stored;
+      this.coordinatorTasks.timeout((): void => {this.startNativeVerification();},0);
+    }
     if (this.inboxPollTimer < 0) this.inboxPollTimer = setInterval(() => this.pollVisibleInbox(), 5000);
     this.logPageLifecycle('about-to-appear', 'stores=7 bridge=bind');
     this.systemActions.activate();
@@ -1910,7 +1967,7 @@ struct Index {
       if (this.detailReturnedToRoot && this.extractPinUrl(url)) return;
       if (this.ignoreSupersededDetailDocument(url)) return;
       try {
-        if (this.pageHistory.key(url) !== this.pageHistory.key(this.controller.getUrl())) return;
+        if (this.pageHistory.key(url) !== this.pageHistory.key(this.sessionDocumentUrl())) return;
         if (this.logoutAwaitingLogin && !isPinterestAuthRoute(url)) return;
         if (this.nativeBackTarget && this.pageHistory.key(url) !== this.pageHistory.key(this.nativeBackTarget) ||
             this.pinStore.detailOpeningPin && this.pinIdentity(url) !== this.pinIdentity(this.pinStore.detailOpeningPin)) return;
@@ -1970,7 +2027,7 @@ struct Index {
       if (this.authStatus !== 'authenticated') return;
       if (this.nativeRootOnly) return;
       try {
-        const address: string = this.controller.getUrl();
+        const address: string = this.sessionDocumentUrl();
         if (this.ignoreSupersededDetailDocument(address)) return;
         if (this.nativeBackTarget && this.pageHistory.key(address) !== this.pageHistory.key(this.nativeBackTarget)) return;
         this.navigationAddress = address;
@@ -2007,7 +2064,7 @@ struct Index {
         } else if (profileRoute && !this.profileStore.profile && !this.profileStore.profileLoading && !this.profileStore.profileError) {
           this.expectProfile();
           if (this.profileStore.profile) {
-            this.controller.runJavaScript('window.PinmonyProfileSync && window.PinmonyProfileSync()')
+            this.runSessionScript('window.PinmonyProfileSync && window.PinmonyProfileSync()')
               .catch(() => PinmonyRuntimeLog.warn('Pinmony: retained profile sync unavailable'));
           } else {
             this.refreshProfile();
@@ -2032,6 +2089,8 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.sessionVerification?.cancel('destroy');
+    if(this.nativeLoginEnabled){this.nativeSessionEpoch++;this.nativeVerificationPending = false;}
     if (this.inboxPollTimer >= 0) clearInterval(this.inboxPollTimer);
     this.inboxPollTimer = -1;
     this.returnCoordinator.cancel();
@@ -2080,22 +2139,139 @@ struct Index {
     this.shareBridge.onSearchState = undefined;
   }
 
+  private sessionDocumentUrl(): string {
+    if(this.nativeLoginEnabled && !this.loginHostMounted)return '';
+    try {return this.controller.getUrl();}catch (_) {return '';}
+  }
+
+  private runSessionScript(script: string): Promise<string> {
+    if(this.nativeLoginEnabled && !this.loginHostMounted)return Promise.resolve('');
+    try {return this.controller.runJavaScript(script);}catch (_) {return Promise.resolve('');}
+  }
+
+  private loadSessionDocument(url: string): void {
+    if(this.nativeLoginEnabled && !this.loginHostMounted)return;
+    this.controller.loadUrl(url);
+  }
+
+  private startNativeVerification(): void {
+    if(!this.nativeLoginEnabled || this.businessSuspended || this.nativeVerificationPending)return;
+    try {
+      if (!connection.hasDefaultNetSync()) {
+        this.sessionVerification.cancel('offline'); this.nativeSessionEpoch++;
+        this.authStatus = 'error'; this.offlineCacheLoading = false; this.loadFailed = false;
+        this.failureDetails = '当前无网络，请连接网络后重试';
+        PinmonyRuntimeLog.info('NativeSession: verification deferred reason=offline');
+        return;
+      }
+    } catch (_) { /* Unknown network availability is not proof of being offline. */ }
+    if(!this.sessionEnvironment.userAgent()){
+      try {this.sessionEnvironment.capture(webview.WebviewController.getDefaultUserAgent());}catch (_) {}
+    }
+    if(!this.sessionEnvironment.userAgent()){
+      this.authStatus = 'error';this.failureDetails = '会话环境尚未就绪，请重试';return;
+    }
+    this.sessionVerification.cancel('native-attempt');
+    const epoch: number = ++this.nativeSessionEpoch;
+    this.nativeVerificationPending = true;this.authStatus = 'checking';this.offlineCacheLoading = false;
+    this.loadFailed = false;this.failureDetails = '';
+    void this.sessionVerification.demand().finally((): void => {if(epoch === this.nativeSessionEpoch)this.nativeVerificationPending = false;});
+    this.coordinatorTasks.timeout((): void => {
+      if(epoch !== this.nativeSessionEpoch || this.authStatus !== 'checking')return;
+      this.sessionVerification.cancel('verification-timeout');this.nativeVerificationPending = false;
+      this.authStatus = 'error';this.failureDetails = '会话核验超时，请重试';
+    },15000);
+  }
+
+  private openNativeLogin(): void {
+    if(!this.nativeLoginEnabled)return;
+    this.sessionVerification.cancel('login-required');this.nativeVerificationPending = false;
+    this.nativeSessionEpoch++;this.authEpoch++;this.nativeLoginEvidenceKey = '';
+    this.loginStartUrl = this.nativeSessionOrigin + '/login/';
+    this.loginPageVisible = true;
+    this.authStatus = 'unauthenticated';this.offlineCacheLoading = false;this.loadFailed = false;this.failureDetails = '';
+    this.nativeRootOnly = false;this.navigationAddress = this.loginStartUrl;
+    if(this.loginHostMounted)this.loadSessionDocument(this.loginStartUrl);
+    else {this.controller = new webview.WebviewController();this.loginHostMounted = true;}
+    PinmonyRuntimeLog.info('NativeSession: login host mounted');
+  }
+
+  private async releaseNativeLogin(): Promise<void> {
+    if(!this.nativeLoginEnabled || this.authStatus !== 'authenticated')return;
+    const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+    if(!session.authenticated || !session.origin)return;
+    const epoch: number = this.nativeSessionEpoch;
+    try {
+      await webview.WebCookieManager.saveCookieAsync();
+      PinmonyRuntimeLog.info('NativeSession: cookie store saved');
+    } catch (_) {
+      PinmonyRuntimeLog.warn('NativeSession: cookie store save unavailable');
+      return;
+    }
+    const current: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+    if(this.businessSuspended || epoch !== this.nativeSessionEpoch || !current.authenticated ||
+        current.generation !== session.generation || current.origin !== session.origin)return;
+    this.nativeSessionOrigin = session.origin;
+    AppStorage.setOrCreate<string>('pinmonySessionOrigin',session.origin);
+    this.nativeVerificationPending = false;this.nativeSessionEpoch++;this.authEpoch++;
+    this.logoutAwaitingLogin = false;this.nativeLoginEvidenceKey = '';this.loginHostMounted = false;
+    PinmonyRuntimeLog.info('NativeSession: native account confirmed webMounted=false');
+  }
+
+  private handleNativeSessionExpired(origin: string, generation: number): void {
+    if(!this.nativeLoginEnabled)return;
+    this.coordinatorTasks.timeout((): void => {
+      const current: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+      if(!current.authenticated || current.origin !== origin || current.generation !== generation)return;
+      this.resetAuthenticatedContent();this.openNativeLogin();
+      PinmonyRuntimeLog.info('NativeSession: explicit expiry accepted');
+    },0);
+  }
+
+  private updateLoginPresentation(url: string): void {
+    if (!this.nativeLoginEnabled || !this.loginHostMounted) return;
+    if (isPinterestAuthRoute(url) ||
+        /^https:\/\/(?:accounts\.google\.com|(?:www|m)\.facebook\.com)\//i.test(url)) {
+      this.loginPageVisible = true;
+    } else if (/^https:\/\/(?:[^/]+\.)?pinterest\.com\//i.test(url)) {
+      this.loginPageVisible = false;
+    }
+    // Non-Pinterest intermediate/blank URLs do not establish a business page.
+  }
+
   private authWebVisible(): boolean {
+    if (this.nativeLoginEnabled) return this.loginHostMounted && this.loginPageVisible &&
+      this.authStatus !== 'authenticated' && this.authStatus !== 'error' && !this.loadFailed;
+    if (this.nativeLoginEnabled && !this.loginHostMounted) return false;
     if (this.authStatus === 'authenticated' || this.authStatus === 'error' || this.loadFailed) return false;
     let url: string = this.navigationAddress || PINTEREST_URL;
-    try { url = this.controller.getUrl() || url; } catch (_) {}
+    try { url = this.sessionDocumentUrl() || url; } catch (_) {}
     return isPinterestAuthRoute(url) ||
       /^https:\/\/(?:accounts\.google\.com|(?:www|m)\.facebook\.com)\//i.test(url);
   }
 
+  private enterAuthenticatedRoot(home: string): void {
+    if (!this.nativeBusinessRoutesEnabled || this.authStatus !== 'authenticated' ||
+        !/^https:\/\/(?:www|uk)\.pinterest\.com\/$/.test(home)) return;
+    this.navigationAddress = home;
+    this.rootTabAddresses.set(0, home);
+    this.nativeBackTarget = '';
+    this.nativeRootOnly = true;
+    this.pendingWebTab = -1;
+    this.bottomBarCoordinator.resetForSession();
+    this.syncFloatingTabsMotion();
+    PinmonyRuntimeLog.info('StartupTrace: native root restored after authentication');
+  }
+
   private confirmBusinessSession(appVersion: string = ''): void {
     if (this.authStatus !== 'authenticated') return;
-    let userAgent: string = '';
-    try { userAgent = this.controller.getUserAgent(); } catch (_) {}
+    if (this.networkNotice === '该登录方式暂不可用') this.clearNetworkNotice();
+    const userAgent: string = this.sessionEnvironment?.userAgent() || '';
     this.businessSession.confirm(this.homeCacheAccountId, this.authenticatedProfileUrl, userAgent, appVersion);
     if (PIN_NATIVE_HOME_READS_ENABLED) this.coordinatorTasks.timeout((): void => { this.homeNativeReads.demand(); }, 80);
     if (PIN_NATIVE_SEARCH_DISCOVERY_ENABLED) this.coordinatorTasks.timeout((): void => { this.boardNativeReads.demand(); this.profileNativeReads.demand(); this.searchDiscoveryNativeReads.demand(); this.searchNativeReads.demand(); this.inboxUpdatesNativeReads.demand(); this.inboxMessagesNativeReads.demand(); }, 80);
   }
+
 
   private nativeBusinessSessionContext(): PinmonyBusinessSessionContext {
     return this.businessSession.context(this.authStatus);
@@ -2103,11 +2279,12 @@ struct Index {
 
   private nativeNetworkContext(): PinmonyNetworkContext {
     let page: string = '', userAgent: string = '';
-    try { page = this.controller.getUrl(); userAgent = this.controller.getUserAgent(); } catch (_) {}
+    try { page = this.sessionDocumentUrl(); } catch (_) {}
+    userAgent = this.sessionEnvironment?.userAgent() || '';
     return { authenticated: this.authStatus === 'authenticated', epoch: this.authEpoch, page: page, userAgent: userAgent };
   }
 
-  private bindNativeNetwork(): void { return this.networkBridgeCoordinator.bindNativeNetwork(); }
+  private bindNativeNetwork(): void { if(this.nativeLoginEnabled)return;return this.networkBridgeCoordinator.bindNativeNetwork(); }
 
   private requestNativeNetwork(value: string): void { return this.networkBridgeCoordinator.requestNativeNetwork(value); }
 
@@ -2118,6 +2295,13 @@ struct Index {
       this.networkNotice = '';
       this.networkNoticeTimer = -1;
     }, 4500);
+  }
+
+  private showUnsupportedLogin(): void {
+    if (this.authStatus === 'authenticated' || !this.authWebVisible()) return;
+    const message: string = '该登录方式暂不可用';
+    if (this.networkNotice === message) return;
+    this.showNetworkNotice(message);
   }
 
   private clearNetworkNotice(): void {
@@ -2142,11 +2326,25 @@ struct Index {
 
   private resetAuthenticatedContent(): void { this.inboxMenuNative.pause();this.boardInvitationNative.pause(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
 
-  private updateAuthState(value: string): void { return this.sessionCoordinator.updateAuthState(value); }
+  private updateAuthState(value: string): void {
+    if(this.nativeLoginEnabled && !this.loginHostMounted)return;
+    this.sessionCoordinator.updateAuthState(value);
+    if(!this.nativeLoginEnabled)this.sessionVerification?.observeWebEvidence(value);
+  }
 
-  private syncAuthentication(): void { return this.sessionCoordinator.syncAuthentication(); }
+  private syncAuthentication(): void {
+    if(this.nativeLoginEnabled){
+      if(this.loginHostMounted){this.runSessionScript('window.PinmonyAuthSync && window.PinmonyAuthSync(' + this.authEpoch.toString() + ')').catch(() => {});}
+      if(this.authStatus === 'checking' && (!this.loginHostMounted || !!this.nativeLoginEvidenceKey))this.startNativeVerification();
+      return;
+    }
+    return this.sessionCoordinator.syncAuthentication();
+  }
 
-  private retryLogin(): void { return this.sessionCoordinator.retryLogin(); }
+  private retryLogin(): void {
+    if(this.nativeLoginEnabled){this.nativeVerificationPending = false;this.startNativeVerification();return;}
+    return this.sessionCoordinator.retryLogin();
+  }
 
   private updateShareSheet(value: string): void {
     if(PIN_NATIVE_SHARE_PUBLISH_ENABLED)return;
@@ -2179,7 +2377,7 @@ struct Index {
       this.homeStore.homeMenuPin = '';
       this.homeStore.homeMenuPage = '';
       if(PIN_NATIVE_PIN_MENUS_ENABLED)return;
-      this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.homeMenuClose(' + session + ')')
+      this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.homeMenuClose(' + session + ')')
         .catch(() => PinmonyRuntimeLog.warn('Pinmony: home menu close unavailable'));
       return;
     }
@@ -2200,7 +2398,7 @@ struct Index {
     }
     this.pinStore.shareError = '';
     this.pinStore.shareLoading = false;
-    if(!PIN_NATIVE_SHARE_PUBLISH_ENABLED)this.controller.runJavaScript('window.PinmonyNativeShareClose && window.PinmonyNativeShareClose(' +
+    if(!PIN_NATIVE_SHARE_PUBLISH_ENABLED)this.runSessionScript('window.PinmonyNativeShareClose && window.PinmonyNativeShareClose(' +
       session.toString() + ')').catch(() => {
       PinmonyRuntimeLog.warn('Pinmony: could not close the web share panel');
     });
@@ -2230,7 +2428,7 @@ struct Index {
 
   private closeMoreWebPanel(session: number, pin: string): void {
     PinmonyRuntimeLog.info('AsyncAction: stage=more-close');
-    try { this.controller.runJavaScript('window.PinmonyNativeMoreClose && window.PinmonyNativeMoreClose(' +
+    try { this.runSessionScript('window.PinmonyNativeMoreClose && window.PinmonyNativeMoreClose(' +
       session.toString() + ',' + JSON.stringify(pin) + ')').catch(() => {
       PinmonyRuntimeLog.warn('Pinmony: could not close the web Pin menu');
     }); } catch (_) { PinmonyRuntimeLog.warn('AsyncAction: more-close unavailable'); }
@@ -2268,7 +2466,7 @@ struct Index {
     this.pinStore.moreLoading = false;
     if(PIN_NATIVE_PIN_MENUS_ENABLED)return;
     if (this.pinStore.moreApiMode) {
-      this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.detailMoreClose(' +
+      this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.detailMoreClose(' +
         session.toString() + ',' + JSON.stringify(pin) + ')').catch(() => {});
     } else this.closeMoreWebPanel(session, pin);
    } finally { this.rootContextCoordinator.notify(); } }
@@ -2346,7 +2544,7 @@ struct Index {
     const nativeAddress: string = this.nativeRootPageAddress(2);
     if (nativeAddress) return this.inboxUrlFromAddress(nativeAddress);
     try {
-      return this.inboxUrlFromAddress(this.controller.getUrl());
+      return this.inboxUrlFromAddress(this.sessionDocumentUrl());
     } catch (error) {
       return '';
     }
@@ -2376,7 +2574,7 @@ struct Index {
     const nativeAddress: string = this.nativeRootPageAddress(1);
     if (nativeAddress) return this.searchUrlFromAddress(nativeAddress);
     try {
-      return this.searchUrlFromAddress(this.controller.getUrl());
+      return this.searchUrlFromAddress(this.sessionDocumentUrl());
     } catch (error) {
       return '';
     }
@@ -2631,7 +2829,7 @@ struct Index {
     if (PIN_NATIVE_SEARCH_READS_ENABLED && this.searchNativeReads.eligible()) { this.searchNativeReads.pause(); this.commitNativeSearchReturn(target); return; }
     const token: number = ++this.pageBackToken;
     try {
-      this.controller.loadUrl(target);
+      this.loadSessionDocument(target);
       this.coordinatorTasks.timeout(() => { if (token === this.pageBackToken) this.pageHistory.cancelBack(); }, 2500);
     } catch (error) {
       this.pageHistory.cancelBack();
@@ -2688,7 +2886,7 @@ struct Index {
     if (this.nativeRootOnly && !this.rootContentInteracted) return;
     if (this.nativeBackTarget) {
       try {
-        if (this.pageHistory.key(this.controller.getUrl()) !== this.pageHistory.key(this.nativeBackTarget)) return;
+        if (this.pageHistory.key(this.sessionDocumentUrl()) !== this.pageHistory.key(this.nativeBackTarget)) return;
       } catch (_) { return; }
     }
     this.searchController.updateSearch(value);
@@ -2718,7 +2916,7 @@ struct Index {
     this.tabsController.changeIndex(1);
     if(PIN_NATIVE_SEARCH_READS_ENABLED){this.searchNativeReads.navigate(target);return;}
     this.prepareSearchNavigation(target);
-    try { this.controller.loadUrl(target); }
+    try { this.loadSessionDocument(target); }
     catch (_) {
       this.searchStore.searchLoading = false;
       this.searchStore.searchError = '无法打开标签搜索，请重试';
@@ -2761,7 +2959,7 @@ struct Index {
       this.syncFloatingTabsMotion();
       this.clearRootTabGuard('search-hero');
       if(PIN_NATIVE_BOARD_READS_ENABLED){this.nativeBackTarget = target;this.navigationAddress = target;this.pageHistory.visit(target,'push');this.boardNativeReads.demand();return;}
-      try { this.controller.loadUrl(target); }
+      try { this.loadSessionDocument(target); }
       catch (_) {
         this.boardStore.pendingBoardSource = ''; this.boardStore.pendingBoardUrl = '';
         this.boardStore.boardReturnPage = '';
@@ -2859,7 +3057,7 @@ struct Index {
     const address: string = this.rootTabAddresses.get(index) || '';
     // A displayed snapshot does not establish the hidden document session.
     try {
-      if (this.pageHistory.key(address) !== this.pageHistory.key(this.controller.getUrl())) return '';
+      if (this.pageHistory.key(address) !== this.pageHistory.key(this.sessionDocumentUrl())) return '';
     } catch (_) { return ''; }
     if (index === 0) return this.isHomeRootAddress(address) ? address : '';
     if (index === 1) return this.searchUrlFromAddress(address);
@@ -2911,6 +3109,20 @@ struct Index {
   }
 
   // A visible page owns its first read; the bottom-bar handler only changes presentation.
+  private markReturnedHome(index: number): void {
+    if (index !== 0) return;
+    const token: number = this.tabRequestToken;
+    const generation: number = this.nativeBusinessSessionContext().generation;
+    this.coordinatorTasks.timeout((): void => {
+      if (token !== this.tabRequestToken || generation !== this.nativeBusinessSessionContext().generation ||
+          this.authStatus !== 'authenticated' || this.businessSuspended || this.activeTab !== 0 || !this.nativeRootTabsVisible()) return;
+      const page: string = this.homePresentationPageKey() || this.retainedHomeRootPageKey();
+      const snapshot: PinmonyHomeSnapshot | undefined = this.homeStore.homeForPresentation(page);
+      if (!snapshot || snapshot.kind !== 'state' || snapshot.sourceError || this.homeStore.homeError) return;
+      if (this.pagePerformance.restoreHome()) this.detailReturnJourney?.mark('return.home.cache.presented');
+    }, 16);
+  }
+
   private onRootPageVisible(index: number, visible: boolean): void {
     if (!visible) { if(index === 3 && PIN_NATIVE_PROFILE_READS_ENABLED) this.profileNativeReads.pause(); if(index === 2 && PIN_NATIVE_INBOX_UPDATES_ENABLED) this.inboxUpdatesNativeReads.pause(); if(index === 2 && PIN_NATIVE_INBOX_MESSAGES_ENABLED && !this.inboxStore.inboxFlow)this.inboxMessagesNativeReads.pause(); if (index === 1 && PIN_NATIVE_SEARCH_DISCOVERY_ENABLED) { this.searchDiscoveryNativeReads.pause(); this.searchNativeReads.pause(); } return; }
     if (this.activeTab === index && this.nativeRootTabsVisible()) {
@@ -2991,17 +3203,17 @@ struct Index {
       this.profileStore.profileActionsReady = false; this.profileStore.profileSessionReady = false;
       let preparedDocument: string = '';
       try {
-        if (this.profileUrlFromAddress(this.controller.getUrl()) !== profile) this.controller.loadUrl(profile);
+        if (this.profileUrlFromAddress(this.sessionDocumentUrl()) !== profile) this.loadSessionDocument(profile);
         const deadline: number = Date.now() + 10000;
         while (current() && Date.now() < deadline) {
-          if (this.profileUrlFromAddress(this.controller.getUrl()) === profile) {
-            const document: string = this.controller.getUrl();
+          if (this.profileUrlFromAddress(this.sessionDocumentUrl()) === profile) {
+            const document: string = this.sessionDocumentUrl();
             if (preparedDocument !== document) {
               this.bindNativeNetwork();
               preparedDocument = document;
             }
             const install: string = this.profileNativeReads.installScript(); if (!install) return false;
-            await this.controller.runJavaScript(install + 'window.PinmonyProfileSync && window.PinmonyProfileSync();');
+            await this.runSessionScript(install + 'window.PinmonyProfileSync && window.PinmonyProfileSync();');
             if (current() && this.profileStore.profileActionsReady && this.profileStore.profileSessionReady &&
                 this.profileStore.profile?.session === this.profileStore.profileSession) return true;
           }
@@ -3016,7 +3228,7 @@ struct Index {
 
   private profileDocumentMatches(url: string): boolean {
     let document: string = '';
-    try { document = this.controller.getUrl(); } catch (_) {}
+    try { document = this.sessionDocumentUrl(); } catch (_) {}
     const profileUrl: string = this.profileUrlFromAddress(url);
     return !!profileUrl && (this.profileUrlFromAddress(document) === profileUrl ||
       this.profileUrlFromAddress(this.rootTabAddresses.get(3) || '') === profileUrl);
@@ -3121,7 +3333,7 @@ struct Index {
 
   private async refreshWebNavigation(): Promise<void> {
     try {
-      await this.controller.runJavaScript(
+      await this.runSessionScript(
         'window.PinmonyNavigationRefresh && window.PinmonyNavigationRefresh()');
     } catch (error) {
       PinmonyRuntimeLog.warn('Pinmony: navigation state refresh failed');
@@ -3132,7 +3344,7 @@ struct Index {
     try {
       if (PIN_NATIVE_HOME_READS_ENABLED && this.authStatus === 'authenticated' && this.activeTab === 0)
         return this.homePresentationPageKey();
-      if (this.nativeRootOnly) return this.homePageKeyFromAddress(this.controller.getUrl());
+      if (this.nativeRootOnly) return this.homePageKeyFromAddress(this.sessionDocumentUrl());
       return this.homePageKeyFromAddress(this.nativeDisplayAddress());
     } catch (error) {
       return '';
@@ -3379,6 +3591,30 @@ struct Index {
     this.markRootPerformance(0);
    } finally { this.rootContextCoordinator.notify(); } }
 
+  private openHomeBoard(id: string): void {
+    const home: PinmonyHomeSnapshot | undefined = this.homeStore.home;
+    const board = home?.board;
+    if (!PIN_NATIVE_BOARD_READS_ENABLED || this.authStatus !== 'authenticated' || this.activeTab !== 0 ||
+      this.businessSuspended || this.activeSheetKind || this.boardStore.pendingBoardUrl || this.homeStore.pendingHomeTab ||
+      !home || home.pageKey !== this.homePresentationPageKey() || !board || board.id !== id ||
+      !home.tabs.some((tab): boolean => tab.selected && tab.id === 'tab:' + id)) return;
+    const target: string = this.boardUrlFromAddress(board.boardUrl || '');
+    if (!target || !target.startsWith(this.nativeBusinessSessionContext().origin + '/')) return;
+    const source: string = home.pageKey;
+    this.homeNativeReads.pause(); this.returnCoordinator.cancel(); this.pageHistory.cancelBack(); this.pageBackToken++;
+    this.boardStore.discoveryBoardPage = ''; this.boardStore.rootTab = 0;
+    this.boardStore.boardReturnUrl = source; this.boardStore.boardReturnPage = target;
+    this.boardStore.pendingBoardSource = source; this.boardStore.pendingBoardUrl = target;
+    this.boardStore.presentationPage = target; this.boardStore.presentationOnly = false;
+    this.boardStore.boardOpeningToken++;
+    this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: target, boardId: id, title: board.name,
+      pinCount: board.pinCount.toString(), ownerName: '', ownerAvatar: '', loading: true, loadingMore: false,
+      ready: false, error: '', hasMore: false, pins: [] };
+    this.nativeRootOnly = false; this.nativeBackTarget = target; this.navigationAddress = target;
+    this.pageHistory.visit(source, 'load'); this.pageHistory.visit(target, 'push');
+    this.boardNativeReads.demand(); this.syncFloatingTabsMotion();
+  }
+
   private async selectHomeTab(id: string, restoring: boolean = false): Promise<void> {
     return this.homeController.selectHomeTab(id, restoring);
   }
@@ -3424,7 +3660,7 @@ struct Index {
     const flow = this.inboxStore.inboxFlow;
     const nativeChat: boolean = this.inboxMessagesNativeReads.ownsFlow();
     let document: string = '';
-    if(!nativeChat) {try { document = this.controller.getUrl(); } catch (_) { return; }}
+    if(!nativeChat) {try { document = this.sessionDocumentUrl(); } catch (_) { return; }}
     if (!PIN_BOARD_API_ENABLED || this.authStatus !== 'authenticated' || this.businessSuspended || this.activeTab !== 2 ||
         this.activeSheetKind || this.boardStore.pendingBoardUrl || this.nativeBoardVisible() || this.pinStore.detail ||
         !flow || flow.screen !== 'chat' || flow.pageUrl !== this.currentInboxUrl() || flow.session !== this.inboxStore.inboxSession ||
@@ -3449,7 +3685,7 @@ struct Index {
     this.pagePerformance.beginSecondary('board', target);
     this.clearRootTabGuard('chat-board'); this.syncFloatingTabsMotion();
     if(PIN_NATIVE_BOARD_READS_ENABLED){this.nativeBackTarget = target;this.navigationAddress = target;this.pageHistory.visit(target,'push');this.boardNativeReads.demand();return;}
-    try { this.controller.loadUrl(target); }
+    try { this.loadSessionDocument(target); }
     catch (_) {
       this.boardStore.pendingBoardUrl = ''; this.boardStore.pendingBoardSource = '';
       this.boardStore.boardReturnUrl = ''; this.boardStore.boardReturnPage = ''; this.boardStore.presentationPage = '';
@@ -3564,7 +3800,7 @@ struct Index {
     if (this.nativeRootOnly) return this.rootPresentationAddress(this.activeTab);
     const nativeAddress: string = this.nativeRootPageAddress(this.activeTab);
     if (nativeAddress) return nativeAddress;
-    try { return this.controller.getUrl(); } catch (_) { return this.navigationAddress; }
+    try { return this.sessionDocumentUrl(); } catch (_) { return this.navigationAddress; }
   }
 
   private presentNativeBackTarget(target: string): void { return this.navigationCoordinator.presentNativeBackTarget(target); }
@@ -3588,7 +3824,7 @@ struct Index {
     if (this.businessSuspended || token !== this.pageBackToken || this.returnLoadToken === token) return;
     this.returnLoadToken = token;
     this.detailReturnJourney?.mark('return.target.load.once');
-    try { this.controller.loadUrl(target); }
+    try { this.loadSessionDocument(target); }
     catch (error) {
       if (!this.boardUrlFromAddress(target) || this.boardStore.boardDetail?.pageKey !== target) throw new Error('无法加载返回目标');
       this.boardStore.boardDetail.loading = false;
@@ -3645,7 +3881,7 @@ struct Index {
       const canReuseHomeDocument: boolean = !this.webPageLoading && !this.pinStore.detailOpeningPin;
       const departedPin: string = this.pinStore.detailPin || this.pinStore.detailOpeningPin;
       if (departedPin) {
-        this.controller.runJavaScript('window.PinmonyDetailPause && window.PinmonyDetailPause(' +
+        this.runSessionScript('window.PinmonyDetailPause && window.PinmonyDetailPause(' +
           JSON.stringify(departedPin) + ')').catch(() => {});
       }
       const returnStartedAt: number = Date.now();
@@ -3724,7 +3960,7 @@ struct Index {
       ideaSections: current.ideaSections, results: current.results };
     this.searchStore.searchInputFocused = false;
     this.searchStore.searchInputStopEditing = undefined;
-    this.controller.runJavaScript('window.PinmonySearchQuizApi && window.PinmonySearchQuizApi.action(' +
+    this.runSessionScript('window.PinmonySearchQuizApi && window.PinmonySearchQuizApi.action(' +
       JSON.stringify(current.pageKey) + ',"back","")')
       .catch(() => PinmonyRuntimeLog.warn('Pinmony: quiz background cancellation unavailable'));
     return true;
@@ -3746,7 +3982,7 @@ struct Index {
     this.loadFailed = false;
     this.failureDetails = '';
     try {
-      this.controller.loadUrl(this.lastPageUrl || PINTEREST_URL);
+      this.loadSessionDocument(this.lastPageUrl || PINTEREST_URL);
     } catch (error) {
       this.loadFailed = true;
     }
@@ -3864,7 +4100,7 @@ struct Index {
     const nativeAddress: string = this.nativeRootPageAddress(3);
     if (nativeAddress) return this.profileUrlFromAddress(nativeAddress);
     try {
-      return this.profileUrlFromAddress(this.controller.getUrl());
+      return this.profileUrlFromAddress(this.sessionDocumentUrl());
     } catch (error) {
       return '';
     }
@@ -3875,7 +4111,7 @@ struct Index {
   private currentBoardUrl(): string {
     if (this.nativeRootOnly) return '';
     if(PIN_NATIVE_BOARD_READS_ENABLED && this.nativeBackTarget && this.boardStore.boardDetail?.pageKey === this.nativeBackTarget && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.publishBoardReturn) return this.boardUrlFromAddress(this.nativeBackTarget);
-    try { return this.boardUrlFromAddress(this.controller.getUrl()); } catch (_) { return ''; }
+    try { return this.boardUrlFromAddress(this.sessionDocumentUrl()); } catch (_) { return ''; }
   }
 
   private isCurrentBoardMenuPin(pinUrl: string, pageKey: string): boolean {
@@ -3917,7 +4153,7 @@ struct Index {
     if (this.inboxStore.inbox?.section !== 'messages' || !this.inboxStore.inboxActionsReady || this.inboxStore.inboxLoading) { this.showMessage('当前聊天入口不可用，请重试'); return; }
     try {
       this.inboxStore.flowDismissed = false;
-      const result = await this.controller.runJavaScript('window.PinmonyInboxConversations && window.PinmonyInboxConversations.direct(' + JSON.stringify(peer) + ',' + this.inboxStore.inboxSession.toString() + ')');
+      const result = await this.runSessionScript('window.PinmonyInboxConversations && window.PinmonyInboxConversations.direct(' + JSON.stringify(peer) + ',' + this.inboxStore.inboxSession.toString() + ')');
       if (result === 'true' || result === '"true"') return;
     } catch (_) {}
     this.showMessage('当前聊天入口不可用，请重试');
@@ -3956,7 +4192,7 @@ struct Index {
     this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: item.boardUrl, boardId: item.boardId, title: item.boardName,
       pinCount: '', ownerName: '', ownerAvatar: '', loading: true, loadingMore: false, ready: false, error: '', hasMore: false, pins: [] };
     if(PIN_NATIVE_BOARD_READS_ENABLED){this.boardStore.rootTab = 2;this.nativeRootOnly = false;this.nativeBackTarget = item.boardUrl;this.navigationAddress = item.boardUrl;this.pageHistory.visit(item.boardUrl,'push');this.boardNativeReads.demand();this.readBoardInvitations(true);return;}
-    try { this.controller.loadUrl(item.boardUrl); }
+    try { this.loadSessionDocument(item.boardUrl); }
     catch (_) {
       this.boardStore.pendingBoardSource = ''; this.boardStore.pendingBoardUrl = '';
       this.boardStore.boardReturnPage = ''; this.boardStore.presentationPage = '';
@@ -3990,7 +4226,7 @@ struct Index {
         this.currentBoardUrl() !== board.pageKey) return;
     this.profileShareMode = true; this.pinStore.shareSession = 0; this.pinStore.ignoredShareSession = 0;
     try {
-      const result: string = await this.controller.runJavaScript('window.PinmonyNativeShareApiOpen && ' +
+      const result: string = await this.runSessionScript('window.PinmonyNativeShareApiOpen && ' +
         'window.PinmonyNativeShareApiOpen(' + JSON.stringify(board.pageKey) + ')');
       if (result !== 'true' && result !== '"true"') this.showMessage('分享接口暂不可用，请重试');
     } catch (_) { this.showMessage('分享接口暂不可用，请重试'); }
@@ -4027,7 +4263,7 @@ struct Index {
     const target: string = this.boardUrlFromAddress(url), profile: PinmonyProfileSnapshot | undefined = this.profileStore.profile;
     const source: string = profile ? profile.profileUrl + (profile.section === 'created' ? '_created/' : '') : '';
     if(!target || !source || this.authStatus !== 'authenticated')return;
-    if(!PIN_NATIVE_BOARD_READS_ENABLED){this.boardStore.boardReturnUrl = this.controller.getUrl();this.closeProfilePanel();this.controller.loadUrl(target);return;}
+    if(!PIN_NATIVE_BOARD_READS_ENABLED){this.boardStore.boardReturnUrl = this.sessionDocumentUrl();this.closeProfilePanel();this.loadSessionDocument(target);return;}
     const panel: PinmonyProfilePanel | undefined = this.profileStore.panel;
     const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
     this.followingBoardReturn = panel?.mode === 'following' && panel.section === 'boards' ? {
@@ -4098,7 +4334,7 @@ struct Index {
     this.clearRootTabGuard('board-open');
     this.boardStore.pendingBoardSource = profile.section === 'created' ? profile.profileUrl + '_created/' : profile.profileUrl;
     try {
-      const source: string = this.controller.getUrl();
+      const source: string = this.sessionDocumentUrl();
       const retained: string = this.rootTabAddresses.get(3) || '';
       if (this.profileUrlFromAddress(source) === profile.profileUrl) this.boardStore.pendingBoardSource = source;
       else if (this.profileStore.origins.length === 0 && this.profileUrlFromAddress(retained) === profile.profileUrl) {
@@ -4120,7 +4356,7 @@ struct Index {
     try {
       // Board cards already carry a validated route. Keep navigation separate
       // from the profile business-action whitelist, which only opens Pins.
-      this.controller.loadUrl(target);
+      this.loadSessionDocument(target);
       dispatched = true;
     } catch (_) {
       this.showMessage('无法打开图板，请重试');
@@ -4176,7 +4412,7 @@ struct Index {
       this.boardStore.boardDetail = undefined; this.profileStore.profileWebFlow = false;
       if (source) {
         if(PIN_NATIVE_DETAIL_READS_ENABLED && PIN_NATIVE_BOARD_READS_ENABLED && this.completeNativeBack(source))return;
-        try { this.controller.loadUrl(source); }
+        try { this.loadSessionDocument(source); }
         catch (_) { this.showMessage('无法返回资料页，请重试'); }
       }
       return;
@@ -4204,10 +4440,10 @@ struct Index {
     const page: string = board.pageKey, token: number = this.boardStore.boardOpeningToken, generation: number = this.nativeBusinessSessionContext().generation;
     const current = (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && !this.nativeRootOnly && !this.pinStore.detail && !this.pinStore.detailOpeningPin && this.boardStore.boardDetail?.pageKey === page && this.nativeBusinessSessionContext().generation === generation;
     try {
-      if(this.controller.getUrl().split(/[?#]/)[0] !== page && this.boardStore.pendingBoardUrl !== page)this.controller.loadUrl(page);
+      if(this.sessionDocumentUrl().split(/[?#]/)[0] !== page && this.boardStore.pendingBoardUrl !== page)this.loadSessionDocument(page);
       const deadline: number = Date.now() + 10000;
       while(current() && Date.now() < deadline) {
-        if(this.controller.getUrl().split(/[?#]/)[0] === page)return true;
+        if(this.sessionDocumentUrl().split(/[?#]/)[0] === page)return true;
         // A new board intent cancels the old wait; a route confirmation may increment this token once.
         if(this.boardStore.boardOpeningToken > token + 1)return false;
         if(!await this.coordinatorTasks.wait(150))return false;
@@ -4261,7 +4497,7 @@ struct Index {
       const pinSource: string = this.pinStore.detail?.pinUrl || this.pinStore.detailOpeningPin || '';
       const boardSource: string = this.boardStore.boardDetail?.pageKey || '';
       source = PIN_NATIVE_PROFILE_READS_ENABLED ? (pinSource ||
-        (boardSource && (boardSource === this.nativeBackTarget || boardSource === this.navigationAddress) ? boardSource : searchSource || this.nativeDisplayAddress())) : this.controller.getUrl();
+        (boardSource && (boardSource === this.nativeBackTarget || boardSource === this.navigationAddress) ? boardSource : searchSource || this.nativeDisplayAddress())) : this.sessionDocumentUrl();
     }
     catch (_) { this.showMessage('当前页面尚未就绪，请重试'); return; }
     if(PIN_NATIVE_PROFILE_READS_ENABLED){
@@ -4291,7 +4527,7 @@ struct Index {
       this.nativeBackTarget = page;this.detailReturnedToRoot = false;this.pageHistory.visit(page,'push');
       this.profileNativeReads.demand();return;
     }
-    try { this.controller.loadUrl(page); }
+    try { this.loadSessionDocument(page); }
     catch (_) {
       const origin = this.profileStore.origins.pop();
       this.nativeRootOnly = rootOnly;
@@ -4388,7 +4624,7 @@ struct Index {
     const page: string = panel?.page || '';
     const account: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
     let source: string = '';
-    try { if(!PIN_NATIVE_PROFILE_SETTINGS_ENABLED)source = this.controller.getUrl(); }
+    try { if(!PIN_NATIVE_PROFILE_SETTINGS_ENABLED)source = this.sessionDocumentUrl(); }
     catch (_) { this.showMessage('当前页面尚未就绪，请重试'); return; }
     if (!panel || panel.mode !== 'edit' || panel.loading || this.profileStore.saving || this.authStatus !== 'authenticated') return;
     const ownsPreview = (): boolean => {const actual: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();return token === this.profileStore.panelToken && this.profileStore.panel?.page === page && this.authStatus === 'authenticated' && (PIN_NATIVE_PROFILE_SETTINGS_ENABLED ? this.currentProfileUrl() === page && actual.accountId === account.accountId && actual.generation === account.generation && actual.origin === account.origin : this.isCurrentWebDocument(source));};
@@ -4431,7 +4667,7 @@ struct Index {
     this.profileStore.profileWebFlow = false;
     try {
       this.beginDetailOpening(pinUrl, this.pinStore.detailReturnUrl);
-      if(!PIN_NATIVE_PROFILE_READS_ENABLED)this.controller.loadUrl(pinUrl);
+      if(!PIN_NATIVE_PROFILE_READS_ENABLED)this.loadSessionDocument(pinUrl);
       return true;
     } catch (error) {
       PinmonyRuntimeLog.warn('Pinmony: profile action unavailable');
@@ -4448,7 +4684,7 @@ struct Index {
     if (!profile || !profile.profileUrl || this.authStatus !== 'authenticated' || !this.profileStore.profileActionsReady || this.activeSheetKind) return;
     this.profileShareMode = true; this.pinStore.shareSession = 0; this.pinStore.ignoredShareSession = 0;
     try {
-      const result: string = await this.controller.runJavaScript('window.PinmonyNativeShareApiOpen && window.PinmonyNativeShareApiOpen(' + JSON.stringify(profile.profileUrl) + ',true)');
+      const result: string = await this.runSessionScript('window.PinmonyNativeShareApiOpen && window.PinmonyNativeShareApiOpen(' + JSON.stringify(profile.profileUrl) + ',true)');
       if (result !== 'true' && result !== '"true"') { this.profileShareMode = false; this.showMessage('分享数据尚未就绪，请重试'); }
     } catch (_) { this.profileShareMode = false; this.showMessage('分享数据读取失败，请重试'); }
   }
@@ -4532,7 +4768,7 @@ struct Index {
     const board = this.boardStore.boardDetail;
     if(PIN_NATIVE_BOARD_READS_ENABLED)return this.boardSectionVisible && this.authStatus === 'authenticated' && !this.businessSuspended && this.boardNativeReads.contentReady();
     let documentPage: string = '';
-    try { documentPage = this.boardUrlFromAddress(this.controller.getUrl()); } catch (_) { return false; }
+    try { documentPage = this.boardUrlFromAddress(this.sessionDocumentUrl()); } catch (_) { return false; }
     return this.boardSectionVisible && this.authStatus === 'authenticated' && !this.businessSuspended &&
       !!board && board.ready && board.session > 0 && !board.loading && !board.refreshing &&
       !this.boardStore.presentationOnly && board.pageKey === this.currentBoardUrl() &&
@@ -4557,7 +4793,7 @@ struct Index {
     this.boardSectionSubmitting = true;
     PinmonyRuntimeLog.info('BoardSectionTrace: submit start');
     try {
-      const raw: string = await this.controller.runJavaScript(
+      const raw: string = await this.runSessionScript(
         'window.PinmonyBoardApi.sectionCreate(' + board.session.toString() + ',' +
         JSON.stringify(board.pageKey) + ',' + JSON.stringify(name.trim()) + ')');
       let result: string = raw === 'pending' || raw === 'created' || raw === 'unavailable' || raw === 'uncertain' ? raw : this.webJsonText(raw);
@@ -4567,7 +4803,7 @@ struct Index {
           this.authStatus === 'authenticated' && !this.businessSuspended &&
           this.boardStore.boardDetail?.session === board.session && this.currentBoardUrl() === board.pageKey) {
         await new Promise<void>((resolve) => { setTimeout(resolve, 250); });
-        const reply: string = await this.controller.runJavaScript('window.PinmonyBoardApi.sectionCreateRead(' +
+        const reply: string = await this.runSessionScript('window.PinmonyBoardApi.sectionCreateRead(' +
           board.session.toString() + ',' + JSON.stringify(board.pageKey) + ')');
         result = reply === 'pending' || reply === 'created' || reply === 'uncertain' ? reply : this.webJsonText(reply);
       }
@@ -4617,7 +4853,7 @@ struct Index {
         for (let offset: number = 0; offset < photo.data.length; offset += 60000) {
           if (!this.isCurrentPublish(token, page)) return;
           const chunk: string = photo.data.slice(offset, offset + 60000);
-          const result: string = await this.controller.runJavaScript('window.PinmonyPublishApi.photoChunk(' + token.toString() + ',' +
+          const result: string = await this.runSessionScript('window.PinmonyPublishApi.photoChunk(' + token.toString() + ',' +
             JSON.stringify(chunk) + ',' + JSON.stringify(photo.uri) + ',' + (offset + 60000 >= photo.data.length).toString() + ')');
           if (result !== 'true' && result !== '"true"') throw new Error('图片传输未完成');
         }
@@ -4638,10 +4874,10 @@ struct Index {
     this.profileStore.publishOptions = [];
     if(PIN_NATIVE_SHARE_PUBLISH_ENABLED){this.publishController.readMenuWhenReady(profile.profileUrl,Date.now() + 8000,this.profileStore.publishRequestToken);return;}
     try {
-      await this.controller.runJavaScript('window.PinmonyProfilePublishClose && ' +
+      await this.runSessionScript('window.PinmonyProfilePublishClose && ' +
         'window.PinmonyProfilePublishClose(' + profile.session.toString() + ',' +
         JSON.stringify(profile.profileUrl) + ')');
-      const result: string = await this.controller.runJavaScript('window.PinmonyProfilePublishDiscover && ' +
+      const result: string = await this.runSessionScript('window.PinmonyProfilePublishDiscover && ' +
         'window.PinmonyProfilePublishDiscover(' + profile.session.toString() + ',' +
         JSON.stringify(profile.profileUrl) + ')');
       if (result === 'true' || result === '"true"') return;
@@ -4661,7 +4897,7 @@ struct Index {
     await this.handleBack();
     if (this.profileStore.profile && this.currentProfileUrl() === this.profileStore.profile.profileUrl) {
       this.profileStore.profileWebFlow = false;
-      this.controller.runJavaScript('window.PinmonyProfileResume && window.PinmonyProfileResume()')
+      this.runSessionScript('window.PinmonyProfileResume && window.PinmonyProfileResume()')
         .catch(() => PinmonyRuntimeLog.warn('Pinmony: could not refresh profile'));
     }
   }
@@ -4737,7 +4973,7 @@ struct Index {
     // Ignore stale presentation callbacks, but invalidate live controls if the
     // hidden document really changed. A cached display never authorizes writes.
     let actual: string = '';
-    try { actual = this.controller.getUrl(); } catch (_) {}
+    try { actual = this.sessionDocumentUrl(); } catch (_) {}
     if (actual === url && this.pinStore.detailActionsReady) {
       this.authEpoch++; this.nativeNetwork.invalidate();
       this.pinStore.detailActionsReady = false;
@@ -4897,7 +5133,7 @@ struct Index {
     this.pinStore.visualToken++;
     if (localOnly || PIN_NATIVE_DETAIL_AUXILIARY_ENABLED) return;
     try {
-      this.controller.runJavaScript('window.PinmonyVisualSearchApi && window.PinmonyVisualSearchApi.close()')
+      this.runSessionScript('window.PinmonyVisualSearchApi && window.PinmonyVisualSearchApi.close()')
         .catch((): void => { PinmonyRuntimeLog.warn('VisualSearch: close unavailable'); });
     } catch (_) { PinmonyRuntimeLog.warn('VisualSearch: close unavailable'); }
   }
@@ -4930,7 +5166,7 @@ struct Index {
           this.pinStore.detailPin !== parent || target === parent || this.pinStore.detailOpeningPin === target) return;
       this.beginDetailOpening(target, parent);
       this.detailJourney.mark(nativeReadRoute ? 'related.native.route.opened' : 'related.cached.route.opened');
-      if(!PIN_NATIVE_DETAIL_READS_ENABLED){try { this.controller.loadUrl(target); }
+      if(!PIN_NATIVE_DETAIL_READS_ENABLED){try { this.loadSessionDocument(target); }
       catch (_) { this.failImageRelatedNavigation(target); }}
       return;
     }
@@ -4941,7 +5177,7 @@ struct Index {
     if (!/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(item.pinUrl)) return;
     this.pinStore.detailReturnUrl = result.pin;
     this.beginDetailOpening(item.pinUrl, result.pin);
-    try { if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.controller.loadUrl(item.pinUrl); }
+    try { if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(item.pinUrl); }
     catch (_) { this.failImageRelatedNavigation(item.pinUrl); }
   }
 
@@ -4958,7 +5194,7 @@ struct Index {
 
   private isCurrentWebDocument(address: string): boolean {
     if (!address) return false;
-    try { return this.controller.getUrl() === address; }
+    try { return this.sessionDocumentUrl() === address; }
     catch (_) { return false; }
   }
 
@@ -4975,7 +5211,7 @@ struct Index {
     }
     PinmonyRuntimeLog.info('PhotoDownload: requested');
     try {
-      const value: string = await this.controller.runJavaScript('JSON.stringify(window.PinmonyPostApi && window.PinmonyPostApi.downloadUrl(' + JSON.stringify(pin) + '))');
+      const value: string = await this.runSessionScript('JSON.stringify(window.PinmonyPostApi && window.PinmonyPostApi.downloadUrl(' + JSON.stringify(pin) + '))');
       if (this.pinStore.detail?.pinUrl !== pin || this.pinStore.imageLayer !== 'zoom') return;
       const url: string = JSON.parse(this.webJsonText(value)) as string;
       if (/^https:\/\/i\.pinimg\.com\//.test(url)) {
@@ -5065,7 +5301,7 @@ struct Index {
     if (value.action === 'photo') {
       if (!value.imageUri || !/^file:\/\/media\//.test(value.imageUri)) return '';
       try {
-        const started: string = await this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.commentPhotoBegin(' + JSON.stringify(pin) + ')');
+        const started: string = await this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.commentPhotoBegin(' + JSON.stringify(pin) + ')');
         if (!current() || (started !== 'true' && started !== '"true"')) return '';
         const bytes: ArrayBuffer = await this.systemActions.readJpeg(value.imageUri);
         if (!current()) return '';
@@ -5075,7 +5311,7 @@ struct Index {
         });
         value.imageUri = undefined;
       } catch (_) {
-        if (current()) await this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.commentPhotoFail(' + JSON.stringify(pin) + ')').catch(() => {});
+        if (current()) await this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.commentPhotoFail(' + JSON.stringify(pin) + ')').catch(() => {});
         return '';
       }
     }
@@ -5249,7 +5485,7 @@ struct Index {
     const copyId: string = this.pinStore.saveUndoId;
     if (!pin || !copyId || this.pinIdentity(pin) !== this.pinIdentity(this.currentPinUrl())) return;
     try {
-      const result: string = await this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.saveUndo(' +
+      const result: string = await this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.saveUndo(' +
         JSON.stringify(pin) + ',' + JSON.stringify(copyId) + ')');
       if (result !== 'true' && result !== '"true"') this.showUndoSnack('撤销未完成，请重试', pin, () => this.undoSavedPin());
     } catch (_) { this.showUndoSnack('撤销失败，请重试', pin, () => this.undoSavedPin()); }
@@ -5261,7 +5497,7 @@ struct Index {
     if (!pin || this.pinStore.feedbackUndoBusy || this.pinIdentity(pin) !== this.pinIdentity(this.currentPinUrl())) return;
     this.pinStore.feedbackUndoBusy = true;
     try {
-      const result: string = await this.controller.runJavaScript('window.PinmonyPostApi && window.PinmonyPostApi.feedbackUndo(' +
+      const result: string = await this.runSessionScript('window.PinmonyPostApi && window.PinmonyPostApi.feedbackUndo(' +
         JSON.stringify(pin) + ',' + this.pinStore.feedbackUndoSession.toString() + ')');
       if (result !== 'true' && result !== '"true"') {
         this.pinStore.feedbackUndoBusy = false;
@@ -5285,7 +5521,7 @@ struct Index {
     if (related) this.beginDetailOpening(targetPinUrl, detail.pinUrl);
     else this.pinStore.detail = undefined;
     try {
-      const result: string = await this.controller.runJavaScript('window.PinmonyDetailRelated && ' +
+      const result: string = await this.runSessionScript('window.PinmonyDetailRelated && ' +
         'window.PinmonyDetailRelated(' + detail.session.toString() + ',' + JSON.stringify(detail.pinUrl) + ',' +
         JSON.stringify(id) + ')');
       if (result !== 'true' && result !== '"true"') {
@@ -5293,7 +5529,7 @@ struct Index {
         // replaced the visible detail. Keep the new Pin opening state alive;
         // restoring `detail` here would paint the previous Pin over it.
         if (targetPinUrl && this.pinStore.detailOpeningPin === targetPinUrl) {
-          this.controller.loadUrl(targetPinUrl);
+          this.loadSessionDocument(targetPinUrl);
         } else {
           this.showMessage('无法打开相关 Pin');
         }
@@ -5301,7 +5537,7 @@ struct Index {
     } catch (error) {
       if (targetPinUrl && this.pinStore.detailOpeningPin === targetPinUrl) {
         try {
-          this.controller.loadUrl(targetPinUrl);
+          this.loadSessionDocument(targetPinUrl);
         } catch (_) {
           this.pinStore.detailOpeningPin = '';
           this.showMessage('无法打开相关 Pin');
@@ -5318,7 +5554,7 @@ struct Index {
     const detail: PinmonyDetailSnapshot | undefined = this.pinStore.detail;
     if (!detail || !this.pinStore.detailActionsReady ||
         (!PIN_DETAIL_API_ENABLED && !detail.related.length)) return;
-    this.controller.runJavaScript('window.PinmonyDetailLoadMore && ' +
+    this.runSessionScript('window.PinmonyDetailLoadMore && ' +
       'window.PinmonyDetailLoadMore(' + detail.session.toString() + ',' + JSON.stringify(detail.pinUrl) + ')')
       .catch(() => PinmonyRuntimeLog.warn('Pinmony: related Pin loading unavailable'));
   }
@@ -5330,7 +5566,7 @@ struct Index {
         this.pinStore.detail.commentLoading || this.nativeBackTarget ||
         this.pinIdentity(this.currentPinUrl()) !== this.pinIdentity(this.pinStore.detailPin)) return;
     this.detailCommentsMeasured = false;
-    this.controller.runJavaScript('window.PinmonyDetailPreviewRetry && window.PinmonyDetailPreviewRetry(' +
+    this.runSessionScript('window.PinmonyDetailPreviewRetry && window.PinmonyDetailPreviewRetry(' +
       this.pinStore.detailSession.toString() + ',' + JSON.stringify(this.pinStore.detailPin) + ')')
       .catch(() => PinmonyRuntimeLog.warn('DetailTrace: comments retry unavailable'));
   }
@@ -5370,7 +5606,7 @@ struct Index {
       this.pinStore.detailOpeningPin = pin;
       this.startOpeningDetailRead(pin, ++this.pinStore.detailOpeningToken);
     }
-    this.controller.runJavaScript('window.PinmonyDetailApiRetry && window.PinmonyDetailApiRetry(' +
+    this.runSessionScript('window.PinmonyDetailApiRetry && window.PinmonyDetailApiRetry(' +
       this.pinStore.detailSession.toString() + ',' + JSON.stringify(this.pinStore.detailPin) + ',' + restart.toString() + ');' +
       'window.PinmonyDetailRefresh && window.PinmonyDetailRefresh()')
       .catch(() => { this.pinStore.detailApiError = '帖子接口不可用，请重新进入'; });
@@ -5384,13 +5620,13 @@ struct Index {
       return;
     }
     try {
-      await this.controller.runJavaScript('window.PinmonyHandleBack ? window.PinmonyHandleBack() : false');
+      await this.runSessionScript('window.PinmonyHandleBack ? window.PinmonyHandleBack() : false');
     } catch (error) {
       PinmonyRuntimeLog.warn('Pinmony: could not close detail web panel');
     }
     if (this.pinIdentity(this.currentPinUrl()) === this.pinIdentity(detail.pinUrl)) {
       this.pinStore.detailWebFlow = false;
-      this.controller.runJavaScript('window.PinmonyDetailResume && window.PinmonyDetailResume()')
+      this.runSessionScript('window.PinmonyDetailResume && window.PinmonyDetailResume()')
         .catch(() => PinmonyRuntimeLog.warn('Pinmony: could not refresh detail'));
     } else {
       this.backFromDetail();
@@ -5403,7 +5639,7 @@ struct Index {
     if (this.pinStore.detailPresentationOnly) return '';
     if (this.nativeRootOnly || this.detailReturnedToRoot) return '';
     try {
-      return this.extractPinUrl(this.controller.getUrl());
+      return this.extractPinUrl(this.sessionDocumentUrl());
     } catch (error) {
       return '';
     }
@@ -5532,7 +5768,7 @@ struct Index {
       this.lastPageUrl = PINTEREST_LOGIN_URL;
       this.loadFailed = false;
       this.failureDetails = '';
-      this.controller.loadUrl(PINTEREST_LOGIN_URL);
+      if(this.nativeLoginEnabled)this.openNativeLogin();else this.loadSessionDocument(PINTEREST_LOGIN_URL);
     } catch (_) {
       if (this.authStatus === 'unauthenticated') {
         this.authStatus = 'error';
@@ -5559,7 +5795,9 @@ struct Index {
     this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => { this.profileSettingsVisible = false; });
    } finally { this.rootContextCoordinator.notify(); } }
 
-  onBackPress(): boolean { return this.navigationCoordinator.onBackPress(); }
+  onBackPress(): boolean {
+    return this.navigationCoordinator.onBackPress();
+  }
 
   @Builder
   private buildShareSheet() {
@@ -5574,6 +5812,30 @@ struct Index {
   @Builder
   private buildSearchFilterSheet() {
     PinmonySearchFilterSheet({ searchStore: this.searchStore, onSelect: (id: string) => this.selectSearchFilter(id), onRetry: () => this.retrySearchFilters() })
+  }
+
+  private nativeModalLabel(): string {
+    return this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? '添加至图板区块' : '添加 Pin 图或图板区块') : this.profileStore.publishTitle || '添加到个人资料') :
+        this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? '创建图板' : '收藏至图板') : '编辑 Pin 图') : this.activeSheetKind === 'comments' ? '你觉得怎么样？' : this.activeSheetKind === 'save' ?
+          (this.pinStore.saveCreating ? '创建图板' : '收藏至图板') : this.activeSheetKind === 'more' ? '选项' :
+          this.activeSheetKind === 'searchFilter' ? '筛选器' : this.pinStore.shareTitle;
+  }
+
+  private closeNativeModal(): void {
+    if (this.detailSystemShareClosed) { this.showNativeSheet = false; return; }
+    this.pinStore.shareBackHandledUntil = Date.now() + 500;
+    this.lastRootBackAt = 0;
+    if (this.activeSheetKind === 'edit') {
+      if (this.pinStore.editResult.busy || this.pinStore.editResult.picker.busy) return;
+      if (this.pinStore.editResult.phase !== 'edit') { this.editPinAction('editPhase', ',"edit"'); return; }
+      this.dismissEditPin();
+    } else if (this.activeSheetKind === 'comments') this.dismissApiComments();
+    else if (this.activeSheetKind === 'save') this.dismissApiBoards();
+    else if (this.activeSheetKind === 'publish') this.dismissProfilePublish();
+    else if (this.activeSheetKind === 'more') this.dismissMoreSheet();
+    else if (this.activeSheetKind === 'share') this.dismissShareSheet();
+    else if (this.activeSheetKind === 'searchFilter') this.dismissSearchFilters();
+    else if (this.activeSheetKind === 'profileMenu') this.dismissProfileMenu();
   }
 
   @Builder
@@ -5660,6 +5922,7 @@ struct Index {
       offlinePreviewMode: this.offlinePreviewMode,
       selectHomeTab: (id: string, restoring: boolean = false): Promise<void> => this.selectHomeTab(id, restoring),
       openHomePin: (id: string): Promise<void> => this.openHomePin(id),
+      openHomeBoard: (id: string): void => this.openHomeBoard(id),
       openHomeMore: (id: string): Promise<void> => this.openHomeMore(id),
       loadMoreHome: (): Promise<void> => this.loadMoreHome(),
       refreshHome: (): void => this.refreshHome(),
@@ -5886,6 +6149,7 @@ struct Index {
             .onAppear(() => {
               this.floatingTabsMounted = true;
               this.floatingTabsHidden = false;
+              if (this.nativeRootTabsVisible()) this.bottomBarCoordinator.resetForSession();
               this.logPageLifecycle('root-tabs-appear', 'tabsMounted=true');
               this.syncFloatingTabsMotion();
             })
@@ -5935,53 +6199,19 @@ struct Index {
   build() {
     Column() {
       Stack({ alignContent: Alignment.Bottom }) {
-        // Keep the session host mounted; hiding its parent does not destroy Cookie/session state.
-        Stack() {
-          Web({ src: PINTEREST_URL, controller: this.controller })
-            .javaScriptAccess(true)
-            .domStorageAccess(true)
-            .darkMode(WebDarkMode.Auto)
-            .forceDarkAccess(true)
-            .javaScriptProxy({
-              object: this.shareBridge,
-              name: 'PinmonyShareBridge',
-              methodList: ['homeMenuChanged', 'authState', 'postState', 'share', 'navigation', 'pageNavigation', 'pageBack', 'sheetState', 'moreState', 'detailState',
-                'profileState', 'profilePublish', 'boardState', 'inboxState', 'homeState', 'searchState', 'networkRequest', 'cancelNetwork'],
-              controller: this.controller
-            })
-            .runJavaScriptOnDocumentStart(this.documentStartScripts)
-            .onControllerAttached(() => this.webLifecycleCoordinator.controllerAttached())
-            .onPageBegin((event) => this.webLifecycleCoordinator.pageBegin(event.url))
-            .onPageEnd(() => this.webLifecycleCoordinator.pageEnd())
-            .onConsole((event) => {
-              if (!event) return false;
-              try { return this.webLifecycleCoordinator.consoleMessage(event.message.getMessage()); }
-              catch (_) { return false; }
-            })
-            .onErrorReceive((event) => {
-              if (this.pinStore.detailPresentationOnly || !event) return;
-              try {
-                if (event.request.isMainFrame()) this.webLifecycleCoordinator.mainFrameError(
-                  event.request.getRequestUrl(), event.error.getErrorCode(), event.error.getErrorInfo());
-              } catch (_) { PinmonyRuntimeLog.warn('Web: error callback unavailable'); }
-            })
-            .onOverrideUrlLoading((request: WebResourceRequest) => {
-              try { return this.webLifecycleCoordinator.overrideUrl(request.getRequestUrl()); }
-              catch (_) { return this.authStatus === 'authenticated'; }
-            })
-            .onLoadIntercept((event) => {
-              if (!event) return false;
-              try { return this.webLifecycleCoordinator.interceptLoad(event.data.getRequestUrl(), event.data.isMainFrame()); }
-              catch (_) { return this.authStatus === 'authenticated'; }
-            })
-            .width('100%')
-          .height('100%')
+        if (!this.nativeLoginEnabled || this.loginHostMounted) {
+        PinmonyBuildLoginPage({
+          controller: this.controller, bridge: this.shareBridge, scripts: this.nativeLoginEnabled ? this.loginScripts : this.documentStartScripts,
+          url: this.nativeLoginEnabled ? this.loginStartUrl : PINTEREST_URL,
+          isCurrent: (controller: webview.WebviewController): boolean => !this.nativeLoginEnabled || this.loginHostMounted && controller === this.controller,
+          lifecycle: this.webLifecycleCoordinator, visible: this.authWebVisible(),
+          authenticated: this.authStatus === 'authenticated', presentationOnly: this.pinStore.detailPresentationOnly,
+          onUnsupportedLogin: (): void => this.showUnsupportedLogin(),
+          captureEnvironment: (): void => {
+            try { this.sessionEnvironment.capture(this.controller.getUserAgent()); } catch (_) {}
+          }
+        })
         }
-        .width('100%')
-        .height('100%')
-        .accessibilityLevel(this.authWebVisible() ? 'auto' : 'no-hide-descendants')
-        .opacity(this.authWebVisible() ? 1 : 0)
-        .hitTestBehavior(this.authWebVisible() ? HitTestMode.Default : HitTestMode.None)
 
         if (this.authStatus === 'authenticated') {
           this.buildRootTabs()
@@ -5996,7 +6226,7 @@ struct Index {
           }
 
           if (this.profileSettingsVisible) {
-            PinmonySettingsPage({ store: this.settingsStore, onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
+            PinmonySettingsPage({ store: this.settingsStore, onOpenExternalLink: (url: string): Promise<void> => this.systemActions.openLink(url), onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
               .width('100%').height('100%')
               .transition(NATIVE_PAGE_TRANSITION)
           }
@@ -6084,7 +6314,7 @@ struct Index {
                 this.inboxStore.retainedChat = this.inboxStore.inboxFlow;
                 this.inboxStore.chatReturnConversation = this.inboxStore.inboxFlow?.conversationId || '';
                 this.beginDetailOpening(target, this.currentInboxUrl());
-                try { if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.controller.loadUrl(target); }
+                try { if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(target); }
                 catch (_) { this.pinStore.detailOpeningPin = ''; this.showMessage('无法打开 Pin 图，请重试'); }
               },
               onAction: (action: string, value: string) => this.inboxFlowAction(action, value) })
@@ -6282,9 +6512,13 @@ struct Index {
             message: this.offlineCacheLoading ? '' : this.authStatus === 'error' ? this.failureDetails : '',
             loading: this.offlineCacheLoading || this.authStatus !== 'error', onRetry: () => this.retryLogin(),
           })
+          if(this.nativeLoginEnabled && this.authStatus === 'error') {
+            Button('重新登录').onClick(() => this.openNativeLogin()).margin({bottom:80})
+          }
         }
+        if (this.authStatus !== 'authenticated') { this.networkNoticeView() }
       }
-      this.networkNoticeView()
+      if (this.authStatus === 'authenticated') { this.networkNoticeView() }
     }
     .width('100%')
     .height('100%')
@@ -6296,17 +6530,15 @@ struct Index {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .backgroundColor($r('app.color.page_background'))
     .bindSheet($$this.showNativeSheet, this.buildNativeSheet(), {
+      radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+      onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=Index.showNativeSheet radius=four-corners-32vp' + ' kind=' + this.activeSheetKind); },
       keyboardAvoidMode: this.activeSheetKind === 'comments' ? SheetKeyboardAvoidMode.RESIZE_ONLY :
         SheetKeyboardAvoidMode.TRANSLATE_AND_SCROLL,
-      height: this.activeSheetKind === 'save' || this.activeSheetKind === 'edit' && this.pinStore.editResult.phase === 'boards' ?
-        SheetSize.LARGE : this.activeSheetKind === 'comments' ? SheetSize.LARGE : this.activeSheetKind === 'edit' ? SheetSize.FIT_CONTENT :
+     height: ['save', 'edit', 'comments'].includes(this.activeSheetKind) ? SheetSize.LARGE :
         this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu && this.pinStore.shareSearchActive ? SheetSize.LARGE : SheetSize.FIT_CONTENT,
       dragBar: true,
       showClose: this.activeSheetKind !== 'comments',
-      title: this.activeSheetKind === 'comments' ? undefined : { title: this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? '添加至图板区块' : '添加 Pin 图或图板区块') : this.profileStore.publishTitle || '添加到个人资料') :
-        this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? '创建图板' : '收藏至图板') : '编辑 Pin 图') : this.activeSheetKind === 'comments' ? '你觉得怎么样？' : this.activeSheetKind === 'save' ?
-          (this.pinStore.saveCreating ? '创建图板' : '收藏至图板') : this.activeSheetKind === 'more' ? '选项' :
-          this.activeSheetKind === 'searchFilter' ? '筛选器' : this.pinStore.shareTitle },
+      title: this.activeSheetKind === 'comments' ? undefined : { title: this.nativeModalLabel() },
       backgroundColor: $r('app.color.page_background'),
       maskColor: '#66000000',
       onDisappear: (): void => {

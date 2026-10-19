@@ -131,36 +131,70 @@ export interface SmartImageOptions {
   targetPx: number;
   borderRadiusVp?: number;
   onLoaded?: () => void;
-  onError?: () => void;
+  onError?: (code: number) => void;
 }
 
 @Component
 export struct SmartImage {
   @Prop @Watch('resetImage') url: string = '';
   @Prop @Watch('resetImage') images: PinImageSources = {};
-  @Prop widthVp: number = 0;
+  @Prop @Watch('resetImage') widthVp: number = 0;
   @Prop heightVp: number = 0;
   @Prop targetPx: number = 0;
   @Prop borderRadiusVp: number = RECOMMEND_CARD_RADIUS_VP;
   onLoaded?: () => void;
-  onError?: () => void;
+  onError?: (code: number) => void;
   onAudit?: (tier: string, targetPx: number, sourceHeightPx: number) => void;
+  onTrace?: (event: string, revision: number, tier: string, elapsedMs: number) => void;
   @State private phase: string = 'loading';
   @State private sourceUrl: string = '';
   @State private sourceTier: string = '';
+  @State private imageRevision: number = 0;
+  private imageVisible: boolean = false;
+  private imageStartedAt: number = 0;
 
   aboutToAppear(): void {
+    this.imageVisible = true;
     this.resetImage();
   }
 
+  aboutToDisappear(): void {
+    this.imageVisible = false;
+  }
+
   private resetImage(): void {
+    const nextTier: string = pickCoverImageTier(this.images, this.widthVp);
+    const nextUrl: string = pickCoverImageUrl(this.images, this.widthVp) || this.url;
+    // Snapshot object identity and layout updates do not invalidate a decoded source.
+    if (this.imageRevision > 0 && nextUrl === this.sourceUrl) return;
+    this.imageRevision++;
+    this.imageStartedAt = Date.now();
     this.phase = 'loading';
-    this.sourceTier = pickCoverImageTier(this.images, this.widthVp);
-    this.sourceUrl = pickCoverImageUrl(this.images, this.widthVp) || this.url;
+    this.sourceTier = nextTier;
+    this.sourceUrl = nextUrl;
     if (this.sourceTier.length === 0 && this.sourceUrl.length > 0) this.sourceTier = 'fallback';
     if (this.onAudit && this.sourceUrl.length > 0) {
       this.onAudit(this.sourceTier, this.widthVp * currentDensityPixels(), this.displayHeightPx());
     }
+  }
+
+  private traceImage(event: string): void {
+    if (this.onTrace) this.onTrace(event, this.imageRevision, this.sourceTier,
+      Math.max(0, Date.now() - this.imageStartedAt));
+  }
+
+  private completeImage(revision: number, status: number): void {
+    if (!this.imageVisible || revision !== this.imageRevision || status !== 1 || this.phase === 'loaded') return;
+    this.phase = 'loaded';
+    this.traceImage('decoded');
+    if (this.onLoaded) this.onLoaded();
+  }
+
+  private failImage(revision: number, code: number): void {
+    if (!this.imageVisible || revision !== this.imageRevision || this.phase === 'loaded' || this.phase === 'failed') return;
+    this.phase = 'failed';
+    this.traceImage('failed');
+    if (this.onError) this.onError(Number.isFinite(code) ? code : 0);
   }
 
   private displayHeightPx(): number {
@@ -168,7 +202,7 @@ export struct SmartImage {
   }
 
   @Builder
-  private imageBody() {
+  private imageBody(revision: number) {
     Stack({ alignContent: Alignment.Center }) {
       if (this.sourceUrl.length > 0) {
         Image(this.sourceUrl)
@@ -179,14 +213,8 @@ export struct SmartImage {
           // sourceSize stretches the decoded bitmap before Cover can crop it.
           .opacity(this.phase === 'loaded' ? 1 : 0)
           .animation({ duration: 180, curve: Curve.EaseOut })
-          .onComplete(() => {
-            this.phase = 'loaded';
-            if (this.onLoaded) this.onLoaded();
-          })
-          .onError(() => {
-            this.phase = 'failed';
-            if (this.onError) this.onError();
-          })
+          .onComplete((event) => this.completeImage(revision, event?.loadingStatus ?? -1))
+          .onError((event) => this.failImage(revision, event?.error?.code || 0))
       }
       if (this.phase === 'failed') {
         SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
@@ -203,6 +231,8 @@ export struct SmartImage {
   }
 
   build() {
-    this.imageBody();
+    ForEach([this.imageRevision], (revision: number) => {
+      this.imageBody(revision);
+    }, (revision: number) => revision.toString())
   }
 }

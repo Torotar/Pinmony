@@ -33,6 +33,18 @@ export class PinmonyBottomBarCoordinator {
   private readonly ports: PinmonyBottomBarCoordinatorPorts;
   constructor(ports: PinmonyBottomBarCoordinatorPorts) { this.ports = ports; }
 
+  resetForSession(): void {
+    this.rootTabsScrollHidden = [false, false, false, false];
+    this.childBottomBarRestoreHidden = null;
+    this.childBottomBarRootTab = -1;
+    ++this.floatingTabsMotionToken;
+    if (this.floatingTabsMounted && this.authStatus === 'authenticated' && this.nativeRootTabsVisible()) {
+      // A controller reused after logout may still retain its platform hide state.
+      this.floatingTabsHidden = true;
+      this.setBottomBarHidden(false, HdsAnimationMode.CLICK_ANIMATION);
+    }
+  }
+
   private get floatingTabsMounted(): boolean { return this.ports.floatingTabsMounted(); }
   private set floatingTabsMounted(value: boolean) { this.ports.setFloatingTabsMounted(value); }
   private get floatingTabsHidden(): boolean { return this.ports.floatingTabsHidden(); }

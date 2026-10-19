@@ -21,6 +21,7 @@ import { PinmonyProfileSnapshot } from 'feature_profile';
 import { PinmonyHomeSnapshot } from 'feature_home';
 const PINTEREST_URL: string = 'https://www.pinterest.com/';
 export interface PinmonyNavigationCoordinatorPorts {
+  rootPresented?: (index: number) => void;
   nativeBusinessOnly?: () => boolean;
   activeSheetKind: () => string;
   activeTab: () => number;
@@ -374,6 +375,7 @@ presentNativeBackTarget(target: string): void {
         this.ports.prepareHomeForPageBegin(target);
     }
     this.ports.tabsController().changeIndex(this.ports.activeTab());
+    if (performanceRoot >= 0) this.ports.rootPresented?.(performanceRoot);
 }
 
 syncNativeReturnRoute(address: string): void {

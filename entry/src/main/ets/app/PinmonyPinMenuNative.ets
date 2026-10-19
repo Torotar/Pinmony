@@ -2,6 +2,7 @@ import { PinmonyPinStore, MoreSheetOption, PIN_EDIT_API_ENABLED, PIN_POST_API_EN
 import { PinmonyHomeMenuState } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyRuntimeLog } from 'common_foundation';
 export const PIN_NATIVE_PIN_MENUS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_POST_API_ENABLED;
 interface Image { url?: string; }
 interface User { id?: string; }
@@ -54,19 +55,27 @@ export class PinmonyPinMenuNative {
     const body: Response = JSON.parse(reply.body) as Response,r: Resource = body.resource_response;
     if(r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)throw new PinMenuRejected('rejected');
     if(!r || r.status !== 'success' || r.error || r.code !== undefined && r.code !== 0)throw new Error('response');
-    if(get){if(!r.data || r.data.id !== this.id())throw new Error('pin');this.raw = r.data;this.viewer = body.client_context?.user?.id || '';}
+    if(get){if(!r.data || r.data.id !== this.id())throw new Error('pin');this.raw = r.data;this.viewer = body.client_context?.user?.id || '';
+      const identityReady: boolean = /^\d{1,30}$/.test(this.viewer) && typeof this.raw.pinner?.id === 'string' && /^\d{1,30}$/.test(this.raw.pinner.id);
+      PinmonyRuntimeLog.info('PinEditTrace: phase=menu-read identity=' + (identityReady ? 'ready' : 'missing') +
+        ' owner=' + (this.raw.pinner?.id === this.viewer && !!this.viewer ? 'self' : 'other') +
+        ' content=' + (this.raw.is_repin === false ? 'original' : this.raw.is_repin === true ? 'saved' : 'unknown'));
+      if(!identityReady)throw new Error('edit-identity');
+    }
     return r;
   }
   private async read(revision: number): Promise<void> {await this.request({id:this.id(),field_set_key:'auth_web_main_pin',noCache:true,fetch_visual_search_objects:false,get_page_metadata:false,
     add_fields:'pin.gen_ai_topics,pin.is_eligible_for_image_download,pin.is_eligible_for_ai_comparison,pin.has_hidden_inner_pin'},revision);}
   private image(): string {const images = this.raw?.images, url: string = (images?.['orig'] || images?.['736x'] || images?.['474x'])?.url || '';return url.length <= 2048 && /^https:\/\/i\.pinimg\.com\//.test(url) ? url : '';}
   private enabled(action: string): boolean {return !this.submitted.has(this.pin + ':' + action);}
+  private canOpenEdit(): boolean {return PIN_EDIT_API_ENABLED && /^\d{1,30}$/.test(this.viewer) && this.raw?.pinner?.id === this.viewer;}
   async photoRead(token: number,pin: string): Promise<PinmonyHomeMenuState> {
     const revision: number = this.bind(pin,token,true);
     const state: PinmonyHomeMenuState = {session:token,pinUrl:pin,loading:false,busy:false,error:'',feedback:'',options:[],actions:[]};
     try {await this.read(revision);if(!this.current(revision))return state;
       state.actions = [{id:'home-save',label:'收藏',enabled:true},{id:'home-download',label:'下载图片',enabled:!!this.image()},
         {id:'home-see-more',label:'查看更多',enabled:this.enabled('more')},{id:'home-see-less',label:'查看更少',enabled:this.enabled('less')}];
+      if(this.canOpenEdit())state.actions.unshift({id:'home-edit',label:'编辑 Pin 图',enabled:true});
     } catch (_) {state.error = '无法读取帖子操作，请重试';}
     return state;
   }
@@ -77,7 +86,7 @@ export class PinmonyPinMenuNative {
     this.store.moreTitle = '选项';this.store.moreOptions = [];this.store.moreLoading = true;this.store.moreError = '';this.store.ignoredMoreSession = 0;this.ports.show();
     const revision: number = this.bind(detail.pinUrl,token,false);
     try {await this.read(revision);if(!this.current(revision))return;const options: MoreSheetOption[] = [];
-      if(PIN_EDIT_API_ENABLED && /^\d{1,30}$/.test(this.viewer) && this.raw?.pinner?.id === this.viewer && this.raw.is_repin === false)options.push(this.option('detail-edit','编辑 Pin 图'));
+      if(this.canOpenEdit())options.push(this.option('detail-edit','编辑 Pin 图'));
       if(this.image())options.push(this.option('detail-download','下载图片'));
       options.push(this.option('detail-see-more','查看更多',this.enabled('more')),this.option('detail-see-less','减少推荐',this.enabled('less')),this.option('detail-share','系统分享'));
       if(this.raw?.ai_disclosures?.includes(1) || this.raw?.gen_ai_topics?.some((t: Topic): boolean => typeof t.name === 'string' && !!t.name.trim()))options.push(this.option('detail-ai-help','详细了解 AI 标签'));
@@ -90,7 +99,10 @@ export class PinmonyPinMenuNative {
     const photo: boolean = this.photo, pin: string = this.pin;
     const options = photo ? undefined : this.store.moreOptions;
     if(!photo && !options?.some((o: MoreSheetOption): boolean => o.id === id && o.enabled))return;
-    if(id === 'detail-edit'){this.ports.dismiss();await this.ports.edit(pin);return;}
+    if(id === 'detail-edit' || id === 'home-edit'){
+      if(!this.canOpenEdit() || photo && id !== 'home-edit' || !photo && id !== 'detail-edit')return;
+      PinmonyRuntimeLog.info('PinEditTrace: phase=menu-open');this.ports.dismiss();await this.ports.edit(pin);return;
+    }
     if(id === 'detail-share'){await this.ports.share(pin);return;}
     if(id === 'detail-ai-help'){this.ports.help('https://help.pinterest.com/en/article/gen-ai-labels');return;}
     if(id === 'home-download' || id === 'detail-download'){const url: string = this.image();if(url)this.ports.download(url);return;}

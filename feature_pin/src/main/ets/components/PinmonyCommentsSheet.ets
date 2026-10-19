@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyComment, PinmonyCommentResult } from '../models/PinmonyComments';
 
 @Component
@@ -145,11 +146,11 @@ export struct PinmonyCommentsSheet {
   build() {
     Column({ space: 12 }) {
       Row({ space: 16 }) {
+        Text('你觉得怎么样？').fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Button({ type: ButtonType.Circle }) {
           SymbolGlyph($r('sys.symbol.xmark')).fontSize(24).fontColor([$r('app.color.primary_text')])
         }.width(36).height(36).backgroundColor(Color.Transparent).onClick(() => { if (this.onClose) this.onClose(); })
           .accessibilityText('关闭评论')
-        Text('你觉得怎么样？').fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
       }.width('100%').padding({ bottom: 12 })
       Divider().color($r('app.color.secondary_text')).opacity(0.2)
       if (this.result.actionError) {
@@ -218,7 +219,10 @@ export struct PinmonyCommentsSheet {
       this.composer()
     }.width('100%').height('100%').padding({ left: 16, right: 16, top: 12, bottom: 20 })
       .backgroundColor($r('app.color.page_background'))
-      .bindSheet($$this.menuOpen, this.commentMenu(), { height: SheetSize.FIT_CONTENT, showClose: !this.deleteOpen,
+      .bindSheet($$this.menuOpen, this.commentMenu(), {
+        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyCommentsSheet.menuOpen radius=four-corners-32vp'); },
+        height: SheetSize.FIT_CONTENT, showClose: !this.deleteOpen,
         dragBar: !this.deleteOpen, backgroundColor: $r('app.color.page_background'), maskColor: '#66000000' })
   }
 

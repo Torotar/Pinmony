@@ -23,6 +23,7 @@ export interface PinmonyHomeRootView {
   offlinePreviewMode: boolean;
   selectHomeTab: (id: string, restoring?: boolean) => Promise<void>;
   openHomePin: (id: string) => Promise<void>;
+  openHomeBoard: (id: string) => void;
   openHomeMore: (id: string) => Promise<void>;
   loadMoreHome: () => Promise<void>;
   refreshHome: () => void;
@@ -48,6 +49,8 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
                 view.authStatus === 'authenticated',
               interactionReady: view.activeTab === 0 && view.authStatus === 'authenticated',
               menuReady: view.homeMenuReady(),
+              paginationReady: view.authStatus === 'authenticated' && !view.offlinePreviewMode &&
+                (view.homeStore.homeNativeReadsReady || view.homeStore.homeActionsReady),
               initialScrollOffset: view.homeStore.cachedHomeScrollOffset,
               pendingTabId: view.homeStore.pendingHomeTab,
               menuLoadingId: PIN_NATIVE_PIN_MENUS_ENABLED ? '' : view.homeStore.homeMoreLoadingId,
@@ -65,6 +68,7 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               error: view.homeStore.homeError,
               onTab: (id: string) => view.selectHomeTab(id),
               onPin: (id: string) => view.openHomePin(id),
+              onBoard: (id: string) => view.openHomeBoard(id),
               onMore: (id: string) => view.openHomeMore(id),
               onLoadMore: () => view.loadMoreHome(),
               onPrefetchMore: () => {

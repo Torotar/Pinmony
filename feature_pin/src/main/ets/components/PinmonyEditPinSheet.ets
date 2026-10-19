@@ -110,14 +110,14 @@ export struct PinmonyEditPinSheet {
 
               }
             }.width('100%').padding({ right: 28 })
-          }.width('100%').constraintSize({ maxHeight: 520 })
+          }.width('100%').layoutWeight(1).clip(true)
           Button('完成').width('100%').height(48)
             .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent'))
             .enabled(this.result.phase === 'edit' && !this.result.loading && !this.result.busy &&
               !this.result.error && !this.result.uncertain && !this.result.picker.busy)
             .onClick(() => this.act('editCommit', ',false,' + JSON.stringify(this.draftTitle) + ',' +
               JSON.stringify(this.draftDescription)))
-        }.padding(20).width('100%').backgroundColor($r('app.color.page_background'))
+        }.padding(20).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
         if (this.result.phase === 'confirm' && !this.result.error) {
           Rect().width('100%').height('100%').fill('#66000000')
             .onClick(() => { if (!this.result.busy) this.act('editPhase', ',"edit"'); })
@@ -136,7 +136,7 @@ export struct PinmonyEditPinSheet {
             }.padding(20).borderRadius(24).backgroundColor($r('app.color.input_surface'))
           }
 
-      }.width('100%')
+      }.width('100%').height('100%')
     }
   }
 }

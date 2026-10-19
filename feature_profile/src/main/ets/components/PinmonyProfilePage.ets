@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyBoard, PinmonyCreatedPin, PinmonyProfileAction, PinmonyProfileSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
@@ -653,7 +654,10 @@ export struct PinmonyProfilePage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
-    .bindSheet($$this.aboutVisible, this.aboutSheet(), { height: '75%', showClose: true, backgroundColor: $r('app.color.page_background') })
+    .bindSheet($$this.aboutVisible, this.aboutSheet(), {
+      radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+      onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyProfilePage.aboutVisible radius=four-corners-32vp'); },
+      height: '75%', showClose: true, backgroundColor: $r('app.color.page_background') })
   }
 
   @Builder

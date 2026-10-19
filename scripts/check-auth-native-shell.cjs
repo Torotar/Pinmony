@@ -195,7 +195,7 @@ async function check() {
   const beforeRetry = loaded.length;
   native.retryLogin(); native.retryLogin();
   assert.equal(loaded.length, beforeRetry + 1, 'rapid manual retry loads the session page once');
-  assert.match(source, /\.hitTestBehavior\(this.authWebVisible\(\) \? HitTestMode.Default : HitTestMode.None\)/);
+  assert.match(fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets', 'utf8'), /\.hitTestBehavior\(view.visible \? HitTestMode.Default : HitTestMode.None\)/);
   const tabsStart = source.indexOf('  private buildRootTabs()');
   const tabsEnd = source.indexOf('  build()', tabsStart);
   assert.ok(tabsStart >= 0 && tabsEnd > tabsStart);

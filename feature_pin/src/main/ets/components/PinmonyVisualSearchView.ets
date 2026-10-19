@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyImageCrop, PinmonyVisualResult } from '../models/PinmonyVisualSearch';
 import { PinmonyRelatedPin } from '../models/PinmonyDetail';
 
@@ -157,6 +158,8 @@ export struct PinmonyVisualSearchView {
     Column() { this.searchContent() }.width('100%').height('100%')
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
+        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: '更多此类 Pin 图' },
         scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,

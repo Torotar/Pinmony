@@ -151,8 +151,8 @@ export struct PinmonyVideoPlayer {
       if (this.readingAddress) {
         Text('正在读取视频地址').fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
           .accessibilityText('正在读取视频地址，请稍候')
-      } else if (this.state.phase === 'loading') {
-        Text(this.state.loadingStage === 'download' ? '正在读取视频文件' : '正在准备视频')
+      } else if (this.state.phase === 'loading' && this.state.loadingStage !== 'download') {
+        Text('正在准备视频')
           .fontSize(14).fontColor($r('app.color.primary_text')).padding(12)
       } else if (!this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
         Text('正在加载视频画面').fontSize(14).fontColor($r('app.color.primary_text')).padding(12)

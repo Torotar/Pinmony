@@ -1,4 +1,4 @@
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyBoardCollaborators, PinmonyBoardCollaborator } from '../models/PinmonyBoardCollaborators';
@@ -21,7 +21,8 @@ export struct PinmonyBoardCollaboratorsPage {
   }
   private titleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: {
+      style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE }, scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
         backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
       content: { title: { mainTitle: this.snapshot.phase === 'invite' ? '邀请合作用户' :
         this.snapshot.phase === 'permissions' ? '合作用户可以…' :

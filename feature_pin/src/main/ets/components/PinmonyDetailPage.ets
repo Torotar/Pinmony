@@ -11,7 +11,7 @@ import { display } from '@kit.ArkUI';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { SmartImage, getRecommendCardWidth, getRecommendColumnCount, RECOMMEND_CARD_RADIUS_VP,
   RECOMMEND_PHONE_GAP_VP, RECOMMEND_WIDE_GAP_VP } from 'common_ui';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
+import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode,
   HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 
 @Component
@@ -146,7 +146,8 @@ export struct PinmonyDetailPage {
     const share: PinmonyDetailAction | undefined = this.action('share');
     if (this.imageLayer === 'search') {
       return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-        style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: {
+        style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE }, scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
           backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
         content: { title: { mainTitle: '图片搜索' }, menu: { value: [] }, backIcon: { label: '返回', isEnabled: true,
           action: () => { if (this.onImageLayer) this.onImageLayer(''); } } } };
@@ -155,8 +156,9 @@ export struct PinmonyDetailPage {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
-        scrollEffectOpts: { enableScrollEffect: false },
-        originalStyle: { backgroundStyle: {
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
           backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
         } }
       },
@@ -354,6 +356,12 @@ export struct PinmonyDetailPage {
     } catch (_) { return 18; }
   }
 
+  private actionCountText(item: PinmonyDetailAction): string {
+    const count: string = (item.countText || '').trim();
+    if ((item.kind === 'like' || item.kind === 'comment') && count === '0') return '';
+    return count;
+  }
+
   @Builder
   private iconAction(item: PinmonyDetailAction) {
     Row({ space: 2 }) {
@@ -372,10 +380,10 @@ export struct PinmonyDetailPage {
         if (!this.acceptsActionIntent(item)) return;
         if (this.onAction) this.onAction(item.id, item.kind);
       })
-      .accessibilityText(item.countText ? `${item.label}，${item.countText}` : item.label)
+      .accessibilityText(this.actionCountText(item) ? `${item.label}，${this.actionCountText(item)}` : item.label)
 
-      if (item.countText && (item.kind === 'like' || item.kind === 'comment')) {
-        Text(item.countText)
+      if (this.actionCountText(item) && (item.kind === 'like' || item.kind === 'comment')) {
+        Text(this.actionCountText(item))
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text'))
@@ -396,7 +404,14 @@ export struct PinmonyDetailPage {
           onLoaded: () => {
             if (this.onRelatedImageLoaded && this.detail.related.some((item: PinmonyRelatedPin): boolean =>
               item.id === pin.id && item.imageUrl === pin.imageUrl)) this.onRelatedImageLoaded(this.detail.pinUrl);
-          }, onError: () => {}, onAudit: (tier: string, targetPx: number, sourceHeightPx: number) =>
+          }, onError: (code: number) => {
+            PinmonyRuntimeLog.warn('RecommendImageError: code=' + code.toString());
+          }, onTrace: (event: string, revision: number, tier: string, elapsedMs: number) => {
+            PinmonyRuntimeLog.info('RecommendImageTrace: openId=' + this.traceId.toString() +
+              ' index=' + this.detail.related.findIndex((item: PinmonyRelatedPin): boolean => item.id === pin.id) +
+              ' event=' + event + ' revision=' + revision.toString() + ' tier=' + tier +
+              ' elapsedMs=' + elapsedMs.toString());
+          }, onAudit: (tier: string, targetPx: number, sourceHeightPx: number) =>
             this.auditRecommendationImage(tier, targetPx, sourceHeightPx) })
           .width('100%')
           .height(this.recommendCardHeight(this.recommendCardWidth(), pin))
@@ -497,7 +512,9 @@ export struct PinmonyDetailPage {
               Image(this.detail.imageUrl).width('100%')
                 .height(this.heroHeight())
                 .objectFit(ImageFit.Contain)
-                .onComplete(() => this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl))
+                .onComplete((event) => {
+                  if (event?.loadingStatus === 1) this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
+                })
                 .onError(() => { if (this.onImageError) this.onImageError(this.detail.pinUrl); })
               Column({ space: 12 }) {
                 Text(this.detail.videoError || '暂无可播放视频地址').fontColor($r('app.color.primary_text'))

@@ -2,9 +2,10 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyNotificationsPage } from './PinmonyNotificationsPage';
 import { PinmonyPreferencesPage } from './PinmonyPreferencesPage';
 import { PinmonyAccountPage } from './PinmonyAccountPage';
+import { PinmonyAboutPage } from './PinmonyAboutPage';
 import { common } from '@kit.AbilityKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
+import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode,
   HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 
 @Component
@@ -16,6 +17,7 @@ export struct PinmonySettingsPage {
   onRequest?: (action: string, value: string) => Promise<void>;
   onEditProfile?: () => void;
   onBack?: () => void;
+  onOpenExternalLink?: (url: string) => Promise<void>;
 
   private async exportLog(): Promise<void> {
     if (this.exportingLog) return;
@@ -33,7 +35,7 @@ export struct PinmonySettingsPage {
   }
   private readonly pathStack: NavPathStack = new NavPathStack();
   private readonly contentScroller: Scroller = new Scroller();
-  private readonly options: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', '通知', '退出账号', '日志'];
+  private readonly options: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', '通知', '退出账号', '日志', '关于'];
 
   aboutToAppear(): void {
     this.pageVisible = true;
@@ -62,8 +64,9 @@ export struct PinmonySettingsPage {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
-        scrollEffectOpts: { enableScrollEffect: false },
-        originalStyle: { backgroundStyle: {
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
           backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
         } }
       },
@@ -110,7 +113,8 @@ export struct PinmonySettingsPage {
               if (label === '优化你的推荐' || label === '个人资料可见性') { this.store.screen = label === '优化你的推荐' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(label === '优化你的推荐' ? 'aiRead' : 'read', ''); }
               if (label === '帐户管理') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
               if (label === '退出账号') this.confirmLogout();
-              if (label === '日志') this.exportLog(); })
+              if (label === '日志') this.exportLog();
+              if (label === '关于') this.store.screen = 'about'; })
             .accessibilityText(label === '日志' && this.exportingLog ? '正在导出日志…' : label)
           }
         }, (label: string) => label) }
@@ -132,7 +136,9 @@ export struct PinmonySettingsPage {
   }
 
   build() {
-    if (this.store.screen === 'notifications') {
+    if (this.store.screen === 'about') {
+      PinmonyAboutPage({ onBack: this.onBack, onOpenExternalLink: this.onOpenExternalLink })
+    } else if (this.store.screen === 'notifications') {
       PinmonyNotificationsPage({ store: this.store, onBack: this.onBack, onRetry: () => { if (this.onRequest) this.onRequest('notifications', ''); } })
     } else if (['display', 'theme', 'recommend', 'visibility'].includes(this.store.screen)) {
       PinmonyPreferencesPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })

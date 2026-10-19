@@ -1,4 +1,4 @@
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
+import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { NotificationGroup, NotificationCategory, NotificationChannel } from '../models/PinmonyNotifications';
 @Component
@@ -44,12 +44,15 @@ export struct PinmonyNotificationsPage {
           if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text('暂无通知设置').fontColor($r('app.color.secondary_text')) }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, bottom: 28 })
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading) {
         LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
     }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+      style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
       content: { title: { mainTitle: '通知' }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
@@ -57,6 +60,10 @@ export struct PinmonyNotificationsPage {
       .backgroundColor($r('app.color.page_background'))
   }
   build() {
-    HdsNavigation(this.stack) {}.width('100%').height('100%').hideTitleBar(true).navDestination(this.destination)
+    HdsNavigation(this.stack) {
+      Column().width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+    }.width('100%').height('100%').hideTitleBar(true).navDestination(this.destination)
+      .mode(NavigationMode.Stack)
+      .backgroundColor($r('app.color.page_background'))
   }
 }

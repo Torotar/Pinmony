@@ -3,7 +3,8 @@ import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { PinmonyLogBuffer } from './PinmonyLogBuffer';
 
-// Bounded diagnostics only. Never export WebView storage, headers or response bodies.
+// Append-only persistent diagnostics with bounded memory and export chunks.
+// Never export WebView storage, headers or response bodies.
 export class PinmonyRuntimeLog {
   private static actionStage: string = 'none';
   private static actionAt: number = 0;
@@ -12,7 +13,6 @@ export class PinmonyRuntimeLog {
       (PinmonyRuntimeLog.actionAt ? Math.max(0, Date.now() - PinmonyRuntimeLog.actionAt).toString() : 'unknown');
   }
   private static readonly MAX_MEMORY_LINES: number = 1000;
-  private static readonly MAX_SESSION_BYTES: number = 8 * 1024 * 1024;
   private static path: string = '';
   private static readonly lines: PinmonyLogBuffer = new PinmonyLogBuffer(1000);
   private static pending: string[] = [];
@@ -29,7 +29,6 @@ export class PinmonyRuntimeLog {
   private static sessionIncomplete: boolean = false;
   private static sessionPath: string = '';
   private static previousPath: string = '';
-  private static sessionSize: number = 0;
   private static sessionPersisted: boolean = false;
   private static sessionStartedAt: number = 0;
 
@@ -49,7 +48,6 @@ export class PinmonyRuntimeLog {
     PinmonyRuntimeLog.path = filesDir + '/pinweb-runtime.log';
     PinmonyRuntimeLog.sessionPath = filesDir + '/pinweb-session-current.log';
     PinmonyRuntimeLog.previousPath = filesDir + '/pinweb-session-previous.log';
-    PinmonyRuntimeLog.sessionSize = 0;
     PinmonyRuntimeLog.sessionPersisted = false;
     PinmonyRuntimeLog.sessionIncomplete = false;
     PinmonyRuntimeLog.initializing = true;
@@ -109,8 +107,8 @@ export class PinmonyRuntimeLog {
       await PinmonyRuntimeLog.restoration;
       await PinmonyRuntimeLog.snapshotRead;
       if (PinmonyRuntimeLog.initializing) {
-        try { await fs.copyFile(PinmonyRuntimeLog.sessionPath, PinmonyRuntimeLog.previousPath); } catch (_) {}
-        await PinmonyRuntimeLog.writeSession('Pinmony session diagnostics; credentials and response bodies excluded\n', true);
+        await PinmonyRuntimeLog.writeSession('\n--- Application launch ' +
+          new Date(PinmonyRuntimeLog.sessionStartedAt).toISOString() + ' ---\n');
         PinmonyRuntimeLog.initializing = false;
       }
       while (PinmonyRuntimeLog.pending.length > 0 || PinmonyRuntimeLog.snapshotDirty) {
@@ -178,16 +176,10 @@ export class PinmonyRuntimeLog {
     }
   }
 
-  private static async writeSession(text: string, truncate: boolean = false): Promise<void> {
+  private static async writeSession(text: string): Promise<void> {
     if (!PinmonyRuntimeLog.sessionPath) return;
     try {
-    const size: number = new util.TextEncoder().encodeInto(text).byteLength;
-    if (!truncate && PinmonyRuntimeLog.sessionSize + size > PinmonyRuntimeLog.MAX_SESSION_BYTES) {
-      await fs.copyFile(PinmonyRuntimeLog.sessionPath, PinmonyRuntimeLog.previousPath);
-      truncate = true;
-    }
-    if (truncate) PinmonyRuntimeLog.sessionSize = 0;
-    PinmonyRuntimeLog.sessionSize += await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.sessionPath, text, !truncate);
+    await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.sessionPath, text, true);
     PinmonyRuntimeLog.sessionPersisted = true;
     } catch (error) {
       PinmonyRuntimeLog.sessionPersisted = false;
@@ -208,58 +200,86 @@ export class PinmonyRuntimeLog {
       await PinmonyRuntimeLog.flush();
       let release: () => void = (): void => {};
       PinmonyRuntimeLog.snapshotRead = new Promise<void>((resolve: () => void): void => { release = resolve; });
-      let session: string = PinmonyRuntimeLog.lines.snapshot().join('\n'), previous: string = '';
+      const summary: PinmonyDiagnosticSummary = new PinmonyDiagnosticSummary();
       try {
-        if (PinmonyRuntimeLog.sessionPersisted) {
-          try { session = await fs.readText(PinmonyRuntimeLog.sessionPath, { length: PinmonyRuntimeLog.MAX_SESSION_BYTES + 1024 }); } catch (_) {}
+        await PinmonyRuntimeLog.writeFile(destinations[0],
+          'Pinmony application diagnostics (not full system HiLog)\n' +
+          '--- Legacy retained history ---\n', false);
+        await PinmonyRuntimeLog.copyLog(PinmonyRuntimeLog.previousPath, destinations[0], summary);
+        await PinmonyRuntimeLog.writeFile(destinations[0], '\n--- Continuous application history ---\n', true);
+        const copied: boolean = await PinmonyRuntimeLog.copyLog(PinmonyRuntimeLog.sessionPath, destinations[0], summary);
+        if (!copied || PinmonyRuntimeLog.sessionIncomplete) {
+          const memory: string = '\n--- Retained memory after storage failure ---\n' + PinmonyRuntimeLog.lines.snapshot().join('\n') + '\n';
+          summary.add(memory);
+          await PinmonyRuntimeLog.writeFile(destinations[0], memory, true);
         }
-        if (PinmonyRuntimeLog.sessionIncomplete) session += '\n--- Retained memory after storage failure ---\n' + PinmonyRuntimeLog.lines.snapshot().join('\n');
-        try { previous = await fs.readText(PinmonyRuntimeLog.previousPath, { length: PinmonyRuntimeLog.MAX_SESSION_BYTES + 1024 }); } catch (_) {}
+        summary.finish();
+        await PinmonyRuntimeLog.writeFile(destinations[0], '\n--- Diagnostic summary ---\n' + summary.result() + '\n', true);
       } finally { release(); }
-      const summary: string = await PinmonyRuntimeLog.summary(previous + '\n' + session);
-      await PinmonyRuntimeLog.writeFile(destinations[0], 'Pinmony application diagnostics (not full system HiLog)\n' +
-        '--- Diagnostic summary ---\n' + summary + '\n' +
-        '--- Previous session / segment ---\n' + previous + '\n--- Current session ---\n' + session + '\n', false);
       PinmonyRuntimeLog.info('Runtime: log export completed');
       return true;
+    } catch (_) {
+      console.warn('PinmonyLog: export failed; persistent history retained');
+      return false;
     } finally { PinmonyRuntimeLog.exporting = false; }
   }
 
-  private static async summary(text: string): Promise<string> {
-    let total: number = 0;
-    let info: number = 0;
-    let warn: number = 0;
-    let error: number = 0;
-    let offlineCache: number = 0;
-    let homeCache: number = 0;
-    let webFailure: number = 0;
-    let actionGate: number = 0;
-    let photoDownload: number = 0;
-    let sharePanel: number = 0;
-    let pending: string = '';
-    for (let start: number = 0; start < text.length; start += 65536) {
-      const chunk: string = pending + text.slice(start, start + 65536);
-      const lines: string[] = chunk.split('\n');
-      pending = start + 65536 < text.length ? lines.pop() || '' : '';
-      lines.forEach((line: string): void => {
-        if (!line) return;
-        total++;
-      if (line.includes(' INFO ')) info++;
-      if (line.includes(' WARN ')) warn++;
-      if (line.includes(' ERROR ')) error++;
-      if (line.includes('OfflineCache:')) offlineCache++;
-      if (line.includes('HomeCache:')) homeCache++;
-      if (line.includes('Web: main frame error')) webFailure++;
-      if (line.includes('ActionGate:')) actionGate++;
-      if (line.includes('PhotoDownload:')) photoDownload++;
-      if (line.includes('SharePanel:')) sharePanel++;
-      });
-      await new Promise<void>((resolve: () => void): void => { setTimeout(resolve, 0); });
-    }
-    return 'total=' + total.toString() +
-      ' info=' + info.toString() + ' warn=' + warn.toString() + ' error=' + error.toString() +
-      ' offlineCache=' + offlineCache.toString() + ' homeCache=' + homeCache.toString() +
-      ' webMainFrameErrors=' + webFailure.toString() + ' actionGate=' + actionGate.toString() +
-      ' photoDownload=' + photoDownload.toString() + ' sharePanel=' + sharePanel.toString();
+  private static async copyLog(path: string, destination: string, summary: PinmonyDiagnosticSummary): Promise<boolean> {
+    let file: fs.File;
+    try { file = await fs.open(path, fs.OpenMode.READ_ONLY); } catch (_) { return false; }
+    try {
+      const buffer: ArrayBuffer = new ArrayBuffer(65536);
+      const decoder: util.TextDecoder = util.TextDecoder.create('utf-8');
+      while (true) {
+        const read: number = await fs.read(file.fd, buffer);
+        if (!read) break;
+        const text: string = decoder.decodeToString(new Uint8Array(buffer, 0, read), { stream: true });
+        summary.add(text);
+        await PinmonyRuntimeLog.writeFile(destination, text, true);
+      }
+      const remaining: string = decoder.decodeToString(new Uint8Array(0), { stream: false });
+      summary.add(remaining);
+      summary.finish();
+      if (remaining) await PinmonyRuntimeLog.writeFile(destination, remaining, true);
+      return true;
+    } finally { await fs.close(file); }
+  }
+}
+
+class PinmonyDiagnosticSummary {
+  private readonly counts: Record<string, number> = {};
+  private pending: string = '';
+
+  constructor() {
+    ['total', 'info', 'warn', 'error', 'offlineCache', 'homeCache', 'webMainFrameErrors', 'actionGate', 'photoDownload', 'sharePanel']
+      .forEach((key: string): void => { this.counts[key] = 0; });
+  }
+
+  add(text: string): void {
+    const lines: string[] = (this.pending + text).split('\n');
+    // Application records are at most 800 characters; malformed legacy lines
+    // must not make the streaming summary retain an unbounded string.
+    this.pending = (lines.pop() || '').slice(0, 2048);
+    lines.forEach((line: string): void => this.count(line));
+  }
+
+  finish(): void { if (this.pending) this.count(this.pending); this.pending = ''; }
+
+  private count(line: string): void {
+    if (!line) return;
+    this.counts['total']++;
+    if (line.includes(' INFO ')) this.counts['info']++;
+    if (line.includes(' WARN ')) this.counts['warn']++;
+    if (line.includes(' ERROR ')) this.counts['error']++;
+    if (line.includes('OfflineCache:')) this.counts['offlineCache']++;
+    if (line.includes('HomeCache:')) this.counts['homeCache']++;
+    if (line.includes('Web: main frame error')) this.counts['webMainFrameErrors']++;
+    if (line.includes('ActionGate:')) this.counts['actionGate']++;
+    if (line.includes('PhotoDownload:')) this.counts['photoDownload']++;
+    if (line.includes('SharePanel:')) this.counts['sharePanel']++;
+  }
+
+  result(): string {
+    return Object.keys(this.counts).map((key: string): string => key + '=' + this.counts[key].toString()).join(' ');
   }
 }

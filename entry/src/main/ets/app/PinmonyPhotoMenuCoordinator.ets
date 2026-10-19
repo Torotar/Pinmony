@@ -123,6 +123,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                 const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
                 const download: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-download');
                 const more: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-see-more');
+                const edit: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-edit' && option.enabled);
                 state.options = [];
                 state.actions = [
                     { id: 'board-menu-cancel-save', label: '取消收藏', enabled: !this.ports.cancelledBoardPins().has(pinUrl) && !state.loading && !state.error && !state.busy &&
@@ -134,6 +135,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                     { id: 'home-system-share', label: '系统分享', enabled: !state.loading && !state.error && !state.busy }
                 ];
                 state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.enabled);
+                if(edit)state.actions.unshift(edit);
                 if (board && /\/pins\/$/i.test(board.pageKey)) {
                     state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean =>
                         option.id !== 'board-menu-cancel-save' && option.id !== 'board-menu-move');

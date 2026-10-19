@@ -190,6 +190,14 @@ async function main() {
   failedRead.fireTimers(200); failedRead.fireTimers(15000); await flush();
   assert.equal(failedRead.players.length, 0, 'failed download cannot loop back into remote or local reads');
   failedRead.playback.release();
+  for (const code of [1007900060, 2300060]) {
+    const certificate = harness(false, { fileReader: { load: async () => { throw { code }; }, cancel() {} } });
+    certificate.playback.start(); await flush();
+    assert.equal(certificate.players.length, 0, 'unverified media cannot reach decoding');
+    assert.match(certificate.states.at(-1).error, /证书校验失败/);
+    assert.match(certificate.states.at(-1).failureSummary, /证书校验失败/);
+    certificate.playback.release();
+  }
   let retryDownloads = 0;
   const directRetry = harness(false, { fileReader: {
     load: async () => { retryDownloads++; throw { code: 1007900028 }; }, cancel() {} } });

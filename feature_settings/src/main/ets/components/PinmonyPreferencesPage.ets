@@ -1,6 +1,6 @@
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyAiTopic, PinmonyRecentActivity } from '../models/PinmonyAccountSettings';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -71,7 +71,25 @@ export struct PinmonyPreferencesPage {
   }
   private options(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false }, originalStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+      style: {
+        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+        originalStyle: {
+          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+          contentStyle: {
+            backIconStyle: { iconColor: $r('app.color.primary_text') },
+            menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+          }
+        },
+        scrollEffectStyle: {
+          contentStyle: {
+            backIconStyle: { iconColor: $r('app.color.primary_text') },
+            menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') }
+          }
+        }
+      },
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.store.screen === 'recommend' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.exclamationmark_circle'))
@@ -245,6 +263,8 @@ export struct PinmonyPreferencesPage {
       .bindToScrollable([this.scroller]).onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.store.confirmOpen, this.privacySheet(), {
+        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPreferencesPage.store.confirmOpen radius=four-corners-32vp'); },
         height: Math.min(380, this.viewportHeight * 0.8), showClose: true, dragBar: false,
         backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
         onWillDismiss: (action: DismissSheetAction) => { if (this.store.busy) return; this.store.confirmOpen = false; action.dismiss(); }

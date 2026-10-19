@@ -22,9 +22,11 @@ const names = ['rootPresentationAddress', 'selectNativeRootTab', 'rootReadInFlig
   'updateDetail', 'updateBoard', 'syncNativeReturnRoute', 'recordPageNavigation',
   'protectedDetailAddress', 'ignoreSupersededDetailDocument'];
 const setup = ['onNavigation', 'onPageNavigation'].map(bridge).join('\n');
-const beginStart = source.indexOf('.onPageBegin(');
-const beginEnd = source.indexOf('\n            .onPageEnd(', beginStart);
-const begin = source.slice(beginStart, beginEnd).replace(/^\.onPageBegin\(/, 'this.pageBegin = ').replace(/\)\s*$/, ';');
+const hostSource = fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets', 'utf8');
+const beginStart = hostSource.indexOf('.onPageBegin(');
+const beginEnd = hostSource.indexOf('\n            .onPageEnd(', beginStart);
+const begin = hostSource.slice(beginStart, beginEnd).replace(/^\.onPageBegin\(/, 'this.pageBegin = ')
+  .replaceAll('view.captureEnvironment()', 'void 0').replaceAll('view.lifecycle', 'this.webLifecycleCoordinator').replace(/\)\s*$/, ';');
 const context = { PINTEREST_URL: 'https://www.pinterest.com/', isPinterestAuthRoute: url => /\/login\//.test(url),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 const code = 'class Native {' + names.map(method).join('\n') + '\nsetup() {' + setup + begin + '} } globalThis.Native = Native;';

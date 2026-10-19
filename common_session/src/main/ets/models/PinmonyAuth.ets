@@ -10,7 +10,7 @@ export interface PinmonyAuthMessage {
 }
 
 export function isPinterestAuthRoute(url: string): boolean {
-  return /^https:\/\/(?:[^/]+\.)?pinterest\.com\/(?:login|signup|logout|auth|oauth)(?:\/|[?#]|$)/i.test(url);
+  return /^https:\/\/(?:[^/]+\.)?pinterest\.com\/(?:login|signup|logout|auth|oauth|password\/reset)(?:\/|[?#]|$)/i.test(url);
 }
 
 export function acceptsAuthMessage(message: PinmonyAuthMessage, currentUrl: string, epoch: number): boolean {

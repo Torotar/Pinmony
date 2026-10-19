@@ -80,6 +80,8 @@ const RESOURCES: string[] = ['UserHomefeedResource', 'BoardContentRecommendation
   'ConversationsResource', 'BoardInvitesResource', 'BoardInviteResource', 'ShareSuggestionsResource', 'ShareSuggestionsTypeaheadResource',
   'FindPinImagesResource', 'UserSessionResource', 'BoardPickerBoardsResource', 'UnifiedCommentsResource', 'UnifiedCommentsPreviewResource',
   'AggregatedCommentReplyFeedResource', 'AggregatedCommentReplyResource', 'AggregatedCommentResource', 'DidItCommentsResource', 'RepinResource'];
+interface SessionVerificationOptions { url: string; data: Record<string, string>; field_sets: string[]; }
+interface SessionVerificationEnvelope { options: SessionVerificationOptions; context: Record<string, string>; }
 interface NativeSearchEnvelope { options: Record<string, Object | null>; context: Record<string,string>; }
 interface NativeSearchApiOptions { url: string; data: Record<string,Object>; }
 interface InboxUpdatesReadOptions { url: string; data: InboxUpdatesData; redux_normalize_feed: boolean; field_sets: string[]; bookmarks?: string[]; }
@@ -100,7 +102,10 @@ interface BoardSectionCreatePayload { options: BoardSectionCreateOptions; contex
 interface BoardSectionCreateOptions { board_id: string; name: string; initial_pins: string[]; }
 interface PinmonyResponseDiagnostic {
   resource_response?: PinmonyResourceDiagnostic;
+  client_context?: PinmonyAuthenticationDiagnostic;
 }
+interface PinmonyAuthenticationUserDiagnostic { id?: string; }
+interface PinmonyAuthenticationDiagnostic { is_authenticated?: boolean; user?: PinmonyAuthenticationUserDiagnostic; }
 interface PinmonyTimingInfo {
   nameLookupTimeMs?: number;
   connectTimeMs?: number;
@@ -625,6 +630,7 @@ export const PIN_BUSINESS_PIN_READ_ENABLED: boolean = true;
 export class PinmonyNativeNetwork {
   onTransientRetry?: (resource: string, speculative: boolean) => void;
   onRateLimited?: (remainingMs: number) => void;
+  onSessionExpired?: (origin: string, epoch: number) => void;
   onReadTrace?: (id: string, resource: string, event: string, duration: number, attempt: number) => void;
   private readonly credentials: PinmonySessionCredentials = new PinmonySessionCredentials();
   private readonly jobs: Map<string, rcp.Request> = new Map<string, rcp.Request>();
@@ -685,6 +691,26 @@ export class PinmonyNativeNetwork {
     requests.forEach((request: rcp.Request) => this.release(request));
     this.audit('invalidate', 'pendingBefore=' + pendingBefore.toString());
   }
+  // Startup read permission is restricted to this constructed GET. It does not
+  // authenticate the account or admit any other business operation.
+  async verifySession(origin: string, userAgent: string, epoch: number, id: string,
+      owner: () => boolean): Promise<PinmonyNetworkReply> {
+    if (!/^https:\/\/(?:www|uk)\.pinterest\.com$/.test(origin) ||
+        !/^session_probe_\d+$/.test(id) || !Number.isInteger(epoch) || epoch < 0 ||
+        !userAgent || userAgent.length > 4096 || /[\r\n]/.test(userAgent) || !owner()) throw new Error('session-probe-unavailable');
+    const options: SessionVerificationOptions = { url: '/v3/users/settings/', data: {},
+      field_sets: ["partner.selected_ecommerce_platforms","partner.advertising_intent","partner.business_name","partner.business_goals","partner.top_business_goal","partner.daily_ads_budget","partner.marketing_plan_name","partner.custom_daily_ads_budget","partner.business_vertical","partner.business_vertical_other","partner.number_employees","partner.contact_name","partner.account_type","partner.contact_email","partner.contact_phone","partner.contact_phone_country()","partner.enable_profile_address","partner.enable_profile_message","partner.is_linked_business","partner.profile_place()","place.latitude","place.longitude","place.country","place.postal_code","place.street","place.extra_street","place.region","place.locality","partner.is_agency_employee","partner.number_agency_clients","partner.agency_content","partner.agency_services","partner.agency_services_other","user.ip_stela_rec_disabled"] };
+    const envelope: SessionVerificationEnvelope = { options: options, context: {} };
+    const source: string = '/settings/';
+    const query: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
+    const page: string = origin + source;
+    const job: PinmonyNetworkJob = { id: id, epoch: epoch, page: page,
+      url: origin + '/resource/ApiResource/get/?' + query, method: 'GET', body: '',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/settings.js',
+        'X-Pinterest-Source-Url': source, 'X-Pinterest-AppState': 'active' } };
+    return this.request(job, (): PinmonyNetworkContext => ({ authenticated: owner(), epoch: epoch, page: page, userAgent: userAgent }));
+  }
+
   // Only validated opening Pin and first-page related GETs may survive source -> Pin
   // navigation. The owner revokes this permission on back, account reset or a
   // different opening. All ordinary requests retain strict page/epoch checks.
@@ -1944,6 +1970,13 @@ export class PinmonyNativeNetwork {
       if (!current()) throw new Error('stale');
       result.status = response.statusCode;
       result.body = body;
+      try {
+        const authentication: PinmonyResponseDiagnostic = JSON.parse(body) as PinmonyResponseDiagnostic;
+        if (response.statusCode === 200 && authentication.resource_response &&
+            authentication.client_context?.is_authenticated === false &&
+            (!authentication.client_context.user?.id || authentication.client_context.user.id === '0') && current())
+          this.onSessionExpired?.(job.url.slice(0, job.url.indexOf('/', 8)), job.epoch);
+      } catch (_) { /* Non-JSON failures are not authentication evidence. */ }
       // Expose only response metadata needed by fetch consumers, never Set-Cookie.
       Object.keys(response.headers).forEach((name: string) => {
         const key: string = name.toLowerCase();
@@ -1969,7 +2002,8 @@ export class PinmonyNativeNetwork {
       const deadlineExpired: boolean = detailRead && Date.now() - startedAt >= 12000 &&
         this.generation === generation && !this.cancelled.has(job.id) && acceptsNetworkJob(job, context());
       const limited: boolean = error instanceof Error && error.message === 'rate-limited';
-      result.error = !current() ? 'cancelled' : limited ? 'rate-limited' : deadlineExpired ? 'timeout' : 'network-unavailable';
+      const missingSession: boolean = stage === 'read-session' && error instanceof Error && error.message === 'missing-session';
+      result.error = !current() ? 'cancelled' : missingSession ? 'missing-session' : limited ? 'rate-limited' : deadlineExpired ? 'timeout' : 'network-unavailable';
       if (result.error === 'rate-limited') {
         result.status = 429;
         if (this.onRateLimited && job.id.indexOf('detail_prefetch_') !== 0)

@@ -32,10 +32,12 @@ export struct PinmonyHomePage {
   @Prop mediaActive: boolean = false;
   @Prop prefetchedImageUrls: string[] = [];
   @Prop @Watch('onPrefetchAvailabilityChanged') feedActive: boolean = false;
-  @Prop loading: boolean = false;
+  @Prop @Watch('onPrefetchAvailabilityChanged') loading: boolean = false;
   @Prop synchronizing: boolean = false;
-  @Prop offlinePreview: boolean = false;
-  @Prop refreshing: boolean = false;
+  @Prop @Watch('onOfflinePreviewChanged') offlinePreview: boolean = false;
+  @State private offlineCategoryId: string = '';
+  @Prop @Watch('onPrefetchAvailabilityChanged') refreshing: boolean = false;
+  @Prop @Watch('onPrefetchAvailabilityChanged') paginationReady: boolean = true;
   @Prop @Watch('onPrefetchAvailabilityChanged') actionsReady: boolean = true;
   @Prop menuReady: boolean = true;
   @Prop navigationReady: boolean = true;
@@ -60,6 +62,7 @@ export struct PinmonyHomePage {
   private visibleFirst: number = 0;
   private visibleLast: number = -1;
   private prefetchKey: string = '';
+  private pendingEnd: boolean = false;
   private prefetchNotBefore: number = 0;
   private prefetchTimer: number = -1;
   private lastHomePinCount: number = 0;
@@ -74,6 +77,7 @@ export struct PinmonyHomePage {
       ' count=' + this.home.pins.length + ' first=' + this.visibleFirst + ' last=' + this.visibleLast);
   }
   onTab?: (id: string) => void;
+  onBoard?: (id: string) => void;
   onPrefetchMore?: () => void;
   onPin?: (id: string) => void;
   onMore?: (id: string) => void;
@@ -133,8 +137,18 @@ export struct PinmonyHomePage {
   }
 
   private updateHomeChrome(offset: number, state: ScrollState): void {
-    // Home chrome remains expanded; scrolling never changes its presentation.
-    this.homeChromeCollapsed = false;
+    if (this.restoringScroll || !this.home.board) return;
+    try {
+      const position: number = Math.max(0, this.feedScroller.currentOffset().yOffset);
+      // Idle callbacks may finish at the top without a final scrolling callback.
+      if (state === ScrollState.Idle && position > 4) return;
+      const collapsed: boolean = position > 32 ? true : position <= 4 ? false : this.homeChromeCollapsed;
+      if (collapsed === this.homeChromeCollapsed) return;
+      this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+        this.homeChromeCollapsed = collapsed;
+      });
+    } catch (_) { }
+
   }
 
   private onHomeChanged(): void {
@@ -150,6 +164,8 @@ export struct PinmonyHomePage {
       // A new bridge session does not move the retained native viewport.
       // WaterFlow may not emit onScrollIndex when identical cards stay mounted.
       if (!sameFeed) {
+        this.pendingEnd = false;
+        this.homeChromeCollapsed = false;
         this.recoveredSources = {}; this.recoveredRevisions = {}; this.lastImageRecovery = 0;
         this.visibleFirst = 0;
         this.visibleLast = -1;
@@ -165,7 +181,7 @@ export struct PinmonyHomePage {
     if (firstApiSnapshot) this.prefetchNotBefore = Date.now() + 900;
     this.lastHomePinCount = this.home.pins.length;
     this.onImageRecovery();
-    setTimeout(() => { this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.resumePendingEnd(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
   }
 
   private prefetchNextScreen(): void {
@@ -197,15 +213,26 @@ export struct PinmonyHomePage {
   }
 
   private onPrefetchAvailabilityChanged(): void {
-    setTimeout(() => { this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.resumePendingEnd(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+  }
+
+  private resumePendingEnd(): void {
+    if (!this.pendingEnd || !this.feedActive || !this.paginationReady || this.loading || this.refreshing ||
+        this.pendingTabId || this.home.loadingMore || this.home.refreshing) return;
+    this.pendingEnd = false;
+    try { if (this.feedScroller.isAtEnd()) this.loadNextPageAtEnd(); } catch (_) {}
   }
 
   private loadNextPageAtEnd(): void {
-    this.paginationTrace(this.home.loadingMore ? 'end-busy' : !this.actionsReady ? 'end-session-pending' :
-      this.home.endReached ? 'end-finished' : this.home.sourceError ? 'end-error' :
+    this.paginationTrace(this.home.loadingMore ? 'end-busy' : !this.paginationReady ? 'end-session-pending' :
+      this.home.endReached ? 'end-finished' : this.home.sourceError && !this.home.categorySourceFailure ? 'end-error' :
       !this.feedActive || this.loading || this.refreshing || !!this.pendingTabId ? 'end-inactive' : 'end-dispatch');
-    if (this.home.dataSource !== 'api' || !this.feedActive || !this.actionsReady || this.loading || this.refreshing ||
-      this.pendingTabId || this.home.loadingMore || this.home.refreshing || this.home.endReached || this.home.sourceError) return;
+    if (this.home.dataSource !== 'api' || this.home.endReached ||
+        this.home.sourceError && !this.home.categorySourceFailure) { this.pendingEnd = false; return; }
+    if (this.home.loadingMore) { this.pendingEnd = false; return; }
+    if (!this.feedActive || !this.paginationReady || this.loading || this.refreshing ||
+        this.pendingTabId || this.home.loadingMore || this.home.refreshing) { this.pendingEnd = true; return; }
+    this.pendingEnd = false;
     if (this.onLoadMore) this.onLoadMore();
   }
 
@@ -220,15 +247,37 @@ export struct PinmonyHomePage {
     this.updateCategories();
   }
 
+  private onOfflinePreviewChanged(): void {
+    this.offlineCategoryId = '';
+    this.updateCategories();
+  }
+
+  private emptyFeedMessage(): string {
+    if (this.offlinePreview) return '当前离线，此分类暂无可显示的缓存照片，请连接网络后重试';
+    if (this.error) return this.error;
+    if (this.home.kind === 'loading') return '内容加载已中断，请重试';
+    return '当前分类暂无 Pin 图';
+  }
+
   private updateCategories(): void {
     this.categories = (this.home.tabs || []).map((tab: PinmonyHomeTab): PinmonyHomeTab => {
       return { id: tab.id, label: tab.label, enabled: tab.enabled,
-        selected: this.pendingTabId ? tab.id === this.pendingTabId : tab.selected };
+        selected: this.offlinePreview && this.offlineCategoryId ? tab.id === this.offlineCategoryId :
+          this.pendingTabId ? tab.id === this.pendingTabId : tab.selected };
     });
   }
 
   private selectTab(tab: PinmonyHomeTab): void {
-    if (!this.interactionReady || !tab.enabled || !this.onTab || tab.selected) return;
+    if ((!this.interactionReady && !this.offlinePreview) || !tab.enabled || tab.selected) return;
+    if (this.offlinePreview) {
+      this.offlineCategoryId = tab.id;
+      this.updateCategories();
+      return;
+    }
+    if (!this.onTab) return;
+    this.categories = this.categories.map((item: PinmonyHomeTab): PinmonyHomeTab => {
+      return { id: item.id, label: item.label, enabled: item.enabled, selected: item.id === tab.id };
+    });
     this.onTab(tab.id);
   }
 
@@ -240,6 +289,8 @@ export struct PinmonyHomePage {
 
   private canShowFeed(): boolean {
     if (this.home.pins.length === 0) return false;
+    if (this.offlinePreview && this.offlineCategoryId &&
+      !this.home.tabs.some((tab: PinmonyHomeTab): boolean => tab.selected && tab.id === this.offlineCategoryId)) return false;
     // A category switch must not label the old category's cards as new data.
     return !this.pendingTabId || this.home.tabs.some((tab: PinmonyHomeTab): boolean =>
       tab.id === this.pendingTabId && tab.selected);
@@ -247,23 +298,25 @@ export struct PinmonyHomePage {
 
   @Builder
   private feedStatus() {
-    if (this.error || this.loading || (this.synchronizing && this.home.pins.length === 0)) {
+    if (this.offlinePreview || this.error || this.loading || (this.synchronizing && this.home.pins.length === 0)) {
       Column({ space: 8 }) {
-        Row({ space: 8 }) {
-          if (!this.error) {
-            LoadingProgress().width(18).height(18).color($r('app.color.accent'))
+        if (!this.offlinePreview) {
+          Row({ space: 8 }) {
+            if (!this.error) {
+              LoadingProgress().width(18).height(18).color($r('app.color.accent'))
+            }
+            Text(this.feedStatusText())
+              .fontSize(13)
+              .fontColor($r('app.color.secondary_text'))
+              .maxLines(2)
+              .layoutWeight(1)
+            if (this.error) {
+              Button('重试').fontSize(13)
+                .onClick(() => { if (this.onRetry) this.onRetry(); })
+            }
           }
-          Text(this.feedStatusText())
-            .fontSize(13)
-            .fontColor($r('app.color.secondary_text'))
-            .maxLines(2)
-            .layoutWeight(1)
-          if (this.error) {
-            Button('重试').fontSize(13)
-              .onClick(() => { if (this.onRetry) this.onRetry(); })
-          }
+          .width('100%')
         }
-        .width('100%')
         if (this.offlinePreview) {
           Row({ space: 8 }) {
             Text('当前离线，仅显示最近缓存')
@@ -288,6 +341,7 @@ export struct PinmonyHomePage {
   }
 
   private feedStatusText(): string {
+    if (this.offlinePreview) return '当前离线，仅显示最近缓存';
     if (this.error) return this.home.categorySourceFailure ? this.error : this.error + '，显示上次内容';
     if (this.refreshing || this.home.refreshing) return '正在刷新首页…';
     if (this.loading) return '正在加载首页…';
@@ -330,11 +384,13 @@ export struct PinmonyHomePage {
     }
     .width('100%')
     .padding({ left: 16, right: 16, top: 8, bottom: 12 })
-    .accessibilityText(`${board.name}，${board.pinCount} 张 Pin 图`)
+    .enabled(this.interactionReady && !!board.boardUrl && !!this.onBoard)
+    .onClick(() => { if (this.onBoard) this.onBoard(board.id); })
+    .accessibilityText(`打开图板：${board.name}，${board.pinCount} 张 Pin 图`)
   }
 
   @Builder
-  private pinCard(pin: PinmonyHomePin, imageRevision: number = 0) {
+  private pinCard(pin: PinmonyHomePin, imageRevision: number = 0, session: number = 0, pageKey: string = '') {
     Column({ space: 8 }) {
       if (pin.video) {
         PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady })
@@ -356,7 +412,10 @@ export struct PinmonyHomePage {
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
           Image(this.recoveredSources[pin.imageUrl] || pin.imageUrl)
-            .onComplete(() => {
+            .onComplete((event) => {
+              if (event?.loadingStatus !== 1 ||
+                session !== this.home.session || pageKey !== this.home.pageKey ||
+                imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
               if (this.imageTraceCount++ < 40) PinmonyRuntimeLog.info('HomeImageTrace: phase=complete index=' +
                 this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
                 ' sincePageMs=' + (Date.now() - this.imageTraceStartedAt));
@@ -367,9 +426,13 @@ export struct PinmonyHomePage {
             .borderRadius(18)
             .clip(true)
             .accessibilityLevel('no')
-            .onError(() => {
+            .onError((event) => {
+              if (session !== this.home.session || pageKey !== this.home.pageKey) return;
               if (imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
               if (this.failedImages.indexOf(pin.imageUrl) < 0) {
+                PinmonyRuntimeLog.warn('HomeImageError: revision=' + imageRevision.toString() +
+                  ' index=' + this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
+                  ' code=' + (event?.error?.code || 0).toString());
                 this.failedImages = [...this.failedImages, pin.imageUrl];
                 this.onImageRecovery();
               }
@@ -426,71 +489,67 @@ export struct PinmonyHomePage {
     .accessibilityText(pin.title || '打开 Pin 图')
   }
 
-  build() {
+  private uniquePrefetchImages(): string[] {
+    const cardSources: Set<string> = new Set<string>();
+    this.home.pins.forEach((pin: PinmonyHomePin): void => {
+      cardSources.add(this.recoveredSources[pin.imageUrl] || pin.imageUrl);
+    });
+    const seen: Set<string> = new Set<string>();
+    return this.prefetchedImageUrls.filter((url: string): boolean => {
+      if (!url || seen.has(url) || cardSources.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+  }
+
+  private selectedCategoryIndex(): number {
+    return Math.max(0, this.categories.findIndex((tab: PinmonyHomeTab): boolean => tab.selected));
+  }
+
+  @Builder
+  private feedContent() {
     Column() {
       if (this.feedActive) {
         // Load detail-sized image resources through ArkUI's existing image cache.
         // This zero-height container has no input or accessibility semantics.
         Row() {
-          ForEach(this.prefetchedImageUrls, (url: string) => {
+          ForEach(this.uniquePrefetchImages(), (url: string) => {
             Image(url).width(1).height(1).opacity(0).accessibilityLevel('no')
           }, (url: string) => url)
         }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }
-      if (this.categories.length > 0) {
-        Scroll() {
-          Row({ space: 8 }) {
-            ForEach(this.categories, (tab: PinmonyHomeTab) => {
-              Button(tab.label, { type: ButtonType.Capsule })
-                .height(36)
-                .padding({ left: 20, right: 20 })
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .backgroundColor(tab.selected ? $r('app.color.home_category_selected') : $r('app.color.input_surface'))
-                .fontColor(tab.selected ? $r('app.color.page_background') : $r('app.color.primary_text'))
-                .enabled(this.interactionReady && tab.enabled)
-                .accessibilitySelected(tab.selected)
-                .onClick(() => this.selectTab(tab))
-            }, (tab: PinmonyHomeTab) => tab.id)
-          }
-          .padding({ left: 24, right: 24 })
-          .height(48)
-        }
-        .width('100%')
-        .height(48)
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .align(Alignment.Start)
-      }
-
       if (this.home.board && this.canShowFeed()) {
         Column() {
           this.boardSummary(this.home.board)
         }
         .width('100%')
-        .height(68)
-        .opacity(1)
+        .height(this.homeChromeCollapsed ? 0 : 68)
+        .opacity(this.homeChromeCollapsed ? 0 : 1)
+        .hitTestBehavior(this.homeChromeCollapsed ? HitTestMode.None : HitTestMode.Default)
+        .accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')
         .clip(true)
       }
 
       if (!this.canShowFeed()) {
-        if ((this.loading || this.synchronizing) && !this.error) {
+        if (!this.offlinePreview && (this.loading || this.synchronizing) && !this.error) {
           PinmonyHomeSkeleton({ showCategories: this.categories.length === 0 })
             .width('100%')
             .layoutWeight(1)
         } else {
           Column({ space: 12 }) {
-            Text(this.error || '当前分类暂无 Pin 图')
+            Text(this.emptyFeedMessage())
+              .width('100%')
+              .textAlign(TextAlign.Center)
               .fontSize(16)
               .fontColor($r('app.color.primary_text'))
-            Button('重新读取')
+            Button(this.offlinePreview ? '连接后重试' : '重新读取')
               .onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           .width('100%')
           .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
-          .padding({ bottom: 100 })
+          .padding({ left: 24, right: 24, bottom: 100 })
         }
       } else {
         Stack({ alignContent: Alignment.Top }) {
@@ -498,7 +557,7 @@ export struct PinmonyHomePage {
             WaterFlow({ scroller: this.feedScroller }) {
               ForEach(this.home.pins, (pin: PinmonyHomePin) => {
                 FlowItem() {
-                  this.pinCard(pin, this.recoveredRevisions[pin.imageUrl] || 0)
+                  this.pinCard(pin, this.recoveredRevisions[pin.imageUrl] || 0, this.home.session, this.home.pageKey)
                 }
                 .width('100%')
               }, (pin: PinmonyHomePin) => pin.id + ':' + pin.imageUrl + ':' + pin.title + ':' + (this.recoveredRevisions[pin.imageUrl] || 0))
@@ -547,7 +606,10 @@ export struct PinmonyHomePage {
               this.prefetchVisibleDetails();
               this.prefetchNextScreen();
             })
-            .onScrollStop(() => this.reportScrollPosition(true))
+            .onScrollStop(() => {
+              this.updateHomeChrome(0, ScrollState.Idle);
+              this.reportScrollPosition(true);
+            })
             .onReachEnd(() => {
               this.loadNextPageAtEnd();
             })
@@ -568,5 +630,40 @@ export struct PinmonyHomePage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
+  }
+
+  build() {
+    Column() {
+      if (this.categories.length > 0) {
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(this.categories, (tab: PinmonyHomeTab) => {
+              Button(tab.label, { type: ButtonType.Capsule })
+                .height(36)
+                .padding({ left: 20, right: 20 })
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .backgroundColor(tab.selected ? $r('app.color.home_category_selected') : $r('app.color.input_surface'))
+                .fontColor(tab.selected ? $r('app.color.page_background') : $r('app.color.primary_text'))
+                .enabled((this.interactionReady || this.offlinePreview) && tab.enabled)
+                .accessibilitySelected(tab.selected)
+                .onClick(() => {
+                  const current: PinmonyHomeTab | undefined = this.categories.find((item: PinmonyHomeTab): boolean => item.id === tab.id);
+                  if (current) this.selectTab(current);
+                })
+            }, (tab: PinmonyHomeTab) => tab.id + ':' + tab.label + ':' + tab.selected.toString() + ':' + tab.enabled.toString())
+          }
+          .padding({ left: 24, right: 24 })
+          .height(48)
+        }
+        .width('100%')
+        .height(48)
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .align(Alignment.Start)
+      }
+      this.feedContent()
+    }
+    .width('100%').height('100%')
   }
 }

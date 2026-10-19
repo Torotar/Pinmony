@@ -42,7 +42,8 @@ assert(!picker.includes('quiz.topics'), 'candidate topics are absent from picker
 assert(!panel.includes('更多创意'));
 assert.match(picker, /Button\('查看结果'\)/);
 assert.match(picker, /\.onReachEnd\(/);
-assert.match(page, /title: \{ title: .*选择灵感（最多10张）/);
+assert.match(page, /title: this\.quizModalTitle/);
+assert.match(page, /PinmonyModalTitle\(\{ title: .*选择灵感（最多10张）/);
 assert(!picker.includes('pickerTitle'), 'sheet header owns the title instead of duplicating it in the body');
 assert.match(picker, /Stack\(\{ alignContent: Alignment.Center \}\)/);
 assert.match(picker, /if \(this.quiz.busy && this.quiz.cards.length === 0\) \{\s*LoadingProgress/);

@@ -78,6 +78,7 @@ export struct PinmonyHomeMenuSheet {
                   .fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
               } else {
               Image(option.id === 'home-save' || option.id === 'board-menu-cancel-save' ? $r('app.media.lucide_bookmark') :
+                option.id === 'home-edit' ? $r('app.media.lucide_pencil') :
                 option.id === 'home-download' ? $r('app.media.lucide_download') :
                 option.id === 'home-see-more' ? $r('app.media.lucide_heart') :
                 option.id === 'home-system-share' ? $r('app.media.lucide_share_2') : $r('app.media.lucide_eye_off'))

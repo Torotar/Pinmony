@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,setTimeout,clearTimeout,console});return exports;}
-const {PinmonyPinMenuNative:Menu,PIN_NATIVE_PIN_MENUS_ENABLED}=load('entry/src/main/ets/app/PinmonyPinMenuNative.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='feature_pin'?{PIN_EDIT_API_ENABLED:true,PIN_POST_API_ENABLED:true}:{});
+const {PinmonyPinMenuNative:Menu,PIN_NATIVE_PIN_MENUS_ENABLED}=load('entry/src/main/ets/app/PinmonyPinMenuNative.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='feature_pin'?{PIN_EDIT_API_ENABLED:true,PIN_POST_API_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',pin=origin+'/pin/11/',image='https://i.pinimg.com/menu-original.jpg';
 const raw={id:'11',is_repin:false,pinner:{id:'42'},images:{orig:{url:image}},ai_disclosures:[1],tracking_params:'synthetic-track',through_id:'11',rec_reason_type:4,source:9};
@@ -16,7 +16,14 @@ async function main(){
 assert(PIN_NATIVE_PIN_MENUS_ENABLED);const f=fixture();await open(f);assert(f.store.moreOptions.some(o=>o.id==='detail-edit'));assert(f.store.moreOptions.some(o=>o.id==='detail-ai-help'));
 await f.menu.action('detail-download');assert.deepEqual(f.effects.at(-1),['download',image]);await f.menu.action('detail-ai-help');assert(f.effects.at(-1)[1].endsWith('/gen-ai-labels'));
 await f.menu.action('detail-share');assert.deepEqual(f.effects.at(-1),['contacts',pin]);assert.equal(f.jobs.length,1);
-const saveCopy=fixture();await open(saveCopy,{...raw,is_repin:true});assert(!saveCopy.store.moreOptions.some(o=>o.id==='detail-edit'));
+const saveCopy=fixture();await open(saveCopy,{...raw,is_repin:true});assert(saveCopy.store.moreOptions.some(o=>o.id==='detail-edit'),'owned saved copy can open restricted editor');
+const foreign=fixture();await open(foreign,{...raw,pinner:{id:'99'}});assert(!foreign.store.moreOptions.some(o=>o.id==='detail-edit'));
+await foreign.menu.action('detail-edit');assert.equal(foreign.effects.length,0,'forged edit action cannot edit another owner');
+const unclassified=fixture();await open(unclassified,{...raw,is_repin:undefined});assert(unclassified.store.moreOptions.some(o=>o.id==='detail-edit'),'unknown content classification does not hide an owned editor');
+const photoEdit=fixture();photoEdit.store.shareSession=7;photoEdit.setSheet('share');let photoRead=photoEdit.menu.photoRead(7,pin);photoEdit.jobs.at(-1).resolve(body(raw));
+const photoState=await photoRead;assert(photoState.actions.some(o=>o.id==='home-edit'&&o.enabled));await photoEdit.menu.action('home-edit');assert.deepEqual(photoEdit.effects.at(-1),['edit',pin]);
+const missingIdentity=fixture();let missingRead=missingIdentity.menu.open();missingIdentity.jobs.at(-1).resolve(JSON.stringify({resource_response:{status:'success',data:raw}}));await missingRead;
+assert(missingIdentity.store.moreError,'missing viewer identity reports a read error instead of silently removing edit');
 const less=fixture();await open(less);let p=less.menu.action('detail-see-less');assert.deepEqual(JSON.parse(JSON.stringify(options(less.jobs.at(-1).job))),{url:'/v3/pfy/11/feedback/',data:{pin:'11',client_tracking_params:'synthetic-track',feedback_type:10}});less.jobs.at(-1).resolve(body({id:'11'},'v3_provide_pfy_pin_feedback'));await p;assert.equal(less.messages.at(-1),'已提交查看更少反馈');
 const more=fixture();await open(more);p=more.menu.action('detail-see-more');assert.equal(options(more.jobs.at(-1).job).data.source,9);await more.menu.action('detail-see-more');assert.equal(more.jobs.length,2);more.jobs[1].resolve(body({id:'11'},'v3_pin_see_more_user_feedback'));await p;assert.equal(more.store.feedbackUndoPin,pin);
 p=more.menu.undoFeedback();assert.equal(options(more.jobs[2].job).url,'/v3/pin/11/feedback/see_more/undo/');assert.equal(options(more.jobs[2].job).data.source,5);more.jobs[2].resolve(body({id:'11'},'v3_pin_see_more_undo_user_feedback'));await p;assert.equal(more.store.feedbackUndoPin,'');assert.equal(more.messages.at(-1),'已撤销查看更多反馈');
@@ -26,7 +33,7 @@ await open(more);assert(more.store.moreOptions.find(o=>o.id==='detail-see-more')
 const unknown=fixture();await open(unknown);p=unknown.menu.action('detail-see-more');unknown.jobs[1].resolve(body({id:'12'},'v3_pin_see_more_user_feedback'));await p;assert(unknown.messages.at(-1).includes('未确认'));await open(unknown);assert.equal(unknown.store.moreOptions.find(o=>o.id==='detail-see-more').enabled,false);const count=unknown.jobs.length;await unknown.menu.action('detail-see-more');assert.equal(unknown.jobs.length,count,'uncertain write cannot replay on reopen');
 const stale=fixture();p=stale.menu.open();stale.setRoute(origin+'/other/');stale.menu.pause();stale.jobs[0].resolve(body(raw));await p;assert.equal(stale.store.moreOptions.length,0);
 const account=fixture();p=account.menu.open();const current=account.jobs[0].current;account.setSession({...account.getSession(),accountId:'new-account',generation:2});assert.equal(current().authenticated,false);account.jobs[0].resolve(body(raw));await p;assert.equal(account.store.moreOptions.length,0);
-const photo=fixture();photo.store.shareSession=7;photo.setSheet('share');photo.setRoute(origin+'/');p=photo.menu.photoRead(7,pin);photo.jobs[0].resolve(body({...raw,source:undefined}));const state=await p;assert.equal(state.actions.length,4);p=photo.menu.action('home-see-more');assert.equal(options(photo.jobs[1].job).data.source,undefined,'home feedback must not invent a source');photo.jobs[1].resolve(body({id:'11'},'v3_pin_see_more_user_feedback'));await p;
+const photo=fixture();photo.store.shareSession=7;photo.setSheet('share');photo.setRoute(origin+'/');p=photo.menu.photoRead(7,pin);photo.jobs[0].resolve(body({...raw,source:undefined}));const state=await p;assert.equal(state.actions.length,5);assert(state.actions.some(o=>o.id==='home-edit'));p=photo.menu.action('home-see-more');assert.equal(options(photo.jobs[1].job).data.source,undefined,'home feedback must not invent a source');photo.jobs[1].resolve(body({id:'11'},'v3_pin_see_more_user_feedback'));await p;
 const badImage=fixture();await open(badImage,{...raw,images:{orig:{url:'https://example.com/photo.jpg'}}});assert(!badImage.store.moreOptions.some(o=>o.id==='detail-download'));
 // The real allowlist rejects cross-Pin endpoints, extra fields, hidden methods and expired account ownership.
 const valid=more.jobs[1].job,net=new Network();let sends=0,session=more.getSession();net.request=async(job,current)=>{if(!acceptsNetworkJob(job,current()))return{error:'rejected'};sends++;return{error:''};};
@@ -65,6 +72,7 @@ async function productionMenus(){
   await h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);assert.equal(effects.at(-1)[0],'system-share');assert.equal(web,0);
   route=origin+'/visitor/board/';h.boardStore.boardDetail={pageKey:route,editable:false,pins:[{id:'11',pinUrl:pin}]};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-move'));assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));
+  assert(h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-edit'),'board menu preserves the verified owner edit entry');
   assert.equal(h.homeStore.customHomeMenu.actions.find(o=>o.id==='home-system-share').label,'系统分享');
   const boardShares=effects.filter(e=>e[0]==='system-share').length;
   pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);

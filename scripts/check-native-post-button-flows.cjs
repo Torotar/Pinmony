@@ -61,7 +61,8 @@ async function main(){
  const s=fixture();await picker(s);let p=s.ops.saveAction('boardsSave',',"100"');
  s.requests[3].resolve(resource({...saved,id:'77'},'v3_repin_handler'));await p;
  assert(s.store.confirmedSaves.isSaved('11'));let rendered=view(s);assert(rendered.action('save').selected);assert.equal(rendered.action('save').label,'已收藏');
- rendered.imageLayer='zoom';assert.equal(rendered.titleBarOptions().content.menu.value[2].content.label,'已收藏');
+ // Headerless image viewing must not be used as a second source of save state.
+ assert.equal(view(s).action('save').selected,true);
  p=s.ops.detailAction('save');s.requests[4].resolve(resource(raw));await flush();assert.match(s.requests[5].job.url,/PinResource\/get/);
  s.requests[5].resolve(resource({...saved,id:'77'}));await flush();assert.match(s.requests[6].job.url,/PinResource\/delete/);
  s.requests[6].resolve(resource(null,'v3_delete_pin_handler'));await p;assert(!view(s).action('save').selected);

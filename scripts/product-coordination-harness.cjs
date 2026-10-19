@@ -19,8 +19,14 @@ function runtime(ts, globals = {}) {
     return loader;
 }
 function stores(native, loader) {
+    native.sessionDocumentUrl ||= () => native.controller?.getUrl?.() || '';
+    native.runSessionScript ||= script => native.controller?.runJavaScript?.(script) || Promise.resolve('');
+    native.loadSessionDocument ||= url => native.controller?.loadUrl?.(url);
     const { PinmonyBusinessSession } = loader.loadFile('common_session/src/main/ets/services/PinmonyBusinessSession.ets');
     native.businessSession ||= new PinmonyBusinessSession();
+    const { PinmonySessionEnvironment } = loader.loadFile('common_session/src/main/ets/services/PinmonySessionEnvironment.ets');
+    native.sessionEnvironment ||= new PinmonySessionEnvironment();
+    if (!native.sessionEnvironment.userAgent() && native.controller?.getUserAgent) native.sessionEnvironment.capture(native.controller.getUserAgent());
     native.authenticatedProfileUrl ??= '';
     if (!native.nativeBusinessSessionContext) {
       const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');

@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyCreatedPin, PinmonyOrganizeSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
@@ -63,6 +64,8 @@ export struct PinmonyPublishBoardPage {
     if (this.state.phase === 'create') {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
         .bindSheet($$this.createVisible, this.createSheet(), {
+          radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+          onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPublishBoardPage.createVisible radius=four-corners-32vp'); },
           height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
           backgroundColor: $r('app.color.page_background'),
           onWillDismiss: (action: DismissSheetAction) => {

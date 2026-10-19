@@ -12,7 +12,7 @@ interface HomeItem { id: string; type: string; images?: Record<string, HomeImage
   description?: string; videos?: HomeVideo; name?: string; }
 interface HomeResource { status: string; code?: number; error?: Object; data: HomeItem[]; bookmark?: string; }
 interface HomeResponse { resource_response: HomeResource; }
-interface BoardData { id: string; name: string; pin_count: number; cover_images?: Record<string, HomeImage>;
+interface BoardData { id: string; url?: string; name: string; pin_count: number; cover_images?: Record<string, HomeImage>;
   image_cover_url?: string; image_cover_hd_url?: string; }
 interface BoardResource { status: string; code?: number; endpoint_name?: string; data: BoardData; }
 interface BoardResponse { resource_response: BoardResource; }
@@ -27,7 +27,7 @@ export interface PinmonyHomeNativeReadsPorts {
   username: () => string;
   network: () => PinmonyNativeNetwork;
   active: () => boolean;
-  committed: (snapshot: PinmonyHomeSnapshot) => void;
+  committed: (snapshot: PinmonyHomeSnapshot, kind?: 'feed' | 'pagination' | 'cache' | 'metadata') => void;
   saved: (id: string) => boolean;
 }
 
@@ -86,7 +86,8 @@ export class PinmonyHomeNativeReads {
   }
   async demand(): Promise<void> {
     if (!this.ports.active() || !this.bind()) return;
-    if (this.feeds.has(this.board)) { this.store.homeNativeReadsReady = true; return; }
+    const retained: HomeFeed | undefined = this.feeds.get(this.board);
+    if (retained) { this.bookmark = retained.bookmark; this.commit(retained.snapshot, 'cache'); return; }
     const selected: PinmonyHomeTab | undefined = this.store.home?.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected);
     if (selected && /^tab:\d+$/.test(selected.id)) this.board = selected.id.slice(4);
     const feed: Promise<void> = this.readFeed(false);
@@ -106,14 +107,24 @@ export class PinmonyHomeNativeReads {
     this.pause(); this.board = id === 'tab:all' ? '' : id.slice(4); this.bookmark = ''; this.boardSummary = undefined;
     this.store.cachedHomeScrollOffset = 0; this.store.homeNativeReadsReady = false;
     const cached: HomeFeed | undefined = this.feeds.get(this.board);
-    if (cached) { this.bookmark = cached.bookmark; this.commit(cached.snapshot); return; }
-    this.store.home = undefined; this.store.cachedHome = undefined;
+    if (cached) { this.bookmark = cached.bookmark; this.commit(cached.snapshot, 'cache'); return; }
+    // Keep the native page and category controls mounted while only the feed loads.
+    const tabs: PinmonyHomeTab[] = this.makeTabs();
+    this.store.home = { kind: 'loading', session: 0, pageKey: this.origin + '/',
+      selectedTab: target.label, tabs: tabs, pins: [], dataSource: 'api' };
     this.store.pendingHomeTab = id;
     await this.readFeed(false);
     if (!this.categoriesReady && !this.categoriesBusy && this.current()) this.readCategories();
   }
   async more(): Promise<void> {
-    if (!this.ports.active() || !this.bind() || !this.store.homeNativeReadsReady || this.busy || this.store.home?.endReached) return;
+    if (!this.ports.active() || !this.bind() || this.busy) return;
+    if (!this.feeds.has(this.board)) { await this.demand(); return; }
+    if (!this.store.homeNativeReadsReady || this.store.home !== this.feeds.get(this.board)?.snapshot) {
+      const retained: HomeFeed | undefined = this.feeds.get(this.board);
+      if (!retained) return;
+      this.bookmark = retained.bookmark; this.commit(retained.snapshot, 'cache');
+    }
+    if (this.store.home?.endReached) return;
     await this.readFeed(true);
   }
   private makeTabs(): PinmonyHomeTab[] {
@@ -128,7 +139,7 @@ export class PinmonyHomeNativeReads {
     }
     return result;
   }
-  private commit(snapshot: PinmonyHomeSnapshot): void {
+  private commit(snapshot: PinmonyHomeSnapshot, kind: 'feed' | 'pagination' | 'cache' = 'feed'): void {
     if (!this.current()) return;
     snapshot.sourceError = this.store.homeSourceWarning || undefined; snapshot.categorySourceFailure = !!this.store.homeSourceWarning;
     snapshot.tabs = this.makeTabs(); snapshot.selectedTab = snapshot.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected)?.label || '所有';
@@ -137,7 +148,7 @@ export class PinmonyHomeNativeReads {
     this.store.retainingHomeFeed = false; this.store.diskCacheRestored = false; this.store.startupFeedCommitted = true;
     this.feeds.set(this.board, { snapshot: snapshot, bookmark: this.bookmark });
     if (this.feeds.size > 4) { const first: string = Array.from(this.feeds.keys())[0]; if (first !== this.board) this.feeds.delete(first); }
-    this.ports.committed(snapshot);
+    this.ports.committed(snapshot, kind);
   }
   private async request(resource: string, options: HomeOptions, source: string, live: () => boolean): Promise<PinmonyNetworkReply> {
     const id: string = 'native_home_' + (++this.sequence).toString();
@@ -182,7 +193,7 @@ export class PinmonyHomeNativeReads {
       const snapshot: PinmonyHomeSnapshot = { kind: 'state', session: 0, pageKey: this.origin + '/', selectedTab: '', tabs: [],
         board: this.boardSummary?.id === board ? this.boardSummary : undefined, pins: pins, dataSource: 'api', loadingMore: false,
         refreshing: false, endReached: !cursor || cursor === '-end-' || !!previous && cursor === previous || data.data.length === 0 || pins.length >= 3000 };
-      this.commit(snapshot);
+      this.commit(snapshot, append ? 'pagination' : 'feed');
     } catch (_) { if (live()) this.store.homeError = append ? '更多帖子读取失败，请重试' : '首页读取失败，请重试'; }
     finally { if (revision === this.revision) { this.busy = false; this.store.homeLoading = false; this.store.homeRefreshing = false;
       this.store.pendingHomeTab = ''; if (this.store.home) this.store.home.loadingMore = false; } }
@@ -203,7 +214,7 @@ export class PinmonyHomeNativeReads {
       data.data.forEach((item: HomeItem): void => { if (item?.type === 'board' && /^\d+$/.test(String(item.id || '')) && item.name?.trim() &&
         !tabs.some((tab: PinmonyHomeTab): boolean => tab.id === 'tab:' + item.id)) tabs.push({ id: 'tab:' + item.id, label: item.name.trim().slice(0,160), selected: false, enabled: true }); });
       this.tabs = tabs; this.categoriesReady = true; this.store.homeSourceWarning = '';
-      if (this.store.home) { this.store.home.tabs = this.makeTabs(); this.store.home.sourceError = undefined; this.store.home.categorySourceFailure = false; this.store.homeError = ''; this.ports.committed(this.store.home); }
+      if (this.store.home) { this.store.home.tabs = this.makeTabs(); this.store.home.sourceError = undefined; this.store.home.categorySourceFailure = false; this.store.homeError = ''; this.ports.committed(this.store.home, 'metadata'); }
     } catch (_) { if (live()) { this.store.homeSourceWarning = '已收藏图板分类读取失败，请下拉重试'; this.store.homeError = this.store.homeSourceWarning; if (this.store.home) { this.store.home.sourceError = this.store.homeSourceWarning; this.store.home.categorySourceFailure = true; } } }
     finally { if (revision === this.revision) this.categoriesBusy = false; }
   }
@@ -215,10 +226,12 @@ export class PinmonyHomeNativeReads {
       const data: BoardData = resource?.data;
       if (resource?.status !== 'success' || resource.code !== 0 || resource.endpoint_name !== 'v3_get_board' || String(data?.id) !== board || !data.name?.trim() ||
         !Number.isFinite(data.pin_count) || data.pin_count < 0 || data.pin_count > 1000000000) return;
-      const value: PinmonyHomeBoard = { id: board, name: data.name.trim().slice(0,160), pinCount: Math.floor(data.pin_count),
+      const boardUrl: string = typeof data.url === 'string' && data.url.length <= 2000 ?
+        (data.url.startsWith('/') && !data.url.startsWith('//') ? this.origin + data.url : data.url) : '';
+      const value: PinmonyHomeBoard = { boardUrl: boardUrl.startsWith(this.origin + '/') ? boardUrl : '', id: board, name: data.name.trim().slice(0,160), pinCount: Math.floor(data.pin_count),
         thumbnailUrl: this.imageUrl(data.cover_images?.['236x']?.url || data.cover_images?.['200x150']?.url || data.image_cover_url || data.image_cover_hd_url || '') };
       this.boardSummary = value;
-      if (this.store.home && this.board === board) { this.store.home.board = value; this.ports.committed(this.store.home); }
+      if (this.store.home && this.board === board) { this.store.home.board = value; this.ports.committed(this.store.home, 'metadata'); }
     } catch (_) {}
   }
   private imageUrl(url: string): string { return url.length <= 2000 && /^https:\/\/(?:[a-z0-9-]+\.)*pinimg\.com\//i.test(url) ? url : ''; }

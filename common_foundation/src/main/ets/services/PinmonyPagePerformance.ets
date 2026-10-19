@@ -12,13 +12,17 @@ class SecondarySample {
   constructor(identity: string, sequence: number, started: number) { this.identity = identity; this.sequence = sequence; this.started = started; }
 }
 class PageSample {
+  readonly reason: 'tab' | 'return';
   readonly started: number;
   readonly tab: number;
   readonly sequence: number;
   readonly stages: Set<string> = new Set<string>();
   reads: number = 0;
+  cacheRestored: boolean = false;
   cancelledTasks: number = 0;
-  constructor(tab: number, sequence: number, started: number) { this.tab = tab; this.sequence = sequence; this.started = started; }
+  constructor(tab: number, sequence: number, started: number, reason: 'tab' | 'return') {
+    this.tab = tab; this.sequence = sequence; this.started = started; this.reason = reason;
+  }
 }
 // Product-level timings contain enums and numbers only, never routes or identities.
 export class PinmonyPagePerformance {
@@ -32,12 +36,12 @@ export class PinmonyPagePerformance {
     (message: string): void => PinmonyRuntimeLog.info(message)) { this.now = now; this.log = log; }
   begin(tab: number, reason: 'tab' | 'return'): void {
     if (!Number.isInteger(tab) || tab < 0 || tab > 3) return;
-    this.active = new PageSample(tab, ++this.sequence, this.now());
+    this.active = new PageSample(tab, ++this.sequence, this.now(), reason);
     this.log('PagePerf: event=begin tab=' + tab + ' sequence=' + this.sequence + ' reason=' + reason);
   }
   mark(tab: number, stage: PinmonyPageStage): void {
     const sample: PageSample | undefined = this.active;
-    if (!sample || sample.tab !== tab || sample.stages.has(stage)) return;
+    if (!sample || sample.tab !== tab || sample.stages.has(stage) || sample.cacheRestored && stage === 'document-ready') return;
     sample.stages.add(stage);
     const elapsed: number = Math.max(0, this.now() - sample.started);
     const key: string = tab + ':' + stage;
@@ -49,6 +53,14 @@ export class PinmonyPagePerformance {
     this.log('PagePerf: event=' + stage + ' tab=' + tab + ' sequence=' + sample.sequence + ' elapsedMs=' + elapsed +
       ' samples=' + ordered.length + ' p50Ms=' + ordered[Math.ceil(ordered.length * 0.5) - 1] +
       ' p95Ms=' + ordered[Math.ceil(ordered.length * 0.95) - 1]);
+  }
+  restoreHome(): boolean {
+    if (!this.active || this.active.tab !== 0 || this.active.reason !== 'return' || this.active.stages.has('content-ready')) return false;
+    this.active.cacheRestored = true;
+    this.mark(0, 'visible');
+    this.mark(0, 'cache-visible');
+    this.mark(0, 'content-ready');
+    return true;
   }
   count(tab: number, event: PinmonyPageCounter, count: number = 1): void {
     const sample: PageSample | undefined = this.active;

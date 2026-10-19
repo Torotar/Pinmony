@@ -1,3 +1,4 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode } from '@kit.UIDesignKit';
 import { InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 import { PinmonyUserAvatar } from 'common_ui';
@@ -513,6 +514,8 @@ export struct PinmonyInboxFlowPage {
         .hitTestBehavior(HitTestMode.Transparent)
         .onAppear(() => { this.presentedNewsId = this.snapshot.newsId || ''; this.showUpdatesMenu = !this.snapshot.newsHidden; })
         .bindSheet($$this.showUpdatesMenu, this.updatesMenuContent(), {
+          radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+          onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyInboxFlowPage.showUpdatesMenu radius=four-corners-32vp'); },
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
           showClose: true,
@@ -630,6 +633,8 @@ export struct PinmonyInboxFlowPage {
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.showMessageMenu, this.activeSheetContent(), {
+        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyInboxFlowPage.showMessageMenu radius=four-corners-32vp'); },
         height: SheetSize.FIT_CONTENT, showClose: true,
         title: { title: this.snapshot.screen === 'settings' ? (this.snapshot.blocked ? '取消屏蔽联系人' : '屏蔽联系人') : '' }, dragBar: true,
         backgroundColor: $r('app.color.page_background'),
@@ -639,7 +644,7 @@ export struct PinmonyInboxFlowPage {
       .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
         style: {
           scrollEffectOpts: { enableScrollEffect: false },
-          originalStyle: { backgroundStyle: {
+          scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: {
             backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
           } }
         },

@@ -52,6 +52,9 @@ export default class EntryAbility extends UIAbility {
     });
     PinmonyRuntimeLog.info('AbilityLifecycle: preconnect-dispatched');
     try {
+      webview.WebviewController.setWebDebuggingAccess(false);
+    } catch (_) { PinmonyRuntimeLog.warn('Web: debug configuration unavailable'); }
+    try {
       const features: webview.BackForwardCacheSupportedFeatures = new webview.BackForwardCacheSupportedFeatures();
       // Visible media is native; do not opt hidden Web media or native embeds into retention.
       features.nativeEmbed = false;
@@ -64,6 +67,7 @@ export default class EntryAbility extends UIAbility {
       errorManager.on('globalUnhandledRejectionDetected', this.rejectionObserver);
     } catch (_) { PinmonyRuntimeLog.warn('Runtime: exception observer unavailable'); }
     PersistentStorage.persistProp('themePreference', 'system');
+    PersistentStorage.persistProp('pinmonySessionOrigin', 'https://www.pinterest.com');
     try {
       const preference: string = AppStorage.get<string>('themePreference') || 'system';
       this.context.getApplicationContext().setColorMode(preference === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : preference === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
@@ -219,6 +223,11 @@ export default class EntryAbility extends UIAbility {
     this.logLifecycle('background', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString());
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+    try {
+      void webview.WebCookieManager.saveCookieAsync().then((): void => {
+        PinmonyRuntimeLog.info('NativeSession: background cookie store saved');
+      }).catch((): void => { PinmonyRuntimeLog.warn('NativeSession: background cookie store save unavailable'); });
+    } catch (_) { PinmonyRuntimeLog.warn('NativeSession: background cookie store save unavailable'); }
     PinmonyRuntimeLog.flush();
   }
 

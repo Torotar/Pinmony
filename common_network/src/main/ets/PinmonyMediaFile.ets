@@ -123,6 +123,7 @@ export class PinmonyMediaFile {
             break;
           } catch (error) {
             const code: number = Number.isFinite((error as BusinessError).code) ? (error as BusinessError).code : 0;
+            if (code === 2300060) failure = 'certificate-validation';
             this.trace('event=connection-failed host=' + host + ' profile=networkkit-http11 status=' + status.toString() +
               ' code=' + code.toString() + ' bytes=' + bytes.toString());
             throw error as Error;
@@ -177,9 +178,14 @@ export class PinmonyMediaFile {
           this.trace('event=connection-failed host=' + host + ' profile=' + profile + ' status=' + status.toString() +
             ' code=' + code.toString() + ' bytes=' + bytes.toString());
           const tlsTimeout: boolean = code === 1007900028 && tlsPending;
+          const certificateFailure: boolean = code === 1007900060;
           if (MEDIA_RECOVERY_BUDGET_MS - (Date.now() - started) < 4000 || attempt !== 0 ||
-              (code !== 1007900035 && !tlsTimeout) || status !== 0 || bytes !== 0 || !current() || failure) throw error as Error;
-          this.trace('event=transport-compatibility reason=' + (tlsTimeout ? 'tls-timeout' : 'ssl-connect') + ' next=networkkit-http11');
+              (code !== 1007900035 && !tlsTimeout && !certificateFailure) || status !== 0 || bytes !== 0 || !current() || failure) {
+            if (certificateFailure) failure = 'certificate-validation';
+            throw error as Error;
+          }
+          // The alternate native stack must independently pass platform certificate validation.
+          this.trace('event=transport-compatibility reason=' + (certificateFailure ? 'certificate-validation' : tlsTimeout ? 'tls-timeout' : 'ssl-connect') + ' next=networkkit-http11');
         } finally {
           // Reject callbacks from a closed attempt before allowing another profile to write the file.
           activeAttempt = -1; activeRequest = undefined; activeSession = undefined;

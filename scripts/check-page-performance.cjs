@@ -10,6 +10,14 @@ now += 100; perf.mark(3, 'content-ready'); assert(logs.at(-1).includes('elapsedM
 perf.count(3, 'read'); perf.count(3, 'read'); assert(logs.at(-1).includes('reads=2'));
 perf.count(3, 'cancel', 4); assert(logs.at(-1).includes('cancelledTasks=4'));
 perf.cancel(); const count = logs.length; perf.mark(3, 'document-ready'); assert.equal(logs.length, count);
+perf.begin(0, 'return'); now += 16; assert.equal(perf.restoreHome(), true);
+const restored = logs.filter(s => s.includes('event=content-ready tab=0')).at(-1);
+assert(restored.includes('elapsedMs=16'));
+now += 12000; assert.equal(perf.restoreHome(), false); perf.mark(0, 'content-ready');
+const completed = logs.length; perf.mark(0, 'document-ready'); assert.equal(logs.length, completed, 'later document callbacks do not become cached return durations');
+assert.equal(logs.filter(s => s.includes('event=content-ready tab=0')).at(-1), restored, 'later pagination cannot stretch a completed return sample');
+perf.begin(1, 'return'); assert.equal(perf.restoreHome(), false);
+perf.begin(0, 'tab'); assert.equal(perf.restoreHome(), false, 'restored home timings only apply to actual returns');
 for (let i = 0; i < 90; i++) { perf.begin(3, 'tab'); now += i; perf.mark(3, 'visible'); }
 assert(logs.at(-1).includes('samples=64')); assert(!logs.some(s => /https:|cookie|account_id/.test(s)));
 for (const page of ['detail','board','chat','share']) {

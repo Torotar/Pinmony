@@ -37,8 +37,9 @@ assert(index.includes('HdsTabs({'), 'root pages use HdsTabs');
 assert.equal((index.match(/TabContent\(\)\s*\{/g) || []).length, 4, 'root pages use four TabContent roots');
 assert(index.includes('.animationDuration(0)'), 'root tabs have no page transition');
 assert(index.includes('nativeRootTabsVisible()'), 'secondary depth controls root tab visibility');
-assert(index.includes('onPageBegin((event)'), 'web page begin invalidates stale page work');
-assert(index.includes('.onPageEnd(() =>'), 'web page end synchronizes navigation/auth state');
+const loginSource = fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets', 'utf8');
+assert(loginSource.includes('onPageBegin((event)'), 'login host page begin invalidates stale page work');
+assert(loginSource.includes('.onPageEnd(() =>'), 'login host page end synchronizes navigation/auth state');
 assert(architecture.includes('## ArkUI 页面与状态管理'), 'architecture documents page/state ownership');
 assert(!/屏幕旋转|横屏|折叠屏/.test(architecture.slice(architecture.indexOf('## ArkUI 页面与状态管理'))),
   'page lifecycle scope does not claim unsupported rotation behavior');

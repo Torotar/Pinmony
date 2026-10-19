@@ -7,23 +7,26 @@ const pins=(ids,cursor)=>JSON.stringify({resource_response:{status:'success',dat
 const categories=JSON.stringify({resource_response:{status:'success',data:[{type:'board',id:'7',name:'Board'},{type:'board',id:'8',name:'Other'}]}});
 function fixture(){
  let session={authenticated:true,generation:1,accountId:'account',origin:'https://www.pinterest.com',userAgent:'fixture'}, active=true;
- const store={homeSourceWarning:'',homeActionsReady:false,cachedHomeScrollOffset:123},jobs=[],canceled=[],commits=[];
+ const store={homeSourceWarning:'',homeActionsReady:false,cachedHomeScrollOffset:123},jobs=[],canceled=[],commits=[],kinds=[];
  const controller=new PinmonyHomeNativeReads({store:()=>store,session:()=>session,username:()=> 'reader',active:()=>active,saved:()=>false,
- network:()=>({cancel:id=>canceled.push(id),requestBusinessHomeRead(job,getSession,user,board,current){assert(current());assert.equal(job.page,session.origin+'/');return new Promise(resolve=>jobs.push({job,board,current,resolve:body=>resolve({status:current()?200:0,error:current()?'':'cancelled',body})}));}}),committed:snapshot=>commits.push(snapshot)});
- return {controller,store,jobs,canceled,commits,setSession:value=>session=value,session:()=>session,setActive:value=>active=value};
+ network:()=>({cancel:id=>canceled.push(id),requestBusinessHomeRead(job,getSession,user,board,current){assert(current());assert.equal(job.page,session.origin+'/');return new Promise(resolve=>jobs.push({job,board,current,resolve:body=>resolve({status:current()?200:0,error:current()?'':'cancelled',body})}));}}),committed:(snapshot,kind)=>{commits.push(snapshot);kinds.push(kind);}});
+ return {controller,store,jobs,canceled,commits,kinds,setSession:value=>session=value,session:()=>session,setActive:value=>active=value};
 }
 async function ready(f){const read=f.controller.demand();assert.match(f.jobs[0].job.url,/UserHomefeedResource/);assert.match(f.jobs[1].job.url,/BoardsFeedResource/);f.jobs[0].resolve(pins([1,2],'next'));await read;f.jobs[1].resolve(categories);await flush();}
 async function main(){
- const f=fixture();await ready(f);
+ const f=fixture();await ready(f);assert.equal(f.kinds[0],'feed');assert.equal(f.kinds.at(-1),'metadata');
  assert.equal(f.store.homeNativeReadsReady,true);assert.equal(f.store.homeActionsReady,false,'native reads never grant Web writes');assert.equal(f.store.home.session,0);
  assert.equal(f.store.home.pins[0].title,'grid');assert.equal(f.store.home.tabs.length,3);assert.equal(f.store.cachedHomeScrollOffset,123);
+ const owned=f.store.home; f.store.home={...owned,pins:owned.pins.slice(),sourceError:'stale cache'}; f.store.homeNativeReadsReady=false;
+ await f.controller.demand(); assert.equal(f.store.home,owned,'presentation cache cannot replace the current feed and cursor');
+ assert.equal(f.store.homeNativeReadsReady,true); assert.equal(f.jobs.length,2,'restoring an owned feed does not refresh it');
  const more=f.controller.more();f.controller.more();assert.equal(f.jobs.length,3);assert.equal(JSON.parse(new URL(f.jobs[2].job.url).searchParams.get('data')).options.bookmarks[0],'next');
- f.jobs[2].resolve(pins([2,3],'next'));await more;assert.equal(f.store.home.pins.length,3);assert.equal(f.store.home.endReached,true);
+ f.jobs[2].resolve(pins([2,3],'next'));await more;assert.equal(f.store.home.pins.length,3);assert.equal(f.store.home.endReached,true);assert.equal(f.kinds.at(-1),'pagination');
  let refresh=f.controller.refresh();f.jobs[3].resolve('bad');await refresh;assert.equal(f.store.home.pins.length,3);assert(f.store.homeError);
  refresh=f.controller.refresh();f.jobs[4].resolve(pins([],''));await refresh;assert.equal(f.store.home.pins.length,0);assert.equal(f.store.home.endReached,true);
- const board=f.controller.select('tab:7');assert.match(f.jobs[5].job.url,/BoardContentRecommendationResource/);assert.match(f.jobs[6].job.url,/BoardResource/);
- f.jobs[6].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_get_board',data:{id:'7',name:'Board',pin_count:12}}}));await flush();
- f.jobs[5].resolve(pins([4],'board-next'));await board;assert.equal(f.store.home.board.id,'7');assert.equal(f.store.home.selectedTab,'Board');
+ const board=f.controller.select('tab:7');assert(f.store.home,'category switch retains mounted page');assert.equal(f.store.home.tabs.length,3);assert.equal(f.store.home.pins.length,0);assert.equal(f.store.home.tabs.find(tab=>tab.selected).id,'tab:7');assert.equal(f.store.homeLoading,true);assert.match(f.jobs[5].job.url,/BoardContentRecommendationResource/);assert.match(f.jobs[6].job.url,/BoardResource/);
+ f.jobs[6].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_get_board',data:{id:'7',url:'/reader/board/',name:'Board',pin_count:12}}}));await flush();
+ f.jobs[5].resolve(pins([4],'board-next'));await board;assert.equal(f.store.home.board.id,'7');assert.equal(f.store.home.board.boardUrl,'https://www.pinterest.com/reader/board/');assert.equal(f.store.home.selectedTab,'Board');
  await f.controller.select('tab:all');assert.equal(f.jobs.length,7,'category return uses cursor cache');assert.equal(f.store.home.pins.length,0);
  await f.controller.select('tab:7');const page=f.controller.more();assert.equal(JSON.parse(new URL(f.jobs[7].job.url).searchParams.get('data')).options.bookmarks[0],'board-next');
  f.jobs[7].resolve(pins([5],'-end-'));await page;assert.equal(f.store.home.pins.length,2);
@@ -31,6 +34,7 @@ async function main(){
  for(const revoke of [g=>g.controller.pause(),g=>g.setActive(false),g=>g.setSession({...g.session(),accountId:'other',generation:2}),g=>g.setSession({...g.session(),generation:2})]){
    const g=fixture();const read=g.controller.demand();revoke(g);g.jobs[0].resolve(pins([99],''));g.jobs[1].resolve(categories);await read;await flush();assert(!g.store.home?.pins.some(pin=>pin.id==='99'));
  }
+ const quick=fixture();await ready(quick);const old=quick.controller.select('tab:7');const latest=quick.controller.select('tab:8');assert.equal(quick.store.home.tabs.find(tab=>tab.selected).id,'tab:8');quick.jobs[2].resolve(pins([77],''));quick.jobs[3].resolve('bad');await old;assert.equal(quick.store.homeLoading,true);assert.equal(quick.store.pendingHomeTab,'tab:8');quick.jobs[4].resolve('bad');quick.jobs[5].resolve('bad');await latest;assert(quick.store.homeError);assert.equal(quick.store.home.tabs.find(tab=>tab.selected).id,'tab:8');const retryCurrent=quick.controller.refresh();assert.equal(quick.jobs[6].board,'8');quick.jobs[6].resolve(pins([88],''));quick.jobs[7].resolve('bad');await retryCurrent;assert.equal(quick.store.home.pins[0].id,'88');
  const reset=fixture();await ready(reset);reset.controller.reset();assert.equal(reset.store.home,undefined);assert.equal(reset.store.homeNativeReadsReady,false);assert.equal(reset.store.cachedHomeScrollOffset,0);
  const changed=fixture();await ready(changed);changed.setSession({...changed.session(),accountId:'other',generation:2});const replacement=changed.controller.demand();assert.equal(changed.store.home,undefined,'account change clears previous presentation');changed.jobs[2].resolve(pins([8],''));changed.jobs[3].resolve(categories);await replacement;
  const failed=fixture();const first=failed.controller.demand();failed.jobs[0].resolve(pins([1],''));failed.jobs[1].resolve('bad');await first;await flush();assert(failed.store.homeSourceWarning);assert.equal(failed.store.home.pins.length,1);

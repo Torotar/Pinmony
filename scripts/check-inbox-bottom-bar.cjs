@@ -12,6 +12,7 @@ function method(source, name) {
   return rest.slice(0, end);
 }
 const timers = [], context = { Number, setTimeout: callback => timers.push(callback),
+  Curve: { EaseOut: 0 },
   ScrollState: { Scroll: 1, Fling: 2 }, HdsAnimationMode: { SCROLL_ANIMATION: 'scroll' } };
 const start = page.indexOf('.onDidScroll('), end = page.indexOf('\n        .onScrollStop(', start);
 const scroll = page.slice(start, end).replace(/^\.onDidScroll\(/, 'this.didScroll = ').replace(/\)\s*$/, ';');
@@ -30,6 +31,7 @@ Object.assign(coordinator, { activeTab: 2, inboxContentScrollable: false,
     applyShowAnimation: mode => motions.push({ hidden: false, mode }) } });
 const view = new context.Page();
 Object.assign(view, { snapshot: { section: 'updates' }, initialScrollOffset: 0,
+  syncSegmentItems() {}, getUIContext: () => ({ animateTo(_options, action) { action(); } }),
   contentHeight: 0, viewportHeight: 0, scroller: { scrollTo() {} }, reportScroll() {},
   onScrollAvailability: value => coordinator.updateInboxScrollAvailability(value),
   onContentScroll: (offset, state) => coordinator.handleRootContentScroll(offset, state) });
