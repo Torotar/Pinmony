@@ -421,12 +421,12 @@ export struct PinmonySearchPage {
     }
   }
 
-  private landscapeLayout(): boolean {
-    return this.viewportWidth >= 840 && this.viewportWidth > this.viewportHeight;
+  private wideDiscoveryLayout(): boolean {
+    return this.viewportWidth >= 600;
   }
 
   private discoveryColumns(): number {
-    return !this.landscapeLayout() ? 1 : Math.max(2, Math.floor(this.contentWidth / 520));
+    return !this.wideDiscoveryLayout() ? 1 : Math.max(2, Math.floor(this.contentWidth / 520));
   }
 
   private discoverySlots(): number[] {
@@ -478,11 +478,11 @@ export struct PinmonySearchPage {
   }
 
   private wideHeroImageSize(): number {
-    return Math.max(1, Math.min(this.heroCarouselHeight() - 36, this.contentWidth * 0.36));
+    return Math.max(1, Math.min(this.heroCarouselHeight() - 36, this.contentWidth * (this.viewportWidth > this.viewportHeight ? 0.36 : 0.45)));
   }
 
   private heroCarouselHeight(): number {
-    return !this.landscapeLayout() ? 390 : Math.min(600, this.contentWidth * 0.38);
+    return !this.wideDiscoveryLayout() ? 390 : Math.min(600, this.contentWidth * (this.viewportWidth > this.viewportHeight ? 0.38 : 0.50) + (this.viewportWidth > this.viewportHeight ? 0 : 24));
   }
 
   private contentColumns(): number {
@@ -547,7 +547,7 @@ export struct PinmonySearchPage {
   @Builder
   private heroSlide(hero: PinmonySearchHero) {
     Stack() {
-      if (this.landscapeLayout()) {
+      if (this.wideDiscoveryLayout()) {
         Row() {
           Column() {
             if (this.imageFailed(hero.imageUrl)) {
@@ -571,7 +571,7 @@ export struct PinmonySearchPage {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }.layoutWeight(1).padding({ left: 32, right: 32 })
             .alignItems(HorizontalAlign.Center).justifyContent(FlexAlign.Center)
-        }.width('100%').height('100%').padding({ left: this.contentWidth * 0.06, right: this.contentWidth * 0.06 })
+        }.width('100%').height('100%').padding({ left: this.contentWidth * 0.04, right: this.contentWidth * 0.04 })
           .alignItems(VerticalAlign.Center).backgroundColor(this.heroBackground(hero))
       } else {
     Stack({ alignContent: Alignment.Top }) {

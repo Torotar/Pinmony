@@ -74,10 +74,10 @@ for(const width of [360,768,839,840,1024,1366,360]) {
 }
 console.log('Detail panes passed: phone stacking, wide equal panes, resize back and media aspect ratio');
 
-const discovery=host('feature_search','PinmonySearchPage',['landscapeLayout','discoveryColumns','discoverySlots','discoveryRows','heroCarouselHeight']);
-for(const [width,columns] of [[360,1],[768,1],[840,2],[1366,2],[1920,3],[360,1]]) {
+const discovery=host('feature_search','PinmonySearchPage',['wideDiscoveryLayout','discoveryColumns','discoverySlots','discoveryRows','heroCarouselHeight']);
+for(const [width,columns] of [[360,1],[768,2],[840,2],[1366,2],[1920,3],[360,1]]) {
  discovery.contentWidth=width;discovery.viewportWidth=width;discovery.viewportHeight=600;assert.equal(discovery.discoveryColumns(),columns);
- assert(discovery.heroCarouselHeight()>=319 && discovery.heroCarouselHeight()<=600);
+ assert(discovery.heroCarouselHeight()>=220 && discovery.heroCarouselHeight()<=600);
  for(let count=0;count<12;count++) {
   discovery.snapshot={ideaSections:Array.from({length:count})};const seen=[];
   for(const start of discovery.discoveryRows())for(const slot of discovery.discoverySlots())if(start+slot<count)seen.push(start+slot);
@@ -86,7 +86,7 @@ for(const [width,columns] of [[360,1],[768,1],[840,2],[1366,2],[1920,3],[360,1]]
 }
 console.log('Search discovery passed: responsive section rows, trailing empty slots and carousel height');
 
-const hero=host('feature_search','PinmonySearchPage',['landscapeLayout','wideHeroImageSize','heroCarouselHeight']);
+const hero=host('feature_search','PinmonySearchPage',['wideDiscoveryLayout','wideHeroImageSize','heroCarouselHeight']);
 for(const width of [840,1024,1366,1920]) {
  hero.contentWidth=width;hero.viewportWidth=width;hero.viewportHeight=600;const size=hero.wideHeroImageSize();
  assert(size>0 && size<=hero.heroCarouselHeight()-36);
@@ -97,7 +97,9 @@ console.log('Wide carousel passed: square media fits banner, text pane remains a
 
 for(const [width,height,wide] of [[1024,1366,false],[1366,1024,true],[840,1200,false],[1200,840,true],[700,500,false]]) {
  panes.contentWidth=width;panes.viewportWidth=width;panes.viewportHeight=height;assert.equal(panes.wideDetail(),wide);
- discovery.contentWidth=width;discovery.viewportWidth=width;discovery.viewportHeight=height;assert.equal(discovery.landscapeLayout(),wide);
- if(!wide) {assert.equal(discovery.discoveryColumns(),1);assert.equal(discovery.heroCarouselHeight(),390);assert.equal(panes.detailPaneWidth(),width-36);}
+ discovery.contentWidth=width;discovery.viewportWidth=width;discovery.viewportHeight=height;assert.equal(discovery.wideDiscoveryLayout(),width>=600);
+ if(!wide) assert.equal(panes.detailPaneWidth(),width-36);
+ if(width>=600) assert(discovery.discoveryColumns()>=2);
+ else {assert.equal(discovery.discoveryColumns(),1);assert.equal(discovery.heroCarouselHeight(),390);}
 }
-console.log('Orientation passed: portrait tablets retain stacked pages; wide landscape windows enable split layouts');
+console.log('Orientation passed: portrait search keeps image/text and paired sections; detail retains landscape-only split');
