@@ -1,3 +1,5 @@
+import { PinmonyProfileSearchPage, PinmonyProfileSearchPin } from 'feature_profile';
+import { PinmonyProfileSearchNativeReads } from '../app/PinmonyProfileSearchNativeReads';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PIN_NATIVE_PROFILE_SETTINGS_ENABLED } from '../app/PinmonyProfileSettingsClient';
@@ -1315,9 +1317,11 @@ struct Index {
           (this.activeTab === 0 && PIN_NATIVE_HOME_READS_ENABLED ? !this.homeStore.homeNativeReadsReady : !this.rootActionContextReady(this.activeTab)))) { this.requestRootPage(this.activeTab); return; }
       }
     }
+    this.profileSearchReads.resume();
     this.scheduleInterruptedHomeRecovery();
   }
   onPageHide(): void {
+    this.profileSearchReads.pause();
     this.sessionVerification?.cancel('background');
     if(this.nativeLoginEnabled){this.nativeSessionEpoch++;this.nativeVerificationPending = false;}
     this.returnCoordinator.cancel();
@@ -1689,6 +1693,11 @@ struct Index {
     traceEntry: (): void => this.traceAction('profile.publish')
   } as PinmonyPublishPorts);
 
+  private readonly profileSearchReads: PinmonyProfileSearchNativeReads = new PinmonyProfileSearchNativeReads({
+    store: () => this.profileStore, session: () => this.nativeBusinessSessionContext(), network: () => this.nativeNetwork,
+    active: () => this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 3 && this.profileStore.searchVisible &&
+      !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.activeSheetKind && !this.nativeBoardVisible() && this.profileStore.origins.length === 0
+  });
   private readonly searchNativeReads: PinmonySearchNativeReads = new PinmonySearchNativeReads({
     profile: (): string => this.authenticatedProfileUrl,
     feedback: (message: string): void => this.showMessage(message),
@@ -2346,7 +2355,7 @@ struct Index {
 
   private cancelNativeNetwork(id: string): void { return this.networkBridgeCoordinator.cancelNativeNetwork(id); }
 
-  private resetAuthenticatedContent(): void { this.inboxMenuNative.pause();this.boardInvitationNative.pause(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
+  private resetAuthenticatedContent(): void { this.profileSearchReads.close(); this.inboxMenuNative.pause();this.boardInvitationNative.pause(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
 
   private updateAuthState(value: string): void {
     if(this.nativeLoginEnabled && !this.loginHostMounted)return;
@@ -2732,6 +2741,7 @@ struct Index {
   }
 
   private nativeRootTabsVisible(): boolean {
+    if (this.profileStore.searchVisible) return false;
     if (this.publishPageVisible()) return false;
     if (this.profileStore.origins.length > 0 || this.profileSettingsVisible || this.profileStore.panel) return false;
     if (this.inboxStore.inboxFlow || this.inboxStore.listSection) return false;
@@ -6081,6 +6091,7 @@ struct Index {
       openProfileBoard: (id: string): Promise<void> => this.openProfileBoard(id),
       traceAction: (name: string, detail: string = ''): void => this.traceAction(name, detail),
       openProfilePinMenu: (id: string): Promise<void> => this.openProfilePinMenu(id),
+      openProfileSearch: (): void => { if (this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 3 && this.profileStore.profile?.isOwn === true && !this.activeSheetKind) { this.profileStore.searchBack = () => this.profileSearchReads.close(); this.profileSearchReads.open(); this.syncFloatingTabsMotion(); } },
       openProfilePublish: (): void => this.openProfilePublish(),
       openProfileShare: (): Promise<void> => this.openProfileShare(),
       openProfileMenu: (): void => this.openProfileMenu(),
@@ -6311,6 +6322,23 @@ struct Index {
               this.closeBoardSection();
             } })
               .width('100%').height('100%')
+          }
+          if (this.activeTab === 3 && this.profileStore.searchVisible && this.profileStore.contentSearch &&
+              !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
+            PinmonyProfileSearchPage({ snapshot: this.profileStore.contentSearch,
+              onResume: () => this.profileSearchReads.resume(),
+              onPause: () => this.profileSearchReads.pause(),
+              onInput: (query: string) => this.profileSearchReads.input(query),
+              onSubmit: (query: string) => this.profileSearchReads.submit(query),
+              onDeleteHistory: (query: string) => this.profileSearchReads.deleteHistory(query),
+              onMore: () => this.profileSearchReads.more(), onRetry: () => this.profileSearchReads.retry(),
+              onBack: () => { this.nativeChildBackUntil = Date.now() + 300; this.profileSearchReads.close(); this.syncFloatingTabsMotion(); },
+              onPin: (id: string) => {
+                const pin: PinmonyProfileSearchPin | undefined = this.profileStore.contentSearch?.pins.find((p: PinmonyProfileSearchPin): boolean => p.id === id) ||
+                  this.profileStore.contentSearch?.suggestions.flatMap((s) => s.pins).find((p: PinmonyProfileSearchPin): boolean => p.id === id);
+                if (!pin || this.authStatus !== 'authenticated' || this.businessSuspended || this.activeSheetKind) return;
+                this.profileSearchReads.pause(); this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + pin.id + '/', this.currentProfileUrl());
+              } }).width('100%').height('100%')
           }
           if (this.activeTab === 2 && this.inboxStore.listSection && this.inboxStore.inbox &&
               !this.pinStore.detail && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
@@ -6567,7 +6595,7 @@ struct Index {
     .width('100%')
     .height('100%')
     .padding({ top: this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
-      !!this.inboxStore.listSection || (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
+      this.profileStore.searchVisible || !!this.inboxStore.listSection || (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
       this.inboxStore.invitationAllVisible || !!this.boardStore.collaborators || !!this.pinStore.detail || this.nativeSearchPageVisible() || this.nativeBoardVisible() ||
       (!this.pinStore.detail && !!this.profileStore.profile?.organize && !this.profileStore.profileWebFlow) ?
       0 : this.getUIContext().px2vp(this.statusBarHeightPx) })

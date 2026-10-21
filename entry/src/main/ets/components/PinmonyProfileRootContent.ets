@@ -23,6 +23,7 @@ export interface PinmonyProfileRootView {
   openProfileBoard: (id: string) => Promise<void>;
   traceAction: (name: string, detail?: string) => void;
   openProfilePinMenu: (id: string) => Promise<void>;
+  openProfileSearch: () => void;
   openProfilePublish: () => void;
   openProfileShare: () => Promise<void>;
   openProfileMenu: () => void;
@@ -67,6 +68,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                   onBoard: (id: string) => view.openProfileBoard(id),
                   onPin: (id: string) => { view.traceAction('profile.pin.open'); view.performProfileAction(id); },
                   onPinMore: (id: string) => view.openProfilePinMenu(id),
+                  onSearch: () => view.openProfileSearch(),
                   onPublish: () => view.openProfilePublish(),
                   onSettings: () => view.onSettings(),
                   followingBusy: view.profileStore.followingBusy, onShare: () => view.openProfileShare(),

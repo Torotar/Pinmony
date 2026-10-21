@@ -45,6 +45,7 @@ export struct PinmonyProfilePage {
   onBoard?: (id: string) => void;
   onPin?: (id: string) => void;
   onPinMore?: (id: string) => void;
+  onSearch?: () => void;
   onPublish?: () => void;
   onSettings?: () => void;
   onShare?: () => void;
@@ -598,7 +599,7 @@ export struct PinmonyProfilePage {
         Text(this.profile.displayName || this.profile.handle)
           .fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
-      }.width('100%').padding({ left: 18, right: 120 }).constraintSize({ maxHeight: 48 })
+      }.width('100%').padding({ left: 18, right: 168 }).constraintSize({ maxHeight: 48 })
     }
   }
 
@@ -621,7 +622,8 @@ export struct PinmonyProfilePage {
           }
         },
         content: { title: { mainTitle: '' }, stackBuilder: this.rootCompactTitleBuilder,
-          menu: { value: [{ content: { icon: $r('sys.symbol.plus'), label: this.uiText("pm_publish_b61f333b"),
+          menu: { value: [{ content: { icon: $r('app.media.inbox_search_outline'), label: this.uiText("pm_search_44ce7ae9"),
+            action: () => { if (this.onSearch) this.onSearch(); } } }, { content: { icon: $r('sys.symbol.plus'), label: this.uiText("pm_publish_b61f333b"),
             action: () => { if (this.onPublish) this.onPublish(); } } },
             { content: { icon: $r('sys.symbol.gearshape'), label: this.uiText("pm_settings_df3d58c7"), action: () => this.openSettings() } }] } }
       })

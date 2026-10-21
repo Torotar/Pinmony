@@ -4317,6 +4317,9 @@
     {"name":"pm_social_unblock_description","value":"Depending on your settings, you will be able to see, follow and contact this person, and save their Pins."},
     {"name":"pm_social_mentions_anyone","value":"Anyone on Pinterest"},
     {"name":"pm_social_mentions_following","value":"Only people you follow"},
-    {"name":"pm_social_mentions_off","value":"Off - no one can @mention you"}
+    {"name":"pm_social_mentions_off","value":"Off - no one can @mention you"},
+    {"name":"pm_profile_search_your_pins","value":"Your Pins"},
+    {"name":"pm_profile_search_recent","value":"Recent searches"},
+    {"name":"pm_profile_search_empty","value":"No matching Pins"}
   ]
 }

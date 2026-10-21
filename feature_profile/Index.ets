@@ -22,3 +22,6 @@ export { PinmonyPublishPhoto, PinmonyProfileAvatarPhoto, pickPublishPhotoUris, r
 export { PinmonyProfileReadController, PinmonyProfileReadPorts } from './src/main/ets/controllers/PinmonyProfileReadController';
 
 export { PinmonyProfileActionsController, PinmonyProfileActionsPorts } from './src/main/ets/controllers/PinmonyProfileActionsController';
+
+export { PinmonyProfileSearchPin, PinmonyProfileSearchSuggestion, PinmonyProfileSearchSnapshot } from './src/main/ets/models/PinmonyProfileSearch';
+export { PinmonyProfileSearchPage } from './src/main/ets/components/PinmonyProfileSearchPage';

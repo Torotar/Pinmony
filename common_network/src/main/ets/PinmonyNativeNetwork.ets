@@ -1551,6 +1551,66 @@ export class PinmonyNativeNetwork {
     } catch (_) {}
     return this.request(job, (): PinmonyNetworkContext => { const actual: PinmonyBusinessSessionContext = session(); return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin, epoch: captured.generation, page: job.page, userAgent: actual.userAgent }; });
   }
+  async requestBusinessProfileSearchDelete(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    query: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    try {
+      const raw: RegExpMatchArray | null = job.body.match(/(?:^|&)data=([^&]+)/);
+      const source: RegExpMatchArray | null = job.body.match(/(?:^|&)source_url=([^&]+)/);
+      const payload: NativeSearchEnvelope = JSON.parse(decodeURIComponent(raw ? raw[1] : '')) as NativeSearchEnvelope;
+      const o: NativeSearchApiOptions = payload.options as Object as NativeSearchApiOptions;
+      permitted = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
+        job.id.startsWith('native_profile_history_delete_') && job.epoch === captured.generation && job.method === 'POST' &&
+        job.page === captured.origin + '/search/me/' && job.url === captured.origin + '/resource/ApiResource/delete/' &&
+        job.headers['X-Pinterest-Pws-Handler'] === 'www/search/me.js' && job.headers['Content-Type'] === 'application/x-www-form-urlencoded' &&
+        !!source && decodeURIComponent(source[1]) === '/search/me/' && Object.keys(payload).length === 2 &&
+        !Array.isArray(payload.context) && Object.keys(payload.context).length === 0 && !Array.isArray(o) &&
+        Object.keys(o).length === 2 && o.url === '/v3/search/recent/' && !!o.data && !Array.isArray(o.data) &&
+        Object.keys(o.data).length === 2 && query.trim().length > 0 && query.length <= 300 && o.data['query'] === query && o.data['vertical'] === 'PERSONAL';
+    } catch (_) {}
+    return this.request(job, (): PinmonyNetworkContext => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
+        actual.generation === captured.generation && actual.origin === captured.origin, epoch: captured.generation, page: job.page, userAgent: actual.userAgent };
+    });
+  }
+  async requestBusinessProfileSearchRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    try {
+      const fields: string = job.url.slice(job.url.indexOf('?') + 1);
+      const raw: RegExpMatchArray | null = fields.match(/(?:^|&)data=([^&]+)/);
+      const source: RegExpMatchArray | null = fields.match(/(?:^|&)source_url=([^&]+)/);
+      const payload: NativeSearchEnvelope = JSON.parse(decodeURIComponent(raw ? raw[1] : '')) as NativeSearchEnvelope;
+      const o: Record<string, Object | null> = payload.options, keys: string[] = Object.keys(o);
+      const path: string = job.page.slice(captured.origin.length);
+      const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
+        job.id.startsWith('native_profile_search_') && job.epoch === captured.generation && job.method === 'GET' && job.body === '' &&
+        job.page === captured.origin + path && !!source && decodeURIComponent(source[1]) === path &&
+        Object.keys(payload).length === 2 && !Array.isArray(payload.context) && Object.keys(payload.context).length === 0 && !Array.isArray(o);
+      if (job.url.startsWith(captured.origin + '/resource/AdvancedTypeaheadResource/get/?')) {
+        const allowed: string[] = ['field_set_key', 'limit', 'num_recent_queries', 'personal_search_only', 'pin_scope', 'recent_queries_tags', 'term', 'autocomplete_request_surface'];
+        permitted = basic && path === '/search/me/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/search/me.js' &&
+          keys.length === 8 && keys.every((key: string): boolean => allowed.includes(key)) && o['field_set_key'] === 'richResults' &&
+          o['limit'] === 3 && o['num_recent_queries'] === 20 && o['personal_search_only'] === true && o['pin_scope'] === 'my_content' &&
+          o['recent_queries_tags'] === 'recent_queries,recent_personal_searches' && o['autocomplete_request_surface'] === 1 &&
+          typeof o['term'] === 'string' && (o['term'] as string).length <= 300;
+      } else if (job.url.startsWith(captured.origin + '/resource/BaseSearchResource/get/?')) {
+        const match: RegExpMatchArray | null = path.match(/^\/search\/my_content\/\?rs=ac&q=([^&#]+)$/);
+        const query: string = match ? decodeURIComponent(match[1]).trim() : '';
+        const bookmarks: string[] | undefined = o['bookmarks'] as string[] | undefined;
+        permitted = basic && !!match && query.length > 0 && query.length <= 300 && o['query'] === query && o['scope'] === 'my_pins' &&
+          job.headers['X-Pinterest-Pws-Handler'] === 'www/search/my_content.js' && keys.length === (bookmarks ? 3 : 2) &&
+          keys.every((key: string): boolean => ['query', 'scope', 'bookmarks'].includes(key)) &&
+          (bookmarks === undefined || Array.isArray(bookmarks) && bookmarks.length === 1 && typeof bookmarks[0] === 'string' && bookmarks[0].length > 0 && bookmarks[0].length <= 4096 && bookmarks[0] !== '-end-');
+      }
+    } catch (_) {}
+    return this.request(job, (): PinmonyNetworkContext => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
+        actual.generation === captured.generation && actual.origin === captured.origin, epoch: captured.generation, page: job.page, userAgent: actual.userAgent };
+    });
+  }
   async requestBusinessSearchRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
     ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;

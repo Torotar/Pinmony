@@ -4317,6 +4317,9 @@
     {"name":"pm_social_unblock_description","value":"根据你的设置，你将可以看到、关注和联系对方，并收藏对方的 Pin 图。"},
     {"name":"pm_social_mentions_anyone","value":"Pinterest 上的任何人"},
     {"name":"pm_social_mentions_following","value":"仅限你关注的人"},
-    {"name":"pm_social_mentions_off","value":"关闭 - 没有人可以 @提到你"}
+    {"name":"pm_social_mentions_off","value":"关闭 - 没有人可以 @提到你"},
+    {"name":"pm_profile_search_your_pins","value":"你的 Pin 图"},
+    {"name":"pm_profile_search_recent","value":"最近搜索"},
+    {"name":"pm_profile_search_empty","value":"没有匹配的 Pin 图"}
   ]
 }

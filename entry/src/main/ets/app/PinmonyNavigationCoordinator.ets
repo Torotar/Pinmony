@@ -204,6 +204,8 @@ selectNativeRootTab(index: number): void {
     this.ports.cancelHomeDetailMore();
     this.profileStore.origins = [];
     this.profileStore.profileWebFlow = false;
+    this.profileStore.searchBack?.();
+    this.profileStore.searchVisible = false;
     this.inboxStore.listSection = '';
     this.inboxStore.inboxFlow = undefined;
     this.inboxStore.retainedChat = undefined;
@@ -547,6 +549,10 @@ onBackPress(): boolean {
         this.ports.setNativeChildBackUntil(Date.now() + 300);
         this.ports.inboxFlowAction('back');
         return true;
+    }
+    if (this.profileStore.searchVisible && !this.pinStore.detail && !this.pinStore.detailOpeningPin &&
+        !this.ports.currentPinUrl() && !this.boardStore.pendingBoardUrl && !this.ports.currentBoardUrl() && !this.ports.activeSheetKind()) {
+        this.ports.setNativeChildBackUntil(Date.now() + 300); this.profileStore.searchBack?.(); return true;
     }
     if (this.inboxStore.listSection && !this.pinStore.detail && !this.pinStore.detailOpeningPin &&
         !this.ports.currentPinUrl() && !this.boardStore.pendingBoardUrl && !this.ports.currentBoardUrl() && !this.ports.activeSheetKind()) {

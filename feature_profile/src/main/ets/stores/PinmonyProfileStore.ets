@@ -1,3 +1,4 @@
+import { PinmonyProfileSearchSnapshot } from '../models/PinmonyProfileSearch';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
 import { PinmonyProfilePanel } from '../models/PinmonyProfilePanel';
 import { PinmonyProfileCache } from '../services/PinmonyProfileCache';
@@ -7,6 +8,9 @@ export interface ProfileOrigin { page: string; tab: number; profile?: PinmonyPro
 
 @Observed
 export class PinmonyProfileStore {
+  searchVisible: boolean = false;
+  contentSearch: PinmonyProfileSearchSnapshot | undefined = undefined;
+  searchBack: (() => void) | undefined = undefined;
   followingBusy: boolean = false;
   saving: boolean = false;
   followUncertain: boolean = false;
