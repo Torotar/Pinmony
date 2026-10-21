@@ -122,13 +122,13 @@ export struct PinmonySaveSheet {
                 Button({ type: ButtonType.Normal }) {
                   Row({ space: 12 }) {
                     this.suggestedCover()
-                    Text(suggestion).fontSize(16).fontWeight(FontWeight.Bold)
+                    Text(PinmonyI18n.render(suggestion, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Bold)
                       .fontColor($r('app.color.primary_text')).layoutWeight(1)
                   }.width('100%')
                 }.width('100%').height(72).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
                   .enabled(!this.result.busy && !this.result.loading && !this.result.error)
                   .onClick(() => this.beginCreate(suggestion))
-              }, (suggestion: string) => suggestion)
+              }, (suggestion: string) => (suggestion) + ':' + this.uiLanguage)
             }
           }.width('100%')
         }.layoutWeight(1).width('100%')

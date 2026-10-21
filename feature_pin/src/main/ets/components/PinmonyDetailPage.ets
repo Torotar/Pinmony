@@ -424,7 +424,7 @@ export struct PinmonyDetailPage {
           .width('100%')
           .height(this.recommendCardHeight(this.recommendCardWidth(), pin))
         if (pin.title.length > 0) {
-          Text(pin.title)
+          Text(PinmonyI18n.render(pin.title, this.uiLanguage))
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text'))
@@ -635,7 +635,7 @@ export struct PinmonyDetailPage {
               })
             }
             if (this.detail.title.length > 0) {
-              Text(this.detail.title)
+              Text(PinmonyI18n.render(this.detail.title, this.uiLanguage))
                 .fontSize(26)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text'))

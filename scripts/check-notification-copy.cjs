@@ -14,3 +14,14 @@ const global={key:'global',label:'如何接收通知',description:'重要通知'
 const unknown={key:'custom',label:'用户原文',description:'未知网站文案',channels:[]};assert.equal(copy.category(unknown,'en'),'用户原文');assert.equal(copy.description(unknown,'en'),'未知网站文案');
 const page=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyNotificationsPage.ets','utf8');assert(!page.includes("this.uiText('pm_notify_how')"));
 console.log('Notification copy: all 25 titles/descriptions, group/global titles, language reversal and unknown website text boundary passed');
+
+// Screenshot regression: actual keys and channel fields observed in the notification HAR.
+const shuffles={key:'shuffles_activity',label:'Shuffles 动态',description:'获取关于 Shuffles 动态的更新',summary:'',channels:[{label:'电子邮件',channel:'email',section:'settings_email_v2',option:'shuffles_activity',value:true}]};
+assert.equal(copy.description(shuffles,'en'),'Get updates about activity on Shuffles');
+assert.equal(copy.description(shuffles,'zh'),'获取关于 Shuffles 动态的更新');
+const delivery={key:'permissions',label:'如何接收通知',categories:[{key:'global',label:'如何接收通知',description:'Pinterest 会持续向你发送关于你帐户的重要更新',summary:'',channels:[{label:'推送',channel:'push',section:'settings_push_everything',option:'NO_PUSH',value:true}]}]};
+assert.equal(copy.group(delivery,'en'),'How you get notifications');
+assert.equal(copy.category(delivery.categories[0],'en'),'How you get notifications');
+assert.equal(copy.description(delivery.categories[0],'en'),'Pinterest will still send you important updates about your account');
+assert.equal(copy.channel(delivery.categories[0].channels[0],'en'),'Push');
+console.log('Screenshot regression: Shuffles expanded description and delivery group/category/description/channel passed');

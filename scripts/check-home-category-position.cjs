@@ -1,8 +1,9 @@
+const { rawLocalMessages } = require('./local-message-test-fixture.cjs');
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]);
 const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
 function method(name){const a=source.indexOf('  private '+name+'(');assert(a>=0);const b=source.indexOf('\n  private ',a+1);return source.slice(a,b).replace(/@Builder\s*$/,'');}
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('updateHomeChrome')+method('emptyFeedMessage')+method('canShowFeed')+method('onOfflinePreviewChanged')+method('updateCategories')+method('selectTab')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Curve:{EaseInOut:'ease',EaseOut:'out'},ScrollState:{Idle:0,Scroll:1},animateTo:(_options,change)=>change()});
-const h=new Host(),calls=[];Object.assign(h,{home:{tabs:['all','art','icons'].map((id,index)=>({id,label:id,selected:index===1,enabled:index!==2}))},categoryViewportWidth:0,categoryWidths:new Map(),alignedCategory:'',pendingTabId:'',interactionReady:true,onTab:id=>calls.push(id)});
+const h=new Host(),calls=[];Object.assign(h,{uiText:rawLocalMessages.text,home:{tabs:['all','art','icons'].map((id,index)=>({id,label:id,selected:index===1,enabled:index!==2}))},categoryViewportWidth:0,categoryWidths:new Map(),alignedCategory:'',pendingTabId:'',interactionReady:true,onTab:id=>calls.push(id)});
 h.updateCategories();assert.equal(h.categories.findIndex(tab=>tab.selected),1);
 h.selectTab(h.categories[1]);h.selectTab(h.categories[2]);assert.equal(calls.length,0);
 h.selectTab(h.categories[0]);assert.deepEqual(calls,['all']);

@@ -46,8 +46,8 @@ export struct PinmonyBoardCollaboratorsPage {
         .enabled(this.snapshot.owner === true && !this.snapshot.busy && !this.snapshot.uncertain)
         .onChange((checked: boolean) => { if (checked) this.selectedPermission = value; })
       Column({ space: 8 }) {
-        Text(title).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-        Text(description).fontSize(15).fontColor($r('app.color.secondary_text'))
+        Text(PinmonyI18n.render(title, this.uiLanguage)).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text(PinmonyI18n.render(description, this.uiLanguage)).fontSize(15).fontColor($r('app.color.secondary_text'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').alignItems(VerticalAlign.Top)
   }
@@ -55,7 +55,7 @@ export struct PinmonyBoardCollaboratorsPage {
     Row({ space: 12 }) {
       PinmonyUserAvatar({ image: user.avatar, name: user.name || user.username, avatarSize: 44 })
       Column({ space: 2 }) {
-        Text(user.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+        Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
         if (invite) { Text(user.username).fontSize(13).fontColor($r('app.color.secondary_text')) }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (invite && !user.status) {

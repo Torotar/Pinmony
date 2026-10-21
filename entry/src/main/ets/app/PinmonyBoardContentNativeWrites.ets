@@ -65,10 +65,10 @@ export class PinmonyBoardContentNativeWrites {
     const original: PinmonyBoardFlow | undefined = this.ports.state(), identity: PinmonyBoardContentIdentity | undefined = this.ports.identity();
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if(this.job || !original || !identity || !session.authenticated || !session.accountId || original.busy || original.loading || original.uncertain || original.error || original.phase && !(action === 'cancel' && original.phase === 'section') && !(action === 'section' && ['sectionSelect','targets'].includes(original.phase)) || !intentCurrent())return PinmonyI18n.message("pm_board_action_unavailable_close_and_refresh_to_check_a98c4c4a");
-    if(initialPins.length > 500 || new Set(initialPins).size !== initialPins.length || !initialPins.every((id: string): boolean => /^\d{1,30}$/.test(id) && !!identity?.loadedIds.includes(id)))return '所选 Pin 已失效，请重新选择';
-    if(action === 'section') {if(!identity.canContribute || typeof value !== 'string' || !value.trim() || value.trim().length > 100)return '区块名称或图板权限无效';value = value.trim();}
-    else if(action === 'cancel') {if(identity.ownerId !== identity.viewerId || !/^\d{1,30}$/.test(value) || !identity.loadedIds.includes(value))return '收藏校验失败，未执行取消收藏';}
-    else return '当前操作不可用';
+    if(initialPins.length > 500 || new Set(initialPins).size !== initialPins.length || !initialPins.every((id: string): boolean => /^\d{1,30}$/.test(id) && !!identity?.loadedIds.includes(id)))return PinmonyI18n.message("pm_selected_pins_are_no_longer_available_select_them_again_74617dc8");
+    if(action === 'section') {if(!identity.canContribute || typeof value !== 'string' || !value.trim() || value.trim().length > 100)return PinmonyI18n.message("pm_invalid_section_name_or_board_permissions_1ca679ce");value = value.trim();}
+    else if(action === 'cancel') {if(identity.ownerId !== identity.viewerId || !/^\d{1,30}$/.test(value) || !identity.loadedIds.includes(value))return PinmonyI18n.message("pm_save_verification_failed_nothing_was_unsaved_ff9e39f2");}
+    else return PinmonyI18n.message("pm_this_action_is_unavailable_f3ea5b4e");
     const revision: number = this.revision, state: PinmonyBoardFlow = this.clone(original);
     const current = (): boolean => {
       const s: PinmonyBusinessSessionContext = this.ports.session(), actual: PinmonyBoardContentIdentity | undefined = this.ports.identity();
@@ -92,7 +92,7 @@ export class PinmonyBoardContentNativeWrites {
       let options: ContentOptions;
       if(action === 'cancel') {
         const r: ContentResource = this.response(await this.request(jobFor({id:value,field_set_key:'auth_web_main_pin'},'PinResource','get'),identity,current),identity.viewerId);
-        if(!current())return '收藏校验已中断，未执行取消收藏';
+        if(!current())return PinmonyI18n.message("pm_save_verification_interrupted_nothing_was_unsaved_7e2833d3");
         const copy: ContentData | null = r.data;
         if(!copy || copy.id !== value || copy.is_repin !== true || copy.pinner?.id !== identity.viewerId || copy.board?.id !== identity.boardId)throw new Error('ownership');
         options = {id:value};
@@ -100,10 +100,10 @@ export class PinmonyBoardContentNativeWrites {
           if(copy.tracking_params.length > 16384)throw new Error('tracking');options.client_tracking_params = copy.tracking_params + '~0';
         }
       }else options = {board_id:identity.boardId,name:value,initial_pins:initialPins.slice()};
-      if(!current())return '操作已中断，未提交';
+      if(!current())return PinmonyI18n.message("pm_action_interrupted_nothing_was_submitted_3bf2295c");
       submitted = true;this.sent = true;
       const r: ContentResource = this.response(await this.request(jobFor(options,action === 'section' ? 'BoardSectionResource' : 'PinResource',action === 'section' ? 'create' : 'delete'),identity,current),identity.viewerId);
-      if(!current())return '操作结果未确认，请关闭后刷新核对；不会重复提交';
+      if(!current())return PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_it_will_not_be_r_b66391e3");
       const data: ContentData | null = r.data;
       if(action === 'section') {
         if(!data || data.type !== 'board_section' || !/^\d{1,30}$/.test(data.id) || data.title !== value || data.board?.id !== identity.boardId)throw new Error('section');
@@ -114,7 +114,7 @@ export class PinmonyBoardContentNativeWrites {
     }catch (_) {
       const uncertain: boolean = submitted;
       if(current()) {if(this.sent)this.unknown(state);else {state.busy = false;this.publish(state);}}
-      return uncertain ? '操作结果未确认，请关闭后刷新核对；不会重复提交' : '收藏校验失败或读取中断，未执行取消收藏';
+      return uncertain ? PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_it_will_not_be_r_b66391e3") : PinmonyI18n.message("pm_save_verification_failed_or_loading_was_interrupted_nothing_was__c9dabe4b");
     }finally {if(revision === this.revision){if(this.displayed?.busy && this.ports.state() === this.displayed){if(submitted)this.unknown(state);else {state.busy = false;this.publish(state);}}this.job = '';this.sent = false;this.displayed = undefined;}}
   }
 }

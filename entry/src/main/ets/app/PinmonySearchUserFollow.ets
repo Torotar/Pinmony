@@ -70,7 +70,7 @@ export class PinmonySearchUserFollow {
       if (!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_user_method' : 'v3_unfollow_user_method') ||
           response.client_context?.user && response.client_context.user.id !== viewer ||
           (!r.data || r.data.id !== id || r.data.type !== 'user' || r.data.username !== profile.slice(session.origin.length).split('/')[1])) throw new Error('unknown');
-      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? '已关注用户' : PinmonyI18n.message("pm_profile_unfollowed_ecb7bb9d"));
+      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? PinmonyI18n.message("pm_profile_followed_6c9e8457") : PinmonyI18n.message("pm_profile_unfollowed_ecb7bb9d"));
     } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message("pm_profile_follow_result_not_confirmed_refresh_to_check_before_subm_1218b98b")); }
     finally { if (this.job === job.id) { this.job = ''; this.targetId = ''; this.release = undefined; this.ports.changed(); } }
   }

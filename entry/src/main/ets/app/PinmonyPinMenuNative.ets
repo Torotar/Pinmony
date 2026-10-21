@@ -74,9 +74,9 @@ export class PinmonyPinMenuNative {
     const revision: number = this.bind(pin,token,true);
     const state: PinmonyHomeMenuState = {session:token,pinUrl:pin,loading:false,busy:false,error:'',feedback:'',options:[],actions:[]};
     try {await this.read(revision);if(!this.current(revision))return state;
-      state.actions = [{id:'home-save',label:'收藏',enabled:true},{id:'home-download',label:'下载图片',enabled:!!this.image()},
-        {id:'home-see-more',label:'查看更多',enabled:this.enabled('more')},{id:'home-see-less',label:'查看更少',enabled:this.enabled('less')}];
-      if(this.canOpenEdit())state.actions.unshift({id:'home-edit',label:'编辑 Pin 图',enabled:true});
+      state.actions = [{id:'home-save',label:PinmonyI18n.message("pm_save_60a53514"),enabled:true},{id:'home-download',label:PinmonyI18n.message("pm_download_image_8894375c"),enabled:!!this.image()},
+        {id:'home-see-more',label:PinmonyI18n.message("pm_see_more_92b2b2de"),enabled:this.enabled('more')},{id:'home-see-less',label:PinmonyI18n.message("pm_see_less_9c80a8dc"),enabled:this.enabled('less')}];
+      if(this.canOpenEdit())state.actions.unshift({id:'home-edit',label:PinmonyI18n.message("pm_edit_pin_f9119bcf"),enabled:true});
     } catch (_) {state.error = PinmonyI18n.message("pm_unable_to_load_pin_actions_please_retry_1434adac");}
     return state;
   }
@@ -84,7 +84,7 @@ export class PinmonyPinMenuNative {
   async open(): Promise<void> {
     const detail = this.store.detail;if(!this.ports.active() || !detail || !this.ports.owns(detail.pinUrl))return;
     const token: number = Math.max(1,this.store.moreSession + 1);this.store.moreSession = token;this.store.morePin = detail.pinUrl;this.store.moreApiMode = true;
-    this.store.moreTitle = '选项';this.store.moreOptions = [];this.store.moreLoading = true;this.store.moreError = '';this.store.ignoredMoreSession = 0;this.ports.show();
+    this.store.moreTitle = PinmonyI18n.message('pm_options_bb7486f4');this.store.moreOptions = [];this.store.moreLoading = true;this.store.moreError = '';this.store.ignoredMoreSession = 0;this.ports.show();
     const revision: number = this.bind(detail.pinUrl,token,false);
     try {await this.read(revision);if(!this.current(revision))return;const options: MoreSheetOption[] = [];
       if(this.canOpenEdit())options.push(this.option('detail-edit','编辑 Pin 图'));
@@ -124,12 +124,12 @@ export class PinmonyPinMenuNative {
       this.submitted.delete(pin + ':' + action);
       if(!less && !photo){this.undo = {pin:pin,session:this.token,account:this.account,tracking:raw.tracking_params || ''};this.store.feedbackUndoPin = pin;this.store.feedbackUndoSession = this.token;}
       this.ports.dismiss();
-      const message: string = less ? '已提交查看更少反馈' : '已提交查看更多反馈';
+      const message: string = less ? PinmonyI18n.message("pm_see_less_feedback_submitted_e4ba54ed") : PinmonyI18n.message("pm_see_more_feedback_submitted_a391370a");
       if(!less && !photo)this.ports.undoSnack(message,pin);else this.ports.message(message);
     } catch (error) {
       const retry: boolean = error instanceof PinMenuNotSent || error instanceof PinMenuRejected;
       if(retry && this.key() === this.account)this.submitted.delete(pin + ':' + action);
-      if(this.current(revision)){const message: string = retry ? '反馈未提交成功，请重试' : PinmonyI18n.message("pm_feedback_result_not_confirmed_refresh_to_check_it_will_not_be_re_a6581062");this.store.moreError = message;this.ports.message(message);}
+      if(this.current(revision)){const message: string = retry ? PinmonyI18n.message("pm_feedback_was_not_submitted_please_retry_e44cb016") : PinmonyI18n.message("pm_feedback_result_not_confirmed_refresh_to_check_it_will_not_be_re_a6581062");this.store.moreError = message;this.ports.message(message);}
     }
     finally {if(revision === this.revision)this.busy = false;}
   }
@@ -147,7 +147,7 @@ export class PinmonyPinMenuNative {
     } catch (error) {
       const retry: boolean = error instanceof PinMenuNotSent || error instanceof PinMenuRejected;
       if(retry && state.account === this.key())this.submitted.delete(lock);
-      if(revision === this.revision && state.account === this.key())this.ports.message(retry ? '撤销未提交成功，请重试' : '撤销结果未确认，请刷新核对；不会重复提交');
+      if(revision === this.revision && state.account === this.key())this.ports.message(retry ? PinmonyI18n.message("pm_undo_was_not_submitted_please_retry_d5a531f7") : PinmonyI18n.message("pm_undo_result_not_confirmed_refresh_to_check_it_will_not_be_resubm_4a85600e"));
     }
     finally {if(revision === this.revision)this.store.feedbackUndoBusy = false;}
   }

@@ -32,7 +32,7 @@ native.getUIContext = () => ({ getHostContext: () => ({ getApplicationContext: (
 native.selectTheme('light'); assert.equal(native.themePreference, 'system'); assert.equal(errors.length, 1);
 const storeSource = fs.readFileSync('feature_settings/src/main/ets/stores/PinmonySettingsStore.ets', 'utf8').replace(/^@Observed\s*$/m, '');
 const storeExports = {};
-vm.runInNewContext(ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports: storeExports });
+Object.assign(storeExports, require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('feature_settings/src/main/ets/stores/PinmonySettingsStore.ets'));
 const store = new storeExports.PinmonySettingsStore(); store.screen = 'visibility'; store.confirmOpen = true;
 assert(store.back()); assert.equal(store.screen, 'visibility'); assert.equal(store.confirmOpen, false);
 store.confirmOpen = true; store.busy = true; store.back(); assert.equal(store.confirmOpen, true);

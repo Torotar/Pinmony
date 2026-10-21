@@ -9,12 +9,16 @@ import { PinmonyUserAvatar } from 'common_ui';
 export struct PinmonyProfilePanelPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
-  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') @Watch('syncFollowingLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncUsername') snapshot: PinmonyProfilePanel;
   private readonly followingSegments: SegmentButtonV2Items = new SegmentButtonV2Items([
     { text: this.uiText("pm_profiles_0d0e1a86") }, { text: this.uiText("pm_board_bd3f17ee") }
   ]);
+  private syncFollowingLanguage(): void {
+    this.followingSegments[0].text = this.uiText('pm_profiles_0d0e1a86');
+    this.followingSegments[1].text = this.uiText('pm_board_bd3f17ee');
+  }
   private displayedSection: string = '';
   private sectionMotionToken: number = 0;
   @State private sectionOffset: number = 0;
@@ -157,23 +161,23 @@ export struct PinmonyProfilePanelPage {
                     }.width('100%').borderRadius(16).clip(true)
                     .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
                   }
-                  Text(item.name).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+                  Text(PinmonyI18n.render(item.name, this.uiLanguage)).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
                     .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
                   Text(PinmonyI18n.render((item.pinCount || '') + (item.updated ? ' · ' + item.updated : ''), this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
                   Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
                     .enabled(!this.followingBusy && item.canFollow === true).onClick(() => { if(this.onFollow)this.onFollow(item.id); })
                 }.width('48%').margin({ bottom: 24 }).alignItems(HorizontalAlign.Start)
-              }, (item: PinmonyProfilePanelItem) => item.id)
+              }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage)
               }.width('100%')
             } else {
             ForEach(this.snapshot.items, (item: PinmonyProfilePanelItem) => {
               Row({ space: 16 }) {
                 PinmonyUserAvatar({ image: item.avatar || '', name: item.name, avatarSize: 48 })
                   .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
-                Text(item.name).layoutWeight(1).fontColor($r('app.color.primary_text'))
+                Text(PinmonyI18n.render(item.name, this.uiLanguage)).layoutWeight(1).fontColor($r('app.color.primary_text'))
                 Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).enabled(!this.followingBusy && item.canFollow !== false).onClick(() => { if (this.onFollow) this.onFollow(item.id); })
               }.width('100%')
-            }, (item: PinmonyProfilePanelItem) => item.id)
+            }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage)
             }
           }
           if (this.snapshot.mode === 'followers' && this.snapshot.hasMore) {

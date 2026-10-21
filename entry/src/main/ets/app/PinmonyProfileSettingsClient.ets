@@ -1,4 +1,4 @@
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 export const PIN_NATIVE_PROFILE_SETTINGS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
@@ -65,6 +65,10 @@ export class PinmonyProfileSettingsClient {
             if (!current() || !reply || reply.error || reply.status < 200 || reply.status >= 300 || !reply.body || reply.body.length > 8000000)
                 throw new Error('request');
             const body: ProfileSettingsResponse = JSON.parse(reply.body) as ProfileSettingsResponse;
+            if (name === 'ApiResource' && source === '/settings/blocked-accounts/' && verb === 'get') {
+                const resource: ProfileSettingsResource | undefined = body.resource_response;
+                PinmonyRuntimeLog.info('SocialBlockedTrace: phase=client-response statusValid=' + (resource?.status === 'success') + ' codeZero=' + (resource?.code === 0) + ' codePresent=' + (resource?.code !== undefined) + ' endpointValid=' + (resource?.endpoint_name === 'v3_get_blocked_list') + ' errorPresent=' + !!resource?.error + ' array=' + Array.isArray(resource?.data) + ' identityMismatch=' + !!(this.viewer && body.client_context?.user && body.client_context.user.id !== this.viewer));
+            }
             if (body.client_context?.is_authenticated === false || this.viewer && body.client_context?.user && body.client_context.user.id !== this.viewer)
                 throw new Error('identity');
             if (!graph) {

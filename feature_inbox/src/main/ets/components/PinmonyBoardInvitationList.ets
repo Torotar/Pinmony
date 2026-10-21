@@ -63,7 +63,7 @@ export struct PinmonyBoardInvitationList {
             }
           }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         }.width('100%').alignItems(VerticalAlign.Top)
-      }, (item: PinmonyBoardInvitation) => item.boardId + ':' + item.invitedUser)
+      }, (item: PinmonyBoardInvitation) => (item.boardId + ':' + item.invitedUser) + ':' + this.uiLanguage)
       if (this.all && !this.snapshot.loading && !this.snapshot.error && !this.snapshot.items.length) {
         Text(this.uiText("pm_no_board_invitations_48691bd4")).fontColor($r('app.color.secondary_text'))
       }

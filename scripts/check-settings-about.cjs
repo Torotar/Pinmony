@@ -33,7 +33,7 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync('feature_settings/src/main
     clearTimeout: () => { timerCleared = true; } });
 sandbox.isNewerRelease = releaseExports.isNewerRelease;
 sandbox.PinmonyReleaseFailure = releaseExports.PinmonyReleaseFailure;
-vm.runInNewContext(ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports: storeExports });
+Object.assign(storeExports, require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('feature_settings/src/main/ets/stores/PinmonySettingsStore.ets'));
 (async () => {
   const page = new sandbox.About(); page.uiText = source => source; page.visible = true;
   page.releaseClient = { latest: async () => undefined };

@@ -59,11 +59,11 @@ export struct PinmonyAccountPage {
     Button({ type: ButtonType.Normal }) {
       Column({ space: 8 }) {
         Row({ space: 12 }) {
-          Text(label).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-          if (value) { Text(value).fontSize(15).fontColor($r('app.color.secondary_text')).maxLines(2) }
+          Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
+          if (value) { Text(PinmonyI18n.render(value, this.uiLanguage)).fontSize(15).fontColor($r('app.color.secondary_text')).maxLines(2) }
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.primary_text')])
         }.width('100%')
-        if (subtitle) { Text(subtitle).width('100%').fontSize(14).fontColor($r('app.color.secondary_text')) }
+        if (subtitle) { Text(PinmonyI18n.render(subtitle, this.uiLanguage)).width('100%').fontSize(14).fontColor($r('app.color.secondary_text')) }
       }.width('100%').padding({ top: 16, bottom: 16 }).alignItems(HorizontalAlign.Start)
     }.width('100%').backgroundColor(Color.Transparent).enabled(!this.store.loading && !this.store.busy)
       .onClick(() => { if (target) this.open(target); }).accessibilityText(label)
@@ -72,7 +72,7 @@ export struct PinmonyAccountPage {
     const p: string[] = (this.store.data?.birthdate || '').split('-');
     return p.length === 3 ? PinmonyI18n.format('pm_birthdate_display', [p[0], p[1], p[2]], this.uiLanguage) : '';
   }
-  private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("pm_female_0ab4610b") : this.store.data?.gender === 'male' ? this.uiText("pm_male_4e79758a") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || '自定义' : ''; }
+  private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("pm_female_0ab4610b") : this.store.data?.gender === 'male' ? this.uiText("pm_male_4e79758a") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || this.uiText('pm_custom_gender_fallback') : ''; }
   @Builder
   private dateField(field: string, value: string) {
     Column({ space: 6 }) {
@@ -85,7 +85,7 @@ export struct PinmonyAccountPage {
   @Builder
   private genderRow(label: string, value: string) {
     Row() {
-      Text(label).fontSize(20).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(20).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Radio({ value: value, group: 'account-gender' }).checked(this.store.data?.gender === value)
         .enabled(!this.store.busy && !this.store.loading && !this.store.error).accessibilityText(label)
         .onChange((checked: boolean) => { if (checked && this.store.data?.gender !== value) this.save('gender', value); })
@@ -143,13 +143,13 @@ export struct PinmonyAccountPage {
               ForEach(this.store.data.countries.filter((c: PinmonyCountry) => (c.name + c.key).toLowerCase().includes(this.query.toLowerCase())).sort((a: PinmonyCountry, b: PinmonyCountry) => a.key === this.store.data?.country ? -1 : b.key === this.store.data?.country ? 1 : 0), (c: PinmonyCountry) => {
                 Button({ type: ButtonType.Normal }) {
                   Row({ space: 12 }) {
-                    Text(c.name).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
+                    Text(PinmonyI18n.render(c.name, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
                     if (c.key === this.store.data?.country) { SymbolGlyph($r('sys.symbol.checkmark')).fontSize(20).fontColor([$r('app.color.primary_text')]) }
                   }.width('100%').padding({ top: 14, bottom: 14 })
                 }.width('100%').constraintSize({ minHeight: 48 })
                   .fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent).enabled(!this.store.busy && !this.store.error)
                   .onClick(() => { this.save('country', c.key); })
-              }, (c: PinmonyCountry) => c.key)
+              }, (c: PinmonyCountry) => (c.key) + ':' + this.uiLanguage)
             }
           }
         }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 32 }).alignItems(HorizontalAlign.Start)

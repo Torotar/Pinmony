@@ -1025,6 +1025,7 @@ struct Index {
     cancelledBoardPins: (): Set<string> => this.cancelledBoardPins,
     nativeBoardContentWrites: (): boolean => PIN_NATIVE_BOARD_READS_ENABLED,
     cancelBoardPin: (pin: string, current: () => boolean): Promise<string> => this.boardNativeReads.cancelSavedPin(this.pinIdentity(pin),current),
+    dismissShareSheetAfterAction: (): Promise<void> => this.dismissPhotoMenuAfterAction(),
     clearRootTabGuard: (reason: string): void => this.clearRootTabGuard(reason),
     controller: (): webview.WebviewController => this.controller,
     coordinatorTasks: (): PinmonyTaskRegistry => this.coordinatorTasks,
@@ -3767,13 +3768,13 @@ struct Index {
   }
 
   @Builder
-  private buildNativeTab(label: string, symbol: Resource, index: number) {
+  private buildNativeTab(labelKey: string, symbol: Resource, index: number) {
     Column({ space: 2 }) {
       SymbolGlyph(symbol)
         .fontSize(24)
         .fontColor([this.activeTab === index ? $r('app.color.tab_text_primary') :
           $r('app.color.tab_text_secondary')])
-      Text(label)
+      Text(PinmonyI18n.text(labelKey, this.uiLanguage))
         .fontSize(11)
         .lineHeight(14)
         .height(14)
@@ -3788,7 +3789,7 @@ struct Index {
     .padding({ top: 4, bottom: 4 })
     .justifyContent(FlexAlign.Start)
     .alignItems(HorizontalAlign.Center)
-    .accessibilityText(label)
+    .accessibilityText(PinmonyI18n.text(labelKey, this.uiLanguage))
     .accessibilitySelected(this.activeTab === index)
   }
 
@@ -5696,6 +5697,26 @@ struct Index {
 
   private detailSystemShareClosed: (() => void) | undefined = undefined;
 
+  private async dismissPhotoMenuAfterAction(): Promise<void> {
+    if (this.detailSystemShareClosed || !this.homeStore.customHomeMenu || this.activeSheetKind !== 'share') return;
+    const menu: PinmonyHomeMenuState = this.homeStore.customHomeMenu;
+    await new Promise<void>((resolve) => {
+      let timer: number = -1;
+      const finish = (): void => {
+        if (this.detailSystemShareClosed !== finish) return;
+        this.detailSystemShareClosed = undefined;
+        if (timer >= 0) clearTimeout(timer);
+        if (this.homeStore.customHomeMenu === menu && !this.showNativeSheet) this.dismissShareSheet();
+        PinmonyRuntimeLog.info('SheetTrace: event=photo-action-closed');
+        resolve();
+      };
+      this.detailSystemShareClosed = finish;
+      timer = setTimeout(finish, 2000);
+      // Keep the current builder and FIT_CONTENT height until the mask exits.
+      this.showNativeSheet = false;
+    });
+  }
+
   private notifyDetailSystemShareClosed(): void {
     if (!this.showNativeSheet && this.detailSystemShareClosed) this.detailSystemShareClosed();
   }
@@ -5703,6 +5724,8 @@ struct Index {
   private async shareDetailPinAfterMenu(pin: string, boardPage: string = '', sharePanel: boolean = false): Promise<void> {
     if (this.detailSystemShareClosed || !this.showNativeSheet || this.activeSheetKind !== (boardPage || sharePanel ? 'share' : 'more')) return;
     const generation: number = this.nativeBusinessSessionContext().generation;
+    const sourceRoute: string = this.nativeDisplayAddress();
+    const menuToken: number = this.homeStore.customHomeMenuToken;
     PinmonyRuntimeLog.info('SystemShareTrace: phase=menu-closing');
     const closed: boolean = await new Promise<boolean>((resolve) => {
       let timer: number = -1;
@@ -5728,7 +5751,7 @@ struct Index {
     PinmonyRuntimeLog.info('SystemShareTrace: phase=frame-ready');
     if (closed && this.authStatus === 'authenticated' && !this.businessSuspended &&
         this.nativeBusinessSessionContext().generation === generation &&
-        (boardPage ? this.isCurrentBoardMenuPin(pin, boardPage) : this.currentPinUrl() === pin) &&
+        (boardPage ? this.nativeDisplayAddress() === sourceRoute && this.homeStore.customHomeMenuToken === menuToken + 1 : this.currentPinUrl() === pin) &&
         !this.showNativeSheet && !this.activeSheetKind) await this.sharePinUrl(pin);
   }
 
@@ -5984,6 +6007,7 @@ struct Index {
   private buildSearchRootContent() {
     PinmonyBuildSearchRootContent({
       photoSearch: (onSelected?: (uri: string) => void) => this.photoSearchFlow.search(onSelected),
+      photoRegionSearch: (crop: PinmonyImageCrop) => this.photoSearchFlow.crop({ x: crop.x, y: crop.y, w: crop.w, h: crop.h }),
       cancelPhotoSearch: () => this.photoSearchFlow.cancel(),
       openPhotoResult: (id: string) => this.photoSearchFlow.open(id),
       syncFloatingTabsMotion: (): void => this.syncFloatingTabsMotion(),
@@ -6155,7 +6179,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(0, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab(this.uiText("pm_home_3e0d676d"), $r('sys.symbol.house'), 0))
+      }.tabBar(this.buildNativeTab("pm_home_3e0d676d", $r('sys.symbol.house'), 0))
       TabContent() {
         Stack() {
           this.buildRootStatus(1)
@@ -6165,7 +6189,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(1, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab(this.uiText("pm_search_44ce7ae9"), $r('sys.symbol.magnifyingglass'), 1))
+      }.tabBar(this.buildNativeTab("pm_search_44ce7ae9", $r('sys.symbol.magnifyingglass'), 1))
       TabContent() {
         Stack() {
           this.buildRootStatus(2)
@@ -6175,7 +6199,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(2, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab(this.uiText("pm_inbox_63a5e7b7"), $r('sys.symbol.ellipsis_bubble'), 2))
+      }.tabBar(this.buildNativeTab("pm_inbox_63a5e7b7", $r('sys.symbol.ellipsis_bubble'), 2))
       TabContent() {
         Stack() {
           this.buildRootStatus(3)
@@ -6185,7 +6209,7 @@ struct Index {
         .width('100%').height('100%')
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(3, visible))
         .backgroundColor($r('app.color.page_background'))
-      }.tabBar(this.buildNativeTab(this.uiText("pm_profile_7f1d9dd0"), $r('sys.symbol.person'), 3))
+      }.tabBar(this.buildNativeTab("pm_profile_7f1d9dd0", $r('sys.symbol.person'), 3))
     }
             .width('100%')
             .height('100%')

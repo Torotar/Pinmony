@@ -43,7 +43,7 @@ export class PinmonyInboxNativeWrites {
   private publish(f: PinmonyInboxFlowSnapshot): void {this.displayed = this.clone(f);this.ports.changed(this.displayed);}
   private unknown(f: PinmonyInboxFlowSnapshot): void {
     f.sending = false;f.messageBusy = false;f.loading = false;f.writeUncertain = true;
-    const text: string = '操作结果未确认，请重新读取核对；不会自动重复提交';
+    const text: string = PinmonyI18n.message("pm_result_not_confirmed_reload_to_check_it_will_not_be_resubmitted__94b9c148");
     if(f.writeAction === 'send')f.sendError = PinmonyI18n.message("pm_send_result_not_confirmed_reload_the_conversation_to_check_it_wi_0a599e63");else f.error = text;
     this.publish(f);PinmonyRuntimeLog.info('InboxNativeWrite: outcome=unknown');
   }

@@ -10,7 +10,7 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 export struct PinmonyRecommendationSettingsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
-  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
@@ -27,7 +27,7 @@ export struct PinmonyRecommendationSettingsPage {
     if (!this.pageVisible || !this.store.error || this.store.loading || this.store.busy || this.store.confirmOpen) {
       this.dismissErrorSnack(); return;
     }
-    const key: string = this.store.screen + ':' + this.store.recommendationTab + ':' + this.store.token.toString() + ':' + this.store.error;
+    const key: string = this.store.screen + ':' + this.store.recommendationTab + ':' + this.store.token.toString() + ':' + this.store.error + ':' + this.uiLanguage;
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
@@ -113,7 +113,7 @@ export struct PinmonyRecommendationSettingsPage {
             .onClick(() => { if (this.available() && !pin.recommendationClosed && !pin.closeUncertain) this.request('activityClose', pin.id); })
             .accessibilityText((pin.title || this.uiText("pm_this_pin_05e8eaee")) + (pin.recommendationClosed ? this.uiText("pm_recommendations_off_7dd43c85") : pin.closeUncertain ? this.uiText("pm_change_not_confirmed_ccc2d77c") : this.uiText("pm_turn_off_recommendations_629265e0")))
         }.width('100%').aspectRatio(pin.width / pin.height).borderRadius(16).clip(true)
-      }, (pin: PinmonyRecentActivity) => pin.id)
+      }, (pin: PinmonyRecentActivity) => (pin.id) + ':' + this.uiLanguage)
     }.layoutWeight(1)
   }
   @Builder

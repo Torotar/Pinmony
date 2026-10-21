@@ -140,19 +140,19 @@ export class PinmonyHomeNativeReads {
   private makeTabs(): PinmonyHomeTab[] {
     const selected: string = this.board ? 'tab:' + this.board : 'tab:all';
     const tabs: PinmonyHomeTab[] = this.tabs.length ? this.tabs : this.store.home?.tabs || [];
-    const result: PinmonyHomeTab[] = [{ id: 'tab:all', label: '所有', selected: selected === 'tab:all', enabled: true }];
+    const result: PinmonyHomeTab[] = [{ id: 'tab:all', label: PinmonyI18n.message("pm_all_ae99f297"), selected: selected === 'tab:all', enabled: true }];
     tabs.filter((tab: PinmonyHomeTab): boolean => tab.id !== 'tab:all').forEach((tab: PinmonyHomeTab): void => {
       result.push({ id: tab.id, label: tab.label, selected: tab.id === selected, enabled: true });
     });
     if (this.board && !result.some((tab: PinmonyHomeTab): boolean => tab.selected)) {
-      result.push({ id: selected, label: this.store.home?.selectedTab || '图板', selected: true, enabled: true });
+      result.push({ id: selected, label: this.store.home?.selectedTab || PinmonyI18n.message('pm_board_bd3f17ee'), selected: true, enabled: true });
     }
     return result;
   }
   private commit(snapshot: PinmonyHomeSnapshot, kind: 'feed' | 'pagination' | 'cache' = 'feed'): void {
     if (!this.current()) return;
     snapshot.sourceError = this.store.homeSourceWarning || undefined; snapshot.categorySourceFailure = !!this.store.homeSourceWarning;
-    snapshot.tabs = this.makeTabs(); snapshot.selectedTab = snapshot.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected)?.label || '所有';
+    snapshot.tabs = this.makeTabs(); snapshot.selectedTab = snapshot.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected)?.label || PinmonyI18n.message('pm_all_ae99f297');
     this.store.home = snapshot; this.store.cachedHome = snapshot; this.store.homeNativeReadsReady = true;
     this.store.homeLoading = false; this.store.homeError = this.store.homeSourceWarning; this.store.homeRefreshing = false; this.store.pendingHomeTab = '';
     this.store.retainingHomeFeed = false; this.store.diskCacheRestored = false; this.store.startupFeedCommitted = true;

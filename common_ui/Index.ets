@@ -26,3 +26,4 @@ export { PinmonyImmersiveLight } from './src/main/ets/services/PinmonyImmersiveL
 export { PinmonyImageSearchView } from './src/main/ets/components/PinmonyImageSearchView';
 export { PinmonyVisualResult as PinmonyImageSearchResult } from './src/main/ets/models/PinmonyImageSearch';
 export { PinmonyRelatedPin as PinmonyImageSearchItem } from './src/main/ets/models/PinmonyImageSearch';
+export { PinmonyImageCrop } from './src/main/ets/models/PinmonyImageSearch';

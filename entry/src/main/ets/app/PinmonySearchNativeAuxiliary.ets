@@ -40,7 +40,7 @@ export class PinmonySearchNativeAuxiliary {
   snapshot(): PinmonySearchQuiz | undefined {
     if(this.page !== this.ports.page() || this.account !== this.client.key() || !this.module && !this.error)return undefined;
     const text: QuizText | undefined = this.module?.quiz;
-    return {mode:this.mode,title:this.mode === 'results' ? '基于你的偏好推荐' + this.query() + '点子' : text?.title || '',entryTitle:text?.title || '',eyebrow:text?.entry_eyebrow || '',pickerTitle:text?.picker_title || '',submitLabel:text?.picker_see_results_button_copy || '',
+    return {mode:this.mode,title:this.mode === 'results' ? PinmonyI18n.message("pm_based_on_your_preferences_ecca4403") + this.query() + PinmonyI18n.message("pm_ideas_13319317") : text?.title || '',entryTitle:text?.title || '',eyebrow:text?.entry_eyebrow || '',pickerTitle:text?.picker_title || '',submitLabel:text?.picker_see_results_button_copy || '',
       topics:(this.module?.related_query_items || []).map((t: Topic,index: number): PinmonySearchQuizTopic => ({id:index.toString(),query:t.query,imageUrl:t.cover_pin_url || ''})),
       cards:this.cards.map((p: PinmonySearchQuizCard): PinmonySearchQuizCard => ({id:p.id,title:p.title,imageUrl:p.imageUrl,targetUrl:p.targetUrl,imageWidth:p.imageWidth,imageHeight:p.imageHeight,selected:this.selected.includes(p.id)})),
       canMore:this.mode === 'picker' && !this.ended,count:this.selected.length,busy:this.busy,error:this.error};

@@ -132,7 +132,7 @@ export class PinmonySettingsController {
       throw new Error('Timeout');
     } catch (_) {
       if (current()) { if (write && this.writeDispatched) this.store.writeUncertain = true;
-        this.store.error = write ? '保存结果未确认，请重新读取核对；不会自动重试保存' : PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1"); }
+        this.store.error = write ? PinmonyI18n.message("pm_save_result_not_confirmed_reload_to_check_saving_will_not_be_ret_f7c0a062") : PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1"); }
     } finally {
       if (token === this.store.token && generation === this.generation) { this.ownedRequest = false; this.writeDispatched = false; this.store.busy = false; this.store.loading = false; }
     }

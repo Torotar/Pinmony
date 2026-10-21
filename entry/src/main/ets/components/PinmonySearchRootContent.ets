@@ -1,8 +1,10 @@
 import { PinmonySearchStore, PinmonySearchPage, PinmonySearchSnapshot, PinmonySearchResult } from 'feature_search';
 import { PinmonyPinStore } from 'feature_pin';
+import { PinmonyImageCrop } from 'common_ui';
 import { PinmonyAuthStatus } from 'common_session';
 
 export interface PinmonySearchRootView {
+  photoRegionSearch: (crop: PinmonyImageCrop) => Promise<PinmonySearchResult[] | undefined>;
   photoSearch: (onSelected?: (uri: string) => void) => Promise<PinmonySearchResult[] | undefined>;
   cancelPhotoSearch: () => void;
   openPhotoResult: (id: string) => void;
@@ -43,6 +45,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
           if (view.shouldKeepSearchRootMounted() && !view.pinStore.detail && !view.loadFailed) {
             PinmonySearchPage({
               onPhotoSearch: view.photoSearch,
+              onPhotoRegionSearch: view.photoRegionSearch,
               onPhotoCancel: view.cancelPhotoSearch,
               onPhotoResult: view.openPhotoResult,
               onPhotoVisibilityChange: (visible: boolean) => {

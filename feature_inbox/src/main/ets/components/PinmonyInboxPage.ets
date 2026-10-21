@@ -136,7 +136,7 @@ export struct PinmonyInboxPage {
 
   @Builder
   private groupTitle(label: string) {
-    Text(label)
+    Text(PinmonyI18n.render(label, this.uiLanguage))
       .fontSize(18)
       .fontWeight(FontWeight.Bold)
       .fontColor($r('app.color.primary_text'))
@@ -149,7 +149,7 @@ export struct PinmonyInboxPage {
   private listTitle(label: string, section: string) {
     Button({ type: ButtonType.Normal }) {
       Row({ space: 8 }) {
-        Text(label).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           .layoutWeight(1).textAlign(TextAlign.Start)
         SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
           .margin({ left: 8 })
@@ -196,7 +196,7 @@ export struct PinmonyInboxPage {
           .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
       }
       Column({ space: 4 }) {
-        Text(item.title)
+        Text(PinmonyI18n.render(item.title, this.uiLanguage))
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text'))
@@ -207,7 +207,7 @@ export struct PinmonyInboxPage {
         if (item.subtitle) {
           Row({ space: 4 }) {
             if (item.outgoing) { SymbolGlyph($r('sys.symbol.arrow_up_circle')).fontSize(14).fontColor([$r('app.color.secondary_text')]) }
-          Text(item.subtitle)
+          Text(PinmonyI18n.render(item.subtitle, this.uiLanguage))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
             .layoutWeight(1)
@@ -373,7 +373,7 @@ export struct PinmonyInboxPage {
               })
             }
 
-            if (this.snapshot.section === 'messages') {
+            if (this.snapshot.section === 'messages' && this.snapshot.items.length > 0) {
               this.listTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("pm_messages_4da199fa"), 'messages')
             }
             if (this.snapshot.items.length === 0 && PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {

@@ -435,7 +435,7 @@ export struct PinmonyHomePage {
           .accessibilityLevel('no')
       }
       Column({ space: 4 }) {
-        Text(board.name)
+        Text(PinmonyI18n.render(board.name, this.uiLanguage))
           .fontSize(17)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text'))
@@ -517,7 +517,7 @@ export struct PinmonyHomePage {
       }
       Row({ space: 4 }) {
         if (pin.title.trim().length > 0) {
-          Text(pin.title)
+          Text(PinmonyI18n.render(pin.title, this.uiLanguage))
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text'))
@@ -709,7 +709,7 @@ export struct PinmonyHomePage {
         Scroll() {
           Row({ space: 8 }) {
             ForEach(this.categories, (tab: PinmonyHomeTab) => {
-              Button(tab.label, { type: ButtonType.Capsule })
+              Button(PinmonyI18n.render(tab.label, this.uiLanguage), { type: ButtonType.Capsule })
                 .height(36)
                 .padding({ left: 20, right: 20 })
                 .fontSize(14)
@@ -722,7 +722,7 @@ export struct PinmonyHomePage {
                   const current: PinmonyHomeTab | undefined = this.categories.find((item: PinmonyHomeTab): boolean => item.id === tab.id);
                   if (current) this.selectTab(current);
                 })
-            }, (tab: PinmonyHomeTab) => tab.id + ':' + tab.label + ':' + tab.selected.toString() + ':' + tab.enabled.toString())
+            }, (tab: PinmonyHomeTab) => tab.id + ':' + tab.label + ':' + tab.selected.toString() + ':' + tab.enabled.toString() + ':' + this.uiLanguage)
           }
           .padding({ left: 24, right: 24 })
           .height(48)

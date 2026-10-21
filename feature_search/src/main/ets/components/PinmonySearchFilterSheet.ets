@@ -88,7 +88,7 @@ export struct PinmonySearchFilterSheet {
                 Text(this.uiText("pm_merchants_d5bae996")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
                 ForEach(this.searchStore.searchProductDomains,(domain: PinmonySearchFilterOption) => {
                   Row() {
-                    Text(domain.label).layoutWeight(1).fontColor($r('app.color.primary_text'))
+                    Text(PinmonyI18n.render(domain.label, this.uiLanguage)).layoutWeight(1).fontColor($r('app.color.primary_text'))
                     Checkbox({name:domain.id,group:'search-merchants'}).select(domain.selected)
                       .shape(CheckBoxShape.CIRCLE)
                       .selectedColor($r('app.color.accent'))
@@ -100,7 +100,7 @@ export struct PinmonySearchFilterSheet {
                           ({id:item.id,label:item.label,group:item.group,selected:item.id === domain.id ? selected : item.selected,enabled:item.enabled}));
                       })
                   }.width('100%')
-                },(domain: PinmonySearchFilterOption) => domain.id)
+                },(domain: PinmonySearchFilterOption) => (domain.id) + ':' + this.uiLanguage)
                 if(this.searchStore.searchProductError) { Text(PinmonyI18n.render(this.searchStore.searchProductError, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
                 Row({space:12}) {
                   Button(this.uiText("pm_clear_bce23772")).layoutWeight(1).height(48).onClick(() => {
@@ -149,7 +149,7 @@ export struct PinmonySearchFilterSheet {
               .onClick(() => {
                 if (option.enabled && !this.searchStore.searchFilterLoading) this.onSelect(option.id);
               })
-            }, (option: PinmonySearchFilterOption) => option.id)
+            }, (option: PinmonySearchFilterOption) => (option.id) + ':' + this.uiLanguage)
           }
           .width('100%')
         }

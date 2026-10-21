@@ -30,7 +30,7 @@ export struct PinmonyShareSheet {
         .fontColor($r('app.color.primary_text'))
         .maxLines(3)
       if (option.subtitle) {
-        Text(option.subtitle)
+        Text(PinmonyI18n.render(option.subtitle, this.uiLanguage))
           .fontSize(12)
           .fontColor($r('app.color.secondary_text'))
           .maxLines(4)
@@ -54,7 +54,7 @@ export struct PinmonyShareSheet {
   private buildShareContactRow(contact: ShareSheetOption) {
     Row({ space: 12 }) {
       PinmonyUserAvatar({ image: contact.icon || '', name: contact.label, avatarSize: 42 })
-      Text(contact.label)
+      Text(PinmonyI18n.render(contact.label, this.uiLanguage))
         .fontSize(16)
         .fontColor($r('app.color.primary_text'))
         .layoutWeight(1)

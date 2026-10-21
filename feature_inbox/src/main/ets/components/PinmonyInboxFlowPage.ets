@@ -177,7 +177,7 @@ export struct PinmonyInboxFlowPage {
       if (this.snapshot.users.some((user: InboxFlowUser) => !user.self)) {
         this.avatar(this.snapshot.users.filter((user: InboxFlowUser) => !user.self)[0], 32)
       }
-      Text(this.snapshot.title || this.uiText("pm_chat_4b3510b8"))
+      Text(PinmonyI18n.render(this.snapshot.title, this.uiLanguage) || this.uiText("pm_chat_4b3510b8"))
         .fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
         .onClick(() => {
@@ -200,7 +200,7 @@ export struct PinmonyInboxFlowPage {
   private userRow(user: InboxFlowUser) {
     Row({ space: 12 }) {
       this.avatar(user)
-      Text(user.name).fontSize(17).fontWeight(FontWeight.Medium)
+      Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontSize(17).fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
       if (this.snapshot.screen === 'compose') {
         Checkbox().select(this.snapshot.selectedIds.includes(user.id)).width(24).height(24).margin(0)
@@ -244,11 +244,11 @@ export struct PinmonyInboxFlowPage {
     Row({ space: 4 }) {
       ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
         Button({ type: ButtonType.Normal }) {
-          Text(reaction).fontSize(24).textAlign(TextAlign.Center).width('100%')
+          Text(PinmonyI18n.render(reaction, this.uiLanguage)).fontSize(24).textAlign(TextAlign.Center).width('100%')
         }.width(40).height(44).padding(0).backgroundColor(Color.Transparent)
           .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
           .onClick(() => { this.act('react', this.reactionMessageId + '|' + reaction); this.reactionMessageId = ''; })
-      })
+      }, (reaction: string): string => JSON.stringify(reaction) + ':' + this.uiLanguage)
     }.padding(8)
   }
 
@@ -259,7 +259,7 @@ export struct PinmonyInboxFlowPage {
       Row() {
         ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
           Button({ type: ButtonType.Circle }) {
-            Text(reaction).fontSize(24).textAlign(TextAlign.Center).width('100%')
+            Text(PinmonyI18n.render(reaction, this.uiLanguage)).fontSize(24).textAlign(TextAlign.Center).width('100%')
           }.padding(0).width(44).height(44)
             .backgroundColor($r('app.color.surface_muted'))
             .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
@@ -267,7 +267,7 @@ export struct PinmonyInboxFlowPage {
               if (this.selectedMessage) this.act('react', this.selectedMessage.id + '|' + reaction);
               this.showMessageMenu = false;
             })
-        })
+        }, (reaction: string): string => JSON.stringify(reaction) + ':' + this.uiLanguage)
       }.width('100%').justifyContent(FlexAlign.SpaceBetween)
       Divider().margin({ top: 8, bottom: 8 })
       }
@@ -581,7 +581,7 @@ export struct PinmonyInboxFlowPage {
                   ForEach(this.snapshot.users.slice(0, 2), (user: InboxFlowUser) => { this.avatar(user, 72) },
                     (user: InboxFlowUser) => user.id)
                 }
-                Text(this.snapshot.title).fontSize(18).fontWeight(FontWeight.Bold)
+                Text(PinmonyI18n.render(this.snapshot.title, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text'))
                 Text(this.uiText("pm_good_things_could_be_on_their_way_3f8e968c")).fontSize(14).fontColor($r('app.color.secondary_text'))
               }.width('100%').padding({ top: 40, bottom: 40 }).alignItems(HorizontalAlign.Center)
@@ -655,7 +655,7 @@ export struct PinmonyInboxFlowPage {
           scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
         },
         content: { title: { mainTitle: this.snapshot.screen === 'chat' ? '' :
-          this.snapshot.screen === 'compose' ? this.uiText("pm_new_message_3fc957bf") : this.snapshot.title || this.uiText("pm_message_settings_57326743") },
+          this.snapshot.screen === 'compose' ? this.uiText("pm_new_message_3fc957bf") : PinmonyI18n.render(this.snapshot.title, this.uiLanguage) || this.uiText("pm_message_settings_57326743") },
           stackBuilder: this.conversationTitleBuilder,
           backIcon: { isEnabled: true, action: () => this.act('back') },
           menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: this.uiText("pm_message_settings_57326743"), action: () => this.act('settings') } }] :

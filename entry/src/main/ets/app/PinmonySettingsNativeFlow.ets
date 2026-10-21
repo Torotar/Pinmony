@@ -1,4 +1,4 @@
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonySettingsStore, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory, NotificationChannel, NotificationChoice, notificationWritable, notificationGlobal } from 'feature_settings';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from 'feature_settings';
@@ -70,7 +70,7 @@ interface Channel {
 }
 interface NotificationUpdate { updated_settings: string; }
 interface SocialUpdate { user_id: string; surface_tag: string; user_confirm_skip_passcode: boolean; allow_mentions?: number; messaging_permissions?: Record<string, number>; }
-interface BlockedUserResponse { id: string; type: string; username: string; full_name?: string; image_medium_url?: string; image_large_url?: string; }
+interface BlockedUserResponse { id: string; type?: string; username: string; full_name?: string; image_medium_url?: string; image_large_url?: string; }
 interface BlockedQuery { q: string; }
 interface Api {
     url: string;
@@ -165,7 +165,6 @@ export class PinmonySettingsNativeFlow {
             this.store.data = undefined;
             this.store.notifications = [];
             this.store.social = emptySocialPermissions();
-            this.store.socialMessageGroup = 0;
             this.client.user = '';
             this.client.viewer = '';
         }
@@ -278,7 +277,7 @@ export class PinmonySettingsNativeFlow {
         });
         if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
         if (!this.current(revision)) return;
-        const snapshot: SocialPermissions = { business: raw.is_partner === true, personal: raw.is_partner === false, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
+        const snapshot: SocialPermissions = { business: raw.is_partner === true, personal: raw.is_partner === false, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, blockedComplete: this.store.social.blockedComplete, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
         this.store.social = snapshot;
         if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
         groups.forEach((g: SocialMessageGroup): void => { if (this.uncertain.get('social:message:' + g.id) === String(g.selected)) this.uncertain.delete('social:message:' + g.id); });
@@ -289,17 +288,26 @@ export class PinmonySettingsNativeFlow {
         const query: BlockedQuery = { q: '' }, options: Api = { url: '/v3/users/blocked', data: query };
         const response: ProfileSettingsResponse = await this.request('ApiResource', 'get', options, '/settings/blocked-accounts/', revision);
         const raw: BlockedUserResponse[] = response.resource_response!.data as BlockedUserResponse[];
-        if (response.resource_response?.endpoint_name !== 'v3_get_blocked_list' || !Array.isArray(raw) || raw.length > 500 || response.resource_response?.bookmark && response.resource_response.bookmark !== '-end-') throw new Error('blocked');
+        PinmonyRuntimeLog.info('SocialBlockedTrace: phase=response endpointValid=' + (response.resource_response?.endpoint_name === 'v3_get_blocked_list') + ' array=' + Array.isArray(raw) + ' count=' + (Array.isArray(raw) ? raw.length : -1));
+        const bookmark: Object | undefined = response.resource_response?.bookmark;
+        const marker: string = bookmark === undefined || bookmark === null ? '' : typeof bookmark === 'string' ? bookmark : Array.isArray(bookmark) && bookmark.length === 0 ? '' : Array.isArray(bookmark) && bookmark.length === 1 && typeof bookmark[0] === 'string' ? bookmark[0] : 'invalid';
+        const terminal: boolean = marker === '' || marker === '-end-';
+        PinmonyRuntimeLog.info('SocialBlockedTrace: phase=bookmark kind=' + (Array.isArray(bookmark) ? 'array' : typeof bookmark) + ' terminal=' + terminal);
+        if (response.resource_response?.endpoint_name !== 'v3_get_blocked_list' || !Array.isArray(raw) || raw.length > 500) throw new Error('blocked');
         const rows: SocialBlockedUser[] = raw.map((u: BlockedUserResponse): SocialBlockedUser => {
-            if (!u || u.type !== 'user' || !/^\d{1,40}$/.test(u.id) || u.id === this.client.viewer || !/^[A-Za-z0-9_]{1,100}$/.test(u.username)) throw new Error('blocked-user');
+            if (!u || u.type !== undefined && u.type !== 'user' || typeof u.id !== 'string' || !/^\d{1,40}$/.test(u.id) || u.id === this.client.viewer || typeof u.username !== 'string' || !/^[A-Za-z0-9_]{1,100}$/.test(u.username) || u.full_name !== undefined && typeof u.full_name !== 'string') {
+                PinmonyRuntimeLog.warn('SocialBlockedTrace: phase=invalid-row present=' + !!u + ' typePresent=' + (u?.type !== undefined) + ' typeValid=' + (u?.type === undefined || u.type === 'user') + ' idString=' + (typeof u?.id === 'string') + ' idValid=' + /^\d{1,40}$/.test(u?.id || '') + ' self=' + (u?.id === this.client.viewer) + ' usernameString=' + (typeof u?.username === 'string') + ' usernameValid=' + /^[A-Za-z0-9_]{1,100}$/.test(u?.username || '') + ' nameValid=' + (u?.full_name === undefined || typeof u.full_name === 'string'));
+                throw new Error('blocked-user');
+            }
             const image: string = u.image_medium_url || u.image_large_url || '';
             return { id: u.id, username: u.username, name: (u.full_name || u.username).slice(0,200), image: /^https:\/\//.test(image) ? image.slice(0,2000) : '' };
         });
         if (rows.some((u: SocialBlockedUser, i: number): boolean => rows.findIndex((other: SocialBlockedUser): boolean => other.id === u.id) !== i)) throw new Error('duplicate-blocked');
         if (!this.current(revision)) return;
+        PinmonyRuntimeLog.info('SocialBlockedTrace: phase=commit count=' + rows.length);
         const old: SocialPermissions = this.store.social;
-        this.store.social = { business: old.business, personal: old.personal, ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blocked: rows };
-        this.uncertain.forEach((_v: string, key: string): void => { if (key.startsWith('social:unblock:') && !rows.some((u: SocialBlockedUser): boolean => u.id === key.slice(15))) this.uncertain.delete(key); });
+        this.store.social = { business: old.business, personal: old.personal, ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blockedComplete: terminal, blocked: rows };
+        this.uncertain.forEach((_v: string, key: string): void => { if (terminal && key.startsWith('social:unblock:') && !rows.some((u: SocialBlockedUser): boolean => u.id === key.slice(15))) this.uncertain.delete(key); });
         this.store.writeUncertain = this.uncertain.size > 0;
         if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
     }
@@ -315,6 +323,7 @@ export class PinmonySettingsNativeFlow {
             const options: Api = { url: '/v3/users/' + value + '/block/' };
             const response: ProfileSettingsResponse = await this.request('ApiResource','delete',options,'/settings/blocked-accounts/',revision);
             if (response.resource_response?.endpoint_name !== 'v3_unblock_user' || response.resource_response.data !== null) throw new Error('unblock');
+            this.uncertain.delete(this.pending);
             await this.socialBlocked(revision);
         } else {
             await this.socialRead(revision);
@@ -331,8 +340,7 @@ export class PinmonySettingsNativeFlow {
                 const choice: SocialMessageChoice = JSON.parse(value) as SocialMessageChoice;
                 const expected: string = choice.group === 0 ? 'socialFriends' : choice.group === 1 ? 'socialFollowers' : choice.group === 2 ? 'socialFollowing' : choice.group === 4 ? 'socialOthers' : '';
                 const group: SocialMessageGroup | undefined = this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === choice.group);
-                const inline: boolean = this.screen === 'socialMessages' && this.store.social.personal && this.store.socialMessageGroup === choice.group;
-                if (!expected || !inline && this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
+                if (!expected || this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
                 if (group.selected === choice.level) return;
                 const permissions: Record<string,number> = {}; permissions[String(choice.group)] = choice.level; update.messaging_permissions = permissions;
                 this.pending = 'social:message:' + choice.group; value = String(choice.level);
@@ -597,6 +605,10 @@ export class PinmonySettingsNativeFlow {
             this.commit(revision);
         }
         catch (error) {
+            if (action === 'socialBlocked' || action === 'socialUnblock') {
+                const reason: string = error instanceof Error && ['request','business','identity','blocked','blocked-bookmark','blocked-user','duplicate-blocked','stale'].includes(error.message) ? error.message : 'other';
+                PinmonyRuntimeLog.warn('SocialBlockedTrace: phase=failed reason=' + reason + ' current=' + this.current(revision));
+            }
             if (this.current(revision)) {
                 if (error instanceof ProfileSettingsRejected && this.pending) {
                     this.uncertain.delete(this.pending);
@@ -604,7 +616,7 @@ export class PinmonySettingsNativeFlow {
                         this.activityUnknown.delete(this.pending.slice(9));
                     this.sent = false;
                 }
-                this.store.error = this.sent ? '保存结果未确认，请重新读取核对；不会自动重试保存' : error instanceof ProfileSettingsRejected ? '网站拒绝了本次操作' : write ? '未能确认当前设置或权限，请重新读取后重试' : PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1");
+                this.store.error = this.sent ? PinmonyI18n.message("pm_save_result_not_confirmed_reload_to_check_saving_will_not_be_ret_f7c0a062") : error instanceof ProfileSettingsRejected ? PinmonyI18n.message("pm_the_website_rejected_this_action_10efc2d0") : write ? PinmonyI18n.message("pm_settings_or_permissions_not_confirmed_reload_and_retry_ed2905c0") : PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1");
                 if (this.value) {
                     this.value.error = this.store.error;
                     this.commit(revision);

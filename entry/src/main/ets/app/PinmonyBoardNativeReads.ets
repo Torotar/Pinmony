@@ -286,19 +286,19 @@ export class PinmonyBoardNativeReads {
       !this.store.boardDetail?.flow?.busy && !this.store.boardDetail?.flow?.loading && !this.store.boardDetail?.flow?.uncertain && !this.store.boardDetail?.flow?.phase;
   }
   async createSection(name: string, current: () => boolean): Promise<string> {
-    if(!this.contentReady())return '图板尚未就绪，请关闭面板后重试';
+    if(!this.contentReady())return PinmonyI18n.message("pm_board_not_ready_close_this_panel_and_retry_337e96bd");
     if(!this.flow){this.flow = this.emptyFlow();this.apply();}
     return this.contentWrites.submit('section',name,current);
   }
   beginSectionSelection(name: string): string {
-    if(!this.contentReady() || !name.trim() || name.trim().length > 100)return '图板尚未就绪或区块名称无效';
+    if(!this.contentReady() || !name.trim() || name.trim().length > 100)return PinmonyI18n.message("pm_board_not_ready_or_invalid_section_name_ce4d4aa7");
     this.cancelFlow();this.flow = this.emptyFlow();this.flow.phase = 'sectionSelect';this.flow.sectionTitle = name.trim();
     this.sectionDraftPins = [];
     this.apply();return '';
   }
   async cancelSavedPin(id: string, current: () => boolean): Promise<string> {
     const sectionReady: boolean = this.bind() && this.verified && this.ready && this.board?.owner.id === this.viewer && this.flow?.phase === 'section' && !this.busy && !this.flow.busy && !this.flow.loading && !this.flow.uncertain && !this.flow.error && this.flow.pins.some((pin: PinmonyBoardPin): boolean => pin.id === id);
-    if((!this.contentReady() && !sectionReady) || this.cancelledCards.has(id))return '收藏校验失败或已取消，未执行取消收藏';
+    if((!this.contentReady() && !sectionReady) || this.cancelledCards.has(id))return PinmonyI18n.message("pm_save_verification_failed_or_was_cancelled_nothing_was_unsaved_7ea6297e");
     if(!this.flow){this.flow = this.emptyFlow();this.apply();}
     return this.contentWrites.submit('cancel',id,current);
   }
@@ -533,7 +533,7 @@ export class PinmonyBoardNativeReads {
       const pins: PinmonyBoardPin[] = [], sources: BoardSourcePin[] = [];rows.forEach((row: BoardPinData): void => {try {const pin: PinmonyBoardPin = this.mapPin(row);if(!pins.some((p: PinmonyBoardPin): boolean => p.id === pin.id)){pins.push(pin);sources.push({id:pin.id,tracking_params:typeof row.tracking_params === 'string' && row.tracking_params.length <= 16384 ? row.tracking_params : undefined});}}catch (_) {}});
       this.sources = sources;f.saved = this.pinWrites.savedIds();
       if(rows.some((p: BoardPinData): boolean => p?.type === 'pin') && !pins.length)throw new Error('unsupported');f.pins = pins;
-    }catch (_) {if(live())f.error = stage + PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1");}
+    }catch (_) {if(live())f.error = PinmonyI18n.message(stage === '区块资料' ? 'pm_board_load_section_details_failed' : stage === '区块工具' ? 'pm_board_load_section_tools_failed' : stage === '推荐内容' ? 'pm_board_load_recommendations_failed' : stage === '图板资料' ? 'pm_board_load_board_details_failed' : 'pm_board_load_board_content_failed');}
     finally {if(live()){f.loading = false;this.syncAuxiliary();}}
   }
   private validateAuxiliaryBoard(b: BoardData, requireUrl: boolean): void {
@@ -673,7 +673,7 @@ export class PinmonyBoardNativeReads {
       if(this.cancelledDisplayCount !== undefined && this.board)this.board.pin_count = this.cancelledDisplayCount;
       this.pins = pins.slice(0,2000); this.cursor = next; this.ended = !next || next === '-end-' || next === previous || !mapped.length || pins.length >= 2000; this.ready = true; this.version++; if(!append)this.recoveryVersion = this.version;
       PinmonyRuntimeLog.info('BoardNativeTrace: committed append=' + append.toString() + ' count=' + this.pins.length.toString());
-    } catch (_) {if(live()){this.error = append ? '更多 Pin 图加载失败，请重试' : stage + '读取失败，请重试';PinmonyRuntimeLog.info('BoardNativeTrace: failed stage=' + (stage === '图板资料' ? 'metadata' : 'feed'));}}
+    } catch (_) {if(live()){this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_pins_please_retry_e4cd3927") : PinmonyI18n.message(stage === '区块资料' ? 'pm_board_load_section_details_failed' : stage === '区块工具' ? 'pm_board_load_section_tools_failed' : stage === '推荐内容' ? 'pm_board_load_recommendations_failed' : stage === '图板资料' ? 'pm_board_load_board_details_failed' : 'pm_board_load_board_content_failed');PinmonyRuntimeLog.info('BoardNativeTrace: failed stage=' + (stage === '图板资料' ? 'metadata' : 'feed'));}}
     finally {if(live()){this.busy = false;this.refreshing = false;this.apply();this.ports.install(this.installScript());if(this.refreshQueued){this.refreshQueued = false;this.refresh();}else if(this.verified && !this.sectionsReady && !this.sectionsBusy && !this.sectionsError)this.readSections();}}
   }
   private async readSections(force: boolean = false): Promise<void> {

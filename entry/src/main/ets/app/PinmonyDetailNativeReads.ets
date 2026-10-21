@@ -129,11 +129,11 @@ export class PinmonyDetailNativeReads {
       const comments: number | undefined = raw.aggregated_pin_data?.comment_count ?? raw.comment_count;
       const count = (value: number | undefined): string => typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value.toString() : '';
       next.actions = next.actions.filter((item): boolean => !['like','comment','save','more','share'].includes(item.kind));
-      next.actions.push({id:'native-like',kind:'like',label:'点赞',countText:count(likes),enabled:reaction.reaction_by_me === 0,selected:reaction.reaction_by_me === 1});
-      next.actions.push({id:'native-comment',kind:'comment',label:'评论',countText:count(comments),enabled:!!this.aggregate,selected:false});
+      next.actions.push({id:'native-like',kind:'like',label:PinmonyI18n.message("pm_like_aced5d7f"),countText:count(likes),enabled:reaction.reaction_by_me === 0,selected:reaction.reaction_by_me === 1});
+      next.actions.push({id:'native-comment',kind:'comment',label:PinmonyI18n.message("pm_comments_6849b825"),countText:count(comments),enabled:!!this.aggregate,selected:false});
       next.actions.push({id:'native-save',kind:'save',label:PinmonyI18n.message("pm_save_60a53514"),countText:'',enabled:true,selected:false});
-      next.actions.push({id:'native-more',kind:'more',label:'更多选项',countText:'',enabled:true,selected:false});
-      next.actions.push({id:'native-share',kind:'share',label:'分享',countText:'',enabled:true,selected:false});
+      next.actions.push({id:'native-more',kind:'more',label:PinmonyI18n.message("pm_more_options_c611656f"),countText:'',enabled:true,selected:false});
+      next.actions.push({id:'native-share',kind:'share',label:PinmonyI18n.message("pm_share_7e564575"),countText:'',enabled:true,selected:false});
       next.actions = this.store.confirmedSaves ? this.store.confirmedSaves.actions(resource.data.id,next.actions) : next.actions;
       this.store.detail = next;
     }
@@ -330,10 +330,10 @@ export class PinmonyDetailNativeReads {
       const options: TranslationOptions = { url: '/v3/aggregated_comments/' + commentId + '/translate/' };
       const reply: PinmonyNetworkReply = await this.request('ApiResource', options, 'native_translation_', live, commentId);
       if (!live()) return;
-      if (reply.error || reply.status !== 200 || reply.body.length > 128000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request-failed status=' + reply.status.toString()); throw new Error('评论翻译请求失败，请重试'); }
+      if (reply.error || reply.status !== 200 || reply.body.length > 128000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request-failed status=' + reply.status.toString()); throw new Error(PinmonyI18n.message('pm_comment_translation_request_failed_please_retry_9ff98b48')); }
       const resource: TranslationResource = (JSON.parse(reply.body) as TranslationResponse).resource_response;
       if (resource?.status !== 'success' || resource.error || resource.code !== undefined && resource.code !== 0 ||
-          resource.endpoint_name !== 'v3_get_translation') { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=invalid-envelope'); throw new Error('评论翻译返回无效，请重试'); }
+          resource.endpoint_name !== 'v3_get_translation') { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=invalid-envelope'); throw new Error(PinmonyI18n.message('pm_invalid_comment_translation_response_please_retry_2f478594')); }
       const shape: string = resource.data === null ? 'null' : Array.isArray(resource.data) ? 'array' : typeof resource.data;
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=response shape=' + shape + ' textLength=' + (typeof resource.data === 'string' ? resource.data.trim().length.toString() : '0'));
       if (resource.data === null || typeof resource.data === 'string' && !resource.data.trim()) {
@@ -342,7 +342,7 @@ export class PinmonyDetailNativeReads {
       }
       // The supplied HAR proves only null. Accept bounded plain text; never render
       // an unconfirmed object shape or treat HTTP success alone as a translation.
-      if (typeof resource.data !== 'string' || resource.data.length > 10000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=unsupported-format'); throw new Error('暂无法识别译文格式'); }
+      if (typeof resource.data !== 'string' || resource.data.length > 10000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=unsupported-format'); throw new Error(PinmonyI18n.message('pm_unsupported_translation_format_9a4c1587')); }
       selected.translatedText = resource.data.trim(); selected.translationVisible = true;
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=committed');
     } catch (error) { if (live()) selected.translationError = error instanceof Error ? error.message : PinmonyI18n.message("pm_comment_translation_failed_please_retry_0c86faa9"); }

@@ -476,7 +476,7 @@ export class PinmonyProfileNativeActions {
                 const profile: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.store.profile)) as PinmonyProfileSnapshot;
                 profile.actions.forEach((a) => {
                     if (a.kind === 'follow')
-                        a.label = this.desired ? '关注中' : '关注';
+                        a.label = this.desired ? PinmonyI18n.message("pm_following_7dfa5d8f") : PinmonyI18n.message("pm_follow_eb137dee");
                 });
                 this.store.profile = profile;
             }
@@ -534,14 +534,14 @@ export class PinmonyProfileNativeActions {
             this.boardFollowUnknown.delete(id);
             const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
             if(actual){actual.following = desired;actual.canFollow = true;}
-            this.store.profileCache.clear();this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
+            this.store.profileCache.clear();this.ports.feedback(desired ? PinmonyI18n.message("pm_board_followed_99719d35") : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
         }catch (error) {
             if(current()){
                 const rejected: boolean = error instanceof ProfileSettingsRejected;
                 if(rejected)this.boardFollowUnknown.delete(id);
                 const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
                 if(actual)actual.canFollow = rejected;
-                this.ports.feedback(rejected ? '网站拒绝本次图板关注操作，可以重试' : PinmonyI18n.message("pm_board_follow_result_not_confirmed_reload_to_check_before_submitt_44c2a0cd"));
+                this.ports.feedback(rejected ? PinmonyI18n.message("pm_the_website_rejected_this_board_follow_action_you_can_retry_768968ce") : PinmonyI18n.message("pm_board_follow_result_not_confirmed_reload_to_check_before_submitt_44c2a0cd"));
             }
         }finally {
             if(current()){this.boardFollowJob = '';this.boardFollowRelease = undefined;this.store.followingBusy = false;this.panel();}
@@ -644,7 +644,7 @@ export class PinmonyProfileNativeActions {
                 const profile: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.store.profile)) as PinmonyProfileSnapshot;
                 profile.avatarUrl = avatar; this.store.profile = profile;
             }
-            this.ports.avatarSaved?.(page, avatar); this.ports.refresh(); this.ports.feedback(readOnlyRefresh ? '已刷新当前头像' : PinmonyI18n.message("pm_profile_picture_updated_a938ed15"));
+            this.ports.avatarSaved?.(page, avatar); this.ports.refresh(); this.ports.feedback(readOnlyRefresh ? PinmonyI18n.message("pm_profile_picture_refreshed_8b32b462") : PinmonyI18n.message("pm_profile_picture_updated_a938ed15"));
         } catch (error) {
             if (!current()) return;
             const rejected: boolean = (error as Error).message === 'avatar-rejected';
@@ -697,7 +697,7 @@ export class PinmonyProfileNativeActions {
             this.store.saveUncertain = false;
             const page: string = this.page;
             this.close();
-            this.ports.feedback('修改完成');
+            this.ports.feedback(PinmonyI18n.message("pm_changes_saved_0027fdbb"));
             this.ports.saved(page, input.username);
         }
         catch (_) {
@@ -724,7 +724,7 @@ export class PinmonyProfileNativeActions {
             return;
         const snapshot: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(profile)) as PinmonyProfileSnapshot;
         snapshot.actions.forEach((action): void => { if (action.kind === 'follow')
-            action.label = confirmed ? '关注中' : '关注'; });
+            action.label = confirmed ? PinmonyI18n.message("pm_following_7dfa5d8f") : PinmonyI18n.message("pm_follow_eb137dee"); });
         this.store.profile = snapshot;
     }
     private updated(value: string | undefined): string {
@@ -866,7 +866,7 @@ export class PinmonyProfileNativeActions {
                     o.phase = 'boards';
                     this.store.profileCache.clear();
                     if (!target.enabled)
-                        throw new ProfileSettingsRejected('图板已创建，但没有写入权限，请选择其他图板');
+                        throw new ProfileSettingsRejected(PinmonyI18n.message("pm_board_created_but_you_do_not_have_write_access_choose_another_bo_181fc3db"));
                     this.syncOrganize();
                 }
                 this.moveDispatched = true;

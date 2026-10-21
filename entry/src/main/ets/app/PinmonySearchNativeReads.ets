@@ -226,10 +226,10 @@ export class PinmonySearchNativeReads {
   private boardCounts(item: Item): string {
     const parts: string[] = [];
     if (typeof item.pin_count === 'number' && Number.isSafeInteger(item.pin_count) && item.pin_count >= 0) {
-      parts.push(item.pin_count.toLocaleString('en-US') + ' 张 Pin 图');
+      parts.push(item.pin_count.toLocaleString('en-US') + PinmonyI18n.message('pm_pins_0a89904f'));
     }
     if (typeof item.section_count === 'number' && Number.isSafeInteger(item.section_count) && item.section_count > 0) {
-      parts.push(item.section_count.toLocaleString('en-US') + ' 个图板区块');
+      parts.push(item.section_count.toLocaleString('en-US') + PinmonyI18n.message('pm_sections_68d526a8'));
     }
     return parts.join(' · ');
   }
@@ -237,10 +237,10 @@ export class PinmonySearchNativeReads {
     const elapsed: number = Date.now() - Date.parse(value || '');
     if (!Number.isFinite(elapsed) || elapsed < 0) return '';
     const days: number = Math.floor(elapsed / 86400000);
-    if (days >= 7) return Math.floor(days / 7).toString() + ' 周';
-    if (days >= 1) return days.toString() + ' 天';
-    if (elapsed >= 3600000) return Math.floor(elapsed / 3600000).toString() + ' 小时';
-    return Math.max(1, Math.floor(elapsed / 60000)).toString() + ' 分钟';
+    if (days >= 7) return Math.floor(days / 7).toString() + PinmonyI18n.message("pm_weeks_5d7d6353");
+    if (days >= 1) return days.toString() + PinmonyI18n.message("pm_days_4ce3054e");
+    if (elapsed >= 3600000) return Math.floor(elapsed / 3600000).toString() + PinmonyI18n.message("pm_hours_8f82ece0");
+    return Math.max(1, Math.floor(elapsed / 60000)).toString() + PinmonyI18n.message("pm_minutes_40de5434");
   }
   private boardCover(item: Item): string {
     const images: (ImageData | string)[] = item.images?.['236x'] as Object as (ImageData | string)[];
@@ -318,7 +318,7 @@ export class PinmonySearchNativeReads {
       const value: ReadFeed = { product: resource.data.productFilters, snapshot: snapshot, cursor: next, filters: [], targets: new Map<string,string>(), modules: Array.isArray(resource.data.oneBarModules), filterCursor: next && next !== '-end-' ? next : feed?.filterCursor || '', scroll: this.store.searchScrollOffset };
       this.mapModules(resource.data.oneBarModules || [], value); this.feeds.set(page,value); if (this.feeds.size > 12) { const oldest: string | undefined = this.feeds.keys().next().value; if (oldest && oldest !== page) this.feeds.delete(oldest); }
       this.store.searchResultsResetPending = false; PinmonyRuntimeLog.info('SearchNativeTrace: results committed append=' + append.toString() + ' count=' + results.length.toString());
-    } catch (_) { if (live()) this.error = append ? '更多搜索结果读取失败，请重试' : PinmonyI18n.message("pm_unable_to_load_search_results_please_retry_27aeffd1"); }
+    } catch (_) { if (live()) this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_search_results_please_retry_8ba01840") : PinmonyI18n.message("pm_unable_to_load_search_results_please_retry_27aeffd1"); }
     finally { if (revision === this.revision && page === this.page) { this.busy = false; if (live()) this.apply(); this.ports.settled(); } }
   }
   async input(term: string, immediate: boolean = false): Promise<void> {

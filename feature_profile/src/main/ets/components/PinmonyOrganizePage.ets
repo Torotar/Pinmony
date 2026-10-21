@@ -165,7 +165,7 @@ export struct PinmonyOrganizePage {
         } else {
           PinmonyBoardPlaceholder()
         }
-        Text(board.title).fontSize(20).fontWeight(FontWeight.Bold)
+        Text(PinmonyI18n.render(board.title, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(2)
         if (board.secret) {
           SymbolGlyph($r('sys.symbol.lock')).fontSize(18).fontColor([$r('app.color.secondary_text')])

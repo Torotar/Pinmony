@@ -399,8 +399,8 @@ export class PinmonyFailureRecoveryCoordinator {
   describeFailure(url: string, code: number): string {
     const path: string = url.split('?')[0].split('#')[0];
     const shortPath: string = path.length > 140 ? path.substring(0, 140) + '…' : path;
-    const reason: string = code === -113 ? 'HTTPS 安全连接协商失败 · ' :
-      code === -200 ? '网站证书校验失败，请检查网络或代理后重试 · ' : code === -100 ? '连接被关闭 · ' : '';
-    return reason + '错误码 ' + code.toString() + ' · ' + shortPath;
+    const reason: string = code === -113 ? PinmonyI18n.message("pm_https_negotiation_failed_bbd70909") :
+      code === -200 ? PinmonyI18n.message("pm_website_certificate_validation_failed_check_your_network_or_prox_28bdbe6e") : code === -100 ? PinmonyI18n.message("pm_connection_closed_bce0d511") : '';
+    return reason + PinmonyI18n.message("pm_error_code_8b1edb5e") + code.toString() + ' · ' + shortPath;
   }
 }

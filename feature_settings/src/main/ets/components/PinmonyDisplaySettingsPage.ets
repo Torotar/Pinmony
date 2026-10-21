@@ -11,7 +11,7 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 export struct PinmonyDisplaySettingsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
-  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
@@ -34,7 +34,7 @@ export struct PinmonyDisplaySettingsPage {
     if (!this.pageVisible || !this.store.error || this.store.loading || this.store.busy || this.store.confirmOpen) {
       this.dismissErrorSnack(); return;
     }
-    const key: string = this.store.screen + ':' + this.store.recommendationTab + ':' + this.store.token.toString() + ':' + this.store.error;
+    const key: string = this.store.screen + ':' + this.store.recommendationTab + ':' + this.store.token.toString() + ':' + this.store.error + ':' + this.uiLanguage;
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
@@ -130,7 +130,8 @@ export struct PinmonyDisplaySettingsPage {
     Row({ space: 12 }) {
       Text(this.uiText("pm_language_9f6fee1a")).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: 'English' }])
+      ForEach([this.uiLanguage], (language: string) => {
+        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: 'English' }])
         .selected(Math.max(0, ['system', 'zh', 'en'].indexOf(this.languagePreference)))
         .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'en' ? 'English' : this.uiText("pm_follow_system_217cfe7d"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
@@ -149,12 +150,14 @@ export struct PinmonyDisplaySettingsPage {
             }
           }
         })
+      }, (language: string): string => language)
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     Row({ space: 12 }) {
       Text(this.uiText("pm_theme_788db1cf")).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_light_aa0819df") }, { value: this.uiText("pm_dark_a6b75d06") }])
+      ForEach([this.uiLanguage], (language: string) => {
+        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_light_aa0819df") }, { value: this.uiText("pm_dark_a6b75d06") }])
         .selected(this.themePreference === 'light' ? 1 : this.themePreference === 'dark' ? 2 : 0)
         .value(this.themeLabel())
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
@@ -166,11 +169,13 @@ export struct PinmonyDisplaySettingsPage {
         .onSelect((index: number) => {
           if (index >= 0 && index < 3) this.selectTheme(['system', 'light', 'dark'][index]);
         })
+      }, (language: string): string => language)
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     if (this.isTablet) {
       Row({ space: 12 }) {
         Text(this.uiText("pm_screen_orientation_60cc99cc")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        ForEach([this.uiLanguage], (language: string) => {
         Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_always_rotate_automatically_d3a0ff23") }, { value: this.uiText("pm_portrait_c35bd83b") }, { value: this.uiText("pm_landscape_055a6b3a") }])
           .selected(Math.max(0, ['system', 'auto', 'portrait', 'landscape'].indexOf(this.orientationPreference)))
           .value(this.orientationPreference === 'auto' ? this.uiText("pm_always_rotate_automatically_d3a0ff23") : this.orientationPreference === 'portrait' ? this.uiText("pm_portrait_c35bd83b") : this.orientationPreference === 'landscape' ? this.uiText("pm_landscape_055a6b3a") : this.uiText("pm_follow_system_217cfe7d"))
@@ -178,6 +183,7 @@ export struct PinmonyDisplaySettingsPage {
           .backgroundColor($r('app.color.display_settings_control')).enabled(!this.orientationBusy)
           .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
+      }, (language: string): string => language)
       }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     }
@@ -192,7 +198,8 @@ export struct PinmonyDisplaySettingsPage {
     Row({ space: 16 }) {
       Text(this.uiText('pm_immersive_light')).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Select([{ value: this.uiText('pm_light_off') }, { value: this.uiText('pm_light_gentle') },
+      ForEach([this.uiLanguage], (language: string) => {
+        Select([{ value: this.uiText('pm_light_off') }, { value: this.uiText('pm_light_gentle') },
         { value: this.uiText('pm_light_immersive') }, { value: this.uiText('pm_light_exquisite') }])
         .selected(Math.max(0, ['off', 'gentle', 'immersive', 'exquisite'].indexOf(this.immersiveLightMode)))
         .value(this.uiText(this.immersiveLightMode === 'off' ? 'pm_light_off' : this.immersiveLightMode === 'gentle' ?
@@ -208,6 +215,7 @@ export struct PinmonyDisplaySettingsPage {
             this.logMaterialMode();
           }
         })
+      }, (language: string): string => language)
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:16 })
@@ -224,7 +232,7 @@ export struct PinmonyDisplaySettingsPage {
           .onChange((selected: boolean) => { if (selected) this.selectTheme(value); })
           .accessibilityText(value === 'system' ? this.uiText("pm_follow_system_217cfe7d") : value === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_dark_a6b75d06"))
       }.width('100%').constraintSize({ minHeight: 56 })
-    }, (value: string) => value)
+    }, (value: string) => (value) + ':' + this.uiLanguage)
   }
   @Builder
   private destination(_name?: string, _param?: Object) {

@@ -77,13 +77,13 @@ export struct PinmonyNotificationsPage {
                           this.change(channel, value);
                         })
                     }.width('100%')
-                  }, (channel: NotificationChannel): string => (channel.channel || channel.label) + ':' + (channel.section || '') + ':' + (channel.option || '') + ':' + channel.value + ':' + this.store.token + ':' + this.store.busy + ':' + this.confirmationOpen)
+                  }, (channel: NotificationChannel): string => ((channel.channel || channel.label) + ':' + (channel.section || '') + ':' + (channel.option || '') + ':' + channel.value + ':' + this.store.token + ':' + this.store.busy + ':' + this.confirmationOpen) + ':' + this.uiLanguage)
                 } else {
                   Text(PinmonyNotificationCopy.summary(category, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
                 }
               }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 8, bottom: 8 })
-            })
-          })
+            }, (category: NotificationCategory): string => group.key + ':' + category.key + ':' + this.uiLanguage)
+          }, (group: NotificationGroup): string => group.key + ':' + this.uiLanguage)
           if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text(this.uiText("pm_no_notification_settings_available_b02ac445")).fontColor($r('app.color.secondary_text')) }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, bottom: 28 })
       }.width('100%').height('100%').align(Alignment.TopStart)

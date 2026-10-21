@@ -30,7 +30,7 @@ function fixture(){
  if(path.includes('/BoardsResource/'))return response([clone(server.board)]);
  if(path.includes('/BoardResource/create/'))return response({...server.board,name:o.name,privacy:o.privacy},'v3_create_board');
  if(path.includes('/ApiResource/')){
-   if(o.url==='/v3/users/blocked')return response(clone(server.blocked||[]),'v3_get_blocked_list');
+   if(o.url==='/v3/users/blocked'){const r=response(clone(server.blocked||[]),'v3_get_blocked_list');if('blockedBookmark' in server)r.resource_response.bookmark=server.blockedBookmark;return r;}
    if(o.url==='/v3/users/2/block/' && path.endsWith('/delete/')){server.blocked=[];return response(null,bad?'wrong':'v3_unblock_user');}
    if(o.url==='/v3/users/settings/' && server.social)return response(clone(server.social),'v3_get_user_settings');
    if(o.url==='/v3/boards/300/follow/'){const followed=path.endsWith('/update/');server.board.followed_by_me=followed;return response(followed?{...server.board,followed_by_me:true}:null,bad?'wrong':followed?'v3_follow_board':'v3_unfollow_board');}

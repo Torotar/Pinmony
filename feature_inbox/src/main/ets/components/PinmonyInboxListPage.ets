@@ -87,10 +87,10 @@ export struct PinmonyInboxListPage {
       Row({ space: 14 }) {
         PinmonyUserAvatar({ image: item.imageUrl, name: item.title, avatarSize: 48 })
         Column({ space: 4 }) {
-          Text(item.title).fontSize(16).fontWeight(item.unread ? FontWeight.Bold : FontWeight.Medium)
+          Text(PinmonyI18n.render(item.title, this.uiLanguage)).fontSize(16).fontWeight(item.unread ? FontWeight.Bold : FontWeight.Medium)
             .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
           if (item.subtitle) {
-            Text(item.subtitle).fontSize(14).fontColor($r('app.color.secondary_text'))
+            Text(PinmonyI18n.render(item.subtitle, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
               .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
           }
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -133,7 +133,7 @@ export struct PinmonyInboxListPage {
               })
             }
             ForEach(this.rows(false), (item: PinmonyInboxItem) => { this.row(item) },
-              (item: PinmonyInboxItem): string => item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread)
+              (item: PinmonyInboxItem): string => (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread) + ':' + this.uiLanguage)
             if (!this.loading() && !this.error() && this.rows(false).length === 0) {
               Text(this.text(this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))
                 .fontColor($r('app.color.secondary_text')).padding(24)
@@ -181,7 +181,7 @@ export struct PinmonyInboxListPage {
               })
             }
             ForEach(this.rows(), (item: PinmonyInboxItem) => { this.row(item) },
-              (item: PinmonyInboxItem): string => item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread)
+              (item: PinmonyInboxItem): string => (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread) + ':' + this.uiLanguage)
             if (!this.loading() && !this.error() && this.rows().length === 0) {
               Text(this.text(this.query().trim() ? 'pm_inbox_no_matching_username' :
                 this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))

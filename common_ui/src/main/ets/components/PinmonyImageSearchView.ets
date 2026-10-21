@@ -153,7 +153,7 @@ export struct PinmonyImageSearchView {
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
       .onAreaChange((_old: Area, area: Area) => { this.widthValue = Number(area.width); this.heightValue = Number(area.height); })
       .onTouch((event: TouchEvent) => {
-        if (this.uploadedPhoto || event.type !== TouchType.Down || !event.touches.length) return;
+        if (event.type !== TouchType.Down || !event.touches.length) return;
         const x: number = event.touches[0].x;
         const y: number = event.touches[0].y;
         const left: number = this.photoX() + this.crop.x * this.photoWidth();
@@ -168,7 +168,7 @@ export struct PinmonyImageSearchView {
         else if (x >= left && x <= right && y >= top && y <= bottom) this.dragCorner = -1;
       })
       .gesture(PanGesture().onActionStart(() => this.startDrag()).onActionUpdate((event: GestureEvent) => {
-        if (!this.uploadedPhoto && this.dragCorner >= -1) this.drag(event, this.dragCorner);
+        if (this.dragCorner >= -1) this.drag(event, this.dragCorner);
       }))
   }
   build() {

@@ -68,7 +68,7 @@ export struct PinmonyCommentsSheet {
   private commentKey(item: PinmonyComment): string {
     // ForEach retains old item closures for an unchanged key. Include the snapshot so
     // expanded replies and reaction updates replace that row, without resetting the List.
-    return item.id + ':' + JSON.stringify(item);
+    return item.id + ':' + JSON.stringify(item) + ':' + this.uiLanguage;
   }
 
   @Builder
@@ -78,7 +78,7 @@ export struct PinmonyCommentsSheet {
         .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
       Column({ space: 4 }) {
         Row({ space: 4 }) {
-          Text(item.name).fontSize(13).fontWeight(FontWeight.Bold)
+          Text(PinmonyI18n.render(item.name, this.uiLanguage)).fontSize(13).fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.primary_text')).maxLines(2)
             .constraintSize({ maxWidth: '75%' })
           Text(this.ageLabel(item.createdAt)).fontSize(12).fontColor($r('app.color.secondary_text'))

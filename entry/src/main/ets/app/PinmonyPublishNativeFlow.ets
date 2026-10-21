@@ -329,11 +329,11 @@ export class PinmonyPublishNativeFlow {
                 }
                 this.commit();
                 if (!mapped.enabled)
-                    throw new PinmonyBusinessRejection('图板已创建，但没有发布权限，请选择其他图板');
+                    throw new PinmonyBusinessRejection(PinmonyI18n.message("pm_board_created_but_you_do_not_have_publishing_access_choose_anoth_ca935e3f"));
             }
             const selected: Candidate[] = this.candidates.filter((c: Candidate): boolean => !c.done && f.selectedIds.includes(c.pin.id));
             if (!target?.enabled || !selected.length)
-                throw new PinmonyBusinessRejection('请选择图片和可写入的图板');
+                throw new PinmonyBusinessRejection(PinmonyI18n.message("pm_select_images_and_a_writable_board_422d3694"));
             for (const c of selected) {
                 if (!this.current(revision))
                     return;

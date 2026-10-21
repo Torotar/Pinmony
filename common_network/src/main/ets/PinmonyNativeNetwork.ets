@@ -120,6 +120,7 @@ interface PinmonyResourceDiagnostic {
   data?: Object;
 }
 interface ProfileAvatarUploadResponse { success?: boolean; image_upload_tracking_id?: string; }
+interface PhotoSearchRegion { x: number; y: number; w: number; h: number; }
 interface ProfileAvatarStatusData { tracking_id: string; }
 interface ProfileAvatarStatusOptions { url: string; data: ProfileAvatarStatusData; }
 interface ProfileAvatarStatusEnvelope { options: ProfileAvatarStatusOptions; context: Record<string, string>; }
@@ -1834,7 +1835,11 @@ export class PinmonyNativeNetwork {
     }
   }
   async searchUploadedPhoto(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
-      owner: () => boolean, id: string): Promise<string> {
+      owner: () => boolean, id: string, crop?: PhotoSearchRegion): Promise<string> {
+    const region: PhotoSearchRegion = crop || { x: 0, y: 0, w: 1, h: 1 };
+    if (![region.x, region.y, region.w, region.h].every((n: number): boolean => Number.isFinite(n)) ||
+      region.x < 0 || region.y < 0 || region.w < 0.08 || region.h < 0.08 ||
+      region.x + region.w > 1.00001 || region.y + region.h > 1.00001) throw new Error('photo-region');
     const state: PinmonyBusinessSessionContext = session();
     const account: string = state.accountId, epoch: number = state.generation, origin: string = state.origin;
     const generation: number = this.generation;
@@ -1858,7 +1863,8 @@ export class PinmonyNativeNetwork {
       if (!csrf) throw new Error('missing-session');
       const fields: rcp.MultipartFormFields = {};
       fields['image'] = { contentOrPath: { content: bytes }, contentType: 'image/jpeg', remoteFileName: 'lens-file-image' };
-      fields['x'] = '0'; fields['y'] = '0'; fields['w'] = '1'; fields['h'] = '1';
+      fields['x'] = region.x.toString(); fields['y'] = region.y.toString();
+      fields['w'] = region.w.toString(); fields['h'] = region.h.toString();
       fields['crop_source'] = '5'; fields['source_type'] = '1';
       const request: rcp.Request = new rcp.Request(url, 'POST', {
         'Cookie': cookie, 'Referer': page, 'Origin': origin, 'User-Agent': state.userAgent,

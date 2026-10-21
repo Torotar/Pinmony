@@ -206,7 +206,7 @@ export class PinmonyProfileActionsController {
         if (result?.pending === true) { if (!await this.delay(generation)) return; continue; }
         if (result?.ok === true) {
           const username: string = typeof result.username === 'string' && /^\w+$/.test(result.username) ? result.username : '';
-          this.closePanel(); this.ports.feedback('修改完成'); this.ports.saved(context.page, username); return;
+          this.closePanel(); this.ports.feedback(PinmonyI18n.message("pm_changes_saved_0027fdbb")); this.ports.saved(context.page, username); return;
         }
         if (result?.duplicate === true) { this.saving = undefined; this.store.saving = false; this.ports.feedback(PinmonyI18n.message("pm_username_already_taken_b003d15d")); return; }
         this.saveFailed(typeof result?.message === 'string' ? result.message.slice(0,200) : PinmonyI18n.message("pm_save_result_not_confirmed_reload_the_profile_to_check_63f4845d")); return;
@@ -265,7 +265,7 @@ export class PinmonyProfileActionsController {
     try {
       const result: string = await this.ports.runScript('window.PinmonyProfileOrganizeAction && window.PinmonyProfileOrganizeAction(' + profile.session.toString() + ',' + JSON.stringify(profile.profileUrl) + ',' + JSON.stringify(action) + ',' + JSON.stringify(value) + ',' + secret.toString() + ')');
       if (generation === this.generation && this.matches(context) && result !== 'true' && result !== '"true"') this.ports.feedback(PinmonyI18n.message("pm_this_action_is_unavailable_refresh_and_retry_b8e900b6"));
-    } catch (_) { if (this.bound(context)) { if (write) this.store.organizeUncertain = true; if (generation === this.generation) this.ports.feedback(write ? '整理结果未确认，请刷新核对' : PinmonyI18n.message("pm_unable_to_organize_refresh_and_retry_b830cf7b")); } }
+    } catch (_) { if (this.bound(context)) { if (write) this.store.organizeUncertain = true; if (generation === this.generation) this.ports.feedback(write ? PinmonyI18n.message("pm_organize_result_not_confirmed_refresh_to_check_4be7f3cf") : PinmonyI18n.message("pm_unable_to_organize_refresh_and_retry_b830cf7b")); } }
     finally { if (ticket === this.organizeTicket) this.organizePending = false; }
   }
 }

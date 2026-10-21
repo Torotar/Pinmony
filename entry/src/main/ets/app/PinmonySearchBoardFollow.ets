@@ -70,7 +70,7 @@ export class PinmonySearchBoardFollow {
       if (!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_board' : 'v3_unfollow_board') ||
           response.client_context?.user && response.client_context.user.id !== viewer ||
           (desired ? !r.data || r.data.id !== id || r.data.type !== 'board' || r.data.followed_by_me !== true : r.data !== null)) throw new Error('unknown');
-      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? '已关注图板' : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
+      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? PinmonyI18n.message("pm_board_followed_99719d35") : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
     } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message("pm_board_follow_result_not_confirmed_refresh_to_check_before_submit_b77726df")); }
     finally { if (this.job === job.id) { this.job = ''; this.board = ''; this.release = undefined; this.ports.changed(); } }
   }

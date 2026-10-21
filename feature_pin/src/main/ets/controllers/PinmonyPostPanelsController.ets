@@ -135,7 +135,7 @@ export class PinmonyPostPanelsController {
           if (!result || !this.boardsValid(result)) throw new Error('Unavailable');
           this.store.saveResult = result; busy = result.loading || result.busy;
           if (!busy && !result.error && !this.pendingWrite && !this.uncertain &&
-              /^\d+$/.test(result.savedId) && /^已收藏至/.test(result.feedback)) {
+              /^\d+$/.test(result.savedId) && /^已收藏至/.test(PinmonyI18n.render(result.feedback, 'zh'))) {
             const feedback: string = result.feedback;
             this.dismiss('save', true);
             this.ports.feedback(feedback);

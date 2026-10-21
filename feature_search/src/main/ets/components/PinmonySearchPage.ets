@@ -1,6 +1,6 @@
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
-import { PinmonyImageSearchView, PinmonyImageSearchResult, PinmonyImageSearchItem } from 'common_ui';
+import { PinmonyImageSearchView, PinmonyImageSearchResult, PinmonyImageSearchItem, PinmonyImageCrop } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { effectKit } from '@kit.ArkGraphics2D';
@@ -23,6 +23,22 @@ export struct PinmonySearchPage {
   onPhotoSearch?: (onSelected?: (uri: string) => void) => Promise<PinmonySearchResult[] | undefined>;
   onPhotoCancel?: () => void;
   onPhotoResult?: (id: string) => void;
+  onPhotoRegionSearch?: (crop: PinmonyImageCrop) => Promise<PinmonySearchResult[] | undefined>;
+
+  private async searchPhotoRegion(crop: PinmonyImageCrop): Promise<void> {
+    if (!this.active || !this.photoPreview || !this.onPhotoRegionSearch) return;
+    const generation: number = ++this.photoGeneration;
+    this.photoBusy = true; this.photoError = false; this.photoResults = [];
+    try {
+      const results: PinmonySearchResult[] | undefined = await this.onPhotoRegionSearch(crop);
+      if (generation !== this.photoGeneration || !this.active) return;
+      if (results) this.photoResults = results;
+    } catch (_) {
+      if (generation === this.photoGeneration && this.active) this.photoError = true;
+    } finally {
+      if (generation === this.photoGeneration) this.photoBusy = false;
+    }
+  }
   onPhotoVisibilityChange?: (visible: boolean) => void;
 
   private closePhotoSearch(): void {
@@ -68,6 +84,7 @@ export struct PinmonySearchPage {
     if (name === 'photo-search') {
       HdsNavDestination() {
         PinmonyImageSearchView({ imageUrl: this.photoPreview, uploadedPhoto: true, result: this.photoResult(),
+          onSearch: (crop: PinmonyImageCrop) => { this.searchPhotoRegion(crop); },
           onClose: () => this.closePhotoSearch(),
           onRelated: (id: string) => {
             if (this.onPhotoResult) this.onPhotoResult(id);
@@ -520,7 +537,7 @@ export struct PinmonySearchPage {
     Button({ type: ButtonType.Normal }) {
       Row({ space: 8 }) {
         if (item.imageUrl) { Image(item.imageUrl).width(44).height(44).objectFit(ImageFit.Cover) }
-        Text(item.label).fontSize(14).fontColor($r('app.color.primary_text')).padding({ right: 12, left: item.imageUrl ? 0 : 12 })
+        Text(PinmonyI18n.render(item.label, this.uiLanguage)).fontSize(14).fontColor($r('app.color.primary_text')).padding({ right: 12, left: item.imageUrl ? 0 : 12 })
       }.height(44)
     }.padding(0).borderRadius(14).clip(true).backgroundColor($r('app.color.surface_muted'))
       .accessibilityText(item.label).accessibilitySelected(item.selected)
@@ -562,11 +579,11 @@ export struct PinmonySearchPage {
             .backgroundColor($r('app.color.surface_muted'))
           Column({ space: 12 }) {
             if (hero.subtitle) {
-              Text(hero.subtitle).fontSize(16).fontWeight(FontWeight.Medium)
+              Text(PinmonyI18n.render(hero.subtitle, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Medium)
                 .fontColor(this.heroTextColor(hero)).textAlign(TextAlign.Center).maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
-            Text(hero.title).fontSize(26).fontWeight(FontWeight.Bold)
+            Text(PinmonyI18n.render(hero.title, this.uiLanguage)).fontSize(26).fontWeight(FontWeight.Bold)
               .fontColor(this.heroTextColor(hero)).textAlign(TextAlign.Center).maxLines(3)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }.layoutWeight(1).padding({ left: 32, right: 32 })
@@ -595,14 +612,14 @@ export struct PinmonySearchPage {
       }
       Column({ space: 6 }) {
           if (hero.subtitle) {
-            Text(hero.subtitle)
+            Text(PinmonyI18n.render(hero.subtitle, this.uiLanguage))
               .fontSize(14)
               .fontColor(Color.White)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .textAlign(TextAlign.Center)
           }
-          Text(hero.title)
+          Text(PinmonyI18n.render(hero.title, this.uiLanguage))
             .fontSize(25)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
@@ -721,7 +738,7 @@ export struct PinmonySearchPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       Row({ space: 8 }) {
-        Text(section.title)
+        Text(PinmonyI18n.render(section.title, this.uiLanguage))
           .fontSize(23)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text'))
@@ -921,7 +938,7 @@ export struct PinmonySearchPage {
           })
       }
       if (result.title && result.title !== '标题暂不可用') {
-      Text(result.title)
+      Text(PinmonyI18n.render(result.title, this.uiLanguage))
         .fontSize(15)
         .height(40).lineHeight(20)
         .fontWeight(FontWeight.Medium)
@@ -978,13 +995,13 @@ export struct PinmonySearchPage {
           }.layoutWeight(1).height('100%')
         }
       }.width('100%').aspectRatio(1.5).borderRadius(14).clip(true).backgroundColor($r('app.color.surface_muted'))
-      Text(result.title).fontSize(16).fontWeight(FontWeight.Bold).maxLines(2)
+      Text(PinmonyI18n.render(result.title, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Bold).maxLines(2)
         .fontColor($r('app.color.primary_text'))
       if (result.ownerName) {
         Text(result.ownerName).fontSize(13).fontColor($r('app.color.primary_text')).maxLines(1)
       }
       if (result.subtitle || result.updated) {
-        Text([result.subtitle, result.updated].filter((value: string | undefined): boolean => !!value).join(' · ')).fontSize(13).fontColor($r('app.color.secondary_text')).maxLines(2)
+        Text(PinmonyI18n.render([result.subtitle, result.updated].filter((value: string | undefined): boolean => !!value).join(' · '), this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')).maxLines(2)
       }
       Button(result.followBusy ? this.uiText("pm_processing_d3d21191") : result.following === true ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee"), { type: ButtonType.Normal })
         .border({ width: 0 })
@@ -1027,7 +1044,7 @@ export struct PinmonySearchPage {
         .accessibilityLevel('no')
       }
       Column({ space: 4 }) {
-        Text(result.title)
+        Text(PinmonyI18n.render(result.title, this.uiLanguage))
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text'))
@@ -1036,7 +1053,7 @@ export struct PinmonySearchPage {
         if (result.kind === 'user' && result.followerCount !== undefined) {
           Text(result.followerCount.toString() + this.uiText("pm_followers_b06be4eb")).fontSize(13).fontColor($r('app.color.secondary_text'))
         } else if (result.subtitle) {
-          Text(result.subtitle)
+          Text(PinmonyI18n.render(result.subtitle, this.uiLanguage))
             .fontSize(13)
             .fontColor($r('app.color.secondary_text'))
             .maxLines(2)
@@ -1069,7 +1086,7 @@ export struct PinmonySearchPage {
       if (/\/search\/videos\//.test(this.snapshot.pageKey)) {
         Image($r('app.media.search_video_empty')).width(200).height(200).objectFit(ImageFit.Contain).accessibilityLevel('no')
         Text(this.uiText("pm_that_does_not_seem_to_work_59c83091")).fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-        Text(this.uiText("目前根据所选的筛选器，未找到搜索结果。\n请尝试更新你的筛选器。"))
+        Text(this.uiText("pm_no_results_match_the_selected_filters_try_changing_your_filters_59447648"))
           .fontSize(16).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center)
       } else {
         Image($r('app.media.search_product_empty')).width(200).height(200).objectFit(ImageFit.Contain).accessibilityLevel('no')
@@ -1281,7 +1298,7 @@ export struct PinmonySearchPage {
           Row({ space: 16 }) {
             Row({ space: 16 }) {
             SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(16).fontColor([$r('app.color.secondary_text')])
-            Text(item.label).fontSize(16).fontWeight(FontWeight.Bold)
+            Text(PinmonyI18n.render(item.label, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(2)
             }.layoutWeight(1).constraintSize({ minHeight: 48 })
               .onClick(() => { if (this.interactionReady && item.enabled && !item.deleting && this.onSuggestion) { this.closeInputPanel(false); this.onSuggestion(item.id); } })
@@ -1296,7 +1313,7 @@ export struct PinmonySearchPage {
           }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 20, right: 12 })
 
         }
-      }, (item: PinmonySearchSuggestion) => item.id)
+      }, (item: PinmonySearchSuggestion) => (item.id) + ':' + this.uiLanguage)
     }.width('100%').height('100%').scrollBar(BarState.Off)
   }
 

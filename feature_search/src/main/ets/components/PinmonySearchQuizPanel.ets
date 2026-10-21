@@ -56,7 +56,7 @@ export struct PinmonySearchQuizPanel {
         }.width(32).height(32).padding(0).backgroundColor(Color.Transparent)
           .accessibilityText(this.uiText("pm_close_idea_recommendations_86934aff")).onClick(() => this.onAction('dismiss', ''))
       }.width('100%')
-      Text(this.quiz.title).fontSize(22).fontWeight(FontWeight.Bold)
+      Text(PinmonyI18n.render(this.quiz.title, this.uiLanguage)).fontSize(22).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).width('100%')
       this.requestState()
       Grid() {
@@ -103,7 +103,7 @@ export struct PinmonySearchQuizPanel {
                   }).accessibilityText(item.title + (item.selected ? this.uiText("pm_selected_657a8c2d") : ''))
                   .accessibilitySelected(item.selected)
               }.width(this.cardWidth()).height(this.cardHeight(item))
-            }, (item: PinmonySearchQuizCard) => item.id)
+            }, (item: PinmonySearchQuizCard) => (item.id) + ':' + this.uiLanguage)
           }.columnsTemplate(this.contentColumnsTemplate()).columnsGap(8).rowsGap(8).width('100%').height('100%')
             .clip(true).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
             .onReachEnd(() => {

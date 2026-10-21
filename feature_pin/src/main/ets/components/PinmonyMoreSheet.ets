@@ -55,7 +55,7 @@ export struct PinmonyMoreSheet {
                     .fontColor($r('app.color.primary_text'))
                     .maxLines(2)
                   if (option.subtitle && !/详细了解.*AI|learn more.*AI/i.test(option.label)) {
-                    Text(option.subtitle)
+                    Text(PinmonyI18n.render(option.subtitle, this.uiLanguage))
                       .fontSize(12)
                       .fontColor($r('app.color.secondary_text'))
                       .maxLines(3)

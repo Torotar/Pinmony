@@ -248,7 +248,7 @@ export class PinmonyPublishController {
       if (value.phase === 'done') {
         const completed: number = value.completed, boardOnly: boolean = value.kind === 'board';
         this.close();
-        if (completed > 0) this.ports.feedback(boardOnly ? '图板已创建' : '已发布 ' + completed.toString() + PinmonyI18n.message("pm_pins_0a89904f"));
+        if (completed > 0) this.ports.feedback(boardOnly ? PinmonyI18n.message("pm_board_created_f7d22eaf") : PinmonyI18n.message("pm_published_58e1bd74") + completed.toString() + PinmonyI18n.message("pm_pins_0a89904f"));
         return;
       }
       if (value.phase === 'photo' && !value.loading && !value.error && !this.store.publishPicking) this.ports.pickPhotos(token, page);
@@ -257,7 +257,7 @@ export class PinmonyPublishController {
       if (generation !== this.flowGeneration || !this.ports.foreground() || !this.isCurrent(token, page)) return;
       const flow: PinmonyPublishFlow = this.store.publishFlow!;
       flow.uncertain = flow.busy; flow.busy = false; flow.loading = false;
-      flow.error = flow.uncertain ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : PinmonyI18n.message("pm_unable_to_load_publishing_status_go_back_and_retry_ade379b3");
+      flow.error = flow.uncertain ? PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_before_submittin_5d6ac26e") : PinmonyI18n.message("pm_unable_to_load_publishing_status_go_back_and_retry_ade379b3");
       this.commit(flow);
     }).finally((): void => { if (generation === this.flowGeneration) this.polling = false; });
   }
@@ -293,7 +293,7 @@ export class PinmonyPublishController {
       if (!this.isCurrent(token, page)) return;
       const latest: PinmonyPublishFlow = this.store.publishFlow!;
       latest.busy = false; latest.uncertain = write;
-      latest.error = write ? '操作结果未确认，请关闭后刷新核对，勿重复提交' : PinmonyI18n.message("pm_action_unavailable_go_back_and_retry_4ce37c85");
+      latest.error = write ? PinmonyI18n.message("pm_result_not_confirmed_close_and_refresh_to_check_before_submittin_5d6ac26e") : PinmonyI18n.message("pm_action_unavailable_go_back_and_retry_4ce37c85");
       this.commit(latest);
     });
   }

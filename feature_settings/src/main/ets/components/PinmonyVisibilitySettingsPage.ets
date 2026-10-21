@@ -9,7 +9,7 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 export struct PinmonyVisibilitySettingsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
-  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
@@ -27,7 +27,7 @@ export struct PinmonyVisibilitySettingsPage {
     if (!this.pageVisible || !this.store.error || this.store.loading || this.store.busy || this.store.confirmOpen) {
       this.dismissErrorSnack(); return;
     }
-    const key: string = this.store.screen + ':' + this.store.recommendationTab + ':' + this.store.token.toString() + ':' + this.store.error;
+    const key: string = this.store.screen + ':' + this.store.recommendationTab + ':' + this.store.token.toString() + ':' + this.store.error + ':' + this.uiLanguage;
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());

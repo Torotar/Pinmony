@@ -34,6 +34,7 @@ export interface PinmonyPhotoMenuCoordinatorPorts {
   currentInboxUrl: () => string;
   currentPinUrl: () => string;
   dismissShareSheet: () => void;
+  dismissShareSheetAfterAction?: () => Promise<void>;
   homeStore: () => PinmonyHomeStore;
   inboxStore: () => PinmonyInboxStore;
   isCurrentBoardMenuPin: (pinUrl: string, pageKey: string) => boolean;
@@ -118,25 +119,23 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                 break;
             if (!inboxAction && !profilePin && (pageKey === this.ports.currentHomePageKey() || this.ports.isCurrentSearchMenuPin(pinUrl, pageKey))) {
                 state.options = [];
-                state.actions.push({ id: 'home-system-share', label: '分享链接', enabled: !state.loading && !state.error && !state.busy });
+                state.actions.push({ id: 'home-system-share', label: PinmonyI18n.message("pm_share_link_10ba6479"), enabled: !state.loading && !state.error && !state.busy });
             }
             else if (!inboxAction && !profilePin && this.ports.isCurrentBoardMenuPin(pinUrl, pageKey)) {
                 const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
                 const download: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-download');
                 const more: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-see-more');
-                const edit: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-edit' && option.enabled);
                 state.options = [];
                 state.actions = [
-                    { id: 'board-menu-cancel-save', label: '取消收藏', enabled: !this.ports.cancelledBoardPins().has(pinUrl) && !state.loading && !state.error && !state.busy &&
+                    { id: 'board-menu-cancel-save', label: PinmonyI18n.message("pm_unsave_dca60869"), enabled: !this.ports.cancelledBoardPins().has(pinUrl) && !state.loading && !state.error && !state.busy &&
                             !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && !board.loadingMore && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
-                    { id: 'board-menu-move', label: '移至其他图板', enabled: !state.loading && !state.error && !state.busy &&
+                    { id: 'board-menu-move', label: PinmonyI18n.message("pm_move_to_another_board_62574b0d"), enabled: !state.loading && !state.error && !state.busy &&
                             !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
-                    { id: 'home-download', label: '下载', enabled: !!download?.enabled },
-                    { id: 'home-see-more', label: '查看更多', enabled: !!more?.enabled },
-                    { id: 'home-system-share', label: '系统分享', enabled: !state.loading && !state.error && !state.busy }
+                    { id: 'home-download', label: PinmonyI18n.message("pm_download_4673a230"), enabled: !!download?.enabled },
+                    { id: 'home-see-more', label: PinmonyI18n.message("pm_see_more_92b2b2de"), enabled: !!more?.enabled },
+                    { id: 'home-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), enabled: !state.loading && !state.error && !state.busy }
                 ];
                 state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.enabled);
-                if(edit)state.actions.unshift(edit);
                 if (board && /\/pins\/$/i.test(board.pageKey)) {
                     state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean =>
                         option.id !== 'board-menu-cancel-save' && option.id !== 'board-menu-move');
@@ -155,7 +154,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                 this.homeStore.customHomeMenu = undefined;
                 this.pinStore.shareLoading = true;
                 const snapshot: string = JSON.stringify({ kind: 'state', session: token, pinUrl: pinUrl,
-                    title: '分享', options: state.options, actions: [], contacts: [], query: '' });
+                    title: PinmonyI18n.message("pm_share_7e564575"), options: state.options, actions: [], contacts: [], query: '' });
                 await this.ports.controller().runJavaScript('(function(){ var snapshot=' + snapshot +
                     '; function publish(){ if (!window.PinmonyPostApi || !window.PinmonyShareBridge) return; ' +
                     'window.PinmonyShareBridge.sheetState(JSON.stringify(window.PinmonyPostApi.shareSnapshot(snapshot,publish))); } publish(); ' +
@@ -206,7 +205,9 @@ async performCustomHomeAction(id: string): Promise<void> {
             else {
               this.ports.cancelledBoardPins().add(menu.pinUrl);
               this.ports.setRetainedBoardContent(this.boardStore.boardDetail);
-              this.ports.dismissShareSheet();this.ports.showMessage(PinmonyI18n.message("pm_unsaved_7fa7b63b"));
+              if (this.ports.dismissShareSheetAfterAction) await this.ports.dismissShareSheetAfterAction();
+              else this.ports.dismissShareSheet();
+              this.ports.showMessage(PinmonyI18n.message("pm_unsaved_7fa7b63b"));
             }
           }catch (_) {if(nativeCurrent())menu.error = PinmonyI18n.message("pm_unsave_result_not_confirmed_close_and_refresh_to_check_it_will_n_65520a27");}
           finally {if(nativeCurrent()){menu.busy = false;menu.actions.forEach((option: PinmonyHomeMenuOption): void => {option.enabled = false;});}}
@@ -242,7 +243,8 @@ async performCustomHomeAction(id: string): Promise<void> {
                         });
                         this.boardStore.boardDetail = JSON.parse(JSON.stringify(board)) as PinmonyBoardDetail;
                         this.ports.setRetainedBoardContent(board);
-                        this.ports.dismissShareSheet();
+                        if (this.ports.dismissShareSheetAfterAction) await this.ports.dismissShareSheetAfterAction();
+                        else this.ports.dismissShareSheet();
                         this.ports.showMessage(PinmonyI18n.message("pm_unsaved_7fa7b63b"));
                     }
                     else {
@@ -286,12 +288,7 @@ async performCustomHomeAction(id: string): Promise<void> {
             return;
         const pinUrl: string = menu.pinUrl;
         const page: string = this.homeStore.homeMenuPage;
-        if (this.ports.isCurrentBoardMenuPin(pinUrl, page)) {
-            await this.ports.shareBoardPinAfterMenu(pinUrl, page);
-            return;
-        }
-        this.ports.dismissShareSheet();
-        await this.ports.sharePinUrl(pinUrl);
+        await this.ports.shareBoardPinAfterMenu(pinUrl, page);
         return;
     }
     if (id === 'home-save') {

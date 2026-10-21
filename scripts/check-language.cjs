@@ -223,3 +223,30 @@ assert.equal(f.api.render(disabledFeed.filters[0].group,'en'),'Filters');
 assert(disabledFeed.filters.every(o=>!o.enabled));assert.equal(disabledFeed.targets.size,0);
 assert.equal(search.filterLabel('','网站自定义类型'),'网站自定义类型');
 assert.equal(search.filterGroup('网站自定义分组'),'网站自定义分组');
+
+const NotificationCopy = nativeLoader.loadFile('feature_settings/src/main/ets/models/PinmonyNotificationCopy.ets').PinmonyNotificationCopy;
+const notificationCategory = {key:'comments',label:'评论',description:'网站中文说明',channels:[{channel:'push',option:'published_comments',label:'推送',value:true},{channel:'news',option:'published_comments',label:'应用内',value:false}]};
+assert.equal(NotificationCopy.group({key:'unknown',label:'你创建的内容',categories:[notificationCategory]},'en'),'Pins you created');
+assert.equal(NotificationCopy.category(notificationCategory,'en'),'Comments');
+assert.equal(NotificationCopy.summary(notificationCategory,'en'),'Push on, in-app off');
+assert.equal(NotificationCopy.description(notificationCategory,'en'),'Get notified when someone comments on a Pin you created');
+assert.equal(NotificationCopy.category(notificationCategory,'zh'),'评论');
+assert.equal(NotificationCopy.category({key:'unknown',label:'网站新类型',channels:[]},'en'),'网站新类型');
+assert.deepEqual(Array.from(notificationCategory.channels,c=>c.value),[true,false]);
+
+// Full-app producer and presentation regressions: switch without refetching data.
+const HomeReader = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyHomeNativeReads.ets').PinmonyHomeNativeReads;
+const homeReader = Object.create(HomeReader.prototype);
+Object.assign(homeReader,{board:'',store:{home:undefined},tabs:[{id:'tab:22',label:'插画',enabled:true,selected:false}]});
+assert.deepEqual(Array.from(homeReader.makeTabs(),tab=>f.api.render(tab.label,'en')),['All','插画']);
+// Exercise the reader with its actual source method, retaining website board names.
+const homeSource=fs.readFileSync('entry/src/main/ets/app/PinmonyHomeNativeReads.ets','utf8');
+assert(homeSource.includes('pm_all_ae99f297'));
+assert.equal(f.api.render(search.boardCounts({pin_count:23,section_count:2}),'en'),'23 Pins · 2 sections');
+assert.equal(f.api.render(search.boardCounts({pin_count:23,section_count:2}),'zh'),'23 张 Pin 图 · 2 个图板区块');
+const profileLanguageView=methodView('feature_profile/src/main/ets/components/PinmonyProfilePanelPage.ets','syncFollowingLanguage(', '  private displayedSection:');
+profileLanguageView.followingSegments=[{text:''},{text:''}];
+profileLanguageView.syncFollowingLanguage();assert.equal(profileLanguageView.followingSegments[0].text,'Profiles');
+profileLanguageView.uiLanguage='zh';profileLanguageView.syncFollowingLanguage();assert.equal(profileLanguageView.followingSegments[1].text,'图板');
+
+require('./check-live-language.cjs')(ts, f.api);

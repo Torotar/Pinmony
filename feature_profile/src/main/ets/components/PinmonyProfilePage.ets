@@ -149,9 +149,9 @@ export struct PinmonyProfilePage {
   }
 
   @Builder
-  private sectionTab(section: string, name: string) {
+  private sectionTab(section: string, nameKey: string) {
     Column({ space: 6 }) {
-      Text(name)
+      Text(PinmonyI18n.text(nameKey, this.uiLanguage))
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text'))
@@ -170,7 +170,7 @@ export struct PinmonyProfilePage {
       this.onTab(section);
       setTimeout(() => { this.sectionMotion = 0; }, 180);
     })
-    .accessibilityText(name)
+    .accessibilityText(PinmonyI18n.text(nameKey, this.uiLanguage))
     .accessibilitySelected(this.profile.section === section)
   }
 
@@ -385,7 +385,7 @@ export struct PinmonyProfilePage {
     Column({ space: 7 }) {
       this.boardCover(board)
       Row({ space: 6 }) {
-        Text(board.title)
+        Text(PinmonyI18n.render(board.title, this.uiLanguage))
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text'))
@@ -430,7 +430,7 @@ export struct PinmonyProfilePage {
         .onClick(() => { if (this.interactionReady && this.onPin) this.onPin(pin.id); })
       Row({ space: 4 }) {
         if (pin.title.length > 0) {
-          Text(pin.title)
+          Text(PinmonyI18n.render(pin.title, this.uiLanguage))
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text'))
@@ -497,7 +497,7 @@ export struct PinmonyProfilePage {
         .width('100%')
         .alignItems(VerticalAlign.Top)
         .margin({ bottom: 24 })
-      }, (start: number) => this.contentColumns().toString() + ':' + start.toString() + ':' + this.profile.boards[start].id)
+      }, (start: number) => this.contentColumns().toString() + ':' + start.toString() + ':' + this.profile.boards[start].id + ':' + this.uiLanguage)
     } else if (this.profile.section === 'created' && this.profile.createdPins.length > 0) {
       WaterFlow() {
         ForEach(this.profile.createdPins, (pin: PinmonyCreatedPin) => {
@@ -505,7 +505,7 @@ export struct PinmonyProfilePage {
             this.createdPinCard(pin)
           }
           .width('100%')
-        }, (pin: PinmonyCreatedPin) => pin.id)
+        }, (pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage)
       }
       .width('100%')
       .columnsTemplate(this.contentColumnsTemplate())
@@ -647,8 +647,8 @@ export struct PinmonyProfilePage {
             this.profileHeader()
           }.width('100%').constraintSize({ maxWidth: 760 })
           Row({ space: 38 }) {
-            this.sectionTab('created', this.uiText("pm_created_80bfa30d"))
-            this.sectionTab('saved', this.uiText("pm_saved_471dd4d7"))
+            this.sectionTab('created', "pm_created_80bfa30d")
+            this.sectionTab('saved', "pm_saved_471dd4d7")
           }
           .width('100%')
           .height(72)

@@ -8,6 +8,7 @@ import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNav
 
 @Component
 struct PinmonyAboutInfoRow {
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
 
   @Prop icon: Resource = $r('sys.symbol.info_circle');
   @Prop title: string = '';
@@ -21,8 +22,8 @@ struct PinmonyAboutInfoRow {
       }.width(44).height(44).backgroundColor($r('app.color.page_background')).borderRadius(12)
         .accessibilityLevel('no')
       Column({ space: 6 }) {
-        Text(this.title).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-        Text(this.description).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+        Text(PinmonyI18n.render(this.title, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Text(PinmonyI18n.render(this.description, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (this.link) {
         SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16)
@@ -148,7 +149,7 @@ export struct PinmonyAboutPage {
               Text(item.body || this.uiText("pm_no_release_notes_provided_for_this_version_631cfa84")).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
             }.width('100%').alignItems(HorizontalAlign.Start).padding(18)
               .backgroundColor($r('app.color.input_surface')).borderRadius(20)
-          }, (item: PinmonyRelease) => item.tag_name)
+          }, (item: PinmonyRelease) => (item.tag_name) + ':' + this.uiLanguage)
           Column() {
             PinmonyAboutInfoRow({ icon: $r('sys.symbol.info_circle'), title: this.uiText("pm_about_the_project_224e0b60"), description:
               this.uiText("pm_an_unofficial_pinterest_client_for_harmonyos_with_a_native_arkui_5990368f") })

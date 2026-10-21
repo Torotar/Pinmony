@@ -56,7 +56,7 @@ export struct PinmonyHomeMenuSheet {
             Blank().layoutWeight(1)
           }, (slot: number) => slot.toString())
           }.width('100%').height(88)
-        }, (page: PinmonyHomeMenuOption[]) => page.map((option: PinmonyHomeMenuOption) => option.id).join(':'))
+        }, (page: PinmonyHomeMenuOption[]) => (page.map((option: PinmonyHomeMenuOption) => option.id).join(':')) + ':' + this.uiLanguage)
       }
       .width('100%').height(88).loop(false).indicator(false)
       .onSizeChange((_oldSize: SizeOptions, newSize: SizeOptions) => {
@@ -68,7 +68,7 @@ export struct PinmonyHomeMenuSheet {
         LoadingProgress().width(28).height(28)
       } else if (this.menu.error) {
         Text(PinmonyI18n.render(this.menu.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-        if (!/取消收藏|收藏校验/.test(this.menu.error)) {
+        if (!/取消收藏|收藏校验/.test(PinmonyI18n.render(this.menu.error, 'zh'))) {
           Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
         }
       } else {
@@ -94,7 +94,7 @@ export struct PinmonyHomeMenuSheet {
           .width('100%').padding(0).backgroundColor(Color.Transparent)
           .enabled(option.enabled && !this.menu.busy)
           .onClick(() => { if (this.onAction) this.onAction(option.id); })
-        }, (option: PinmonyHomeMenuOption) => option.id + ':' + option.enabled.toString())
+        }, (option: PinmonyHomeMenuOption) => (option.id + ':' + option.enabled.toString()) + ':' + this.uiLanguage)
         }.width('100%')
       }
       if (this.menu.busy) { LoadingProgress().width(24).height(24) }

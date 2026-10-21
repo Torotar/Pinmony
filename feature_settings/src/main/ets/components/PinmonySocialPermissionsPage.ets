@@ -1,5 +1,4 @@
 import { BlurStrategy, HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
-import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
@@ -8,7 +7,7 @@ import { SocialBlockedUser, SocialMessageGroup, SocialMessageChoice } from '../m
 export struct PinmonySocialPermissionsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
-  @StorageLink('pinmonyLanguage') @Watch('syncSegments') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @ObjectLink store: PinmonySettingsStore;
   onBack?: () => void;
   onRequest?: (action: string, value: string) => void;
@@ -17,21 +16,13 @@ export struct PinmonySocialPermissionsPage {
   private visible: boolean = false;
   private stack: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
-  private readonly segments: SegmentButtonV2Items = new SegmentButtonV2Items([
-    { text: this.uiText('pm_social_friends') }, { text: this.uiText('pm_social_followers') },
-    { text: this.uiText('pm_social_following') }, { text: this.uiText('pm_social_others_short') }
-  ]);
-  private syncSegments(): void {
-    const labels: string[] = ['pm_social_friends','pm_social_followers','pm_social_following','pm_social_others_short'];
-    labels.forEach((key: string, index: number): void => { this.segments[index].text = this.uiText(key); });
-  }
   private uiText(key: string): string { return PinmonyI18n.text(key, this.uiLanguage); }
-  aboutToAppear(): void { this.visible = true; this.syncSegments(); this.stack.pushPath({ name: 'social' }, false); }
+  aboutToAppear(): void { this.visible = true; this.stack.pushPath({ name: 'social' }, false); }
   aboutToDisappear(): void { this.visible = false; this.confirming = false; }
   private available(): boolean { return this.visible && !this.store.busy && !this.store.loading && !this.store.writeUncertain && !this.confirming; }
   private title(): string {
     const screens: string[] = ['social','socialMessages','socialBlocked','socialMentions','socialFriends','socialFollowers','socialFollowing','socialOthers'];
-    const titles: string[] = ['pm_social_title','pm_social_messages','pm_social_blocked','pm_social_mentions','pm_social_friends','pm_social_followers','pm_social_following','pm_social_others'];
+    const titles: string[] = ['pm_social_title','pm_social_messages','pm_social_blocked','pm_social_mentions','pm_social_friends','pm_social_followers','pm_social_following',this.store.social.personal ? 'pm_social_others_short' : 'pm_social_others'];
     return this.uiText(titles[screens.indexOf(this.store.screen)] || 'pm_social_title');
   }
   private open(screen: string): void {
@@ -40,17 +31,12 @@ export struct PinmonySocialPermissionsPage {
     if (this.onRequest) this.onRequest(screen === 'socialBlocked' ? 'socialBlocked' : 'socialRead','');
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
   }
-  private groupId(): number { return this.store.screen === 'socialMessages' && this.store.social.personal ? this.store.socialMessageGroup : this.store.screen === 'socialFriends' ? 0 : this.store.screen === 'socialFollowers' ? 1 : this.store.screen === 'socialFollowing' ? 2 : 4; }
-  private selectGroup(index: number): void {
-    const groups: number[] = [0,1,2,4];
-    if (!this.visible || this.store.screen !== 'socialMessages' || !this.store.social.personal || this.store.busy || this.store.loading || this.confirming || !Number.isInteger(index) || index < 0 || index >= groups.length) return;
-    this.store.socialMessageGroup = groups[index];
-  }
+  private groupId(): number { return this.store.screen === 'socialFriends' ? 0 : this.store.screen === 'socialFollowers' ? 1 : this.store.screen === 'socialFollowing' ? 2 : 4; }
   private group(id: number): SocialMessageGroup | undefined { return this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === id); }
   private levelLabel(level: number): string { return this.uiText(level === 0 ? 'pm_social_direct' : level === 1 ? 'pm_social_requests' : 'pm_social_ignore'); }
   private selectionKey(level: number): string {
     const selected: number = this.store.screen === 'socialMentions' ? this.store.social.mentions ?? -1 : this.group(this.groupId())?.selected ?? -1;
-    return this.store.screen + ':' + this.groupId() + ':' + level + ':' + this.store.token + ':' + selected + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain + ':' + this.store.social.ready + ':' + this.store.social.protected;
+    return this.store.screen + ':' + this.groupId() + ':' + level + ':' + this.store.token + ':' + selected + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain + ':' + this.store.social.ready + ':' + this.store.social.protected + ':' + this.uiLanguage;
   }
   private choose(level: number): void {
     if (!this.available() || !this.store.social.ready || this.store.social.protected || !this.onRequest) return;
@@ -81,24 +67,24 @@ export struct PinmonySocialPermissionsPage {
         Row() { Text(this.uiText(title)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
         }.width('100%')
-        if (detail) { Text(detail).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%') }
+        if (detail) { Text(PinmonyI18n.render(detail, this.uiLanguage)).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%') }
       }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:12,bottom:12 })
     }.width('100%').backgroundColor(Color.Transparent).padding(0).enabled(!this.store.busy && !this.store.loading && !this.confirming).onClick(() => this.open(target))
   }
   @Builder
-  private selection(label: string, value: number, selected: number) {
+  private selection(label: string, value: number, selected: number, messageOption: boolean = false) {
     Row() {
-      Text(label).fontSize(20).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Radio({ value: String(value), group: this.store.screen + ':' + this.groupId() }).checked(selected === value)
         .enabled(this.available() && this.store.social.ready && !this.store.social.protected)
         .accessibilityText(label).onChange((checked: boolean) => { if (checked) this.choose(value); })
-    }.width('100%').constraintSize({ minHeight:56 }).onClick(() => this.choose(value))
+    }.width('100%').constraintSize({ minHeight: messageOption ? 48 : 56 }).onClick(() => this.choose(value))
   }
   @Builder
   private messageChoices() {
     Text(this.uiText(this.groupId() === 0 ? 'pm_social_friends_detail' : this.groupId() === 1 ? 'pm_social_followers_detail' : this.groupId() === 2 ? 'pm_social_following_detail' : 'pm_social_others_detail')).fontSize(16).fontColor($r('app.color.primary_text'))
-    Column({ space: 4 }) {
-      ForEach(this.group(this.groupId())?.levels || [], (level: number) => { this.selection(this.levelLabel(level),level,this.group(this.groupId())!.selected) }, (level: number): string => this.selectionKey(level))
+    Column({ space: 0 }) {
+      ForEach(this.group(this.groupId())?.levels || [], (level: number) => { this.selection(this.levelLabel(level),level,this.group(this.groupId())!.selected,true) }, (level: number): string => this.selectionKey(level))
     }.width('100%')
   }
   @Builder
@@ -114,20 +100,12 @@ export struct PinmonySocialPermissionsPage {
       Text(this.uiText('pm_social_business_detail')).fontSize(16).fontColor($r('app.color.secondary_text'))
       Text(this.uiText('pm_social_unavailable')).fontSize(14).fontColor($r('app.color.secondary_text'))
       }
-      if (this.store.social.ready && this.store.social.personal) {
-        CapsuleSegmentButtonV2({ items: this.segments, enableStateAnimation: true,
-          selectedIndex: [0,1,2,4].indexOf(this.store.socialMessageGroup),
-          onItemClicked: (index: number) => { this.selectGroup(index); }
-        }).width('100%').enabled(!this.store.busy && !this.store.loading && !this.confirming)
-        this.messageChoices()
-      } else {
       Column({ space: 0 }) {
         this.link('pm_social_friends','', 'socialFriends')
         this.link('pm_social_followers','', 'socialFollowers')
         this.link('pm_social_following','', 'socialFollowing')
-        this.link('pm_social_others','', 'socialOthers')
+        this.link(this.store.social.personal ? 'pm_social_others_short' : 'pm_social_others','', 'socialOthers')
       }.width('100%')
-      }
     } else if (this.store.screen === 'socialBlocked') {
       Text(this.uiText('pm_social_blocked_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
       if (this.store.social.blocked.length) {
@@ -135,12 +113,13 @@ export struct PinmonySocialPermissionsPage {
         ForEach(this.blocked(), (user: SocialBlockedUser) => {
           Row({ space:12 }) {
             if (user.image) { Image(user.image).width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover) }
-            Column({ space:4 }) { Text(user.name).fontColor($r('app.color.primary_text')); Text('@' + user.username).fontColor($r('app.color.secondary_text')) }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+            Column({ space:4 }) { Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontColor($r('app.color.primary_text')); Text('@' + user.username).fontColor($r('app.color.secondary_text')) }.layoutWeight(1).alignItems(HorizontalAlign.Start)
             Button(this.uiText('pm_social_unblock')).enabled(this.available()).onClick(() => this.unblock(user))
           }.width('100%').padding({ top:12,bottom:12 })
-        }, (user: SocialBlockedUser): string => user.id)
+        }, (user: SocialBlockedUser): string => (user.id) + ':' + this.uiLanguage)
         if (!this.blocked().length) { Text(this.uiText('pm_social_no_matches')).fontColor($r('app.color.secondary_text')) }
-      } else if (this.store.social.blockedReady && !this.store.loading && !this.store.error) { Text(this.uiText('pm_social_no_blocked')).width('100%').textAlign(TextAlign.Center).fontColor($r('app.color.secondary_text')).margin({ top:100 }) }
+      } else if (this.store.social.blockedReady && this.store.social.blockedComplete && !this.store.loading && !this.store.error) { Text(this.uiText('pm_social_no_blocked')).width('100%').textAlign(TextAlign.Center).fontColor($r('app.color.secondary_text')).margin({ top:100 }) }
+      if (this.store.social.blockedReady && !this.store.social.blockedComplete) { Text(this.uiText('pm_social_blocked_partial')).fontSize(14).fontColor($r('app.color.secondary_text')) }
     } else if (this.store.screen === 'socialMentions') {
       Text(this.uiText('pm_social_mentions_detail')).fontSize(16).fontColor($r('app.color.primary_text'))
       Column({ space: 4 }) {

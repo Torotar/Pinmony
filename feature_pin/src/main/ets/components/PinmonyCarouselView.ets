@@ -59,7 +59,7 @@ export struct PinmonyCarouselView {
                 .accessibilityText(this.uiFormat("pm_image_value_of_value_value_66dd48e8", [index + 1, this.carousel.items.length, item.title]))
             }
           }.width('100%').height('100%')
-        }, (item: PinmonyCarouselItem): string => `${this.carousel.pinId}:${item.id}:${this.revision}`)
+        }, (item: PinmonyCarouselItem): string => (`${this.carousel.pinId}:${item.id}:${this.revision}`) + ':' + this.uiLanguage)
       }
       .width('100%').height(this.mediaHeight()).loop(false).autoPlay(false)
       .indicator(Indicator.dot().bottom(14)

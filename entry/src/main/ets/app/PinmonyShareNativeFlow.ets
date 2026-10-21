@@ -196,8 +196,8 @@ export class PinmonyShareNativeFlow {
         this.store.shareFeedback = '';
         this.store.shareError = '';
         this.store.shareLoading = true;
-        this.store.shareOptions = mode === 'user' ? ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X'].map((v: string): ShareSheetOption => ({ id: 'native-share:' + v, label: v, icon: '', enabled: false })) : [];
-        this.store.shareActions = mode === 'user' ? [{ id: 'native-copy', label: '复制链接', icon: '', enabled: false }] : mode === 'pin' ? [{ id: 'native-system-share', label: '系统分享', icon: '', enabled: false }] : [];
+        this.store.shareOptions = mode === 'user' ? ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X'].map((v: string): ShareSheetOption => ({ id: 'native-share:' + v, label: v === '短信' ? PinmonyI18n.message('pm_messages_4da199fa') : v, icon: '', enabled: false })) : [];
+        this.store.shareActions = mode === 'user' ? [{ id: 'native-copy', label: PinmonyI18n.message("pm_copy_link_8e86f9b1"), icon: '', enabled: false }] : mode === 'pin' ? [{ id: 'native-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), icon: '', enabled: false }] : [];
         this.ports.show(mode !== 'pin');
         const revision: number = this.revision;
         try {
@@ -207,7 +207,7 @@ export class PinmonyShareNativeFlow {
                     return true;
                 if (d.type !== 'pin' || d.id !== id)
                     throw new Error('pin');
-                this.store.shareActions = [{ id: 'native-system-share', label: '系统分享', icon: '', enabled: true }];
+                this.store.shareActions = [{ id: 'native-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), icon: '', enabled: true }];
                 this.tracking = d.client_tracking_params || d.tracking_params || '';
                 if (this.tracking.length > 16384)
                     this.tracking = '';

@@ -50,6 +50,25 @@ const Flow = load('entry/src/main/ets/app/PinmonyPhotoSearchFlow.ets', 'PinmonyP
   const switched = flow.search(); session.generation++; selected('photo-uri'); await switched;
   assert.equal(uploaded, 0, 'Session changes must prevent upload');
   const valid = flow.search(); selected('photo-uri'); assert.equal((await valid).length, 1);
+  const requests = [];
+  const fullPhoto = new ArrayBuffer(24);
+  ports.read = async (uri, ...extra) => {
+    assert.equal(uri, 'photo-uri'); assert.equal(extra.length, 0, 'Region search must read the complete original photo');
+    return fullPhoto;
+  };
+  ports.network = () => ({ cancel() {}, searchUploadedPhoto: (bytes, page, session, current, job, region) => {
+    assert.equal(bytes, fullPhoto);
+    return new Promise(resolve => requests.push({ region, resolve }));
+  } });
+  const firstRegion = { x: .1, y: .1, w: .5, h: .5 };
+  const newerRegion = { x: .3, y: .2, w: .4, h: .6 };
+  const first = flow.crop(firstRegion); await new Promise(resolve => setImmediate(resolve));
+  const second = flow.crop(newerRegion); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(JSON.stringify(requests[0].region), JSON.stringify(firstRegion));
+  assert.equal(JSON.stringify(requests[1].region), JSON.stringify(newerRegion));
+  requests[1].resolve(JSON.stringify(body)); assert.equal((await second).length, 1);
+  requests[0].resolve(JSON.stringify({ ...body, data: [] }));
+  assert.equal(await first, undefined, 'Old selection results must not overwrite the latest region');
   flow.open('not-returned'); assert.equal(opened, 0);
   flow.open('123'); assert.equal(opened, 1);
   session.generation++; flow.open('123'); assert.equal(opened, 1);

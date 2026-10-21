@@ -149,7 +149,7 @@ export class PinmonyPostNativeOperations {
     const r: Resource = await this.request('BoardPickerBoardsResource','get',{pin_id:this.id(),field_set_key:'profile_grid_item',shortlist_length:2,shortlist_suggestions:3,user_id:this.viewer},revision) as Resource;
     const d: PickerData = r.data as PickerData;if(!d || !Array.isArray(d.all_boards) || !Array.isArray(d.boards_shortlist) || d.all_boards.length > 2000 || d.boards_shortlist.length > 2000)throw new Error('picker');
     const p: PinmonySaveResult = this.picker();p.items = d.all_boards.map((b: NativeBoard): PinmonySaveBoard => this.board(b));p.shortlist = d.boards_shortlist.map((b: NativeBoard): PinmonySaveBoard => this.board(b));
-    if(this.mode === 'save' && PIN_PROFILE_ORGANIZE_ENABLED)p.items.push({id:'profile-quick-saves',name:'个人资料',imageUrl:'',enabled:true,secret:false});
+    if(this.mode === 'save' && PIN_PROFILE_ORGANIZE_ENABLED)p.items.push({id:'profile-quick-saves',name:PinmonyI18n.message("pm_profile_b94d13a4"),imageUrl:'',enabled:true,secret:false});
     p.loading = false;this.publish();
   }
   async openSave(pin: string): Promise<void> {
@@ -225,14 +225,14 @@ export class PinmonyPostNativeOperations {
     this.verifiedCopy = ownSaved ? '' : copy;const options: Options = {id:copy}, tracking: string | undefined = ownSaved ? p.tracking_params : p.client_tracking_params || p.tracking_params;
     if(tracking){if(tracking.length > 16384)throw new Error('tracking');options.client_tracking_params = ownSaved ? tracking + '~0' : tracking;}
     this.sent = true;const removed: Resource = await this.request('PinResource','delete',options,revision) as Resource;if(removed.code !== 0 || removed.endpoint_name !== 'v3_delete_pin_handler')throw new Error('remove');
-    this.sent = false;this.saved.delete(this.id());if(this.store.saveUndoPin === this.pin){this.store.saveUndoPin = '';this.store.saveUndoId = '';}this.store.confirmedSaves.confirm(this.id(),false);this.apply();this.ports.committed('remove-save',this.pin);this.ports.feedback(ownSaved ? '已取消收藏' : PinmonyI18n.message("pm_save_undone_7d8baadf"));
+    this.sent = false;this.saved.delete(this.id());if(this.store.saveUndoPin === this.pin){this.store.saveUndoPin = '';this.store.saveUndoId = '';}this.store.confirmedSaves.confirm(this.id(),false);this.apply();this.ports.committed('remove-save',this.pin);this.ports.feedback(ownSaved ? PinmonyI18n.message("pm_unsaved_7fa7b63b") : PinmonyI18n.message("pm_save_undone_7d8baadf"));
     this.store.saveResult.savedId = '';this.store.saveResult.savedBoard = '';this.store.saveResult.feedback = PinmonyI18n.message("pm_save_undone_7d8baadf");this.publish();
   }
   async cancelSave(pin: string): Promise<void> {
     if(!this.sync())return;
     if(this.uncertainCancels.has(this.id(pin))){this.ports.feedback(PinmonyI18n.message("pm_unsave_result_not_confirmed_reload_to_check_before_submitting_ag_aba92f81"));return;}
     if(!PIN_POST_EXTENSIONS_ENABLED || !this.begin('cancel',pin))return;const revision: number = this.revision;this.busy = true;this.store.viewerSaveBusy = true;
-    try {await this.base(revision);await this.removeCopy(revision);}catch (_) {if(revision === this.revision)this.markUnknown();if(this.valid(revision))this.ports.feedback(this.sent ? '取消收藏结果未确认，请重新读取核对；不会重复提交' : PinmonyI18n.message("pm_saved_copy_verification_failed_nothing_was_unsaved_f0d571ad"));}
+    try {await this.base(revision);await this.removeCopy(revision);}catch (_) {if(revision === this.revision)this.markUnknown();if(this.valid(revision))this.ports.feedback(this.sent ? PinmonyI18n.message("pm_unsave_result_not_confirmed_reload_to_check_it_will_not_be_resub_97357a44") : PinmonyI18n.message("pm_saved_copy_verification_failed_nothing_was_unsaved_f0d571ad"));}
     finally {if(revision === this.revision){this.busy = false;this.sent = false;this.store.viewerSaveBusy = false;}}
   }
   owns(pin: string): boolean {
@@ -257,7 +257,7 @@ export class PinmonyPostNativeOperations {
       if(reaction !== 0 || !raw.tracking_params || raw.tracking_params.length > 16384)throw new Error('reaction');
       this.sent = true;const r: Resource = await this.request('ApiResource','create',{url:'/v3/pins/' + this.id() + '/react/',data:{client_tracking_params:raw.tracking_params,reaction_type:1}},revision) as Resource,p: NativePin = r.data as NativePin;
       if(!p || p.id !== this.id())throw new Error('like');this.sent = false;this.liked.add(this.id());this.apply();this.ports.committed('like',pin);
-    }catch (_) {if(revision === this.revision)this.markUnknown();if(this.valid(revision))this.ports.feedback(this.sent ? '点赞结果未确认，请重新读取核对；不会重复提交' : PinmonyI18n.message("pm_like_status_or_tracking_details_not_confirmed_5341ec8c"));}
+    }catch (_) {if(revision === this.revision)this.markUnknown();if(this.valid(revision))this.ports.feedback(this.sent ? PinmonyI18n.message("pm_like_result_not_confirmed_reload_to_check_it_will_not_be_resubmi_30ddc2ea") : PinmonyI18n.message("pm_like_status_or_tracking_details_not_confirmed_5341ec8c"));}
     finally {if(revision === this.revision){this.busy = false;this.sent = false;}}
   }
   async editAction(method: string, encoded: string): Promise<void> {
@@ -283,7 +283,7 @@ export class PinmonyPostNativeOperations {
       if(!remove && (!p || p.id !== this.id() || p.board?.id !== edit.board.id || p.pinner?.id !== undefined && p.pinner.id !== this.viewer || !Array.isArray(p.ai_disclosures) || p.ai_disclosures.includes(1) !== edit.ai ||
         edit.editableContent && ((edit.title !== (this.raw.title || '') && p.title !== edit.title) || (edit.description !== (this.raw.description || '') && p.description !== edit.description))))throw new Error('edit-result');
       this.sent = false;if(!remove)this.edited.set(this.id(),p);else this.store.confirmedSaves.confirm(this.id(),false);
-      this.apply();this.lock(false);this.busy = false;const pin: string = this.pin;this.dismiss('edit');this.ports.committed(remove ? 'delete' : 'edit',pin);this.ports.feedback(remove ? '已从你的图板移除 Pin 图' : PinmonyI18n.message("pm_changes_saved_1045a8e6"));
+      this.apply();this.lock(false);this.busy = false;const pin: string = this.pin;this.dismiss('edit');this.ports.committed(remove ? 'delete' : 'edit',pin);this.ports.feedback(remove ? PinmonyI18n.message("pm_pin_removed_from_your_board_d44f44e2") : PinmonyI18n.message("pm_changes_saved_1045a8e6"));
     }catch (_) {if(this.valid(revision))this.fail(PinmonyI18n.message("pm_result_not_confirmed_close_and_reload_to_check_it_will_not_be_re_d952b803"),this.sent);}
     finally {if(revision === this.revision){this.busy = false;this.sent = false;this.lock(false);}}
   }
@@ -297,7 +297,7 @@ export class PinmonyPostNativeOperations {
     if(!actions.some((a: PinmonyDetailAction): boolean => a.kind === 'save'))actions.push({
       id:'native-save',kind:'save',label:this.store.confirmedSaves.isSaved(id) ? PinmonyI18n.message("pm_saved_471dd4d7") : PinmonyI18n.message("pm_save_60a53514"),countText:'',enabled:true,selected:this.store.confirmedSaves.isSaved(id)});
     if(!actions.some((a: PinmonyDetailAction): boolean => a.kind === 'like'))actions.push({
-      id:'native-like',kind:'like',label:'点赞',countText:'',enabled:!this.liked.has(id) && !this.likeBlocked(detail.pinUrl),selected:this.liked.has(id)});
+      id:'native-like',kind:'like',label:PinmonyI18n.message("pm_like_aced5d7f"),countText:'',enabled:!this.liked.has(id) && !this.likeBlocked(detail.pinUrl),selected:this.liked.has(id)});
     detail.actions = actions;const edit: NativePin | undefined = this.edited.get(id);if(edit){if(typeof edit.title === 'string')detail.title = edit.title;if(typeof edit.description === 'string')detail.description = edit.description;}
     this.store.detail = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
   }

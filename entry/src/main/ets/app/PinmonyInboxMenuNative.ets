@@ -25,7 +25,7 @@ export class PinmonyInboxMenuNative {
     if(this.account !== account){this.unknown.clear();this.unsubscribed.clear();this.hiddenUndo = undefined;}this.account = account;this.pin = target.notificationPinId;
     const store: PinmonyInboxStore = this.ports.store();store.flowDismissed = false;
     store.inboxFlow = {kind:'nativeFlow',nativeRead:true,nativeToken:this.revision,nativeAccountGeneration:this.ports.session().generation,pageUrl:this.ports.page(),session:store.inboxSession,
-      screen:'updatesMenu',title:'更新',loading:false,error:'',users:[],messages:[],selectedIds:[],hasMore:false,newsId:target.newsId,newsHidden:false,
+      screen:'updatesMenu',title:PinmonyI18n.message("pm_updates_3055a035"),loading:false,error:'',users:[],messages:[],selectedIds:[],hasMore:false,newsId:target.newsId,newsHidden:false,
       canUnsubscribePin:/^\d{1,40}$/.test(this.pin),unsubscribedPin:target.notificationMuted === true || this.unsubscribed.has(this.pin),writeUncertain:this.unknown.has('pin:' + this.pin) || Array.from(this.unknown).some((v: string): boolean => v.startsWith(target.newsId + ':'))};
     return true;
   }
@@ -64,7 +64,7 @@ export class PinmonyInboxMenuNative {
     }catch (error){
       const retry: boolean = error instanceof PinmonyAuxiliaryNotSent || error instanceof PinmonyAuxiliaryRejected;
       if(retry && account === this.client.key())this.unknown.delete(lock);
-      update({writeUncertain:!retry,error:retry ? '操作未提交成功，请重试' : PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27")});
+      update({writeUncertain:!retry,error:retry ? PinmonyI18n.message("pm_action_was_not_submitted_please_retry_af0579a9") : PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27")});
     }finally {update({messageBusy:false});}return true;
   }
 }
