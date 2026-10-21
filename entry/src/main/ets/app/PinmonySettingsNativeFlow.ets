@@ -271,11 +271,12 @@ export class PinmonySettingsNativeFlow {
         });
         if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
         if (!this.current(revision)) return;
-        const snapshot: SocialPermissions = { mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
+        const snapshot: SocialPermissions = { business: raw.is_partner === true, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
         this.store.social = snapshot;
         if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
         groups.forEach((g: SocialMessageGroup): void => { if (this.uncertain.get('social:message:' + g.id) === String(g.selected)) this.uncertain.delete('social:message:' + g.id); });
         this.store.writeUncertain = this.uncertain.size > 0;
+        if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
     }
     private async socialBlocked(revision: number): Promise<void> {
         const query: BlockedQuery = { q: '' }, options: Api = { url: '/v3/users/blocked', data: query };
@@ -287,11 +288,13 @@ export class PinmonySettingsNativeFlow {
             const image: string = u.image_medium_url || u.image_large_url || '';
             return { id: u.id, username: u.username, name: (u.full_name || u.username).slice(0,200), image: /^https:\/\//.test(image) ? image.slice(0,2000) : '' };
         });
+        if (rows.some((u: SocialBlockedUser, i: number): boolean => rows.findIndex((other: SocialBlockedUser): boolean => other.id === u.id) !== i)) throw new Error('duplicate-blocked');
         if (!this.current(revision)) return;
         const old: SocialPermissions = this.store.social;
-        this.store.social = { ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blocked: rows };
+        this.store.social = { business: old.business, ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blocked: rows };
         this.uncertain.forEach((_v: string, key: string): void => { if (key.startsWith('social:unblock:') && !rows.some((u: SocialBlockedUser): boolean => u.id === key.slice(15))) this.uncertain.delete(key); });
         this.store.writeUncertain = this.uncertain.size > 0;
+        if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
     }
     private async socialAction(action: string, value: string, revision: number): Promise<void> {
         if (!this.screen.startsWith('social')) throw new Error('screen');

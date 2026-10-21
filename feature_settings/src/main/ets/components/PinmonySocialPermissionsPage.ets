@@ -34,6 +34,10 @@ export struct PinmonySocialPermissionsPage {
   private groupId(): number { return this.store.screen === 'socialFriends' ? 0 : this.store.screen === 'socialFollowers' ? 1 : this.store.screen === 'socialFollowing' ? 2 : 4; }
   private group(id: number): SocialMessageGroup | undefined { return this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === id); }
   private levelLabel(level: number): string { return this.uiText(level === 0 ? 'pm_social_direct' : level === 1 ? 'pm_social_requests' : 'pm_social_ignore'); }
+  private selectionKey(level: number): string {
+    const selected: number = this.store.screen === 'socialMentions' ? this.store.social.mentions ?? -1 : this.group(this.groupId())?.selected ?? -1;
+    return this.store.screen + ':' + level + ':' + this.store.token + ':' + selected + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain + ':' + this.store.social.ready + ':' + this.store.social.protected;
+  }
   private choose(level: number): void {
     if (!this.available() || !this.store.social.ready || this.store.social.protected || !this.onRequest) return;
     if (this.store.screen === 'socialMentions') { if (level !== this.store.social.mentions) this.onRequest('socialMentions',String(level)); }
@@ -59,12 +63,12 @@ export struct PinmonySocialPermissionsPage {
   @Builder
   private link(title: string, detail: string, target: string) {
     Button() {
-      Column({ space: 10 }) {
+      Column({ space: 6 }) {
         Row() { Text(this.uiText(title)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
         }.width('100%')
-        Text(detail).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%')
-      }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:16,bottom:16 })
+        if (detail) { Text(detail).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%') }
+      }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:12,bottom:12 })
     }.width('100%').backgroundColor(Color.Transparent).padding(0).enabled(!this.store.busy && !this.store.loading && !this.confirming).onClick(() => this.open(target))
   }
   @Builder
@@ -85,13 +89,17 @@ export struct PinmonySocialPermissionsPage {
       this.link('pm_social_mentions',this.uiText('pm_social_mentions_detail'),'socialMentions')
     } else if (this.store.screen === 'socialMessages') {
       Text(this.uiText('pm_social_message_intro')).fontSize(16).fontColor($r('app.color.primary_text'))
+      if (this.store.social.ready && this.store.social.business) {
       Text(this.uiText('pm_social_business_messages')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
       Text(this.uiText('pm_social_business_detail')).fontSize(16).fontColor($r('app.color.secondary_text'))
       Text(this.uiText('pm_social_unavailable')).fontSize(14).fontColor($r('app.color.secondary_text'))
-      this.link('pm_social_friends',this.group(0) ? this.levelLabel(this.group(0)!.selected) : '', 'socialFriends')
-      this.link('pm_social_followers',this.group(1) ? this.levelLabel(this.group(1)!.selected) : '', 'socialFollowers')
-      this.link('pm_social_following',this.group(2) ? this.levelLabel(this.group(2)!.selected) : '', 'socialFollowing')
-      this.link('pm_social_others',this.group(4) ? this.levelLabel(this.group(4)!.selected) : '', 'socialOthers')
+      }
+      Column({ space: 0 }) {
+        this.link('pm_social_friends','', 'socialFriends')
+        this.link('pm_social_followers','', 'socialFollowers')
+        this.link('pm_social_following','', 'socialFollowing')
+        this.link('pm_social_others','', 'socialOthers')
+      }.width('100%')
     } else if (this.store.screen === 'socialBlocked') {
       Text(this.uiText('pm_social_blocked_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
       if (this.store.social.blocked.length) {
@@ -107,11 +115,14 @@ export struct PinmonySocialPermissionsPage {
       } else if (this.store.social.blockedReady && !this.store.loading && !this.store.error) { Text(this.uiText('pm_social_no_blocked')).width('100%').textAlign(TextAlign.Center).fontColor($r('app.color.secondary_text')).margin({ top:100 }) }
     } else if (this.store.screen === 'socialMentions') {
       Text(this.uiText('pm_social_mentions_detail')).fontSize(16).fontColor($r('app.color.primary_text'))
-      ForEach([0,1,2], (level: number) => { this.selection(this.uiText(level === 0 ? 'pm_social_mentions_anyone' : level === 1 ? 'pm_social_mentions_following' : 'pm_social_mentions_off'),level,this.store.social.mentions === undefined ? -1 : this.store.social.mentions) }, (level: number): string => String(level) + ':' + this.store.token)
+      Column({ space: 4 }) {
+        ForEach([0,1,2], (level: number) => { this.selection(this.uiText(level === 0 ? 'pm_social_mentions_anyone' : level === 1 ? 'pm_social_mentions_following' : 'pm_social_mentions_off'),level,this.store.social.mentions === undefined ? -1 : this.store.social.mentions) }, (level: number): string => this.selectionKey(level))
+      }.width('100%')
     } else {
       Text(this.uiText(this.groupId() === 0 ? 'pm_social_friends_detail' : this.groupId() === 1 ? 'pm_social_followers_detail' : this.groupId() === 2 ? 'pm_social_following_detail' : 'pm_social_others_detail')).fontSize(16).fontColor($r('app.color.primary_text'))
-      Text(this.uiText('pm_social_delivery')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-      ForEach(this.group(this.groupId())?.levels || [], (level: number) => { this.selection(this.levelLabel(level),level,this.group(this.groupId())!.selected) }, (level: number): string => this.store.screen + ':' + level + ':' + this.store.token)
+      Column({ space: 4 }) {
+        ForEach(this.group(this.groupId())?.levels || [], (level: number) => { this.selection(this.levelLabel(level),level,this.group(this.groupId())!.selected) }, (level: number): string => this.selectionKey(level))
+      }.width('100%')
     }
   }
   @Builder
