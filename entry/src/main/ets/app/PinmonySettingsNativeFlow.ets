@@ -1,6 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
-import { PinmonySettingsStore, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory } from 'feature_settings';
+import { PinmonySettingsStore, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory, NotificationChannel, NotificationChoice, notificationWritable, notificationGlobal } from 'feature_settings';
 import { PinmonyBusinessSessionContext } from 'common_session';
+import { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from 'feature_settings';
 import { ProfileSettingsPorts, PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
 interface User {
     id: string;
@@ -59,9 +60,16 @@ interface Category {
     channel_options: Channel[];
 }
 interface Channel {
+    channel?: string;
+    category_key?: string;
+    subcategory_key?: string;
     label: string;
     value: boolean;
 }
+interface NotificationUpdate { updated_settings: string; }
+interface SocialUpdate { user_id: string; surface_tag: string; user_confirm_skip_passcode: boolean; allow_mentions?: number; messaging_permissions?: Record<string, number>; }
+interface BlockedUserResponse { id: string; type: string; username: string; full_name?: string; image_medium_url?: string; image_large_url?: string; }
+interface BlockedQuery { q: string; }
 interface Api {
     url: string;
     data?: Object;
@@ -152,6 +160,7 @@ export class PinmonySettingsNativeFlow {
             this.activityClosed.clear();
             this.store.data = undefined;
             this.store.notifications = [];
+            this.store.social = emptySocialPermissions();
             this.client.user = '';
             this.client.viewer = '';
         }
@@ -233,20 +242,104 @@ export class PinmonySettingsNativeFlow {
             return { key: String(g.key).slice(0, 100), label: g.label.slice(0, 200), categories: g.subcategories.slice(0, 60).map((c: Category): NotificationCategory => {
                     if (typeof c.label !== 'string' || !Array.isArray(c.channel_options))
                         throw new Error('category');
-                    return { key: String(c.key).slice(0, 100), label: c.label.slice(0, 200), description: String(c.description || '').slice(0, 500), summary: String(c.channel_options_label || '').slice(0, 500), channels: c.channel_options.slice(0, 10).map((o: Channel): Channel => {
+                    return { key: String(c.key).slice(0, 100), label: c.label.slice(0, 200), description: String(c.description || '').slice(0, 500), summary: String(c.channel_options_label || '').slice(0, 500), channels: c.channel_options.slice(0, 10).filter((o: Channel): boolean => o.channel !== 'web_push').map((o: Channel): NotificationChannel => {
                             if (typeof o.label !== 'string' || typeof o.value !== 'boolean')
                                 throw new Error('channel');
-                            return { label: o.label.slice(0, 100), value: o.value };
+                            return { label: o.label.slice(0, 100), value: notificationGlobal(o.channel || '', o.category_key || '', o.subcategory_key || '') ? !o.value : o.value, channel: o.channel, section: o.category_key, option: o.subcategory_key, editable: notificationWritable(o.channel || '', o.category_key || '', o.subcategory_key || '') };
                         }) };
                 }) };
         });
-        if (this.current(revision))
+        if (this.current(revision)) {
             this.store.notifications = mapped;
+            mapped.forEach((g: NotificationGroup): void => g.categories.forEach((c: NotificationCategory): void => c.channels.forEach((o: NotificationChannel): void => {
+                const key: string = 'notification:' + o.channel + ':' + o.section + ':' + o.option;
+                if (this.uncertain.get(key) === o.value.toString()) this.uncertain.delete(key);
+            })));
+            this.store.writeUncertain = this.uncertain.size > 0;
+            if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
+        }
+    }
+    private async socialRead(revision: number): Promise<void> {
+        const data: Record<string, string> = {};
+        const options: Api = { url: '/v3/users/settings/', data: data };
+        const response: ProfileSettingsResponse = await this.request('ApiResource', 'get', options, this.screen === 'socialMentions' ? '/settings/edit/mentions/' : '/settings/messages/', revision);
+        const raw: SocialSettingsResponse = response.resource_response!.data as SocialSettingsResponse;
+        if (response.resource_response?.endpoint_name !== 'v3_get_user_settings' || raw?.id !== this.client.viewer || !Array.isArray(raw.messaging_permissions) || raw.messaging_permissions.length > 10 || ![0,1,2].includes(raw.allow_mentions!)) throw new Error('social');
+        const groups: SocialMessageGroup[] = raw.messaging_permissions.map((g: SocialMessageResponse): SocialMessageGroup => {
+            if (!g || !socialMessagePath(g.group_id) || !Array.isArray(g.eligible_levels) || !g.eligible_levels.length || g.eligible_levels.length > 3 || g.eligible_levels.some((v: number, i: number): boolean => !socialMessageLevel(g.group_id, v) || g.eligible_levels.indexOf(v) !== i) || !g.eligible_levels.includes(g.selected_level)) throw new Error('social-group');
+            return { id: g.group_id, levels: g.eligible_levels.slice(), selected: g.selected_level };
+        });
+        if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
+        if (!this.current(revision)) return;
+        const snapshot: SocialPermissions = { mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
+        this.store.social = snapshot;
+        if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
+        groups.forEach((g: SocialMessageGroup): void => { if (this.uncertain.get('social:message:' + g.id) === String(g.selected)) this.uncertain.delete('social:message:' + g.id); });
+        this.store.writeUncertain = this.uncertain.size > 0;
+    }
+    private async socialBlocked(revision: number): Promise<void> {
+        const query: BlockedQuery = { q: '' }, options: Api = { url: '/v3/users/blocked', data: query };
+        const response: ProfileSettingsResponse = await this.request('ApiResource', 'get', options, '/settings/blocked-accounts/', revision);
+        const raw: BlockedUserResponse[] = response.resource_response!.data as BlockedUserResponse[];
+        if (response.resource_response?.endpoint_name !== 'v3_get_blocked_list' || !Array.isArray(raw) || raw.length > 500 || response.resource_response?.bookmark && response.resource_response.bookmark !== '-end-') throw new Error('blocked');
+        const rows: SocialBlockedUser[] = raw.map((u: BlockedUserResponse): SocialBlockedUser => {
+            if (!u || u.type !== 'user' || !/^\d{1,40}$/.test(u.id) || u.id === this.client.viewer || !/^[A-Za-z0-9_]{1,100}$/.test(u.username)) throw new Error('blocked-user');
+            const image: string = u.image_medium_url || u.image_large_url || '';
+            return { id: u.id, username: u.username, name: (u.full_name || u.username).slice(0,200), image: /^https:\/\//.test(image) ? image.slice(0,2000) : '' };
+        });
+        if (!this.current(revision)) return;
+        const old: SocialPermissions = this.store.social;
+        this.store.social = { ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blocked: rows };
+        this.uncertain.forEach((_v: string, key: string): void => { if (key.startsWith('social:unblock:') && !rows.some((u: SocialBlockedUser): boolean => u.id === key.slice(15))) this.uncertain.delete(key); });
+        this.store.writeUncertain = this.uncertain.size > 0;
+    }
+    private async socialAction(action: string, value: string, revision: number): Promise<void> {
+        if (!this.screen.startsWith('social')) throw new Error('screen');
+        if (action === 'socialBlocked') { await this.socialBlocked(revision); return; }
+        if (action === 'socialUnblock') {
+            if (this.screen !== 'socialBlocked' || !/^\d{1,40}$/.test(value)) throw new Error('screen');
+            await this.socialBlocked(revision);
+            if (!this.store.social.blocked.some((u: SocialBlockedUser): boolean => u.id === value)) return;
+            this.client.allowed = ['social-unblock:' + value];
+            this.pending = 'social:unblock:' + value; this.uncertain.set(this.pending,'false'); this.sent = true;
+            const options: Api = { url: '/v3/users/' + value + '/block/' };
+            const response: ProfileSettingsResponse = await this.request('ApiResource','delete',options,'/settings/blocked-accounts/',revision);
+            if (response.resource_response?.endpoint_name !== 'v3_unblock_user' || response.resource_response.data !== null) throw new Error('unblock');
+            await this.socialBlocked(revision);
+        } else {
+            await this.socialRead(revision);
+            if (action === 'socialRead') return;
+            if (this.store.social.protected) throw new Error('passcode');
+            const update: SocialUpdate = { user_id: this.client.viewer, surface_tag: 'settings', user_confirm_skip_passcode: false };
+            let source: string = '/settings/edit/mentions/';
+            if (action === 'socialMentions') {
+                if (this.screen !== 'socialMentions' || !['0','1','2'].includes(value)) throw new Error('mentions');
+                if (this.store.social.mentions === Number(value)) return;
+                update.allow_mentions = Number(value); this.pending = 'social:mentions';
+                this.client.allowed = ['social-mentions:' + value];
+            } else if (action === 'socialMessage') {
+                const choice: SocialMessageChoice = JSON.parse(value) as SocialMessageChoice;
+                const expected: string = choice.group === 0 ? 'socialFriends' : choice.group === 1 ? 'socialFollowers' : choice.group === 2 ? 'socialFollowing' : choice.group === 4 ? 'socialOthers' : '';
+                const group: SocialMessageGroup | undefined = this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === choice.group);
+                if (!expected || this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
+                if (group.selected === choice.level) return;
+                const permissions: Record<string,number> = {}; permissions[String(choice.group)] = choice.level; update.messaging_permissions = permissions;
+                this.pending = 'social:message:' + choice.group; value = String(choice.level);
+                this.client.allowed = ['social-message:' + choice.group + ':' + choice.level];
+                source = '/settings/messages/' + socialMessagePath(choice.group) + '/';
+            } else throw new Error('action');
+            this.uncertain.set(this.pending,value); this.sent = true;
+            const response: ProfileSettingsResponse = await this.request('UserSettingsResource','update',update,source,revision);
+            if (response.resource_response?.endpoint_name !== 'v3_edit_settings_handler') throw new Error('result');
+            await this.socialRead(revision);
+        }
+        if (this.uncertain.has(this.pending)) throw new Error('readback');
+        this.sent = false;
     }
     async requestAction(action: string, value: string): Promise<void> {
-        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications'].includes(action))
+        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock'].includes(action))
             return;
-        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy'].includes(action);
+        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock'].includes(action);
         this.bind();
         if (write && this.uncertain.size) {
             this.store.writeUncertain = true;
@@ -278,6 +371,29 @@ export class PinmonySettingsNativeFlow {
             this.client.user = u.id;
             this.client.viewer = u.id;
             this.client.permissions = ['own'];
+            if (action.startsWith('social')) { await this.socialAction(action,value,revision); if (this.current(revision)) this.store.writeUncertain = this.uncertain.size > 0; return; }
+            if (action === 'notificationSet') {
+                if (this.screen !== 'notifications') throw new Error('screen');
+                const choice: NotificationChoice = JSON.parse(value) as NotificationChoice;
+                if (typeof choice.value !== 'boolean' || !notificationWritable(choice.type, choice.section, choice.option)) throw new Error('choice');
+                await this.notify(revision);
+                const channel: NotificationChannel | undefined = this.store.notifications.flatMap((g: NotificationGroup) => g.categories).flatMap((c: NotificationCategory) => c.channels).find((c: NotificationChannel): boolean => c.channel === choice.type && c.section === choice.section && c.option === choice.option && c.editable === true);
+                if (!channel || channel.value === choice.value) return;
+                this.client.allowed = ['notification:' + choice.type + ':' + choice.section + ':' + choice.option];
+                this.pending = 'notification:' + choice.type + ':' + choice.section + ':' + choice.option;
+                this.uncertain.set(this.pending, choice.value.toString());
+                this.sent = true;
+                const wire: NotificationChoice = { type: choice.type, section: choice.section, option: choice.option, value: notificationGlobal(choice.type, choice.section, choice.option) ? !choice.value : choice.value };
+                const update: NotificationUpdate = { updated_settings: JSON.stringify([wire]) };
+                const body: Api = { url: '/v3/settings/notifications/', data: update };
+                const result: ProfileSettingsResponse = await this.request('ApiResource', 'create', body, this.page.slice(this.origin.length), revision);
+                if (result.resource_response?.endpoint_name !== 'v3_post_settings_all_notifications' || !result.resource_response.data || Array.isArray(result.resource_response.data) || (result.resource_response.data as User).id !== this.client.viewer) throw new Error('result');
+                await this.notify(revision);
+                if (this.uncertain.has(this.pending)) throw new Error('readback');
+                this.sent = false;
+                this.store.writeUncertain = this.uncertain.size > 0;
+                return;
+            }
             if (action === 'notifications') {
                 this.store.notifications = [];
                 await this.notify(revision);

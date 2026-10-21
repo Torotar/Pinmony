@@ -1,3 +1,6 @@
+import { BlurStrategy } from '@kit.UIDesignKit';
+import { PinmonyImmersiveLight } from 'common_ui';
+import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsNavigation, HdsNavigationTitleMode, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
@@ -6,6 +9,8 @@ import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 
 @Component
 export struct PinmonyProfilePage {
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop automaticLoadingEnabled: boolean = true;
@@ -173,8 +178,7 @@ export struct PinmonyProfilePage {
     Column({ space: 9 }) {
       if (this.profile.business || this.profile.isOwn === false) {
         Row({ space: 16 }) {
-          if (this.profile.avatarUrl) { Image(this.profile.avatarUrl).width(72).height(72).borderRadius(36)
-            .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); }) }
+          PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 72 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
           Column({ space: 4 }) {
             Text(this.profile.displayName || this.profile.handle).fontSize(this.profile.isOwn === false ? 20 : 24).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).width('100%')
@@ -185,25 +189,7 @@ export struct PinmonyProfilePage {
           }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         }.width('100%')
       } else {
-      Stack({ alignContent: Alignment.Center }) {
-        Column()
-          .width(108)
-          .height(108)
-          .backgroundColor($r('app.color.detail_accent'))
-          .borderRadius(54)
-        if (this.profile.avatarUrl.length > 0) {
-          Image(this.profile.avatarUrl)
-            .width(108)
-            .height(108)
-            .borderRadius(54)
-            .objectFit(ImageFit.Cover)
-        } else {
-          Text((this.profile.displayName || this.profile.handle).slice(0, 1).toUpperCase())
-            .fontSize(52)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.detail_on_accent'))
-        }
-      }
+      PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 108 })
       .width(108)
       .height(108)
       .accessibilityText(this.uiText("pm_profile_picture_5c814f4f")).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
@@ -554,19 +540,18 @@ export struct PinmonyProfilePage {
 
   private profileTitleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-        scrollEffectStyle: { contentStyle: {
-          backIconStyle: { iconColor: $r('app.color.primary_text') },
-          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: {
+          backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+          menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
           titleStyle: { mainTitleColor: $r('app.color.primary_text') }
         } },
         originalStyle: { contentStyle: {
-          backIconStyle: { iconColor: $r('app.color.primary_text') },
-          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+          backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+          menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
           titleStyle: { mainTitleColor: $r('app.color.primary_text') }
-        }, backgroundStyle: {
-        backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 } } },
+        }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
       content: { title: { mainTitle: '' }, stackBuilder: this.compactTitleBuilder,
         backIcon: { isEnabled: true, action: () => this.requestProfileBack() },
         menu: { value: [{ content: { icon: $r('app.media.lucide_share_2'), label: this.uiText("pm_share_profile_6cc3a1d5"), action: () => { if (this.onShare) this.onShare(); } } }] } } };
@@ -575,8 +560,7 @@ export struct PinmonyProfilePage {
   private compactTitle() {
     if (this.compactHeader) {
       Row({ space: 10 }) {
-        if (this.profile.avatarUrl) { Image(this.profile.avatarUrl).width(32).height(32).borderRadius(16)
-          .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); }) }
+        PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 32 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
         Text(this.profile.displayName || this.profile.handle).fontSize(18).fontWeight(FontWeight.Bold)
           .maxFontSize(18).minFontSize(12).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST)
           .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -610,10 +594,7 @@ export struct PinmonyProfilePage {
   private rootCompactTitle() {
     if (this.compactHeader) {
       Row({ space: 10 }) {
-        if (this.profile.avatarUrl) {
-          Image(this.profile.avatarUrl).width(32).height(32).borderRadius(16)
-            .onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
-        }
+        PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 32 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
         Text(this.profile.displayName || this.profile.handle)
           .fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
@@ -628,13 +609,13 @@ export struct PinmonyProfilePage {
       .width('100%').height(56)
       .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
       .titleBar({ avoidLayoutSafeArea: false, enableComponentSafeArea: false,
-        style: {
+        style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
           scrollEffectOpts: { enableScrollEffect: false },
-          systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+          systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
           originalStyle: {
-            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 },
+            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
             contentStyle: {
-              menuStyle: { iconColor: $r('app.color.primary_text') },
+              menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
               titleStyle: { mainTitleColor: $r('app.color.primary_text') }
             }
           }

@@ -16,7 +16,7 @@ async function open(f,r=raw){const p=f.menu.open();assert.equal(f.jobs.at(-1).jo
 async function main(){
 assert(PIN_NATIVE_PIN_MENUS_ENABLED);const f=fixture();await open(f);assert(f.store.moreOptions.some(o=>o.id==='detail-edit'));assert(f.store.moreOptions.some(o=>o.id==='detail-ai-help'));
 await f.menu.action('detail-download');assert.deepEqual(f.effects.at(-1),['download',image]);await f.menu.action('detail-ai-help');assert(f.effects.at(-1)[1].endsWith('/gen-ai-labels'));
-await f.menu.action('detail-share');assert.deepEqual(f.effects.at(-1),['contacts',pin]);assert.equal(f.jobs.length,1);
+const effectsBeforeShare=f.effects.length;await f.menu.action('detail-share');assert.equal(f.effects.length,effectsBeforeShare);assert.equal(f.jobs.length,1);
 const saveCopy=fixture();await open(saveCopy,{...raw,is_repin:true});assert(saveCopy.store.moreOptions.some(o=>o.id==='detail-edit'),'owned saved copy can open restricted editor');
 const foreign=fixture();await open(foreign,{...raw,pinner:{id:'99'}});assert(!foreign.store.moreOptions.some(o=>o.id==='detail-edit'));
 await foreign.menu.action('detail-edit');assert.equal(foreign.effects.length,0,'forged edit action cannot edit another owner');
@@ -83,10 +83,10 @@ async function productionMenus(){
   frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['system-share',pin]);
   h.boardStore.boardDetail={pageKey:route,editable:true,pins:[],flow:{phase:'section',pins:[{id:'11',pinUrl:pin}]}};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-cancel-save'||o.id==='board-menu-move'));h.dismissShareSheet();
-  h.boardStore.boardDetail=undefined;route=pin;pending=h.openApiDetailMore();f.jobs.at(-1).resolve(body(raw));await pending;assert(h.pinStore.moreOptions.some(o=>o.id==='detail-see-more'));assert(h.pinStore.moreOptions.some(o=>o.id==='detail-share'&&o.label==='系统分享'));
+  h.boardStore.boardDetail=undefined;route=pin;pending=h.openApiDetailMore();f.jobs.at(-1).resolve(body(raw));await pending;assert(h.pinStore.moreOptions.some(o=>o.id==='detail-see-more'));assert(!h.pinStore.moreOptions.some(o=>o.id==='detail-share'));
   const shareCount=effects.filter(e=>e[0]==='system-share').length;
-  pending=h.performMoreAction('detail-share');
-  assert.equal(h.activeSheetKind,'more');assert.equal(h.showNativeSheet,false);assert(h.pinStore.moreOptions.length>0);
+  h.dismissMoreSheet();h.activeSheetKind='share';h.showNativeSheet=true;pending=h.shareDetailPinAfterMenu(pin,'',true);
+  assert.equal(h.activeSheetKind,'share');assert.equal(h.showNativeSheet,false);
   assert.equal(effects.filter(e=>e[0]==='system-share').length,shareCount,'system panel must wait for actual Sheet disappearance');
   await h.shareDetailPinAfterMenu(pin);
   h.notifyDetailSystemShareClosed();await flush();assert.equal(h.activeSheetKind,'');
@@ -95,11 +95,11 @@ async function productionMenus(){
   assert.deepEqual(effects.at(-1),['system-share',pin]);assert.equal(web,0);
   const completed=effects.filter(e=>e[0]==='system-share').length;
   h.notifyDetailSystemShareClosed();assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'duplicate disappearance cannot reopen share');
-  h.showNativeSheet=true;h.activeSheetKind='more';pending=h.shareDetailPinAfterMenu(pin);
+  h.showNativeSheet=true;h.activeSheetKind='share';pending=h.shareDetailPinAfterMenu(pin,'',true);
   h.currentPinUrl=()=>'';h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
   assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'leaving the pin during dismissal cancels sharing');
   h.currentPinUrl=()=>pin;
-  h.showNativeSheet=true;h.activeSheetKind='more';pending=h.shareDetailPinAfterMenu(pin);
+  h.showNativeSheet=true;h.activeSheetKind='share';pending=h.shareDetailPinAfterMenu(pin,'',true);
   f.setSession({...f.getSession(),generation:2});h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
   assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'account generation change cancels sharing');
   f.setSession({...f.getSession(),generation:1});

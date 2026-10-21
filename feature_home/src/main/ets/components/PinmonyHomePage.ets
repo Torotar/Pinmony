@@ -67,6 +67,8 @@ export struct PinmonyHomePage {
   private visibleLast: number = -1;
   private prefetchKey: string = '';
   private pendingEnd: boolean = false;
+  private viewportFillKey: string = '';
+  private viewportHeight: number = 0;
   private prefetchNotBefore: number = 0;
   private prefetchTimer: number = -1;
   private lastHomePinCount: number = 0;
@@ -141,18 +143,31 @@ export struct PinmonyHomePage {
   }
 
   private updateHomeChrome(offset: number, state: ScrollState): void {
-    if (this.restoringScroll || !this.home.board) return;
+    if (!this.feedActive || this.restoringScroll || !this.home.board || this.refreshing || this.home.refreshing) return;
     try {
-      const position: number = Math.max(0, this.feedScroller.currentOffset().yOffset);
-      // Idle callbacks may finish at the top without a final scrolling callback.
-      if (state === ScrollState.Idle && position > 4) return;
-      const collapsed: boolean = position > 32 ? true : position <= 4 ? false : this.homeChromeCollapsed;
+      const position = this.feedScroller.offset();
+      if (!position) return;
+      if (position.yOffset <= 1) {
+        this.chromeScrollDistance = 0;
+        if (this.homeChromeCollapsed) {
+          this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+            this.homeChromeCollapsed = false;
+          });
+        }
+        return;
+      }
+      // Match the search results: accumulate intentional scroll in one direction.
+      if (state !== ScrollState.Scroll || !Number.isFinite(offset) || Math.abs(offset) < 0.1) return;
+      if (this.chromeScrollDistance * offset < 0) this.chromeScrollDistance = 0;
+      this.chromeScrollDistance += offset;
+      if (Math.abs(this.chromeScrollDistance) < 20) return;
+      const collapsed: boolean = this.chromeScrollDistance > 0;
+      this.chromeScrollDistance = 0;
       if (collapsed === this.homeChromeCollapsed) return;
       this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
         this.homeChromeCollapsed = collapsed;
       });
     } catch (_) { }
-
   }
 
   private onHomeChanged(): void {
@@ -169,7 +184,9 @@ export struct PinmonyHomePage {
       // WaterFlow may not emit onScrollIndex when identical cards stay mounted.
       if (!sameFeed) {
         this.pendingEnd = false;
+        this.viewportFillKey = '';
         this.homeChromeCollapsed = false;
+        this.chromeScrollDistance = 0;
         this.recoveredSources = {}; this.recoveredRevisions = {}; this.lastImageRecovery = 0;
         this.visibleFirst = 0;
         this.visibleLast = -1;
@@ -185,7 +202,7 @@ export struct PinmonyHomePage {
     if (firstApiSnapshot) this.prefetchNotBefore = Date.now() + 900;
     this.lastHomePinCount = this.home.pins.length;
     this.onImageRecovery();
-    setTimeout(() => { this.resumePendingEnd(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.resumePendingEnd(); this.fillShortViewport(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
   }
 
   private prefetchNextScreen(): void {
@@ -217,7 +234,24 @@ export struct PinmonyHomePage {
   }
 
   private onPrefetchAvailabilityChanged(): void {
+    if (this.refreshing) this.viewportFillKey = '';
     setTimeout(() => { this.resumePendingEnd(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+  }
+
+  private fillShortViewport(): void {
+    if (this.viewportHeight <= 0 || this.offlinePreview || !this.feedActive || !this.paginationReady ||
+      this.loading || this.refreshing || this.pendingTabId || this.home.loadingMore || this.home.refreshing ||
+      this.home.endReached || !this.home.pins.length ||
+      (this.error || this.home.sourceError) && !this.home.categorySourceFailure) return;
+    try {
+      if (!this.feedScroller.isAtEnd() || this.feedScroller.currentOffset().yOffset > 4) return;
+      const key: string = this.home.pageKey + ':' + this.home.session.toString() + ':' + this.home.selectedTab + ':' +
+        this.home.pins.length.toString() + ':' + (this.home.pins[0]?.id || '') + ':' + (this.home.pins[this.home.pins.length - 1]?.id || '');
+      if (this.viewportFillKey === key) return;
+      this.viewportFillKey = key;
+      this.paginationTrace('short-viewport-fill');
+      this.loadNextPageAtEnd();
+    } catch (_) { }
   }
 
   private resumePendingEnd(): void {
@@ -297,6 +331,21 @@ export struct PinmonyHomePage {
 
   private contentColumnsTemplate(): string {
     return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
+  private suppressSwipeClick: boolean = false;
+
+  private swipeCategory(offsetX: number, offsetY: number): void {
+    if ((!this.interactionReady && !this.offlinePreview) || Math.abs(offsetX) < 48 ||
+      Math.abs(offsetX) <= Math.abs(offsetY) * 1.5) return;
+    const selected: number = this.categories.findIndex((tab: PinmonyHomeTab): boolean => tab.selected);
+    if (selected < 0) return;
+    const direction: number = offsetX < 0 ? 1 : -1;
+    for (let index: number = selected + direction; index >= 0 && index < this.categories.length; index += direction) {
+      if (!this.categories[index].enabled) continue;
+      this.selectTab(this.categories[index]);
+      return;
+    }
   }
 
   private imageHeight(pin: PinmonyHomePin): number {
@@ -403,7 +452,7 @@ export struct PinmonyHomePage {
     .width('100%')
     .padding({ left: 16, right: 16, top: 8, bottom: 12 })
     .enabled(this.interactionReady && !!board.boardUrl && !!this.onBoard)
-    .onClick(() => { if (this.onBoard) this.onBoard(board.id); })
+    .onClick(() => { if (!this.suppressSwipeClick && this.onBoard) this.onBoard(board.id); })
     .accessibilityText(this.uiFormat("pm_open_board_value_value_pins_134006a7", [board.name, board.pinCount]))
   }
 
@@ -413,7 +462,7 @@ export struct PinmonyHomePage {
       if (pin.video) {
         PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady })
           .width('100%').height(this.imageHeight(pin))
-          .onClick(() => { if (this.onPin) this.onPin(pin.id); })
+          .onClick(() => { if (!this.suppressSwipeClick && this.onPin) this.onPin(pin.id); })
       } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
         Column() {
           Text(this.uiText("pm_image_failed_to_load_572993f5"))
@@ -426,7 +475,7 @@ export struct PinmonyHomePage {
         .backgroundColor($r('app.color.surface_muted'))
         .justifyContent(FlexAlign.Center)
         .accessibilityText((pin.title || this.uiText("pm_pin_234ff540")) + this.uiText("pm_image_failed_to_load_open_details_8406e8c5"))
-        .onClick(() => { if (this.onPin) this.onPin(pin.id); })
+        .onClick(() => { if (!this.suppressSwipeClick && this.onPin) this.onPin(pin.id); })
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
           Image(this.recoveredSources[pin.imageUrl] || pin.imageUrl)
@@ -455,7 +504,7 @@ export struct PinmonyHomePage {
                 this.onImageRecovery();
               }
             })
-            .onClick(() => { if (this.onPin) this.onPin(pin.id); })
+            .onClick(() => { if (!this.suppressSwipeClick && this.onPin) this.onPin(pin.id); })
           if (pin.saved === true) {
             Column() {
               Text(this.uiText("pm_saved_471dd4d7")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
@@ -475,7 +524,7 @@ export struct PinmonyHomePage {
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
-            .onClick(() => { if (this.onPin) this.onPin(pin.id); })
+            .onClick(() => { if (!this.suppressSwipeClick && this.onPin) this.onPin(pin.id); })
         } else {
           Blank()
         }
@@ -494,7 +543,7 @@ export struct PinmonyHomePage {
         .backgroundColor(Color.Transparent)
         .enabled(this.interactionReady && this.menuReady && !this.menuLoadingId)
         .onClick(() => {
-          if (this.onMore) this.onMore(pin.id);
+          if (!this.suppressSwipeClick && this.onMore) this.onMore(pin.id);
         })
         .accessibilityText(this.uiText("pm_more_options_c611656f"))
       }
@@ -609,7 +658,7 @@ export struct PinmonyHomePage {
             .rowsGap(12)
             .width('100%')
             .height('100%')
-            .padding({ left: 12, right: 12, top: 16 })
+            .padding({ left: 12, right: 12, top: 8 })
             .scrollBar(BarState.Off)
             .onAppear(() => this.restoreScrollPosition())
             .onDidScroll((offset: number, state: ScrollState) => {
@@ -623,6 +672,7 @@ export struct PinmonyHomePage {
               if (this.onVisiblePins) this.onVisiblePins(first, last);
               this.prefetchVisibleDetails();
               this.prefetchNextScreen();
+              setTimeout(() => this.fillShortViewport(), 0);
             })
             .onScrollStop(() => {
               this.updateHomeChrome(0, ScrollState.Idle);
@@ -633,6 +683,8 @@ export struct PinmonyHomePage {
               this.loadNextPageAtEnd();
             })
             .onAreaChange((_oldArea: Area, newArea: Area) => {
+              this.viewportHeight = Number(newArea.height);
+              setTimeout(() => this.fillShortViewport(), 0);
               const width: number = Number(newArea.width);
               if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
             })
@@ -681,7 +733,16 @@ export struct PinmonyHomePage {
         .scrollBar(BarState.Off)
         .align(Alignment.Start)
       }
-      this.feedContent()
+      Column() { this.feedContent() }
+        .width('100%').layoutWeight(1)
+        .onTouch((event: TouchEvent) => {
+          if (event.type === TouchType.Down) this.suppressSwipeClick = false;
+        })
+        .priorityGesture(
+          PanGesture({ direction: PanDirection.Horizontal, distance: 12 })
+            .onActionStart(() => { this.suppressSwipeClick = true; })
+            .onActionEnd((event: GestureEvent) => this.swipeCategory(event.offsetX, event.offsetY))
+        )
     }
     .width('100%').height('100%')
   }

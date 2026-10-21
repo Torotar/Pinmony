@@ -64,6 +64,7 @@ export class PinmonyI18n {
 
   static optionLabel(id: string, original: string, language: string): string {
     const labels: Record<string, string> = {
+      'home-system-share': 'pm_system_share_13a1c63f',
       'home-save': "pm_save_60a53514", 'home-edit': "pm_edit_pin_f9119bcf", 'home-download': "pm_download_image_8894375c",
       'home-see-more': "pm_see_more_92b2b2de", 'home-see-less': "pm_see_less_9c80a8dc", 'home-share': "pm_share_7e564575",
       'board-menu-move': "pm_move_to_another_board_62574b0d", 'board-menu-cancel-save': "pm_unsave_dca60869",

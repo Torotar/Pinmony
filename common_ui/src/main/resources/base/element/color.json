@@ -1,5 +1,8 @@
 {
   "color": [
+    { "name": "display_settings_card", "value": "#ECEFF1" },
+    { "name": "display_settings_control", "value": "#ECEFF1" },
+    { "name": "immersive_title_scrolled", "value": "#C2F7F8FC" },
     { "name": "home_category_selected", "value": "#000000" },
     { "name": "link_text", "value": "#065BD8" },
     { "name": "recommendation_selection", "value": "#6155E8" },

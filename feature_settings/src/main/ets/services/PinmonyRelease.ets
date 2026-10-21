@@ -142,9 +142,9 @@ export class PinmonyReleaseClient {
       const code: number = Number.isFinite(rawCode) ? rawCode : 0;
       PinmonyRuntimeLog.warn('ReleaseCheck: event=failed stage=' + stage + ' status=' + status.toString() +
         ' code=' + code.toString() + ' timeout=' + timedOut.toString() + ' elapsedMs=' + (Date.now() - started).toString());
-      const reason: string = timedOut ? '连接 GitHub 超过 12 秒' : status === 403 || status === 429 ? 'GitHub 访问受限，HTTP ' + status.toString() :
-        status !== 0 && status !== 200 ? 'GitHub 返回 HTTP ' + status.toString() : stage !== 'request' ? '发布信息格式异常' :
-        code !== 0 ? '网络错误 ' + code.toString() : '无法连接 GitHub';
+      const reason: string = timedOut ? PinmonyI18n.message('pm_github_connection_exceeded_12_seconds_f13449d8') : status === 403 || status === 429 ? PinmonyI18n.message('pm_github_access_restricted_http_f36de88e') + status.toString() :
+        status !== 0 && status !== 200 ? PinmonyI18n.message('pm_github_returned_http_8ae4d6ab') + status.toString() : stage !== 'request' ? PinmonyI18n.message('pm_invalid_release_information_1050d6f8') :
+        code !== 0 ? PinmonyI18n.message('pm_network_error_d8e20c2f') + code.toString() : PinmonyI18n.message('pm_unable_to_connect_to_github_a30d0dd6');
       throw new PinmonyReleaseFailure(PinmonyI18n.message("pm_update_check_failed_eaae93d1") + reason + PinmonyI18n.message("pm_tap_to_retry_66897f19"), status);
     } finally {
       if (deadline !== -1) clearTimeout(deadline);

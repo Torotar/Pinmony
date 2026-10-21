@@ -1,3 +1,6 @@
+import { BlurStrategy } from '@kit.UIDesignKit';
+import { PinmonyImmersiveLight } from 'common_ui';
+import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardTarget, PinmonyBoardSection, PinmonyBoardCreator } from '../models/PinmonyBoardDetail';
@@ -29,6 +32,8 @@ interface BoardEditValues {
 
 @Component
 export struct PinmonyBoardPage {
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop discoveryBoard: boolean = false;
@@ -219,6 +224,7 @@ export struct PinmonyBoardPage {
     if (this.snapshot.editable !== true) {
       const follow: BoardTitleMenuItem = { content: {
         icon: new SymbolGlyphModifier(this.snapshot.following ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+          .fontSize(28)
           .fontColor([this.snapshot.following ? $r('app.color.accent') : $r('app.color.primary_text')]),
         label: this.snapshot.followBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.following ? this.uiText("pm_unfollow_dc89d336") : this.uiText("pm_follow_eb137dee"),
         isEnabled: this.snapshot.ready && this.snapshot.canFollow === true && !this.snapshot.followBusy,
@@ -238,15 +244,13 @@ export struct PinmonyBoardPage {
       // Reserve the official title bar's component area above the scrolling content.
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
-      style: {
-        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
-        scrollEffectStyle: { contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: {  backgroundStyle: {
-          backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0
-        }, contentStyle: this.isDiscoveryBoard() ? {
-          backIconStyle: { backgroundColor: Color.Transparent, iconColor: $r('app.color.primary_text') },
-          menuStyle: { backgroundColor: Color.Transparent, iconColor: $r('app.color.primary_text') }
-        } : { backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text') } } }
+      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: {  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: this.isDiscoveryBoard() ? {
+          backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+          menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }
+        } : { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text') } } }
       },
       content: {
         title: { mainTitle: this.creatingTarget ? this.uiText("pm_add_section_779008ec") : this.selectingPins() ? this.uiText("pm_select_pins_46854e37") : this.phase() === 'targets' ? this.uiText("pm_select_section_c87be634") :
@@ -572,8 +576,8 @@ export struct PinmonyBoardPage {
                 Image(avatar).width(48).height(48).borderRadius(24).margin({ left: index > 0 ? -16 : 0 })
               }, (avatar: string) => avatar)
             }
-          } else if (this.snapshot.memberAvatar || this.snapshot.ownerAvatar) {
-            Image(this.snapshot.memberAvatar || this.snapshot.ownerAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(48).height(48).borderRadius(24)
+          } else {
+            PinmonyUserAvatar({ image: this.snapshot.memberAvatar || this.snapshot.ownerAvatar, name: this.snapshot.ownerName, avatarSize: 48 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
           }
           Blank()
           Button('+').fontSize(26).width(48).height(48).borderRadius(10)
@@ -779,7 +783,7 @@ export struct PinmonyBoardPage {
           }
           if (!this.phase() && this.invitationVisible) {
             Row({ space: 12 }) {
-              Image(this.invitationAvatar).width(44).height(44).borderRadius(22)
+              PinmonyUserAvatar({ image: this.invitationAvatar, name: this.invitationName, avatarSize: 44 })
               Column({ space: 12 }) {
                 Text(this.invitationName + this.uiText("pm_invited_you_to_collaborate_on_this_board_261f393f")).fontSize(16).fontColor($r('app.color.primary_text'))
                 Row({ space: 8 }) {
@@ -823,7 +827,7 @@ export struct PinmonyBoardPage {
           if (!this.phase() && this.snapshot.featuredCreators?.length) {
             Row({ space: 6 }) {
               ForEach(this.snapshot.featuredCreators || [], (creator: PinmonyBoardCreator, index: number) => {
-                if (creator.avatar) { Image(creator.avatar).width(30).height(30).borderRadius(15).margin({ left: index > 0 ? -12 : 0 }) }
+                PinmonyUserAvatar({ image: creator.avatar, name: creator.name, avatarSize: 30 }).margin({ left: index > 0 ? -12 : 0 })
               }, (creator: PinmonyBoardCreator) => creator.id)
               Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
               Text(this.uiText("pm_from_df6e36f7")).fontSize(15).fontColor($r('app.color.primary_text'))
@@ -843,8 +847,8 @@ export struct PinmonyBoardPage {
           }
           if (!this.phase() && !this.snapshot.featuredCreators?.length && this.snapshot.ownerName && !this.joinedAvatar) {
             Row({ space: 8 }) {
-              if (this.snapshot.ownerAvatar) {
-                Image(this.snapshot.ownerAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(32).height(32).borderRadius(16)
+              if (this.snapshot.ownerName) {
+                PinmonyUserAvatar({ image: this.snapshot.ownerAvatar, name: this.snapshot.ownerName, avatarSize: 32 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
               }
               Column({ space: 4 }) {
                 if (this.isDiscoveryBoard() && this.snapshot.sponsored) {
@@ -865,7 +869,7 @@ export struct PinmonyBoardPage {
           }
           if (!this.phase() && this.joinedAvatar) {
             Row({ space: 8 }) {
-              Image(this.snapshot.memberAvatar || this.snapshot.ownerAvatar).width(36).height(36).borderRadius(18)
+              PinmonyUserAvatar({ image: this.snapshot.memberAvatar || this.snapshot.ownerAvatar, name: this.snapshot.ownerName, avatarSize: 36 })
               Image(this.joinedAvatar).width(36).height(36).borderRadius(18)
             }.width('100%')
           }
@@ -895,8 +899,8 @@ export struct PinmonyBoardPage {
                     Image(avatar).width(36).height(36).borderRadius(18).margin({ left: index > 0 ? -12 : 0 })
                   }, (avatar: string) => avatar)
                 }
-              } else if (this.snapshot.memberAvatar) {
-                Image(this.snapshot.memberAvatar).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); }).width(36).height(36).borderRadius(18)
+              } else {
+                PinmonyUserAvatar({ image: this.snapshot.memberAvatar, name: this.snapshot.ownerName, avatarSize: 36 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
               }
               Button({ type: ButtonType.Circle }) {
                 Image($r('app.media.lucide_user_round_plus')).width(20).height(20)

@@ -269,11 +269,18 @@ function acceptsCanonicalNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetw
         const encoded: RegExpMatchArray | null = job.body.match(/(?:^|&)data=([^&]+)/);
         if (!encoded) return false;
         const payload: SettingsUpdate = JSON.parse(decodeURIComponent(encoded[1])) as SettingsUpdate;
-        const options: Record<string, string | boolean> = payload.options;
+        const options: Record<string, Object> = payload.options;
         const keys: string[] = Object.keys(options);
         const fields: string[] = keys.filter((key: string) => !['user_id', 'surface_tag', 'user_confirm_skip_passcode'].includes(key));
         if (options.surface_tag !== 'settings' || fields.length !== 1 || keys.length > 4) return false;
-        const field: string = fields[0]; const value: string | boolean = options[field];
+        const field: string = fields[0]; const value: Object = options[field];
+        if (field === 'allow_mentions' || field === 'messaging_permissions') {
+          if (keys.length !== 4 || typeof options.user_id !== 'string' || !/^\d{1,40}$/.test(options.user_id as string) || options.user_confirm_skip_passcode !== false || !job.id.startsWith('native_profile_settings_')) return false;
+          if (field === 'allow_mentions') return typeof value === 'number' && [0,1,2].includes(value);
+          const groups: Record<string, Object> = value as Record<string,Object>;
+          const ids: string[] = groups && !Array.isArray(groups) ? Object.keys(groups) : [];
+          return ids.length === 1 && ['0','1','2','4'].includes(ids[0]) && [0,1,2].includes(groups[ids[0]] as number) && (ids[0] !== '4' || groups[ids[0]] !== 0);
+        }
         if (field === 'opt_in_private_account' || field === 'exclude_from_search') {
           return typeof options.user_id === 'string' && /^\d+$/.test(options.user_id) && typeof value === 'boolean' &&
             (field === 'opt_in_private_account' ? options.user_confirm_skip_passcode === false : !keys.includes('user_confirm_skip_passcode'));
@@ -323,7 +330,7 @@ interface PublishCreateOptions {
   boardId: string; board_id: string; description: string; guid: string;
   imageBase64: string; image_base64: string; imageUrl: string; image_url: string; link: string; method: string;
 }
-interface SettingsUpdate { options: Record<string, string | boolean>; }
+interface SettingsUpdate { options: Record<string, Object>; }
 interface LogoutWrite { options: LogoutWriteOptions; context: Object; }
 interface LogoutWriteOptions { disable_auth_failure_redirect: boolean; }
 interface BoardSectionReadData { options: BoardSectionReadOptions; context: Object; }
@@ -783,16 +790,34 @@ export class PinmonyNativeNetwork {
           permitted = fields.length === 1 && o['surface_tag'] === 'settings' && (field === 'birthdate' ? keys.length === 2 && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && source === '/settings/edit/birthdate/' : o['user_id'] === viewer && (field === 'opt_in_private_account' ? keys.length === 4 && permissions.includes('privacy') && o['user_confirm_skip_passcode'] === false && typeof value === 'boolean' && source === '/settings/profile-visibility/' : keys.length === 3 && (field === 'exclude_from_search' ? permissions.includes('search') && typeof value === 'boolean' && source === '/settings/profile-visibility/' : field === 'gender' ? ['female','male','unspecified'].includes(value as string) && source === '/settings/edit/gender/' : field === 'custom_gender' ? permissions.includes('custom') && typeof value === 'string' && !!(value as string).trim() && (value as string).length <= 500 && source === '/settings/edit/gender/' : field === 'country' && typeof value === 'string' && allowed.includes('country:' + value) && source === '/settings/edit/country/')));
           // Country source follows the existing country-region route.
           if(field === 'country')permitted = fields.length === 1 && keys.length === 3 && o['surface_tag'] === 'settings' && o['user_id'] === viewer && typeof value === 'string' && /^[A-Z]{2}$/.test(value) && allowed.includes('country:' + value) && source === '/settings/edit/country-region/';
+          if (field === 'allow_mentions' || field === 'messaging_permissions') {
+            const base: boolean = fields.length === 1 && keys.length === 4 && o['surface_tag'] === 'settings' && o['user_id'] === viewer && o['user_confirm_skip_passcode'] === false;
+            if (field === 'allow_mentions') permitted = base && source === '/settings/edit/mentions/' && [0,1,2].includes(value as number) && allowed.includes('social-mentions:' + value);
+            else {
+              const choices: Record<string,Object> = value as Record<string,Object>, groups: string[] = choices && !Array.isArray(choices) ? Object.keys(choices) : [];
+              const group: string = groups[0], level: Object = choices?.[group];
+              const route: string = group === '0' ? 'friends' : group === '1' ? 'followers' : group === '2' ? 'following' : group === '4' ? 'others' : '';
+              permitted = base && groups.length === 1 && !!route && source === '/settings/messages/' + route + '/' && [0,1,2].includes(level as number) && (group !== '4' || level !== 0) && allowed.includes('social-message:' + group + ':' + level);
+            }
+          }
         }else if(envelope && resource === '/resource/ApiResource/get/') {
           const data: Record<string,Object> = o['data'] as Record<string,Object>,url: string = o['url'] as string;
           permitted = keys.length === 1 && get && own && url === '/v3/settings/notifications/' && source === path;
           if(keys.length === 2 && data && !Array.isArray(data)) {
-            if(get && !Object.keys(data).length)permitted = (url === '/v3/users/settings/' && own && [path,'/settings/edit/birthdate/'].includes(source)) || own && url === '/v3/users/settings/gen_ai/' && source === '/edit/gen-ai-interests/';
+            if(get && !Object.keys(data).length)permitted = (url === '/v3/users/settings/' && own && [path,'/settings/edit/birthdate/','/settings/messages/','/settings/edit/mentions/'].includes(source)) || own && url === '/v3/users/settings/gen_ai/' && source === '/edit/gen-ai-interests/';
             else if(!get)permitted = source === path && url === '/v3/users/' + username + '/boards/following/' && data['explicit_following'] === true && data['page_size'] === 12 && Object.keys(data).length === 3 && JSON.stringify(data['fields']) === JSON.stringify(['board.id','board.name','board.image_cover_url','board.followed_by_me','board.type','board.images[236x]','board.image_cover_hd_url','board.pin_count','board.board_order_modified_at','board.url','board.owner()','user.username']);
+            if(get && own && url === '/v3/users/blocked' && source === '/settings/blocked-accounts/') permitted = Object.keys(data).length === 1 && data['q'] === '';
           }
+        }else if(envelope && resource === '/resource/ApiResource/delete/' && !get && own && keys.length === 1 && source === '/settings/blocked-accounts/') {
+          const target: RegExpMatchArray | null = (o['url'] as string || '').match(/^\/v3\/users\/(\d{1,40})\/block\/$/);
+          permitted = !!target && target[1] !== viewer && allowed.includes('social-unblock:' + target[1]);
         }else if(envelope && resource === '/resource/ApiResource/create/' && !get && own && keys.length === 2) {
           const data: Record<string,Object> = o['data'] as Record<string,Object>;
-          if(o['url'] === '/v3/users/settings/' && source === '/edit/gen-ai-interests/' && data && Object.keys(data).length === 2 && data['gen_ai_topics_update_source'] === 'hf_tuner') {
+          if(o['url'] === '/v3/settings/notifications/' && source === path && data && Object.keys(data).length === 1 && typeof data['updated_settings'] === 'string' && (data['updated_settings'] as string).length < 1000) {
+            const choices: Record<string,Object>[] = JSON.parse(data['updated_settings'] as string) as Record<string,Object>[];
+            const c: Record<string,Object> = choices[0];
+            permitted = Array.isArray(choices) && choices.length === 1 && !!c && Object.keys(c).length === 4 && typeof c['value'] === 'boolean' && ['push','email','news'].includes(c['type'] as string) && allowed.includes('notification:' + c['type'] + ':' + c['section'] + ':' + c['option']);
+          }else if(o['url'] === '/v3/users/settings/' && source === '/edit/gen-ai-interests/' && data && Object.keys(data).length === 2 && data['gen_ai_topics_update_source'] === 'hf_tuner') {
             const ids: string[] = (data['gen_ai_topics_opt_in'] || data['gen_ai_topics_opt_out']) as string[];
             permitted = Array.isArray(ids) && ids.length > 0 && ids.length <= 80 && ids.every((id: string,i: number): boolean => digits(id) && allowed.includes('topic:' + id) && ids.indexOf(id) === i);
           }else if(o['url'] === '/v3/pins/bulk/move/' && source === path && data && Object.keys(data).length === 2) {
@@ -1742,6 +1767,56 @@ export class PinmonyNativeNetwork {
       this.jobs.delete(id); this.pending.delete(id); this.sentJobs.delete(id); this.cancelled.delete(id);
     }
   }
+  async searchUploadedPhoto(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
+      owner: () => boolean, id: string): Promise<string> {
+    const state: PinmonyBusinessSessionContext = session();
+    const account: string = state.accountId, epoch: number = state.generation, origin: string = state.origin;
+    const generation: number = this.generation;
+    const current = (): boolean => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return generation === this.generation && this.foreground && owner() && actual.authenticated &&
+        actual.accountId === account && actual.generation === epoch && actual.origin === origin;
+    };
+    const head: Uint8Array = new Uint8Array(bytes);
+    if (!current() || !account || !/^https:\/\/(?:www|uk)\.pinterest\.com$/.test(origin) ||
+      page !== origin + '/search/' || !/^native_photo_search_\d+$/.test(id) ||
+      bytes.byteLength < 12 || bytes.byteLength > 4 * 1024 * 1024 || head[0] !== 255 || head[1] !== 216 ||
+      this.pending.has(id) || this.pending.size >= 12 || NetworkManager.requestRemainingMs() > 0) throw new Error('photo-unavailable');
+    const url: string = origin + '/upload-lens-image/';
+    this.pending.add(id); this.cancelled.delete(id);
+    const live = (): boolean => current() && this.pending.has(id) && !this.cancelled.has(id);
+    try {
+      const cookie: string = await this.credentials.read(url);
+      if (!live()) throw new Error('stale');
+      const csrf: RegExpMatchArray | null = cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      if (!csrf) throw new Error('missing-session');
+      const fields: rcp.MultipartFormFields = {};
+      fields['image'] = { contentOrPath: { content: bytes }, contentType: 'image/jpeg', remoteFileName: 'lens-file-image' };
+      fields['x'] = '0'; fields['y'] = '0'; fields['w'] = '1'; fields['h'] = '1';
+      fields['crop_source'] = '5'; fields['source_type'] = '1';
+      const request: rcp.Request = new rcp.Request(url, 'POST', {
+        'Cookie': cookie, 'Referer': page, 'Origin': origin, 'User-Agent': state.userAgent,
+        'X-CSRFToken': decodeURIComponent(csrf[1]), 'X-Requested-With': 'XMLHttpRequest'
+      }, new rcp.MultipartForm(fields), undefined, undefined,
+        { transfer: { autoRedirect: false, timeout: { connectMs: 10000, transferMs: 30000 } } });
+      this.jobs.set(id, request);
+      const response: rcp.Response = await NetworkManager.enqueue(Priority.NORMAL, (): Promise<rcp.Response> => {
+        if (!live()) return Promise.reject(new Error('stale'));
+        this.sentJobs.add(id);
+        return NetworkManager.getSession().fetch(request);
+      });
+      if (!live()) throw new Error('stale');
+      const cookies: string | string[] | undefined = response.headers['set-cookie'];
+      if (cookies) await this.credentials.update(url, typeof cookies === 'string' ? [cookies] : cookies, live);
+      if (!live()) throw new Error('stale');
+      const text: string = response.toString() || '';
+      if (response.statusCode !== 200 || !text || text.length > 8 * 1024 * 1024) throw new Error('photo-unconfirmed');
+      return text;
+    } finally {
+      this.jobs.delete(id); this.pending.delete(id); this.sentJobs.delete(id); this.cancelled.delete(id);
+    }
+  }
+
   async readProfileAvatarStatus(tracking: string, page: string, session: () => PinmonyBusinessSessionContext,
       owner: () => boolean, id: string): Promise<number> {
     const state: PinmonyBusinessSessionContext = session();

@@ -4247,6 +4247,76 @@
     {
       "name": "pm_1_section_4d13c778",
       "value": "1 section"
-    }
+    },
+    {
+      "name": "pm_birthdate_display",
+      "value": "{1}/{2}/{0}"
+    },
+    {
+      "name": "pm_one_day_ago_suffix",
+      "value": " day ago"
+    },
+    {
+      "name": "pm_one_week_ago_suffix",
+      "value": " week ago"
+    },
+    {
+      "name": "pm_one_month_ago_suffix",
+      "value": " month ago"
+    },
+    {
+      "name": "pm_one_year_ago_suffix",
+      "value": " year ago"
+    },
+    {"name":"pm_immersive_light","value":"Immersive lighting"},
+    {"name":"pm_light_off","value":"Off"},
+    {"name":"pm_light_gentle","value":"Gentle"},
+    {"name":"pm_light_immersive","value":"Immersive"},
+    {"name":"pm_light_exquisite","value":"Exquisite"},
+    {"name":"pm_inbox_search_username","value":"Search username"},
+    {"name":"pm_inbox_no_matching_username","value":"No matching usernames"},
+    {"name":"pm_photo_search","value":"Photo search"},
+    {"name":"pm_photo_search_loading","value":"Searching photo…"},
+    {"name":"pm_photo_search_empty","value":"No matching Pins found"},
+    {"name":"pm_photo_search_unconfirmed","value":"Photo search did not finish or its result was not confirmed. Close and choose a photo again."},
+    {"name":"pm_notifications_turn_off_all","value":"Turn off all"},
+    {"name":"pm_notifications_disable_push","value":"You will no longer receive push notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."},
+    {"name":"pm_notifications_disable_email","value":"You will no longer receive email notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."},
+    {"name":"pm_notifications_disable_news","value":"You will no longer receive in-app notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."},
+    {"name":"pm_social_title","value":"Social permissions"},
+    {"name":"pm_social_messages","value":"Messages"},
+    {"name":"pm_social_message_settings","value":"Message settings"},
+    {"name":"pm_social_blocked","value":"Blocked accounts"},
+    {"name":"pm_social_mentions","value":"@Mentions"},
+    {"name":"pm_social_friends","value":"Friends"},
+    {"name":"pm_social_followers","value":"Followers"},
+    {"name":"pm_social_following","value":"Following"},
+    {"name":"pm_social_others","value":"Everyone else"},
+    {"name":"pm_social_intro","value":"Choose how others interact with you on Pinterest and manage permissions for our latest features"},
+    {"name":"pm_social_message_settings_detail","value":"Choose who can message you and add you to group conversations"},
+    {"name":"pm_social_blocked_detail","value":"Manage blocked users"},
+    {"name":"pm_social_mentions_detail","value":"Choose who can @mention you"},
+    {"name":"pm_social_message_intro","value":"Decide whether messages go to your inbox, requests, or are ignored"},
+    {"name":"pm_social_business_messages","value":"Allow others to message my business"},
+    {"name":"pm_social_business_detail","value":"A message button on your profile lets other people send you messages."},
+    {"name":"pm_social_unavailable","value":"Currently unavailable"},
+    {"name":"pm_social_direct","value":"Direct messages"},
+    {"name":"pm_social_requests","value":"Message requests"},
+    {"name":"pm_social_ignore","value":"Ignore"},
+    {"name":"pm_social_delivery","value":"Choose where messages are delivered"},
+    {"name":"pm_social_friends_detail","value":"People you follow who also follow you"},
+    {"name":"pm_social_followers_detail","value":"People and brands following you. To message your followers, you must follow them."},
+    {"name":"pm_social_following_detail","value":"People and brands you follow. To message them, they must follow you."},
+    {"name":"pm_social_others_detail","value":"People on Pinterest you have not interacted or collaborated with."},
+    {"name":"pm_social_blocked_intro","value":"If you block someone, you can still view each other’s profiles, but cannot message, follow, or save each other’s Pins."},
+    {"name":"pm_social_no_blocked","value":"You have not blocked anyone"},
+    {"name":"pm_social_no_matches","value":"No matching accounts"},
+    {"name":"pm_social_search","value":"Search"},
+    {"name":"pm_social_unblock","value":"Unblock"},
+    {"name":"pm_social_unblock_title","value":"Unblock {0}?"},
+    {"name":"pm_social_unblock_description","value":"Depending on your settings, you will be able to see, follow and contact this person, and save their Pins."},
+    {"name":"pm_social_mentions_anyone","value":"Anyone on Pinterest"},
+    {"name":"pm_social_mentions_following","value":"Only people you follow"},
+    {"name":"pm_social_mentions_off","value":"Off - no one can @mention you"}
   ]
 }

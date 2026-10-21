@@ -89,7 +89,7 @@ export class PinmonyPinMenuNative {
     try {await this.read(revision);if(!this.current(revision))return;const options: MoreSheetOption[] = [];
       if(this.canOpenEdit())options.push(this.option('detail-edit','编辑 Pin 图'));
       if(this.image())options.push(this.option('detail-download','下载图片'));
-      options.push(this.option('detail-see-more','查看更多',this.enabled('more')),this.option('detail-see-less','减少推荐',this.enabled('less')),this.option('detail-share','系统分享'));
+      options.push(this.option('detail-see-more','查看更多',this.enabled('more')),this.option('detail-see-less','减少推荐',this.enabled('less')));
       if(this.raw?.ai_disclosures?.includes(1) || this.raw?.gen_ai_topics?.some((t: Topic): boolean => typeof t.name === 'string' && !!t.name.trim()))options.push(this.option('detail-ai-help','详细了解 AI 标签'));
       this.store.moreOptions = options;
     } catch (_) {if(this.current(revision))this.store.moreError = PinmonyI18n.message("pm_unable_to_load_service_options_please_retry_3b2d272d");}
@@ -104,7 +104,6 @@ export class PinmonyPinMenuNative {
       if(!this.canOpenEdit() || photo && id !== 'home-edit' || !photo && id !== 'detail-edit')return;
       PinmonyRuntimeLog.info('PinEditTrace: phase=menu-open');this.ports.dismiss();await this.ports.edit(pin);return;
     }
-    if(id === 'detail-share'){await this.ports.share(pin);return;}
     if(id === 'detail-ai-help'){this.ports.help('https://help.pinterest.com/en/article/gen-ai-labels');return;}
     if(id === 'home-download' || id === 'detail-download'){const url: string = this.image();if(url)this.ports.download(url);return;}
     const less: boolean = id === 'home-see-less' || id === 'detail-see-less';

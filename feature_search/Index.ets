@@ -1,5 +1,6 @@
 export { PinmonySearchCategory, PinmonySearchFilterOption, PinmonySearchFilterSnapshot, PinmonySearchSuggestion, PinmonySearchResult, PinmonySearchHero, PinmonySearchIdea, PinmonySearchIdeaSection, PinmonySearchSnapshot, PinmonySearchQuizTopic, PinmonySearchQuizCard, PinmonySearchQuiz } from './src/main/ets/models/PinmonySearch';
 export { PinmonySearchPage } from './src/main/ets/components/PinmonySearchPage';
+export { parsePhotoSearch } from './src/main/ets/services/PinmonyPhotoSearch';
 export { PinmonySearchQuizPanel } from './src/main/ets/components/PinmonySearchQuizPanel';
 export { PIN_SEARCH_API_ENABLED, PIN_SEARCH_API_SCRIPT } from './src/main/ets/services/PinmonySearchApiScript';
 export { PinmonySearchCacheEntry, PinmonySearchCache } from './src/main/ets/services/PinmonySearchCache';

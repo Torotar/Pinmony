@@ -4247,6 +4247,76 @@
     {
       "name": "pm_1_section_4d13c778",
       "value": "1 个图板区块"
-    }
+    },
+    {
+      "name": "pm_birthdate_display",
+      "value": "{0}年{1}月{2}日"
+    },
+    {
+      "name": "pm_one_day_ago_suffix",
+      "value": " 天前"
+    },
+    {
+      "name": "pm_one_week_ago_suffix",
+      "value": " 周前"
+    },
+    {
+      "name": "pm_one_month_ago_suffix",
+      "value": " 个月前"
+    },
+    {
+      "name": "pm_one_year_ago_suffix",
+      "value": " 年前"
+    },
+    {"name":"pm_immersive_light","value":"沉浸光感"},
+    {"name":"pm_light_off","value":"关闭"},
+    {"name":"pm_light_gentle","value":"柔和"},
+    {"name":"pm_light_immersive","value":"沉浸"},
+    {"name":"pm_light_exquisite","value":"精致"},
+    {"name":"pm_inbox_search_username","value":"搜索联系人用户名"},
+    {"name":"pm_inbox_no_matching_username","value":"没有匹配的用户名"},
+    {"name":"pm_photo_search","value":"照片搜索"},
+    {"name":"pm_photo_search_loading","value":"正在搜索照片…"},
+    {"name":"pm_photo_search_empty","value":"未找到匹配的 Pin 图"},
+    {"name":"pm_photo_search_unconfirmed","value":"照片搜索未完成或结果未确认，请关闭后重新选择照片。"},
+    {"name":"pm_notifications_turn_off_all","value":"全部关闭"},
+    {"name":"pm_notifications_disable_push","value":"你将不会再收到来自 Pinterest 关于你的个人帐户的推送通知（关于重要更新、帐户设置和隐私的邮件除外）"},
+    {"name":"pm_notifications_disable_email","value":"你将不会再收到来自 Pinterest 关于你的个人帐户的电子邮件通知（关于重要更新、帐户设置和隐私的邮件除外）"},
+    {"name":"pm_notifications_disable_news","value":"你将不会再收到来自 Pinterest 关于你的个人帐户的应用内通知（关于重要更新、帐户设置和隐私的邮件除外）"},
+    {"name":"pm_social_title","value":"社交权限"},
+    {"name":"pm_social_messages","value":"消息"},
+    {"name":"pm_social_message_settings","value":"消息设置"},
+    {"name":"pm_social_blocked","value":"已屏蔽的帐户"},
+    {"name":"pm_social_mentions","value":"@提及内容"},
+    {"name":"pm_social_friends","value":"朋友"},
+    {"name":"pm_social_followers","value":"粉丝"},
+    {"name":"pm_social_following","value":"关注中"},
+    {"name":"pm_social_others","value":"其他所有人"},
+    {"name":"pm_social_intro","value":"选择其他人如何与你在 Pinterest 上互动，以及基于我们最新功能的其他权限"},
+    {"name":"pm_social_message_settings_detail","value":"选择谁可以向你发送消息以及将你添加到群聊"},
+    {"name":"pm_social_blocked_detail","value":"管理已屏蔽的用户"},
+    {"name":"pm_social_mentions_detail","value":"选择可以 @提到你的用户"},
+    {"name":"pm_social_message_intro","value":"你决定是否将消息发送至你的收件箱、请求，或者不接收任何消息"},
+    {"name":"pm_social_business_messages","value":"允许其他人向我的企业发送消息"},
+    {"name":"pm_social_business_detail","value":"你的个人资料中将显示消息按钮，以便其他用户向你发送消息。"},
+    {"name":"pm_social_unavailable","value":"暂不可用"},
+    {"name":"pm_social_direct","value":"直接发送消息"},
+    {"name":"pm_social_requests","value":"消息请求"},
+    {"name":"pm_social_ignore","value":"忽略"},
+    {"name":"pm_social_delivery","value":"选择消息投放位置"},
+    {"name":"pm_social_friends_detail","value":"你和用户互相关注"},
+    {"name":"pm_social_followers_detail","value":"关注你的用户和品牌。要向关注你的用户发送消息，你必须关注他们"},
+    {"name":"pm_social_following_detail","value":"你关注的用户和品牌。要向你关注的用户发送消息，他们必须关注你"},
+    {"name":"pm_social_others_detail","value":"Pinterest 上你尚未与之交流或合作的用户。"},
+    {"name":"pm_social_blocked_intro","value":"如果你屏蔽某人，你们仍可以查看对方的个人资料，但不能发送消息、关注或收藏对方的 Pin 图。"},
+    {"name":"pm_social_no_blocked","value":"你目前没有屏蔽任何人"},
+    {"name":"pm_social_no_matches","value":"没有匹配的帐户"},
+    {"name":"pm_social_search","value":"搜索"},
+    {"name":"pm_social_unblock","value":"取消屏蔽"},
+    {"name":"pm_social_unblock_title","value":"取消屏蔽 {0}？"},
+    {"name":"pm_social_unblock_description","value":"根据你的设置，你将可以看到、关注和联系对方，并收藏对方的 Pin 图。"},
+    {"name":"pm_social_mentions_anyone","value":"Pinterest 上的任何人"},
+    {"name":"pm_social_mentions_following","value":"仅限你关注的人"},
+    {"name":"pm_social_mentions_off","value":"关闭 - 没有人可以 @提到你"}
   ]
 }

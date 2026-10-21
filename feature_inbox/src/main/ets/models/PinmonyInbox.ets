@@ -3,6 +3,7 @@ export interface PinmonyInboxItem {
   title: string;
   subtitle: string;
   outgoing?: boolean;
+  usernames?: string[];
   imageUrl: string;
   profileUrl?: string;
   enabled: boolean;

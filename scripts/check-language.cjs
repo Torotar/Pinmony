@@ -164,3 +164,62 @@ const saveKey = baseRows.find(row => row.value === '收藏').name;
 assert.equal(f.api.text(saveKey, 'en'), 'Save');
 assert.equal(f.api.message('收藏'), f.api.message(saveKey), 'New tokens normalize legacy identifiers');
 assert.equal(f.api.render(f.api.message(saveKey), 'zh'), '收藏');
+
+// Device-reported omissions: execute the actual display/date methods.
+function methodView(file, startName, endName) {
+ const source = fs.readFileSync(file, 'utf8');
+ const begin = source.indexOf('  private ' + startName);
+ const end = source.indexOf(endName, begin + 1);
+ assert(begin >= 0 && end > begin, startName);
+ const Type = vm.runInNewContext(ts.transpileModule('class View {' + source.slice(begin, end) + '} View;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText, {PinmonyI18n:f.api});
+ const view = new Type(); view.uiLanguage = 'en'; view.uiText = key => f.api.text(key, view.uiLanguage); return view;
+}
+const searchView = methodView('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'searchPlaceholder(', '  private uiText(');
+searchView.snapshot = {placeholder:'搜索'}; assert.equal(searchView.searchPlaceholder(),'Search');
+searchView.snapshot.placeholder='风景灵感'; assert.equal(searchView.searchPlaceholder(),'风景灵感');
+searchView.uiLanguage='zh'; searchView.snapshot.placeholder='Search'; assert.equal(searchView.searchPlaceholder(),'搜索');
+assert.equal(f.api.optionLabel('home-system-share','系统分享','en'),'System share');
+const accountView = methodView('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','birthday(', '  private gender(');
+accountView.store = {data:{birthdate:'1999-12-02'}}; assert.equal(accountView.birthday(),'12/02/1999');
+accountView.uiLanguage='zh'; assert.equal(accountView.birthday(),'1999年12月02日');
+const followView = methodView('entry/src/main/ets/app/PinmonyProfileNativeActions.ets','updated(', '    private boardImage(');
+assert.equal(f.api.render(followView.updated(new Date(Date.now()-31*86400000).toISOString()),'en'),'1 month ago');
+assert.equal(f.api.render(followView.updated(new Date(Date.now()-8*86400000).toISOString()),'en'),'1 week ago');
+const shareView = methodView('feature_pin/src/main/ets/components/PinmonyShareSheet.ets','actionLabel(', '  private shareActionKey(');
+assert.equal(shareView.actionLabel({id:'native-copy',label:'复制链接'}),'Copy link');
+assert.equal(shareView.actionLabel({id:'website',label:'网站原文'}),'网站原文');
+shareView.uiLanguage='zh'; assert.equal(shareView.actionLabel({id:'native-copy',label:'Copy link'}),'复制链接');
+
+// Real update-client failures must localize the reason as well as the wrapper.
+(async () => {
+ let reply = {responseCode:200,result:'invalid-json'};
+ let networkCode = 0;
+ const releaseLoader = createArktsLoader(ts, {
+  common_foundation:{PinmonyI18n:f.api,PinmonyRuntimeLog:{info(){},warn(){}}},
+  '@kit.NetworkKit':{http:{RequestMethod:{GET:'GET'},HttpDataType:{STRING:0},HttpProtocol:{HTTP1_1:1},createHttp:()=>({
+   request:async()=>{if(networkCode)throw {code:networkCode};return reply;},destroy(){}
+  })}},'@kit.BasicServicesKit':{}
+ });
+ const {PinmonyReleaseClient} = releaseLoader.loadFile('feature_settings/src/main/ets/services/PinmonyRelease.ets');
+ for(const [status,code,expected] of [[200,0,'Invalid release information'],[500,0,'HTTP 500'],[403,0,'HTTP 403'],[0,2300006,'2300006'],[0,0,'GitHub']]) {
+  reply={responseCode:status,result:'invalid-json'}; networkCode=code;
+  let failure;try{await new PinmonyReleaseClient().latest();}catch(error){failure=error;}
+  assert(failure); const english=f.api.render(failure.feedback,'en');
+  assert(english.includes(expected),english); assert(!/[\u3400-\u9fff]/.test(english),english);
+  assert(/[\u3400-\u9fff]/.test(f.api.render(failure.feedback,'zh')));
+ }
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Disabled content filters lack destinations but still need local control copy.
+const disabledFeed = {snapshot:{pageKey:'https://www.pinterest.com/search/pins/?q=art'},filters:[],targets:new Map()};
+search.origin='https://www.pinterest.com';
+search.mapModules([{action:{type:'contenttypefiltermoduleaction',title:'筛选器',filters:[
+ {type:'filteroption',display:{display_text:'所有 Pin 图'},disabled:true,is_selected:true},
+ {type:'filteroption',display:{display_text:'个人资料'},is_disabled:true},
+ {type:'filteroption',display:{display_text:'产品'},disabled:true}
+]}}],disabledFeed);
+assert.deepEqual(Array.from(disabledFeed.filters,o=>f.api.render(o.label,'en')),['All Pins','Profiles','Products']);
+assert.equal(f.api.render(disabledFeed.filters[0].group,'en'),'Filters');
+assert(disabledFeed.filters.every(o=>!o.enabled));assert.equal(disabledFeed.targets.size,0);
+assert.equal(search.filterLabel('','网站自定义类型'),'网站自定义类型');
+assert.equal(search.filterGroup('网站自定义分组'),'网站自定义分组');

@@ -27,6 +27,7 @@ export interface PinmonyHomeRootView {
   openHomeMore: (id: string) => Promise<void>;
   loadMoreHome: () => Promise<void>;
   refreshHome: () => void;
+  retryHome: () => void;
   prefetchHomePinDetails: (first: number, last: number) => void;
   onTouch: (event: TouchEvent) => void;
 }
@@ -79,7 +80,7 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               onScrollPosition: (pageKey: string, offset: number) => {
                 if (view.homeStore.cachedHome?.pageKey === pageKey) view.homeStore.cachedHomeScrollOffset = offset;
               },
-              onRetry: () => view.refreshHome()
+              onRetry: () => view.retryHome()
             })
             .width('100%')
             .height('100%')

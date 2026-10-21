@@ -13,6 +13,10 @@ export struct PinmonyShareSheet {
   onReady: () => void = (): void => {};
   hasCopyLink: () => boolean = (): boolean => false;
   isCopyLink: (label: string) => boolean = (): boolean => false;
+  private actionLabel(option: ShareSheetOption): string {
+    if (option.id === 'native-system-share') return this.uiText('pm_system_share_13a1c63f');
+    return option.id === 'native-copy' ? this.uiText('pm_copy_link_8e86f9b1') : PinmonyI18n.render(option.label, this.uiLanguage);
+  }
   private shareActionKey(option: ShareSheetOption): string {
     return JSON.stringify([this.pinStore.shareSession, option.id, option.enabled,
       option.label, option.subtitle || '', this.uiLanguage]);
@@ -20,7 +24,7 @@ export struct PinmonyShareSheet {
   @Builder
   private buildShareActionRow(option: ShareSheetOption) {
     Column() {
-      Text(option.label)
+      Text(this.actionLabel(option))
         .fontSize(17)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary_text'))
@@ -39,7 +43,7 @@ export struct PinmonyShareSheet {
     .justifyContent(FlexAlign.Center)
     .opacity(option.enabled ? 1 : 0.4)
     .enabled(option.enabled)
-    .accessibilityText(option.label)
+    .accessibilityText(this.actionLabel(option))
     .onClick(() => {
       if (option.enabled) this.onAction(option.id);
     })
@@ -154,7 +158,7 @@ export struct PinmonyShareSheet {
         }
       }
 
-      if (!this.pinStore.shareOnPinDetail && !this.pinStore.shareLoading && this.pinStore.shareActions.some((option: ShareSheetOption) =>
+      if (!this.pinStore.shareLoading && this.pinStore.shareActions.some((option: ShareSheetOption) =>
           !this.pinStore.shareOnPinDetail || !this.hasCopyLink() || !this.isCopyLink(option.label))) {
         Divider()
           .color('#4D8A8A8A')

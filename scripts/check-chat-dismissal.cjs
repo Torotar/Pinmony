@@ -43,6 +43,6 @@ const inbox = 'https://www.pinterest.com/inbox/';
   const scroll = ui.slice(ui.indexOf('.onDidScroll('), ui.indexOf("if (this.snapshot.screen === 'chat') {", ui.indexOf('.onDidScroll(')));
   assert(!scroll.includes('this.onOffset('), 'scroll frames do not rebuild parent title configuration');
   assert(ui.includes('scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR'));
-  assert(ui.includes('materialType: hdsMaterial.MaterialType.IMMERSIVE'));
+  assert(ui.includes('systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)'));
   console.log('PASS chat dismissal/title: retained and rebound back, late callback suppression, explicit reopen, stable avatar builder and no parent writes per scroll frame');
 })().catch(error => { console.error(error); process.exitCode = 1; });

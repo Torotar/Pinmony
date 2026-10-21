@@ -15,3 +15,5 @@ export { PinmonyBoardInvitationList } from './src/main/ets/components/PinmonyBoa
 export { PinmonyBoardInvitationController, PinmonyBoardInvitationPorts } from './src/main/ets/controllers/PinmonyBoardInvitationController';
 export { PinmonyInboxReadController, PinmonyInboxReadPorts } from './src/main/ets/controllers/PinmonyInboxReadController';
 export { PinmonyInboxActionsController, PinmonyInboxActionsPorts } from './src/main/ets/controllers/PinmonyInboxActionsController';
+
+export { PinmonyInboxListPage } from './src/main/ets/components/PinmonyInboxListPage';

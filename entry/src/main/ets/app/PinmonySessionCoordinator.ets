@@ -313,6 +313,7 @@ resetAuthenticatedContent(): void {
     this.ports.setProfileSettingsVisible(false);
     this.settingsStore.reset();
     this.inboxStore.retainedChat = undefined;
+    this.inboxStore.listSection = '';
     this.inboxStore.inboxFlow = undefined;
     this.inboxStore.chatScrollOffset = 0;
     this.inboxStore.chatReturnConversation = '';

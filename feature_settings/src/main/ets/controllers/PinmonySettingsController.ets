@@ -89,6 +89,7 @@ export class PinmonySettingsController {
   }
   async request(action: string, value: string): Promise<void> {
     if(this.ports.nativeEnabled?.()){if(this.allowed())await this.ports.nativeRequest?.(action,value);return;}
+    if (action.startsWith('social')) return;
     if (action === 'notifications') { await this.readNotifications(); return; }
     if (!this.allowed() || this.store.busy || this.store.loading) return;
     const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy'].includes(action);

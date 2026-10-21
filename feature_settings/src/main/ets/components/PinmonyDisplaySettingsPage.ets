@@ -1,3 +1,5 @@
+import { BlurStrategy } from '@kit.UIDesignKit';
+import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
@@ -7,6 +9,8 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyDisplaySettingsPage {
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
@@ -23,7 +27,7 @@ export struct PinmonyDisplaySettingsPage {
   private errorSnack: HdsSnackBar | undefined = undefined;
   private errorSnackKey: string = '';
   private pageVisible: boolean = false;
-  aboutToAppear(): void { this.pageVisible = true; this.paths.pushPath({ name: 'display' }, false); this.syncErrorSnack(); }
+  aboutToAppear(): void { this.pageVisible = true; this.paths.pushPath({ name: 'display' }, false); this.syncErrorSnack(); this.logMaterialMode(); }
   aboutToDisappear(): void { this.pageVisible = false; this.dismissErrorSnack(); }
   private dismissErrorSnack(): void { this.errorSnack?.dismiss(); this.errorSnackKey = ''; }
   private syncErrorSnack(): void {
@@ -79,23 +83,30 @@ export struct PinmonyDisplaySettingsPage {
       this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 });
     } finally { this.orientationBusy = false; }
   }
+  private logMaterialMode(): void {
+    try {
+      const types: hdsMaterial.MaterialType[] = hdsMaterial.getSystemMaterialTypes();
+      PinmonyRuntimeLog.info('ImmersiveLight: mode=' + this.immersiveLightMode +
+        ' supportedTypes=' + types.join(',') + ' immersiveSupported=' + types.includes(hdsMaterial.MaterialType.IMMERSIVE));
+    } catch (_) { PinmonyRuntimeLog.warn('ImmersiveLight: capability query unavailable mode=' + this.immersiveLightMode); }
+  }
   private options(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: {
-        scrollEffectOpts: { enableScrollEffect: true, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: { materialType: hdsMaterial.MaterialType.IMMERSIVE, materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE },
+      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         originalStyle: {
-          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
           contentStyle: {
-            backIconStyle: { iconColor: $r('app.color.primary_text') },
-            menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+            backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+            menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
           }
         },
-        scrollEffectStyle: {
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
           contentStyle: {
-            backIconStyle: { iconColor: $r('app.color.primary_text') },
-            menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+            backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+            menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
           }
         }
@@ -112,8 +123,8 @@ export struct PinmonyDisplaySettingsPage {
         .selected(Math.max(0, ['system', 'zh', 'en'].indexOf(this.languagePreference)))
         .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'en' ? 'English' : this.uiText("pm_follow_system_217cfe7d"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-        .backgroundColor($r('app.color.surface_muted'))
-        .selectedOptionBgColor($r('app.color.surface_muted'))
+        .backgroundColor($r('app.color.display_settings_control'))
+        .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
@@ -127,7 +138,8 @@ export struct PinmonyDisplaySettingsPage {
             }
           }
         })
-    }.width('100%').padding({ top: 16, bottom: 16 })
+    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     Row({ space: 12 }) {
       Text(this.uiText("pm_theme_788db1cf")).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -135,15 +147,16 @@ export struct PinmonyDisplaySettingsPage {
         .selected(this.themePreference === 'light' ? 1 : this.themePreference === 'dark' ? 2 : 0)
         .value(this.themeLabel())
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-        .backgroundColor($r('app.color.surface_muted'))
-        .selectedOptionBgColor($r('app.color.surface_muted'))
+        .backgroundColor($r('app.color.display_settings_control'))
+        .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
         .accessibilityText(this.uiText("pm_theme_0fa0bfe4") + this.themeLabel())
         .onSelect((index: number) => {
           if (index >= 0 && index < 3) this.selectTheme(['system', 'light', 'dark'][index]);
         })
-    }.width('100%').padding({ top: 16, bottom: 16 })
+    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     if (this.isTablet) {
       Row({ space: 12 }) {
         Text(this.uiText("pm_screen_orientation_60cc99cc")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -151,10 +164,11 @@ export struct PinmonyDisplaySettingsPage {
           .selected(Math.max(0, ['system', 'auto', 'portrait', 'landscape'].indexOf(this.orientationPreference)))
           .value(this.orientationPreference === 'auto' ? this.uiText("pm_always_rotate_automatically_d3a0ff23") : this.orientationPreference === 'portrait' ? this.uiText("pm_portrait_c35bd83b") : this.orientationPreference === 'landscape' ? this.uiText("pm_landscape_055a6b3a") : this.uiText("pm_follow_system_217cfe7d"))
           .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-          .backgroundColor($r('app.color.surface_muted')).enabled(!this.orientationBusy)
+          .backgroundColor($r('app.color.display_settings_control')).enabled(!this.orientationBusy)
           .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
-      }.width('100%').padding({ top: 16, bottom: 16 })
+      }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     }
     Row({ space: 16 }) {
       Column({ space: 6 }) {
@@ -162,7 +176,29 @@ export struct PinmonyDisplaySettingsPage {
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled }).onChange((value: boolean) => { this.collapseEnabled = value; })
         .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
-    }.width('100%').padding({ top: 16, bottom: 16 })
+    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    Row({ space: 16 }) {
+      Text(this.uiText('pm_immersive_light')).fontSize(17)
+        .fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Select([{ value: this.uiText('pm_light_off') }, { value: this.uiText('pm_light_gentle') },
+        { value: this.uiText('pm_light_immersive') }, { value: this.uiText('pm_light_exquisite') }])
+        .selected(Math.max(0, ['off', 'gentle', 'immersive', 'exquisite'].indexOf(this.immersiveLightMode)))
+        .value(this.uiText(this.immersiveLightMode === 'off' ? 'pm_light_off' : this.immersiveLightMode === 'gentle' ?
+          'pm_light_gentle' : this.immersiveLightMode === 'exquisite' ? 'pm_light_exquisite' : 'pm_light_immersive'))
+        .font({ size: 15 }).fontColor($r('app.color.primary_text'))
+        .backgroundColor($r('app.color.display_settings_control'))
+        .selectedOptionBgColor($r('app.color.display_settings_control'))
+        .selectedOptionFontColor($r('app.color.primary_text')).optionFontColor($r('app.color.primary_text'))
+        .accessibilityText(this.uiText('pm_immersive_light'))
+        .onSelect((index: number) => {
+          if (index >= 0 && index < 4) {
+            this.immersiveLightMode = ['off', 'gentle', 'immersive', 'exquisite'][index];
+            this.logMaterialMode();
+          }
+        })
+    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
   }
   @Builder
   private theme() {

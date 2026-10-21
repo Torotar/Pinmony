@@ -48,6 +48,7 @@ export struct PinmonyInboxPage {
   onUser?: (url: string) => void;
   onAction?: (id: string) => void;
   onHome?: () => void;
+  onList?: (section: string) => void;
   onRetry?: () => void;
   onLoadMore?: () => void;
   onContactsRetry?: () => void;
@@ -142,6 +143,20 @@ export struct PinmonyInboxPage {
       .width('100%')
       .textAlign(TextAlign.Start)
       .padding({ left: 20, right: 20, top: 16, bottom: 8 })
+  }
+
+  @Builder
+  private listTitle(label: string, section: string) {
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 8 }) {
+        Text(label).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+          .layoutWeight(1).textAlign(TextAlign.Start)
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
+          .margin({ left: 8 })
+      }.width('100%')
+    }.width('100%').backgroundColor(Color.Transparent).padding({ left: 20, right: 20, top: 16, bottom: 8 })
+      .stateEffect(false)
+      .accessibilityText(label).onClick(() => { if (this.interactionReady && this.onList) this.onList(section); })
   }
 
   private updateRowKey(item: PinmonyInboxItem): string {
@@ -358,6 +373,9 @@ export struct PinmonyInboxPage {
               })
             }
 
+            if (this.snapshot.section === 'messages') {
+              this.listTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("pm_messages_4da199fa"), 'messages')
+            }
             if (this.snapshot.items.length === 0 && PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {
               Column() {
                 this.emptyState()
@@ -366,9 +384,6 @@ export struct PinmonyInboxPage {
               .padding({ top: this.snapshot.section === 'updates' ? 120 : 24,
                 bottom: this.snapshot.section === 'updates' ? 48 : 12 })
             } else if (this.snapshot.section === 'messages') {
-              if (this.snapshot.items.length > 0) {
-                this.groupTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("pm_messages_4da199fa"))
-              }
               ForEach(this.snapshot.items, (item: PinmonyInboxItem) => {
                 this.itemRow(item, false)
               }, (item: PinmonyInboxItem) => item.id)
@@ -392,14 +407,8 @@ export struct PinmonyInboxPage {
             }
             if (this.snapshot.section === 'messages' &&
               (PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) || this.snapshot.contacts.length > 0)) {
-              Text(PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) ||
-                (this.snapshot.inboxLabel.toLowerCase() === 'inbox' ? 'Contacts' : this.uiText("pm_contacts_3303b569")))
-                .fontSize(18)
-                .fontColor($r('app.color.primary_text'))
-                .width('100%')
-                .textAlign(TextAlign.Start)
-                .margin({ top: 24, bottom: 8 })
-                .padding({ left: 20 })
+              this.listTitle(PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) ||
+                this.uiText("pm_contacts_3303b569"), 'contacts')
               if (this.snapshot.contactsLoading) {
                 Row({ space: 12 }) {
                   LoadingProgress().width(24).height(24)

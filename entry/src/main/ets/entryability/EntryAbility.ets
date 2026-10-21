@@ -73,6 +73,8 @@ export default class EntryAbility extends UIAbility {
       errorManager.on('globalUnhandledRejectionDetected', this.rejectionObserver);
     } catch (_) { PinmonyRuntimeLog.warn('Runtime: exception observer unavailable'); }
     PersistentStorage.persistProp('themePreference', 'system');
+    PersistentStorage.persistProp('immersiveLightEnabled', true);
+    PersistentStorage.persistProp('immersiveLightMode', AppStorage.get<boolean>('immersiveLightEnabled') === false ? 'off' : 'immersive');
     PersistentStorage.persistProp('screenOrientationPreference', 'system');
     PersistentStorage.persistProp('pinmonySessionOrigin', 'https://www.pinterest.com');
     PersistentStorage.persistProp('pinmonySessionConfirmed', false);

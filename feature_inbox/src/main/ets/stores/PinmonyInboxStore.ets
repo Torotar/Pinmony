@@ -5,6 +5,14 @@ import { PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 
 @Observed
 export class PinmonyInboxStore {
+  listSearchBack: (() => boolean) | undefined = undefined;
+  private _listSection: string = '';
+  get listSection(): string { return this._listSection; }
+  set listSection(value: string) {
+    if (this._listSection === value) return;
+    this._listSection = value;
+    if (this.onNavigationChange) this.onNavigationChange();
+  }
   inboxNativeMessagesReady: boolean = false;
   inboxNativeUpdatesReady: boolean = false;
   retainedChat: PinmonyInboxFlowSnapshot | undefined = undefined;

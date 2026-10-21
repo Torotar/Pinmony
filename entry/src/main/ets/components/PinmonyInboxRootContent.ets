@@ -30,7 +30,7 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
           if ((view.inboxStore.inbox || view.inboxStore.inboxLoading || view.inboxStore.inboxError) && !view.inboxStore.inboxWebFlow &&
               !view.pinStore.detail && !view.activeSheetKind && !view.loadFailed) {
             PinmonyInboxPage({ onUser: (url: string) => view.openUserProfile(url),
-              interactionReady: view.activeTab === 2 && view.authStatus === 'authenticated' && !view.inboxStore.inboxFlow,
+              interactionReady: view.activeTab === 2 && view.authStatus === 'authenticated' && !view.inboxStore.inboxFlow && !view.inboxStore.listSection,
               onScrollAvailability: (scrollable: boolean) => view.updateInboxScrollAvailability(scrollable),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               snapshot: view.inboxStore.inbox || view.inboxPlaceholder(),
@@ -50,6 +50,7 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
               },
               loading: view.inboxStore.inboxLoading,
               error: view.inboxStore.inboxError,
+              onList: (section: string) => { view.inboxStore.listSection = section; },
               onSection: (section: string) => view.selectInboxSection(section),
               onLoadMore: () => view.loadMoreInbox(),
               onContactsRetry: () => view.retryInboxContacts(),
@@ -62,7 +63,7 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
             .width('100%')
             .height('100%')
             .visibility(view.activeTab === 2 ? Visibility.Visible : Visibility.Hidden)
-            .hitTestBehavior(view.activeTab === 2 && !view.inboxStore.inboxFlow ? HitTestMode.Default : HitTestMode.None)
+            .hitTestBehavior(view.activeTab === 2 && !view.inboxStore.inboxFlow && !view.inboxStore.listSection ? HitTestMode.Default : HitTestMode.None)
           }
 
 

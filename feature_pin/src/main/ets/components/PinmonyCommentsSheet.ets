@@ -1,3 +1,4 @@
+import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyComment, PinmonyCommentResult } from '../models/PinmonyComments';
@@ -73,16 +74,8 @@ export struct PinmonyCommentsSheet {
   @Builder
   private commentRow(item: PinmonyComment, reply: boolean = false) {
     Row({ space: 10 }) {
-      if (item.avatar) {
-        Image(item.avatar).onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); }).width(reply ? 28 : 32).height(reply ? 28 : 32)
-          .borderRadius(16).objectFit(ImageFit.Cover)
-      } else {
-        Stack({ alignContent: Alignment.Center }) {
-          Text(item.name.trim().slice(0, 1).toUpperCase()).fontSize(reply ? 12 : 13)
-            .fontColor($r('app.color.primary_text'))
-        }.width(reply ? 28 : 32).height(reply ? 28 : 32).borderRadius(16)
-          .backgroundColor($r('app.color.surface_muted'))
-      }
+      PinmonyUserAvatar({ image: item.avatar, name: item.name, avatarSize: reply ? 28 : 32 })
+        .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
       Column({ space: 4 }) {
         Row({ space: 4 }) {
           Text(item.name).fontSize(13).fontWeight(FontWeight.Bold)

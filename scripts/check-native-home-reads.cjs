@@ -15,6 +15,16 @@ function fixture(){
 }
 async function ready(f){const read=f.controller.demand();assert.match(f.jobs[0].job.url,/UserHomefeedResource/);assert.match(f.jobs[1].job.url,/BoardsFeedResource/);f.jobs[0].resolve(pins([1,2],'next'));await read;f.jobs[1].resolve(categories);await flush();}
 async function main(){
+ const recovery=fixture();await ready(recovery);const failedPage=recovery.controller.more();
+ recovery.jobs[2].resolve('invalid');await failedPage;assert(recovery.store.homeError);
+ const existing=recovery.store.home.pins.slice();recovery.controller.pause();recovery.setActive(false);
+ await recovery.controller.retry();assert.equal(recovery.jobs.length,3,'background retry cannot dispatch');
+ recovery.setActive(true);const retryPage=recovery.controller.retry();recovery.controller.retry();
+ assert.equal(recovery.jobs.length,4,'manual pagination retry is single flight');
+ assert.equal(JSON.parse(new URL(recovery.jobs[3].job.url).searchParams.get('data')).options.bookmarks[0],'next');
+ assert.equal(recovery.store.home.pins[0],existing[0],'retry preserves visible cards');
+ recovery.jobs[3].resolve(pins([3],'-end-'));await retryPage;assert.equal(recovery.store.home.pins.length,3);
+ assert.equal(recovery.store.homeError,'');assert.equal(recovery.store.cachedHomeScrollOffset,123);
  const f=fixture();await ready(f);assert.equal(f.kinds[0],'feed');assert.equal(f.kinds.at(-1),'metadata');
  assert.equal(f.store.homeNativeReadsReady,true);assert.equal(f.store.homeActionsReady,false,'native reads never grant Web writes');assert.equal(f.store.home.session,0);
  assert.equal(f.store.home.pins[0].title,'grid');assert.equal(f.store.home.tabs.length,3);assert.equal(f.store.cachedHomeScrollOffset,123);

@@ -1,3 +1,4 @@
+import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PIN_NATIVE_PROFILE_SETTINGS_ENABLED } from '../app/PinmonyProfileSettingsClient';
 import { PinmonyProfileNativeActions, PinmonyProfileNativeActionsPorts } from '../app/PinmonyProfileNativeActions';
@@ -23,6 +24,7 @@ import { descriptionTagSearchUrl } from 'feature_pin';
 import { assembleControllerLifecycle, bindStoreNavigation, PinmonyProductControllers } from '../app/PinmonyControllerAssembly';
 import { PinmonyBuildHomeRootContent } from '../components/PinmonyHomeRootContent';
 import { PinmonyBuildSearchRootContent } from '../components/PinmonySearchRootContent';
+import { PinmonyPhotoSearchFlow } from '../app/PinmonyPhotoSearchFlow';
 import { PinmonyBuildInboxRootContent } from '../components/PinmonyInboxRootContent';
 import { PinmonyBuildProfileRootContent } from '../components/PinmonyProfileRootContent';
 import { PinmonyNetworkBridgeCoordinator, PinmonyNetworkBridgeCoordinatorPorts } from '../app/PinmonyNetworkBridgeCoordinator';
@@ -59,7 +61,7 @@ import { PinmonyInboxReadController, PinmonyInboxReadPorts, PinmonyInboxActionsC
   PinmonyInboxActionsPorts, PinmonyInboxStore, PinmonyBoardInvitationController,
   PinmonyBoardInvitationPorts, PinmonyBoardInvitation, PinmonyBoardInvitationList,
   PIN_BOARD_INVITATION_SCRIPT, PinmonyInboxSnapshot, PIN_INBOX_CONVERSATIONS_API_ENABLED,
-  PinmonyInboxFlowSnapshot, PinmonyInboxFlowPage } from 'feature_inbox';
+  PinmonyInboxFlowSnapshot, PinmonyInboxFlowPage, PinmonyInboxListPage } from 'feature_inbox';
 import { PinmonyControllerLifecycle } from '../app/PinmonyControllerLifecycle';
 import { PinmonyPagePerformance, ApiCache, CACHE_TTL, hashCacheString, PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyProfileActionsController, PinmonyProfileActionsPorts, PinmonyProfileReadController,
@@ -152,6 +154,8 @@ interface PinmonyBoardOperationAction {
 @Entry
 @Component
 struct Index {
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private nativeChildBackUntil: number = 0;
@@ -167,6 +171,13 @@ struct Index {
   private readonly documentStartScripts: ScriptItem[] = pinWebDocumentStartScripts();
   private readonly nativeBusinessRoutesEnabled: boolean = PIN_NATIVE_POST_OPERATIONS_ENABLED && PIN_NATIVE_COMMENT_WRITES_ENABLED && PIN_NATIVE_DETAIL_AUXILIARY_ENABLED && PIN_NATIVE_SEARCH_DISCOVERY_ENABLED && PIN_NATIVE_DETAIL_READS_ENABLED && PIN_NATIVE_HOME_READS_ENABLED && PIN_NATIVE_SEARCH_READS_ENABLED && PIN_NATIVE_PROFILE_READS_ENABLED && PIN_NATIVE_INBOX_MESSAGES_ENABLED && PIN_NATIVE_INBOX_UPDATES_ENABLED && PIN_NATIVE_BOARD_READS_ENABLED && PIN_NATIVE_SHARE_PUBLISH_ENABLED && PIN_NATIVE_PROFILE_SETTINGS_ENABLED && PIN_NATIVE_PIN_MENUS_ENABLED;
   private readonly nativeNetwork: PinmonyNativeNetwork = new PinmonyNativeNetwork();
+  private readonly photoSearchFlow: PinmonyPhotoSearchFlow = new PinmonyPhotoSearchFlow({
+    session: () => this.nativeBusinessSessionContext(), network: () => this.nativeNetwork,
+    page: () => this.currentSearchPageKey(),
+    active: () => this.authStatus === 'authenticated' && this.activeTab === 1 && this.nativeSearchPageVisible(),
+    pick: () => this.systemActions.pickImage(), read: (uri: string) => this.systemActions.readJpeg(uri),
+    open: (url: string, source: string) => this.beginDetailOpening(url, source)
+  });
   private readonly detailReadNetwork: PinmonyNativeNetwork = new PinmonyNativeNetwork();
   private readonly coordinatorTasks: PinmonyTaskRegistry = new PinmonyTaskRegistry();
   private readonly pageTasks: PinmonyTaskRegistry = new PinmonyTaskRegistry();
@@ -370,7 +381,7 @@ struct Index {
 
   private readonly bottomBarCoordinator: PinmonyBottomBarCoordinator = new PinmonyBottomBarCoordinator({
     searchResultsVisible: (): boolean => this.activeTab === 1 &&
-      (this.searchStore.searchInputFocused ||
+      (this.searchStore.photoSearchVisible || this.searchStore.searchInputFocused ||
         /[?&]q=[^&#]+/i.test(this.searchStore.search?.pageKey || this.currentSearchPageKey())),
     floatingTabsMounted: (): boolean => this.floatingTabsMounted,
     setFloatingTabsMounted: (value: boolean): void => { this.floatingTabsMounted = value; },
@@ -1619,7 +1630,7 @@ struct Index {
     current: (kind: string,page: string,id: string): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && (kind === 'pin' ? (this.pinStore.detail?.pinUrl === page && this.currentPinUrl() === page || this.homeStore.homeMenuPin === page && this.isCurrentMorePin(page)) : kind === 'board' ? this.boardStore.boardDetail?.pageKey === page && this.boardStore.boardDetail?.boardId === id && this.boardStore.boardDetail?.nativeAccountGeneration === this.nativeBusinessSessionContext().generation && this.boardStore.boardDetail?.nativeReadsReady === true && this.boardStore.boardDetail?.ready === true && this.currentBoardUrl() === page : (this.activeTab === 3 || this.profileStore.origins.length > 0) && this.profileStore.profile?.profileUrl === page && this.currentProfileUrl() === page && !this.pinStore.detail && !this.boardStore.boardDetail),
     visible: (): boolean => this.activeSheetKind === 'share' && this.showNativeSheet,
     show: (profile: boolean): void => {this.suspendMoreForShare();this.profileShareMode = profile;this.activeSheetKind = 'share';this.showNativeSheet = true;},
-    feedback: (): void => this.showShareFeedbackSnack(),copy: (value: string): Promise<void> => this.systemActions.copyText(value),share: (value: string): Promise<void> => this.sharePinUrl(value,this.profileStore.profile?.displayName || 'Pinterest')
+    feedback: (): void => this.showShareFeedbackSnack(),copy: (value: string): Promise<void> => this.systemActions.copyText(value),share: (value: string): Promise<void> => this.pinStore.shareOnPinDetail ? this.shareDetailPinAfterMenu(value, '', true) : this.sharePinUrl(value,this.profileStore.profile?.displayName || 'Pinterest')
   } as PinmonyShareNativePorts);
   private readonly publishNativeFlow: PinmonyPublishNativeFlow = new PinmonyPublishNativeFlow({
     store: (): PinmonyProfileStore => this.profileStore,session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),network: (): PinmonyNativeNetwork => this.nativeNetwork,
@@ -2723,7 +2734,7 @@ struct Index {
   private nativeRootTabsVisible(): boolean {
     if (this.publishPageVisible()) return false;
     if (this.profileStore.origins.length > 0 || this.profileSettingsVisible || this.profileStore.panel) return false;
-    if (this.inboxStore.inboxFlow) return false;
+    if (this.inboxStore.inboxFlow || this.inboxStore.listSection) return false;
     if (this.searchStore.search && this.nativeSearchPageVisible() && this.searchStore.search.quiz && this.searchStore.search.quiz.mode !== 'entry') return false;
     if (this.profileStore.profile && this.profileStore.profile.organize) return false;
     if (this.boardStore.pendingBoardUrl) return false;
@@ -5679,8 +5690,8 @@ struct Index {
     if (!this.showNativeSheet && this.detailSystemShareClosed) this.detailSystemShareClosed();
   }
 
-  private async shareDetailPinAfterMenu(pin: string, boardPage: string = ''): Promise<void> {
-    if (this.detailSystemShareClosed || !this.showNativeSheet || this.activeSheetKind !== (boardPage ? 'share' : 'more')) return;
+  private async shareDetailPinAfterMenu(pin: string, boardPage: string = '', sharePanel: boolean = false): Promise<void> {
+    if (this.detailSystemShareClosed || !this.showNativeSheet || this.activeSheetKind !== (boardPage || sharePanel ? 'share' : 'more')) return;
     const generation: number = this.nativeBusinessSessionContext().generation;
     PinmonyRuntimeLog.info('SystemShareTrace: phase=menu-closing');
     const closed: boolean = await new Promise<boolean>((resolve) => {
@@ -5689,7 +5700,7 @@ struct Index {
         if (this.detailSystemShareClosed !== onClosed) return;
         this.detailSystemShareClosed = undefined;
         if (timer >= 0) clearTimeout(timer);
-        if (boardPage) this.dismissShareSheet();
+        if (boardPage || sharePanel) this.dismissShareSheet();
         else this.dismissMoreSheet();
         PinmonyRuntimeLog.info('SystemShareTrace: phase=' + (disappeared ? 'menu-closed' : 'menu-close-timeout'));
         resolve(disappeared);
@@ -5943,6 +5954,7 @@ struct Index {
       openHomeMore: (id: string): Promise<void> => this.openHomeMore(id),
       loadMoreHome: (): Promise<void> => this.loadMoreHome(),
       refreshHome: (): void => this.refreshHome(),
+      retryHome: (): void => { if (PIN_NATIVE_HOME_READS_ENABLED) { void this.homeNativeReads.retry(); } else this.refreshHome(); },
       prefetchHomePinDetails: (first: number, last: number): void => this.prefetchHomePinDetails(first, last),
       onTouch: (event: TouchEvent): void => this.markRootContentTouch(0, event),
     })
@@ -5961,6 +5973,9 @@ struct Index {
   @Builder
   private buildSearchRootContent() {
     PinmonyBuildSearchRootContent({
+      photoSearch: (onSelected?: (uri: string) => void) => this.photoSearchFlow.search(onSelected),
+      cancelPhotoSearch: () => this.photoSearchFlow.cancel(),
+      openPhotoResult: (id: string) => this.photoSearchFlow.open(id),
       syncFloatingTabsMotion: (): void => this.syncFloatingTabsMotion(),
       searchStore: this.searchStore,
       shouldKeepSearchRootMounted: (): boolean => this.shouldKeepSearchRootMounted(),
@@ -6179,12 +6194,10 @@ struct Index {
             .scrollable(false)
             .barOverlap(true)
             .barHeight(56)
+            .barBackgroundColor(this.immersiveLightEnabled ? Color.Transparent : $r('app.color.surface_muted'))
             .barFloatingStyle({
               barBottomMargin: 28,
-              systemMaterialEffect: {
-                materialType: hdsMaterial.MaterialType.IMMERSIVE,
-                materialLevel: hdsMaterial.MaterialLevel.EXQUISITE
-              }
+              systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
             })
             .animationDuration(0)
             .onTabBarClick((index: number) => {
@@ -6298,6 +6311,20 @@ struct Index {
               this.closeBoardSection();
             } })
               .width('100%').height('100%')
+          }
+          if (this.activeTab === 2 && this.inboxStore.listSection && this.inboxStore.inbox &&
+              !this.pinStore.detail && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
+            PinmonyInboxListPage({ snapshot: this.inboxStore.inbox,
+              section: this.inboxStore.listSection,
+              onSearchBackChange: (handler: (() => boolean) | undefined) => { this.inboxStore.listSearchBack = handler; },
+              onSearchClosed: () => { this.nativeChildBackUntil = Date.now() + 300; },
+              actionsReady: this.inboxStore.inboxNativeMessagesReady || this.inboxStore.inboxActionsReady,
+              onSection: (section: string) => { this.inboxStore.listSection = section; },
+              onBack: () => { this.nativeChildBackUntil = Date.now() + 300; this.inboxStore.listSection = ''; },
+              onAction: (id: string) => this.performInboxAction(id),
+              onRetry: () => this.retryInbox(), onContactsRetry: () => this.retryInboxContacts() })
+              .width('100%').height('100%')
+              .hitTestBehavior(this.inboxStore.inboxFlow ? HitTestMode.None : HitTestMode.Default)
           }
           if (!(PIN_NATIVE_PROFILE_READS_ENABLED && this.profileStore.origins.length > 0 && this.currentProfileUrl()) && !this.nativeBoardVisible() && this.inboxStore.inboxFlow && (this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() ||
               this.activeTab === 2 && !!this.inboxStore.retainedChat)) {
@@ -6540,7 +6567,7 @@ struct Index {
     .width('100%')
     .height('100%')
     .padding({ top: this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
-      (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
+      !!this.inboxStore.listSection || (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
       this.inboxStore.invitationAllVisible || !!this.boardStore.collaborators || !!this.pinStore.detail || this.nativeSearchPageVisible() || this.nativeBoardVisible() ||
       (!this.pinStore.detail && !!this.profileStore.profile?.organize && !this.profileStore.profileWebFlow) ?
       0 : this.getUIContext().px2vp(this.statusBarHeightPx) })

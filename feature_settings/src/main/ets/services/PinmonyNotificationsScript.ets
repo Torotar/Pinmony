@@ -12,7 +12,7 @@ export const PIN_NOTIFICATIONS_READ_SCRIPT: string = `
         if(g.type!=='notification_settings_group' || typeof g.label!=='string' || !Array.isArray(g.subcategories)) throw new Error('通知分组格式无效');
         return {key:String(g.key).slice(0,100),label:g.label.slice(0,200),categories:g.subcategories.slice(0,60).map(function(c){
           if(typeof c.label!=='string' || !Array.isArray(c.channel_options)) throw new Error('通知选项格式无效');
-          return {key:String(c.key).slice(0,100),label:c.label.slice(0,200),description:String(c.description||'').slice(0,500),summary:String(c.channel_options_label||'').slice(0,500),channels:c.channel_options.slice(0,10).map(function(o){if(typeof o.label!=='string'||typeof o.value!=='boolean')throw new Error('通知渠道格式无效');return {label:o.label.slice(0,100),value:o.value};})};
+          return {key:String(c.key).slice(0,100),label:c.label.slice(0,200),description:String(c.description||'').slice(0,500),summary:String(c.channel_options_label||'').slice(0,500),channels:c.channel_options.slice(0,10).filter(function(o){return o.channel!=='web_push';}).map(function(o){if(typeof o.label!=='string'||typeof o.value!=='boolean')throw new Error('通知渠道格式无效');return {label:o.label.slice(0,100),value:o.value};})};
         })};
       });
       if(location.href===page && token===window.PinmonyNotificationsToken)window.PinmonyNotificationsResult={groups:groups,error:''};

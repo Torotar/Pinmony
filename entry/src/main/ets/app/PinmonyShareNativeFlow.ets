@@ -197,7 +197,7 @@ export class PinmonyShareNativeFlow {
         this.store.shareError = '';
         this.store.shareLoading = true;
         this.store.shareOptions = mode === 'user' ? ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X'].map((v: string): ShareSheetOption => ({ id: 'native-share:' + v, label: v, icon: '', enabled: false })) : [];
-        this.store.shareActions = mode === 'user' ? [{ id: 'native-copy', label: '复制链接', icon: '', enabled: false }] : [];
+        this.store.shareActions = mode === 'user' ? [{ id: 'native-copy', label: '复制链接', icon: '', enabled: false }] : mode === 'pin' ? [{ id: 'native-system-share', label: '系统分享', icon: '', enabled: false }] : [];
         this.ports.show(mode !== 'pin');
         const revision: number = this.revision;
         try {
@@ -207,6 +207,7 @@ export class PinmonyShareNativeFlow {
                     return true;
                 if (d.type !== 'pin' || d.id !== id)
                     throw new Error('pin');
+                this.store.shareActions = [{ id: 'native-system-share', label: '系统分享', icon: '', enabled: true }];
                 this.tracking = d.client_tracking_params || d.tracking_params || '';
                 if (this.tracking.length > 16384)
                     this.tracking = '';
@@ -294,6 +295,12 @@ export class PinmonyShareNativeFlow {
         const revision: number = this.revision;
         if (!this.current(revision) || this.busy)
             return;
+        if (id === 'native-system-share') {
+            if (this.mode !== 'pin' || !this.store.shareActions.some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
+                return;
+            await this.ports.share(this.page);
+            return;
+        }
         if (id === 'native-copy' || id.startsWith('native-share:')) {
             if (this.mode !== 'user' || !this.link || !this.store.shareOptions.concat(this.store.shareActions).some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
                 return;

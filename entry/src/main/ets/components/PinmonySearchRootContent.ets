@@ -1,8 +1,11 @@
-import { PinmonySearchStore, PinmonySearchPage, PinmonySearchSnapshot } from 'feature_search';
+import { PinmonySearchStore, PinmonySearchPage, PinmonySearchSnapshot, PinmonySearchResult } from 'feature_search';
 import { PinmonyPinStore } from 'feature_pin';
 import { PinmonyAuthStatus } from 'common_session';
 
 export interface PinmonySearchRootView {
+  photoSearch: (onSelected?: (uri: string) => void) => Promise<PinmonySearchResult[] | undefined>;
+  cancelPhotoSearch: () => void;
+  openPhotoResult: (id: string) => void;
   searchStore: PinmonySearchStore;
   shouldKeepSearchRootMounted: () => boolean;
   pinStore: PinmonyPinStore;
@@ -39,6 +42,13 @@ export interface PinmonySearchRootView {
 export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
           if (view.shouldKeepSearchRootMounted() && !view.pinStore.detail && !view.loadFailed) {
             PinmonySearchPage({
+              onPhotoSearch: view.photoSearch,
+              onPhotoCancel: view.cancelPhotoSearch,
+              onPhotoResult: view.openPhotoResult,
+              onPhotoVisibilityChange: (visible: boolean) => {
+                view.searchStore.photoSearchVisible = visible;
+                view.syncFloatingTabsMotion();
+              },
               active: view.nativeSearchPageVisible(),
               interactionReady: view.activeTab === 1 && view.authStatus === 'authenticated',
               automaticLoadingEnabled: view.activeTab === 1 && (!view.nativeRootOnly || view.rootContentInteracted),

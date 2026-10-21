@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const ts=require(process.argv[2]||'typescript');
 const {createArktsLoader}=require('./arkts-module-loader.cjs');
 const foundation={PinmonyRuntimeLog:{info(){},warn(){}},PinmonyTaskRegistry:class{invalidate(){}timeout(){}wait(){return Promise.resolve(true)}}};
-const loader=createArktsLoader(ts,{'common_foundation':foundation,'common_network':{PIN_BUSINESS_PIN_READ_ENABLED:true},'common_session':{},'feature_profile':{PIN_PROFILE_ORGANIZE_ENABLED:true},'feature_settings':{},'@kit.RemoteCommunicationKit':{rcp:{}},'@kit.BasicServicesKit':{}});
+const loader=createArktsLoader(ts,{'common_foundation':foundation,'common_network':{PIN_BUSINESS_PIN_READ_ENABLED:true},'common_session':{},'feature_profile':{PIN_PROFILE_ORGANIZE_ENABLED:true},'@kit.RemoteCommunicationKit':{rcp:{}},'@kit.BasicServicesKit':{}});
 const {PinmonySettingsNativeFlow}=loader.loadFile('entry/src/main/ets/app/PinmonySettingsNativeFlow.ets');
 const {PinmonyProfileNativeActions}=loader.loadFile('entry/src/main/ets/app/PinmonyProfileNativeActions.ets');
 const {PinmonyNativeNetwork,acceptsNetworkJob}=loader.loadFile('common_network/src/main/ets/PinmonyNativeNetwork.ets');
@@ -12,7 +12,7 @@ const origin='https://www.pinterest.com',page=origin+'/sample/',clone=v=>JSON.pa
 function fixture(){
  let active=true,currentPage=page,session={authenticated:true,generation:1,accountId:'synthetic-session',origin,userAgent:'synthetic'},hold,unknown='',duplicate=false,bad=false,refreshes=0;
  const req=[],denials=[],cancelled=[],saved=[],feedback=[];
- const server={me:{id:'1',type:'user',username:'sample'},peer:{id:'2',type:'user',username:'peer',explicitly_followed_by_me:false},account:{id:'1',username:'sample',email:'synthetic@example.test',birthdate:'2000-01-02',gender:'unspecified',country:'CN',allow_switch_between_private_and_public_profile:true,can_edit_search_privacy:true,opt_in_private_account:false,exclude_from_search:false},edit:{id:'1',username:'sample',first_name:'First',last_name:'Last',about:'About',website_url:'https://example.test/'},topics:[{key:'art',text:'Art',opt_out:false,interest_ids:['101','102']},{key:'style',text:'Style',opt_out:false,interest_ids:['103']}],board:{id:'300',type:'board',name:'Board',privacy:'public',access:['write']},pins:[{id:'500',type:'pin',images:{'474x':{url:'https://i.pinimg.com/synthetic.jpg',width:474,height:600}}}]};
+ const server={me:{id:'1',type:'user',username:'sample'},peer:{id:'2',type:'user',username:'peer',explicitly_followed_by_me:false},account:{id:'1',username:'sample',email:'synthetic@example.test',birthdate:'2000-01-02',gender:'unspecified',country:'CN',allow_switch_between_private_and_public_profile:true,can_edit_search_privacy:true,opt_in_private_account:false,exclude_from_search:false},edit:{id:'1',username:'sample',first_name:'First',last_name:'Last',about:'About',website_url:'https://example.test/'},topics:[{key:'art',text:'Art',opt_out:false,interest_ids:['101','102']},{key:'style',text:'Style',opt_out:false,interest_ids:['103']}],board:{id:'300',type:'board',name:'Board',privacy:'public',access:['write']},notification:true,pins:[{id:'500',type:'pin',images:{'474x':{url:'https://i.pinimg.com/synthetic.jpg',width:474,height:600}}}]};
  const ps={panelToken:0,profileSession:0,profileNativeReadsReady:true,profile:{profileUrl:page,section:'saved',actions:[],boards:[],createdPins:[],unorganizedPins:[{id:'500',imageUrl:'https://i.pinimg.com/synthetic.jpg'}]},profileCache:{clear(){}},origins:[]};const st={screen:'account',token:0,busy:false,loading:false,notifications:[]};
  function response(data,endpoint){return {resource_response:{status:'success',code:0,endpoint_name:endpoint,data},client_context:{user:server.me}};}
  function answer(job,e){const o=e.options||{},path=job.url.split('?')[0];if(path.endsWith('/_/graphql/')){const v=e.variables;
@@ -23,15 +23,20 @@ function fixture(){
  }
  if(path.includes('/UserResource/'))return response(o.username==='peer'?server.peer:server.me);
  if(path.includes('/UserSettingsResource/get/'))return response(clone(server.account));
- if(path.includes('/UserSettingsResource/update/')){for(const k of ['birthdate','gender','custom_gender','country','opt_in_private_account','exclude_from_search'])if(k in o)server.account[k]=o[k];return response(bad?{}:clone(server.account));}
+ if(path.includes('/UserSettingsResource/update/')){if(server.social){if(o.allow_mentions!==undefined)server.social.allow_mentions=o.allow_mentions;if(o.messaging_permissions){const [id,level]=Object.entries(o.messaging_permissions)[0];server.social.messaging_permissions.find(g=>g.group_id===+id).selected_level=level;}return response({},bad?'wrong':'v3_edit_settings_handler');}for(const k of ['birthdate','gender','custom_gender','country','opt_in_private_account','exclude_from_search'])if(k in o)server.account[k]=o[k];return response(bad?{}:clone(server.account));}
  if(path.includes('/CountriesResource/'))return response([{key:'CN',name:'China'},{key:'GB',name:'United Kingdom'}]);
  if(path.includes('/UserRecentActivityResource/'))return response(clone(server.pins));
  if(path.includes('/UserFollowingResource/'))return response([clone(server.peer)]);
  if(path.includes('/BoardsResource/'))return response([clone(server.board)]);
  if(path.includes('/BoardResource/create/'))return response({...server.board,name:o.name,privacy:o.privacy},'v3_create_board');
  if(path.includes('/ApiResource/')){
+   if(o.url==='/v3/users/blocked')return response(clone(server.blocked||[]),'v3_get_blocked_list');
+   if(o.url==='/v3/users/2/block/' && path.endsWith('/delete/')){server.blocked=[];return response(null,bad?'wrong':'v3_unblock_user');}
+   if(o.url==='/v3/users/settings/' && server.social)return response(clone(server.social),'v3_get_user_settings');
    if(o.url==='/v3/boards/300/follow/'){const followed=path.endsWith('/update/');server.board.followed_by_me=followed;return response(followed?{...server.board,followed_by_me:true}:null,bad?'wrong':followed?'v3_follow_board':'v3_unfollow_board');}
-   if(o.url==='/v3/settings/notifications/')return response([{type:'notification_settings_group',key:'all',label:'All',subcategories:[{key:'social',label:'Social',channel_options:[{label:'Push',value:true}]}]}],'v3_get_settings_all_notifications');
+   if(o.url==='/v3/settings/notifications/' && job.method==='POST'){const c=JSON.parse(o.data.updated_settings)[0];server.notification=c.value;if(server.notificationRows){const match=server.notificationRows[0].subcategories[0].channel_options.find(x=>x.channel===c.type&&x.category_key===c.section&&x.subcategory_key===c.option);assert(match);match.value=c.value;}return response(bad?null:{id:'1',type:'notification_settings'},bad?'wrong':'v3_post_settings_all_notifications');}
+   if(o.url==='/v3/settings/notifications/' && server.notificationRows)return response(clone(server.notificationRows),'v3_get_settings_all_notifications');
+   if(o.url==='/v3/settings/notifications/')return response([{type:'notification_settings_group',key:'all',label:'All',subcategories:[{key:'social',label:'Social',channel_options:[{label:'Push',value:server.notification,channel:'push',category_key:'settings_push_v2',subcategory_key:'messages'}]}]}],'v3_get_settings_all_notifications');
    if(o.url.endsWith('/boards/following/'))return response([{...server.board,followed_by_me:server.board.followed_by_me!==false,url:'/sample/board/',images:{'236x':[{url:'https://i.pinimg.com/cover.jpg'}]}}]);
    if(o.url==='/v3/users/settings/gen_ai/')return response(clone(server.topics));
    if(o.url==='/v3/users/settings/' && job.method==='POST'){const ids=o.data.gen_ai_topics_opt_in||o.data.gen_ai_topics_opt_out;server.topics.forEach(t=>{if(t.interest_ids.some(id=>ids.includes(id)))t.opt_out=!!o.data.gen_ai_topics_opt_out;});return response({gen_ai_topics_opt_out:bad?[]:server.topics.filter(t=>t.opt_out).flatMap(t=>t.interest_ids)});}
@@ -45,6 +50,55 @@ function fixture(){
  return {settings,profile,ps,st,server,network,req,denials,cancelled,saved,feedback,hold:()=>hold,hang:v=>unknown=v,bad:v=>bad=v,duplicate:v=>duplicate=v,active:v=>active=v,page:v=>currentPage=v,account:()=>session={...session,accountId:'another',generation:session.generation+1},context:()=>({...session}),refreshes:()=>refreshes,response};
 }
 const draft={firstName:'First',lastName:'Last',about:'Changed',websiteUrl:'https://example.test/',username:'sample'};
+async function notificationsWrites(){
+ const choice={type:'push',section:'settings_push_v2',option:'messages',value:false};
+ const f=fixture();f.st.screen='notifications';await f.settings.requestAction('notifications','');
+ assert(f.st.notifications[0].categories[0].channels[0].editable);
+ let count=f.req.length;await f.settings.requestAction('notificationSet',JSON.stringify({...choice,option:'NO_PUSH'}));
+ assert(!f.req.slice(count).some(r=>r.job.method==='POST'),'unsupported option never writes');
+ await f.settings.requestAction('notificationSet',JSON.stringify(choice));assert.equal(f.st.notifications[0].categories[0].channels[0].value,false);assert(!f.st.writeUncertain);
+ const post=f.req.find(r=>r.e.options?.data?.updated_settings);assert.equal(typeof post.e.options.data.updated_settings,'string');assert.equal(JSON.parse(post.e.options.data.updated_settings).length,1);
+ for(const value of [JSON.stringify([{...choice,option:'other'}]),JSON.stringify([choice,choice])]){const body=new URLSearchParams(post.job.body),e=JSON.parse(body.get('data'));e.options.data.updated_settings=value;body.set('data',JSON.stringify(e));assert((await f.network.requestBusinessProfileSettings({...post.job,body:body.toString()},f.context,page,'1','1',['notification:push:settings_push_v2:messages'],['own'],()=>true)).error,'network guard rejects altered/batch writes');}
+ const b=fixture();b.st.screen='notifications';await b.settings.requestAction('notifications','');b.bad(true);await b.settings.requestAction('notificationSet',JSON.stringify(choice));assert(b.st.writeUncertain);assert.equal(b.st.notifications[0].categories[0].channels[0].value,true);count=b.req.length;await b.settings.requestAction('notificationSet',JSON.stringify(choice));assert.equal(b.req.length,count,'unknown write cannot replay');b.bad(false);await b.settings.requestAction('notifications','');assert(!b.st.writeUncertain);assert.equal(b.st.notifications[0].categories[0].channels[0].value,false);
+ const u=fixture();u.st.screen='notifications';await u.settings.requestAction('notifications','');u.hang('ApiResource/create');const p=u.settings.requestAction('notificationSet',JSON.stringify(choice));await flush();assert(u.hold());count=u.req.length;await u.settings.requestAction('notificationSet',JSON.stringify(choice));assert.equal(u.req.length,count);u.settings.pause();await p;assert(u.st.writeUncertain);u.hold().resolve(u.response({id:'1',type:'notification_settings'},'v3_post_settings_all_notifications'));await flush();assert.equal(u.st.notifications[0].categories[0].channels[0].value,true,'late response cannot update state');u.hang('');u.server.notification=false;await u.settings.requestAction('notifications','');assert(!u.st.writeUncertain);assert.equal(u.denials.length,0);
+}
+async function notificationSupplement(){
+ const model=loader.loadFile('feature_settings/src/main/ets/models/PinmonyNotifications.ets');
+ for(const option of ['saved_pin_comments','saved_pin_mentions','saved_pin_reminders','saved_pin_tries']){
+   assert(!model.notificationWritable('email','settings_email_v2',option),'unconfirmed email remains unavailable');
+   for(const [type,section] of [['push','settings_push_v2'],['news','settings_news_categories']]){
+     assert(model.notificationWritable(type,section,option));
+     const f=fixture();f.st.screen='notifications';f.server.notificationRows=[{type:'notification_settings_group',key:'pins-you-saved',label:'Saved Pins',subcategories:[{key:option,label:option,channel_options:[{label:type,value:true,channel:type,category_key:section,subcategory_key:option}]}]}];
+     await f.settings.requestAction('notifications','');assert(f.st.notifications[0].categories[0].channels[0].editable);
+     for(const value of [false,true]){
+       await f.settings.requestAction('notificationSet',JSON.stringify({type,section,option,value}));
+       assert.equal(f.st.notifications[0].categories[0].channels[0].value,value);assert(!f.st.writeUncertain);
+       const post=f.req.findLast(r=>r.job.method==='POST');assert.deepEqual(JSON.parse(post.e.options.data.updated_settings),[{type,section,option,value}]);
+     }
+     assert.equal(f.denials.length,0);
+   }
+ }
+ const confirmed=[['push','settings_push_v2','homefeed_pins'],['email','settings_email_v2','homefeed_pins'],['news','settings_news_categories','homefeed_pins'],...['search_recommendations','pinterest_announcements','surveys_and_quizzes','reports_and_violations_center','shuffles_activity'].map(k=>['email','settings_email_v2',k])];
+ for(const [type,section,option] of confirmed)assert(model.notificationWritable(type,section,option));
+ for(const [type,section,option] of [['push','settings_push_everything','NO_PUSH'],['email','settings_email_everything','ONLY_REQUIRED'],['news','settings_news','NONE_IN_APP']]){
+   const f=fixture();f.st.screen='notifications';f.server.notificationRows=[{type:'notification_settings_group',key:'permissions',label:'Permissions',subcategories:[{key:'global',label:'Global',channel_options:[{label:'Channel',value:false,channel:type,category_key:section,subcategory_key:option},{label:'Browser',value:false,channel:'web_push',category_key:'settings_web_push_everything',subcategory_key:'NO_WEB_PUSH'}]}]}];
+   await f.settings.requestAction('notifications','');let rows=f.st.notifications[0].categories[0].channels;assert.equal(rows.length,1,'browser push removed');assert.equal(rows[0].value,true,'false opt-out displays enabled');assert(rows[0].editable);
+   await f.settings.requestAction('notificationSet',JSON.stringify({type,section,option,value:false}));assert.equal(f.st.notifications[0].categories[0].channels[0].value,false);assert(!f.st.writeUncertain);let post=f.req.findLast(r=>r.job.method==='POST');assert.equal(JSON.parse(post.e.options.data.updated_settings)[0].value,true,'disable sends opt-out true');
+   await f.settings.requestAction('notificationSet',JSON.stringify({type,section,option,value:true}));assert.equal(f.st.notifications[0].categories[0].channels[0].value,true);assert(!f.st.writeUncertain);post=f.req.findLast(r=>r.job.method==='POST');assert.equal(JSON.parse(post.e.options.data.updated_settings)[0].value,false);assert.equal(f.denials.length,0);
+ }
+ assert(!model.notificationWritable('push','settings_push_everything_biz','NO_PUSH'),'business alias unconfirmed');assert(!model.notificationWritable('web_push','settings_web_push_everything','NO_WEB_PUSH'));
+ const ui=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyNotificationsPage.ets','utf8');assert(ui.includes("this.store.token === token"));assert(ui.includes('notificationGlobal(choice.type, choice.section, choice.option) || value'));assert(ui.includes('cancel: () => { this.confirmationOpen = false; }'));
+ const method=ui.slice(ui.indexOf('  private change('),ui.indexOf('  @Builder'));
+ const js=ts.transpileModule('class NotificationInteraction {'+method+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
+ const Interaction=vm.runInNewContext(js+';NotificationInteraction',{notificationGlobal:model.notificationGlobal,DialogAlignment:{Bottom:1},$r:v=>v});
+ let dialog;const requests=[];const x=new Interaction();x.pageVisible=true;x.confirmationOpen=false;x.store={token:1,screen:'notifications',busy:false,loading:false,writeUncertain:false};x.uiText=s=>s;x.getUIContext=()=>({showAlertDialog:d=>dialog=d});x.onRequest=(a,v)=>requests.push([a,JSON.parse(v)]);
+ const channel={channel:'push',section:'settings_push_everything',option:'NO_PUSH',value:true,editable:true};
+ x.change(channel,false);assert(dialog);assert.equal(requests.length,0,'opening confirmation never writes');dialog.primaryButton.action();assert.equal(requests.length,0,'cancel never writes');assert(!x.confirmationOpen);
+ x.change(channel,false);dialog.secondaryButton.action();assert.equal(requests.length,1);assert.equal(requests[0][1].value,false);dialog.secondaryButton.action();assert.equal(requests.length,1,'duplicate confirmation cannot resubmit');
+ x.change(channel,false);x.store.token++;dialog.secondaryButton.action();assert.equal(requests.length,1,'stale dialog cannot submit');
+ x.change(channel,false);x.pageVisible=false;dialog.secondaryButton.action();assert.equal(requests.length,1,'dismissed page cannot submit');x.pageVisible=true;
+ x.change({...channel,value:false},true);assert.equal(requests.length,2,'enabling does not require confirmation');
+}
 async function settings(){
  const f=fixture();await f.settings.requestAction('read','');assert.equal(f.st.data.birthdate,'2000-01-02');assert.equal(f.st.data.email,'synthetic@example.test');assert.equal(f.denials.length,0);await f.settings.requestAction('countries','');assert.equal(f.st.data.countries.length,2);await f.settings.requestAction('country','GB');assert.equal(f.st.data.country,'GB');assert(f.st.data.saved);
  f.server.account.is_parental_control_passcode_enabled=true;let count=f.req.length;await f.settings.requestAction('privateProfile','true');assert(!f.req.slice(count).some(r=>r.job.method==='POST'));assert(!f.st.data.privateProfile);f.server.account.is_parental_control_passcode_enabled=false;await f.settings.requestAction('privateProfile','true');assert(f.st.data.privateProfile);assert(f.st.data.saved);await f.settings.requestAction('searchPrivacy','true');assert(f.st.data.searchPrivacy);await f.settings.requestAction('gender','female');assert.equal(f.st.data.gender,'female');await f.settings.requestAction('birthdate','2001-02-29');assert(f.st.error);
@@ -96,4 +150,4 @@ async function policy(){const f=fixture();await f.settings.requestAction('privat
  const w={PinmonyNativeProfileSettingsEnabled:true,addEventListener(){}};w.top=w;const ctx={window:w,location:{origin,href:page},fetch(){throw Error('Old Web request');}};for(const [p,k] of [['feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets','PIN_ACCOUNT_SETTINGS_SCRIPT'],['feature_settings/src/main/ets/services/PinmonyNotificationsScript.ets','PIN_NOTIFICATIONS_READ_SCRIPT'],['feature_profile/src/main/ets/services/PinmonyProfilePanelScript.ets','PIN_PROFILE_PANEL_SCRIPT']])vm.runInNewContext(loader.loadFile(p)[k],ctx);assert.equal(w.PinmonyAccountSettings,undefined);assert.equal(await w.PinmonyProfilePanel.open(page,'edit','users',1),false);assert.equal(w.PinmonyProfilePanel.follow(page,'2'),false);
 }
 const watchdog=setTimeout(()=>{console.error('Native profile/settings timed out');process.exit(1)},20000);
-(async()=>{await settings();await profiles();await followersPaging();await boardFollowing();await boardFollowPolicy();await production();renameRoute();await avatarPreview();await policy();console.log('Native profile/settings: actual requests and Index bindings without Web, identity/permissions, edit/conflict, follows, organize, preferences/readback, cancellation, unknown results and stale responses passed');})().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1;});
+(async()=>{await require('./social-permissions-test-cases.cjs')({fixture,loader,ts,flush,page});await notificationSupplement();await notificationsWrites();await settings();await profiles();await followersPaging();await boardFollowing();await boardFollowPolicy();await production();renameRoute();await avatarPreview();await policy();console.log('Native profile/settings: actual requests and Index bindings without Web, identity/permissions, edit/conflict, follows, organize, preferences/readback, cancellation, unknown results and stale responses passed');})().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1;});

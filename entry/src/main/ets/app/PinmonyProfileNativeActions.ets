@@ -390,7 +390,7 @@ export class PinmonyProfileNativeActions {
                     const target: string = r.url?.startsWith('/') ? this.origin + r.url : r.url || '', following: boolean = section === 'boards' ? r.followed_by_me === true : r.explicitly_followed_by_me === true;
                     if (this.followUnknown.get(r.id) === following)
                         this.followUnknown.delete(r.id);
-                    return { id: r.id, name: (r.full_name || r.name || r.username || '').slice(0, 300), avatar: /^https:\/\//.test(image) ? image : '', covers: covers, targetUrl: target.startsWith(this.origin + '/') && !/[?#\s]/.test(target) ? target : '', pinCount: typeof r.pin_count === 'number' ? r.pin_count.toString() + ' 张 Pin 图' : '', updated: this.updated(r.board_order_modified_at), profileUrl: /^[A-Za-z0-9_]+$/.test(r.username || '') ? this.origin + '/' + r.username + '/' : '', following: following, canFollow: section === 'boards' ? this.client.permissions.includes('own') && typeof r.followed_by_me === 'boolean' && !this.boardFollowUnknown.has(r.id) : r.blocked_by_me !== true && r.id !== this.client.viewer && typeof r.explicitly_followed_by_me === 'boolean' && !this.followUnknown.has(r.id) };
+                    return { id: r.id, name: (r.full_name || r.name || r.username || '').slice(0, 300), avatar: /^https:\/\//.test(image) ? image : '', covers: covers, targetUrl: target.startsWith(this.origin + '/') && !/[?#\s]/.test(target) ? target : '', pinCount: typeof r.pin_count === 'number' ? r.pin_count.toString() + PinmonyI18n.message('pm_pins_0a89904f') : '', updated: this.updated(r.board_order_modified_at), profileUrl: /^[A-Za-z0-9_]+$/.test(r.username || '') ? this.origin + '/' + r.username + '/' : '', following: following, canFollow: section === 'boards' ? this.client.permissions.includes('own') && typeof r.followed_by_me === 'boolean' && !this.boardFollowUnknown.has(r.id) : r.blocked_by_me !== true && r.id !== this.client.viewer && typeof r.explicitly_followed_by_me === 'boolean' && !this.followUnknown.has(r.id) };
                 });
             }
         }
@@ -727,8 +727,15 @@ export class PinmonyProfileNativeActions {
             action.label = confirmed ? '关注中' : '关注'; });
         this.store.profile = snapshot;
     }
-    private updated(value: string | undefined): string { const elapsed: number = Date.now() - Date.parse(value || ''); if (!Number.isFinite(elapsed) || elapsed < 0)
-        return ''; const days: number = Math.floor(elapsed / 86400000); return days < 7 ? days.toString() + ' 天前' : days < 30 ? Math.floor(days / 7).toString() + ' 周前' : days < 365 ? Math.floor(days / 30).toString() + ' 个月前' : Math.floor(days / 365).toString() + ' 年前'; }
+    private updated(value: string | undefined): string {
+        const elapsed: number = Date.now() - Date.parse(value || '');
+        if (!Number.isFinite(elapsed) || elapsed < 0) return '';
+        const days: number = Math.floor(elapsed / 86400000);
+        const count: number = days < 7 ? days : days < 30 ? Math.floor(days / 7) : days < 365 ? Math.floor(days / 30) : Math.floor(days / 365);
+        const singular: string = days < 7 ? 'pm_one_day_ago_suffix' : days < 30 ? 'pm_one_week_ago_suffix' : days < 365 ? 'pm_one_month_ago_suffix' : 'pm_one_year_ago_suffix';
+        const plural: string = days < 7 ? 'pm_days_ago_5972982c' : days < 30 ? 'pm_weeks_ago_2ad8bd1c' : days < 365 ? 'pm_months_ago_1bb931f2' : 'pm_years_ago_c533a6c6';
+        return count.toString() + PinmonyI18n.message(count === 1 ? singular : plural);
+    }
     private boardImage(value: string | undefined): string { return typeof value === 'string' && value.length <= 4096 && /^https:\/\/(?:i|s)\.pinimg\.com\//.test(value) ? value : ''; }
     private async boards(revision: number, append: boolean): Promise<void> {
         const o: PinmonyOrganizeSnapshot = this.organize!;

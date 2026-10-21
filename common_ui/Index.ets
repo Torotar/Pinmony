@@ -21,3 +21,8 @@ export {
   PinImageSource,
   PinImageSources
 } from './src/main/ets/components/SmartImage';
+
+export { PinmonyImmersiveLight } from './src/main/ets/services/PinmonyImmersiveLight';
+export { PinmonyImageSearchView } from './src/main/ets/components/PinmonyImageSearchView';
+export { PinmonyVisualResult as PinmonyImageSearchResult } from './src/main/ets/models/PinmonyImageSearch';
+export { PinmonyRelatedPin as PinmonyImageSearchItem } from './src/main/ets/models/PinmonyImageSearch';

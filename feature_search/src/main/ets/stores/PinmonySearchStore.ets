@@ -29,6 +29,7 @@ export class PinmonySearchStore {
   searchProductMax: string = '';
   searchProductError: string = '';
   searchInputFocused: boolean = false;
+  photoSearchVisible: boolean = false;
   searchOpenHistory?: () => void;
   searchInputStopEditing: (() => void) | undefined = undefined;
   searchRequestToken: number = 0;

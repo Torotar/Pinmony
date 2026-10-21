@@ -46,6 +46,7 @@ export class PinmonyHomeNativeReads {
   private bookmark: string = '';
   private boardSummary: PinmonyHomeBoard | undefined = undefined;
   private busy: boolean = false;
+  private failedAppend: boolean = false;
   private categoriesBusy: boolean = false;
   private categoriesReady: boolean = false;
   private tabs: PinmonyHomeTab[] = [];
@@ -53,6 +54,7 @@ export class PinmonyHomeNativeReads {
   private readonly requests: Set<string> = new Set<string>();
   constructor(ports: PinmonyHomeNativeReadsPorts) { this.ports = ports; this.store = ports.store(); }
   reset(): void {
+    this.failedAppend = false;
     this.pause(); this.feeds.clear(); this.account = ''; this.generation = -1; this.origin = ''; this.username = '';
     this.board = ''; this.bookmark = ''; this.boardSummary = undefined; this.tabs = []; this.categoriesReady = false;
     this.store.home = undefined; this.store.cachedHome = undefined; this.store.cachedHomeScrollOffset = 0;
@@ -74,6 +76,7 @@ export class PinmonyHomeNativeReads {
       const sameAccount: boolean = this.account === session.accountId && this.origin === session.origin;
       this.pause(); this.feeds.clear(); this.bookmark = ''; this.categoriesReady = false; this.tabs = [];
       this.board = ''; this.boardSummary = undefined; this.store.homeNativeReadsReady = false; this.store.homeActionsReady = false;
+      this.failedAppend = false;
       if (!sameAccount && this.account) { this.store.home = undefined; this.store.cachedHome = undefined; this.store.cachedHomeScrollOffset = 0; }
       this.store.homeSourceWarning = '';
       this.account = session.accountId; this.generation = session.generation; this.origin = session.origin; this.username = username;
@@ -101,11 +104,17 @@ export class PinmonyHomeNativeReads {
     if (!this.categoriesReady && !this.categoriesBusy) this.readCategories();
     await feed;
   }
+  async retry(): Promise<void> {
+    if (!this.ports.active() || !this.bind() || this.busy) return;
+    if (this.failedAppend) { await this.more(); return; }
+    await this.refresh();
+  }
   async select(id: string): Promise<void> {
     if (!this.ports.active() || !this.bind()) return;
     const target: PinmonyHomeTab | undefined = this.store.home?.tabs.find((tab: PinmonyHomeTab): boolean => tab.id === id && tab.enabled);
     if (!target || target.selected && !this.store.homeError) return;
     this.pause(); this.board = id === 'tab:all' ? '' : id.slice(4); this.bookmark = ''; this.boardSummary = undefined;
+    this.failedAppend = false;
     this.store.cachedHomeScrollOffset = 0; this.store.homeNativeReadsReady = false;
     const cached: HomeFeed | undefined = this.feeds.get(this.board);
     if (cached) { this.bookmark = cached.bookmark; this.commit(cached.snapshot, 'cache'); return; }
@@ -194,8 +203,9 @@ export class PinmonyHomeNativeReads {
       const snapshot: PinmonyHomeSnapshot = { kind: 'state', session: 0, pageKey: this.origin + '/', selectedTab: '', tabs: [],
         board: this.boardSummary?.id === board ? this.boardSummary : undefined, pins: pins, dataSource: 'api', loadingMore: false,
         refreshing: false, endReached: !cursor || cursor === '-end-' || !!previous && cursor === previous || data.data.length === 0 || pins.length >= 3000 };
+      this.failedAppend = false;
       this.commit(snapshot, append ? 'pagination' : 'feed');
-    } catch (_) { if (live()) this.store.homeError = append ? '更多帖子读取失败，请重试' : PinmonyI18n.message("pm_unable_to_load_home_feed_please_retry_cc9728f6"); }
+    } catch (_) { if (live()) { this.failedAppend = append; this.store.homeError = append ? PinmonyI18n.message('pm_unable_to_load_more_pins_please_retry_0a0a8b67') : PinmonyI18n.message("pm_unable_to_load_home_feed_please_retry_cc9728f6"); } }
     finally { if (revision === this.revision) { this.busy = false; this.store.homeLoading = false; this.store.homeRefreshing = false;
       this.store.pendingHomeTab = ''; if (this.store.home) this.store.home.loadingMore = false; } }
   }

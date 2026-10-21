@@ -1,0 +1,13 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]);
+const source=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');
+const start=source.indexOf('  private pinCardHeight('),end=source.indexOf('  @Builder',start);
+assert(start>=0&&end>start);
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+source.slice(start,end)+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const host=new Host();host.imageHeight=()=>300;
+assert.equal(host.pinCardHeight({kind:'pin'}),340,'image and menu are included even without a title');
+assert.equal(host.pinCardHeight({kind:'pin',title:'title'}),388,'both title lines and the menu are in scroll extent');
+assert.equal(host.pinCardHeight({kind:'pin',title:'title',merchant:'shop',price:'10'}),442,'commerce text cannot consume menu space');
+assert(source.includes('.height(this.pinCardHeight(item))'));
+assert(source.includes(".height(32).flexShrink(0)"));
+assert(!source.includes('bottom: 48'));
+console.log('Search card layout: complete image/text/menu height, nonshrinking menu, no pagination-dependent extent passed');
