@@ -5,9 +5,12 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyMediaFile } from 'common_network';
 import { PinmonyVideoFileLease } from 'common_ui';
 import { common } from '@kit.AbilityKit';
+import { connection } from '@kit.NetworkKit';
 
 @Component
 export struct PinmonyVideoPlayer {
+  @Prop @Watch('autoplayChanged') autoplayWifi: boolean = false;
+  @Prop @Watch('autoplayChanged') autoplayCellular: boolean = false;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('sourceChanged') video: PinmonyVideo = {} as PinmonyVideo;
@@ -30,6 +33,11 @@ export struct PinmonyVideoPlayer {
   private mounted: boolean = false;
   private sourceUpdateQueued: boolean = false;
   private componentGeneration: number = 0;
+  private networkType: string = 'unknown';
+  private networkConnection: connection.NetConnection | undefined = undefined;
+  private networkRevision: number = 0;
+  private autoplayStarted: boolean = false;
+  private manualPlayback: boolean = false;
   private readonly surfaceController: XComponentController = new XComponentController();
   private readonly mediaFile: PinmonyMediaFile = new PinmonyMediaFile((event: string) =>
     PinmonyRuntimeLog.info('VideoFileTrace: openId=' + this.openId.toString() + ' ' + event));
@@ -55,9 +63,13 @@ export struct PinmonyVideoPlayer {
     this.mounted = true;
     if (this.onFailureChanged) this.onFailureChanged(this.video.pinId, '');
     this.sourceChanged(); this.activeChanged();
+    this.watchNetwork();
   }
   aboutToDisappear(): void {
     this.mounted = false; this.componentGeneration++; this.sourceUpdateQueued = false;
+    this.networkRevision++;
+    try { this.networkConnection?.unregister(() => {}); } catch (_) {}
+    this.networkConnection = undefined;
     this.sourceKey = ''; this.pendingRetry = false; this.playback.release();
   }
 
@@ -79,18 +91,54 @@ export struct PinmonyVideoPlayer {
     const key: string = this.mediaOwner + ':' + this.video.pinId + ':' + this.video.sources.map((s) => s.url).join('|') + ':' + (this.video.readRevision || 0).toString();
     if (key === this.sourceKey) return;
     this.sourceKey = key; this.pendingRetry = false;
+    this.autoplayStarted = false; this.manualPlayback = false;
     this.playback.setVideo(this.video); this.dragging = false; this.sliderValue = 0;
     this.playback.setActive(this.active && this.visible && this.sessionReady);
-    if (this.active && this.visible) this.playback.start();
+    this.autoplayChanged();
   }
 
   private activeChanged(): void {
     this.playback.setActive(this.active && this.visible && this.sessionReady);
     if (!this.active || !this.sessionReady) this.pendingRetry = false;
     if (this.pendingRetry && this.active && this.visible && this.sessionReady && !this.readingAddress) {
-      this.pendingRetry = false; this.playback.retry();
+      this.pendingRetry = false; this.manualPlayback = true; this.playback.retry();
+    }
+    this.autoplayChanged();
+  }
+  private watchNetwork(): void {
+    try {
+      this.networkConnection = connection.createNetConnection();
+      this.networkConnection.on('netAvailable', () => { this.refreshNetwork(); });
+      this.networkConnection.on('netCapabilitiesChange', () => { this.refreshNetwork(); });
+      this.networkConnection.on('netLost', () => { this.refreshNetwork(); });
+      this.networkConnection.on('netUnavailable', () => { this.refreshNetwork(); });
+      this.networkConnection.register(() => { if (this.mounted) this.refreshNetwork(); });
+      this.refreshNetwork();
+    } catch (_) { this.networkType = 'unknown'; this.autoplayChanged(); }
+  }
+  private async refreshNetwork(): Promise<void> {
+    const revision: number = ++this.networkRevision;
+    try {
+      const handle: connection.NetHandle = await connection.getDefaultNet();
+      const capabilities: connection.NetCapabilities = await connection.getNetCapabilities(handle);
+      if (!this.mounted || revision !== this.networkRevision) return;
+      // Mobile transport takes precedence for mixed/VPN paths to avoid treating paid data as Wi-Fi.
+      this.networkType = capabilities.bearerTypes.includes(connection.NetBearType.BEARER_CELLULAR) ? 'cellular' : capabilities.bearerTypes.includes(connection.NetBearType.BEARER_WIFI) ? 'wifi' : 'unknown';
+    } catch (_) { if (!this.mounted || revision !== this.networkRevision) return; this.networkType = 'unknown'; }
+    this.autoplayChanged();
+  }
+  private autoplayChanged(): void {
+    if (!this.mounted || !this.sourceKey || this.manualPlayback) return;
+    const allowed: boolean = this.networkType === 'wifi' ? this.autoplayWifi : this.networkType === 'cellular' ? this.autoplayCellular : false;
+    if (!allowed) {
+      if (this.autoplayStarted) { this.playback.setActive(false); this.playback.setActive(this.active && this.visible && this.sessionReady); this.autoplayStarted = false; }
+      return;
+    }
+    if (!this.autoplayStarted && this.active && this.visible && this.sessionReady && (this.state.phase === 'idle' || this.state.phase === 'paused')) {
+      this.autoplayStarted = true; this.playback.start();
     }
   }
+  private togglePlayback(): void { this.manualPlayback = true; this.playback.toggle(); }
   private retryRequested(): void {
     if (!this.active || !this.sessionReady || this.readingAddress) return;
     this.pendingRetry = true; this.activeChanged();
@@ -113,7 +161,7 @@ export struct PinmonyVideoPlayer {
         if (this.state.phase === 'playing') {
           Button({ type: ButtonType.Normal }) { Column().width('100%').height('100%') }
             .width('100%').height('100%').padding(0).backgroundColor(Color.Transparent)
-            .enabled(this.active && this.sessionReady && !this.readingAddress).accessibilityText(this.uiText("pm_pause_video_550c18fe")).onClick(() => this.playback.toggle())
+            .enabled(this.active && this.sessionReady && !this.readingAddress).accessibilityText(this.uiText("pm_pause_video_550c18fe")).onClick(() => this.togglePlayback())
         }
         if (this.readingAddress || this.state.phase === 'loading' || this.state.buffering ||
             !this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
@@ -123,7 +171,7 @@ export struct PinmonyVideoPlayer {
             Image($r('app.media.video_play')).width(32).height(32)
           }.width(64).height(64).padding(0).backgroundColor('#66000000')
             .accessibilityText(this.state.phase === 'error' ? this.uiText("pm_retry_playback_f867a4c8") : this.state.phase === 'completed' ? this.uiText("pm_replay_4c5a69ac") : this.uiText("pm_play_c3396195"))
-            .enabled(this.active && this.sessionReady && !this.readingAddress).onClick(() => this.playback.toggle())
+            .enabled(this.active && this.sessionReady && !this.readingAddress).onClick(() => this.togglePlayback())
         }
       Column() {
       Row({ space: 8 }) {

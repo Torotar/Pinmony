@@ -52,6 +52,17 @@ export struct PinmonyDisplaySettingsPage {
   private title(): string { return this.store.screen === 'theme' ? this.uiText("pm_theme_788db1cf") : this.uiText("pm_display_settings_32e62ed0"); }
   private themeLabel(): string { return this.themePreference === 'dark' ? this.uiText("pm_dark_a6b75d06") : this.themePreference === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_follow_system_217cfe7d"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
+  @Builder
+  private autoplayOption(action: string, label: string, value: boolean | undefined) {
+    Row({ space: 16 }) {
+      Text(this.uiText(label)).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Toggle({ type: ToggleType.Switch, isOn: value === true })
+        .enabled(this.available() && !this.store.writeUncertain && typeof value === 'boolean')
+        .accessibilityText(this.uiText(label))
+        .onChange((next: boolean) => { if (this.available() && !this.store.writeUncertain && typeof value === 'boolean' && next !== value) this.request(action, String(next)); })
+    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
+      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+  }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private selectTheme(value: string): void {
     if (!['system', 'light', 'dark'].includes(value) || this.themePreference === value) return;
@@ -199,6 +210,10 @@ export struct PinmonyDisplaySettingsPage {
         })
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:16 })
+    ForEach(['autoplayCellular','autoplayWifi'], (action: string) => {
+      this.autoplayOption(action, action === 'autoplayWifi' ? 'pm_autoplay_video_wifi' : 'pm_autoplay_video_cellular', action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular)
+    }, (action: string): string => action + ':' + (action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular) + ':' + this.store.token + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain)
   }
   @Builder
   private theme() {

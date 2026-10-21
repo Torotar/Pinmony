@@ -17,6 +17,7 @@ export struct PinmonySettingsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @State private exportingLog: boolean = false;
   private logoutConfirmOpen: boolean = false;
@@ -43,9 +44,9 @@ export struct PinmonySettingsPage {
   }
   private readonly pathStack: NavPathStack = new NavPathStack();
   private readonly contentScroller: Scroller = new Scroller();
-  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'logout', 'logs', 'about'];
+  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'logout', 'logs', 'help', 'terms', 'privacy', 'about'];
   private optionLabel(id: string): string {
-    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', 'pm_social_title', '通知', '退出账号', '日志', '关于'];
+    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', 'pm_social_title', '通知', '退出账号', '日志', 'pm_settings_help_center', 'pm_settings_terms_of_service', 'pm_settings_privacy_policy', '关于'];
     return this.uiText(labels[this.options.indexOf(id)] || '');
   }
 
@@ -120,18 +121,21 @@ export struct PinmonySettingsPage {
             .onClick(() => { if (id === 'profile' && this.onEditProfile) this.onEditProfile();
               if (id === 'notifications') { this.store.screen = 'notifications'; if (this.onRequest) this.onRequest('notifications', ''); }
               if (id === 'social') { this.store.screen = 'social'; if (this.onRequest) this.onRequest('socialRead', ''); }
-              if (id === 'display') this.store.screen = 'display';
+              if (id === 'display') { this.store.screen = 'display'; if (this.onRequest) this.onRequest('read', ''); }
               if (id === 'recommend' || id === 'visibility') { this.store.screen = id === 'recommend' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(id === 'recommend' ? 'aiRead' : 'read', ''); }
               if (id === 'account') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
               if (id === 'logout') this.confirmLogout();
               if (id === 'logs') this.exportLog();
+              if (id === 'help' && this.onOpenExternalLink) this.onOpenExternalLink('https://www.pinterest.com/_/_/help/?source=gear_menu_web');
+              if (id === 'terms' && this.onOpenExternalLink) this.onOpenExternalLink('https://www.pinterest.com/_/_/policy/terms-of-service/');
+              if (id === 'privacy' && this.onOpenExternalLink) this.onOpenExternalLink('https://www.pinterest.com/_/_/policy/privacy-policy/');
               if (id === 'about') this.store.screen = 'about'; })
             .accessibilityText(id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
           }
         }, (id: string) => id + this.uiLanguage) }
       }
       .width('100%').height('100%')
-      .padding({ bottom: 28 })
+      .contentEndOffset(this.getUIContext().px2vp(this.gestureBarHeightPx) + 12)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
         LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
@@ -143,7 +147,7 @@ export struct PinmonySettingsPage {
     .hideBackButton(false)
     .bindToScrollable([this.contentScroller])
     .onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor($r('app.color.page_background'))
   }
 

@@ -274,6 +274,9 @@ function acceptsCanonicalNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetw
         const fields: string[] = keys.filter((key: string) => !['user_id', 'surface_tag', 'user_confirm_skip_passcode'].includes(key));
         if (options.surface_tag !== 'settings' || fields.length !== 1 || keys.length > 4) return false;
         const field: string = fields[0]; const value: Object = options[field];
+        if (['autoplay_videos_on_wifi_enabled','autoplay_videos_on_cellular_enabled'].includes(field)) {
+          return keys.length === 3 && typeof options.user_id === 'string' && /^\d{1,40}$/.test(options.user_id as string) && typeof value === 'boolean' && job.id.startsWith('native_profile_settings_');
+        }
         if (field === 'allow_mentions' || field === 'messaging_permissions') {
           if (keys.length !== 4 || typeof options.user_id !== 'string' || !/^\d{1,40}$/.test(options.user_id as string) || options.user_confirm_skip_passcode !== false || !job.id.startsWith('native_profile_settings_')) return false;
           if (field === 'allow_mentions') return typeof value === 'number' && [0,1,2].includes(value);
@@ -790,6 +793,7 @@ export class PinmonyNativeNetwork {
           permitted = fields.length === 1 && o['surface_tag'] === 'settings' && (field === 'birthdate' ? keys.length === 2 && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && source === '/settings/edit/birthdate/' : o['user_id'] === viewer && (field === 'opt_in_private_account' ? keys.length === 4 && permissions.includes('privacy') && o['user_confirm_skip_passcode'] === false && typeof value === 'boolean' && source === '/settings/profile-visibility/' : keys.length === 3 && (field === 'exclude_from_search' ? permissions.includes('search') && typeof value === 'boolean' && source === '/settings/profile-visibility/' : field === 'gender' ? ['female','male','unspecified'].includes(value as string) && source === '/settings/edit/gender/' : field === 'custom_gender' ? permissions.includes('custom') && typeof value === 'string' && !!(value as string).trim() && (value as string).length <= 500 && source === '/settings/edit/gender/' : field === 'country' && typeof value === 'string' && allowed.includes('country:' + value) && source === '/settings/edit/country/')));
           // Country source follows the existing country-region route.
           if(field === 'country')permitted = fields.length === 1 && keys.length === 3 && o['surface_tag'] === 'settings' && o['user_id'] === viewer && typeof value === 'string' && /^[A-Z]{2}$/.test(value) && allowed.includes('country:' + value) && source === '/settings/edit/country-region/';
+          if (['autoplay_videos_on_wifi_enabled','autoplay_videos_on_cellular_enabled'].includes(field)) permitted = fields.length === 1 && keys.length === 3 && o['surface_tag'] === 'settings' && o['user_id'] === viewer && typeof value === 'boolean' && source === '/settings/permissions/';
           if (field === 'allow_mentions' || field === 'messaging_permissions') {
             const base: boolean = fields.length === 1 && keys.length === 4 && o['surface_tag'] === 'settings' && o['user_id'] === viewer && o['user_confirm_skip_passcode'] === false;
             if (field === 'allow_mentions') permitted = base && source === '/settings/edit/mentions/' && [0,1,2].includes(value as number) && allowed.includes('social-mentions:' + value);
@@ -1730,7 +1734,9 @@ export class PinmonyNativeNetwork {
       permitted = captured.authenticated && !!captured.accountId && !!match &&
         pinUrl.startsWith(captured.origin + '/pin/') && job.page === pinUrl && job.epoch === captured.generation &&
         job.method === 'GET' && job.body === '' &&
-        ((job.url.startsWith(captured.origin + '/resource/PinResource/get/?') &&
+        ((job.id.startsWith('native_autoplay_') && job.url.startsWith(captured.origin + '/resource/UserSettingsResource/get/?source_url=%2Fsettings%2Faccount-settings%2F&data=') &&
+          !!data.options && Object.keys(data.options).length === 0 && job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' && job.headers['X-Pinterest-Source-Url'] === '/settings/account-settings/') ||
+         (job.url.startsWith(captured.origin + '/resource/PinResource/get/?') &&
           data.options?.id === match[1] && data.options?.field_set_key === 'auth_web_main_pin') ||
          (job.url.startsWith(captured.origin + '/resource/RelatedModulesResource/get/?') &&
           (job.id.startsWith('opening_related_') || job.id.startsWith('native_related_')) && data.options?.pin_id === match[1] &&

@@ -13,7 +13,7 @@ const { PinmonyDetailCache } = load('feature_pin/src/main/ets/services/PinmonyDe
 const translationEvents = [];
 const { PinmonyDetailNativeReads } = load('entry/src/main/ets/app/PinmonyDetailNativeReads.ets', name =>
   name === 'feature_pin' ? { readRelatedPresentation } : name === 'common_network' ? { PIN_BUSINESS_PIN_READ_ENABLED: true } :
-    name === 'common_foundation' ? { PinmonyRuntimeLog: { info(message) { translationEvents.push(message); } } } : {});
+    name === 'common_foundation' ? { PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); } } } : {});
 const pinUrl = id => 'https://www.pinterest.com/pin/' + id + '/';
 const related = (ids, bookmark) => JSON.stringify({ resource_response: { status: 'success', data: ids.map(id => ({
   id: String(id), type: 'pin', images: { '474x': { url: 'https://i.pinimg.com/' + id + '.jpg', width: 474, height: 700 } } })), bookmark } });

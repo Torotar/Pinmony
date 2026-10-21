@@ -4,6 +4,8 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from 'feature_settings';
 import { ProfileSettingsPorts, PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
 interface User {
+    autoplay_videos_on_wifi_enabled?: boolean;
+    autoplay_videos_on_cellular_enabled?: boolean;
     id: string;
     type?: string;
     username: string;
@@ -79,6 +81,8 @@ interface Identity {
     field_set_key: string;
 }
 interface Update {
+    autoplay_videos_on_wifi_enabled?: boolean;
+    autoplay_videos_on_cellular_enabled?: boolean;
     user_id?: string;
     surface_tag: string;
     birthdate?: string;
@@ -161,6 +165,7 @@ export class PinmonySettingsNativeFlow {
             this.store.data = undefined;
             this.store.notifications = [];
             this.store.social = emptySocialPermissions();
+            this.store.socialMessageGroup = 0;
             this.client.user = '';
             this.client.viewer = '';
         }
@@ -210,6 +215,8 @@ export class PinmonySettingsNativeFlow {
         v.canChangePrivacy = account.allow_switch_between_private_and_public_profile === true && account.is_parental_control_passcode_enabled !== true && account.is_parental_control_passcode_verification_pending !== true;
         v.canEditSearchPrivacy = account.can_edit_search_privacy === true;
         v.ready = true;
+        v.autoplayWifi = typeof account.autoplay_videos_on_wifi_enabled === 'boolean' ? account.autoplay_videos_on_wifi_enabled : undefined;
+        v.autoplayCellular = typeof account.autoplay_videos_on_cellular_enabled === 'boolean' ? account.autoplay_videos_on_cellular_enabled : undefined;
         this.client.permissions = ['own'];
         if (v.canChangePrivacy)
             this.client.permissions.push('privacy');
@@ -218,7 +225,7 @@ export class PinmonySettingsNativeFlow {
         if (v.gender === 'unspecified')
             this.client.permissions.push('custom');
         this.uncertain.forEach((value: string, key: string): void => {
-            const actual: string | undefined = key === 'birthdate' ? v.birthdate : key === 'gender' ? v.gender : key === 'customGender' ? v.customGender : key === 'country' ? v.country : key === 'privateProfile' ? v.privateProfile.toString() : key === 'searchPrivacy' ? v.searchPrivacy.toString() : undefined;
+            const actual: string | undefined = key === 'autoplayWifi' ? v.autoplayWifi?.toString() : key === 'autoplayCellular' ? v.autoplayCellular?.toString() : key === 'birthdate' ? v.birthdate : key === 'gender' ? v.gender : key === 'customGender' ? v.customGender : key === 'country' ? v.country : key === 'privateProfile' ? v.privateProfile.toString() : key === 'searchPrivacy' ? v.searchPrivacy.toString() : undefined;
             if (actual !== undefined && actual === value)
                 this.uncertain.delete(key);
         });
@@ -271,7 +278,7 @@ export class PinmonySettingsNativeFlow {
         });
         if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
         if (!this.current(revision)) return;
-        const snapshot: SocialPermissions = { business: raw.is_partner === true, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
+        const snapshot: SocialPermissions = { business: raw.is_partner === true, personal: raw.is_partner === false, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
         this.store.social = snapshot;
         if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
         groups.forEach((g: SocialMessageGroup): void => { if (this.uncertain.get('social:message:' + g.id) === String(g.selected)) this.uncertain.delete('social:message:' + g.id); });
@@ -291,7 +298,7 @@ export class PinmonySettingsNativeFlow {
         if (rows.some((u: SocialBlockedUser, i: number): boolean => rows.findIndex((other: SocialBlockedUser): boolean => other.id === u.id) !== i)) throw new Error('duplicate-blocked');
         if (!this.current(revision)) return;
         const old: SocialPermissions = this.store.social;
-        this.store.social = { business: old.business, ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blocked: rows };
+        this.store.social = { business: old.business, personal: old.personal, ready: old.ready, mentions: old.mentions, groups: old.groups, protected: old.protected, blockedReady: true, blocked: rows };
         this.uncertain.forEach((_v: string, key: string): void => { if (key.startsWith('social:unblock:') && !rows.some((u: SocialBlockedUser): boolean => u.id === key.slice(15))) this.uncertain.delete(key); });
         this.store.writeUncertain = this.uncertain.size > 0;
         if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
@@ -324,7 +331,8 @@ export class PinmonySettingsNativeFlow {
                 const choice: SocialMessageChoice = JSON.parse(value) as SocialMessageChoice;
                 const expected: string = choice.group === 0 ? 'socialFriends' : choice.group === 1 ? 'socialFollowers' : choice.group === 2 ? 'socialFollowing' : choice.group === 4 ? 'socialOthers' : '';
                 const group: SocialMessageGroup | undefined = this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === choice.group);
-                if (!expected || this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
+                const inline: boolean = this.screen === 'socialMessages' && this.store.social.personal && this.store.socialMessageGroup === choice.group;
+                if (!expected || !inline && this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
                 if (group.selected === choice.level) return;
                 const permissions: Record<string,number> = {}; permissions[String(choice.group)] = choice.level; update.messaging_permissions = permissions;
                 this.pending = 'social:message:' + choice.group; value = String(choice.level);
@@ -340,9 +348,10 @@ export class PinmonySettingsNativeFlow {
         this.sent = false;
     }
     async requestAction(action: string, value: string): Promise<void> {
-        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock'].includes(action))
+        if (['autoplayWifi','autoplayCellular'].includes(action) && this.store.screen !== 'display') return;
+        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','autoplayWifi','autoplayCellular'].includes(action))
             return;
-        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock'].includes(action);
+        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','autoplayWifi','autoplayCellular'].includes(action);
         this.bind();
         if (write && this.uncertain.size) {
             this.store.writeUncertain = true;
@@ -534,6 +543,14 @@ export class PinmonySettingsNativeFlow {
                         throw new Error('country');
                     update.country = value;
                 }
+                else if (['autoplayWifi','autoplayCellular'].includes(action)) {
+                    const previous: boolean | undefined = action === 'autoplayWifi' ? this.value.autoplayWifi : this.value.autoplayCellular;
+                    if (!['true','false'].includes(value) || typeof previous !== 'boolean') throw new Error('autoplay');
+                    if (previous === (value === 'true')) { this.commit(revision); return; }
+                    field = action === 'autoplayWifi' ? 'autoplay_videos_on_wifi_enabled' : 'autoplay_videos_on_cellular_enabled';
+                    if (action === 'autoplayWifi') update.autoplay_videos_on_wifi_enabled = value === 'true';
+                    else update.autoplay_videos_on_cellular_enabled = value === 'true';
+                }
                 else {
                     if (!['true', 'false'].includes(value) || action === 'privateProfile' && !this.value.canChangePrivacy || action === 'searchPrivacy' && !this.value.canEditSearchPrivacy)
                         throw new Error('permission');
@@ -550,13 +567,15 @@ export class PinmonySettingsNativeFlow {
                 this.pending = action;
                 this.uncertain.set(action, value);
                 this.sent = true;
-                const source: string = ['privateProfile', 'searchPrivacy'].includes(action) ? '/settings/profile-visibility/' : '/settings/edit/' + (action === 'country' ? 'country-region' : action === 'customGender' ? 'gender' : action) + '/';
+                const autoplay: boolean = ['autoplayWifi','autoplayCellular'].includes(action);
+                const source: string = autoplay ? '/settings/permissions/' : ['privateProfile', 'searchPrivacy'].includes(action) ? '/settings/profile-visibility/' : '/settings/edit/' + (action === 'country' ? 'country-region' : action === 'customGender' ? 'gender' : action) + '/';
                 response = await this.request('UserSettingsResource', 'update', update, source, revision);
                 const result: Record<string, Object> = response.resource_response!.data as Record<string, Object>;
-                if (result?.[field] !== (['privateProfile', 'searchPrivacy'].includes(action) ? value === 'true' : value))
+                if (autoplay && response.resource_response?.endpoint_name !== 'v3_edit_settings_handler') throw new Error('endpoint');
+                if (result?.[field] !== (autoplay || ['privateProfile', 'searchPrivacy'].includes(action) ? value === 'true' : value))
                     throw new Error('result');
-                if (['privateProfile', 'searchPrivacy'].includes(action)) {
-                    response = await this.request('UserSettingsResource', 'get', this.emptyOptions(), '/settings/profile-visibility/', revision);
+                if (autoplay || ['privateProfile', 'searchPrivacy'].includes(action)) {
+                    response = await this.request('UserSettingsResource', 'get', this.emptyOptions(), autoplay ? '/settings/account-settings/' : '/settings/profile-visibility/', revision);
                     this.map(response.resource_response!.data as User);
                     if (this.uncertain.has(action))
                         throw new Error('readback');

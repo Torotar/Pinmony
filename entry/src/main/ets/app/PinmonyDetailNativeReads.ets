@@ -7,6 +7,9 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
 interface CommentClient { user?: CommentUser; }
 interface BaseResponse { resource_response: BaseResource; client_context?: CommentClient; }
+interface AutoplayResponse { resource_response?: AutoplayResource; client_context?: CommentClient; }
+interface AutoplayResource { status: string; code: number; error?: Object; data?: AutoplaySettings; }
+interface AutoplaySettings { id: string; autoplay_videos_on_wifi_enabled?: boolean; autoplay_videos_on_cellular_enabled?: boolean; }
 interface BaseResource { status: string; data: BasePin; }
 interface AggregatePinData { id?: string; comment_count?: number; }
 interface BaseReaction { reaction_by_me?: number; reaction_counts?: Record<string, number>; }
@@ -73,9 +76,12 @@ export class PinmonyDetailNativeReads {
   private previewError: string = '';
   private previewAvailable: boolean = false;
   private readonly requests: Set<string> = new Set<string>();
+  private autoplayWifi: boolean | undefined = undefined;
+  private autoplayCellular: boolean | undefined = undefined;
   constructor(ports: PinmonyDetailNativeReadsPorts) { this.ports = ports; this.store = ports.pinStore(); }
 
   pause(): void {
+    this.autoplayWifi = undefined; this.autoplayCellular = undefined;
     this.revision++;
     this.requests.forEach((id: string) => this.ports.network().cancel(id)); this.requests.clear();
     this.commentViewer = ''; this.commentAuthors.clear();
@@ -94,6 +100,7 @@ export class PinmonyDetailNativeReads {
     if (!detail || detail.pinUrl !== this.pin) return;
     this.store.detailNativeReadsReady = true;
     const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
+    next.autoplayWifi = this.autoplayWifi; next.autoplayCellular = this.autoplayCellular;
     next.commentPreview = this.previewText; next.commentLoading = this.previewLoading;
     next.commentEmpty = this.previewEmpty; next.commentError = this.previewError; next.commentsAvailable = this.previewAvailable;
     next.commentsRetained = false; next.related = this.related.slice(); next.relatedLoading = this.relatedLoading;
@@ -136,6 +143,7 @@ export class PinmonyDetailNativeReads {
     this.previewText = ''; this.previewError = this.aggregate ? '' : PinmonyI18n.message("pm_missing_comment_id_retry_the_comment_preview_b1b3707a"); this.previewEmpty = false;
     this.previewAvailable = !!this.aggregate; this.previewLoading = !!this.aggregate; this.apply();
     const revision: number = this.revision;
+    if (this.store.detail?.isVideo || this.store.detail?.video) this.readAutoplay();
     await this.readPreview();
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
     return this.readRelated(false);
@@ -340,15 +348,30 @@ export class PinmonyDetailNativeReads {
     } catch (error) { if (live()) selected.translationError = error instanceof Error ? error.message : PinmonyI18n.message("pm_comment_translation_failed_please_retry_0c86faa9"); }
     finally { if (live()) { selected.translationLoading = false; this.publishComments(this.store.commentResult); } }
   }
+  private async readAutoplay(): Promise<void> {
+    const revision: number = this.revision, viewer: string = this.commentViewer;
+    try {
+      if (!viewer) return;
+      const options: Record<string,string> = {};
+      const reply: PinmonyNetworkReply = await this.request('UserSettingsResource',options,'native_autoplay_');
+      if (revision !== this.revision || !this.owned() || reply.error || reply.status !== 200) return;
+      const body: AutoplayResponse = JSON.parse(reply.body || '') as AutoplayResponse, r: AutoplayResource | undefined = body.resource_response;
+      if (!r || r.status !== 'success' || r.code !== 0 || r.error || r.data?.id !== viewer || body.client_context?.user?.id !== viewer) return;
+      this.autoplayWifi = typeof r.data.autoplay_videos_on_wifi_enabled === 'boolean' ? r.data.autoplay_videos_on_wifi_enabled : undefined;
+      this.autoplayCellular = typeof r.data.autoplay_videos_on_cellular_enabled === 'boolean' ? r.data.autoplay_videos_on_cellular_enabled : undefined;
+      this.apply();
+    } catch (_) { /* Unknown preferences keep autoplay disabled; manual playback remains available. */ }
+  }
   private async request(resource: string, options: Object, prefix: string, extraCurrent: () => boolean = (): boolean => true, commentId: string = ''): Promise<PinmonyNetworkReply> {
     const session: PinmonyBusinessSessionContext = this.ports.session();
     const pin: string = this.pin;
     const revision: number = this.revision;
     const id: string = prefix + (++this.sequence).toString();
-    const source: string = pin.slice(session.origin.length);
+    const source: string = prefix === 'native_autoplay_' ? '/settings/account-settings/' : pin.slice(session.origin.length);
     const headers: Record<string, string> = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
       'X-Pinterest-Pws-Handler': 'www/pin/[id].js', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Source-Url': source };
     if (session.appVersion) headers['X-App-Version'] = session.appVersion;
+    if (prefix === 'native_autoplay_') headers['X-Pinterest-Pws-Handler'] = 'www/index.js';
     const envelope: ReadEnvelope = { options: options, context: {} };
     const job: PinmonyNetworkJob = { id: id, epoch: session.generation, page: pin, method: 'GET', body: '', headers: headers,
       url: session.origin + '/resource/' + resource + '/get/?source_url=' + encodeURIComponent(source) +

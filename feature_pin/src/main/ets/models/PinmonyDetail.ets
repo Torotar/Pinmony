@@ -34,6 +34,8 @@ export interface PinmonyCarousel {
 }
 
 export interface PinmonyDetailSnapshot {
+  autoplayWifi?: boolean;
+  autoplayCellular?: boolean;
   aiLabel?: string;
   originalImageUrl?: string;
   carousel?: PinmonyCarousel;

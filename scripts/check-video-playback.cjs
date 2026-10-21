@@ -36,7 +36,7 @@ function harness(delayed = false, config = {}) {
   const media = { createAVPlayer: () => delayed ? new Promise(resolve => pending.push(() => resolve(player()))) : Promise.resolve(player()),
     SeekMode: { SEEK_CLOSEST: 0 }, VideoScaleType: { VIDEO_SCALE_TYPE_FIT: 0 }, BufferingInfoType: { BUFFERING_START: 1, BUFFERING_END: 2 } };
   const audio = { InterruptHint: { INTERRUPT_HINT_PAUSE: 1, INTERRUPT_HINT_STOP: 2 } };
-  const exports = {}; vm.runInNewContext(code, { exports, require: name => ({ media, audio }), ...timerApi });
+  const exports = {}; vm.runInNewContext(code, { exports, require: name => name === 'common_foundation' ? {PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages} : ({ media, audio }), ...timerApi });
   const playback = new exports.PinmonyVideoPlayback(state => states.push(state), event => traces.push(event), config.fileReader);
   const video = { pinId: '123', duration: 4600, sources: [{ url: 'hls', kind: 'hls' }, { url: 'mp4', kind: 'mp4' }] };
   playback.setVideo(video); playback.setSurface('surface');
@@ -87,7 +87,7 @@ async function main() {
   const cacheExports = {};
   const cacheCode = ts.transpileModule(readSourceFileSync('entry/src/main/ets/services/PinmonyDetailCache.ets', 'utf8'),
     { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
-  vm.runInNewContext(cacheCode, { exports: cacheExports });
+  vm.runInNewContext(cacheCode, { exports: cacheExports, require: () => ({ PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages }) });
   const cache = new cacheExports.PinmonyDetailCache();
   cache.put('123', { pinUrl: '/pin/123/', isVideo: true, video: h.video, actions: [], related: [] }, 0);
   assert.equal(cache.get('123').detail.isVideo, true, 'return cache preserves media identity');
@@ -225,7 +225,7 @@ async function main() {
   vm.runInNewContext(ts.transpileModule(`class Component { ${changeMethod} } globalThis.Component = Component;`,
     { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, componentContext);
   let resets = 0; const view = new componentContext.Component();
-  Object.assign(view, { video: { ...h.video, readRevision: 0 }, sourceKey: '', active: true, visible: true,
+  Object.assign(view, { autoplayChanged() {}, video: { ...h.video, readRevision: 0 }, sourceKey: '', active: true, visible: true,
     mediaOwner: '', mounted: true, sourceUpdateQueued: false, componentGeneration: 0, sessionReady: false,
     playback: { setVideo() { resets++; }, setActive() {}, start() {}, stop() {} } });
   view.sourceChanged(); await flush(); assert.equal(resets, 0, 'early base media does not start before the current session is confirmed');

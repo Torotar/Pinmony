@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');
+module.exports=async({fixture,flush,page})=>{
+ function setup(){const f=fixture();f.st.screen='display';f.server.account.autoplay_videos_on_wifi_enabled=true;f.server.account.autoplay_videos_on_cellular_enabled=true;return f;}
+ const f=setup();await f.settings.requestAction('read','');assert.equal(f.st.data.autoplayWifi,true);assert.equal(f.st.data.autoplayCellular,true);
+ for(const [action,field] of [['autoplayCellular','autoplay_videos_on_cellular_enabled'],['autoplayWifi','autoplay_videos_on_wifi_enabled']]){
+   for(const value of [false,true]){await f.settings.requestAction(action,String(value));assert.equal(f.st.data[action],value);assert(f.st.data.saved);assert(!f.st.writeUncertain);const post=f.req.findLast(r=>r.job.method==='POST');assert.deepEqual(post.e.options,{surface_tag:'settings',user_id:'1',[field]:value});assert.equal(post.job.headers['X-Pinterest-Source-Url'],'/settings/permissions/');}
+ }
+ assert.equal(f.denials.length,0);
+ let count=f.req.length;await f.settings.requestAction('autoplayWifi','false-or-true');assert(!f.req.slice(count).some(r=>r.job.method==='POST'));f.st.screen='account';count=f.req.length;await f.settings.requestAction('autoplayWifi','false');assert.equal(f.req.length,count,'display-only action');
+ const missing=setup();delete missing.server.account.autoplay_videos_on_wifi_enabled;await missing.settings.requestAction('read','');assert.equal(missing.st.data.autoplayWifi,undefined);count=missing.req.length;await missing.settings.requestAction('autoplayWifi','false');assert(!missing.req.slice(count).some(r=>r.job.method==='POST'),'unknown initial state cannot be written');
+ const u=setup();await u.settings.requestAction('read','');u.hang('UserSettingsResource/update');const p=u.settings.requestAction('autoplayWifi','false');await flush();assert(u.hold());count=u.req.length;await u.settings.requestAction('autoplayWifi','false');assert.equal(u.req.length,count);u.settings.pause();await p;assert(u.st.writeUncertain);assert.equal(u.st.data.autoplayWifi,true);u.hold().resolve(u.response({autoplay_videos_on_wifi_enabled:false},'v3_edit_settings_handler'));await flush();assert.equal(u.st.data.autoplayWifi,true);u.hang('');u.server.account.autoplay_videos_on_wifi_enabled=false;await u.settings.requestAction('read','');assert(!u.st.writeUncertain);assert.equal(u.st.data.autoplayWifi,false);
+ const bad=setup();await bad.settings.requestAction('read','');bad.bad(true);await bad.settings.requestAction('autoplayCellular','false');assert(bad.st.writeUncertain);assert.equal(bad.st.data.autoplayCellular,true);
+ const post=f.req.find(r=>r.e.options.autoplay_videos_on_wifi_enabled!==undefined&&r.job.method==='POST');
+ for(const patch of [{autoplay_videos_on_wifi_enabled:'false'},{user_id:'2'},{autoplay_videos_on_cellular_enabled:false},{user_confirm_skip_passcode:false}]){const body=new URLSearchParams(post.job.body),data=JSON.parse(body.get('data'));Object.assign(data.options,patch);body.set('data',JSON.stringify(data));assert((await f.network.requestBusinessProfileSettings({...post.job,body:body.toString()},f.context,page,'1','1',[],['own'],()=>true)).error);}
+ console.log('Autoplay settings: both channels, true/false, exact writes/readback, missing state, unknown/no replay and transport guards passed');
+};

@@ -512,6 +512,7 @@ export struct PinmonyDetailPage {
             }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
           } else if (this.detail.video && this.detail.isVideo) {
             PinmonyVideoPlayer({ video: this.detail.video, poster: this.detail.imageUrl, active: this.videoActive, openId: this.traceId,
+              autoplayWifi: this.detail.autoplayWifi === true, autoplayCellular: this.detail.autoplayCellular === true,
               mediaOwner: this.detail.pinUrl + '|' + this.traceId.toString(),
               sessionReady: this.actionsReady || this.readsReady,
               readingAddress: this.detail.mediaLoading === true || this.mediaReadBusy,

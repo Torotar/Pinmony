@@ -17,6 +17,8 @@ export interface PinmonyAccountSettings {
   searchPrivacy: boolean;
   canChangePrivacy: boolean;
   canEditSearchPrivacy: boolean;
+  autoplayWifi?: boolean;
+  autoplayCellular?: boolean;
   topics: PinmonyAiTopic[];
   activities: PinmonyRecentActivity[];
   activityBookmark: string;

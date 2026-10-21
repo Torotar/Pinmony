@@ -1,3 +1,4 @@
+import { PinmonyNotificationCopy } from '../models/PinmonyNotificationCopy';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -54,28 +55,31 @@ export struct PinmonyNotificationsPage {
             Button(this.uiText("pm_retry_b8784c8d")).enabled(!this.store.busy && !this.store.loading).onClick(() => { if (this.onRetry) this.onRetry(); })
           }
           ForEach(this.store.notifications, (group: NotificationGroup) => {
-            Text(group.label).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
+            Text(PinmonyNotificationCopy.group(group, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
             ForEach(group.categories, (category: NotificationCategory) => {
               Column({ space: 8 }) {
                 Row() {
-                  Text(category.label).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
-                  SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+                  Text(PinmonyNotificationCopy.category(category, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
+                  SymbolGlyph(this.expanded.includes(group.key + ':' + category.key) ? $r('sys.symbol.chevron_up') : $r('sys.symbol.chevron_down')).fontSize(16).fontColor([$r('app.color.secondary_text')])
                 }.width('100%').onClick(() => {
                   const key: string = group.key + ':' + category.key;
                   this.expanded = this.expanded.includes(key) ? this.expanded.filter((value: string): boolean => value !== key) : this.expanded.concat([key]);
                 })
                 if (this.expanded.includes(group.key + ':' + category.key)) {
+                  if (category.description) { Text(PinmonyNotificationCopy.description(category, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')) }
                   ForEach(category.channels, (channel: NotificationChannel) => {
                     Row() {
-                      Text(channel.label).fontColor($r('app.color.primary_text')).layoutWeight(1)
+                      Text(PinmonyNotificationCopy.channel(channel, this.uiLanguage)).fontColor($r('app.color.primary_text')).layoutWeight(1)
                       Toggle({ type: ToggleType.Switch, isOn: channel.value })
                         .enabled(channel.editable === true && !this.confirmationOpen && !this.store.busy && !this.store.loading && !this.store.writeUncertain)
-                        .accessibilityText(category.label + ' ' + channel.label)
+                        .accessibilityText(PinmonyNotificationCopy.category(category, this.uiLanguage) + ' ' + PinmonyNotificationCopy.channel(channel, this.uiLanguage))
                         .onChange((value: boolean) => {
                           this.change(channel, value);
                         })
                     }.width('100%')
                   }, (channel: NotificationChannel): string => (channel.channel || channel.label) + ':' + (channel.section || '') + ':' + (channel.option || '') + ':' + channel.value + ':' + this.store.token + ':' + this.store.busy + ':' + this.confirmationOpen)
+                } else {
+                  Text(PinmonyNotificationCopy.summary(category, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
                 }
               }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 8, bottom: 8 })
             })
@@ -92,7 +96,7 @@ export struct PinmonyNotificationsPage {
       style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
-      content: { title: { mainTitle: this.uiText("pm_notifications_4b6ded8a") }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
+      content: { title: { mainTitle: this.uiText('pm_notify_title') }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
