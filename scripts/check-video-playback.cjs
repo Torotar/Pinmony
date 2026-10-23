@@ -44,6 +44,22 @@ function harness(delayed = false, config = {}) {
     fireTimers(delay) { for (const [id, timer] of Array.from(timers)) if (timer.delay === delay) { timers.delete(id); timer.fn(); } } };
 }
 async function main() {
+  const timeout = harness(false, { fakeTime: true });
+  timeout.playback.start(); await flush();
+  timeout.players[0].events.error({ code: 1007900028 }); await flush();
+  timeout.players[1].events.error({ code: 5400106 }); await flush();
+  assert.match(timeout.states.at(-1).error, /pinimg\.com.*DIRECT/);
+  assert.match(timeout.states.at(-1).error, /建议使用全局模式/);
+  assert(!timeout.states.at(-1).error.includes('格式'));
+  timeout.playback.retry(); await flush();
+  timeout.players[2].events.error({ code: 5400106 }); await flush();
+  timeout.players[3].events.error({ code: 5400106 }); await flush();
+  assert(!timeout.states.at(-1).error.includes('DIRECT'), 'explicit retry clears old diagnosis');
+  timeout.playback.release();
+  const fileTimeout = harness(false, { fakeTime: true, fileReader: { load: async () => { throw { code: 1007900028 }; }, cancel() {} } });
+  fileTimeout.playback.start(); await flush();
+  assert.match(fileTimeout.states.at(-1).error, /pinimg\.com.*DIRECT/);
+  fileTimeout.playback.release();
   const automatic = harness();
   automatic.playback.setVideo(automatic.video);
   automatic.playback.setSurface('');

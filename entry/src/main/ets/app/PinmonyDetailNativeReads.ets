@@ -143,7 +143,7 @@ export class PinmonyDetailNativeReads {
     this.previewText = ''; this.previewError = this.aggregate ? '' : PinmonyI18n.message("pm_missing_comment_id_retry_the_comment_preview_b1b3707a"); this.previewEmpty = false;
     this.previewAvailable = !!this.aggregate; this.previewLoading = !!this.aggregate; this.apply();
     const revision: number = this.revision;
-    if (this.store.detail?.isVideo || this.store.detail?.video) this.readAutoplay();
+    this.readAutoplay();
     await this.readPreview();
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
     return this.readRelated(false);
@@ -351,16 +351,23 @@ export class PinmonyDetailNativeReads {
   private async readAutoplay(): Promise<void> {
     const revision: number = this.revision, viewer: string = this.commentViewer;
     try {
-      if (!viewer) return;
+      if (!this.owned()) return;
+      // Settings are a current-session self read. PinResource may omit its
+      // viewer; use the settings response's own matching identity evidence.
       const options: Record<string,string> = {};
       const reply: PinmonyNetworkReply = await this.request('UserSettingsResource',options,'native_autoplay_');
       if (revision !== this.revision || !this.owned() || reply.error || reply.status !== 200) return;
       const body: AutoplayResponse = JSON.parse(reply.body || '') as AutoplayResponse, r: AutoplayResource | undefined = body.resource_response;
-      if (!r || r.status !== 'success' || r.code !== 0 || r.error || r.data?.id !== viewer || body.client_context?.user?.id !== viewer) return;
+      const settingsViewer: string = r?.data?.id || '';
+      if (!r || !r.data || r.status !== 'success' || r.code !== 0 || r.error || !/^\d{1,30}$/.test(settingsViewer) ||
+          settingsViewer === '0' || body.client_context?.user?.id !== settingsViewer || (!!viewer && settingsViewer !== viewer)) {
+        PinmonyRuntimeLog.warn('VideoAutoplayTrace: preferences=identity-rejected'); return;
+      }
       this.autoplayWifi = typeof r.data.autoplay_videos_on_wifi_enabled === 'boolean' ? r.data.autoplay_videos_on_wifi_enabled : undefined;
       this.autoplayCellular = typeof r.data.autoplay_videos_on_cellular_enabled === 'boolean' ? r.data.autoplay_videos_on_cellular_enabled : undefined;
+      PinmonyRuntimeLog.info('VideoAutoplayTrace: preferences=confirmed wifi=' + this.autoplayWifi + ' cellular=' + this.autoplayCellular);
       this.apply();
-    } catch (_) { /* Unknown preferences keep autoplay disabled; manual playback remains available. */ }
+    } catch (_) { PinmonyRuntimeLog.warn('VideoAutoplayTrace: preferences=unavailable'); }
   }
   private async request(resource: string, options: Object, prefix: string, extraCurrent: () => boolean = (): boolean => true, commentId: string = ''): Promise<PinmonyNetworkReply> {
     const session: PinmonyBusinessSessionContext = this.ports.session();

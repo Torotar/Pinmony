@@ -13,7 +13,7 @@ const { PinmonyDetailCache } = load('feature_pin/src/main/ets/services/PinmonyDe
 const translationEvents = [];
 const { PinmonyDetailNativeReads } = load('entry/src/main/ets/app/PinmonyDetailNativeReads.ets', name =>
   name === 'feature_pin' ? { readRelatedPresentation } : name === 'common_network' ? { PIN_BUSINESS_PIN_READ_ENABLED: true } :
-    name === 'common_foundation' ? { PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); } } } : {});
+    name === 'common_foundation' ? { PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); }, warn() {} } } : {});
 const pinUrl = id => 'https://www.pinterest.com/pin/' + id + '/';
 const related = (ids, bookmark) => JSON.stringify({ resource_response: { status: 'success', data: ids.map(id => ({
   id: String(id), type: 'pin', images: { '474x': { url: 'https://i.pinimg.com/' + id + '.jpg', width: 474, height: 700 } } })), bookmark } });
@@ -33,16 +33,22 @@ function fixture() {
     if (value !== commentResult) published.push(JSON.parse(JSON.stringify(value)));
     commentResult = value;
   } });
-  const requests = [], canceled = [], marks = [];
+  const requests = [], autoplayRequests = [], canceled = [], marks = [];
   const network = { cancel(id) { canceled.push(id); }, requestBusinessPinRead(job, context, pin, current, legacy, aggregate) {
     assert.equal(job.page, pin); assert(['', '777'].includes(aggregate)); assert(current());
+    if (job.id.startsWith('native_autoplay_')) {
+      autoplayRequests.push(job);
+      return Promise.resolve({ status: 200, error: '', body: JSON.stringify({ resource_response: {
+        status: 'success', code: 0, data: { id: '7', autoplay_videos_on_wifi_enabled: true, autoplay_videos_on_cellular_enabled: false }
+      }, client_context: { user: { id: '7' } } }) });
+    }
     return new Promise(resolve => requests.push({ job, resolve: body => resolve({ ...job, status: current() ? 200 : 0, body,
       error: current() ? '' : 'cancelled', headers: {} }) }));
   } };
   const controller = new PinmonyDetailNativeReads({ pinStore: () => store, session: () => session, network: () => network,
     legacyContext: () => { throw Error('Web context must not be read'); }, foreground: () => foreground, rootOnly: () => root,
     backTarget: () => '', mark: event => marks.push(event) });
-  return { controller, store, requests, canceled, marks, published, setSession(value) { session = value; }, getSession() { return session; },
+  return { controller, store, requests, autoplayRequests, canceled, marks, published, setSession(value) { session = value; }, getSession() { return session; },
     setForeground(value) { foreground = value; }, setRoot(value) { root = value; } };
 }
 async function main() {
@@ -89,6 +95,8 @@ async function main() {
   f.requests[0].resolve(preview('confirmed preview')); await flush();
   assert.equal(f.requests.length, 2, 'related starts only after preview settles');
   f.requests[1].resolve(related([2,3], 'next')); await first;
+  assert.equal(f.autoplayRequests.length, 1, "missing base viewer does not block settings read");
+  assert.equal(f.store.detail.autoplayWifi, true);
   assert.equal(f.store.detail.commentPreview, 'confirmed preview'); assert.equal(f.store.detail.related.length, 2);
   assert.equal(f.store.detailNativeReadsReady, true);
   assert.equal(f.store.detailCache.get('1').detail.related.length, 2, 'return cache includes native recommendations');

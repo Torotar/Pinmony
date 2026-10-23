@@ -4400,6 +4400,8 @@
     {"name":"pm_notify_description_surveys_and_quizzes","value":"参与调查以改善 Pinterest 体验，并发现新的测验以增加互动"},
     {"name":"pm_notify_description_reports_and_violations_center","value":"获取有关你的内容和已举报内容的举报和违规行为的更新"},
     {"name":"pm_notify_description_shuffles_activity","value":"获取关于 Shuffles 动态的更新"},
-    {"name":"pm_social_blocked_partial","value":"已显示当前返回的账户，尚未确认完整屏蔽列表。"}
+    {"name":"pm_social_blocked_partial","value":"已显示当前返回的账户，尚未确认完整屏蔽列表。"},
+    {"name":"pm_video_connection_timeout","value":"视频连接超时"},
+    {"name":"pm_video_proxy_timeout_hint","value":"视频连接超时，请检查代理规则是否将 pinimg.com 指向 DIRECT，或切换代理节点（建议使用全局模式）"}
   ]
 }

@@ -52,6 +52,7 @@ export struct PinmonyHomePage {
   @State private contentWidth: number = 360;
   @State private failedImages: string[] = [];
   @State private categories: PinmonyHomeTab[] = [];
+  @State private categoryDirection: number = 1;
   @State private homeChromeCollapsed: boolean = false;
   private activeSession: number = 0;
   private activeTab: string = '';
@@ -298,11 +299,32 @@ export struct PinmonyHomePage {
   }
 
   private updateCategories(): void {
-    this.categories = (this.home.tabs || []).map((tab: PinmonyHomeTab): PinmonyHomeTab => {
+    const next: PinmonyHomeTab[] = (this.home.tabs || []).map((tab: PinmonyHomeTab): PinmonyHomeTab => {
       return { id: tab.id, label: tab.label, enabled: tab.enabled,
         selected: this.offlinePreview && this.offlineCategoryId ? tab.id === this.offlineCategoryId :
           this.pendingTabId ? tab.id === this.pendingTabId : tab.selected };
     });
+    this.applyCategories(next);
+  }
+
+  private applyCategories(next: PinmonyHomeTab[]): void {
+    const previous: number = this.categories.findIndex((tab: PinmonyHomeTab): boolean => tab.selected);
+    const selected: number = next.findIndex((tab: PinmonyHomeTab): boolean => tab.selected);
+    const previousId: string = this.categories[previous]?.id || '';
+    const nextId: string = next[selected]?.id || '';
+    // Initial load and same-category data/language refresh do not move the page.
+    // Compare positions in the same list; a refreshed list is not navigation.
+    const target: number = this.categories.findIndex((tab: PinmonyHomeTab): boolean => tab.id === nextId);
+    if (!previousId || !nextId || previousId === nextId || target < 0) { this.categories = next; return; }
+    // Update the mounted page's exit effect before animateTo replaces its key.
+    this.categoryDirection = target > previous ? 1 : -1;
+    this.getUIContext().animateTo({ duration: 280, curve: Curve.EaseOut }, () => {
+      this.categories = next;
+    });
+  }
+
+  private categoryPageKey(): string {
+    return this.categories.find((tab: PinmonyHomeTab): boolean => tab.selected)?.id || 'initial';
   }
 
   private selectTab(tab: PinmonyHomeTab): void {
@@ -313,9 +335,9 @@ export struct PinmonyHomePage {
       return;
     }
     if (!this.onTab) return;
-    this.categories = this.categories.map((item: PinmonyHomeTab): PinmonyHomeTab => {
+    this.applyCategories(this.categories.map((item: PinmonyHomeTab): PinmonyHomeTab => {
       return { id: item.id, label: item.label, enabled: item.enabled, selected: item.id === tab.id };
-    });
+    }));
     this.onTab(tab.id);
   }
 
@@ -733,8 +755,23 @@ export struct PinmonyHomePage {
         .scrollBar(BarState.Off)
         .align(Alignment.Start)
       }
-      Column() { this.feedContent() }
-        .width('100%').layoutWeight(1)
+      Stack({ alignContent: Alignment.TopStart }) {
+        ForEach([this.categoryPageKey()], (page: string) => {
+          Column() { this.feedContent() }
+            .width('100%').height('100%')
+            .backgroundColor($r('app.color.page_background'))
+            .hitTestBehavior(page === this.categoryPageKey() ? HitTestMode.Default : HitTestMode.None)
+            .accessibilityLevel(page === this.categoryPageKey() ? 'auto' : 'no-hide-descendants')
+            .transition(TransitionEffect.asymmetric(
+              TransitionEffect.translate({ x: this.categoryDirection * this.contentWidth }),
+              TransitionEffect.translate({ x: -this.categoryDirection * this.contentWidth })))
+        }, (page: string) => page)
+      }
+        .width('100%').layoutWeight(1).clip(true)
+        .onAreaChange((_previous: Area, current: Area) => {
+          const width: number = Number(current.width);
+          if (Number.isFinite(width) && width > 0) this.contentWidth = width;
+        })
         .onTouch((event: TouchEvent) => {
           if (event.type === TouchType.Down) this.suppressSwipeClick = false;
         })
@@ -746,4 +783,5 @@ export struct PinmonyHomePage {
     }
     .width('100%').height('100%')
   }
+
 }

@@ -4400,6 +4400,8 @@
     {"name":"pm_notify_description_surveys_and_quizzes","value":"Take surveys to improve Pinterest and discover new quizzes"},
     {"name":"pm_notify_description_reports_and_violations_center","value":"Get updates about reports and violations involving your content or content you reported"},
     {"name":"pm_notify_description_shuffles_activity","value":"Get updates about activity on Shuffles"},
-    {"name":"pm_social_blocked_partial","value":"Showing accounts from the current response. The full blocked list has not been confirmed."}
+    {"name":"pm_social_blocked_partial","value":"Showing accounts from the current response. The full blocked list has not been confirmed."},
+    {"name":"pm_video_connection_timeout","value":"Video connection timed out"},
+    {"name":"pm_video_proxy_timeout_hint","value":"Video connection timed out. Please check whether your proxy rules route pinimg.com to DIRECT, or switch proxy nodes (Global mode recommended)."}
   ]
 }
