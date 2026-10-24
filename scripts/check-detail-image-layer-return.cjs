@@ -36,8 +36,8 @@ async function main() {
   const failed = fixture(); const pending = failed.controller.openImageLayer('search'); failed.resolve(false); await pending;
   assert.equal(failed.store.imageLayer, '');
   const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
-  assert.match(page, /backgroundColor\('#77303030'\)\.enabled\(this.actionsReady \|\| this.deferredActions\)/);
-  assert.match(page, /Button\('加载推荐'\)\.enabled\(this.deferredActions \|\| this.readsReady \|\| this.actionsReady\)/);
+  assert.match(page, /\.enabled\(this.acceptsActionIntent\(item\)\)/);
+  assert.match(page, /Button\(this\.uiText\("pm_load_recommendations_08df83f8"\)\)\.enabled\(this.deferredActions \|\| this.readsReady \|\| this.actionsReady\)/);
   assert.ok(!page.includes('推荐内容需要重新读取'));
   assert.match(page, /this.detail.kind === 'cached' && !this.detail.relatedLoading && this.detail.relatedError/);
   console.log('Detail image return: deferred search, duplicate taps, preparation failure, departure, close, background and account guards passed');

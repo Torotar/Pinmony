@@ -33,13 +33,13 @@ for (const change of [n => n.tabRequestToken++, n => n.authStatus = 'unauthentic
 }
 // Execute the actual production home callback: metadata and pagination must not
 // finish any pending return sample, even if cache restoration could not finish it.
-const callback = index.match(/committed: \(snapshot: PinmonyHomeSnapshot, kind:[\s\S]*?\n    }(?=\n  } as PinmonyHomeNativeReadsPorts)/)[0].replace(/^committed: /, '');
+const callback = index.match(/committed: \(snapshot: PinmonyHomeSnapshot, kind:[\s\S]*?\r?\n    }(?=\r?\n  } as PinmonyHomeNativeReadsPorts)/)[0].replace(/^committed: /, '');
 const out = {};
 vm.runInNewContext(ts.transpileModule('export function callback(){return ' + callback + ';}', {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
-}).outputText, { exports: out });
+}).outputText, { exports: out, PinmonyUpdateNotice:{start(){}} });
 f = fixture(); const marks = [];
-Object.assign(f.native, { rootTabAddresses: new Map(), persistHomeDiskCache() {}, rootContextCoordinator: { notify() {} },
+Object.assign(f.native, { getUIContext:()=>({getHostContext:()=>({})}),rootTabAddresses: new Map(), persistHomeDiskCache() {}, rootContextCoordinator: { notify() {} },
   controller: { runJavaScript: () => Promise.resolve() }, detailReturnJourney: { mark: x => marks.push(x) } });
 const committed = out.callback.call(f.native);
 committed({ pageKey: 'synthetic-page' }, 'pagination'); committed({ pageKey: 'synthetic-page' }, 'metadata');

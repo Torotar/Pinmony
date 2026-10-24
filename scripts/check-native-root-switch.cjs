@@ -26,7 +26,7 @@ const hostSource = fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPa
 const beginStart = hostSource.indexOf('.onPageBegin(');
 const beginEnd = hostSource.indexOf('\n            .onPageEnd(', beginStart);
 const begin = hostSource.slice(beginStart, beginEnd).replace(/^\.onPageBegin\(/, 'this.pageBegin = ')
-  .replaceAll('view.captureEnvironment()', 'void 0').replaceAll('view.lifecycle', 'this.webLifecycleCoordinator').replace(/\)\s*$/, ';');
+  .replaceAll('view.isCurrent?.(view.controller) === false', 'false').replaceAll('view.captureEnvironment()', 'void 0').replaceAll('view.lifecycle', 'this.webLifecycleCoordinator').replace(/\)\s*$/, ';');
 const context = { PINTEREST_URL: 'https://www.pinterest.com/', isPinterestAuthRoute: url => /\/login\//.test(url),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 const code = 'class Native {' + names.map(method).join('\n') + '\nsetup() {' + setup + begin + '} } globalThis.Native = Native;';
@@ -35,7 +35,7 @@ const home = context.PINTEREST_URL, pin = home + 'pin/123/', profile = home + 's
 function harness() {
   const native = new context.Native(), requests = [], indices = [], confirmations = [];
   let document = pin;
-  Object.assign(native, { authStatus: 'authenticated', authEpoch: 10, nativeNetwork: { invalidate() {} },
+  Object.assign(native, { updateLoginPresentation(){}, authStatus: 'authenticated', authEpoch: 10, nativeNetwork: { invalidate() {} },
     activeTab: 0, pendingWebTab: 3, tabRequestToken: 0,
     pageBackToken: 0, nativeBackTarget: home, rootTabAddresses: new Map(), authenticatedProfileUrl: profile,
     profileStore: { origins: [], profileRequestToken: 0, profile: { profileUrl: profile }, profileScrollOffset: 420,
@@ -125,7 +125,7 @@ assert(!/runJavaScript|loadUrl|backOrForward|expectHome|expectSearch|expectInbox
 assert.match(source, /\.animationDuration\(0\)/);
 const search = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
 assert.match(search, /if \(!this\.automaticLoadingEnabled\) return/);
-assert.equal((search.match(/onReachEnd\(\(\) => this\.resultsReachEnd\(\)\)/g) || []).length, 2);
+assert.equal((search.match(/onReachEnd\(\(\) => this\.resultsReachEnd\(\)\)/g) || []).length, 3); // Main results, retained results and photo search share the same gated handler.
 assert.match(search, /private resultsReachEnd\(\): void \{\s*if \(!this\.automaticLoadingEnabled/);
 const profileSource = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets', 'utf8');
 for (const component of [search, profileSource]) {

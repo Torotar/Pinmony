@@ -23,7 +23,7 @@ class HdsSnackBar {
   show(icon, message, operation, style) { presentations.push({ title: message.title, operation, style }); }
   dismiss() {}
 }
-const nativeContext = { HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 }, Date: { now: () => now } };
+const nativeContext = { $r:value=>value,SnackBarIconType:{NORMAL:0},HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 }, Date: { now: () => now } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Log { ' + sanitize + ' } globalThis.Log = Log;', {}).outputText, nativeContext);
 nativeContext.PinmonyRuntimeLog = { info: text => logs.push(nativeContext.Log.sanitize(text)), warn: text => logs.push(nativeContext.Log.sanitize(text)) };
 const nativeCode = 'class Native { ' + source.slice(start, end) + method('updateShareSheet') + method('handlePostResult') + ' } globalThis.Native = Native;';

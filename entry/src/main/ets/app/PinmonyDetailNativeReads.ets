@@ -6,6 +6,18 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 
 export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
 interface CommentClient { user?: CommentUser; }
+interface RetainedRelatedRead {
+  at: number;
+  pins: PinmonyRelatedPin[];
+  bookmark: string;
+  ended: boolean;
+  reply: PinmonyNetworkReply;
+  aggregate: string;
+  previewText: string;
+  previewEmpty: boolean;
+  previewAvailable: boolean;
+  previewReady: boolean;
+}
 interface BaseResponse { resource_response: BaseResource; client_context?: CommentClient; }
 interface AutoplayResponse { resource_response?: AutoplayResource; client_context?: CommentClient; }
 interface AutoplayResource { status: string; code: number; error?: Object; data?: AutoplaySettings; }
@@ -70,6 +82,8 @@ export class PinmonyDetailNativeReads {
   private relatedLoading: boolean = false;
   private relatedEnded: boolean = false;
   private relatedError: string = '';
+  private readonly retainedRelated: Map<string, RetainedRelatedRead> = new Map<string, RetainedRelatedRead>();
+  private retainedOwner: string = '';
   private previewLoading: boolean = false;
   private previewText: string = '';
   private previewEmpty: boolean = false;
@@ -81,6 +95,10 @@ export class PinmonyDetailNativeReads {
   constructor(ports: PinmonyDetailNativeReadsPorts) { this.ports = ports; this.store = ports.pinStore(); }
 
   pause(): void {
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    if (!session.authenticated || this.retainedOwner !== session.accountId + ':' + session.generation.toString()) {
+      this.retainedRelated.clear(); this.retainedOwner = '';
+    }
     this.autoplayWifi = undefined; this.autoplayCellular = undefined;
     this.revision++;
     this.requests.forEach((id: string) => this.ports.network().cancel(id)); this.requests.clear();
@@ -93,6 +111,20 @@ export class PinmonyDetailNativeReads {
     return PIN_NATIVE_DETAIL_READS_ENABLED && !!this.pin && session.authenticated && session.generation === this.sessionGeneration &&
       this.ports.foreground() && !this.ports.rootOnly() && !this.ports.backTarget() &&
       this.opening === this.store.detailOpeningToken && (this.store.detailPin === this.pin || this.store.detailOpeningPin === this.pin);
+  }
+  resume(pin: string, opening: number): boolean {
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    const cached: RetainedRelatedRead | undefined = this.retainedRelated.get(pin);
+    if (!session.authenticated || this.retainedOwner !== session.accountId + ':' + session.generation.toString() ||
+        !cached || !cached.previewReady || Date.now() - cached.at >= 300000 || this.store.detail?.pinUrl !== pin) return false;
+    this.pause(); this.pin = pin; this.opening = opening; this.sessionGeneration = session.generation;
+    if (!this.owned()) return false;
+    this.aggregate = cached.aggregate; this.bookmark = cached.bookmark; this.related = cached.pins.slice();
+    this.relatedLoading = false; this.relatedEnded = cached.ended; this.relatedError = '';
+    this.previewText = cached.previewText; this.previewEmpty = cached.previewEmpty;
+    this.previewAvailable = cached.previewAvailable; this.previewLoading = false; this.previewError = '';
+    this.apply(); this.readAutoplay(); this.ports.mark('return.native.reads.restored');
+    return true;
   }
   apply(): void {
     if (!this.owned()) { this.store.detailNativeReadsReady = false; return; }
@@ -111,6 +143,9 @@ export class PinmonyDetailNativeReads {
   async start(pin: string, opening: number, body: string): Promise<PinmonyNetworkReply> {
     this.pause();
     const session: PinmonyBusinessSessionContext = this.ports.session();
+    const owner: string = session.authenticated ? session.accountId + ':' + session.generation.toString() : '';
+    if (!owner || owner !== this.retainedOwner) this.retainedRelated.clear();
+    this.retainedOwner = owner;
     const response: BaseResponse = JSON.parse(body) as BaseResponse;
     const resource: BaseResource = response.resource_response;
     this.commentViewer = /^\d{1,30}$/.test(response.client_context?.user?.id || '') ? response.client_context!.user!.id! : '';
@@ -139,13 +174,17 @@ export class PinmonyDetailNativeReads {
     }
     this.ports.mark(this.aggregate ? 'comments.native.identity.ready' : 'comments.native.identity.missing');
     const existing: PinmonyDetailSnapshot | undefined = this.store.detail;
-    this.bookmark = ''; this.related = existing?.pinUrl === pin ? existing.related.slice() : []; this.relatedLoading = true; this.relatedEnded = false; this.relatedError = '';
+    const cached: RetainedRelatedRead | undefined = this.retainedRelated.get(pin);
+    const retained: RetainedRelatedRead | undefined = cached && Date.now() - cached.at < 300000 ? cached : undefined;
+    this.bookmark = retained?.bookmark || ''; this.related = retained ? retained.pins.slice() : existing?.pinUrl === pin ? existing.related.slice() : [];
+    this.relatedLoading = !retained; this.relatedEnded = retained?.ended || false; this.relatedError = '';
     this.previewText = ''; this.previewError = this.aggregate ? '' : PinmonyI18n.message("pm_missing_comment_id_retry_the_comment_preview_b1b3707a"); this.previewEmpty = false;
     this.previewAvailable = !!this.aggregate; this.previewLoading = !!this.aggregate; this.apply();
     const revision: number = this.revision;
     this.readAutoplay();
     await this.readPreview();
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
+    if (retained) { this.ports.mark('related.native.retained'); return retained.reply; }
     return this.readRelated(false);
   }
   retryPreview(): boolean {
@@ -431,6 +470,13 @@ export class PinmonyDetailNativeReads {
       mapped.pins.forEach((pin: PinmonyRelatedPin) => { if (!merged.some((existing: PinmonyRelatedPin): boolean => existing.pinUrl === pin.pinUrl)) merged.push(pin); });
       this.related = merged; this.bookmark = mapped.bookmark || '';
       this.relatedEnded = mapped.ended || append && this.bookmark === previous;
+      this.retainedRelated.delete(this.pin);
+      this.retainedRelated.set(this.pin, { at: Date.now(), pins: this.related.slice(), bookmark: this.bookmark,
+        ended: this.relatedEnded, aggregate: this.aggregate, previewText: this.previewText,
+        previewEmpty: this.previewEmpty, previewAvailable: this.previewAvailable,
+        previewReady: !this.previewLoading && !this.previewError, reply: { id: '', epoch: this.sessionGeneration, page: this.pin,
+          status: 200, body: '', url: '', error: '', headers: {} } });
+      if (this.retainedRelated.size > 12) this.retainedRelated.delete(this.retainedRelated.keys().next().value);
       this.ports.mark('related.native.committed');
     } catch (_) { if (revision === this.revision && this.owned()) { this.relatedError = PinmonyI18n.message("pm_unable_to_load_recommendations_please_retry_87984c87"); reply.error = reply.error || 'invalid-response'; } }
     finally { if (revision === this.revision && this.owned()) { this.relatedLoading = false; this.apply(); } }

@@ -5,10 +5,11 @@ const scripts = require('./product-coordination-harness.cjs').runtime(ts)
 // Authorized feature changes invalidate old byte hashes; retain injection boundaries,
 // parse every real script and verify the dependency-sensitive order explicitly.
 const baseline = require('./fixtures/document-start-script-hashes.json');
-assert.equal(scripts.length, baseline.length);
-assert.deepEqual(Array.from(scripts, item => Array.from(item.scriptRules)), baseline.map(item => item.scriptRules));
+assert.equal(scripts.length, baseline.length + 1, 'Google-login support guard is registered after auth');
+assert.match(scripts[2].script, /Google|google/);
+assert.deepEqual(Array.from(scripts, item => Array.from(item.scriptRules)), [...baseline.slice(0,2), {scriptRules:['*']}, ...baseline.slice(2)].map(item => item.scriptRules));
 for (const item of scripts) new Function(item.script);
-assert.match(scripts[0].script, /window\.PinmonySpeculativeReadsEnabled = false;/);
+assert(scripts[0].script.includes('window.PinmonySpeculativeReadsEnabled = '+require('./product-coordination-harness.cjs').runtime(ts).loadPackage('common_foundation').allowsSpeculativeReads()+';'));
 assert.match(scripts[0].script, /window\.PinmonyReadMergingEnabled = true;/);
 assert.match(scripts[0].script, /window\.PinmonyNetwork =/);
 assert.match(scripts[1].script, /window\.PinmonyAuthSync =/);
@@ -22,7 +23,7 @@ for (const flag of flags) {
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const controller = fs.readFileSync('feature_search/src/main/ets/controllers/PinmonySearchController.ets', 'utf8');
 assert.match(index, /documentStartScripts: ScriptItem\[\] = pinWebDocumentStartScripts\(\)/);
-assert.match(index, /runJavaScriptOnDocumentStart\(this\.documentStartScripts\)/);
+assert.match(fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets','utf8'), /runJavaScriptOnDocumentStart\(view\.scripts\)/);
 assert.equal((index.match(/new PinmonySearchStore\(\)/g) || []).length, 1);
 assert.match(index, /new PinmonySearchController\(this\.searchStore,/);
 assert.doesNotMatch(controller, /from ['"][^'"]*(?:entry|feature_pin|feature_home|feature_profile|feature_inbox)[^'"]*['"]/);

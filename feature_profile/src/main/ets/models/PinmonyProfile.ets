@@ -6,6 +6,7 @@ export interface PinmonyProfileAction {
 }
 
 export interface PinmonyBoard {
+  secret?: boolean;
   id: string;
   targetUrl?: string;
   title: string;

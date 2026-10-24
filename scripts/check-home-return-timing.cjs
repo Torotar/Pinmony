@@ -107,7 +107,7 @@ async function main() {
   const feed = new pageCtx.Feed(), ranges = [];
   Object.assign(feed, { activeSession: 1, activePageKey: home, activeTab: 'all', visibleFirst: 10, visibleLast: 15,
     home: { session: 2, pageKey: home, selectedTab: 'all', pins: Array.from({ length: 30 }) }, feedActive: true, actionsReady: true,
-    onImageRecovery() {}, updateCategories() {}, prefetchNextScreen() {}, onPrefetchPins: (first, last) => ranges.push([first, last]) });
+    resumePendingEnd(){},fillShortViewport(){},uiText:require('./local-message-test-fixture.cjs').rawLocalMessages.text,onImageRecovery() {}, updateCategories() {}, prefetchNextScreen() {}, onPrefetchPins: (first, last) => ranges.push([first, last]) });
   feed.onHomeChanged();
   assert.deepEqual(ranges, [[10, 15]], 'session rebind resumes the retained viewport without another scroll event');
   assert.equal(feed.feedStatusText(), '正在恢复首页连接…');

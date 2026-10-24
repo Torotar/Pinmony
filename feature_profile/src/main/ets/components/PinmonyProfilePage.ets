@@ -37,7 +37,7 @@ export struct PinmonyProfilePage {
   onUser?: (url: string) => void;
   onWebsite?: (url: string) => void;
   private readonly profilePaths: NavPathStack = new NavPathStack();
-  @State private headerHeight: number = 180;
+  private profileNameBottom: number = 0;
   @State private compactHeader: boolean = false;
   @State private aboutVisible: boolean = false;
   @State private sectionMotion: number = 0;
@@ -47,6 +47,7 @@ export struct PinmonyProfilePage {
   onPinMore?: (id: string) => void;
   onSearch?: () => void;
   onPublish?: () => void;
+  @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   onSettings?: () => void;
   onShare?: () => void;
   @Prop followingBusy: boolean = false;
@@ -64,7 +65,7 @@ export struct PinmonyProfilePage {
   }
 
   private onProfileChanged(): void {
-    if (this.activeProfile !== this.profile.profileUrl) this.backRequested = false;
+    if (this.activeProfile !== this.profile.profileUrl) { this.backRequested = false; this.profileNameBottom = 0; this.compactHeader = false; }
     if (this.activeProfile !== this.profile.profileUrl || this.activeSection !== this.profile.section) {
       this.activeProfile = this.profile.profileUrl;
       this.activeSection = this.profile.section;
@@ -76,8 +77,21 @@ export struct PinmonyProfilePage {
     setTimeout(() => {
       try { this.scroller.scrollTo({ xOffset: 0, yOffset: Math.max(0, this.initialScrollOffset), animation: false }); }
       catch (_) { console.warn('Pinmony: profile scroll restoration unavailable'); }
+      this.updateCompactHeader();
       this.restoringScroll = false;
     }, 0);
+  }
+
+  private measureProfileName(area: Area): void {
+    const bottom: number = Number(area.position.y) + Number(area.height);
+    if (!Number.isFinite(bottom) || bottom <= 0) return;
+    this.profileNameBottom = bottom;
+    this.updateCompactHeader();
+  }
+
+  private updateCompactHeader(): void {
+    const offset: number = this.scroller.offset()?.yOffset || 0;
+    this.compactHeader = this.profileNameBottom > 0 && offset >= this.profileCoverHeight() + this.profileNameBottom;
   }
 
   private reportScroll(): void {
@@ -188,7 +202,7 @@ export struct PinmonyProfilePage {
               Text(this.profile.handle).fontSize(14).fontColor($r('app.color.secondary_text'))
             }
           }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-        }.width('100%')
+        }.width('100%').onAreaChange((_old: Area, area: Area) => this.measureProfileName(area))
       } else {
       PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 108 })
       .width(108)
@@ -201,8 +215,10 @@ export struct PinmonyProfilePage {
         .fontColor($r('app.color.primary_text'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .onAreaChange((_old: Area, area: Area) => { if (!this.profile.handle) this.measureProfileName(area); })
       if (this.profile.handle) {
         Text(this.profile.handle).fontSize(14).fontColor($r('app.color.secondary_text'))
+          .onAreaChange((_old: Area, area: Area) => this.measureProfileName(area))
       }
       if (this.profile.website || this.profile.about) {
         Text() {
@@ -295,7 +311,7 @@ export struct PinmonyProfilePage {
     .width('100%')
     .alignItems(this.profile.business || this.profile.isOwn === false ? HorizontalAlign.Start : HorizontalAlign.Center)
     .padding({ left: 20, right: 20, top: 16 })
-    .onAreaChange((_old: Area, area: Area) => { this.headerHeight = Number(area.height); })
+
   }
 
   @Builder
@@ -339,7 +355,7 @@ export struct PinmonyProfilePage {
 
   @Builder
   private boardCover(board: PinmonyBoard) {
-    Stack() {
+    Stack({alignContent:Alignment.TopStart}) {
       Column()
         .width('100%')
         .height('100%')
@@ -372,6 +388,12 @@ export struct PinmonyProfilePage {
         }
         .width('100%')
         .height('100%')
+      }
+      if(board.secret) {
+        Stack({alignContent:Alignment.Center}) {
+          Image($r('app.media.board_private_lock')).width(16).height(16).fillColor($r('app.color.primary_text'))
+        }.width(30).height(30).borderRadius(15).backgroundColor($r('app.color.page_background'))
+          .margin({left:10,top:10}).accessibilityText(this.uiText('pm_secret_board_afc1422a'))
       }
     }
     .width('100%')
@@ -625,7 +647,7 @@ export struct PinmonyProfilePage {
           menu: { value: [{ content: { icon: $r('app.media.inbox_search_outline'), label: this.uiText("pm_search_44ce7ae9"),
             action: () => { if (this.onSearch) this.onSearch(); } } }, { content: { icon: $r('sys.symbol.plus'), label: this.uiText("pm_publish_b61f333b"),
             action: () => { if (this.onPublish) this.onPublish(); } } },
-            { content: { icon: $r('sys.symbol.gearshape'), label: this.uiText("pm_settings_df3d58c7"), action: () => this.openSettings() } }] } }
+            { content: { icon: $r('sys.symbol.gearshape'), label: this.uiText("pm_settings_df3d58c7"), action: () => this.openSettings() }, badge: this.updateUnread ? { value: '', accessibilityText: this.uiText('pm_new_version_available_596dd46c') } : undefined }] } }
       })
   }
   @Builder
@@ -677,7 +699,7 @@ export struct PinmonyProfilePage {
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       .onAppear(() => this.restoreScroll())
       .onDidScroll((_xOffset: number, offset: number, state: ScrollState) => {
-          this.compactHeader = (this.scroller.offset()?.yOffset || 0) > this.headerHeight + this.profileCoverHeight();
+          this.updateCompactHeader();
           this.reportScroll();
           if (this.onContentScroll) this.onContentScroll(offset, state);
         })

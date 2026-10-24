@@ -21,3 +21,10 @@
 -enable-toplevel-obfuscation
 -enable-filename-obfuscation
 -enable-export-obfuscation
+
+# AppStartup profile entries are loaded by their configured paths.
+-keep-file-name
+./ets/startup/StartupConfig.ets
+./ets/startup/RuntimeLogTask.ets
+./ets/startup/PreferencesTask.ets
+./ets/startup/WebEngineTask.ets

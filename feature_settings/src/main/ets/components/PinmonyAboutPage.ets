@@ -1,3 +1,4 @@
+import { PinmonyUpdateNotice } from '../services/PinmonyUpdateNotice';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -57,31 +58,33 @@ export struct PinmonyAboutPage {
 
   aboutToAppear(): void {
     this.visible = true;
+    PinmonyUpdateNotice.setAboutVisible(true);
     this.paths.clear();
     this.paths.pushPath({ name: 'about' }, false);
     this.readVersion();
   }
-  aboutToDisappear(): void { this.visible = false; this.releaseClient.cancel(); }
+  aboutToDisappear(): void { PinmonyUpdateNotice.setAboutVisible(false); this.visible = false; this.releaseClient.cancel(); }
   private async readVersion(): Promise<void> {
     try {
       const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
       if (this.visible) {
         this.version = info.versionName + ' (' + info.versionCode.toString() + ')';
         this.installedVersion = info.versionName;
-        this.checkUpdate();
+        this.checkUpdate(false);
       }
     } catch (_) {
       if (this.visible) { this.version = PinmonyI18n.message("pm_version_information_unavailable_7d6fa6b1"); this.updateStatus = PinmonyI18n.message("pm_unable_to_compare_versions_check_the_releases_page_82efead4"); }
     }
   }
-  private async checkUpdate(): Promise<void> {
+  private async checkUpdate(force: boolean = true): Promise<void> {
     if (PinmonyI18n.isText(this.updateStatus, "正在检查更新…") && this.releaseChecking) return;
     this.releaseChecking = true;
     this.updateStatus = PinmonyI18n.message("pm_checking_for_updates_91834aeb");
     PinmonyRuntimeLog.info('ReleaseCheck: event=page-check');
     try {
-      const release = await this.releaseClient.latest(this.installedVersion);
+      const release = await this.releaseClient.latest(this.installedVersion, force);
       if (!this.visible) return;
+      PinmonyUpdateNotice.confirm(release?.tag_name || '', this.installedVersion);
       this.release = release;
       this.hasUpdate = !!release && isNewerRelease(release.tag_name, this.installedVersion);
       this.newerReleases = (this.releaseClient.releases || (release ? [release] : []))

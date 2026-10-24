@@ -74,6 +74,7 @@ export class PinmonyPinMenuNative {
     const revision: number = this.bind(pin,token,true);
     const state: PinmonyHomeMenuState = {session:token,pinUrl:pin,loading:false,busy:false,error:'',feedback:'',options:[],actions:[]};
     try {await this.read(revision);if(!this.current(revision))return state;
+      state.canCancelSave = this.raw?.is_repin === true && this.raw?.pinner?.id === this.viewer;
       state.actions = [{id:'home-save',label:PinmonyI18n.message("pm_save_60a53514"),enabled:true},{id:'home-download',label:PinmonyI18n.message("pm_download_image_8894375c"),enabled:!!this.image()},
         {id:'home-see-more',label:PinmonyI18n.message("pm_see_more_92b2b2de"),enabled:this.enabled('more')},{id:'home-see-less',label:PinmonyI18n.message("pm_see_less_9c80a8dc"),enabled:this.enabled('less')}];
       if(this.canOpenEdit())state.actions.unshift({id:'home-edit',label:PinmonyI18n.message("pm_edit_pin_f9119bcf"),enabled:true});

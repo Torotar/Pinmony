@@ -23,6 +23,7 @@ const cookieManager = {
 };
 const logger = { info() {}, warn: v => logs.push(v), error: v => logs.push(v) };
 const loader = createArktsLoader(ts, {
+  '@kit.RemoteCommunicationKit': { rcp: {} },
   '@kit.ArkTS': { util: { TextEncoder: class { encodeInto(v) { return new Uint8Array(Buffer.from(v)); } } } },
   '@kit.CryptoArchitectureKit': { cryptoFramework: { createMd: () => {
     if (hashFailure) sdkFailure();
@@ -68,6 +69,7 @@ const loader = createArktsLoader(ts, {
   await assert.rejects(Runtime.writeSession('text'), /diagnostics-session-write-failed/);
   assert.equal(Runtime.sessionPersisted, false);
   assert.equal(Runtime.sessionIncomplete, true);
+  assert.deepEqual(events.splice(0), ['open', 'close']);
   const Actions = loader.loadFile('entry/src/main/ets/app/PinmonySystemActions.ets').PinmonySystemActions;
   const actions = new Actions(() => ({ openLink: sdkFailure }), () => {});
   // Synchronous SDK exceptions must become Promise failures for existing callers.

@@ -9,7 +9,7 @@ function method(name) {
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf('\n  private ', start + 1));
 }
-const code = ts.transpileModule('class Native {' + method('finishProfilePull') + method('refreshProfile') +
+const code = ts.transpileModule('class Native {' + method('usesNativeProfileReads') + method('finishProfilePull') + method('refreshProfile') +
   '} globalThis.Native=Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
 async function main() {
   const timers = [], context = { PIN_NATIVE_PROFILE_READS_ENABLED: false, setTimeout: fn => timers.push(fn) }; require('./product-coordination-harness.cjs').run(ts,code, context);

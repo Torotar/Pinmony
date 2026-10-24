@@ -69,11 +69,28 @@ export class PinmonyBottomBarCoordinator {
   private get coordinatorTasks(): PinmonyTaskRegistry { return this.ports.coordinatorTasks(); }
 
   setBottomBarHidden(hidden: boolean,
-    mode: HdsAnimationMode = HdsAnimationMode.SCROLL_ANIMATION): void {
-    if (!this.floatingTabsMounted || this.floatingTabsHidden === hidden) return;
+    mode: HdsAnimationMode = HdsAnimationMode.SCROLL_ANIMATION, force: boolean = false): void {
+    if (!this.floatingTabsMounted || !force && this.floatingTabsHidden === hidden) return;
     this.floatingTabsHidden = hidden;
     if (hidden) this.tabsController.applyHideAnimation(mode);
     else this.tabsController.applyShowAnimation(mode);
+  }
+
+  resumeAfterForeground(): void {
+    ++this.floatingTabsMotionToken;
+    this.coordinatorTasks.timeout(() => {
+      if (!this.floatingTabsMounted) return;
+      if (this.authStatus === 'authenticated' && this.nativeRootTabsVisible() &&
+          !this.pinStore.detailOpeningPin && !this.ports.searchResultsVisible?.()) {
+        this.rootTabsScrollHidden[this.activeTab] = false;
+        this.childBottomBarRestoreHidden = null;
+        this.childBottomBarRootTab = -1;
+      }
+      this.syncBottomBarForPageDepth();
+      // The HDS animation can be interrupted while the app is backgrounded;
+      // the local boolean alone cannot confirm the platform's visual state.
+      this.setBottomBarHidden(this.floatingTabsHidden, HdsAnimationMode.CLICK_ANIMATION, true);
+    }, 0);
   }
 
   onBottomBarScrollSettingChanged(): void {

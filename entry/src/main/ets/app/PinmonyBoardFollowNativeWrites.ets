@@ -9,6 +9,7 @@ interface FollowResource { status: string; code: number; endpoint_name: string; 
 interface FollowUser { id: string; }
 interface FollowContext { user?: FollowUser; }
 interface FollowResponse { resource_response?: FollowResource; client_context?: FollowContext; }
+interface ConfirmedFollow { following: boolean; expires: number; account: string; generation: number; origin: string; }
 export interface PinmonyBoardFollowNativeWritesPorts {
   session: () => PinmonyBusinessSessionContext;
   network: () => PinmonyNativeNetwork;
@@ -21,6 +22,7 @@ let followSequence: number = 0;
 export class PinmonyBoardFollowNativeWrites {
   private readonly ports: PinmonyBoardFollowNativeWritesPorts;
   private readonly unknown: Map<string, boolean> = new Map();
+  private readonly confirmedStates: Map<string, ConfirmedFollow> = new Map();
   private job: string = '';
   private board: string = '';
   private release: (() => void) | undefined = undefined;
@@ -31,11 +33,21 @@ export class PinmonyBoardFollowNativeWrites {
   reconcile(id: string, following: boolean): void {
     if (!this.busy(id) && this.unknown.get(id) === following) this.unknown.delete(id);
   }
+  readFollowing(id: string, following: boolean | undefined): boolean | undefined {
+    const confirmed: ConfirmedFollow | undefined = this.confirmedStates.get(id);
+    if (!confirmed) return following;
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    if (!session.authenticated || session.accountId !== confirmed.account || session.generation !== confirmed.generation ||
+      session.origin !== confirmed.origin || Date.now() >= confirmed.expires || following === confirmed.following) {
+      this.confirmedStates.delete(id); return following;
+    }
+    return confirmed.following;
+  }
   pause(): void {
     if (this.job) this.ports.network().cancel(this.job);
     this.job = ''; this.board = ''; this.release?.(); this.release = undefined;
   }
-  reset(): void { this.pause(); this.unknown.clear(); }
+  reset(): void { this.pause(); this.unknown.clear(); this.confirmedStates.clear(); }
   async submit(item: PinmonySearchResult, viewer: string, owner: () => boolean): Promise<void> {
     const session: PinmonyBusinessSessionContext = this.ports.session(), profile: string = item.targetUrl;
     const id: string = item.boardId || '';
@@ -69,7 +81,11 @@ export class PinmonyBoardFollowNativeWrites {
       if (!r || r.status !== 'success' || r.code !== 0 || r.endpoint_name !== (desired ? 'v3_follow_board' : 'v3_unfollow_board') ||
           response.client_context?.user && response.client_context.user.id !== viewer ||
           (desired ? !r.data || r.data.id !== id || r.data.type !== 'board' || r.data.followed_by_me !== true : r.data !== null)) throw new Error('unknown');
-      this.unknown.delete(id); this.ports.confirmed(id,desired); this.ports.feedback(desired ? PinmonyI18n.message("pm_board_followed_99719d35") : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
+      this.unknown.delete(id);
+      this.confirmedStates.delete(id);
+      if (this.confirmedStates.size >= 100) this.confirmedStates.clear();
+      this.confirmedStates.set(id,{following:desired,expires:Date.now() + 15000,account:session.accountId,generation:session.generation,origin:session.origin});
+      this.ports.confirmed(id,desired); this.ports.feedback(desired ? PinmonyI18n.message("pm_board_followed_99719d35") : PinmonyI18n.message("pm_board_unfollowed_b3151db9"));
     } catch (_) { if (current()) this.ports.feedback(PinmonyI18n.message("pm_board_follow_result_not_confirmed_refresh_to_check_before_submit_b77726df")); }
     finally { if (this.job === job.id) { this.job = ''; this.board = ''; this.release = undefined; this.ports.changed(); } }
   }

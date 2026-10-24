@@ -1,11 +1,22 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
 function method(name){const start=source.indexOf('  private '+name+'(');assert(start>=0);return source.slice(start,source.indexOf('\n  private ',start+1)).replace(/@Builder/g,'');}
-const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['requestProfileBack','profileCoverHeight','profileTitleOptions','onProfileChanged'].map(method).join('\n')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{$r:x=>x});
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['requestProfileBack','profileCoverHeight','profileTitleOptions','onProfileChanged','measureProfileName','updateCompactHeader'].map(method).join('\n')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText, {Color:{Transparent:'transparent'},BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},$r:x=>x});
+Host.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
 const h=new Host(),events=[];Object.assign(h,{profile:{profileUrl:'profile',isOwn:false,coverUrl:'https://i.pinimg.com/synthetic.jpg'},contentWidth:360,onBack:()=>events.push('back'),onShare:()=>events.push('share'),scroller:{scrollTo(){}},activeProfile:'profile'});
 assert.equal(h.profileCoverHeight(),187.20000000000002);h.profile.isOwn=true;assert.equal(h.profileCoverHeight(),0);h.profile.isOwn=false;
 const title=h.profileTitleOptions();assert.equal(title.content.menu.value.length,1);assert.equal(title.content.menu.value[0].content.label,'分享个人资料');title.content.menu.value[0].content.action();assert.deepEqual(events,['share']);
 title.content.backIcon.action();h.requestProfileBack();assert.deepEqual(events,['share','back'],'one return gesture cannot pop twice');
 h.profile.profileUrl='parent';h.onProfileChanged();h.requestProfileBack();assert.equal(events.length,3,'new profile permits next return');
 assert(source.includes('.maxFontSize(18).minFontSize(12)'));assert(source.includes('.padding({ left: 64, right: 72 })'));
+let scrollOffset=0;h.scroller.offset=()=>({yOffset:scrollOffset});h.profile.isOwn=true;
+h.measureProfileName({position:{y:140},height:20});assert.equal(h.profileNameBottom,160);assert.equal(h.compactHeader,false);
+scrollOffset=159;h.updateCompactHeader();assert.equal(h.compactHeader,false);
+scrollOffset=160;h.updateCompactHeader();assert.equal(h.compactHeader,true,'show when the username area has scrolled past');
+scrollOffset=0;h.updateCompactHeader();assert.equal(h.compactHeader,false,'hide again when returning to username');
+h.measureProfileName({position:{y:NaN},height:20});assert.equal(h.profileNameBottom,160);
+h.profile.isOwn=false;scrollOffset=160;h.updateCompactHeader();assert.equal(h.compactHeader,false,'cover remains part of content coordinates');
+scrollOffset=h.profileCoverHeight()+160;h.updateCompactHeader();assert.equal(h.compactHeader,true);
+h.profile.profileUrl='next';h.onProfileChanged();assert.equal(h.compactHeader,false);assert.equal(h.profileNameBottom,0);
+assert(!source.includes('this.headerHeight + this.profileCoverHeight()'));
 console.log('Visitor profile: cover bounds, share-only title, adaptive title constraints and duplicate return guard passed');

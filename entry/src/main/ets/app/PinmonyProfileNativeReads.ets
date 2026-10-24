@@ -7,7 +7,7 @@ export const PIN_NATIVE_PROFILE_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_E
 interface ProfileImage { url?: string; width?: number; height?: number; }
 interface ProfileCover { source?: string; images?: Record<string,ProfileImage>; }
 interface ProfileUser { profile_cover?: ProfileCover; should_show_messaging?: boolean; profile_reach?: number; id: string; type: string; username: string; full_name?: string; image_large_url?: string; image_medium_url?: string; image_small_url?: string; follower_count?: number; following_count?: number; pin_count?: number; last_pin_save_time?: string; is_partner?: boolean; about?: string; website_url?: string; explicitly_followed_by_me?: boolean; blocked_by_me?: boolean; }
-interface ProfileRow { id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
+interface ProfileRow { privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
 interface ProfileTitle { text?: string; format?: string; }
 interface ProfileAction { url?: string; }
 interface ProfileResource { status: string; code?: number; error?: Object; data: ProfileUser | ProfileRow[]; bookmark?: string; }
@@ -175,7 +175,7 @@ export class PinmonyProfileNativeReads {
     const metadata: string = (count !== null ? count.toString() + PinmonyI18n.message("pm_pins_0a89904f") : '') +
       (sections !== null && Number.isInteger(sections) && sections > 0 ? (count !== null ? ' · ' : '') +
         (sections === 1 ? PinmonyI18n.message("pm_1_section_4d13c778") : sections.toString() + PinmonyI18n.message("pm_sections_68d526a8")) : '');
-    return {id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
+    return {secret:row.type === 'board' && row.privacy === 'secret',id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
   }
   private async request(resource: string, options: ProfileOptions, source: string, revision: number): Promise<ProfileResponse> {
     const id: string = 'native_profile_' + (++this.sequence).toString(); this.requestId = id;

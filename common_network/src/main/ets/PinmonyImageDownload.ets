@@ -8,7 +8,10 @@ export class PinmonyImageDownload {
   async read(source: string,current: () => boolean): Promise<PinmonyDownloadedImage> {
     this.cancel();if(!acceptsImageDownloadUrl(source) || !current())throw new Error('image-url');
     const generation: number = this.generation,live = (): boolean => generation === this.generation && current();
-    const session: rcp.Session = rcp.createSession(),request: rcp.Request = new rcp.Request(source,'GET',{'Accept':'image/*','Accept-Encoding':'identity'});
+    let session: rcp.Session;
+    try { session = rcp.createSession(); }
+    catch (_) { throw new Error('image-session-unavailable'); }
+    const request: rcp.Request = new rcp.Request(source,'GET',{'Accept':'image/*','Accept-Encoding':'identity'});
     let status: number = 0,size: number = 0;const chunks: Uint8Array[] = [];
     let timer: number = -1;let cancelled: (() => void) | undefined = undefined;
     request.configuration = {proxy:'system',transfer:{autoRedirect:false,timeout:{connectMs:10000,transferMs:30000}},tracing:{httpEventsHandler:{onStatusCodeReceive:(value: number): void => {status = value;}}}};

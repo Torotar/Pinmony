@@ -9,6 +9,8 @@ function runtime(ts, globals = {}) {
     return exports;
   }
   const foundation = compile('common_foundation/src/main/ets/services/PinmonyTaskRegistry.ets', () => ({}));
+  foundation.PinmonyI18n = require('./local-message-test-fixture.cjs').rawLocalMessages;
+  foundation.PinmonyRuntimeLog = globals.PinmonyRuntimeLog || { info() {}, warn() {}, error() {} };
   const { PinmonyReturnCoordinator } = compile('entry/src/main/ets/app/PinmonyReturnCoordinator.ets', () => foundation);
   return { PinmonyReturnCoordinator, foundation, compile };
 }

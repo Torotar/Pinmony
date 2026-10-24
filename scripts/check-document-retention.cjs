@@ -15,9 +15,14 @@ const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: home + 'log
   webview: { BackForwardCacheOptions: class {} }, clearTimeout() {},
   PinmonyRuntimeLog: { info() {}, warn() {} }, retainHomePins: (_old, pins) => pins };
 require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native { constructor() { this.shareBridge={};' + callback + '} ' +
-  ['configureDocumentRetention', 'updateAuthState', 'updateHome'].map(method).join('\n') + '} globalThis.Native=Native;',
+  ['confirmBusinessSession','configureDocumentRetention', 'updateAuthState', 'updateHome'].map(method).join('\n') + '} globalThis.Native=Native;',
   { target: ts.ScriptTarget.ES2021 }), context);
 const native = new context.Native(); native.markRootPerformance = () => {};
+native.nativeLoginEnabled = true; native.loginHostMounted = false;
+native.configureDocumentRetention(false);
+assert.equal(settings.length, 0, 'detached native login lifecycle must not call an unbound Web controller');
+native.loginHostMounted = true;
+native.nativeLoginEnabled = false;
 const cached = { pageKey: home, kind: 'state', session: 1, selectedTab: 'all', dataSource: 'api',
   tabs: [{ id: 'all', label: 'All', selected: true }, { id: 'board', label: 'Board' }],
   pins: [{ id: '123', pinUrl: pin, imageUrl: 'https://i.pinimg.com/a.jpg' }] };
@@ -28,7 +33,7 @@ Object.assign(native, { authStatus: 'authenticated', authEpoch: 9, authCheckTime
   controller: { getUrl: () => home, runJavaScript: async () => 'true', setBackForwardCacheOptions(options) { settings.push(options); } },
   pageHistory: { key: url => url }, homePageKeyFromAddress: url => url === home ? home : '',
   pinIdentity: url => url.match(/\/pin\/(\d+)/)?.[1] || '',
-  nativeNetwork: { invalidate() { events.push('invalidate'); } },
+  nativeNetwork: { invalidateDocument(){events.push('invalidate');},invalidate() { events.push('invalidate'); } },
   recordPageNavigation() { this.nativeBackTarget = ''; events.push('route'); }, syncAuthentication() { events.push('auth'); },
   currentHomePageKey: () => home, bindNativeNetwork() { events.push('bind'); }, requestHomeTitles() {},
   normalizeHomeBoard: () => undefined, persistHomeDiskCache() {},
@@ -53,7 +58,7 @@ native.shareBridge.onPageNavigation(pin, 'restore'); assert.equal(native.authEpo
 const reset = method('resetAuthenticatedContent');
 const sessionReset=fs.readFileSync('entry/src/main/ets/app/PinmonySessionCoordinator.ets','utf8');
 assert.ok(sessionReset.includes('this.ports.configureDocumentRetention(false)') && sessionReset.includes('this.ports.controller().clearHistory()'), 'explicit logout/session loss prevents back into old account documents');
-const ability = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8');
+const ability = fs.readFileSync('entry/src/main/ets/startup/WebEngineTask.ets', 'utf8');
 assert.ok(ability.indexOf('enableBackForwardCache(features)') < ability.indexOf('initializeWebEngine()'), 'platform requires enabling before engine initialization');
 const navTemplate = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationScript.ets', 'utf8').match(/`([\s\S]*?)`;/)[1];
 const browserEvents = {}, notices = [];

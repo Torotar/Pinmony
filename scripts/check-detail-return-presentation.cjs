@@ -127,6 +127,20 @@ async function main() {
     'a late base-only read cannot wipe a full parent cache');
   assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNetworkBridgeCoordinator.ets','utf8').includes('this.detailReadCache.store(job, reply)'), 'successful current replies populate the return cache');
   assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8').includes('this.ports.detailReadCache().setPin(pin)'), 'return target enables Pin-scoped read reuse');
-  console.log('Detail return: complete read-only cache, partial refresh, authoritative empty, cyclic origins, continuous back and early document binding passed');
+  assert(index.includes("if(pin){this.beginDetailOpening(pin, '', true);return true;}"), 'native Pin back explicitly requests a retained resume');
+  assert(index.includes('!resumed) this.startOpeningDetailRead(pinUrl, token)'), 'successful resume skips the opening request chain');
+  const detailPage = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
+  const frame = detailPage.match(/\.onScrollFrameBegin\(\(offset: number, state: ScrollState\) => \{([\s\S]*?)\n      \}\)/)[1];
+  const reach = detailPage.match(/\.onReachEnd\(\(\) => \{([\s\S]*?)\n      \}\)/)[1];
+  const scrollView = { restoringScroll: false, restoredPaginationAllowed: false, readsReady: true, actionsReady: false,
+    detail: { relatedError: '' }, isRecommendReady: () => true, onLoadMore() { this.loads++; }, loads: 0 };
+  const scrollContext = { view: scrollView, ScrollState: { Scroll: 1, Fling: 2 }, PinmonyRuntimeLog: { info() {} } };
+  function reachEnd() { vm.runInNewContext('(function(){' + reach + '}).call(view)', scrollContext); }
+  function scroll(offset, state) { vm.runInNewContext(ts.transpileModule('(function(offset: number, state: ScrollState){' + frame + '}).call(view,' + offset + ',' + state + ')', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, scrollContext); }
+  reachEnd(); assert.equal(scrollView.loads, 0, 'restored bottom cannot fetch a new page');
+  scroll(20, 2); reachEnd(); assert.equal(scrollView.loads, 0, 'inertia cannot authorize restored pagination');
+  scroll(-20, 1); reachEnd(); assert.equal(scrollView.loads, 0, 'scrolling toward the top cannot fetch a new page');
+  scroll(20, 1); reachEnd(); assert.equal(scrollView.loads, 1, 'user scrolling toward the bottom enables normal pagination');
+  console.log('Detail return: complete cache, native resume, scroll restoration pagination, partial refresh and navigation guards passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

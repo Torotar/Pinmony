@@ -5,7 +5,7 @@ import { PinmonyCreatedPin, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard } from
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
   HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
-import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay } from 'common_ui';
+import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay, PinmonyBoardPickerRow, PinmonyBoardPickerFooter } from 'common_ui';
 
 @Component
 export struct PinmonyOrganizePage {
@@ -158,27 +158,10 @@ export struct PinmonyOrganizePage {
 
   @Builder
   private boardRow(board: PinmonyOrganizeBoard) {
-    Button({ type: ButtonType.Normal }) {
-      Row({ space: 16 }) {
-        if (board.imageUrl) {
-          Image(board.imageUrl).width(56).height(56).objectFit(ImageFit.Cover).borderRadius(16)
-        } else {
-          PinmonyBoardPlaceholder()
-        }
-        Text(PinmonyI18n.render(board.title, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.primary_text')).layoutWeight(1).maxLines(2)
-        if (board.secret) {
-          SymbolGlyph($r('sys.symbol.lock')).fontSize(18).fontColor([$r('app.color.secondary_text')])
-        }
-      }.width('100%')
-    }.width('100%').constraintSize({ minHeight: 72 }).padding(0)
-    .backgroundColor(Color.Transparent).borderRadius(12)
-    .enabled(board.enabled && !this.state.busy && !this.state.uncertain && !this.state.loading)
-    .opacity(board.enabled ? 1 : 0.4)
-    .onClick(() => this.act('move', board.id))
-    .accessibilityText(board.title + (board.secret ? this.uiText("pm_secret_board_a61a7ae3") : ''))
+    PinmonyBoardPickerRow({title:board.title,imageUrl:board.imageUrl,secret:board.secret,
+      actionEnabled:board.enabled && !this.state.busy && !this.state.loading && !this.state.uncertain,
+      onSelect:() => this.act('move',board.id)})
   }
-
   @Builder
   private boardList() {
     Column({ space: 8 }) {
@@ -186,7 +169,7 @@ export struct PinmonyOrganizePage {
         Text(this.uiText("pm_all_boards_f1847589")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
       }
       ForEach(this.state.boards, (board: PinmonyOrganizeBoard) => { this.boardRow(board) },
-        (board: PinmonyOrganizeBoard) => board.id)
+        (board: PinmonyOrganizeBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
       if (!this.state.loading && this.state.error && !this.state.uncertain) {
         Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.state.busy).onClick(() => this.act('retryBoards'))
       } else if (!this.state.loading && !this.state.boards.length && !this.state.error) {
@@ -246,18 +229,8 @@ export struct PinmonyOrganizePage {
         }
       })
       if (this.state.phase === 'boards') {
-        Button({ type: ButtonType.Normal }) {
-          Row({ space: 12 }) {
-            Text('+').fontSize(26).width(44).height(44).textAlign(TextAlign.Center)
-              .backgroundColor($r('app.color.surface_muted')).borderRadius(10)
-              .fontColor($r('app.color.primary_text'))
-            Text(this.uiText("pm_create_board_513babc9")).fontSize(19).fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.primary_text')).layoutWeight(1)
-          }.width('100%')
-        }.width('calc(100% + 24vp)').height(76).margin({ left: -12, right: -12 }).padding({ left: 16, right: 16, top: 12, bottom: 20 }).borderRadius(0)
-          .backgroundColor($r('app.color.page_background'))
-          .enabled(!this.state.busy && !this.state.uncertain && !this.state.loading)
-          .onClick(() => this.act('createForm'))
+        PinmonyBoardPickerFooter({actionEnabled:!this.state.busy && !this.state.uncertain && !this.state.loading,
+          onSelect:() => this.act('createForm')})
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
   }

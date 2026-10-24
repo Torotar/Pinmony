@@ -1,5 +1,5 @@
 import { PinmonyI18n } from 'common_foundation';
-import { PinmonyBoardFlow } from 'feature_board';
+import { PinmonyBoardFlow, PinmonyBoardTarget } from 'feature_board';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -17,7 +17,7 @@ interface EditOptions {
 interface BoardIdOptions { board_id: string; }
 interface ApiOptions { url: string; data?: Record<string,string>; }
 interface ManagementEnvelope { options: EditOptions | BoardIdOptions | ApiOptions; context: Record<string,string>; }
-interface ManagementAction { action: string; value?: EditValue; }
+interface ManagementAction { action: string; value?: EditValue | string; }
 interface BoardOwner { id: string; username?: string; }
 interface ManagementBoard { type: string; id: string; name: string; privacy: string; url: string; owner: BoardOwner; collaborated_by_me?: boolean; }
 interface ManagementResource { status: string; code: number; endpoint_name: string; data: ManagementBoard | null; }
@@ -71,13 +71,17 @@ export class PinmonyBoardManagementNativeWrites {
     let options: EditOptions | BoardIdOptions | ApiOptions, name: string, verb: string, endpoint: string;
     let source: string = identity.page.slice(session.origin.length), handler: string = 'www/index.js';
     if(a.action === 'editSave') {
-      const v: EditValue | undefined = a.value;
+      const v: EditValue | undefined = a.value as EditValue | undefined;
       if(!own || original.phase !== 'edit' || !v || typeof v.name !== 'string' || !v.name.trim() ||
         typeof v.description !== 'string' || !['public','secret'].includes(v.privacy) ||
         typeof v.recommend !== 'boolean' || typeof v.invites !== 'boolean' || typeof v.requests !== 'boolean')return;
       options = {board_id:identity.boardId,name:v.name.trim().slice(0,300),description:v.description.slice(0,500),privacy:v.privacy,
         allow_homefeed_recommendations:v.recommend,collaborator_invites_enabled:v.invites,collaborator_requests_enabled:v.requests,sensitivity:null};
       name = 'BoardResource';verb = 'update';endpoint = 'v3_edit_board';
+    }else if(a.action === 'merge') {
+      if(!own || original.phase !== 'mergeTargets' || typeof a.value !== 'string' || !/^\d{1,30}$/.test(a.value) || a.value === identity.boardId || !original.targets.some((t: PinmonyBoardTarget): boolean => t.id === a.value && t.enabled))return;
+      options = {url:'/v3/boards/' + identity.boardId + '/merge/' + a.value + '/',data:{}};
+      name = 'ApiResource';verb = 'create';endpoint = 'v3_board_merge';handler = 'www/[username]/[slug].js';
     }else if(a.action === 'delete') {
       if(!own || original.phase !== 'edit')return;
       options = {board_id:identity.boardId};name = 'BoardResource';verb = 'delete';endpoint = 'v3_delete_board';
@@ -108,7 +112,7 @@ export class PinmonyBoardManagementNativeWrites {
     PinmonyRuntimeLog.info('BoardManagementNative: start action=' + a.action);
     try {
       const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessBoardManagementWrite(job,(): PinmonyBusinessSessionContext => this.ports.session(),
-        identity.boardId,identity.viewerId,identity.ownerId,identity.member,current);
+        identity.boardId,identity.viewerId,identity.ownerId,identity.member,current,original.phase === 'mergeTargets' ? original.targets.filter((t: PinmonyBoardTarget): boolean => t.enabled).map((t: PinmonyBoardTarget): string => t.id) : []);
       if(!current())return;
       if(reply.error || reply.status < 200 || reply.status >= 300 || !reply.body || reply.body.length > 6000000)throw new Error('unconfirmed');
       const body: ManagementResponse = JSON.parse(reply.body) as ManagementResponse, r: ManagementResource = body.resource_response, b: ManagementBoard | null = r?.data;
@@ -119,6 +123,8 @@ export class PinmonyBoardManagementNativeWrites {
         const edit: EditOptions = options as EditOptions;
         if(!b || b.type !== 'board' || b.id !== identity.boardId || b.owner?.id !== identity.viewerId || b.name !== edit.name || b.privacy !== edit.privacy)throw new Error('edit');
         nextPage = this.editedPage(b,identity,session.origin);
+      }else if(a.action === 'merge') {
+        if(!b || b.type !== 'board' || b.id !== a.value)throw new Error('merge');
       }else if(a.action === 'leave') {
         if(!b || b.type !== 'board' || b.id !== identity.boardId || b.collaborated_by_me !== false || b.owner && b.owner.id !== identity.ownerId)throw new Error('leave');
       }else if(a.action === 'delete' || a.action === 'unfollow') {if(b !== null)throw new Error('result');}

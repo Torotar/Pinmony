@@ -13,7 +13,7 @@ const timers = [], logs = [];
 const context = { PIN_NATIVE_PROFILE_READS_ENABLED:false, PIN_NATIVE_HOME_READS_ENABLED:false, PIN_NATIVE_SEARCH_READS_ENABLED:false, PIN_NATIVE_SEARCH_DISCOVERY_ENABLED:false, PIN_NATIVE_INBOX_UPDATES_ENABLED:false, PIN_NATIVE_INBOX_MESSAGES_ENABLED:false, setTimeout: callback => timers.push(callback),
   PinmonyRuntimeLog: { info: message => logs.push(message) } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Page {' +
-  ['rootPageHasReadState', 'onRootPageVisible', 'rootStatusError', 'rootStatusLoading', 'failRootPreparation'].map(method).join('\n') +
+  ['usesNativeProfileReads', 'rootPageHasReadState', 'onRootPageVisible', 'rootStatusError', 'rootStatusLoading', 'failRootPreparation'].map(method).join('\n') +
   '\n} globalThis.Page = Page;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 function harness(index) {
   const native = new context.Page(), requests = [];

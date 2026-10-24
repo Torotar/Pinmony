@@ -27,6 +27,9 @@ const compiled = ts.transpileModule('class Presentation {' + methods + '} Presen
 const now = Date.parse('2026-10-01T06:30:00Z');
 const Presentation = vm.runInNewContext(compiled, { Date: { now: () => now, parse: Date.parse }, JSON, Number, Math });
 const view = new Presentation();
+const copy = Object.fromEntries(JSON.parse(fs.readFileSync('common_foundation/src/main/resources/base/element/string.json', 'utf8')).string.map(row => [row.name, row.value]));
+view.uiLanguage = 'zh';
+view.uiText = key => copy[key];
 assert.equal(view.ageLabel('Thu, 01 Oct 2026 06:29:30 +0000'), '刚刚');
 assert.equal(view.ageLabel('2026-10-01T04:30:00Z'), '2小时');
 assert.equal(view.ageLabel('2026-08-01T06:30:00Z'), '2个月');

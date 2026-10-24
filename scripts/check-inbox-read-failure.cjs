@@ -10,7 +10,7 @@ store.inboxCache.put=()=>{throw Error('failed contents must not enter cache')};
 const controller=new PinmonyInboxReadController(store,{authenticated:()=>true,foreground:()=>true,activeTab:()=>2,
  document:()=> 'root',currentInbox:()=> 'root',prepareContext:async()=>true,runScript:async()=>{calls++;return 'true'},feedback(){},readStarted(){},cancelled(){}});
 (async()=>{await controller.selectSection('updates');assert.equal(calls,1);store.pendingInboxSection='';store.inboxSectionReady=false;await controller.selectSection('updates');assert.equal(calls,1);
-const profile=method('  private profileUrlFromAddress(', '  private currentProfileUrl(');
-const routes=require('./product-coordination-harness.cjs').run(ts,'({'+profile+'})',{});routes.inboxUrlFromAddress=a=>/^https:\/\/www\.pinterest\.com\/(?:inbox|messages|updates|notifications)\//.test(a)?a:'';
+const profile=method('  private profileUrlFromAddress(', '  private usesNativeProfileReads(');
+const routes=require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Routes {'+profile+'} new Routes();',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{});routes.inboxUrlFromAddress=a=>/^https:\/\/www\.pinterest\.com\/(?:inbox|messages|updates|notifications)\//.test(a)?a:'';
 for(const route of ['inbox','messages','updates','notifications'])assert.equal(routes.profileUrlFromAddress('https://www.pinterest.com/'+route+'/'),'');assert.equal(routes.profileUrlFromAddress('https://www.pinterest.com/testuser/'),'https://www.pinterest.com/testuser/');
 console.log('PASS native navigation: API failure permits segment switching, stale cache controls stay blocked, inbox root routes cannot trigger profile loading');})().catch(e=>{console.error(e);process.exitCode=1});

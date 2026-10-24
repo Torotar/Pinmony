@@ -14,7 +14,7 @@ function method(name) {
 const names = ['nativeDisplayAddress', 'boardUrlFromAddress', 'currentBoardUrl', 'syncBoardRoute', 'nativeBoardVisible', 'openProfileBoard', 'backFromBoard', 'commitNativeSearchReturn', 'pinIdentity', 'isCurrentBoardMenuPin', 'openBoardPinMore', 'shareCurrentBoard'];
 const code = ts.transpileModule('class Native {' + names.map(method).join('\n') + '} globalThis.Native = Native;',
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-const timers = [], context = { PIN_BOARD_API_ENABLED: true, PIN_POST_API_ENABLED: true, setTimeout: fn => timers.push(fn),
+const timers = [], context = { PIN_NATIVE_SEARCH_READS_ENABLED:true, PIN_BOARD_API_ENABLED: true, PIN_POST_API_ENABLED: true, setTimeout: fn => timers.push(fn),
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 context.boardVisiblePins = require('./product-coordination-harness.cjs').runtime(ts).loadFile(
   'feature_board/src/main/ets/services/PinmonyBoardPresentation.ets').boardVisiblePins;

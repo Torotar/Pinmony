@@ -27,7 +27,7 @@ async function main(){
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
   const method=index.match(/  private updateShareSheet\([\s\S]*?(?=\n  private dismissShareSheet)/)[0];
   const events=[];const exported={};
-  vm.runInNewContext(ts.transpileModule('export class Fixture {'+method+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:exported,PIN_NATIVE_SHARE_PUBLISH_ENABLED:false});
+  vm.runInNewContext(ts.transpileModule('export class Fixture {'+method+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages,exports:exported,PIN_NATIVE_SHARE_PUBLISH_ENABLED:false});
   const native=new exported.Fixture();native.pinStore={shareSession:1};native.activeSheetKind='share';native.businessSuspended=false;
   native.pagePerformance={beginSecondary(){},markSecondary(_page,_key,event){events.push(event);}};
   native.sharePanelsController={updateShareSheet(feedback){native.pinStore.shareFeedback=feedback;native.pinStore.shareLoading=false;native.pinStore.shareError='';}};

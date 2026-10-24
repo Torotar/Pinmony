@@ -7,11 +7,15 @@ const source = fs.readFileSync('feature_settings/src/main/ets/components/Pinmony
 const methods = source.slice(source.indexOf('  private async readVersion'), source.indexOf('  @Builder'));
 const sandbox = { PinmonyI18n: rawLocalMessages, bundleManager: { BundleFlag: { GET_BUNDLE_INFO_DEFAULT: 0 },
   getBundleInfoForSelfSync: () => ({ versionName: '9.8.7', versionCode: 987 }) }, PinmonyRuntimeLog: { warn() {}, info() {} } };
+sandbox.PinmonyUpdateNotice = { confirm() {} };
 vm.runInNewContext(ts.transpileModule('class About {' + methods + '} globalThis.About = About;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, sandbox);
 const storeSource = fs.readFileSync('feature_settings/src/main/ets/stores/PinmonySettingsStore.ets', 'utf8').replace(/^@Observed\s*$/m, '');
 const storeExports = {};
 const releaseExports = {};
+const releaseWarnings = [], releaseLogs = [];
+sandbox.PinmonyRuntimeLog.warn = message => releaseWarnings.push(message);
+sandbox.PinmonyRuntimeLog.info = message => releaseLogs.push(message);
 let response = { responseCode: 404 }, timeoutCallback, timerCleared = false, destroyed = 0, feedResponse;
 const httpMock = { RequestMethod: { GET: 'GET' }, HttpDataType: { STRING: 0 }, HttpProtocol: { HTTP1_1: 1 }, createHttp: () => ({
   request: (url, options) => {
@@ -80,7 +84,11 @@ Object.assign(storeExports, require('./arkts-module-loader.cjs').createArktsLoad
   assert.equal(releaseExports.parseReleaseFeed('<feed></feed>'), undefined);
   assert.throws(() => releaseExports.parseReleaseFeed('invalid'));
   response = { responseCode: 403 }; feedResponse = { responseCode: 200, result: feed };
+  releaseWarnings.length = 0; releaseLogs.length = 0;
   await page.checkUpdate(); assert.equal(page.hasUpdate, true); assert.equal(page.release.tag_name, 'V2.2.0');
+  assert.equal(releaseWarnings.length, 0, 'successful Atom recovery is not a final failure');
+  assert(releaseLogs.some(message => message.includes('event=api-denied status=403')));
+  assert(releaseLogs.some(message => message.includes('event=success source=atom')));
   assert.equal(page.updateStatus, '最新发布：V2.2.0');
   feedResponse = { responseCode: 200, result: feed.replace('</feed>', '<entry><link href="https://github.com/Torotar/Pinmony/releases/tag/v2.1.1"/><content>Older notes</content></entry></feed>') };
   await page.checkUpdate(); assert.deepEqual(Array.from(page.newerReleases, item => item.tag_name), ['V2.2.0', 'v2.1.1']);

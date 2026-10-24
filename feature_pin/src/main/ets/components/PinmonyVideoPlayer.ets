@@ -100,6 +100,7 @@ export struct PinmonyVideoPlayer {
   private activeChanged(): void {
     this.playback.setActive(this.active && this.visible && this.sessionReady);
     if (!this.active || !this.sessionReady) this.pendingRetry = false;
+    if (!this.active || !this.visible || !this.sessionReady) this.autoplayStarted = false;
     if (this.pendingRetry && this.active && this.visible && this.sessionReady && !this.readingAddress) {
       this.pendingRetry = false; this.manualPlayback = true; this.playback.retry();
     }
@@ -129,12 +130,13 @@ export struct PinmonyVideoPlayer {
   }
   private autoplayChanged(): void {
     if (!this.mounted || !this.sourceKey || this.manualPlayback) return;
-    const allowed: boolean = this.networkType === 'wifi' ? this.autoplayWifi : this.networkType === 'cellular' ? this.autoplayCellular : false;
+    const allowed: boolean = this.networkType === 'wifi' ? this.autoplayWifi : this.networkType === 'cellular' ? this.autoplayCellular : this.autoplayWifi && this.autoplayCellular;
     if (!allowed) {
       if (this.autoplayStarted) { this.playback.setActive(false); this.playback.setActive(this.active && this.visible && this.sessionReady); this.autoplayStarted = false; }
       return;
     }
     if (!this.autoplayStarted && this.active && this.visible && this.sessionReady && (this.state.phase === 'idle' || this.state.phase === 'paused')) {
+      PinmonyRuntimeLog.info('VideoAutoplayTrace: action=start network=' + this.networkType);
       this.autoplayStarted = true; this.playback.start();
     }
   }

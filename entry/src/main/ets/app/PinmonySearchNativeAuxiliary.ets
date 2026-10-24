@@ -1,4 +1,4 @@
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonySearchStore, PinmonySearchQuiz, PinmonySearchQuizCard, PinmonySearchQuizTopic, PIN_SEARCH_QUIZ_API_ENABLED } from 'feature_search';
 import { PinmonyBusinessAuxiliaryClient, PinmonyAuxiliaryPorts, PinmonyAuxiliaryNotSent, PinmonyAuxiliaryRejected } from './PinmonyBusinessAuxiliaryClient';
 interface QuizModule { quiz: QuizText; related_query_items: Topic[]; }
@@ -55,18 +55,53 @@ export class PinmonySearchNativeAuxiliary {
   }
   private async read(kind: string,append: boolean = false): Promise<void> {
     if(this.busy)return;const revision: number = ++this.revision,previous: string = this.cursor;
+    const started: number = Date.now();
+    let timer: number = -1;
+    let stage: string = 'prepare';
+    PinmonyRuntimeLog.info('SearchQuizTrace: event=start mode=' + kind + ' append=' + append.toString());
     this.busy = true;this.error = '';this.publish();
     try {
       let resource: string = 'UserExperienceResource',options: Object,target: string = '';
       if(kind === 'entry'){const value: EntryOptions = {placement_ids:[1000269],extra_context:{search_query:this.query()}};options = value;}
       else if(kind === 'picker'){resource = 'BaseSearchResource';target = this.topic;const value: TopicOptions = {query:this.topic,scope:'pins',page_size:25,enable_promoted_pins:false};if(append)value.bookmarks = [previous];options = value;}
       else {resource = 'ApiResource';target = this.selected.join(',');const value: RelatedOptions = {url:'/v3/batch/related/pins/',data:{client_type:118,pin_ids:this.selected.slice(),prepend_seed_pins:false}};options = value;}
-      const response: Response = JSON.parse(await this.client.request(this.page,resource,'get',options,'quiz',target,(): boolean => this.live(revision))) as Response;
+      stage = 'request';
+      const timeout: Promise<string> = new Promise<string>((_resolve, reject): void => {
+        timer = setTimeout((): void => {
+          if (revision === this.revision) this.client.pause();
+          reject(new Error('quiz-timeout'));
+        }, 20000);
+      });
+      const raw: string = await Promise.race([this.client.request(this.page,resource,'get',options,'quiz',target,(): boolean => this.live(revision)), timeout]);
+      stage = 'decode';
+      const response: Response = JSON.parse(raw) as Response;
       if(!this.live(revision))return;const r: Resource | undefined = response.resource_response;
       if(!r || r.status !== 'success' || r.code !== undefined && r.code !== 0)throw new Error('response');
+      stage = 'map';
       if(kind === 'entry'){
-        if(!r.data || Array.isArray(r.data))throw new Error('entry');
+        stage = 'entry-data';
+        PinmonyRuntimeLog.info('SearchQuizTrace: event=entry-shape present=' + (!!r.data).toString() +
+          ' array=' + Array.isArray(r.data).toString() + ' count=' + (Array.isArray(r.data) ? r.data.length : 0).toString());
+        if (!r.data || Array.isArray(r.data) && r.data.length === 0) {
+          this.module = undefined; this.cards = []; this.selected = [];
+          PinmonyRuntimeLog.info('SearchQuizTrace: event=unavailable reason=no-placement');
+          return;
+        }
+        if(Array.isArray(r.data))throw new Error('entry');
         const module: QuizModule | undefined = (r.data as Record<string,Placement>)['1000269']?.display_data;
+        stage = 'entry-module';
+        PinmonyRuntimeLog.info('SearchQuizTrace: event=module-shape present=' + (!!module).toString() +
+          ' type=' + typeof module + ' array=' + Array.isArray(module).toString() +
+          ' fields=' + (module && typeof module === 'object' ? Object.keys(module).length : 0).toString() +
+          ' quiz=' + (!!module?.quiz).toString() + ' topics=' + Array.isArray(module?.related_query_items).toString() +
+          ' count=' + (Array.isArray(module?.related_query_items) ? module!.related_query_items.length : 0).toString());
+        // Successful UserExperience responses can explicitly contain display_data: {}.
+        // This placement has no quiz; retrying it must not create an error entry.
+        if (module && typeof module === 'object' && !Array.isArray(module) && Object.keys(module).length === 0) {
+          this.module = undefined; this.cards = []; this.selected = [];
+          PinmonyRuntimeLog.info('SearchQuizTrace: event=unavailable reason=empty-display');
+          return;
+        }
         if(module && (!module.quiz || !Array.isArray(module.related_query_items) || module.related_query_items.length > 100 || !module.related_query_items.every((t: Topic): boolean => typeof t.query === 'string' && t.query.length > 0 && t.query.length <= 300)))throw new Error('module');
         this.module = module;
       }else {
@@ -77,8 +112,15 @@ export class PinmonySearchNativeAuxiliary {
         this.cursor = typeof r.bookmark === 'string' && r.bookmark.length <= 4096 ? r.bookmark : '';
         this.ended = !this.cursor || this.cursor === '-end-' || append && this.cursor === previous || !items.length;
       }
-    }catch (_) {if(this.live(revision))this.error = PinmonyI18n.message("pm_unable_to_load_inspiration_please_retry_f3a36d60");}
-    finally {if(this.live(revision)){this.busy = false;this.publish();}}
+      PinmonyRuntimeLog.info('SearchQuizTrace: event=committed mode=' + kind + ' count=' + this.cards.length.toString());
+    }catch (_) {
+      PinmonyRuntimeLog.warn('SearchQuizTrace: event=failed mode=' + kind + ' stage=' + stage + ' current=' + this.live(revision).toString() + ' elapsedMs=' + (Date.now() - started).toString());
+      if(this.live(revision))this.error = PinmonyI18n.message("pm_unable_to_load_inspiration_please_retry_f3a36d60");
+    }
+    finally {
+      clearTimeout(timer);
+      if(revision === this.revision){this.busy = false;if(this.live(revision))this.publish();}
+    }
   }
   async action(kind: string,id: string = ''): Promise<void> {
     if(!PIN_SEARCH_QUIZ_API_ENABLED || !this.bind())return;

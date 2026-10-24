@@ -71,6 +71,12 @@ export class PinmonySystemActions {
     } catch (_) { throw new Error(PinmonyI18n.message("pm_unable_to_choose_photo_please_retry_50d94255")); }
   }
 
+  async jpegFromBytes(bytes: ArrayBuffer): Promise<ArrayBuffer> {
+    const source: image.ImageSource = image.createImageSource(bytes);
+    const packer: image.ImagePacker = image.createImagePacker();
+    try { return await packer.packToData(source, { format: 'image/jpeg', quality: 90 }); }
+    finally { await packer.release(); await source.release(); }
+  }
   async readJpeg(uri: string): Promise<ArrayBuffer> {
     try {
     const file: fileIo.File = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY);

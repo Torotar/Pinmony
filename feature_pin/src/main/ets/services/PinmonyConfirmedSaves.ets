@@ -6,12 +6,14 @@ import { PinmonyDetailAction, PinmonyDetailSnapshot } from '../models/PinmonyDet
 export class PinmonyConfirmedSaves {
   private states: Map<string, boolean> = new Map<string, boolean>();
   private copies: Map<string, string> = new Map<string, string>();
-  clear(): void { this.states.clear(); this.copies.clear(); }
-  confirm(identity: string, saved: boolean, copyId: string = ''): void {
+  private boards: Map<string, string> = new Map<string, string>();
+  clear(): void { this.states.clear(); this.copies.clear(); this.boards.clear(); }
+  confirm(identity: string, saved: boolean, copyId: string = '', boardName: string = ''): void {
     if (!identity) return;
     this.states.set(identity, saved);
-    if (!saved) this.copies.delete(identity);
+    if (!saved) { this.copies.delete(identity); this.boards.delete(identity); }
     else if (/^\d+$/.test(copyId) && copyId !== identity) this.copies.set(identity, copyId);
+    if (saved && boardName) this.boards.set(identity, boardName.slice(0, 300));
   }
   copyId(identity: string): string { return this.copies.get(identity) || ''; }
   known(identity: string): boolean { return this.states.has(identity); }
@@ -23,7 +25,7 @@ export class PinmonyConfirmedSaves {
     if (saved === undefined) return actions;
     return actions.map((item: PinmonyDetailAction): PinmonyDetailAction => {
       if (item.kind !== 'save') return item;
-      return { id: item.id, kind: item.kind, label: saved ? PinmonyI18n.message("pm_saved_471dd4d7") : PinmonyI18n.message("pm_save_60a53514"),
+      return { id: item.id, kind: item.kind, label: saved ? this.boards.get(identity) || PinmonyI18n.message("pm_saved_471dd4d7") : PinmonyI18n.message("pm_save_60a53514"),
         countText: item.countText, enabled: item.enabled, selected: saved };
     });
   }

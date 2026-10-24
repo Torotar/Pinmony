@@ -18,7 +18,9 @@ function runtime(ts, globals = {}) {
     runtimes.set(original, loader);
     return loader;
 }
-function stores(native, loader) {
+function stores(native, loader, globals = {}) {
+    native.usesNativeProfileReads ||= () => globals.PIN_NATIVE_PROFILE_READS_ENABLED === true;
+    native.uiText ||= source => require('./local-message-test-fixture.cjs').rawLocalMessages.text(source);
     native.sessionDocumentUrl ||= () => native.controller?.getUrl?.() || '';
     native.runSessionScript ||= script => native.controller?.runJavaScript?.(script) || Promise.resolve('');
     native.loadSessionDocument ||= url => native.controller?.loadUrl?.(url);
@@ -50,12 +52,12 @@ function stores(native, loader) {
 }
 function createHost(Type, ts, globals = {}) {
     const native = new Type();
-    stores(native, runtime(ts, globals));
+    stores(native, runtime(ts, globals), globals);
     return native;
 }
 function bind(native, ts, globals = {}, groups) {
     const loader = runtime(ts, globals);
-    stores(native, loader);
+    stores(native, loader, globals);
     if (groups?.includes('Session') && !native.inboxMessagesNativeReads) bind(native, ts, globals, ['NativeInboxMessages']);
     if (groups?.includes('Session') && !native.inboxUpdatesNativeReads) bind(native, ts, globals, ['NativeInboxUpdates']);
     if (groups?.includes('Session') && !native.searchNativeReads) bind(native, ts, globals, ['NativeSearchReads']);
@@ -97,19 +99,20 @@ function bind(native, ts, globals = {}, groups) {
     return loader;
 }
 function run(ts, code, context = {}, options) {
+    context.PinmonyI18n ??= require('./local-message-test-fixture.cjs').rawLocalMessages;
     context.PIN_NATIVE_PIN_MENUS_ENABLED ??= false; // Legacy fixtures; default native menu has production execution coverage.
     context.PIN_NATIVE_PROFILE_SETTINGS_ENABLED ??= false; // Legacy bridge fixtures; native profile/settings have production-binding coverage.
     context.PIN_NATIVE_DETAIL_AUXILIARY_ENABLED ??= false; // Legacy fixtures; native auxiliary paths have focused execution coverage.
     context.PIN_NATIVE_SHARE_PUBLISH_ENABLED ??= false; // Legacy bridge fixtures; native production bindings have focused coverage.
     context.PIN_NATIVE_POST_OPERATIONS_ENABLED ??= false; // Existing bridge fixtures; native post paths have focused coverage.
     context.PIN_NATIVE_BOARD_READS_ENABLED ??= false; // Legacy bridge tests; default native board path has its own check.
-    context.PIN_NATIVE_PROFILE_READS_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyProfileNativeReads.ets').PIN_NATIVE_PROFILE_READS_ENABLED;
-    context.PIN_NATIVE_INBOX_MESSAGES_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyInboxMessagesNativeReads.ets').PIN_NATIVE_INBOX_MESSAGES_ENABLED;
-    context.PIN_NATIVE_INBOX_UPDATES_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyInboxUpdatesNativeReads.ets').PIN_NATIVE_INBOX_UPDATES_ENABLED;
-    context.PIN_NATIVE_SEARCH_READS_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonySearchNativeReads.ets').PIN_NATIVE_SEARCH_READS_ENABLED;
-    context.PIN_NATIVE_SEARCH_DISCOVERY_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonySearchDiscoveryNativeReads.ets').PIN_NATIVE_SEARCH_DISCOVERY_ENABLED;
-    context.PIN_NATIVE_HOME_READS_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyHomeNativeReads.ets').PIN_NATIVE_HOME_READS_ENABLED;
-    context.PIN_NATIVE_DETAIL_READS_ENABLED ??= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyDetailNativeReads.ets').PIN_NATIVE_DETAIL_READS_ENABLED;
+    context.PIN_NATIVE_PROFILE_READS_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
+    context.PIN_NATIVE_INBOX_MESSAGES_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
+    context.PIN_NATIVE_INBOX_UPDATES_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
+    context.PIN_NATIVE_SEARCH_READS_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
+    context.PIN_NATIVE_SEARCH_DISCOVERY_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
+    context.PIN_NATIVE_HOME_READS_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
+    context.PIN_NATIVE_DETAIL_READS_ENABLED ??= false; // Extracted legacy hosts select their branch explicitly; native defaults have dedicated execution checks.
     context.PinmonyRouteParser ||= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyRouteParser.ets').PinmonyRouteParser;
     if (!context.require)
         context.require = spec => runtime(ts, context).loadPackage(spec);
@@ -140,7 +143,7 @@ function run(ts, code, context = {}, options) {
             const fn = original[name];
             if (name !== 'constructor' && typeof fn === 'function' && !fn.toString().includes('bind(this')) {
                 original[name] = function (...args) {
-                    stores(this, runtime(ts, context));
+                    stores(this, runtime(ts, context), context);
                     if (fn.toString().includes('this.boardNativeReads.')) bind(this, ts, context, ['NativeBoardReads']);
                     if (fn.toString().includes('this.profileNativeReads.')) bind(this, ts, context, ['NativeProfileReads']);
                     if (fn.toString().includes('this.inboxMessagesNativeReads.')) bind(this, ts, context, ['NativeInboxMessages']);

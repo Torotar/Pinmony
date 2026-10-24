@@ -21,6 +21,7 @@ import { PinmonyProfileSnapshot } from 'feature_profile';
 import { PinmonyHomeSnapshot } from 'feature_home';
 const PINTEREST_URL: string = 'https://www.pinterest.com/';
 export interface PinmonyNavigationCoordinatorPorts {
+  rootBack?: () => boolean;
   rootPresented?: (index: number) => void;
   nativeBusinessOnly?: () => boolean;
   activeSheetKind: () => string;
@@ -600,7 +601,10 @@ onBackPress(): boolean {
         /[?&]q=[^&#]+/.test(this.ports.currentSearchPageKey())) {
         this.ports.backFromSearch();
     }
-    else if (this.ports.authStatus() !== 'authenticated' || this.ports.nativeRootTabsVisible()) {
+    else if (this.ports.authStatus() === 'authenticated' && this.ports.nativeRootTabsVisible()) {
+        return this.ports.rootBack ? this.ports.rootBack() : false;
+    }
+    else if (this.ports.authStatus() !== 'authenticated') {
         PinmonyRuntimeLog.info('PinmonyReturn: root back delegated to system');
         return false;
     }

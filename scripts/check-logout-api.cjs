@@ -39,6 +39,7 @@ const context = { ...api, Date, PINTEREST_URL: 'https://www.pinterest.com/', PIN
 require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + method + '} globalThis.Native=Native;',
   { target: ts.ScriptTarget.ES2021 }), context);
 function harness() {
+  context.Native.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
   const native = new context.Native(), calls = [], loads = []; let resolve;
   Object.assign(native, { authStatus: 'authenticated', authEpoch: 7, profileSettingsVisible: true,
     settingsStore: { screen: 'root', busy: false, loading: false, token: 1, error: '' },
@@ -76,6 +77,7 @@ async function main() {
   require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
   }).outputText, confirmContext);
+  confirmContext.Confirm.prototype.uiText=require('./local-message-test-fixture.cjs').rawLocalMessages.text;
   const confirm = new confirmContext.Confirm(), dialogs = [], confirmedWrites = [];
   confirm.store = { screen: 'root', token: 1, loading: false, busy: false };
   confirm.pageVisible = true; confirm.logoutConfirmOpen = false;

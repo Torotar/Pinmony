@@ -73,7 +73,8 @@ async function main() {
     url: 'https://www.pinterest.com/resource/RelatedModulesResource/get/', method: 'GET' }));
   assert.equal(calls.length, 3, 'pending return is guarded even without a cached native parent');
   assert(calls.every(value => value.includes('"error":"cancelled"')));
-  assert(index.indexOf('window.PinmonyDetailPause(') < index.indexOf('this.presentNativeBackTarget(target);'),
+  const returning=method(index,'backOnePage');
+  assert(returning.indexOf('window.PinmonyDetailPause(') >= 0 && returning.indexOf('window.PinmonyDetailPause(') < returning.indexOf('this.presentNativeBackTarget(target);'),
     'pause is queued before target navigation invalidates the old requests');
 
   const page = source('feature_pin/src/main/ets/components/PinmonyDetailPage.ets');
@@ -81,7 +82,7 @@ async function main() {
   require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page { ${method(page, 'notifyImageLoaded')} }
     globalThis.Page = Page;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, componentHost);
   const component = new componentHost.Page(), images = [];
-  component.renderIdentity = 'opening-1'; component.onImageLoaded = (...args) => images.push(args);
+  component.detail={pinUrl:'',imageUrl:''};component.renderIdentity = 'opening-1'; component.onImageLoaded = (...args) => images.push(args);
   for (let i = 0; i < 100; i++) component.notifyImageLoaded(pin, 'https://i.pinimg.com/1.jpg');
   assert.equal(images.length, 1);
   component.renderIdentity = 'state-1'; component.notifyImageLoaded(pin, 'https://i.pinimg.com/1.jpg');

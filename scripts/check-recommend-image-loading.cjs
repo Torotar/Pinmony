@@ -26,7 +26,7 @@ assert.match(cache, /images: item\.images/);
 assert.match(page, /SmartImage\(/);
 assert.match(page, /this\.isRecommendReady\(\)/);
 assert.match(page, /if \(!this\.isRecommendReady\(\)\)/);
-assert.match(page, /if \(!this\.detail\.interactionsSettled\)/);
+assert.match(page, /if \(!this\.readsReady && !this\.detail\.interactionsSettled\)/);
 assert.match(page, /recommendationSkeleton/);
 assert.match(page, /RecommendAudit: gate/);
 assert.match(page, /RecommendAudit: layout/);

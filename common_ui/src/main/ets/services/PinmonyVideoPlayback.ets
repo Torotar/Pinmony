@@ -37,6 +37,7 @@ export class PinmonyVideoPlayback {
   private candidateFailures: string[] = [];
   private networkTimeout: boolean = false;
   private fileAttempted: boolean = false;
+  private readonly attemptedSources: Set<number> = new Set<number>();
   private usingFile: boolean = false;
   private localFile: PinmonyVideoFileLease | undefined;
   private changed: (state: PinmonyPlaybackState) => void;
@@ -110,12 +111,11 @@ export class PinmonyVideoPlayback {
 
   private openInitial(): void {
     this.candidateFailures = []; this.networkTimeout = false; this.state.failureSummary = ''; this.fileAttempted = false;
-    const mp4: number = this.video ? this.video.sources.findIndex((source) => source.kind === 'mp4') : -1;
-    if (this.fileReader && mp4 >= 0) {
-      this.fileAttempted = true;
-      this.record('event=source-selected kind=mp4-file reason=detail-native-transport');
-      this.open(mp4, true);
-    } else this.open(0);
+    this.attemptedSources.clear();
+    const mp4: number = this.fileReader && this.video ? this.video.sources.findIndex((source) => source.kind === 'mp4') : -1;
+    const index: number = mp4 >= 0 ? mp4 : 0;
+    this.record('event=source-selected kind=' + (mp4 >= 0 ? 'mp4-stream' : 'stream') + ' reason=first-frame-latency');
+    this.open(index);
   }
 
   setSurface(surface: string): void {
@@ -134,8 +134,6 @@ export class PinmonyVideoPlayback {
 
   stop(): void {
     this.release();
-    this.state.phase = 'idle'; this.state.rendered = false; this.state.buffering = false;
-    this.state.position = 0; this.state.error = ''; this.notify();
   }
 
   start(): void {
@@ -203,8 +201,9 @@ export class PinmonyVideoPlayback {
       this.record('event=file-fallback reason=remote-read code=' + errorCode.toString());
       this.open(mp4, true); return;
     }
-    if (!this.usingFile && this.video && this.sourceIndex + 1 < this.video.sources.length && this.active) {
-      this.open(this.sourceIndex + 1); return;
+    const next: number = this.video ? this.video.sources.findIndex((_source, index: number) => !this.attemptedSources.has(index)) : -1;
+    if (next >= 0 && this.active && !certificateFailure) {
+      this.open(next); return;
     }
     this.state.phase = 'error'; this.state.buffering = false; this.state.rendered = false;
     this.state.error = certificateFailure ? PinmonyI18n.message("pm_video_certificate_validation_failed_check_device_time_and_networ_a74a0baf") : this.networkTimeout ? PinmonyI18n.message('pm_video_proxy_timeout_hint') : stage === 'download' ? (errorCode === 1007900035 ?
@@ -240,7 +239,7 @@ export class PinmonyVideoPlayback {
     this.disposePlayer(); this.usingFile = useFile;
     this.clearTimer(); this.clearErrorTimer(); this.sourceIndex = index;
     this.candidateStarted = Date.now();
-    if (index === 0 && !useFile) { this.candidateFailures = []; this.state.failureSummary = ''; this.fileAttempted = false; }
+    if (!useFile) this.attemptedSources.add(index);
     this.record('event=opening candidate=' + index.toString() + ' kind=' + (useFile ? 'mp4-file' : video.sources[index].kind));
     this.state.phase = 'loading'; this.state.rendered = false; this.state.buffering = false; this.state.error = '';
     this.state.position = 0; this.notify();
@@ -326,5 +325,8 @@ export class PinmonyVideoPlayback {
     this.generation++; this.clearTimer(); this.clearErrorTimer(); this.wanted = false;
     if (this.fileReader) this.fileReader.cancel();
     this.disposePlayer();
+    this.state.phase = 'idle'; this.state.rendered = false; this.state.buffering = false;
+    this.state.position = 0; this.state.error = ''; this.state.failureSummary = ''; this.state.loadingStage = '';
+    this.notify();
   }
 }

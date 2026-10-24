@@ -17,7 +17,7 @@ assert.doesNotMatch(source, /querySelector|querySelectorAll|MutationObserver|\.c
 assert.match(source, /dataSource: 'api'/);
 assert.match(pageSource, /Button\(\{ type: ButtonType\.Circle \}\)/);
 assert.match(readSourceFileSync('entry/src/main/ets/app/PinmonySessionCoordinator.ets','utf8'), /window\.PinmonyHomeSetUsername/);
-assert.match(indexSource, /this\.controller\.loadUrl\(pinUrl\)/);
+assert.match(indexSource, /if \(pinUrl\) this\.beginDetailOpening\(pinUrl, source\)/, 'home Pin intents use the detail opening coordinator');
 assert.doesNotMatch(indexSource, /window\.PinmonyHomeMore/);
 
 const messages = [];

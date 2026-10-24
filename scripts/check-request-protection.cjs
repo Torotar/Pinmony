@@ -169,7 +169,7 @@ function modeChecks() {
     }).outputText, ctx);
     const home = new ctx.Home(); let pages = 0;
     Object.assign(home, {home: {dataSource: 'api', pins: [{id: 'synthetic'}], session: 1, selectedTab: 'all'},
-      feedActive: true, actionsReady: true, visibleFirst: 0, visibleLast: 0, prefetchNotBefore: 0,
+      paginationTrace(){},paginationReady:true,feedActive: true, actionsReady: true, visibleFirst: 0, visibleLast: 0, prefetchNotBefore: 0,
       onLoadMore: () => pages++});
     home.prefetchNextScreen();
     assert.equal(pages, speculative ? 1 : 0, 'debug suppresses lookahead, release retains it');

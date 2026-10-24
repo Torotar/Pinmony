@@ -363,9 +363,14 @@ export struct PinmonyInboxPage {
                   .fontSize(18)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text'))
+                  .layoutWeight(1)
+                  .textAlign(TextAlign.Start)
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18)
+                  .fontColor([$r('app.color.secondary_text')])
+                  .accessibilityLevel('no')
               }
               .width('100%')
-              .padding({ left: 18, right: 18, top: 18, bottom: 18 })
+              .padding({ left: 18, right: 20, top: 18, bottom: 18 })
               .accessibilityText(PinmonyI18n.render(this.snapshot.composeLabel, this.uiLanguage))
               .enabled(!!this.snapshot.composeId)
               .onClick(() => {

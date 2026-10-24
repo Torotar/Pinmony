@@ -2,7 +2,7 @@ import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
@@ -31,7 +31,7 @@ export struct PinmonyVisibilitySettingsPage {
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
-    this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
+    this.errorSnack.show({ icon: $r('sys.symbol.exclamationmark_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
       content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
       contentAccessibilityText: this.uiText("pm_reload_current_settings_d2b82d8a"),

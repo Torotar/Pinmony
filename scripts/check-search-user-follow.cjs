@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),console});return exports;}
 const {PinmonySearchUserFollow:Follow}=load('entry/src/main/ets/app/PinmonySearchUserFollow.ets');
 const {PinmonyNativeNetwork:Network}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',name=>name==='common_session'?{PinmonySessionCredentials:class{}}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 function fixture(){

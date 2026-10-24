@@ -212,7 +212,7 @@ export struct PinmonyInboxFlowPage {
           .accessibilityText(this.uiText("pm_select_beb4816b") + user.name)
       } else if (!user.self) {
         Button(this.snapshot.blocked && this.snapshot.blockedUserId === user.id ? this.uiText("pm_unblock_e2c88959") : this.uiText("pm_block_5e2a9472"))
-          .height(36).borderRadius(12).fontSize(14).fontWeight(FontWeight.Normal)
+          .height(36).borderRadius(16).fontSize(14).fontWeight(FontWeight.Normal)
           .padding({ left: 14, right: 14 })
           .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
           .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)

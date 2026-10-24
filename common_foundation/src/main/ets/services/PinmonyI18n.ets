@@ -22,10 +22,13 @@ export class PinmonyI18n {
     englishConfig.locale = 'en-US';
     PinmonyI18n.chinese = context.resourceManager.getOverrideResourceManager(chineseConfig);
     PinmonyI18n.english = context.resourceManager.getOverrideResourceManager(englishConfig);
-    PinmonyI18n.storage = preferences.getPreferencesSync(context, { name: 'pinmony_local_display' });
     // Read disk before any component can create the AppStorage defaults.
     const previous: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'system';
-    const saved: preferences.ValueType = PinmonyI18n.storage.getSync('language', previous);
+    let saved: preferences.ValueType;
+    try {
+      PinmonyI18n.storage = preferences.getPreferencesSync(context, { name: 'pinmony_local_display' });
+      saved = PinmonyI18n.storage.getSync('language', previous);
+    } catch (_) { throw new Error('language-storage-read-unavailable'); }
     const value: string = typeof saved === 'string' && ['system', 'zh', 'en'].includes(saved) ? saved : 'system';
     AppStorage.setOrCreate('pinmonyLanguagePreference', value);
     PinmonyI18n.syncSystemLanguage();
@@ -40,8 +43,10 @@ export class PinmonyI18n {
   static select(preference: string): void {
     if (!['system', 'zh', 'en'].includes(preference)) return;
     if (!PinmonyI18n.storage) throw new Error('Language storage unavailable');
-    PinmonyI18n.storage.putSync('language', preference);
-    PinmonyI18n.storage.flushSync();
+    try {
+      PinmonyI18n.storage.putSync('language', preference);
+      PinmonyI18n.storage.flushSync();
+    } catch (_) { throw new Error('language-storage-write-unavailable'); }
     AppStorage.setOrCreate('pinmonyLanguagePreference', preference);
     PinmonyI18n.syncSystemLanguage();
   }
@@ -51,7 +56,11 @@ export class PinmonyI18n {
     const key: string = PINMONY_LOCAL_COPY_KEYS[source] || source;
     const manager: resourceManager.ResourceManager | undefined = language === 'en' ? PinmonyI18n.english : PinmonyI18n.chinese;
     if (!manager || !key.startsWith('pm_')) return source;
-    return manager.getStringByNameSync(key);
+    try { return manager.getStringByNameSync(key); }
+    catch (_) {
+      console.warn('LanguagePreference: resource lookup unavailable');
+      return source;
+    }
   }
 
   // Stable local message tokens: never translate an unmarked website response.

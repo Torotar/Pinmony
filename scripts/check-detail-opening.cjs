@@ -14,7 +14,7 @@ function compile(path, deps = () => ({}), transform = source => source) {
   const exports = {};
   require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(transform(fs.readFileSync(path, 'utf8')), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
-  }).outputText, { exports, require: deps, console, setTimeout, clearTimeout });
+  }).outputText, { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps), console, setTimeout, clearTimeout });
   return exports;
 }
 const { PinmonyDetailPrefetch } = compile('feature_pin/src/main/ets/services/PinmonyDetailPrefetch.ets',
@@ -32,7 +32,7 @@ const { PinmonyNativeNetwork, acceptsNetworkJob } = compile('common_network/src/
     { PinmonyRuntimeLog: log } : name.includes('PinmonyRequestPolicy') ? { PinmonyRequestPolicy } : { rcp });
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 function method(name) { const begin = index.indexOf(`  private ${name}`); const end = index.indexOf('\n  private ', begin + 1); return index.slice(begin, end); }
-const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true, PIN_NATIVE_DETAIL_READS_ENABLED: true,
+const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true, PIN_NATIVE_DETAIL_READS_ENABLED: false, // This fixture verifies retained legacy prefetch and bridge adoption.
   PINTEREST_URL: 'https://www.pinterest.com/', acceptsNetworkJob,
   PinmonyRuntimeLog: log, readRelatedPresentation: () => undefined, setTimeout() {}, clearTimeout() {} };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {

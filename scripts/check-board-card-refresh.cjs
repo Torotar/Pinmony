@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
+const src=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');
+const start=src.indexOf('  private pinCardKey('),end=start+1+src.slice(start+1).search(/\n  (?:private |@[A-Z])/);
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+src.slice(start,end)+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{});
+const h=new Host();h.uiLanguage='zh';const pin={id:'1',title:'original',imageUrl:'https://i.pinimg.com/example.jpg',cancelled:false};
+const before=h.pinCardKey(pin);assert.equal(h.pinCardKey({...pin}),before,'unchanged card keeps its node');
+pin.cancelled=true;assert.notEqual(h.pinCardKey(pin),before,'confirmed cancellation immediately refreshes visible card');
+assert.notEqual(h.pinCardKey({...pin,title:'updated'}),h.pinCardKey(pin),'refreshed text is rendered for same Pin id');
+h.uiLanguage='en';assert.notEqual(h.pinCardKey(pin),before);
+assert(src.includes('.pullToRefresh(!this.phase() && this.snapshot.ready && !this.snapshot.flow?.busy)'),'refresh remains enabled while the current refresh is running');
+console.log('Board cards: changed cancellation/content updates nodes; unchanged cards retained; refresh gesture stays enabled');

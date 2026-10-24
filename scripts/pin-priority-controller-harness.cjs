@@ -1,10 +1,10 @@
 const fs=require('node:fs'),vm=require('node:vm');
 const {createArktsLoader}=require('./arkts-module-loader.cjs');
 function runtime(ts,globals={}) {
-  const scope={setTimeout,clearTimeout,setInterval,clearInterval,useNativeTransport:s=>s,PIN_VISUAL_SEARCH_API_SCRIPT:'',PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:false,PIN_NATIVE_DETAIL_AUXILIARY_ENABLED:false,PIN_NATIVE_COMMENT_WRITES_ENABLED:false,PIN_NATIVE_POST_OPERATIONS_ENABLED:false,...globals};
+  const scope={setTimeout,clearTimeout,setInterval,clearInterval,useNativeTransport:s=>s,PIN_VISUAL_SEARCH_API_SCRIPT:'',PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_NATIVE_PIN_MENUS_ENABLED:false,PIN_NATIVE_SHARE_PUBLISH_ENABLED:false,PIN_NATIVE_DETAIL_AUXILIARY_ENABLED:false,PIN_NATIVE_COMMENT_WRITES_ENABLED:false,PIN_NATIVE_POST_OPERATIONS_ENABLED:false,...globals};
   const loader=createArktsLoader(ts);
   const cache=loader.loadFile('feature_pin/src/main/ets/services/PinmonyDetailCache.ets');
-  const deps={...cache,PinmonyRuntimeLog:{info(){},warn(){}},PIN_DETAIL_API_ENABLED:true,PIN_POST_API_ENABLED:true,PIN_EDIT_API_ENABLED:true,PIN_VISUAL_SEARCH_API_ENABLED:true};
+  const deps={...cache,PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages,PinmonyRuntimeLog:{info(){},warn(){}},PIN_DETAIL_API_ENABLED:true,PIN_POST_API_ENABLED:true,PIN_EDIT_API_ENABLED:true,PIN_VISUAL_SEARCH_API_ENABLED:true};
   const compile=file=>{const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,{...scope,exports,require:()=>deps});return exports;};
   Object.assign(deps,compile('common_foundation/src/main/ets/services/PinmonyTaskRegistry.ets'));
   deps.PinmonyPinStore=loader.loadFile('feature_pin/src/main/ets/stores/PinmonyPinStore.ets').PinmonyPinStore;
@@ -13,6 +13,8 @@ function runtime(ts,globals={}) {
 }
 function bind(native,ts,globals={},names=['detailRead','detailOperations','sharePanels']) {
   require('./medium-priority-controller-harness.cjs').bindWork(native, ts, globals);
+  native.sessionDocumentUrl ||= () => native.controller?.getUrl?.() || native.currentPinUrl?.() || '';
+  native.uiText ||= require('./local-message-test-fixture.cjs').rawLocalMessages.text;
   native.pinStore.visualResult ||= {pin:'',loading:false,error:'',ended:false,items:[]};
   if(native.controller && !native.controller.getUrl) native.controller.getUrl=()=>native.currentPinUrl?.() || native.pinStore.detail?.pinUrl || native.pinStore.sharePin || '';
   const r=runtime(ts,globals),index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');

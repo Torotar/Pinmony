@@ -17,6 +17,18 @@ function fixture(page=searchPage){
 }
 const placement={'1000269':{display_data:{quiz:{title:'Taste',picker_title:'Pick',picker_see_results_button_copy:'Results'},related_query_items:[{query:'art topic',cover_pin_url:'https://i.pinimg.com/topic.jpg'}]}}};
 async function search(){
+ for(const absent of [null,[],{},{'1000269':{display_data:{}}}]){
+  const empty=fixture(),aux=new Search(empty.ports,()=>{}),pending=aux.demand();
+  empty.jobs[0].reply(absent);await pending;assert.equal(aux.snapshot(),undefined,'No quiz placement must not show a failed inspiration panel');
+  await aux.demand();assert.equal(empty.jobs.length,1,'Unavailable placement must not repeatedly load');
+  empty.page(origin+'/search/pins/?q=design');const next=aux.demand();
+  empty.jobs[1].reply(placement);await next;assert.equal(aux.snapshot().topics.length,1,'Another query must still load a provided quiz');
+ }
+ for(const malformed of [{quiz:{}},{related_query_items:[]},[], 'invalid']){
+  const invalid=fixture(),aux=new Search(invalid.ports,()=>{}),pending=aux.demand();
+  invalid.jobs[0].reply({'1000269':{display_data:malformed}});await pending;
+  assert(aux.snapshot()?.error,'Malformed nonempty display must remain an error');
+ }
  const f=fixture(),s=new Search(f.ports,()=>f.states.push(s.snapshot()));let p=s.demand();assert.deepEqual(JSON.parse(JSON.stringify(f.jobs[0].options)),{placement_ids:[1000269],extra_context:{search_query:'art'}});f.jobs[0].reply(placement);await p;assert.equal(s.snapshot().topics.length,1);
  p=s.action('topic','0');assert.equal(f.jobs.at(-1).options.query,'art topic');f.jobs.at(-1).reply({results:Array.from({length:11},(_,i)=>pin(i+1))},'',{bookmark:'cursor'});await p;
  for(let i=1;i<=11;i++)await s.action('select',String(i));assert.equal(s.snapshot().count,10);

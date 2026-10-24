@@ -23,7 +23,33 @@ function fixture(action='editSave') {
 }
 const endpoints={editSave:'v3_edit_board',delete:'v3_delete_board',archive:'v3_archive_board',leave:'v3_remove_board_collaborators',unfollow:'v3_unfollow_board'};
 function success(action) {return action==='editSave'?{...board,name:edit.name,privacy:edit.privacy,url:'/sample/renamed/'}:action==='leave'?{...board,collaborated_by_me:false}:null;}
+async function mergeChecks(){
+  const ui=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');
+  assert(!ui.includes('.bindSheet($this.mergeOpen'),'merge reuses existing sheet');
+  const row=ui.slice(ui.indexOf('  private optionRow('),ui.indexOf('  private mergeSheet('));
+  const click=row.match(/\.onClick\(\(\) => \{([\s\S]*?)\n      \}\)/)[1];
+  const handler=vm.runInNewContext('(function(action){'+click+'})',{PinmonyRuntimeLog:{info(){}}});
+  const actions=[],host={menuOpen:true,mergeOpen:false,act:(action)=>actions.push(action)};
+  handler.call(host,'merge');assert.equal(host.menuOpen,true,'click must not dismiss the active sheet');assert.equal(host.mergeOpen,true);assert.deepEqual(actions,['mergeTargets']);
+
+  const setup=()=>{const f=fixture('merge');f.setState({...f.state(),phase:'mergeTargets',targets:[{id:'200',enabled:true},{id:'300',enabled:false}]});return f;};
+  let f=setup();for(const id of ['100','300','999','section:200']){await f.submit(id);assert.equal(f.requests.length,0,'invalid target never writes');}
+  const p=f.submit('200');assert(f.state().busy);await f.submit('200');assert.equal(f.requests.length,1);
+  const job=f.requests[0].job,o=JSON.parse(new URLSearchParams(job.body).get('data')).options;
+  assert.equal(job.url,origin+'/resource/ApiResource/create/');assert.equal(o.url,'/v3/boards/100/merge/200/');assert.deepEqual(Object.keys(o.data),[]);
+  f.requests[0].resolve(result({id:'200',type:'board'},'v3_board_merge'));await p;assert.equal(f.commits[0][0],'merge');assert(!f.state().uncertain);
+  const n=new Network();n.request=async(j,context)=>({status:context().authenticated?200:0,error:context().authenticated?'':'blocked'});
+  assert.equal((await n.requestBusinessBoardManagementWrite(job,f.session,'100','42','42',false,()=>true,['200'])).status,200);
+  assert((await n.requestBusinessBoardManagementWrite(job,f.session,'100','42','42',false,()=>true,[])).error);
+  assert((await n.requestBusinessBoardManagementWrite(job,f.session,'100','43','42',true,()=>true,['200'])).error);
+  for(const response of [result({id:'100',type:'board'},'v3_board_merge'),result({id:'200',type:'board'},'wrong'),result(null,'v3_board_merge')]){
+    f=setup();const pending=f.submit('200');f.requests[0].resolve(response);await pending;assert(f.state().uncertain);assert.equal(f.commits.length,0);await f.submit('200');assert.equal(f.requests.length,1);
+  }
+  f=setup();const pending=f.submit('200');f.writer.pause();f.requests[0].resolve(result({id:'200',type:'board'},'v3_board_merge'));await pending;assert.equal(f.commits.length,0);assert(f.state().uncertain);
+  console.log('Board merge: exact HAR contract, target/owner guards, confirmed target, duplicate/unknown and late response checks passed');
+}
 async function main(){
+  await mergeChecks();
   const jobs={};
   for(const action of Object.keys(endpoints)) {
     const f=fixture(action),old=f.state(),pending=f.submit();assert.equal(f.state().busy,true);assert.notEqual(f.state(),old);await f.submit();assert.equal(f.requests.length,1);

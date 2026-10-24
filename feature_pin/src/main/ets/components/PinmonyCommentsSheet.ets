@@ -159,7 +159,7 @@ export struct PinmonyCommentsSheet {
                   Button({ type: ButtonType.Normal }) {
                     Row({ space: 8 }) {
                       Divider().width(28).color($r('app.color.secondary_text'))
-                      Text(item.repliesOpen ? this.uiText("pm_hide_replies_c6edf966") : this.uiText("pm_view_9ae8f7e3") + item.replyCount + this.uiText("pm_replies_37b37671"))
+                      Text(item.repliesOpen ? this.uiText("pm_hide_replies_c6edf966") : PinmonyI18n.format("pm_view_comment_replies", [item.replyCount], this.uiLanguage))
                         .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
                     }
                   }.height(32).padding(0).backgroundColor(Color.Transparent).margin({ left: 42 })
@@ -262,7 +262,7 @@ export struct PinmonyCommentsSheet {
             if (this.result.busy) { LoadingProgress().width(20).height(20) }
             else { SymbolGlyph(this.editing ? $r('sys.symbol.checkmark') : $r('sys.symbol.arrow_up'))
               .fontSize(20).fontColor([$r('app.color.detail_on_accent')]) }
-          }.width(32).height(32).borderRadius(10).backgroundColor($r('app.color.accent'))
+          }.width(32).height(32).borderRadius(16).backgroundColor($r('app.color.accent'))
             .enabled(!this.result.loading && !this.result.busy && !this.result.uncertain && !this.choosing && (!!this.draft.trim() || !!this.photoUri))
             .onClick(() => this.send()).accessibilityText(this.editing ? this.uiText("pm_save_comment_80c50b4a") : this.uiText("pm_send_comment_d25f5715"))
         }.width('100%')

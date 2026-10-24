@@ -9,6 +9,7 @@ export interface PinmonyHomeMenuState {
   pinUrl: string;
   loading: boolean;
   busy: boolean;
+  canCancelSave?: boolean;
   error: string;
   feedback: string;
   options: PinmonyHomeMenuOption[];

@@ -1,5 +1,7 @@
 import { PinmonyNativeNetwork } from 'common_network';
 import { PinmonyImageCrop } from 'common_ui';
+import { util } from '@kit.ArkTS';
+import { PinmonyPhotoHistoryItem, PinmonyPhotoHistoryPage, parsePhotoHistory } from 'feature_search';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { parsePhotoSearch, PinmonySearchResult } from 'feature_search';
 interface PhotoPorts {
@@ -9,6 +11,7 @@ interface PhotoPorts {
   active: () => boolean;
   pick: () => Promise<string>;
   read: (uri: string) => Promise<ArrayBuffer>;
+  jpeg: (bytes: ArrayBuffer) => Promise<ArrayBuffer>;
   open: (url: string, source: string) => void;
 }
 export class PinmonyPhotoSearchFlow {
@@ -19,6 +22,9 @@ export class PinmonyPhotoSearchFlow {
   private account: string = '';
   private epoch: number = -1;
   private uri: string = '';
+  private bytes: ArrayBuffer | undefined = undefined;
+  private historyItems: PinmonyPhotoHistoryItem[] = [];
+  private sequence: number = Date.now();
   private readonly ports: PhotoPorts;
   constructor(ports: PhotoPorts) { this.ports = ports; }
   cancel(): void {
@@ -26,6 +32,8 @@ export class PinmonyPhotoSearchFlow {
     if (this.job) this.ports.network().cancel(this.job);
     this.job = ''; this.results = [];
     this.uri = '';
+    this.bytes = undefined;
+    this.historyItems = [];
   }
   async search(onSelected?: (uri: string) => void): Promise<PinmonySearchResult[] | undefined> {
     this.cancel();
@@ -63,7 +71,7 @@ export class PinmonyPhotoSearchFlow {
         actual.accountId === this.account && actual.generation === this.epoch &&
         actual.origin === session.origin && this.ports.page() === this.page;
     };
-    const bytes: ArrayBuffer = await this.ports.read(uri);
+    const bytes: ArrayBuffer = this.bytes || await this.ports.read(uri);
     if (!current()) return undefined;
     this.job = 'native_photo_search_' + Date.now().toString();
     const text: string = await this.ports.network().searchUploadedPhoto(bytes, this.page, this.ports.session, current, this.job,
@@ -78,5 +86,39 @@ export class PinmonyPhotoSearchFlow {
     if (!item || !this.ports.active() || !session.authenticated || session.accountId !== this.account ||
       session.generation !== this.epoch || this.ports.page() !== this.page) return;
     this.ports.open(item.targetUrl, this.page);
+  }
+  async history(cursor: string): Promise<PinmonyPhotoHistoryPage> {
+    if (!cursor) { this.cancel(); const s: PinmonyBusinessSessionContext = this.ports.session();
+      this.account = s.accountId; this.epoch = s.generation; this.page = this.ports.page(); }
+    const revision: number = this.revision;
+    const live = (): boolean => revision === this.revision && this.ports.active() && this.ports.session().authenticated &&
+      this.ports.session().accountId === this.account && this.ports.session().generation === this.epoch && this.ports.page() === this.page;
+    if (!live()) throw new Error('history-stale');
+    this.job = 'native_photo_history_' + (++this.sequence).toString();
+    const bytes: ArrayBuffer = await this.ports.network().readPhotoHistory(cursor, '', this.ports.session, live, this.job);
+    if (!live()) throw new Error('history-stale');
+    const page: PinmonyPhotoHistoryPage = parsePhotoHistory(util.TextDecoder.create('utf-8').decodeWithStream(new Uint8Array(bytes)), cursor);
+    this.historyItems = cursor ? this.historyItems.concat(page.items.filter((p: PinmonyPhotoHistoryItem): boolean => !this.historyItems.some((v: PinmonyPhotoHistoryItem): boolean => v.id === p.id))).slice(0, 1000) : page.items;
+    return page;
+  }
+  async selectHistory(id: string, onSelected: (uri: string) => void): Promise<PinmonySearchResult[] | undefined> {
+    const item: PinmonyPhotoHistoryItem | undefined = this.historyItems.find((p: PinmonyPhotoHistoryItem): boolean => p.id === id);
+    if (!item) return undefined;
+    const revision: number = ++this.revision;
+    const live = (): boolean => revision === this.revision && this.ports.active() && this.ports.session().authenticated &&
+      this.ports.session().accountId === this.account && this.ports.session().generation === this.epoch && this.ports.page() === this.page;
+    if (!live()) return undefined;
+    this.job = 'native_photo_history_' + (++this.sequence).toString();
+    const data: ArrayBuffer = await this.ports.network().readPhotoHistory('', item.imageUrl, this.ports.session, live, this.job);
+    if (!live()) return undefined;
+    const bytes: ArrayBuffer = await this.ports.jpeg(data);
+    if (!live()) return undefined;
+    this.bytes = bytes; this.uri = item.imageUrl; this.results = [];
+    onSelected(item.imageUrl);
+    this.job = 'native_photo_search_' + (++this.sequence).toString();
+    const text: string = await this.ports.network().searchUploadedPhoto(bytes, this.page, this.ports.session, live, this.job);
+    if (!live()) return undefined;
+    this.results = parsePhotoSearch(text, this.ports.session().origin);
+    return this.results.slice();
   }
 }

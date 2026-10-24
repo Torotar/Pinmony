@@ -1,5 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),ts=require(process.argv[2]);
-const s=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyVisualSearchView.ets','utf8');
+const wrapper=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyVisualSearchView.ets','utf8');
+assert(wrapper.includes('PinmonyImageSearchView as PinmonyVisualSearchView'), 'detail crop delegates to the shared image-search component');
+const s=fs.readFileSync('common_ui/src/main/ets/components/PinmonyImageSearchView.ets','utf8');
 const a=s.indexOf('  private startDrag()'),b=s.indexOf('  @Builder',a);
 const code=ts.transpileModule('class Crop {'+s.slice(a,b)+'};Crop;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
 const Crop=vm.runInNewContext(code,{});

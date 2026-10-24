@@ -81,6 +81,7 @@ export class PinmonySessionVerification {
     const revision: number = this.revision;
     const id: string = 'session_probe_' + (++this.sequence).toString();
     this.job = id;
+    const startedAt: number = Date.now();
     PinmonyRuntimeLog.info('SessionVerification: phase=started');
     const current = (): boolean => {
       try { return revision === this.revision && this.ports.active() && this.eligible() &&
@@ -95,7 +96,7 @@ export class PinmonySessionVerification {
       const result: PinmonySessionVerificationResult = detached && reply.error === 'missing-session' ?
         { status: 'unauthenticated', profileUrl: '', appVersion: '' } : reply.error ?
         { status: 'unknown', profileUrl: '', appVersion: '' } : parseSessionVerification(match[0], reply.status, reply.body);
-      PinmonyRuntimeLog.info('SessionVerification: result=' + result.status);
+      PinmonyRuntimeLog.info('SessionVerification: result=' + result.status + ' elapsedMs=' + (Date.now() - startedAt).toString());
       if (result.status === 'unknown') { if (detached) this.ports.unavailable?.(); return; }
       if (result.status === 'unauthenticated' && this.ports.status() === 'authenticated') {
         PinmonyRuntimeLog.warn('SessionVerification: phase=discarded reason=web-auth-conflict');

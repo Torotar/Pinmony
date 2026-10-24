@@ -1,5 +1,6 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideoCard } from 'common_ui';
+import { connection } from '@kit.NetworkKit';
 import { allowsSpeculativeReads, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
 import { PinmonyHomeSkeleton } from './PinmonyHomeSkeleton';
@@ -13,6 +14,54 @@ export struct PinmonyHomePage {
   @State private recoveredSources: Record<string, string> = {};
   @State private recoveredRevisions: Record<string, number> = {};
   private lastImageRecovery: number = 0;
+  private imageNetwork: connection.NetConnection | undefined = undefined;
+  private imageNetworkOnline: boolean = true;
+  private imageNetworkVisible: boolean = false;
+  private imageRecoveryPending: boolean = false;
+  private imageRecoveryAttempts: Set<string> = new Set<string>();
+
+  private watchImageNetwork(): void {
+    this.imageNetworkVisible = true;
+    try {
+      this.imageNetworkOnline = connection.hasDefaultNetSync();
+      const monitor: connection.NetConnection = connection.createNetConnection();
+      this.imageNetwork = monitor;
+      monitor.on('netAvailable', (): void => {
+        if (this.imageNetwork !== monitor || !this.imageNetworkVisible) return;
+        const recovered: boolean = !this.imageNetworkOnline;
+        this.imageNetworkOnline = true;
+        if (recovered) {
+          this.imageRecoveryAttempts.clear();
+          this.imageRecoveryPending = true;
+          this.retryRecoveredImages();
+        }
+      });
+      monitor.on('netLost', (): void => {
+        if (this.imageNetwork !== monitor || !this.imageNetworkVisible) return;
+        try { this.imageNetworkOnline = connection.hasDefaultNetSync(); } catch (_) { return; }
+        if (!this.imageNetworkOnline) this.imageRecoveryPending = false;
+      });
+      monitor.register((error): void => {
+        if (error) PinmonyRuntimeLog.warn('HomeImageTrace: network-monitor unavailable');
+      });
+    } catch (_) { PinmonyRuntimeLog.warn('HomeImageTrace: network-monitor unavailable'); }
+  }
+
+  private retryRecoveredImages(): void {
+    if (!this.imageNetworkVisible || !this.imageNetworkOnline || !this.imageRecoveryPending ||
+      !this.feedActive || !this.actionsReady || this.offlinePreview || this.loading || this.refreshing ||
+      this.synchronizing || this.visibleLast < this.visibleFirst) return;
+    const pins: PinmonyHomePin[] = this.home.pins.slice(this.visibleFirst, this.visibleLast + 1);
+    let count: number = 0;
+    for (const pin of pins) {
+      if (this.imageRecoveryAttempts.size >= 12) break;
+      if (this.failedImages.indexOf(pin.imageUrl) < 0 || this.imageRecoveryAttempts.has(pin.imageUrl)) continue;
+      this.imageRecoveryAttempts.add(pin.imageUrl);
+      this.retryImage(pin.imageUrl, 'network-recovery');
+      count++;
+    }
+    if (count > 0) PinmonyRuntimeLog.info('HomeImageTrace: phase=network-recovery count=' + count.toString());
+  }
   private onImageRecovery(): void {
     const recovery: PinmonyHomeImageRecovery | undefined = this.imageRecovery;
     if (!recovery) { this.recoveredSources = {}; this.recoveredRevisions = {}; this.lastImageRecovery = 0; return; }
@@ -30,6 +79,15 @@ export struct PinmonyHomePage {
     Object.keys(this.recoveredRevisions).forEach((key: string): void => { revisions[key] = this.recoveredRevisions[key]; });
     revisions[pin.imageUrl] = (revisions[pin.imageUrl] || 0) + 1; this.recoveredRevisions = revisions;
     this.failedImages = this.failedImages.filter((url: string): boolean => url !== pin.imageUrl);
+  }
+  private retryImage(url: string, reason: string = 'manual-retry'): void {
+    if (this.offlinePreview || this.failedImages.indexOf(url) < 0) return;
+    const revisions: Record<string, number> = {};
+    Object.keys(this.recoveredRevisions).forEach((key: string): void => { revisions[key] = this.recoveredRevisions[key]; });
+    revisions[url] = (revisions[url] || 0) + 1;
+    this.recoveredRevisions = revisions;
+    this.failedImages = this.failedImages.filter((failed: string): boolean => failed !== url);
+    PinmonyRuntimeLog.info('HomeImageTrace: phase=' + reason + ' revision=' + revisions[url].toString());
   }
   @Prop @Watch('onHomeChanged') home: PinmonyHomeSnapshot = {} as PinmonyHomeSnapshot;
   @Prop @Watch('onPendingTabChanged') pendingTabId: string = '';
@@ -97,6 +155,7 @@ export struct PinmonyHomePage {
   onPrefetchPins?: (first: number, last: number) => void;
 
   aboutToAppear(): void {
+    this.watchImageNetwork();
     this.updateCategories();
     this.activeSession = this.home.session;
     this.activeTab = this.home.selectedTab;
@@ -109,6 +168,16 @@ export struct PinmonyHomePage {
       // The first API snapshot can create this component directly, so there
       // may be no watched prop transition to arm the post-paint delay.
       this.prefetchNotBefore = Date.now() + 900;
+    }
+  }
+
+  aboutToDisappear(): void {
+    this.imageNetworkVisible = false;
+    this.imageRecoveryPending = false;
+    const monitor: connection.NetConnection | undefined = this.imageNetwork;
+    this.imageNetwork = undefined;
+    if (monitor) {
+      try { monitor.unregister((): void => {}); } catch (_) { }
     }
   }
 
@@ -235,6 +304,7 @@ export struct PinmonyHomePage {
   }
 
   private onPrefetchAvailabilityChanged(): void {
+    this.retryRecoveredImages();
     if (this.refreshing) this.viewportFillKey = '';
     setTimeout(() => { this.resumePendingEnd(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
   }
@@ -490,6 +560,11 @@ export struct PinmonyHomePage {
           Text(this.uiText("pm_image_failed_to_load_572993f5"))
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
+          if (!this.offlinePreview) {
+            Button(this.uiText("pm_retry_b8784c8d"))
+              .fontSize(13).margin({ top: 8 })
+              .onClick(() => this.retryImage(pin.imageUrl))
+          }
         }
         .width('100%')
         .height(this.imageHeight(pin))
@@ -524,6 +599,7 @@ export struct PinmonyHomePage {
                   ' code=' + (event?.error?.code || 0).toString());
                 this.failedImages = [...this.failedImages, pin.imageUrl];
                 this.onImageRecovery();
+                this.retryRecoveredImages();
               }
             })
             .onClick(() => { if (!this.suppressSwipeClick && this.onPin) this.onPin(pin.id); })
@@ -692,6 +768,7 @@ export struct PinmonyHomePage {
               this.visibleFirst = Math.max(0, first);
               this.visibleLast = Math.min(last, this.home.pins.length - 1);
               if (this.onVisiblePins) this.onVisiblePins(first, last);
+              this.retryRecoveredImages();
               this.prefetchVisibleDetails();
               this.prefetchNextScreen();
               setTimeout(() => this.fillShortViewport(), 0);

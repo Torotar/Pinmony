@@ -59,14 +59,16 @@ export struct PinmonyBoardCollaboratorsPage {
         if (invite) { Text(user.username).fontSize(13).fontColor($r('app.color.secondary_text')) }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (invite && !user.status) {
-        Button(this.uiText("pm_invite_1955b265")).backgroundColor($r('app.color.accent')).fontColor(Color.White)
+        Button(this.uiText("pm_invite_1955b265")).type(ButtonType.Normal).borderRadius(16).backgroundColor($r('app.color.accent')).fontColor(Color.White)
+          .width(88).height(40)
           .enabled(!this.snapshot.busy && !this.snapshot.uncertain)
           .onClick(() => this.onAction('send', user.id))
       } else {
         Text(user.status === 'owner' ? this.uiText("pm_owner_43a7f4b4") : user.status === 'accepted' ? this.uiText("pm_collaborator_59fa99bc") : this.uiText("pm_invited_b43e8a99"))
           .fontSize(14).fontColor($r('app.color.secondary_text'))
+          .width(88).height(40).textAlign(TextAlign.Center)
       }
-    }.width('100%').padding({ top: 10, bottom: 10 })
+    }.width('100%').alignItems(VerticalAlign.Center).padding({ top: 10, bottom: 10 })
   }
   @Builder
   private destination(_name?: string, _param?: Object) {
@@ -77,7 +79,7 @@ export struct PinmonyBoardCollaboratorsPage {
               if (this.snapshot.loading || this.snapshot.busy) { LoadingProgress().width(28).height(28) }
               if (this.snapshot.error) {
                 Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-                if (!this.snapshot.uncertain && !this.snapshot.busy) { Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.onAction('retry', '')) }
+                if (!this.snapshot.uncertain && !this.snapshot.busy) { Button(this.uiText("pm_retry_b8784c8d")).type(ButtonType.Normal).borderRadius(16).onClick(() => this.onAction('retry', '')) }
               } else if (!this.snapshot.loading) {
                 if (this.snapshot.phase === 'members') {
                   Text(this.uiText("pm_collaborators_can_82551ec5")).fontSize(13).fontColor($r('app.color.secondary_text'))
@@ -110,7 +112,7 @@ export struct PinmonyBoardCollaboratorsPage {
             }.width('100%').alignItems(HorizontalAlign.Start).padding(20)
           }.layoutWeight(1).width('100%').align(Alignment.Top)
           if (this.snapshot.canInvite === true && this.snapshot.phase === 'members' && !this.snapshot.loading && !this.snapshot.error) {
-            Button(this.uiText("pm_invite_collaborators_602179cf")).width('100%').height(56).backgroundColor($r('app.color.surface_muted'))
+            Button(this.uiText("pm_invite_collaborators_602179cf")).type(ButtonType.Normal).borderRadius(16).width('100%').height(56).backgroundColor($r('app.color.surface_muted'))
               .fontColor($r('app.color.primary_text')).onClick(() => { this.query = ''; this.onAction('invite', ''); })
           }
         }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))

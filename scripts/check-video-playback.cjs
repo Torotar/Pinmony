@@ -44,22 +44,21 @@ function harness(delayed = false, config = {}) {
     fireTimers(delay) { for (const [id, timer] of Array.from(timers)) if (timer.delay === delay) { timers.delete(id); timer.fn(); } } };
 }
 async function main() {
-  const timeout = harness(false, { fakeTime: true });
-  timeout.playback.start(); await flush();
-  timeout.players[0].events.error({ code: 1007900028 }); await flush();
-  timeout.players[1].events.error({ code: 5400106 }); await flush();
-  assert.match(timeout.states.at(-1).error, /pinimg\.com.*DIRECT/);
-  assert.match(timeout.states.at(-1).error, /建议使用全局模式/);
-  assert(!timeout.states.at(-1).error.includes('格式'));
-  timeout.playback.retry(); await flush();
-  timeout.players[2].events.error({ code: 5400106 }); await flush();
-  timeout.players[3].events.error({ code: 5400106 }); await flush();
-  assert(!timeout.states.at(-1).error.includes('DIRECT'), 'explicit retry clears old diagnosis');
-  timeout.playback.release();
-  const fileTimeout = harness(false, { fakeTime: true, fileReader: { load: async () => { throw { code: 1007900028 }; }, cancel() {} } });
-  fileTimeout.playback.start(); await flush();
-  assert.match(fileTimeout.states.at(-1).error, /pinimg\.com.*DIRECT/);
-  fileTimeout.playback.release();
+  const reenter = harness(true);
+  reenter.playback.start(); await flush();
+  assert.equal(reenter.pending.length, 1);
+  reenter.playback.release();
+  assert.equal(reenter.states.at(-1).phase, 'idle', 'release must clear a loading state');
+  assert.equal(reenter.states.at(-1).rendered, false);
+  reenter.playback.setSurface(''); reenter.playback.start(); await flush();
+  assert.equal(reenter.pending.length, 1, 'reentry waits for a new Surface');
+  reenter.playback.setSurface('new-surface'); await flush();
+  assert.equal(reenter.pending.length, 2, 'released loading player can restart with the same source');
+  reenter.pending[0](); await flush();
+  assert.equal(reenter.players[0].releases, 1, 'late old creation is released');
+  reenter.pending[1](); await flush();
+  assert.equal(reenter.players[1].state, 'playing');
+  reenter.playback.release();
   const automatic = harness();
   automatic.playback.setVideo(automatic.video);
   automatic.playback.setSurface('');
@@ -186,30 +185,36 @@ async function main() {
   let downloads = 0, fileReleases = 0, fileCancels = 0;
   const local = harness(false, { fakeTime: true, fileReader: {
     load: async source => { downloads++; assert.equal(source, 'mp4'); return { fd: 77, size: 24, release() {
-      assert.equal(local.players[0].releases, 1, 'AVPlayer releases before closing its file descriptor'); fileReleases++;
+      assert.equal(local.players[1].releases, 1, 'AVPlayer releases before closing its file descriptor'); fileReleases++;
     } }; }, cancel() { fileCancels++; }
   } });
   local.playback.start(); await flush();
-  assert.equal(downloads, 1); assert.equal(local.players.length, 1, 'detail skips the failing remote HLS candidate');
-  assert.equal(local.players[0].source, undefined, 'detail file playback does not send a remote URL to AVPlayer');
-  assert.equal(local.players[0].fileSource.fd, 77); assert.equal(local.players[0].fileSource.offset, 0);
-  assert.equal(local.players[0].fileSource.length, 24);
+  assert.equal(downloads, 0, 'stream starts without waiting for a complete MP4 download');
+  assert.equal(local.players[0].source, 'mp4', 'detail prioritizes MP4 streaming over HLS');
+  local.players[0].events.error({ code: 5400103 }); await flush();
+  assert.equal(downloads, 1); assert.equal(local.players.length, 2);
+  assert.equal(local.players[1].fileSource.fd, 77); assert.equal(local.players[1].fileSource.offset, 0);
+  assert.equal(local.players[1].fileSource.length, 24);
   assert.equal(local.states.at(-1).rendered, false, 'successful download is not proof of a first frame');
-  local.players[0].events.startRenderFrame(); assert.equal(local.states.at(-1).rendered, true);
-  assert(local.traces.some(event => event.includes('event=source-selected kind=mp4-file')));
+  local.players[1].events.startRenderFrame(); assert.equal(local.states.at(-1).rendered, true);
+  assert(local.traces.some(event => event.includes('event=file-fallback')));
   local.playback.release(); await flush(); assert.equal(fileReleases, 1); assert(fileCancels > 0);
   const failedRead = harness(false, { fakeTime: true, fileReader: {
     load: async () => { throw { code: 1007900035 }; }, cancel() {} } });
   failedRead.playback.start(); await flush();
-  assert.equal(failedRead.players.length, 0); assert.equal(failedRead.states.at(-1).phase, 'error');
+  failedRead.players[0].events.error({ code: 5400103 }); await flush();
+  assert.equal(failedRead.players.length, 2); assert.equal(failedRead.players[1].source, 'hls', 'HLS is tried after MP4 stream and file recovery');
+  failedRead.players[1].events.error({ code: 5400103 }); await flush();
+  assert.equal(failedRead.states.at(-1).phase, 'error');
   assert(failedRead.traces.some(event => /event=failed stage=download.*code=1007900035/.test(event)));
   failedRead.fireTimers(200); failedRead.fireTimers(15000); await flush();
-  assert.equal(failedRead.players.length, 0, 'failed download cannot loop back into remote or local reads');
+  assert.equal(failedRead.players.length, 2, 'exhausted candidates cannot loop back into remote or local reads');
   failedRead.playback.release();
   for (const code of [1007900060, 2300060]) {
     const certificate = harness(false, { fileReader: { load: async () => { throw { code }; }, cancel() {} } });
     certificate.playback.start(); await flush();
-    assert.equal(certificate.players.length, 0, 'unverified media cannot reach decoding');
+    certificate.players[0].events.error({ code: 5400103 }); await flush();
+    assert.equal(certificate.players.length, 1, 'unverified file cannot reach decoding');
     assert.match(certificate.states.at(-1).error, /证书校验失败/);
     assert.match(certificate.states.at(-1).failureSummary, /证书校验失败/);
     certificate.playback.release();
@@ -217,9 +222,23 @@ async function main() {
   let retryDownloads = 0;
   const directRetry = harness(false, { fileReader: {
     load: async () => { retryDownloads++; throw { code: 1007900028 }; }, cancel() {} } });
-  directRetry.playback.start(); await flush(); directRetry.playback.retry(); await flush();
+  directRetry.playback.start(); await flush();
+  directRetry.players[0].events.error({ code: 5400103 }); await flush();
+  directRetry.playback.retry(); await flush();
+  assert.equal(directRetry.players[1].source, 'hls');
+  assert.equal(directRetry.players[2].source, 'mp4', 'explicit retry resets MP4 priority');
+  directRetry.players[2].events.error({ code: 5400103 }); await flush();
   assert.equal(retryDownloads, 2, 'each explicit retry makes exactly one file attempt');
-  assert.equal(directRetry.players.length, 0, 'file failure does not replay the failing remote path');
+  assert.equal(directRetry.players.length, 4, 'each retry tries each remote candidate at most once');
+  directRetry.players[3].events.error({ code: 5400106 }); await flush();
+  assert.match(directRetry.states.at(-1).error, /pinimg\.com.*DIRECT/);
+  assert.match(directRetry.states.at(-1).error, /建议使用全局模式/);
+  assert(!directRetry.states.at(-1).error.includes('格式'), 'known connection timeout must not become a format error after another candidate fails');
+  assert.match(directRetry.states.at(-1).failureSummary, /视频连接超时.*1007900028/);
+  directRetry.playback.retry(); await flush();
+  directRetry.players[4].events.error({ code: 5400106 }); await flush();
+  directRetry.players[5].events.error({ code: 5400106 }); await flush();
+  assert(!directRetry.states.at(-1).error.includes('DIRECT'), 'explicit retry clears the previous timeout diagnosis');
   directRetry.playback.release();
   let hlsDownloads = 0;
   const hlsOnly = harness(false, { fileReader: { load: async () => { hlsDownloads++; throw new Error('unexpected'); }, cancel() {} } });
@@ -231,9 +250,10 @@ async function main() {
   const lateFile = harness(false, { fakeTime: true, fileReader: {
     load: () => new Promise(resolve => completeFileRead = resolve), cancel() {} } });
   lateFile.playback.start(); await flush();
+  lateFile.players[0].events.error({ code: 5400103 }); await flush();
   lateFile.playback.setActive(false);
   completeFileRead({ fd: 88, size: 24, release() { staleFileReleases++; } }); await flush();
-  assert.equal(staleFileReleases, 1); assert.equal(lateFile.players.length, 0);
+  assert.equal(staleFileReleases, 1); assert.equal(lateFile.players.length, 1);
   assert.equal(lateFile.states.at(-1).phase, 'idle', 'background cancels the pending local candidate');
   lateFile.playback.release();
   const changeMethod = component.slice(component.indexOf('  private sourceChanged()'), component.indexOf('  private activeChanged()'));

@@ -1,0 +1,30 @@
+{
+  "startupTasks": [
+    {
+      "name": "RuntimeLogTask",
+      "srcEntry": "./ets/startup/RuntimeLogTask.ets",
+      "dependencies": [],
+      "runOnThread": "mainThread",
+      "waitOnMainThread": true
+    },
+    {
+      "name": "PreferencesTask",
+      "srcEntry": "./ets/startup/PreferencesTask.ets",
+      "dependencies": [
+        "RuntimeLogTask"
+      ],
+      "runOnThread": "mainThread",
+      "waitOnMainThread": true
+    },
+    {
+      "name": "WebEngineTask",
+      "srcEntry": "./ets/startup/WebEngineTask.ets",
+      "dependencies": [
+        "PreferencesTask"
+      ],
+      "runOnThread": "mainThread",
+      "waitOnMainThread": true
+    }
+  ],
+  "configEntry": "./ets/startup/StartupConfig.ets"
+}

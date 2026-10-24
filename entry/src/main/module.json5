@@ -2,6 +2,8 @@
   "module": {
     "name": "entry",
     "type": "entry",
+    "srcEntry": "./ets/entryability/PinmonyAbilityStage.ets",
+    "appStartup": "$profile:startup_config",
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
     "deviceTypes": [

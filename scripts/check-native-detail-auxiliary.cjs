@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const Aux=load('entry/src/main/ets/app/PinmonyDetailNativeAuxiliary.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='feature_pin'?{PIN_VIDEO_API_ENABLED:true,PIN_CAROUSEL_API_ENABLED:true,PIN_VISUAL_SEARCH_API_ENABLED:true}:{}).PinmonyDetailNativeAuxiliary;
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',pin=origin+'/pin/11/',flush=()=>new Promise(setImmediate),crop={x:.1,y:.1,w:.8,h:.8};
@@ -18,6 +18,31 @@ function fixture(data=raw){
  return {aux,store,requests,cancelled,session:()=>session,setSession:s=>session=s,setOwned:v=>owned=v};
 }
 async function main(){
+ const mixedSlots=Array.from({length:15},(_,i)=>({id:'slot-'+i,images:{'736x':art()},
+   videos:i<5?video.videos:null}));
+ const mixedCarousel=fixture({...raw,is_video:false,videos:null,carousel_data:{carousel_slots:mixedSlots}});
+ assert.equal(mixedCarousel.store.detail.carousel.items.length,15);
+ assert.equal(mixedCarousel.store.detail.carousel.items.filter(item=>item.video).length,5);
+ assert.deepEqual(Array.from(mixedCarousel.store.detail.carousel.items,item=>item.id),mixedSlots.map(item=>item.id));
+ assert.equal(mixedCarousel.store.detail.carousel.items[0].video.sources.find(s=>s.kind==='mp4').url,video.videos.video_list.V_720P.url);
+ assert.equal(mixedCarousel.requests.length,0,'mixed carousel is complete in the validated PinResource response');
+ const carouselView=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets','utf8');
+ assert(carouselView.includes('item.video && index === this.page'),'only the current video item mounts a player');
+ assert(carouselView.includes("mediaOwner: this.mediaOwner + ':' + item.id"),'each slot owns a distinct player session');
+ const returned=fixture();
+ returned.store.detail.dataSource='api';returned.store.detail.imageUrl=raw.images.orig.url;
+ const parent=JSON.parse(JSON.stringify(returned.store.detail));
+ returned.aux.pause();returned.store.detailOpeningToken=3;returned.store.detail=parent;
+ assert(!returned.aux.ready(),'departed viewer context is invalidated');
+ assert(returned.aux.resume(pin,3),'matching native parent reads rebind the image viewer');
+ await returned.aux.openLayer('zoom');assert.equal(returned.store.imageLayer,'zoom');
+ assert.equal(returned.aux.downloadUrl(),raw.images.orig.url);assert.equal(returned.requests.length,0,'photo viewing after return does not reload content');
+ await returned.aux.openLayer('search');assert.equal(returned.store.imageLayer,'search');
+ returned.setOwned(false);assert(!returned.aux.resume(pin,3),'unconfirmed or old-account parent cannot resume viewer');
+ returned.setOwned(true);assert(!returned.aux.resume(pin,2),'old opening token cannot resume viewer');
+ returned.store.detail.pinUrl=origin+'/pin/12/';assert(!returned.aux.resume(pin,3),'different Pin cannot resume viewer');
+ const indexSource=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+ assert(indexSource.includes('this.detailNativeAuxiliary.resume(pinUrl, token)'), 'native back restores both reads and viewer context');
  const f=fixture();assert(f.aux.ready());await f.aux.openLayer('zoom');assert.equal(f.aux.downloadUrl(),raw.images.orig.url);assert.equal(f.requests.length,0);
  await f.aux.openLayer('search');let p=f.aux.search(crop,false,true);assert.equal(f.requests.length,1);
  let options=JSON.parse(new URL(f.requests[0].job.url).searchParams.get('data')).options;

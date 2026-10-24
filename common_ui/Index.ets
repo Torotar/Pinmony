@@ -1,6 +1,7 @@
 export { PinmonyStatusPage } from './src/main/ets/components/PinmonyStatusPage';
 export { PinmonyUserAvatar } from './src/main/ets/components/PinmonyUserAvatar';
 export { PinmonyBoardPlaceholder } from './src/main/ets/components/PinmonyBoardPlaceholder';
+export { PinmonyBoardPickerRow, PinmonyBoardPickerFooter } from './src/main/ets/components/PinmonyBoardPicker';
 
 export { PinmonyVideo, PinmonyVideoSource, PinmonyVideoFileLease, PinmonyVideoFileReader } from './src/main/ets/models/PinmonyVideo';
 export { PinmonyPlaybackState, PinmonyVideoPlayback } from './src/main/ets/services/PinmonyVideoPlayback';

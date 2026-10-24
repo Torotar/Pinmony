@@ -7,7 +7,7 @@ const native = harness.createHost(class Fixture {}, ts, globals);
 const root = 'https://www.pinterest.com/', search = root + 'search/pins/?q=design';
 let document = search, urlFailure = false, obsolete = false, reads = 0;
 Object.assign(native, {
-  returnCoordinator: { navigationBegun(url) { calls.push(['navigation-begin', url]); } },
+  updateLoginPresentation(){}, returnCoordinator: { navigationBegun(url) { calls.push(['navigation-begin', url]); } },
   authStatus: 'authenticated', authEpoch: 2, activeTab: 1, nativeRootOnly: false, businessSuspended: false,
   authCheckTimer: -1, tabRequestToken: 4, rootTabGuardTarget: -1, staleRootDocumentTarget: () => -1,
   retainedRootTabPending: -1, retainedRootTabAddress: '', retainedHomeDocumentPending: false,

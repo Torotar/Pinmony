@@ -54,13 +54,81 @@ export function isNewerRelease(tag: string, installed: string): boolean {
   return false;
 }
 
+interface ReleaseSnapshot {
+  installed: string;
+  expiresAt: number;
+  release: PinmonyRelease | undefined;
+  releases: PinmonyRelease[];
+}
+
+interface PendingRelease {
+  installed: string;
+  sequence: number;
+  promise: Promise<ReleaseSnapshot>;
+  worker: PinmonyReleaseClient;
+  readers: number;
+}
+
+function copyRelease(release: PinmonyRelease): PinmonyRelease {
+  return { tag_name: release.tag_name, html_url: release.html_url, body: release.body,
+    draft: release.draft, prerelease: release.prerelease };
+}
+
 export class PinmonyReleaseClient {
+  private static cache: ReleaseSnapshot | undefined = undefined;
+  private static pending: PendingRelease | undefined = undefined;
+  private static sequence: number = 0;
   releases: PinmonyRelease[] = [];
   private pageReleases: PinmonyRelease[] = [];
   private request: http.HttpRequest | undefined = undefined;
   private revision: number = 0;
-  cancel(): void { this.revision++; this.request?.destroy(); this.request = undefined; }
-  async latest(installed: string = ''): Promise<PinmonyRelease | undefined> {
+  private shared: PendingRelease | undefined = undefined;
+  cancel(): void {
+    this.revision++; this.request?.destroy(); this.request = undefined;
+    const shared: PendingRelease | undefined = this.shared;
+    this.shared = undefined;
+    if (shared) {
+      shared.readers--;
+      if (shared.readers === 0 && PinmonyReleaseClient.pending === shared) {
+        PinmonyReleaseClient.pending = undefined;
+        if (shared.sequence === PinmonyReleaseClient.sequence) PinmonyReleaseClient.sequence++;
+        shared.worker.cancel();
+      }
+    }
+  }
+  async latest(installed: string = '', force: boolean = false): Promise<PinmonyRelease | undefined> {
+    this.cancel();
+    const revision: number = this.revision;
+    let snapshot: ReleaseSnapshot | undefined = PinmonyReleaseClient.cache;
+    if (force || !snapshot || snapshot.installed !== installed || Date.now() >= snapshot.expiresAt) {
+      let pending: PendingRelease | undefined = PinmonyReleaseClient.pending;
+      if (!pending || pending.installed !== installed) {
+        const sequence: number = ++PinmonyReleaseClient.sequence;
+        const worker: PinmonyReleaseClient = new PinmonyReleaseClient();
+        const promise: Promise<ReleaseSnapshot> = worker.readLatest(installed).then((release): ReleaseSnapshot => {
+          const result: ReleaseSnapshot = { installed: installed, expiresAt: Date.now() + 300000,
+            release: release ? copyRelease(release) : undefined, releases: worker.releases.map(copyRelease) };
+          if (sequence === PinmonyReleaseClient.sequence) PinmonyReleaseClient.cache = result;
+          return result;
+        }).finally((): void => {
+          if (PinmonyReleaseClient.pending?.sequence === sequence) PinmonyReleaseClient.pending = undefined;
+        });
+        pending = { installed: installed, sequence: sequence, promise: promise, worker: worker, readers: 0 };
+        PinmonyReleaseClient.pending = pending;
+      } else PinmonyRuntimeLog.info('ReleaseCheck: event=joined');
+      this.shared = pending;
+      pending.readers++;
+      try { snapshot = await pending.promise; }
+      finally {
+        if (this.shared === pending) { this.shared = undefined; pending.readers--; }
+      }
+    } else PinmonyRuntimeLog.info('ReleaseCheck: event=cache-hit');
+    if (revision !== this.revision) throw new Error('Release check cancelled');
+    this.releases = snapshot.releases.map(copyRelease);
+    return snapshot.release ? copyRelease(snapshot.release) : undefined;
+  }
+
+  private async readLatest(installed: string): Promise<PinmonyRelease | undefined> {
     this.cancel();
     const revision: number = this.revision;
     this.releases = [];
@@ -140,8 +208,13 @@ export class PinmonyReleaseClient {
     } catch (error) {
       const rawCode: number = (error as BusinessError).code;
       const code: number = Number.isFinite(rawCode) ? rawCode : 0;
-      PinmonyRuntimeLog.warn('ReleaseCheck: event=failed stage=' + stage + ' status=' + status.toString() +
-        ' code=' + code.toString() + ' timeout=' + timedOut.toString() + ' elapsedMs=' + (Date.now() - started).toString());
+      if (!feed && (status === 403 || status === 429)) {
+        // latest() handles this branch through the existing public Atom feed.
+        PinmonyRuntimeLog.info('ReleaseCheck: event=api-denied status=' + status.toString() + ' recovery=atom');
+      } else {
+        PinmonyRuntimeLog.warn('ReleaseCheck: event=failed stage=' + stage + ' status=' + status.toString() +
+          ' code=' + code.toString() + ' timeout=' + timedOut.toString() + ' elapsedMs=' + (Date.now() - started).toString());
+      }
       const reason: string = timedOut ? PinmonyI18n.message('pm_github_connection_exceeded_12_seconds_f13449d8') : status === 403 || status === 429 ? PinmonyI18n.message('pm_github_access_restricted_http_f36de88e') + status.toString() :
         status !== 0 && status !== 200 ? PinmonyI18n.message('pm_github_returned_http_8ae4d6ab') + status.toString() : stage !== 'request' ? PinmonyI18n.message('pm_invalid_release_information_1050d6f8') :
         code !== 0 ? PinmonyI18n.message('pm_network_error_d8e20c2f') + code.toString() : PinmonyI18n.message('pm_unable_to_connect_to_github_a30d0dd6');

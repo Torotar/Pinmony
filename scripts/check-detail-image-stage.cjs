@@ -7,7 +7,7 @@ const source = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailI
 const compiledExports = {};
 vm.runInNewContext(ts.transpileModule(source, { compilerOptions: {
   target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS
-} }).outputText, { exports: compiledExports, require: () => ({}) });
+} }).outputText, { exports: compiledExports, require: require('./local-message-test-fixture.cjs').withLocalMessages(() => ({})) });
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function main() {
   const pin = 'https://www.pinterest.com/pin/101/';

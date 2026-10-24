@@ -89,8 +89,16 @@ const { PinmonyPhotoMenuCoordinator } = loader.loadFile('entry/src/main/ets/app/
     resultSheet='';failCopy(Error('closed panel'));await copying;
     assert.equal(notices.length,0,'a closed panel does not receive a late external-operation failure');
     const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-    for (const item of require('./product-coordination-bindings.json'))
-        assert(index.includes('this.' + item.field + '.' + item.name + '('));
+    const components = fs.readdirSync('entry/src/main/ets/components').filter(n=>n.endsWith('.ets')).map(n=>fs.readFileSync('entry/src/main/ets/components/'+n,'utf8')).join('');
+    for (const item of require('./product-coordination-bindings.json')) {
+        if (item.group.startsWith('Native')) {
+            assert(index.includes('new '+item.className+'('),item.field+' initializer');
+        } else if (item.field === 'webLifecycleCoordinator') {
+            assert(components.includes('view.lifecycle.'+item.name+'('),item.name);
+        } else {
+            assert((index+components).includes('this.'+item.field+'.'+item.name+'(') || components.includes('view.'+item.field+'.'+item.name+'('),item.name);
+        }
+    }
     assert(!fs.readFileSync('entry/src/main/ets/app/PinmonyRootContextCoordinator.ets', 'utf8').includes('while ('));
     assert(!fs.readFileSync('entry/src/main/ets/app/PinmonyPhotoMenuCoordinator.ets', 'utf8').split('async openHomeMoreViaDetail')[1].includes('while ('));
     for (const [feature, name] of [['pin', 'PinmonyShareSheet'], ['pin', 'PinmonyMoreSheet'], ['search', 'PinmonySearchFilterSheet']]) {

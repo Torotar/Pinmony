@@ -17,6 +17,10 @@ export struct PinmonySocialPermissionsPage {
   private stack: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
   private uiText(key: string): string { return PinmonyI18n.text(key, this.uiLanguage); }
+  private messageTabLabel(id: number): string {
+    return this.uiText(id === -1 ? 'pm_social_business_tab' : id === 0 ? 'pm_social_friends' : id === 1 ? 'pm_social_followers' : id === 2 ? 'pm_social_following' : 'pm_social_others_short');
+  }
+  private messageTabIds(): number[] { return this.store.social.business ? [-1,0,1,2,4] : [0,1,2,4]; }
   aboutToAppear(): void { this.visible = true; this.stack.pushPath({ name: 'social' }, false); }
   aboutToDisappear(): void { this.visible = false; this.confirming = false; }
   private available(): boolean { return this.visible && !this.store.busy && !this.store.loading && !this.store.writeUncertain && !this.confirming; }
@@ -27,11 +31,16 @@ export struct PinmonySocialPermissionsPage {
   }
   private open(screen: string): void {
     if (!this.visible || this.store.busy || this.store.loading || this.confirming) return;
+    if (screen === 'socialMessages' && this.store.social.business) this.store.socialMessageGroup = -1;
     this.store.token++; this.store.screen = screen; this.store.error = '';
     if (this.onRequest) this.onRequest(screen === 'socialBlocked' ? 'socialBlocked' : 'socialRead','');
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
   }
-  private groupId(): number { return this.store.screen === 'socialFriends' ? 0 : this.store.screen === 'socialFollowers' ? 1 : this.store.screen === 'socialFollowing' ? 2 : 4; }
+  private groupId(): number { return this.store.screen === 'socialMessages' && (this.store.social.personal || this.store.social.business) ? this.store.socialMessageGroup : this.store.screen === 'socialFriends' ? 0 : this.store.screen === 'socialFollowers' ? 1 : this.store.screen === 'socialFollowing' ? 2 : 4; }
+  private selectMessageTab(index: number): void {
+    if (!this.visible || this.store.screen !== 'socialMessages' || !(this.store.social.personal || this.store.social.business) || this.store.busy || this.store.loading || this.confirming || !Number.isInteger(index) || index < 0 || index >= this.messageTabIds().length) return;
+    this.store.socialMessageGroup = this.messageTabIds()[index];
+  }
   private group(id: number): SocialMessageGroup | undefined { return this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === id); }
   private levelLabel(level: number): string { return this.uiText(level === 0 ? 'pm_social_direct' : level === 1 ? 'pm_social_requests' : 'pm_social_ignore'); }
   private selectionKey(level: number): string {
@@ -88,6 +97,36 @@ export struct PinmonySocialPermissionsPage {
     }.width('100%')
   }
   @Builder
+  private messageTabs() {
+    Column({ space:16 }) {
+      Scroll() {
+        Row({ space:8 }) {
+          ForEach(this.messageTabIds(), (id: number, index: number) => {
+            Button(this.messageTabLabel(id), { type: ButtonType.Capsule })
+              .height(36).padding({left:20,right:20}).fontSize(14).fontWeight(FontWeight.Medium)
+              .backgroundColor(id === this.store.socialMessageGroup ? $r('app.color.home_category_selected') : $r('app.color.input_surface'))
+              .fontColor(id === this.store.socialMessageGroup ? $r('app.color.page_background') : $r('app.color.primary_text'))
+              .enabled(!this.store.busy && !this.store.loading && !this.confirming)
+              .accessibilitySelected(id === this.store.socialMessageGroup)
+              .onClick(() => this.selectMessageTab(index))
+          }, (id: number): string => id + ':' + this.store.socialMessageGroup + ':' + this.store.busy + ':' + this.store.loading + ':' + this.uiLanguage)
+        }.height(48)
+      }.width('100%').height(48).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.Start)
+      Scroll(this.scroller) {
+        Column({ space:16 }) {
+          if (this.store.error) { Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')); Button(this.uiText('pm_retry_b8784c8d')).enabled(!this.store.loading && !this.store.busy).onClick(() => { if (this.onRequest) this.onRequest('socialRead',''); }) }
+          if (this.store.social.business && this.store.socialMessageGroup === -1) {
+            Text(this.uiText('pm_social_business_messages')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+            Text(this.uiText('pm_social_business_detail')).fontSize(16).fontColor($r('app.color.secondary_text'))
+            Text(this.uiText('pm_social_unavailable')).fontSize(14).fontColor($r('app.color.secondary_text'))
+          } else {
+            this.messageChoices()
+          }
+        }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom:28 })
+      }.width('100%').layoutWeight(1).align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+    }.width('100%').height('100%').padding({left:20,right:20,top:16})
+  }
+  @Builder
   private body() {
     if (this.store.screen === 'social') {
       Text(this.uiText('pm_social_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
@@ -133,12 +172,16 @@ export struct PinmonySocialPermissionsPage {
   private destination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
+        if (this.store.screen === 'socialMessages' && (this.store.social.personal || this.store.social.business)) {
+          this.messageTabs()
+        } else {
         Scroll(this.scroller) {
           Column({ space:16 }) {
             if (this.store.error) { Text(PinmonyI18n.render(this.store.error,this.uiLanguage)).fontColor($r('app.color.secondary_text')); Button(this.uiText('pm_retry_b8784c8d')).enabled(!this.store.busy && !this.store.loading).onClick(() => { if (this.onRequest) this.onRequest(this.store.screen === 'socialBlocked' ? 'socialBlocked' : 'socialRead',''); }) }
             this.body()
           }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:16,bottom:28 })
         }.width('100%').height('100%').align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+        }
         if (this.store.loading || this.store.busy) { LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None) }
       }.width('100%').height('100%')
     }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,

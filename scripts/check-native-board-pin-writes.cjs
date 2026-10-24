@@ -48,6 +48,41 @@ async function main() {
   assert.deepEqual(JSON.parse(moveForm.get('data')).options, {url: '/v3/pins/bulk/move/', data: {board_id: '200', pin_ids: ['1', '2', '3']}});
   move.requests[0].resolve(resource(null, 'v3_move_pins')); await pending;
   assert.equal(move.commits[0].action, 'move'); assert.deepEqual(Array.from(move.commits[0].ids), ['1', '2', '3']);
+  function sectionFixture(target = 'section:100:300', ids = ['1']) {
+    const f = fixture(true); f.setIdentity({...f.identity(), selectedIds: ids});
+    f.state().targets.push({id: target, enabled: true, title: 'Section', imageUrl: ''}); return f;
+  }
+  const section = sectionFixture(); pending = section.writer.submit('move', 'section:100:300');
+  await section.writer.submit('move', 'section:100:300'); assert.equal(section.requests.length, 1);
+  const sectionJob = section.requests[0].job, sectionOptions = JSON.parse(new URLSearchParams(sectionJob.body).get('data')).options;
+  assert.deepEqual(sectionOptions, {url:'/v3/board/sections/300/',data:{pins:['1'],fields:[
+    'boardsection.board()','boardsection.id','boardsection.pin_count','boardsection.preview_pins()',
+    'boardsection.slug','boardsection.title','boardsection.type']}});
+  section.requests[0].resolve(resource({id:'300',type:'board_section',board:{id:'100'}},'v3_post_board_section')); await pending;
+  assert.equal(section.commits[0].action,'moveSection');
+  const cross=fixture(true);cross.state().targetBoardId='200';cross.state().targetSections=[{id:'300',title:'Section',images:[]}];
+  pending=cross.writer.submit('move','section:200:300');await cross.writer.submit('move','section:200:300');assert.equal(cross.requests.length,1);
+  const crossJob=cross.requests[0].job,crossForm=new URLSearchParams(crossJob.body);
+  assert.equal(crossForm.get('source_url'),'/sample/board/_tools/organize/?organization_feed=False');
+  assert.deepEqual(JSON.parse(crossForm.get('data')).options,{url:'/v3/pins/bulk/move/',data:{board_id:'200',section_id:'300',pin_ids:['1','2','3']}});
+  assert(cross.requests[0].targets.includes('section:200:300'));assert.equal(cross.state().targetBoardId,'200','busy retains target context');
+  cross.requests[0].resolve(resource(null,'v3_move_pins'));await pending;assert.equal(cross.commits[0].action,'move');
+  for(const configure of [f=>f.state().targetSections=[],f=>f.state().targetBoardId='201',f=>f.state().targets[0].enabled=false]) {
+    const f=fixture(true);f.state().targetBoardId='200';f.state().targetSections=[{id:'300',title:'Section',images:[]}];configure(f);
+    await f.writer.submit('move','section:200:300');assert.equal(f.requests.length,0,'unverified section ownership cannot write');
+  }
+  for (const [target, ids] of [['section:200:300',['1']], ['section:100:300',['1','2']]]) {
+    const f = sectionFixture(target,ids); await f.writer.submit('move',target); assert.equal(f.requests.length,0);
+  }
+  for (const [data, endpoint] of [
+    [{id:'301',type:'board_section',board:{id:'100'}},'v3_post_board_section'],
+    [{id:'300',type:'board_section',board:{id:'200'}},'v3_post_board_section'],
+    [{id:'300',type:'board',board:{id:'100'}},'v3_post_board_section'],
+    [{id:'300',type:'board_section',board:{id:'100'}},'v3_move_pins']]) {
+    const f=sectionFixture(), p=f.writer.submit('move','section:100:300'); f.requests[0].resolve(resource(data,endpoint)); await p;
+    assert(f.state().uncertain); assert.equal(f.commits.length,0);
+    await f.writer.submit('move','section:100:300'); assert.equal(f.requests.length,1);
+  }
   for(const change of [f => f.state().busy = true, f => f.state().loading = true, f => f.state().uncertain = true,
     f => f.state().error = 'read-error', f => f.setIdentity({...f.identity(), canContribute: false}), f => f.setSession({...f.session(), authenticated: false})]) {
     const f = fixture(); change(f); await f.writer.submit('save', '7'); assert.equal(f.requests.length, 0);
@@ -97,6 +132,17 @@ async function main() {
   assert.equal((await undoTransport(sectionDelete,['77'],sectionRoute)).error,'');assert.equal((await undoTransport(sectionDelete,['7'],sectionRoute)).error,'rejected');
   const before = sent;
   function mutate(job, change) {const q = new URLSearchParams(job.body), e = JSON.parse(q.get('data')); change(e); q.set('data', JSON.stringify(e)); return {...job, body: q.toString()}}
+  const crossTransport=(job,targets=['200','section:200:300'])=>net.requestBusinessBoardPinWrite(job,()=>session,'100','42',['1','2','3'],targets,[],()=>owner);
+  assert.equal((await crossTransport(crossJob)).error,'');
+  for(const targets of [['200'],['section:200:300'],['200','section:201:300']])assert.equal((await crossTransport(crossJob,targets)).error,'rejected');
+  for(const job of [mutate(crossJob,e=>e.options.data.section_id='301'),mutate(crossJob,e=>e.options.data.pin_ids=['99']),
+    mutate(crossJob,e=>e.options.data.extra=true)])assert.equal((await crossTransport(job)).error,'rejected');
+  const sectionTransport=(job,targets=['section:100:300'])=>net.requestBusinessBoardPinWrite(job,()=>session,'100','42',['1'],targets,[],()=>owner);
+  assert.equal((await sectionTransport(sectionJob)).error,'');
+  assert.equal((await sectionTransport(sectionJob,[])).error,'rejected');
+  for(const job of [mutate(sectionJob,e=>e.options.data.pins=['2']),
+    mutate(sectionJob,e=>e.options.data.pins=['1','1']),mutate(sectionJob,e=>e.options.data.fields=[]),
+    mutate(sectionJob,e=>e.options.url='/v3/board/sections/301/')]) assert.equal((await sectionTransport(job)).error,'rejected');
   for(const job of [{...saveJob, method: 'GET'}, {...saveJob, id: 'bridge'}, {...saveJob, page: origin + '/sample/pins/'},
     {...saveJob, body: saveJob.body + '&extra=true'}, {...saveJob, url: origin + '/resource/PinResource/delete/'},
     mutate(saveJob, e => e.options.pin_id = '999'), mutate(saveJob, e => e.options.board_id = '999'), mutate(saveJob, e => e.options.user_id = '99'),
@@ -105,7 +151,7 @@ async function main() {
     mutate(moveJob, e => e.options.data.board_id = '100'), mutate(moveJob, e => e.options.data.pin_ids = ['99']),
     mutate(moveJob, e => e.options.data.pin_ids = ['1', '1']), mutate(moveJob, e => e.options.data.pin_ids = []),
     mutate(moveJob, e => e.options.data.section_id = '123'), mutate(moveJob, e => e.options.url = '/v3/boards/100/archive/')]) assert((await transport(job)).error);
-  assert.equal(sent, before); session = {...session, origin: 'https://uk.pinterest.com'};
+  assert.equal(sent, before + 2); session = {...session, origin: 'https://uk.pinterest.com'};
   assert.equal((await transport({...saveJob, page: saveJob.page.replace(origin, session.origin), url: saveJob.url.replace(origin, session.origin)})).error, '');
   owner = false; assert.equal(context().authenticated, false);
 
@@ -161,13 +207,26 @@ async function main() {
 
   const cs={boardDetail:{kind:'state',session:0,pageKey:page,title:'Board',pins:[],ready:false},collaboratorsToken:0}, cr=[];
   const sendCreate=(job,...args)=>{assert(args.findLast(value=>typeof value==='function')());return new Promise(resolve=>cr.push({job,resolve:body=>resolve({body,status:200,error:''})}))};
-  const nr=new Reader({store:()=>cs,session:()=>save.session(),active:()=>true,network:()=>({cancel(){},requestBusinessBoardRead:sendCreate,requestBusinessBoardAuxRead:sendCreate,requestBusinessBoardPinWrite:sendCreate}),install(){},bridge(){},committed(){},openPin(){},invalidateProfile(){}});
+  const nr=new Reader({store:()=>cs,session:()=>save.session(),active:()=>true,network:()=>({cancel(){},requestBusinessBoardRead:sendCreate,requestBusinessBoardAuxRead:sendCreate,requestBusinessBoardSectionRead:sendCreate,requestBusinessBoardPinWrite:sendCreate}),install(){},bridge(){},committed(){},openPin(){},invalidateProfile(){}});
   let work=nr.demand();cr[0].resolve(resource(board));await flush();cr[1].resolve(resource([rawPin(1)]));await work;
   work=nr.handle('flow',JSON.stringify({action:'targets',value:['1']}));cr[2].resolve(resource([]));await work;
   work=nr.handle('flow',JSON.stringify({action:'createTarget',value:input}));assert(cs.boardDetail.flow.busy);cr[3].resolve(resource({id:'250',type:'board',name:'New board',privacy:'secret',owner:{id:'42'}},'v3_create_board'));await work;
   assert.equal(cs.boardDetail.flow.phase,'targets');assert.equal(cs.boardDetail.flow.targets[0].id,'250');assert.equal(cs.boardDetail.pins.length,1,'creating a destination never removes source Pins');
   work=nr.handle('flow',JSON.stringify({action:'move',value:'250'}));assert.equal(JSON.parse(new URLSearchParams(cr[4].job.body).get('data')).options.data.pin_ids[0],'1');cr[4].resolve(resource(null,'v3_move_pins'));await work;assert.equal(cs.boardDetail.pins.length,0);
   cr[5].resolve(resource({...board,pin_count:0}));await flush();cr[6].resolve(resource([]));await flush();
+  work=nr.refresh();cr[7].resolve(resource(board));await flush();cr[8].resolve(resource([rawPin(1)]));await work;
+  work=nr.handle('flow',JSON.stringify({action:'targets',value:['1']}));cr[9].resolve(resource([{type:'board',id:'200',name:'Target',access:['write']}]));await work;
+  work=nr.handle('flow',JSON.stringify({action:'sectionTargetOpen',value:'200'}));
+  const readSectionJob=cr[10].job;assert.equal(cs.boardDetail.flow.targetBoardId,'200');
+  assert.equal((await net.requestBusinessBoardSectionRead(readSectionJob,()=>save.session(),'200','100','',()=>true)).error,'');
+  cr[10].resolve(resource([{id:'300',type:'board_section',title:'Section',board:{id:'200'}}],'get_all_boards_sections'));await work;
+  assert.equal(cs.boardDetail.flow.targetSections[0].id,'300');
+  const targetBack=new Back();targetBack.boardStore=cs;targetBack.boardNativeReads=nr;targetBack.boardOperation=(method,id)=>nr.handle(method,id);
+  targetBack.backFromBoard();await flush();assert.equal(cs.boardDetail.flow.phase,'targets');assert.equal(cs.boardDetail.flow.targetBoardId,undefined);
+  work=nr.handle('flow',JSON.stringify({action:'sectionTargetOpen',value:'200'}));cr[11].resolve(resource([{id:'300',type:'board_section',title:'Section',board:{id:'200'}}],'get_all_boards_sections'));await work;
+  work=nr.handle('flow',JSON.stringify({action:'move',value:'section:200:300'}));assert.equal(cr.length,13);
+  cr[12].resolve(resource(null,'v3_move_pins'));await work;assert.equal(cs.boardDetail.pins.length,0);
+  cr[13].resolve(resource({...board,pin_count:0}));await flush();cr[14].resolve(resource([]));await flush();
   // Real Web adapter adopts native busy and completed flows, with both legacy submit entrypoints disabled.
   const script = load('feature_board/src/main/ets/services/PinmonyBoardApiScript.ets').PIN_BOARD_API_SCRIPT;
   const location={hostname:'www.pinterest.com',origin,pathname:'/sample/board/',href:page};let fetches=0;const states=[];

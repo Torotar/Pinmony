@@ -8,7 +8,7 @@ function method(name) {
   const start = source.indexOf('  private ' + name + '(');
   assert.ok(start >= 0, name);
   const rest = source.slice(start);
-  const end = rest.slice(1).search(/\n  (?:private |@Builder)/) + 1;
+  const end = rest.slice(1).search(/\n  (?:private |@[A-Z])/) + 1;
   return rest.slice(0, end);
 }
 const home = 'https://www.pinterest.com/', pin = home + 'pin/123/', other = home + 'pin/456/';

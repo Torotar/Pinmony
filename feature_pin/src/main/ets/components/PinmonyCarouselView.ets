@@ -1,5 +1,6 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyCarousel, PinmonyCarouselItem } from '../models/PinmonyDetail';
+import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
 
 @Component
 export struct PinmonyCarouselView {
@@ -8,6 +9,12 @@ export struct PinmonyCarouselView {
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
   @Prop @Watch('onCarouselChanged') carousel: PinmonyCarousel;
   @Prop contentWidth: number = 324;
+  @Prop active: boolean = true;
+  @Prop sessionReady: boolean = false;
+  @Prop mediaOwner: string = '';
+  @Prop openId: number = 0;
+  @Prop autoplayWifi: boolean = false;
+  @Prop autoplayCellular: boolean = false;
   @State private page: number = 0;
   @State private failed: string[] = [];
   @State private revision: number = 0;
@@ -36,7 +43,15 @@ export struct PinmonyCarouselView {
       Swiper(this.controller) {
         ForEach(this.carousel.items, (item: PinmonyCarouselItem, index: number) => {
           Stack({ alignContent: Alignment.Center }) {
-            if (this.failed.includes(item.id)) {
+            if (item.video && index === this.page) {
+              PinmonyVideoPlayer({ video: item.video, poster: item.imageUrl,
+                active: this.active && index === this.page, sessionReady: this.sessionReady,
+                mediaOwner: this.mediaOwner + ':' + item.id, openId: this.openId,
+                autoplayWifi: this.autoplayWifi, autoplayCellular: this.autoplayCellular,
+                onPosterSettled: (failed: boolean) => {
+                  if (index === 0 && this.carousel.items[0]?.id === item.id) this.onFirstImageSettled?.(failed);
+                } }).width('100%').height('100%')
+            } else if (this.failed.includes(item.id)) {
               Column({ space: 12 }) {
                 Text(this.uiText("pm_image_failed_to_load_572993f5")).fontColor($r('app.color.primary_text'))
                 Button(this.uiText("pm_retry_b8784c8d")).onClick(() => {
@@ -55,7 +70,7 @@ export struct PinmonyCarouselView {
                       this.carousel.items[0]?.imageUrl === item.imageUrl && this.onFirstImageSettled) this.onFirstImageSettled(true);
                   if (!this.failed.includes(item.id)) this.failed = this.failed.concat(item.id);
                 })
-                .onClick(() => { if (this.onImageTap) this.onImageTap(item.imageUrl); })
+                .onClick(() => { if (!item.video && this.onImageTap) this.onImageTap(item.imageUrl); })
                 .accessibilityText(this.uiFormat("pm_image_value_of_value_value_66dd48e8", [index + 1, this.carousel.items.length, item.title]))
             }
           }.width('100%').height('100%')

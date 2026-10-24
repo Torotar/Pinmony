@@ -6,7 +6,7 @@ function compile(file, deps = () => ({})) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
-  }).outputText, { exports, require: deps });
+  }).outputText, {PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages,BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined}, exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps) });
   return exports;
 }
 const source = fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets', 'utf8');
@@ -18,11 +18,12 @@ function method(name) {
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
   ['snapshotChanged(', 'isDiscoveryBoard(', 'phase(', 'selectingPins(', 'boardTitleMenu(', 'titleBarOptions('].map(method).join('\n') + '} Host;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
-}).outputText, { Color: { Transparent: 'transparent' }, $r: value => value,
-  SymbolGlyphModifier: class { fontColor() { return this; } } });
+}).outputText, {PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages,BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined}, Color: { Transparent: 'transparent' }, $r: value => value,
+  SymbolGlyphModifier: class { fontSize(){return this;} fontColor() { return this; } } });
+Host.prototype.uiText=require('./local-message-test-fixture.cjs').rawLocalMessages.text;
 const header = (discoveryBoard, profileBoard, featured, editable = true) => {
-  const host = new Host();
-  Object.assign(host, { discoveryBoard, profileBoard, snapshot: { title: 'Board', ready: true, featured, editable } });
+  const host = new Host(); host.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
+  Object.assign(host, { discoveryBoard, profileBoard, snapshot: { title: 'Board', ready: true, featured, editable,canFollow:editable!==true } });
   return host.titleBarOptions();
 };
 for (const [discovery, profile, featured] of [[true, false, true], [true, true, false], [false, false, true]]) {
@@ -30,15 +31,16 @@ for (const [discovery, profile, featured] of [[true, false, true], [true, true, 
   assert.equal(options.content.title.mainTitle, '');
   assert.equal(options.content.menu.value.length, 1);
   assert.equal(options.content.menu.value[0].content.label, '图板选项');
-  assert.equal(options.style.originalStyle.contentStyle.backIconStyle.backgroundColor, 'transparent');
-  assert.equal(options.style.originalStyle.contentStyle.menuStyle.backgroundColor, 'transparent');
+  assert.equal(options.style.originalStyle.contentStyle.backIconStyle.backgroundColor, undefined);
+  assert.equal(options.style.originalStyle.contentStyle.menuStyle.backgroundColor, undefined);
   assert.equal(options.avoidLayoutSafeArea, true); assert.equal(options.enableComponentSafeArea, true);
 }
 for (const [profile, featured] of [[true, false], [true, true], [false, false]]) {
   const options = header(false, profile, featured);
   assert.equal(options.content.title.mainTitle, 'Board');
   assert.equal(options.content.menu.value.length, 2, 'ordinary/profile board keeps its existing title actions');
-  assert.equal(options.style.originalStyle.contentStyle, undefined);
+  assert.equal(options.style.originalStyle.contentStyle.titleStyle.mainTitleColor, 'app.color.primary_text');
+  assert.equal(options.style.scrollEffectStyle.contentStyle.titleStyle.mainTitleColor, 'app.color.primary_text');
 }
 for (const discovery of [true,false]) for (const editable of [false,undefined]) {
   const options=header(discovery,true,false,editable === undefined ? null : editable);

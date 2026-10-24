@@ -1,3 +1,4 @@
+import { ImageFlightRect } from '../services/PinmonyImageTransition';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
@@ -42,7 +43,31 @@ export struct PinmonyDetailPage {
   @Prop initialScrollOffset: number = 0;
   @Prop @Watch('onImageLayerChanged') imageLayer: string = '';
   @State private viewerControls: boolean = true;
-  private onImageLayerChanged(): void { this.viewerControls = true; }
+  @State private viewerMounted: boolean = false;
+  @State private viewerImageReady: boolean = false;
+  @State private viewerClosing: boolean = false;
+  @State private viewerOrigin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
+  private onImageLayerChanged(): void {
+    this.viewerControls = true;
+    if (this.imageLayer === 'zoom') {
+      if (!this.viewerMounted) this.viewerImageReady = false;
+      this.viewerOrigin = this.measureViewerOrigin();
+      this.viewerClosing = false; this.viewerMounted = true;
+    } else if (this.viewerMounted) {
+      this.viewerOrigin = this.measureViewerOrigin();
+      this.viewerClosing = true;
+    }
+  }
+  private measureViewerOrigin(): ImageFlightRect {
+    try {
+      const ui = this.getUIContext();
+      const source = ui.getComponentUtils().getRectangleById('pinmony-photo-source-' + this.traceId.toString());
+      const root = ui.getComponentUtils().getRectangleById('pinmony-photo-root-' + this.traceId.toString());
+      return { x: ui.px2vp(source.windowOffset.x - root.windowOffset.x),
+        y: ui.px2vp(source.windowOffset.y - root.windowOffset.y),
+        width: ui.px2vp(source.size.width), height: ui.px2vp(source.size.height) };
+    } catch (_) { return { x: 0, y: 0, width: 0, height: 0 }; }
+  }
   @Prop visualResult: PinmonyVisualResult = emptyVisualResult();
   @State private zoomImageUrl: string = '';
   @State private searchLabelVisible: boolean = true;
@@ -80,6 +105,8 @@ export struct PinmonyDetailPage {
   private lastReportedScrollOffset: number = 0;
   private lastRecommendAuditKey: string = '';
   private activePin: string = '';
+  private restoredPaginationAllowed: boolean = true;
+  private restoringScroll: boolean = false;
   onBack?: () => void;
   onUser?: (url: string) => void;
   onAction?: (id: string, kind: string) => void;
@@ -96,6 +123,7 @@ export struct PinmonyDetailPage {
 
   private onPinChanged(): void {
     if (this.activePin !== this.detail.pinUrl) {
+      this.viewerMounted = false; this.viewerClosing = false;
       this.activePin = this.detail.pinUrl;
       this.decodedHeroSource = undefined;
       this.expanded = false;
@@ -187,18 +215,23 @@ export struct PinmonyDetailPage {
 
   private restoreScrollPosition(): void {
     const offset: number = Math.max(0, this.initialScrollOffset);
+    this.restoredPaginationAllowed = offset <= 0;
+    this.restoringScroll = true;
     const pin: string = this.detail.pinUrl;
     setTimeout(() => {
       if (this.detail.pinUrl !== pin) return;
       try {
         this.detailScroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
+        this.lastReportedScrollOffset = offset;
       } catch (error) {
         PinmonyRuntimeLog.warn('Pinmony: detail scroll restoration unavailable');
       }
+      this.restoringScroll = false;
     }, 0);
   }
 
   private reportScrollPosition(force: boolean = false): void {
+    if (this.restoringScroll) return;
     try {
       const position = this.detailScroller.offset();
       if (!position) return;
@@ -492,11 +525,16 @@ export struct PinmonyDetailPage {
     Column() {
           if (this.detail.carousel) {
             PinmonyCarouselView({ carousel: this.detail.carousel, contentWidth: this.detailPaneWidth(),
+              active: this.videoActive && !this.imageLayer,
+              sessionReady: this.actionsReady || this.readsReady,
+              mediaOwner: this.detail.pinUrl + '|' + this.traceId.toString(), openId: this.traceId,
+              autoplayWifi: this.detail.autoplayWifi === true, autoplayCellular: this.detail.autoplayCellular === true,
               onFirstImageSettled: (failed: boolean) => {
                 if (failed) { if (this.onImageError) this.onImageError(this.detail.pinUrl); }
                 else this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
               },
               onImageTap: (url: string) => { this.zoomImageUrl = url; if (this.onImageLayer) this.onImageLayer('zoom'); } })
+              .id('pinmony-photo-source-' + this.traceId.toString()).opacity(this.viewerMounted && this.viewerImageReady ? 0 : 1)
           } else if (((this.detail.mediaLoading || this.mediaReadBusy) && !this.detail.video) || (this.detail.mediaKind === 'carousel' && !this.detail.carousel)) {
             Stack({ alignContent: Alignment.Center }) {
               if (this.detail.imageUrl) this.heroImage()
@@ -781,6 +819,7 @@ export struct PinmonyDetailPage {
         onTap: () => { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } })
     }, (source: DetailHeroSource): string => source.key)
     }.width('100%').height(this.heroHeight())
+      .id('pinmony-photo-source-' + this.traceId.toString()).opacity(this.viewerMounted && this.viewerImageReady ? 0 : 1)
   }
 
   private heroImageSources(url: string, pinUrl: string): DetailHeroSource[] {
@@ -838,9 +877,14 @@ export struct PinmonyDetailPage {
       .align(Alignment.TopStart)
       .edgeEffect(EdgeEffect.Spring)
       .onAppear(() => this.restoreScrollPosition())
+      .onScrollFrameBegin((offset: number, state: ScrollState) => {
+        if (!this.restoringScroll && state === ScrollState.Scroll && offset > 0) this.restoredPaginationAllowed = true;
+        return { offsetRemain: offset };
+      })
       .onDidScroll(() => this.reportScrollPosition())
       .onScrollStop(() => this.reportScrollPosition(true))
       .onReachEnd(() => {
+        if (!this.restoredPaginationAllowed) return;
         if (!this.readsReady && (this.detail.kind === 'cached' || this.detail.relatedRetained)) {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=cached-presentation');
           return;
@@ -926,17 +970,20 @@ export struct PinmonyDetailPage {
       }
       .width('100%').height('100%').hideTitleBar(true)
       .navDestination(this.detailDestination).backgroundColor($r('app.color.page_background'))
-      .hitTestBehavior(this.imageLayer === 'zoom' ? HitTestMode.None : HitTestMode.Default)
-      if (this.imageLayer === 'zoom') {
+      .hitTestBehavior(this.viewerMounted ? HitTestMode.None : HitTestMode.Default)
+      if (this.viewerMounted) {
         PinmonyImageViewer({ detail: this.detail, imageUrl: this.zoomImageUrl || this.detail.originalImageUrl || this.detail.imageUrl,
           previewUrl: this.zoomImageUrl || this.detail.imageUrl,
+          origin: this.viewerOrigin, closing: this.viewerClosing,
+          onReady: () => { this.viewerImageReady = true; },
+          onClosed: () => { if (this.imageLayer !== 'zoom') { this.viewerMounted = false; this.viewerImageReady = false; } },
           active: this.videoActive,
           actionsReady: this.actionsReady,
           onClose: () => { if (this.onImageLayer) this.onImageLayer(''); }, onAction: this.onAction,
           onDownload: this.onDownload, onSave: this.onViewerSave,
           onControlsChange: (visible: boolean) => { this.viewerControls = visible; } })
       }
-    }.width('100%').height('100%')
+    }.width('100%').height('100%').id('pinmony-photo-root-' + this.traceId.toString())
       .onAreaChange((_old: Area, area: Area) => {
         const width: number = Number(area.width);
         const height: number = Number(area.height);

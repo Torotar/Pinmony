@@ -1,7 +1,8 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,console});return exports;}
-const {PinmonyBoardFollowNativeWrites:Follow}=load('entry/src/main/ets/app/PinmonyBoardFollowNativeWrites.ets');
+let now=1000;
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,Date:{now:()=>now},require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),console});return exports;}
+const {PinmonyBoardFollowNativeWrites:Follow}=load('entry/src/main/ets/app/PinmonyBoardFollowNativeWrites.ets', require('./local-message-test-fixture.cjs').withLocalMessages(() => ({})));
 const {PinmonyNativeNetwork:Network}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',name=>name==='common_session'?{PinmonySessionCredentials:class{}}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 function fixture(){
  let active=true,session={authenticated:true,accountId:'fixture',generation:1,origin:'https://www.pinterest.com',userAgent:'test'},profile=session.origin+'/fixture/board/';
@@ -18,6 +19,13 @@ async function main(){
  assert.deepEqual(JSON.parse(new URLSearchParams(job.body).get('data')),{options:{url:'/v3/boards/123/follow/'},context:{}});
  f.calls[0].resolve(reply(f.calls[0]));await p;assert.deepEqual(f.confirmed,[['123',true]]);assert(!f.flow.locked('123'));
  f.item.following=true;p=f.flow.submit(f.item,'22',f.owner);assert(f.calls[1].job.url.endsWith('/delete/'));f.calls[1].resolve(reply(f.calls[1],false));await p;assert.deepEqual(f.confirmed[1],['123',false]);
+ f.flow.pause();assert.equal(f.flow.readFollowing('123',true),false,'return/reenter cannot overwrite confirmed unfollow with stale read');
+ assert.equal(f.flow.readFollowing('999',true),true,'other boards remain independent');
+ assert.equal(f.flow.readFollowing('123',false),false,'matching server read settles confirmation');
+ assert.equal(f.flow.readFollowing('123',true),true,'later external change is accepted after convergence');
+ p=f.flow.submit({...f.item,following:false},'22',f.owner);f.calls[2].resolve(reply(f.calls[2],true));await p;
+ assert.equal(f.flow.readFollowing('123',false),true);now+=15001;assert.equal(f.flow.readFollowing('123',false),false,'confirmed overlay has a bounded lifetime');
+ p=f.flow.submit({...f.item,following:false},'22',f.owner);f.calls[3].resolve(reply(f.calls[3],true));await p;f.switchAccount();assert.equal(f.flow.readFollowing('123',false),false,'account reset clears confirmations');
  f=fixture();p=f.flow.submit(f.item,'22',f.owner);f.calls[0].resolve(reply(f.calls[0],true,{data:{id:'999',type:'board',followed_by_me:true}}));await p;assert(f.flow.locked('123'));assert.equal(f.confirmed.length,0);await f.flow.submit(f.item,'22',f.owner);assert.equal(f.calls.length,1);f.flow.reconcile('123',false);assert(f.flow.locked('123'));f.flow.reconcile('123',true);assert(!f.flow.locked('123'));
  f=fixture();p=f.flow.submit(f.item,'22',f.owner);f.calls[0].resolve(reply(f.calls[0],true,{status:'failure',code:9}));await p;assert(!f.flow.locked('123'));assert.equal(f.confirmed.length,0);
  f=fixture();p=f.flow.submit(f.item,'22',f.owner);f.leave();await p;assert(f.flow.locked('123'));f.calls[0].resolve(reply(f.calls[0]));await Promise.resolve();assert.equal(f.confirmed.length,0);

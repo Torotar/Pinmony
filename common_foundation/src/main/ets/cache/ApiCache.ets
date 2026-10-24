@@ -47,7 +47,7 @@ export class ApiCache {
     if (memoryValue !== null) return { value: memoryValue as T, status: 'memory', ageMs: -1 };
     const diskResult: DiskCacheReadResult<T> = this.disk.getWithMetadata<T>(key, maxAgeMs);
     if (diskResult.value !== null) {
-      this.memory.put(key, diskResult.value, maxAgeMs);
+      this.memory.put(key, diskResult.value, maxAgeMs, diskResult.ageMs);
       return { value: diskResult.value, status: 'disk', ageMs: diskResult.ageMs };
     }
     const status: 'miss' | 'expired' | 'corrupt' = diskResult.status === 'hit' ? 'miss' : diskResult.status;
@@ -68,9 +68,10 @@ export class ApiCache {
       return value;
     }
 
-    const diskValue: T | null = this.disk.get<T>(key, ttlMs);
+    const diskResult: DiskCacheReadResult<T> = this.disk.getWithMetadata<T>(key, ttlMs);
+    const diskValue: T | null = diskResult.value;
     if (diskValue !== null) {
-      this.memory.put(key, diskValue, ttlMs);
+      this.memory.put(key, diskValue, ttlMs, diskResult.ageMs);
       if (onValue) onValue(diskValue, 'disk');
       this.refreshInBackground(key, ttlMs, fetcher, onValue);
       return diskValue;

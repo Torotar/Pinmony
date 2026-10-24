@@ -3,7 +3,7 @@ const ts=require(process.argv[2]||'typescript');
 const root='https://www.pinterest.com/',requests=[],messages=[],timers=[],events={};
 const window={top:null,PinmonyHomeApiEnabled:true,PinmonyShareBridge:{homeState:value=>messages.push(JSON.parse(value))},addEventListener:(name,fn)=>{(events[name] ||= []).push(fn);}};window.top=window;
 const location={origin:root.slice(0,-1),hostname:'www.pinterest.com',pathname:'/',href:root};
-const context={window,location,URL,AbortController,Date,console:{warn(){}},setInterval:()=>0,clearTimeout(){},setTimeout:fn=>{timers.push(fn);return timers.length;},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))};
+const context={window,location,URL,AbortController,Date,console:{warn(){},info(){}},setInterval:()=>0,clearTimeout(){},setTimeout:fn=>{timers.push(fn);return timers.length;},fetch:(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}))};
 function script(file){const template=fs.readFileSync(file,'utf8').match(/`([\s\S]*?)`;/)[1];return Function('return `'+template+'`')();}
 vm.runInNewContext(script('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets')+script('feature_home/src/main/ets/services/PinmonyHomeScript.ets'),context);
 const publish=()=>timers.splice(0).filter(fn=>fn.name==='publish').forEach(fn=>fn());

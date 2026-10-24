@@ -12,7 +12,7 @@ function method(name) {
 }
 const names = ['rootActionContextReady', 'ensureRootActionContext', 'updateSearchQuery', 'submitSearch',
   'openHomePin', 'prepareSearchNavigation', 'performSearchAction', 'performInboxAction'];
-const context = { PIN_NATIVE_INBOX_MESSAGES_ENABLED:false, PIN_NATIVE_INBOX_UPDATES_ENABLED:false, setTimeout, Date, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
+const context = { PIN_NATIVE_DETAIL_READS_ENABLED:true, PIN_NATIVE_INBOX_MESSAGES_ENABLED:false, PIN_NATIVE_INBOX_UPDATES_ENABLED:false, setTimeout, Date, PIN_INBOX_CONVERSATIONS_API_ENABLED: true,
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + names.map(method).join('\n') +
   '} globalThis.Native = Native;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);

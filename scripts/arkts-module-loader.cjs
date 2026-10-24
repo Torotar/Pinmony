@@ -8,7 +8,12 @@ const { rawLocalMessages } = require('./local-message-test-fixture.cjs');
 function createArktsLoader(ts, mocks = {}, globals = {}) {
   const cache = new Map(), packages = new Map();
   function loadPackage(name) {
-    if (Object.hasOwn(mocks, name)) return name === 'common_foundation' ? { PinmonyI18n: rawLocalMessages, ...mocks[name] } : mocks[name];
+    if (Object.hasOwn(mocks, name)) return name === 'common_foundation' ? new Proxy(mocks[name], {
+      get(target, key) {
+        const value = target[key];
+        return key === 'PinmonyI18n' ? (value ?? rawLocalMessages) : value;
+      }
+    }) : mocks[name];
     if (name.startsWith('@')) throw Error('Missing native kit mock: ' + name);
     if (packages.has(name)) return packages.get(name);
     const barrel = path.join(root, name, 'Index.ets');
@@ -37,6 +42,11 @@ function createArktsLoader(ts, mocks = {}, globals = {}) {
       setTimeout, clearTimeout, setInterval, clearInterval, URL, ...globals,
       require: spec => spec.startsWith('.') ? loadFile(path.resolve(path.dirname(file), spec) + '.ets') : loadPackage(spec)
     }, { filename: file });
+    // Honor an explicitly selected legacy/native branch across imported modules too.
+    // Without this, extracted Index and its real coordinators execute different branches.
+    for (const key of Object.keys(exports)) {
+      if (/^PIN_NATIVE_.*_ENABLED$/.test(key) && Object.hasOwn(globals,key)) exports[key]=globals[key];
+    }
     return exports;
   }
   return { loadFile, loadPackage };

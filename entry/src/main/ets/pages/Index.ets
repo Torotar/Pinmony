@@ -1,3 +1,5 @@
+import { PinmonyUpdateNotice } from 'feature_settings';
+import { PinmonySessionHistory } from 'common_session';
 import { PinmonyProfileSearchPage, PinmonyProfileSearchPin } from 'feature_profile';
 import { PinmonyProfileSearchNativeReads } from '../app/PinmonyProfileSearchNativeReads';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -27,6 +29,7 @@ import { assembleControllerLifecycle, bindStoreNavigation, PinmonyProductControl
 import { PinmonyBuildHomeRootContent } from '../components/PinmonyHomeRootContent';
 import { PinmonyBuildSearchRootContent } from '../components/PinmonySearchRootContent';
 import { PinmonyPhotoSearchFlow } from '../app/PinmonyPhotoSearchFlow';
+import { PinmonyPhotoHistoryPage } from 'feature_search';
 import { PinmonyBuildInboxRootContent } from '../components/PinmonyInboxRootContent';
 import { PinmonyBuildProfileRootContent } from '../components/PinmonyProfileRootContent';
 import { PinmonyNetworkBridgeCoordinator, PinmonyNetworkBridgeCoordinatorPorts } from '../app/PinmonyNetworkBridgeCoordinator';
@@ -104,7 +107,7 @@ import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
 
 import { image } from '@kit.ImageKit';
-import { HdsTabs, HdsTabsController, HdsAnimationMode, hdsMaterial, HdsSnackBar, SnackBarOperationType } from '@kit.UIDesignKit';
+import { HdsTabs, HdsTabsController, HdsAnimationMode, hdsMaterial, HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
 
 import { PinmonyNavigationHistory } from '../app/PinmonyNavigationHistory';
 
@@ -157,7 +160,6 @@ interface PinmonyBoardOperationAction {
 @Component
 struct Index {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private nativeChildBackUntil: number = 0;
@@ -174,6 +176,7 @@ struct Index {
   private readonly nativeBusinessRoutesEnabled: boolean = PIN_NATIVE_POST_OPERATIONS_ENABLED && PIN_NATIVE_COMMENT_WRITES_ENABLED && PIN_NATIVE_DETAIL_AUXILIARY_ENABLED && PIN_NATIVE_SEARCH_DISCOVERY_ENABLED && PIN_NATIVE_DETAIL_READS_ENABLED && PIN_NATIVE_HOME_READS_ENABLED && PIN_NATIVE_SEARCH_READS_ENABLED && PIN_NATIVE_PROFILE_READS_ENABLED && PIN_NATIVE_INBOX_MESSAGES_ENABLED && PIN_NATIVE_INBOX_UPDATES_ENABLED && PIN_NATIVE_BOARD_READS_ENABLED && PIN_NATIVE_SHARE_PUBLISH_ENABLED && PIN_NATIVE_PROFILE_SETTINGS_ENABLED && PIN_NATIVE_PIN_MENUS_ENABLED;
   private readonly nativeNetwork: PinmonyNativeNetwork = new PinmonyNativeNetwork();
   private readonly photoSearchFlow: PinmonyPhotoSearchFlow = new PinmonyPhotoSearchFlow({
+    jpeg: (bytes: ArrayBuffer) => this.systemActions.jpegFromBytes(bytes),
     session: () => this.nativeBusinessSessionContext(), network: () => this.nativeNetwork,
     page: () => this.currentSearchPageKey(),
     active: () => this.authStatus === 'authenticated' && this.activeTab === 1 && this.nativeSearchPageVisible(),
@@ -723,6 +726,7 @@ struct Index {
   } as PinmonyRootContextCoordinatorPorts);
 
   private readonly navigationCoordinator: PinmonyNavigationCoordinator = new PinmonyNavigationCoordinator({
+    rootBack: (): boolean => this.handleRootExitBack(),
     rootPresented: (index: number): void => this.markReturnedHome?.(index),
     nativeBusinessOnly: (): boolean => this.nativeBusinessRoutesEnabled,
     activeSheetKind: (): string => this.activeSheetKind,
@@ -1137,7 +1141,7 @@ struct Index {
     returnTarget: (page: string): void => { this.loadFailed = false; const token: number = ++this.pageBackToken; this.nativeBackTarget = page; this.loadReturnTarget(page, token); },
     load: (page: string): void => this.loadSessionDocument(page), reload: (): void => this.reload(),
     cancelled: (pin: string): boolean => this.cancelledBoardPins.has(pin), retain: (board: PinmonyBoardDetail): void => { this.retainedBoardContent = board; },
-    rememberPin: (pin: string, page: string): void => { this.pinStore.detailReturnUrl = page; if (pin) { const identity: string = this.pinIdentity(pin); this.pinStore.rememberDetailOrigin(identity, page); this.pinStore.confirmedSaves.confirm(identity, true); } },
+    rememberPin: (pin: string, page: string): void => { this.pinStore.detailReturnUrl = page; if (pin) { const identity: string = this.pinIdentity(pin); this.pinStore.rememberDetailOrigin(identity, page); this.pinStore.confirmedSaves.confirm(identity, true, '', this.boardStore.boardDetail?.pageKey === page ? this.boardStore.boardDetail.title : ''); } },
     runScript: (script: string): Promise<string> => this.runSessionScript(script), feedback: (message: string): void => this.showMessage(message)
   } as PinmonyBoardOperationsPorts);
 
@@ -1305,6 +1309,7 @@ struct Index {
     this.pinStore.videoForeground = true;
     if (this.businessSuspended) {
       this.businessSuspended = false;
+      this.bottomBarCoordinator.resumeAfterForeground();
       const readNeeded: boolean = this.nativeNetwork.setForeground(true);
       const detailReadNeeded: boolean = this.detailReadNetwork.setForeground(true);
       this.runSessionScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(true)').catch(() => {});
@@ -1322,6 +1327,7 @@ struct Index {
     this.scheduleInterruptedHomeRecovery();
   }
   onPageHide(): void {
+    this.rootExitBackAt = 0;
     this.profileSearchReads.pause();
     this.sessionVerification?.cancel('background');
     if(this.nativeLoginEnabled){this.nativeSessionEpoch++;this.nativeVerificationPending = false;}
@@ -1472,7 +1478,7 @@ struct Index {
       if(this.cancelledBoardPins.has(pin.pinUrl))return;
       this.retainedBoardContent = board; this.pinStore.detailReturnUrl = board.pageKey;
       this.pinStore.rememberDetailOrigin(this.pinIdentity(pin.pinUrl),board.pageKey);
-      this.pinStore.confirmedSaves.confirm(this.pinIdentity(pin.pinUrl),true);
+      this.pinStore.confirmedSaves.confirm(this.pinIdentity(pin.pinUrl),true,'',board.title);
       this.beginDetailOpening(pin.pinUrl,board.pageKey); if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(pin.pinUrl);
     }
   } as PinmonyBoardNativeReadsPorts);
@@ -1737,6 +1743,9 @@ struct Index {
       this.rootTabAddresses.set(0, snapshot.pageKey); this.retainedHomeAwaitingFeed = false; this.interruptedHomePage = '';
       this.homeRecoveryAttempted = false; this.homeRecoveryToken++;
       if (kind === 'feed') {
+        if (this.authStatus === 'authenticated' && !snapshot.sourceError && !this.businessSuspended) {
+          PinmonyUpdateNotice.start(this.getUIContext().getHostContext() as common.UIAbilityContext);
+        }
         this.pagePerformance.mark(0, 'content-ready'); this.detailReturnJourney?.mark('return.home.feed.confirmed');
       }
       if (!snapshot.sourceError) this.persistHomeDiskCache(snapshot); this.rootContextCoordinator.notify();
@@ -1926,6 +1935,13 @@ struct Index {
   private inboxPollTick: number = 0;
 
   private pollVisibleInbox(): void {
+    if (this.inboxUpdatesNativeReads.eligible()) {
+      if (this.businessSuspended || this.authStatus !== 'authenticated' || this.activeTab !== 2 ||
+          !this.nativeRootTabsVisible() || this.inboxStore.inboxLoading) return;
+      this.inboxPollTick++;
+      if (this.inboxPollTick % 3 === 0) this.inboxUpdatesNativeReads.poll();
+      return;
+    }
     if(this.inboxMessagesNativeReads.eligible()) {this.inboxPollTick++; if(this.inboxStore.inboxFlow || this.inboxPollTick % 3 === 0)this.inboxMessagesNativeReads.poll(); return;}
     if (this.inboxPollPending || this.businessSuspended || this.authStatus !== 'authenticated' || this.activeTab !== 2 ||
       this.nativeBoardVisible() || this.pinStore.detail || this.pinStore.detailOpeningPin || this.activeSheetKind ||
@@ -1943,7 +1959,26 @@ struct Index {
     } catch (_) { this.inboxPollPending = false; }
   }
 
+  private startupBuildLogged: boolean = false;
+
+  onDidBuild(): void {
+    if (this.startupBuildLogged) return;
+    this.startupBuildLogged = true;
+    // Component build completion is not a physical display/first-frame timestamp.
+    this.logStartupBoundary('index-first-build');
+  }
+
+  private logStartupBoundary(event: string): void {
+    const now: number = Date.now();
+    const createdAt: number = AppStorage.get<number>('pinmonyAbilityCreatedAt') || 0;
+    const loadAt: number = AppStorage.get<number>('pinmonyContentLoadStartedAt') || 0;
+    PinmonyRuntimeLog.info('StartupBoundary: ' + event +
+      ' sinceAbilityMs=' + (createdAt > 0 ? now - createdAt : -1).toString() +
+      ' sinceLoadContentMs=' + (loadAt > 0 ? now - loadAt : -1).toString());
+  }
+
   aboutToAppear(): void {
+    this.logStartupBoundary('index-about-to-appear');
     PinmonyRuntimeLog.info('NativeSession: lifecycle enabled=' + this.nativeLoginEnabled.toString());
     if(this.nativeLoginEnabled){
       try {this.sessionEnvironment.capture(webview.WebviewController.getDefaultUserAgent());}catch (_) {}
@@ -2175,17 +2210,12 @@ struct Index {
 
   private loadSessionDocument(url: string): void {
     if(this.nativeLoginEnabled && !this.loginHostMounted)return;
-    this.controller.loadUrl(url);
+    try { this.controller.loadUrl(url); }
+    catch (_) { throw new Error('session-navigation-unavailable'); }
   }
 
   private startNativeVerification(): void {
     if(!this.nativeLoginEnabled || this.businessSuspended || this.nativeVerificationPending)return;
-    // This non-credential hint only chooses presentation; it never grants access.
-    if (!this.loginHostMounted && AppStorage.get<boolean>('pinmonySessionConfirmed') !== true) {
-      PinmonyRuntimeLog.info('NativeSession: login required reason=no-confirmed-history');
-      this.openNativeLogin();
-      return;
-    }
     try {
       if (!connection.hasDefaultNetSync()) {
         this.sessionVerification.cancel('offline'); this.nativeSessionEpoch++;
@@ -2195,6 +2225,13 @@ struct Index {
         return;
       }
     } catch (_) { /* Unknown network availability is not proof of being offline. */ }
+    // Offline startup must not navigate to login or erase cached content.
+    // This non-credential hint only chooses presentation; it never grants access.
+    if (!this.loginHostMounted && AppStorage.get<boolean>('pinmonySessionConfirmed') !== true) {
+      PinmonyRuntimeLog.info('NativeSession: login required reason=no-confirmed-history');
+      this.openNativeLogin();
+      return;
+    }
     if(!this.sessionEnvironment.userAgent()){
       try {this.sessionEnvironment.capture(webview.WebviewController.getDefaultUserAgent());}catch (_) {}
     }
@@ -2215,7 +2252,7 @@ struct Index {
 
   private openNativeLogin(): void {
     if(!this.nativeLoginEnabled)return;
-    AppStorage.setOrCreate<boolean>('pinmonySessionConfirmed', false);
+    if (!PinmonySessionHistory.save(false)) PinmonyRuntimeLog.warn('NativeSession: history reset persistence unavailable');
     this.sessionVerification.cancel('login-required');this.nativeVerificationPending = false;
     this.nativeSessionEpoch++;this.authEpoch++;this.nativeLoginEvidenceKey = '';
     this.loginStartUrl = this.nativeSessionOrigin + '/login/';
@@ -2244,7 +2281,7 @@ struct Index {
         current.generation !== session.generation || current.origin !== session.origin)return;
     this.nativeSessionOrigin = session.origin;
     AppStorage.setOrCreate<string>('pinmonySessionOrigin',session.origin);
-    AppStorage.setOrCreate<boolean>('pinmonySessionConfirmed',true);
+    if (!PinmonySessionHistory.save(true)) PinmonyRuntimeLog.warn('NativeSession: history persistence unavailable');
     this.nativeVerificationPending = false;this.nativeSessionEpoch++;this.authEpoch++;
     this.logoutAwaitingLogin = false;this.nativeLoginEvidenceKey = '';this.loginHostMounted = false;
     PinmonyRuntimeLog.info('NativeSession: native account confirmed webMounted=false');
@@ -3582,7 +3619,11 @@ struct Index {
         this.profileSettingsVisible || this.profileStore.panel || this.inboxStore.inboxFlow ||
         this.boardStore.pendingBoardUrl) return '';
     if (this.offlinePreviewMode) return this.homeStore.home?.pageKey || this.offlineHomeMarker?.pageKey || '';
-    if (PIN_NATIVE_HOME_READS_ENABLED) return this.homeStore.home?.pageKey || (this.nativeBusinessSessionContext().origin ? this.nativeBusinessSessionContext().origin + '/' : this.rootTabAddresses.get(0) || PINTEREST_URL);
+    if (PIN_NATIVE_HOME_READS_ENABLED) {
+      const origin: string = this.nativeBusinessSessionContext().origin;
+      const candidate: string = this.homeStore.home?.pageKey || (origin ? origin + '/' : this.rootTabAddresses.get(0) || PINTEREST_URL);
+      return this.homePageKeyFromAddress(candidate);
+    }
     const address: string = this.nativeDisplayAddress();
     if (this.pendingWebTab === 0) {
       const target: string = this.rootTabAddresses.get(0) || PINTEREST_URL;
@@ -3767,13 +3808,17 @@ struct Index {
     return this.homeController.refreshHome();
   }
 
+  @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   @Builder
   private buildNativeTab(labelKey: string, symbol: Resource, index: number) {
     Column({ space: 2 }) {
+      Badge({ value: '', position: BadgePosition.RightTop,
+        style: { badgeSize: index === 3 && this.updateUnread ? 6 : 0, fontSize: 0 } }) {
       SymbolGlyph(symbol)
         .fontSize(24)
         .fontColor([this.activeTab === index ? $r('app.color.tab_text_primary') :
           $r('app.color.tab_text_secondary')])
+      }
       Text(PinmonyI18n.text(labelKey, this.uiLanguage))
         .fontSize(11)
         .lineHeight(14)
@@ -3890,7 +3935,7 @@ struct Index {
     const pin: string = this.extractPinUrl(target),board: string = this.boardUrlFromAddress(target),root: number = this.rootTabIndexFromAddress(target);
     if(!pin && !board && root < 0)return false;
     this.returnCoordinator.cancel();this.pageHistory.cancelBack();this.pageHistory.visit(target,'load');this.pageBackToken++;
-    if(pin){this.beginDetailOpening(pin);return true;}
+    if(pin){this.beginDetailOpening(pin, '', true);return true;}
     if(board){
       this.clearDetail();this.nativeRootOnly = false;this.nativeBackTarget = target;this.navigationAddress = target;
       this.boardStore.presentationOnly = false;this.boardStore.presentationPage = target;this.syncBoardRoute(target);
@@ -4060,6 +4105,10 @@ struct Index {
   private retainRootSnapshotAfterFailure(failedRoot: number, url: string, code: number): boolean { return this.failureRecoveryCoordinator.retainRootSnapshotAfterFailure(failedRoot, url, code); }
 
   private configureDocumentRetention(enabled: boolean): void {
+    if (this.nativeLoginEnabled && !this.loginHostMounted) {
+      PinmonyRuntimeLog.info('RootTabTrace: document-retention skipped reason=web-unmounted');
+      return;
+    }
     try {
       // Visible business UI stays native; the hidden session must keep processing
       // network completions and bridge callbacks without inactive-page throttling.
@@ -4425,6 +4474,9 @@ struct Index {
       this.pageBackToken++;
     }
     if (this.boardStore.boardDetail?.flow?.busy) return;
+    if(this.boardStore.boardDetail?.flow?.phase === 'targets' && this.boardStore.boardDetail.flow.targetBoardId && !this.boardStore.boardDetail.flow.uncertain) {
+      this.boardOperation('flow', JSON.stringify({action:'sectionTargetBack'}));return;
+    }
     if (this.boardStore.boardDetail?.flow?.phase) {
       const phase: string = this.boardStore.boardDetail.flow.phase;
       this.boardOperation('flow', JSON.stringify({ action: phase === 'targets' && !this.boardStore.boardDetail.flow.uncertain ? 'select' : 'close' }));
@@ -5023,7 +5075,7 @@ struct Index {
     return true;
   }
 
-  private beginDetailOpening(pinUrl: string, returnUrl: string = ''): void {
+  private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false): void {
     this.detailReturnJourney?.close();
     const clickAt: number = this.detailClickedAt > 0 && Date.now() - this.detailClickedAt < 20000 ? this.detailClickedAt : Date.now();
     this.detailClickedAt = 0;
@@ -5076,7 +5128,9 @@ struct Index {
         actions: [], related: []
       };
     }
-    if (PIN_DETAIL_API_ENABLED && PIN_NATIVE_NETWORK_ENABLED) this.startOpeningDetailRead(pinUrl, token);
+    const resumed: boolean = returning && PIN_NATIVE_DETAIL_READS_ENABLED && this.detailNativeReads.resume(pinUrl, token) &&
+      (!PIN_NATIVE_DETAIL_AUXILIARY_ENABLED || this.detailNativeAuxiliary.resume(pinUrl, token));
+    if (PIN_DETAIL_API_ENABLED && PIN_NATIVE_NETWORK_ENABLED && !resumed) this.startOpeningDetailRead(pinUrl, token);
     if (PIN_DETAIL_API_ENABLED && PIN_NATIVE_NETWORK_ENABLED && !PIN_NATIVE_DETAIL_READS_ENABLED) this.probeDetailDocument(pinUrl, token, 0);
     this.coordinatorTasks.timeout(() => {
       if (token !== this.pinStore.detailOpeningToken) return;
@@ -5429,7 +5483,7 @@ struct Index {
     this.pinStore.shareSnackKey = key;
     const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: PinmonyI18n.render(this.pinStore.shareError, this.uiLanguage) }, {
+    snack.show({ icon: $r('sys.symbol.exclamationmark_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(this.pinStore.shareError, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("pm_retry_b8784c8d"),
       contentAccessibilityText: this.uiText("pm_reload_share_link_6a0a897d"), closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onContentClick: () => {
@@ -5453,7 +5507,7 @@ struct Index {
     this.pinStore.shareFeedbackSnackKey = key;
     const snack: HdsSnackBar = this.preparePostSnack(5000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage) }, {
+    snack.show({ icon: $r('sys.symbol.info_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage) }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
       closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
@@ -5464,7 +5518,9 @@ struct Index {
     PinmonyRuntimeLog.info('PinmonyReturn: undo snackbar shown');
     const snack: HdsSnackBar = this.preparePostSnack(8000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: PinmonyI18n.render(message, this.uiLanguage) }, {
+    snack.show({ icon: PinmonyI18n.isText(message, 'pm_undo_incomplete_please_retry_e69779de') ||
+      PinmonyI18n.isText(message, 'pm_undo_failed_please_retry_ea519ad9') ?
+      $r('sys.symbol.exclamationmark_circle') : $r('sys.symbol.checkmark_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(message, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("pm_undo_926a50b9"),
       contentAccessibilityText: this.uiText("pm_undo_this_action_fab003cc"), closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onContentClick: () => {
@@ -5482,7 +5538,7 @@ struct Index {
     PinmonyRuntimeLog.info('PinmonyInbox: update hidden, undo snackbar shown');
     const snack: HdsSnackBar = this.preparePostSnack(8000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: this.uiText("pm_update_deleted_509d0754") }, {
+    snack.show({ icon: $r('sys.symbol.trash'), iconType: SnackBarIconType.NORMAL }, { title: this.uiText("pm_update_deleted_509d0754") }, {
       operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("pm_undo_926a50b9"),
       contentAccessibilityText: this.uiText("pm_undo_update_deletion_98448231"), closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onContentClick: () => {
@@ -5500,7 +5556,7 @@ struct Index {
   private showInboxRestoredSnack(): void {
     const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: this.uiText("pm_update_deletion_undone_e4e5cba0") }, {
+    snack.show({ icon: $r('sys.symbol.checkmark_circle'), iconType: SnackBarIconType.NORMAL }, { title: this.uiText("pm_update_deletion_undone_e4e5cba0") }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
       closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
@@ -5510,7 +5566,7 @@ struct Index {
   private showInboxUnsubscribedSnack(): void {
     const snack: HdsSnackBar = this.preparePostSnack(8000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: this.uiText("pm_you_will_no_longer_receive_notifications_about_this_pin_75459ce5") }, {
+    snack.show({ icon: $r('sys.symbol.bell_slash'), iconType: SnackBarIconType.NORMAL }, { title: this.uiText("pm_you_will_no_longer_receive_notifications_about_this_pin_75459ce5") }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
       closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
@@ -5850,13 +5906,33 @@ struct Index {
   private closeProfileSettings(): void { try {
     this.nativeChildBackUntil = Date.now() + 220;
     if (this.settingsStore.back()) { if (!this.settingsStore.busy) this.cancelAccountSettings(); return; }
-    this.cancelAccountSettings(); this.settingsStore.reset();
+    this.cancelAccountSettings(); this.settingsStore.reset(true);
     this.nativeChildBackUntil = Date.now() + 220;
     this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => { this.profileSettingsVisible = false; });
    } finally { this.rootContextCoordinator.notify(); } }
 
+  private rootExitBackAt: number = 0;
+  private rootExitBackHandled: boolean = false;
   onBackPress(): boolean {
-    return this.navigationCoordinator.onBackPress();
+    this.rootExitBackHandled = false;
+    const handled: boolean = this.navigationCoordinator.onBackPress();
+    if (!this.rootExitBackHandled) this.rootExitBackAt = 0;
+    return handled;
+  }
+  private handleRootExitBack(): boolean {
+    this.rootExitBackHandled = true;
+    const now: number = Date.now();
+    if (this.rootExitBackAt > 0 && now - this.rootExitBackAt <= 2000 && now >= this.rootExitBackAt) {
+      this.rootExitBackAt = 0;
+      try {
+        const context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+        context.terminateSelf().catch(() => PinmonyRuntimeLog.warn('RootExit: terminate-unavailable'));
+      } catch (_) { PinmonyRuntimeLog.warn('RootExit: context-unavailable'); }
+    } else {
+      this.rootExitBackAt = now;
+      this.showMessage(PinmonyI18n.message('pm_press_back_again_to_exit'));
+    }
+    return true;
   }
 
   @Builder
@@ -5934,9 +6010,13 @@ struct Index {
         onClose: () => this.dismissApiComments(),
         onLike: (id: string) => this.commentApiAction('commentLike', id) })
     } else if (this.activeSheetKind === 'save') {
-      PinmonySaveSheet({ result: this.pinStore.saveResult, onRetry: () => this.openApiBoards(),
+      PinmonySaveSheet({ result: this.pinStore.saveResult, onRetry: () => {
+          if(this.pinStore.saveResult.targetBoardId)this.saveApiAction('boardsSections', ',' + JSON.stringify(this.pinStore.saveResult.targetBoardId));else this.openApiBoards();
+        },
+        onOpenBoard: PIN_NATIVE_POST_OPERATIONS_ENABLED ? (id: string) => this.saveApiAction('boardsSections', ',' + JSON.stringify(id)) : undefined,
+        onBack: () => this.saveApiAction('boardsBack'),
         onCreatingChange: (creating: boolean) => this.pinStore.saveCreating = creating,
-        onSave: (id: string) => this.saveApiAction('boardsSave', ',' + JSON.stringify(id)),
+        onSave: (id: string, section?: string) => this.saveApiAction('boardsSave', ',' + JSON.stringify(id) + (section ? ',' + JSON.stringify(section) : '')),
         onCreate: (name: string, secret: boolean) => this.saveApiAction('boardsCreate', ',' + JSON.stringify(name) + ',' + secret.toString()),
         onRemove: () => this.saveApiAction('boardsRemove') })
     } else if (this.activeSheetKind === 'publish') {
@@ -6007,6 +6087,8 @@ struct Index {
   private buildSearchRootContent() {
     PinmonyBuildSearchRootContent({
       photoSearch: (onSelected?: (uri: string) => void) => this.photoSearchFlow.search(onSelected),
+      photoHistory: (cursor: string): Promise<PinmonyPhotoHistoryPage> => this.photoSearchFlow.history(cursor),
+      selectPhotoHistory: (id: string, onSelected: (uri: string) => void) => this.photoSearchFlow.selectHistory(id, onSelected),
       photoRegionSearch: (crop: PinmonyImageCrop) => this.photoSearchFlow.crop({ x: crop.x, y: crop.y, w: crop.w, h: crop.h }),
       cancelPhotoSearch: () => this.photoSearchFlow.cancel(),
       openPhotoResult: (id: string) => this.photoSearchFlow.open(id),
@@ -6087,7 +6169,7 @@ struct Index {
   private showInboxBlockSnack(blocked: boolean, userName: string): void {
     const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
-    snack.show({}, { title: blocked ? this.uiText("pm_blocked_eb3c6420") + userName : this.uiText("pm_unblocked_16369d5f") + userName }, {
+    snack.show({ icon: $r('sys.symbol.info_circle'), iconType: SnackBarIconType.NORMAL }, { title: blocked ? this.uiText("pm_blocked_eb3c6420") + userName : this.uiText("pm_unblocked_16369d5f") + userName }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
       closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
@@ -6229,7 +6311,7 @@ struct Index {
             .scrollable(false)
             .barOverlap(true)
             .barHeight(56)
-            .barBackgroundColor(this.immersiveLightEnabled ? Color.Transparent : $r('app.color.surface_muted'))
+            .barBackgroundColor(this.immersiveLightMode !== 'off' ? Color.Transparent : $r('app.color.surface_muted'))
             .barFloatingStyle({
               barBottomMargin: 28,
               systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
@@ -6608,9 +6690,6 @@ struct Index {
             message: this.offlineCacheLoading ? '' : this.authStatus === 'error' ? this.failureDetails : '',
             loading: this.offlineCacheLoading || this.authStatus !== 'error', onRetry: () => this.retryLogin(),
           })
-          if(this.nativeLoginEnabled && this.authStatus === 'error') {
-            Button(this.uiText("pm_sign_in_99232cdd")).onClick(() => this.openNativeLogin()).margin({bottom:80})
-          }
         }
         if (this.authStatus !== 'authenticated') { this.networkNoticeView() }
       }

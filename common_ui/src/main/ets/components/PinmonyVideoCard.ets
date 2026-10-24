@@ -18,7 +18,11 @@ export struct PinmonyVideoCard {
   });
 
   aboutToAppear(): void { this.sourceChanged(); }
-  aboutToDisappear(): void { this.visible = false; this.playback.release(); }
+  aboutToDisappear(): void {
+    this.visible = false;
+    this.playback.release();
+    this.playback.setSurface('');
+  }
 
   private sourceChanged(): void {
     const key: string = this.video.pinId + ':' + this.video.sources.map(s => s.url).join('|');

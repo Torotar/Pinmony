@@ -60,6 +60,8 @@ export interface PinmonyBoardDetail {
 }
 
 export interface PinmonyBoardTarget {
+  hasSections?: boolean;
+  secret?: boolean;
   enabled: boolean;
   id: string;
   title: string;

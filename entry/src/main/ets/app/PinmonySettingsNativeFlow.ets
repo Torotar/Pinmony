@@ -1,8 +1,10 @@
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonySettingsStore, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory, NotificationChannel, NotificationChoice, notificationWritable, notificationGlobal } from 'feature_settings';
+import { PinmonySettingsStore, PinmonyRecoverableBoard, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory, NotificationChannel, NotificationChoice, notificationWritable, notificationGlobal } from 'feature_settings';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from 'feature_settings';
 import { ProfileSettingsPorts, PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
+interface RecoveryFields { fields: string[]; }
+interface RecoveryBoardResponse { id: string; name: string; image_cover_url?: string; pin_count: number; section_count: number; }
 interface User {
     autoplay_videos_on_wifi_enabled?: boolean;
     autoplay_videos_on_cellular_enabled?: boolean;
@@ -163,8 +165,8 @@ export class PinmonySettingsNativeFlow {
             this.activityUnknown.clear();
             this.activityClosed.clear();
             this.store.data = undefined;
-            this.store.notifications = [];
-            this.store.social = emptySocialPermissions();
+            this.store.notifications = [];this.store.recoverableBoards = [];this.store.boardRecoveryReady = false;
+            this.store.social = emptySocialPermissions(); this.store.socialMessageGroup = 0;
             this.client.user = '';
             this.client.viewer = '';
         }
@@ -277,6 +279,8 @@ export class PinmonySettingsNativeFlow {
         });
         if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
         if (!this.current(revision)) return;
+        if (raw.is_partner === true && !this.store.social.business) this.store.socialMessageGroup = -1;
+        if (raw.is_partner === false && ![0,1,2,4].includes(this.store.socialMessageGroup)) this.store.socialMessageGroup = 0;
         const snapshot: SocialPermissions = { business: raw.is_partner === true, personal: raw.is_partner === false, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, blockedComplete: this.store.social.blockedComplete, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false };
         this.store.social = snapshot;
         if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
@@ -340,7 +344,8 @@ export class PinmonySettingsNativeFlow {
                 const choice: SocialMessageChoice = JSON.parse(value) as SocialMessageChoice;
                 const expected: string = choice.group === 0 ? 'socialFriends' : choice.group === 1 ? 'socialFollowers' : choice.group === 2 ? 'socialFollowing' : choice.group === 4 ? 'socialOthers' : '';
                 const group: SocialMessageGroup | undefined = this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === choice.group);
-                if (!expected || this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
+                const inline: boolean = this.screen === 'socialMessages' && (this.store.social.personal || this.store.social.business) && this.store.socialMessageGroup === choice.group;
+                if (!expected || !inline && this.screen !== expected || !group || !socialMessageLevel(choice.group,choice.level) || !group.levels.includes(choice.level)) throw new Error('choice');
                 if (group.selected === choice.level) return;
                 const permissions: Record<string,number> = {}; permissions[String(choice.group)] = choice.level; update.messaging_permissions = permissions;
                 this.pending = 'social:message:' + choice.group; value = String(choice.level);
@@ -355,11 +360,44 @@ export class PinmonySettingsNativeFlow {
         if (this.uncertain.has(this.pending)) throw new Error('readback');
         this.sent = false;
     }
+    private async readRecoverableBoards(revision: number): Promise<void> {
+        const fields: string[] = ['board.image_cover_url','board.id','board.name','board.pin_count','board.section_count','board.url'];
+        const data: RecoveryFields = {fields:fields};
+        const options: Api = {url:'/v3/users/me/boards/soft_deleted/',data:data};
+        const response: ProfileSettingsResponse = await this.request('ApiResource','get',options,this.page.slice(this.origin.length) + '_saved/',revision);
+        const r = response.resource_response;
+        if(r?.endpoint_name !== 'v3_get_soft_deleted_boards_for_user' || !Array.isArray(r.data) || r.data.length > 500)throw new Error('boards');
+        const rows: RecoveryBoardResponse[] = r.data as RecoveryBoardResponse[];
+        const seen: Set<string> = new Set();
+        const boards: PinmonyRecoverableBoard[] = rows.map((b: RecoveryBoardResponse): PinmonyRecoverableBoard => {
+            if(!b || !/^\d{1,40}$/.test(b.id) || seen.has(b.id) || typeof b.name !== 'string' || b.name.length > 1000 || !Number.isInteger(b.pin_count) || b.pin_count < 0 || !Number.isInteger(b.section_count) || b.section_count < 0)throw new Error('board');
+            seen.add(b.id);
+            return {id:b.id,name:b.name,imageUrl:typeof b.image_cover_url === 'string' && /^https:\/\/i\.pinimg\.com\//.test(b.image_cover_url) ? b.image_cover_url : '',pinCount:b.pin_count,sectionCount:b.section_count,restored:false};
+        });
+        if(!this.current(revision))return;
+        this.store.recoverableBoards = boards.concat(this.store.recoverableBoards.filter((b: PinmonyRecoverableBoard): boolean => b.restored && !seen.has(b.id)));
+        this.store.boardRecoveryReady = true;
+    }
+    private async recoverBoard(action: string, id: string, revision: number): Promise<void> {
+        if(this.screen !== 'boardRecovery')throw new Error('screen');
+        if(action === 'boardRecoveryRead'){await this.readRecoverableBoards(revision);return;}
+        if(!/^\d{1,40}$/.test(id) || !this.store.boardRecoveryReady || !this.store.recoverableBoards.some((b: PinmonyRecoverableBoard): boolean => b.id === id && !b.restored))throw new Error('selection');
+        await this.readRecoverableBoards(revision);
+        if(!this.current(revision) || !this.store.recoverableBoards.some((b: PinmonyRecoverableBoard): boolean => b.id === id && !b.restored))return;
+        this.client.allowed = ['restore-board:' + id];this.pending = 'restore-board:' + id;
+        this.uncertain.set(this.pending,'');this.sent = true;
+        const response: ProfileSettingsResponse = await this.request('ApiResource','update',{url:'/v3/boards/' + id + '/restore/'} as Api,this.page.slice(this.origin.length) + '_saved/',revision);
+        if(response.resource_response?.endpoint_name !== 'v3_restore_board' || response.resource_response.data !== null)throw new Error('result');
+        if(!this.current(revision))return;
+        this.uncertain.delete(this.pending);this.sent = false;this.store.writeUncertain = this.uncertain.size > 0;
+        this.store.recoverableBoards = this.store.recoverableBoards.map((b: PinmonyRecoverableBoard): PinmonyRecoverableBoard => ({id:b.id,name:b.name,imageUrl:b.imageUrl,pinCount:b.pinCount,sectionCount:b.sectionCount,restored:b.restored || b.id === id}));
+    }
     async requestAction(action: string, value: string): Promise<void> {
         if (['autoplayWifi','autoplayCellular'].includes(action) && this.store.screen !== 'display') return;
-        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','autoplayWifi','autoplayCellular'].includes(action))
+        if(action.startsWith('boardRecovery') && this.store.screen !== 'boardRecovery')return;
+        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','autoplayWifi','autoplayCellular','boardRecoveryRead','boardRecoveryRestore'].includes(action))
             return;
-        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','autoplayWifi','autoplayCellular'].includes(action);
+        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','autoplayWifi','autoplayCellular','boardRecoveryRestore'].includes(action);
         this.bind();
         if (write && this.uncertain.size) {
             this.store.writeUncertain = true;
@@ -391,6 +429,7 @@ export class PinmonySettingsNativeFlow {
             this.client.user = u.id;
             this.client.viewer = u.id;
             this.client.permissions = ['own'];
+            if (action.startsWith('boardRecovery')) { await this.recoverBoard(action,value,revision);return; }
             if (action.startsWith('social')) { await this.socialAction(action,value,revision); if (this.current(revision)) this.store.writeUncertain = this.uncertain.size > 0; return; }
             if (action === 'notificationSet') {
                 if (this.screen !== 'notifications') throw new Error('screen');

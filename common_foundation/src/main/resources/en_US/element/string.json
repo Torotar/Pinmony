@@ -1,6 +1,54 @@
 {
   "string": [
     {
+      "name": "pm_board_recovery_title",
+      "value": "Board recovery"
+    },
+    {
+      "name": "pm_board_recovery_description",
+      "value": "You can restore recently deleted boards within 7 days."
+    },
+    {
+      "name": "pm_board_recovery_submit",
+      "value": "Restore selected board"
+    },
+    {
+      "name": "pm_board_recovery_restored",
+      "value": "(Restored)"
+    },
+    {
+      "name": "pm_board_recovery_counts",
+      "value": "{pins} Pins · {sections} board sections"
+    },
+    {
+      "name": "pm_board_recovery_total",
+      "value": "Boards: {count}"
+    },
+    {
+      "name": "pm_board_recovery_empty",
+      "value": "No boards available to restore"
+    },
+    {
+      "name": "pm_board_recovery_selected",
+      "value": "Selected"
+    },
+    {
+      "name": "pm_board_recovery_select",
+      "value": "Select board"
+    },
+    {
+      "name": "pm_load_more_merge_boards",
+      "value": "Load more"
+    },
+    {
+      "name": "pm_no_merge_target_boards",
+      "value": "No available boards"
+    },
+    {
+      "name": "pm_merge_board_menu",
+      "value": "Merge"
+    },
+    {
       "name": "pm_loading_please_wait_b6aaac70",
       "value": "Loading, please wait…"
     },
@@ -38,7 +86,7 @@
     },
     {
       "name": "pm_unable_to_verify_the_session_retry_or_sign_in_again_fb5c22fa",
-      "value": "Unable to verify the session. Retry or sign in again."
+      "value": "Unable to confirm your sign-in status right now. Please try again later."
     },
     {
       "name": "pm_left_board_af0547a0",
@@ -366,7 +414,7 @@
     },
     {
       "name": "pm_unsaved_it_will_disappear_when_you_reopen_the_board_04bda668",
-      "value": "Unsaved. It will disappear when you reopen the board."
+      "value": "Unsaved. It will disappear when you refresh or reopen the board."
     },
     {
       "name": "pm_unsave_dca60869",
@@ -544,6 +592,7 @@
       "name": "pm_secret_board_afc1422a",
       "value": "Secret board"
     },
+    { "name": "pm_public_board", "value": "Public board" },
     {
       "name": "pm_featured_board_4b3cbe23",
       "value": "Featured board ·"
@@ -2238,7 +2287,7 @@
     },
     {
       "name": "pm_unable_to_load_current_session_447e235d",
-      "value": "Unable to load current session"
+      "value": "Unable to load right now"
     },
     {
       "name": "pm_loading_existing_session_f538c37e",
@@ -3242,7 +3291,7 @@
     },
     {
       "name": "pm_saved_to_b75786b2",
-      "value": "Saved to “"
+      "value": "Saved to "
     },
     {
       "name": "pm_save_result_not_confirmed_close_and_reload_to_check_it_will_not__1f283f26",
@@ -4401,6 +4450,27 @@
     {"name":"pm_notify_description_reports_and_violations_center","value":"Get updates about reports and violations involving your content or content you reported"},
     {"name":"pm_notify_description_shuffles_activity","value":"Get updates about activity on Shuffles"},
     {"name":"pm_social_blocked_partial","value":"Showing accounts from the current response. The full blocked list has not been confirmed."},
+    {
+      "name": "pm_view_comment_replies",
+      "value": "View {0} replies"
+    },
+    {"name":"pm_photo_upload","value":"Upload photo"},
+    {"name":"pm_photo_history","value":"Photo search history"},
+    {"name":"pm_photo_history_select","value":"Select history photo"},
+    {"name":"pm_photo_history_confirm","value":"Confirm"},
+    {"name":"pm_photo_history_empty","value":"No photo search history"},
+    {"name":"pm_photo_history_error","value":"Unable to load photos. Please retry."},
+    {"name":"pm_social_business_tab","value":"Business"},
+    {"name":"pm_photo_history_single_only","value":"Only one photo can be selected for search."},
+    { "name": "pm_press_back_again_to_exit", "value": "Press back again to exit" }
+,
+    {"value":"Make this board public","name":"pm_board_make_public"},
+    {"value":"Anyone can see this board. It appears on your profile and may appear in search and elsewhere on Pinterest.","name":"pm_board_public_description"},
+    {"value":"This board is public","name":"pm_board_public_title"},
+    {"value":"Anyone can see this board","name":"pm_board_public_visibility"},
+    {"value":"Only you and your collaborators can see this board. It does not appear on your public profile, in search results or elsewhere on Pinterest.","name":"pm_board_secret_description"},
+    {"value":"This board is secret","name":"pm_board_secret_title"},
+    {"value":"Only you and your collaborators can see this board","name":"pm_board_secret_visibility"},
     {"name":"pm_video_connection_timeout","value":"Video connection timed out"},
     {"name":"pm_video_proxy_timeout_hint","value":"Video connection timed out. Please check whether your proxy rules route pinimg.com to DIRECT, or switch proxy nodes (Global mode recommended)."}
   ]

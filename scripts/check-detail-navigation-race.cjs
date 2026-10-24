@@ -21,7 +21,7 @@ const pin = 'https://www.pinterest.com/pin/123/', oldPin = 'https://www.pinteres
 const search = 'https://www.pinterest.com/search/pins/?q=example', n = new context.Native();
 let document = pin;
 const detail = { pinUrl: pin, imageUrl: 'https://i.pinimg.com/hero.jpg', related: [{ pinUrl: oldPin }] };
-Object.assign(n, { authStatus: 'authenticated', authEpoch: 10, activeTab: 1,
+Object.assign(n, { searchNativeReads:{eligible:()=>false},searchDiscoveryNativeReads:{eligible:()=>false},inboxMessagesNativeReads:{selected:()=>false},inboxUpdatesNativeReads:{eligible:()=>false},authStatus: 'authenticated', authEpoch: 10, activeTab: 1,
   tabRequestToken: 7, pageBackToken: 3, homeRecoveryToken: 2, rootReadToken: 7,
   rootReadAddress: search, rootReadStartedAt: Date.now(), pendingWebTab: 1,
   retainedRootTabPending: 1, retainedRootTabAddress: search, retainedHomeDocumentPending: true,

@@ -10,6 +10,7 @@ class Delegate {
 }
 const context = { openLink: async url => events.push(['link', url]) };
 const mocks = {
+  '@kit.RemoteCommunicationKit': { rcp: {} },
   '@kit.ShareKit': {}, '@kit.ArkData': {},
   '@kit.ArkWeb': { webview: { WebDownloadDelegate: Delegate } },
   '@kit.CoreFileKit': {

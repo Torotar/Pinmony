@@ -24,6 +24,8 @@ const sheets = [['pin','PinmonyShareSheet'],['pin','PinmonyMoreSheet'],['search'
 const product = ['RootContext','Navigation','Session','PhotoMenu','DetailOpening','BusinessResults','WebLifecycle','NetworkBridge','FailureRecovery','BottomBar'].map(name=>currentCompiled('entry/src/main/ets/app/Pinmony'+name+'Coordinator')).join('\n');
 const rootViews = ['Home','Search','Inbox','Profile'].map(name=>currentCompiled('entry/src/main/ets/components/Pinmony'+name+'RootContent')).join('\n');
 const index = currentCompiled(indexPath), search = currentCompiled(searchPath), home = currentCompiled(homePath);
+assert(!index.includes('this.immersiveLightEnabled'), 'ArkUI must not reference a stripped getter');
+assert.match(index, /HdsTabs.barBackgroundColor\(this\.immersiveLightMode !== 'off'/);
 for (const [name, state] of Object.entries(contracts)) {
   assert(!new RegExp('\\bthis\\.' + name + '\\b').test(index), 'Compiled ArkUI references a missing page field: ' + name);
   const owner = state.store === 'searchStore' ? index + '\n' + search : state.store === 'homeStore' ? index + '\n' + home : state.store === 'profileStore' ? index + '\n' + publish + '\n' + profileRead + '\n' + profileActions : state.store === 'inboxStore' ? index + '\n' + invitation : state.store === 'pinStore' ? index + '\n' + panels : index;

@@ -26,7 +26,7 @@ const envelope = fields => JSON.stringify({ resource_response: { status: 'succes
 const bridgeSource = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailScript.ets', 'utf8');
 const bridge = Function('return `' + bridgeSource.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const snapshotBody = bridge.match(/function apiSnapshot\(pin\) \{([\s\S]*?)\n  function snapshot\(pin\)/)[1];
-const context = { window: {}, location: { origin: 'https://uk.pinterest.com', href: pin }, URL,
+const context = { PIN_NATIVE_SEARCH_READS_ENABLED:false, window: {}, location: { origin: 'https://uk.pinterest.com', href: pin }, URL,
   session: 1, schedule() {}, findHero: () => null, webFlowActive: false };
 vm.runInNewContext('function apiSnapshot(pin) {' + snapshotBody, context);
 for (const [fields, expected] of [
@@ -43,13 +43,13 @@ for (const [fields, expected] of [
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const start = index.indexOf('  private openDetailTagSearch(');
 const end = index.indexOf('\n  private ', start + 1);
-const nav = { descriptionTagSearchUrl };
+const nav = { descriptionTagSearchUrl,PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages };
 vm.runInNewContext(ts.transpileModule('class Navigation {' + index.slice(start, end) + '} globalThis.Navigation = Navigation;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
-}).outputText, nav);
+}).outputText, Object.assign(nav,{PIN_NATIVE_SEARCH_READS_ENABLED:false}));
 const calls = [];
 const n = new nav.Navigation();
-Object.assign(n, { authStatus: 'authenticated', activeSheetKind: '', pinIdentity: () => '101',
+Object.assign(n, { loadSessionDocument:url=>n.controller.loadUrl(url), authStatus: 'authenticated', activeSheetKind: '', pinIdentity: () => '101',
   pinStore: { detail: { pinUrl: pin, description: text }, detailPin: pin, detailScrollOffset: 5,
     detailCache: { put: () => calls.push('cache') } }, pageHistory: { visit: () => calls.push('history') },
   clearDetail: () => calls.push('clear'), tabsController: { changeIndex: () => calls.push('tab') },

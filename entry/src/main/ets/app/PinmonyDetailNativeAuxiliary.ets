@@ -7,7 +7,7 @@ export const PIN_NATIVE_DETAIL_AUXILIARY_ENABLED: boolean = PIN_BUSINESS_PIN_REA
 interface Art { url: string; width: number; height: number; duration?: number; }
 interface VideoList { V_HLSV4?: Art; V_720P?: Art; vHLSV4?: Art; v720P?: Art; }
 interface Videos { video_list?: VideoList; videoList?: VideoList; }
-interface Slot { id?: string; slot_id?: string; slotId?: string; title?: string; images?: Record<string,Art>; images_1200x?: Art; images_736x?: Art; images_474x?: Art; images_564x?: Art; images_orig?: Art; images_236x?: Art; }
+interface Slot { videos?: Videos; id?: string; slot_id?: string; slotId?: string; title?: string; images?: Record<string,Art>; images_1200x?: Art; images_736x?: Art; images_474x?: Art; images_564x?: Art; images_orig?: Art; images_236x?: Art; }
 interface Carousel { carousel_slots?: Slot[]; carouselSlots?: Slot[]; }
 interface NativePin { id?: string; entityId?: string; type?: string; is_video?: boolean; videos?: Videos; carousel_data?: Carousel; carouselData?: Carousel; images?: Record<string,Art>; grid_title?: string; title?: string; }
 interface Resource { status: string; code?: number; error?: Object; endpoint_name?: string; data: NativePin; bookmark?: string; }
@@ -85,6 +85,22 @@ export class PinmonyDetailNativeAuxiliary {
     if (this.original) next.originalImageUrl = this.original;
     this.store.detail = next;
   }
+  resume(pin: string, token: number): boolean {
+    const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
+    if (!PIN_NATIVE_DETAIL_AUXILIARY_ENABLED || !this.ports.owned() || !detail ||
+        detail.pinUrl !== pin || detail.dataSource !== 'api' || token !== this.store.detailOpeningToken ||
+        this.store.detailPin !== pin || detail.mediaLoading || detail.isVideo && !detail.video ||
+        detail.mediaKind === 'carousel' && !detail.carousel) return false;
+    const original: string = this.image(detail.originalImageUrl || detail.imageUrl);
+    if (!original) return false;
+    this.pause();
+    this.pin = pin; this.token = token; this.account = this.key(); this.original = original;
+    this.video = detail.video; this.carousel = detail.carousel;
+    this.mediaKind = detail.isVideo ? 'video' : detail.mediaKind === 'carousel' ? 'carousel' : '';
+    this.mediaVersion = detail.video?.readRevision || 0; this.mediaLoading = false;
+    this.mediaError = detail.isVideo ? detail.videoError || '' : detail.mediaError || '';
+    return this.ready();
+  }
   async openLayer(layer: string): Promise<void> {
     if (!this.ready() || !['search','zoom'].includes(layer) || layer === 'search' && (!PIN_VISUAL_SEARCH_API_ENABLED || this.mediaKind === 'video')) return;
     this.cancelVisual(); this.bookmark = ''; this.crop = '';
@@ -128,7 +144,9 @@ export class PinmonyDetailNativeAuxiliary {
       const art: Art | undefined = ['1200x','736x','474x','564x','orig','236x'].map((key: string): Art => sizes[key]).find((v: Art): boolean => !!v && !!this.image(v.url) && Number.isFinite(v.width) && v.width > 0 && Number.isFinite(v.height) && v.height > 0);
       const id: string = graph ? slot.slotId || '' : slot.id || slot.slot_id || '';
       if (!art || typeof id !== 'string' || !id || id.length > 200 || items.some((v: PinmonyCarouselItem): boolean => v.id === id)) return undefined;
-      items.push({id:id,imageUrl:art.url,imageWidth:art.width,imageHeight:art.height,title:typeof slot.title === 'string' ? slot.title.slice(0,500) : ''});
+      const video: PinmonyVideo | undefined = slot.videos ? this.videoMap({id:p.id,entityId:p.entityId,videos:slot.videos},graph) : undefined;
+      if(slot.videos && !video)return undefined;
+      items.push({id:id,imageUrl:art.url,imageWidth:art.width,imageHeight:art.height,title:typeof slot.title === 'string' ? slot.title.slice(0,500) : '',video:video});
     }
     return {pinId:this.pin.match(/\/pin\/(\d+)\/$/)![1],items:items};
   }

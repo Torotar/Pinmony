@@ -16,12 +16,15 @@ interface CreatedTarget { id: string; type: string; name: string; privacy: strin
 interface SaveOptions { pin_id: string; board_id: string; user_id: string; clientTrackingParams?: string; }
 interface UnsaveOptions { id: string; client_tracking_params: string; }
 interface SavedRecommendation { id: string; tracking: string; }
-interface MoveData { board_id: string; pin_ids: string[]; }
+interface MoveData { board_id: string; pin_ids: string[]; section_id?: string; }
 interface MoveOptions { url: string; data: MoveData; }
-interface WriteEnvelope { options: SaveOptions | UnsaveOptions | MoveOptions | CreateTargetOptions; context: Record<string, string>; }
+interface SectionMoveData { pins: string[]; fields: string[]; }
+interface SectionMoveOptions { url: string; data: SectionMoveData; }
+interface SectionMoveResult { id: string; type: string; board: CopyOwner; }
+interface WriteEnvelope { options: SaveOptions | UnsaveOptions | MoveOptions | SectionMoveOptions | CreateTargetOptions; context: Record<string, string>; }
 interface CopyOwner { id: string; }
 interface SavedCopy { id: string; board: CopyOwner; pinner: CopyOwner; is_repin: boolean; }
-interface WriteResource { status: string; code: number; endpoint_name: string; data: SavedCopy | CreatedTarget | null; }
+interface WriteResource { status: string; code: number; endpoint_name: string; data: SavedCopy | CreatedTarget | SectionMoveResult | null; }
 interface WriteResponse { resource_response: WriteResource; client_context?: WriteContext; }
 interface WriteContext { user?: CopyOwner; }
 export interface PinmonyBoardPinWritePorts {
@@ -55,7 +58,7 @@ export class PinmonyBoardPinNativeWrites {
     return identity.sources.filter((pin: PinmonyBoardRecommendationSource): boolean => this.savedCopies.has(this.key(pin.id, identity, session))).map((pin: PinmonyBoardRecommendationSource): string => pin.id);
   }
   private clone(state: PinmonyBoardFlow): PinmonyBoardFlow {
-    return {phase:state.phase,sectionId:state.sectionId,sectionTitle:state.sectionTitle,loading:state.loading,busy:state.busy,
+    return {phase:state.phase,targetBoardId:state.targetBoardId,targetSections:state.targetSections?.slice(),sectionId:state.sectionId,sectionTitle:state.sectionTitle,loading:state.loading,busy:state.busy,
       uncertain:state.uncertain,error:state.error,description:state.description,privacy:state.privacy,recommend:state.recommend,
       invites:state.invites,requests:state.requests,pins:state.pins.slice(),targets:state.targets.slice(),saved:state.saved.slice(),hasMore:state.hasMore};
   }
@@ -77,7 +80,8 @@ export class PinmonyBoardPinNativeWrites {
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if(this.job || !original || !identity || !identity.canContribute || !session.authenticated || !session.accountId ||
       original.busy || original.loading || original.uncertain || original.error)return;
-    let options: SaveOptions | UnsaveOptions | MoveOptions | CreateTargetOptions;
+    let options: SaveOptions | UnsaveOptions | MoveOptions | SectionMoveOptions | CreateTargetOptions;
+    const sectionTarget: RegExpMatchArray | null = value.match(/^section:(\d{1,30}):(\d{1,30})$/);
     let createKey: string = '';
     let url: string, source: string, handler: string;
     let selected: string[] = [];
@@ -109,12 +113,22 @@ export class PinmonyBoardPinNativeWrites {
       options = {name:input.name.trim(),privacy:input.secret ? 'secret' : 'public'};
       url = '/resource/BoardResource/create/';source = '/board/create/';handler = 'www/board/create.js';
     }else if(action === 'move') {
-      const target = original.targets.find((t): boolean => t.id === value && t.enabled && t.id !== identity.boardId);
+      const target = original.targets.find((t): boolean => t.id === (sectionTarget && sectionTarget[1] !== identity.boardId ? sectionTarget[1] : value) && t.enabled && t.id !== identity.boardId);
       selected = identity.selectedIds.slice();
       if(original.phase !== 'targets' || !target || !selected.length || selected.length > 500 ||
         !selected.every((id: string,index: number): boolean => /^\d{1,30}$/.test(id) && selected.indexOf(id) === index && identity.loadedIds.includes(id)))return;
       options = {url:'/v3/pins/bulk/move/',data:{board_id:target.id,pin_ids:selected}};url = '/resource/ApiResource/create/';
+      if(sectionTarget) {
+        if(sectionTarget[1] === identity.boardId) {
+          if(selected.length !== 1)return;
+          options = {url:'/v3/board/sections/' + sectionTarget[2] + '/',data:{pins:selected,fields:['boardsection.board()','boardsection.id','boardsection.pin_count','boardsection.preview_pins()','boardsection.slug','boardsection.title','boardsection.type']}};
+        } else {
+          if(original.targetBoardId !== sectionTarget[1] || !original.targetSections?.some((s): boolean => s.id === sectionTarget[2]))return;
+          options = {url:'/v3/pins/bulk/move/',data:{board_id:sectionTarget[1],section_id:sectionTarget[2],pin_ids:selected}};
+        }
+      }
       source = '/board/' + identity.boardId + '/organize/repin/';handler = 'www/board/[id]/organize.js';
+      if(sectionTarget && sectionTarget[1] !== identity.boardId) {source = identity.page.slice(session.origin.length) + '_tools/organize/?organization_feed=False';handler = 'www/[username]/[slug]/_tools/organize.js';}
     }else return;
     const revision: number = this.revision, state: PinmonyBoardFlow = this.clone(original);
     const current = (): boolean => {
@@ -133,20 +147,20 @@ export class PinmonyBoardPinNativeWrites {
     PinmonyRuntimeLog.info('BoardPinNativeWrite: start action=' + action + ' count=' + selected.length.toString());
     try {
       const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessBoardPinWrite(job,
-        (): PinmonyBusinessSessionContext => this.ports.session(),identity.boardId,identity.viewerId,identity.loadedIds,original.targets.filter((t): boolean => t.enabled && t.id !== identity.boardId).map((t): string => t.id),identity.sources.map((p: PinmonyBoardRecommendationSource): string => p.id),current,
+        (): PinmonyBusinessSessionContext => this.ports.session(),identity.boardId,identity.viewerId,identity.loadedIds,original.targets.filter((t): boolean => t.enabled && t.id !== identity.boardId).map((t): string => t.id).concat(original.targetBoardId && original.targets.some((t): boolean => t.id === original.targetBoardId && t.enabled) ? (original.targetSections || []).map((s): string => 'section:' + original.targetBoardId + ':' + s.id) : []),identity.sources.map((p: PinmonyBoardRecommendationSource): string => p.id),current,
           action === 'unsave' ? [(options as UnsaveOptions).id] : [], identity.recommendationPath || '');
       if(!current())return;
       if(reply.error || reply.status < 200 || reply.status >= 300 || !reply.body || reply.body.length > 6 * 1024 * 1024)throw new Error('unconfirmed');
       const response: WriteResponse = JSON.parse(reply.body) as WriteResponse, resource: WriteResource = response.resource_response;
       if(!resource || resource.status !== 'success' || resource.code !== 0 ||
-        resource.endpoint_name !== (action === 'createTarget' ? 'v3_create_board' : action === 'save' ? 'v3_repin_handler' : action === 'unsave' ? 'v3_delete_pin_handler' : 'v3_move_pins') ||
+        resource.endpoint_name !== (action === 'createTarget' ? 'v3_create_board' : action === 'save' ? 'v3_repin_handler' : action === 'unsave' ? 'v3_delete_pin_handler' : sectionTarget && sectionTarget[1] === identity.boardId ? 'v3_post_board_section' : 'v3_move_pins') ||
         response.client_context?.user && response.client_context.user.id !== identity.viewerId)throw new Error('business');
       if(action === 'createTarget') {
         const board: CreatedTarget | null = resource.data as CreatedTarget | null, wanted: CreateTargetOptions = options as CreateTargetOptions;
         if(!board || !/^\d{1,30}$/.test(board.id) || board.type !== 'board' || board.id === identity.boardId || board.name !== wanted.name ||
             board.privacy !== wanted.privacy || board.owner?.id !== identity.viewerId)throw new Error('create');
         this.createUnknown.delete(createKey);
-        if(!state.targets.some((t): boolean => t.id === board.id))state.targets.unshift({id:board.id,title:board.name,
+        if(!state.targets.some((t): boolean => t.id === board.id))state.targets.unshift({id:board.id,secret:board.privacy === 'secret',title:board.name,
           imageUrl:/^https:\/\/i\.pinimg\.com\//.test(board.image_cover_url || '') ? board.image_cover_url! : '',enabled:true});
       }else if(action === 'save') {
         const copy: SavedCopy | null = resource.data as SavedCopy | null;
@@ -157,10 +171,13 @@ export class PinmonyBoardPinNativeWrites {
       }else if(action === 'unsave') {
         if(resource.data !== null)throw new Error('delete');
         this.savedCopies.delete(this.key(value,identity,session));state.saved = state.saved.filter((id: string): boolean => id !== value);
+      }else if(sectionTarget && sectionTarget[1] === identity.boardId) {
+        const result: SectionMoveResult | null = resource.data as SectionMoveResult | null;
+        if(!result || result.type !== 'board_section' || result.id !== sectionTarget[2] || result.board?.id !== identity.boardId)throw new Error('section-move');
       }else if(resource.data !== null)throw new Error('move');
       state.busy = false;this.publish(state);
       PinmonyRuntimeLog.info('BoardPinNativeWrite: outcome=confirmed action=' + action);
-      this.ports.confirmed(action,selected,action === 'save' ? JSON.stringify(resource.data) : action === 'unsave' ? (options as UnsaveOptions).id : '');
+      this.ports.confirmed(sectionTarget && sectionTarget[1] === identity.boardId ? 'moveSection' : action,selected,action === 'save' ? JSON.stringify(resource.data) : action === 'unsave' ? (options as UnsaveOptions).id : '');
     }catch (_) {if(current())this.unknown(state);}
     finally {if(revision === this.revision){this.job = '';this.state = undefined;this.identity = undefined;}}
   }

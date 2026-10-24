@@ -17,6 +17,10 @@ assert.equal(saves.copyId('2'), '');
 const reopened = saves.apply('1', fresh);
 assert.equal(reopened.actions[0].selected, true);
 assert.equal(reopened.actions[0].label, '已收藏');
+saves.confirm('1', true, '801', '旅行 Travel');
+assert.equal(saves.apply('1', fresh).actions[0].label, '旅行 Travel', 'confirmed destination is displayed verbatim after reopening');
+saves.confirm('1', true);
+assert.equal(saves.apply('1', fresh).actions[0].label, '旅行 Travel', 'later saved-state evidence retains the confirmed destination');
 assert.equal(fresh.actions[0].selected, false, 'Do not mutate incoming snapshots');
 assert.equal(reopened.actions[1].selected, true);
 const progressive = { ...fresh, mediaLoading: true, mediaKind: 'video', commentLoading: true,
@@ -28,10 +32,20 @@ assert.equal(saves.apply('2', fresh).actions[0].selected, false, 'Other Pins sta
 saves.confirm('1', false);
 assert.equal(saves.copyId('1'), '');
 assert.equal(saves.apply('1', reopened).actions[0].selected, false);
+assert.equal(saves.apply('1', reopened).actions[0].label, '收藏', 'unsave clears the destination label');
 saves.confirm('1', true, '802'); saves.clear();
 assert.equal(saves.copyId('1'), '', 'session reset clears saved-copy identities');
 assert.equal(saves.apply('1', fresh).actions[0].selected, false, 'Session reset removes prior evidence');
 const index = readSourceFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+const boardOpenBody = index.match(/openPin: \(pin: PinmonyBoardPin, board: PinmonyBoardDetail\): void => \{([\s\S]*?)\n    \}/)[1];
+const boardHost = { cancelledBoardPins: new Set(), pinStore: { confirmedSaves: saves, rememberDetailOrigin() {} },
+  pinIdentity: () => '42', beginDetailOpening() {
+    assert.equal(saves.apply('42', fresh).actions[0].label, '风景 Landscape', 'board title is available before detail opening');
+  } };
+vm.runInNewContext(compile('(function(pin,board){' + boardOpenBody + '}).call(host,pin,board)'), {
+  host: boardHost, pin: { pinUrl: 'https://www.pinterest.com/pin/42/' },
+  board: { pageKey: 'https://www.pinterest.com/test/landscape/', title: '风景 Landscape' }, PIN_NATIVE_DETAIL_READS_ENABLED: true
+});
 const method = index.match(/  private beginDetailOpening\([^\n]*\): void \{[\s\S]*?(?=\r?\n  private restoreCachedDetail)/)[0];
 const events = [];
 const navContext = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: false,

@@ -13,6 +13,7 @@ const context = { $r: x => x, SnackBarIconType: { NORMAL: 1 },
   HdsSnackBar: class { show(icon, message) { messages.push(message.title); } dismiss() {} } };
 vm.runInNewContext(code, context);
 const view = new context.View();
+view.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
 view.savedSession = 'board:1'; view.confirmedSaved = [];
 view.snapshot = { pageKey: 'board', session: 1, title: '风景', flow: { phase: 'ideas', saved: [], busy: true } };
 view.updateSavedFeedback(); assert.equal(messages.length, 0, 'button dispatch is not a success');

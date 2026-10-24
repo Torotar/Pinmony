@@ -38,7 +38,7 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class N
 function native() {
   const n = new context.Native(), loads = [];
   let document = root, ready = false;
-  Object.assign(n, { authStatus: 'authenticated', activeTab: 1, tabRequestToken: 1,
+  Object.assign(n, { searchNativeReads:{eligible:()=>false},searchDiscoveryNativeReads:{eligible:()=>false},inboxMessagesNativeReads:{selected:()=>false},inboxUpdatesNativeReads:{eligible:()=>false},authStatus: 'authenticated', activeTab: 1, tabRequestToken: 1,
     webPageLoading: false,
     searchController: { searchPlaceholder: pageKey => ({ pageKey, results: [] }) }, syncFloatingTabsMotion() {},
     pendingWebTab: -1, rootReadToken: -1, rootTabAddresses: new Map([[1, root + 'search/']]), searchStore: {}, pinStore: {},

@@ -6,16 +6,16 @@ function load(path, deps = () => ({})) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
-  }).outputText, { exports, require: deps, console }); return exports;
+  }).outputText, { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps), console }); return exports;
 }
 const session = { ...load('common_session/src/main/ets/models/PinmonyAuth.ets'),
   ...load('common_session/src/main/ets/models/PinmonySessionVerification.ets') };
 const { PinmonyBusinessSession } = load('common_session/src/main/ets/services/PinmonyBusinessSession.ets');
 const { PinmonySessionEnvironment } = load('common_session/src/main/ets/services/PinmonySessionEnvironment.ets');
 const { PinmonySessionVerification } = load('entry/src/main/ets/app/PinmonySessionVerification.ets', name =>
-  name === 'common_session' ? session : { PinmonyRuntimeLog: log });
+  name === 'common_session' ? session : { PinmonyRuntimeLog: log, PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages });
 const { PinmonySessionCoordinator } = load('entry/src/main/ets/app/PinmonySessionCoordinator.ets', name =>
-  name === 'common_session' ? session : { PinmonyRuntimeLog: log });
+  name === 'common_session' ? session : { PinmonyRuntimeLog: log, PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages });
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert(source.includes('private readonly nativeLoginEnabled: boolean = PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED && this.nativeBusinessRoutesEnabled;'),
   'ArkUI must receive an initialized field; a struct getter is stripped by its compiler');
@@ -35,11 +35,13 @@ class Controller {
 let saveCookies = () => Promise.resolve();
 let online = true;
 const globals = { connection: {hasDefaultNetSync: () => online}, webview: { WebviewController: Controller, WebCookieManager: {saveCookieAsync: () => saveCookies()} }, PinmonyRuntimeLog: log,
+  PinmonySessionHistory: { save: confirmed => { storage.set('pinmonySessionConfirmed', confirmed); return true; } },
   PINTEREST_LOGIN_URL: login, PIN_NATIVE_HOME_READS_ENABLED: false, PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: false,
   AppStorage: { get: key => storage.get(key), setOrCreate: (key, value) => storage.set(key, value) } };
 const names = ['sessionDocumentUrl','runSessionScript','loadSessionDocument','startNativeVerification',
   'openNativeLogin','releaseNativeLogin','handleNativeSessionExpired','updateAuthState','syncAuthentication',
   'retryLogin','confirmBusinessSession','nativeBusinessSessionContext','enterAuthenticatedRoot'];
+globals.PinmonyI18n = require('./local-message-test-fixture.cjs').rawLocalMessages;
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + names.map(method).join('\n') + '} Host;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText, globals);
@@ -90,6 +92,13 @@ function reply(status = 'authenticated') {
       data: { id: '123', username: 'fixture_user', type: 'user_settings' } } }) };
 }
 async function main() {
+  const offlineGuest = fixture(); storage.delete('pinmonySessionConfirmed'); online = false;
+  offlineGuest.host.startNativeVerification();
+  assert.equal(offlineGuest.host.authStatus, 'error');
+  assert.equal(offlineGuest.host.loginHostMounted, false, 'offline startup cannot mount login even without saved history');
+  assert.equal(offlineGuest.jobs.length, 0);
+  assert(!source.includes('Button(this.uiText("pm_sign_in_99232cdd")).onClick(() => this.openNativeLogin())'), 'verification errors only offer retry');
+  online = true;
   let guest = fixture(); storage.delete('pinmonySessionConfirmed'); guest.host.startNativeVerification();
   assert.equal(guest.jobs.length,0,'first use and legacy upgrades open login without relying on arbitrary visitor cookies');
   assert.equal(guest.host.loginHostMounted,true); assert.equal(guest.host.authStatus,'unauthenticated');

@@ -5,7 +5,7 @@ const ts = require(process.argv[2] || 'typescript');
 function load(file, deps) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText,
-    { exports, require: deps || (() => ({})), console });
+    { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps || (() => ({}))), console });
   return exports;
 }
 const { readRelatedPresentation } = load('feature_pin/src/main/ets/services/PinmonyRelatedPresentation.ets');
@@ -52,6 +52,31 @@ function fixture() {
     setForeground(value) { foreground = value; }, setRoot(value) { root = value; } };
 }
 async function main() {
+  const retained = fixture();
+  let retaining = retained.controller.start(pinUrl(1), 1, base(1));
+  retained.requests[0].resolve(preview('preview')); await flush();
+  retained.requests[1].resolve(related([2, 3], 'retained-next')); await retaining;
+  retained.controller.pause();
+  assert.equal(retained.controller.resume(pinUrl(1), 1), true);
+  await flush();
+  assert.equal(retained.autoplayRequests.length, 2, 'native back reloads preferences cleared on pause');
+  assert.equal(retained.store.detail.autoplayWifi, true, 'self settings work without PinResource viewer');
+  assert.equal(retained.requests.length, 2, 'native back resumes without base, preview or recommendation reads');
+  assert.equal(retained.store.detail.commentPreview, 'preview');
+  retained.controller.pause();
+  retaining = retained.controller.start(pinUrl(1), 1, base(1));
+  assert.equal(retained.store.detail.relatedLoading, false);
+  retained.requests[2].resolve(preview('fresh preview')); await retaining;
+  assert.equal(retained.requests.length, 3, 'return retains recommendations without fetching their first page');
+  retained.controller.loadMore();
+  assert.equal(JSON.parse(new URL(retained.requests[3].job.url).searchParams.get('data')).options.bookmarks[0], 'retained-next');
+  retained.requests[3].resolve(related([4], '-end-')); await flush();
+  retained.setSession({ ...retained.getSession(), generation: 2, accountId: 'other' });
+  assert.equal(retained.controller.resume(pinUrl(1), 1), false, 'account changes reject native back state');
+  retaining = retained.controller.start(pinUrl(1), 1, base(1));
+  retained.requests[4].resolve(preview('other preview')); await flush();
+  assert.equal(retained.requests.length, 6, 'new account generation cannot reuse retained recommendations');
+  retained.requests[5].resolve(related([], '-end-')); await retaining;
   // The captured PinResource shape has aggregated_pin_data.id only. Exercise
   // preview and full list, not just successful base/related reads.
   for (const data of [ { id: '1', aggregated_pin_data: { id: '777' } },
@@ -95,8 +120,6 @@ async function main() {
   f.requests[0].resolve(preview('confirmed preview')); await flush();
   assert.equal(f.requests.length, 2, 'related starts only after preview settles');
   f.requests[1].resolve(related([2,3], 'next')); await first;
-  assert.equal(f.autoplayRequests.length, 1, "missing base viewer does not block settings read");
-  assert.equal(f.store.detail.autoplayWifi, true);
   assert.equal(f.store.detail.commentPreview, 'confirmed preview'); assert.equal(f.store.detail.related.length, 2);
   assert.equal(f.store.detailNativeReadsReady, true);
   assert.equal(f.store.detailCache.get('1').detail.related.length, 2, 'return cache includes native recommendations');

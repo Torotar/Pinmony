@@ -3,22 +3,25 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const { createArktsLoader } = require('./arkts-module-loader.cjs');
-const disk = new Map(); let flushes = 0, failWrite = false, failFlush = false;
+const disk = new Map(); let flushes = 0, failWrite = false, failFlush = false, failOpen = false, failRead = false, failResource = false;
 function boot(system = 'zh-CN') {
   const memory = new Map(); let currentSystem = system;
   const cache = new Map(disk);
-  const storage = { getSync: (k, fallback) => cache.has(k) ? cache.get(k) : fallback,
+  const storage = { getSync: (k, fallback) => {if(failRead)throw Error('synthetic read');return cache.has(k) ? cache.get(k) : fallback;},
     putSync: (k, value) => { if (failWrite) throw Error('disk'); cache.set(k, value); },
     flushSync: () => { if (failFlush) throw Error('flush'); flushes++; for (const [k,v] of cache) disk.set(k,v); } };
   const loader = createArktsLoader(ts, {
     '@kit.LocalizationKit': { i18n: { System: { getSystemLanguage: () => currentSystem } } },
-    '@kit.ArkData': { preferences: { getPreferencesSync: () => storage } }, '@kit.AbilityKit': {}
+    '@kit.ArkData': { preferences: { getPreferencesSync: () => {if(failOpen)throw Error('synthetic open');return storage;} } }, '@kit.AbilityKit': {}
   }, { AppStorage: { get: key => memory.get(key), setOrCreate: (k,v) => memory.set(k,v) },
     PersistentStorage: { persistProp: (k,v) => { if (!memory.has(k)) memory.set(k,v); } } });
   const api = loader.loadFile('common_foundation/src/main/ets/services/PinmonyI18n.ets').PinmonyI18n;
-  api.initialize({ resourceManager: { getConfigurationSync: () => ({}), getOverrideResourceManager: config => ({ getStringByNameSync: key => { const rows = JSON.parse(fs.readFileSync('common_foundation/src/main/resources/' + (config.locale === 'en-US' ? 'en_US' : 'zh_CN') + '/element/string.json', 'utf8')).string; const row = rows.find(row => row.name === key); if (!row) throw Error('Missing resource: ' + key); return row.value; } }) } }); return { api, memory, system: value => currentSystem = value };
+  api.initialize({ resourceManager: { getConfigurationSync: () => ({}), getOverrideResourceManager: config => ({ getStringByNameSync: key => { if(failResource)throw Error('synthetic resource');const rows = JSON.parse(fs.readFileSync('common_foundation/src/main/resources/' + (config.locale === 'en-US' ? 'en_US' : 'zh_CN') + '/element/string.json', 'utf8')).string; const row = rows.find(row => row.name === key); if (!row) throw Error('Missing resource: ' + key); return row.value; } }) } }); return { api, memory, system: value => currentSystem = value };
 }
-let f = boot(); assert.equal(f.memory.get('pinmonyLanguage'), 'zh');
+failOpen=true;assert.throws(()=>boot(),/language-storage-read-unavailable/);failOpen=false;
+failRead=true;assert.throws(()=>boot(),/language-storage-read-unavailable/);failRead=false;
+let f = boot();failResource=true;assert.equal(f.api.text('搜索'),'搜索');failResource=false;
+ assert.equal(f.memory.get('pinmonyLanguage'), 'zh');
 f.api.select('en'); assert.equal(flushes, 1); assert.equal(disk.get('language'), 'en');
 f = boot('zh-CN'); assert.equal(f.memory.get('pinmonyLanguagePreference'), 'en'); assert.equal(f.memory.get('pinmonyLanguage'), 'en');
 f.system('zh-TW'); f.api.syncSystemLanguage(); assert.equal(f.memory.get('pinmonyLanguage'), 'en');
@@ -46,6 +49,14 @@ assert.equal(f.api.optionLabel('home-save', '收藏', 'zh'), '收藏');
 const mixed = f.api.message('已收藏至 ') + '收藏';
 assert.equal(f.api.render(mixed, 'en'), 'Saved to 收藏');
 assert.equal(f.api.render(mixed, 'zh'), '已收藏至 收藏');
+// Website templates keep counts and user data correct across language changes.
+assert.equal(f.api.format('pm_view_comment_replies', [12], 'zh'), '查看 12 条回复');
+assert.equal(f.api.format('pm_view_comment_replies', [12], 'en'), 'View 12 replies');
+const retainedSaved = f.api.message('pm_saved_to_b75786b2') + '风景 {0}”';
+assert.equal(f.api.render(retainedSaved, 'zh'), '已收藏至 风景 {0}”');
+assert.equal(f.api.render(retainedSaved, 'en'), 'Saved to 风景 {0}”');
+assert.equal(f.api.format('pm_social_unblock_title', ['风景 {0}'], 'zh'), '取消屏蔽 风景 {0}？');
+
 assert.equal(f.api.format('查看{0}全部内容', ['Board {0}'], 'en'), 'View all of Board {0}');
 // Execute a real native producer so ternary/multiline status assignments are covered.
 const mediaLoader = createArktsLoader(ts, {

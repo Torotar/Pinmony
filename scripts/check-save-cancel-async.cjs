@@ -22,7 +22,7 @@ function harness(encoded = false) {
     resourceRequest: (p, name, verb, options, valid) => new Promise((resolve, reject) => requests.push({ p, name, verb, options, valid, resolve, reject })) };
   const window = { PinmonyPostApi: api, PinmonyPostExtensionsEnabled: true };
   require('./product-coordination-harness.cjs').run(ts,PIN_POST_EXTENSIONS_SCRIPT, { window, location, console: { info() {} } });
-  const Native = require('./product-coordination-harness.cjs').run(ts,code, { PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
+  const Native = require('./product-coordination-harness.cjs').run(ts,code, { PIN_NATIVE_PIN_MENUS_ENABLED:false, PIN_POST_API_ENABLED: true, PIN_POST_EXTENSIONS_ENABLED: true,
     PinmonyRuntimeLog: { info() {} }, Date: { now: () => now }, setTimeout: (fn, ms) => timers.push({ fn, ms }) });
   const native = new Native();
   const saves = new PinmonyConfirmedSaves(); saves.confirm('101', true, '802');

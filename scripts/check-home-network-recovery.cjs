@@ -26,10 +26,11 @@ function drainRecovery() {
 }
 function harness() {
   timers.length = 0;
+  context.Native.prototype.profileSearchReads={pause(){},resume(){}};
   const native = new context.Native(), loads = [], effects = [];
   const cached = { pageKey: home, pins: [{ id: '123', pinUrl: pin, imageUrl: 'https://i.pinimg.com/a.jpg' }],
     selectedTab: 'feed', tabs: [{ id: 'feed', label: 'Feed', selected: true }, { id: 'other', label: 'Other' }], dataSource: 'api' };
-  Object.assign(native, { authStatus: 'authenticated', authEpoch: 7, activeTab: 0, pendingWebTab: -1,
+  Object.assign(native, { syncAuthentication(){},authStatus: 'authenticated', authEpoch: 7, activeTab: 0, pendingWebTab: -1,
     navigationAddress: home, nativeBackTarget: '', pageBackToken: 0, homeRecoveryToken: 0,
     interruptedHomePage: '', homeRecoveryAttempted: false, loadFailed: false, rootTabAddresses: new Map(),
     homeStore: { home: cached, cachedHome: cached, homeActionsReady: true, homeRequestToken: 1 },
@@ -54,6 +55,7 @@ function harness() {
     clearDetail() { this.pinStore.detail = undefined; this.pinStore.detailOpeningPin = ''; },
     showNetworkNotice() {}, showMessage() {}, describeFailure: (_url, code) => 'error ' + code,
     requestHomeTitles() {}, tabsController: { changeIndex() {} },
+    bottomBarCoordinator: { resumeAfterForeground() {} },
     normalizeHomeBoard: () => undefined, persistHomeDiskCache() {},
     controller: { getUrl: () => home, loadUrl(url) { loads.push(url); }, runJavaScript: async () => 'true' } });
   native.searchStore = Object.assign(new searchRuntime.Store(), native.searchStore);

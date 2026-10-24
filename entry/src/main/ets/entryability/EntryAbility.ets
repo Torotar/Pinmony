@@ -3,14 +3,24 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { window } from '@kit.ArkUI';
-import { deviceInfo } from '@kit.BasicServicesKit';
-import { webview } from '@kit.ArkWeb';
-import { NetworkManager } from 'common_network';
+import lazy { window } from '@kit.ArkUI';
+import lazy { deviceInfo } from '@kit.BasicServicesKit';
+import lazy { webview } from '@kit.ArkWeb';
+import lazy { NetworkManager } from 'common_network';
 
 const DOMAIN = 0x0000;
+const MODULE_EVALUATED_AT: number = Date.now();
+PinmonyRuntimeLog.info('StartupBoundary: entry-module-evaluated');
 
 export default class EntryAbility extends UIAbility {
+  constructor() {
+    super();
+    AppStorage.setOrCreate<boolean>('pinmonyStartupAbilityConstructed', true);
+    const stageReadyAt: number = AppStorage.get<number>('pinmonyAbilityStageReadyAt') || 0;
+    PinmonyRuntimeLog.info('StartupBoundary: ability-constructed sinceStageMs=' +
+      (stageReadyAt > 0 ? Date.now() - stageReadyAt : -1).toString() +
+      ' sinceModuleMs=' + (Date.now() - MODULE_EVALUATED_AT).toString());
+  }
   private mainWindow: window.Window | undefined = undefined;
   private lifecycleSequence: number = 0;
   private runtimeErrorSequence: number = 0;
@@ -44,48 +54,23 @@ export default class EntryAbility extends UIAbility {
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    PinmonyRuntimeLog.initialize(this.context.filesDir);
-    try { PinmonyI18n.initialize(this.context); }
-    catch (_) { PinmonyRuntimeLog.warn('LanguagePreference: restore failed'); PinmonyI18n.syncSystemLanguage(); }
-    PinmonyRuntimeLog.info('LanguagePreference: restored=' + (AppStorage.get<string>('pinmonyLanguagePreference') || 'system') +
-      ' effective=' + (AppStorage.get<string>('pinmonyLanguage') || 'unknown'));
+    AppStorage.setOrCreate<number>('pinmonyAbilityCreatedAt', Date.now());
+    PinmonyRuntimeLog.info('StartupBoundary: ability-onCreate sinceModuleMs=' +
+      (Date.now() - MODULE_EVALUATED_AT).toString() + ' launchReason=' + launchParam.launchReason.toString());
     PinmonyRuntimeLog.info('RuntimeBuild: ' + PINMONY_BUILD_IDENTITY);
     this.lifecycleStartedAt = Date.now();
     this.lifecycleLastEventAt = this.lifecycleStartedAt;
     this.logLifecycle('create-start', 'windowStage=false content=false');
+    const preconnectStartedAt: number = Date.now();
     NetworkManager.preConnect('https://www.pinterest.com').catch(() => {
       // Startup pre-connect is best effort and never blocks the ability.
     });
     PinmonyRuntimeLog.info('AbilityLifecycle: preconnect-dispatched');
-    try {
-      webview.WebviewController.setWebDebuggingAccess(false);
-    } catch (_) { PinmonyRuntimeLog.warn('Web: debug configuration unavailable'); }
-    try {
-      const features: webview.BackForwardCacheSupportedFeatures = new webview.BackForwardCacheSupportedFeatures();
-      // Visible media is native; do not opt hidden Web media or native embeds into retention.
-      features.nativeEmbed = false;
-      features.mediaTakeOver = false;
-      webview.WebviewController.enableBackForwardCache(features);
-      webview.WebviewController.initializeWebEngine();
-    } catch (_) { PinmonyRuntimeLog.warn('PinmonyReturn: document retention unavailable'); }
+    PinmonyRuntimeLog.info('StartupBoundary: preconnect-dispatch elapsedMs=' + (Date.now() - preconnectStartedAt).toString());
     try {
       errorManager.on('globalErrorOccurred', this.errorObserver);
       errorManager.on('globalUnhandledRejectionDetected', this.rejectionObserver);
     } catch (_) { PinmonyRuntimeLog.warn('Runtime: exception observer unavailable'); }
-    PersistentStorage.persistProp('themePreference', 'system');
-    PersistentStorage.persistProp('immersiveLightEnabled', true);
-    PersistentStorage.persistProp('immersiveLightMode', AppStorage.get<boolean>('immersiveLightEnabled') === false ? 'off' : 'immersive');
-    PersistentStorage.persistProp('screenOrientationPreference', 'system');
-    PersistentStorage.persistProp('pinmonySessionOrigin', 'https://www.pinterest.com');
-    PersistentStorage.persistProp('pinmonySessionConfirmed', false);
-    try {
-      const preference: string = AppStorage.get<string>('themePreference') || 'system';
-      this.context.getApplicationContext().setColorMode(preference === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : preference === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-    } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
-    }
-    PersistentStorage.persistProp('bottomBarScrollCollapseEnabled', true);
-    PersistentStorage.persistProp('pinwebHomeOfflineMarker', '');
     this.syncSystemColorMode();
     this.logLifecycle('create-complete', 'windowStage=false content=false');
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
@@ -154,6 +139,7 @@ export default class EntryAbility extends UIAbility {
     }
 
     this.contentLoadStartedAt = Date.now();
+    AppStorage.setOrCreate<number>('pinmonyContentLoadStartedAt', this.contentLoadStartedAt);
     this.logLifecycle('content-load-start', 'windowStage=' + this.windowStageReady.toString() +
       ' content=false');
     windowStage.loadContent('pages/Index', (err) => {

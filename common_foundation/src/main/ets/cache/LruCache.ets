@@ -32,11 +32,13 @@ export class LruCache<T> {
     return entry.value;
   }
 
-  put(key: string, value: T, ttlMs: number = this.ttlMs): void {
+  put(key: string, value: T, ttlMs: number = this.ttlMs, ageMs: number = 0): void {
     if (!Number.isFinite(ttlMs) || ttlMs < 0) throw new Error('ttlMs must be non-negative');
+    if (!Number.isFinite(ageMs) || ageMs < 0) throw new Error('ageMs must be non-negative');
     const now: number = Date.now();
+    const createdAt: number = now - ageMs;
     this.entries.delete(key);
-    this.entries.set(key, { value, createdAt: now, ttlMs, expiresAt: now + ttlMs });
+    this.entries.set(key, { value, createdAt, ttlMs, expiresAt: createdAt + ttlMs });
     while (this.entries.size > this.maxSize) {
       const oldest: IteratorResult<[string, LruCacheEntry<T>]> = this.entries.entries().next();
       if (oldest.done) break;

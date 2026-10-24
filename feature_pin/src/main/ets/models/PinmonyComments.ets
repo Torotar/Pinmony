@@ -39,6 +39,7 @@ export interface PinmonyCommentResult {
 }
 
 export interface PinmonySaveBoard {
+  hasSections?: boolean;
   id: string;
   name: string;
   imageUrl: string;
@@ -47,6 +48,9 @@ export interface PinmonySaveBoard {
 }
 
 export interface PinmonySaveResult {
+  targetBoardId?: string;
+  uncertain?: boolean;
+  targetSections?: PinmonySaveBoard[];
   pin: string;
   loading: boolean;
   busy: boolean;

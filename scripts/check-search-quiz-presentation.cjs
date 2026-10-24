@@ -41,10 +41,10 @@ assert.match(page, /WaterFlow\(\{ scroller: this\.resultsScroller, sections: thi
 const picker = panel.slice(panel.indexOf('private selectionContent()'), panel.indexOf('\n  build()'));
 assert(!picker.includes('quiz.topics'), 'candidate topics are absent from picker UI');
 assert(!panel.includes('更多创意'));
-assert.match(picker, /Button\('查看结果'\)/);
+assert.match(picker, /Button\(this\.uiText\("pm_view_results_d06bc6ef"\)\)/);
 assert.match(picker, /\.onReachEnd\(/);
-assert.match(page, /title: this\.quizModalTitle/);
-assert.match(page, /PinmonyModalTitle\(\{ title: .*选择灵感（最多10张）/);
+assert.match(page, /title: \{ title: this\.snapshot.quiz\?\.mode === 'picker'/);
+assert.match(page, /pm_choose_inspiration_up_to_10_images_19ae0263/);
 assert(!picker.includes('pickerTitle'), 'sheet header owns the title instead of duplicating it in the body');
 assert.match(picker, /Stack\(\{ alignContent: Alignment.Center \}\)/);
 assert.match(picker, /if \(this.quiz.busy && this.quiz.cards.length === 0\) \{\s*LoadingProgress/);
@@ -52,13 +52,13 @@ assert.match(picker, /footer: this.paginationFooter/, 'pagination loader belongs
 assert.match(panel, /private paginationFooter\(\)[\s\S]*?this.quiz.busy && this.quiz.cards.length > 0/);
 assert.match(picker, /objectFit\(ImageFit.Contain\)/, 'selection previews never crop the source image');
 const geometryStart = panel.indexOf('  private cardWidth()');
-const geometry = panel.slice(geometryStart, panel.indexOf('\n  @Builder', geometryStart));
+const geometry = panel.slice(panel.indexOf('  private contentColumns()'), geometryStart) + panel.slice(geometryStart, panel.indexOf('\n  @Builder', geometryStart));
 const Geometry = vm.runInNewContext(ts.transpileModule('class Geometry {' + geometry + '}',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText + '\nGeometry;');
 const metrics = new Geometry();
 for (const width of [200, 328, 600]) {
   metrics.contentWidth = width;
-  assert.equal(metrics.cardWidth() * 2 + 8, width, 'two images and their gap fit the measured flow width');
+  assert.equal(metrics.cardWidth() * metrics.contentColumns() + 8 * (metrics.contentColumns()-1), width, 'responsive columns and their gaps fit the measured flow width');
   for (const [imageWidth, imageHeight] of [[800, 200], [200, 1000], [236, 310]]) {
     assert.equal(metrics.cardHeight({ imageWidth, imageHeight }) / metrics.cardWidth(), imageHeight / imageWidth,
       'portrait and landscape previews keep the complete source aspect ratio');

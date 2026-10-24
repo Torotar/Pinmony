@@ -18,7 +18,7 @@ function host(pathname) {
     }
   };
   window.top = window;
-  const context = vm.createContext({ window, location });
+  const context = vm.createContext({ window, location, URL, history: { pushState() {}, replaceState() {} } });
   Object.defineProperty(context, 'document', { get() { throw Error('board accessed DOM'); } });
   vm.runInContext(classifier, context);
   return { context, window, location, events, states, calls };
@@ -27,7 +27,7 @@ for (const path of ['/sample/board/', '/sample/pins/']) {
   const h = host(path);
   assert.equal(h.window.PinmonyBoardDocument, true);
   // Execute the real registered legacy scripts with every DOM access forbidden.
-  for (const index of [3, 5, 6, 8, scripts.length - 1]) vm.runInContext(scripts[index].script, h.context);
+  for (const item of scripts.filter(item=>item.script.startsWith('(function () { if (window.PinmonyBoardDocument === true) return;') || item.script.includes('} else {') && item.script.includes('PinmonyNativeShareApiOpen'))) vm.runInContext(item.script, h.context);
   assert.equal(h.window.PinmonyNativeShareApiOpen(h.location.href), true);
   assert.equal(h.window.PinmonyNativeShareApiOpen(h.location.href), false);
   const session = h.states[0].session;

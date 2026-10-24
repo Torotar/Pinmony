@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const files = new Map(), timers = new Map(); let destinations = [], opens = 0, closes = 0, next = 0, fail = false, partial = false;
-let delayedRead;
+let delayedRead, failRead=false, failClose=false;
 const sessionPath = '/internal/pinweb-session-current.log', previousPath = '/internal/pinweb-session-previous.log';
 const modes = [];
 const io = {
@@ -11,13 +11,14 @@ const io = {
   async open(path, mode) { if (fail) throw Error('disk unavailable'); if (mode & 16 && !files.has(path)) throw Error('missing');
     opens++; modes.push({path,mode}); if (mode & 4) files.set(path, ''); return { fd: { path, mode, position: 0 } }; },
   async read(fd, buffer) {
+    if(failRead)throw Error('synthetic read failure');
     if (delayedRead) { const waiting = delayedRead; delayedRead = undefined; await waiting; }
     const source = Buffer.from(files.get(fd.path)); const part = source.subarray(fd.position, fd.position + buffer.byteLength);
     new Uint8Array(buffer).set(part); fd.position += part.length; return part.length;
   },
   async write(fd, bytes) { const data = Buffer.from(bytes); const count = partial ? Math.min(7, data.length) : data.length;
     files.set(fd.path, Buffer.concat([Buffer.from(files.get(fd.path) || '', 'utf8'), data.subarray(0, count)]).toString('utf8')); return count; },
-  async close() { closes++; },
+  async close() { closes++; if(failClose)throw Error('synthetic close failure'); },
   openSync() { throw Error('Sync file I/O forbidden'); },
   writeSync() { throw Error('Sync file I/O forbidden'); }, closeSync() { throw Error('Sync file I/O forbidden'); }
 };
@@ -80,5 +81,12 @@ const { PinmonyRuntimeLog: log } = compile('common_foundation/src/main/ets/servi
   for (let i = 0; i < 1300; i++) log.info('bounded-queue ' + i); await log.flush();
   assert(files.get('/internal/pinweb-session-current.log').includes('dropped=300'));
   assert.equal(timers.size, 0);
+  const summary={add(){},finish(){}};
+  failRead=true;
+  await assert.rejects(log.copyLog('/unicode.txt','/export.txt',summary),/diagnostics-read-failed/);
+  failRead=false;assert.equal(opens,closes,'read failure still closes the source');
+  failClose=true;
+  await assert.rejects(log.copyLog('/unicode.txt','/export.txt',summary),/diagnostics-close-failed/);
+  failClose=false;
   console.log('Runtime log: append across restarts, preserved legacy, complete >8MiB streaming export, privacy, partial writes, bounded memory and failure passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

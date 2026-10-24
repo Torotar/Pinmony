@@ -24,12 +24,12 @@ function navigationChecks() {
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
   const start = index.indexOf('  private openInboxBoard(');
   const method = index.slice(start, index.indexOf('\n  private ', start + 1));
-  const context = { PIN_BOARD_API_ENABLED: true, PIN_NATIVE_BOARD_READS_ENABLED: false };
+  const context = { PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages, PIN_BOARD_API_ENABLED: true, PIN_NATIVE_BOARD_READS_ENABLED: false };
   vm.runInNewContext(ts.transpileModule('class Native {' + method + '} globalThis.Native = Native;',
     { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
   function harness() {
     const n = new context.Native(), loads = [], timers = [];
-    Object.assign(n, { authStatus: 'authenticated', activeTab: 2, businessSuspended: false, activeSheetKind: '',
+    Object.assign(n, { sessionDocumentUrl:()=>n.controller.getUrl(),loadSessionDocument:url=>n.controller.loadUrl(url),PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages, authStatus: 'authenticated', activeTab: 2, businessSuspended: false, activeSheetKind: '',
       pinStore: {}, inboxMessagesNativeReads: {ownsFlow:()=>false}, boardStore: { boardOpeningToken: 0 }, inboxStore: { inboxSession: 7, chatScrollOffset: 321,
         inboxFlow: { screen: 'chat', pageUrl: inbox, session: 7, conversationId: '100',
           messages: [{ id: '301', board: { id: '123', title: 'Sample board', url: target, pinCount: 48 } }] } },

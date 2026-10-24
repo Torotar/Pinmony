@@ -127,7 +127,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                 const more: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-see-more');
                 state.options = [];
                 state.actions = [
-                    { id: 'board-menu-cancel-save', label: PinmonyI18n.message("pm_unsave_dca60869"), enabled: !this.ports.cancelledBoardPins().has(pinUrl) && !state.loading && !state.error && !state.busy &&
+                    { id: 'board-menu-cancel-save', label: PinmonyI18n.message("pm_unsave_dca60869"), enabled: (!native || state.canCancelSave === true) && !this.ports.cancelledBoardPins().has(pinUrl) && !state.loading && !state.error && !state.busy &&
                             !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && !board.loadingMore && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
                     { id: 'board-menu-move', label: PinmonyI18n.message("pm_move_to_another_board_62574b0d"), enabled: !state.loading && !state.error && !state.busy &&
                             !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
@@ -277,7 +277,10 @@ async performCustomHomeAction(id: string): Promise<void> {
         const pin: PinmonyBoardPin | undefined = boardVisiblePins(board).find((item: PinmonyBoardPin): boolean => item.pinUrl === menu.pinUrl);
         if (!pin)
             return;
-        this.ports.dismissShareSheet();
+        if (this.ports.dismissShareSheetAfterAction) await this.ports.dismissShareSheetAfterAction();
+        else this.ports.dismissShareSheet();
+        if (this.ports.authStatus() !== 'authenticated' || this.ports.currentBoardUrl() !== board.pageKey ||
+            this.ports.boardStore().boardDetail !== board || this.ports.showNativeSheet()) return;
         this.ports.setSinglePinMovePage(board.pageKey);
         this.ports.boardOperation('flow', JSON.stringify(board.flow?.phase === 'section' ? {action:'sectionSingleMove',value:pin.id} : { action: 'targets', value: [pin.id] }));
         return;

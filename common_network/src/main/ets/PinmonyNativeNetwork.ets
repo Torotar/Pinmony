@@ -121,6 +121,8 @@ interface PinmonyResourceDiagnostic {
 }
 interface ProfileAvatarUploadResponse { success?: boolean; image_upload_tracking_id?: string; }
 interface PhotoSearchRegion { x: number; y: number; w: number; h: number; }
+interface PhotoHistoryOptions { url: string; data: Record<string, string>; bookmarks?: string[]; }
+interface PhotoHistoryEnvelope { options: PhotoHistoryOptions; context: Record<string, string>; }
 interface ProfileAvatarStatusData { tracking_id: string; }
 interface ProfileAvatarStatusOptions { url: string; data: ProfileAvatarStatusData; }
 interface ProfileAvatarStatusEnvelope { options: ProfileAvatarStatusOptions; context: Record<string, string>; }
@@ -808,6 +810,10 @@ export class PinmonyNativeNetwork {
         }else if(envelope && resource === '/resource/ApiResource/get/') {
           const data: Record<string,Object> = o['data'] as Record<string,Object>,url: string = o['url'] as string;
           permitted = keys.length === 1 && get && own && url === '/v3/settings/notifications/' && source === path;
+          if(get && own && source === path + '_saved/' && keys.length === 2 && url === '/v3/users/me/boards/soft_deleted/' && data && Object.keys(data).length === 1) {
+            const fields: string[] = data['fields'] as string[];
+            permitted = Array.isArray(fields) && fields.join(',') === 'board.image_cover_url,board.id,board.name,board.pin_count,board.section_count,board.url';
+          }
           if(keys.length === 2 && data && !Array.isArray(data)) {
             if(get && !Object.keys(data).length)permitted = (url === '/v3/users/settings/' && own && [path,'/settings/edit/birthdate/','/settings/messages/','/settings/edit/mentions/'].includes(source)) || own && url === '/v3/users/settings/gen_ai/' && source === '/edit/gen-ai-interests/';
             else if(!get)permitted = source === path && url === '/v3/users/' + username + '/boards/following/' && data['explicit_following'] === true && data['page_size'] === 12 && Object.keys(data).length === 3 && JSON.stringify(data['fields']) === JSON.stringify(['board.id','board.name','board.image_cover_url','board.followed_by_me','board.type','board.images[236x]','board.image_cover_hd_url','board.pin_count','board.board_order_modified_at','board.url','board.owner()','user.username']);
@@ -828,6 +834,9 @@ export class PinmonyNativeNetwork {
           }else if(o['url'] === '/v3/pins/bulk/move/' && source === path && data && Object.keys(data).length === 2) {
             const ids: string[] = data['pin_ids'] as string[];permitted = digits(data['board_id']) && allowed.includes('board:' + data['board_id']) && Array.isArray(ids) && ids.length > 0 && ids.length <= 100 && ids.every((id: string,i: number): boolean => digits(id) && allowed.includes('organize:' + id) && ids.indexOf(id) === i);
           }
+        }else if(envelope && resource === '/resource/ApiResource/update/' && !get && own && source === path + '_saved/' && keys.length === 1) {
+          const target: RegExpMatchArray | null = (o['url'] as string || '').match(/^\/v3\/boards\/(\d{1,40})\/restore\/$/);
+          permitted = !!target && allowed.includes('restore-board:' + target[1]);
         }else if(envelope && resource === '/resource/ApiResource/update/' && !get && own && source === '/edit/activity/' && keys.length === 2) {
           const data: Record<string,Object> = o['data'] as Record<string,Object>,id: string = data?.['pin'] as string;
           permitted = digits(id) && allowed.includes('pin:' + id) && o['url'] === '/v3/pfy/' + id + '/feedback/' && !!data && Object.keys(data).length === 4 && data['feedback_type'] === 4 && data['through_id'] === id && data['rec_reason_type'] === 4;
@@ -1060,10 +1069,17 @@ export class PinmonyNativeNetwork {
         const user: boolean = /^\d{1,30}$/.test(viewer), text = (v: Object | null | undefined,max: number): boolean => typeof v === 'string' && v.length <= max;
         if(get && job.body === '' && job.url.startsWith(captured.origin + '/resource/PinResource/get/?'))permitted = envelope && pinSource && keys.length === 2 && o['field_set_key'] === 'auth_web_main_pin' && (o['id'] === id || !!copyId && copyId !== id && o['id'] === copyId && /^\d{1,30}$/.test(copyId) && user);
         else if(get && job.body === '' && job.url.startsWith(captured.origin + '/resource/BoardPickerBoardsResource/get/?'))permitted = envelope && user && source === path + 'repin/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/pin/[id]/repin.js' && keys.length === 5 && o['pin_id'] === id && o['user_id'] === viewer && o['field_set_key'] === 'profile_grid_item' && o['shortlist_length'] === 2 && o['shortlist_suggestions'] === 3;
+        else if(get && job.body === '' && job.url.startsWith(captured.origin + '/resource/ApiResource/get/?')) {
+          const target: RegExpMatchArray | null = typeof o['url'] === 'string' ? (o['url'] as string).match(/^\/v3\/board\/(\d{1,30})\/sections\/all\/$/) : null;
+          const d: Record<string,Object> = o['data'] as Record<string,Object>;
+          permitted = envelope && user && pinSource && keys.length === 2 && !!target && writableBoards.includes(target[1]) && !!d && !Array.isArray(d) && Object.keys(d).length === 2 && d['orbac_subject_id'] === '' &&
+            JSON.stringify(d['fields']) === JSON.stringify(['boardsection.board','boardsection.id','boardsection.slug','boardsection.title','boardsection.type','boardsection.preview_pins(limit:1)']);
+        }
         else if(job.method === 'POST' && envelope && user) {
           if(job.url === captured.origin + '/resource/RepinResource/create/') {
-            const quick: boolean = o['board_id'] === undefined, tracking: boolean = o['clientTrackingParams'] !== undefined;
-            permitted = pinSource && o['pin_id'] === id && o['user_id'] === viewer && keys.length === (quick ? 2 : 3) + (tracking ? 1 : 0) && (!tracking || text(o['clientTrackingParams'],16384)) &&
+            const quick: boolean = o['board_id'] === undefined, tracking: boolean = o['clientTrackingParams'] !== undefined, section: boolean = o['section'] !== undefined;
+            permitted = pinSource && o['pin_id'] === id && o['user_id'] === viewer && keys.length === (quick ? 2 : 3) + (tracking ? 1 : 0) + (section ? 1 : 0) && (!tracking || text(o['clientTrackingParams'],16384)) &&
+              (!section || !quick && typeof o['section'] === 'string' && /^\d{1,30}$/.test(o['section'] as string) && writableBoards.includes('section:' + o['board_id'] + ':' + o['section'])) &&
               (quick ? writableBoards.includes('profile-quick-saves') : typeof o['board_id'] === 'string' && /^\d{1,30}$/.test(o['board_id'] as string) && writableBoards.includes(o['board_id'] as string));
           }else if(job.url === captured.origin + '/resource/BoardResource/create/') {
             const tracking: Object | null = o['initial_pin_client_tracking_params'];
@@ -1102,7 +1118,7 @@ export class PinmonyNativeNetwork {
       else if(job.url.startsWith(captured.origin + '/resource/ApiResource/get/?')) {
         const d: Record<string,Object> = o['data'] as Record<string,Object>;
         const tools: boolean = o['url'] === '/v3/boards/sections/' + section + '/tools/' && route && source === sectionPath && handler === 'www/[username]/[slug]/[section_slug].js';
-        const targets: boolean = o['url'] === '/v3/board/' + board + '/sections/all/' && organize;
+        const targets: boolean = o['url'] === '/v3/board/' + board + '/sections/all/' && (organize || source === base + '_tools/organize/?organization_feed=False' && handler === 'www/[username]/[slug]/_tools/organize.js');
         permitted = basic && Object.keys(o).length === 2 && !!d && Object.keys(d).length === 1 && JSON.stringify(d['fields']) === JSON.stringify(tools ? ['boardtool.id','boardtool.type','boardtool.tool','boardtool.text','boardtool.icon','boardtool.link','boardtool.show_badge'] : ['boardsection.board','boardsection.id','boardsection.slug','boardsection.title','boardsection.type','boardsection.preview_pins(limit:1)']) && (tools || targets);
       } else if(job.url.startsWith(captured.origin + '/resource/BoardContentRecommendationResource/get/?'))permitted = basic && route && source === sectionPath + '_tools/more-ideas/?ideas_referrer=24' && handler === 'www/[username]/[slug]/[section_slug]/_tools/more-ideas.js' && Object.keys(o).length === 3 && o['id'] === board && o['type'] === 'board' && o['__track__referrer'] === 24;
     }catch (_) {}
@@ -1184,7 +1200,7 @@ export class PinmonyNativeNetwork {
     return this.request(job, (): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});
   }
   async requestBusinessBoardManagementWrite(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
-    boardId: string, viewerId: string, ownerId: string, member: boolean, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    boardId: string, viewerId: string, ownerId: string, member: boolean, ownerCurrent: () => boolean, mergeTargets: string[] = []): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session();let permitted: boolean = false;
     try {
       const path: string = job.page.slice(captured.origin.length), parts: string[] = path.split('/').filter((part: string): boolean => !!part);
@@ -1210,6 +1226,11 @@ export class PinmonyNativeNetwork {
       }else if(job.url === captured.origin + '/resource/ApiResource/create/') {
         permitted = basic && participant && source === path && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug].js' &&
           Object.keys(o).length === 1 && o['url'] === '/v3/boards/' + boardId + '/archive/';
+        if(basic && own && source === path && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug].js' && Object.keys(o).length === 2) {
+          const target: RegExpMatchArray | null = (o['url'] as string || '').match(/^\/v3\/boards\/(\d{1,30})\/merge\/(\d{1,30})\/$/);
+          const data: Object | null = o['data'];
+          permitted = !!target && target[1] === boardId && target[2] !== boardId && mergeTargets.includes(target[2]) && !!data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0;
+        }
       }else if(job.url === captured.origin + '/resource/ApiResource/delete/') {
         const allowed: boolean = basic && member && !own && source === path && job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js';
         permitted = allowed && (Object.keys(o).length === 1 && o['url'] === '/v3/boards/' + boardId + '/follow/' ||
@@ -1252,6 +1273,18 @@ export class PinmonyNativeNetwork {
           keys.length === 2 && o['url'] === '/v3/pins/bulk/move/' && !!data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 2 &&
           typeof data['board_id'] === 'string' && /^\d{1,30}$/.test(data['board_id'] as string) && data['board_id'] !== boardId && enabledTargets.includes(data['board_id'] as string) &&
           Array.isArray(ids) && ids.length > 0 && ids.length <= 500 && ids.every((id: string,index: number): boolean => typeof id === 'string' && /^\d{1,30}$/.test(id) && ids.indexOf(id) === index && loadedIds.includes(id));
+        if(data?.['section_id'] !== undefined) permitted = basic && source === job.page.slice(captured.origin.length) + '_tools/organize/?organization_feed=False' && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug]/_tools/organize.js' &&
+          keys.length === 2 && o['url'] === '/v3/pins/bulk/move/' && !Array.isArray(data) && Object.keys(data).length === 3 &&
+          typeof data['board_id'] === 'string' && /^\d{1,30}$/.test(data['board_id'] as string) && data['board_id'] !== boardId && enabledTargets.includes(data['board_id'] as string) &&
+          typeof data['section_id'] === 'string' && /^\d{1,30}$/.test(data['section_id'] as string) && enabledTargets.includes('section:' + data['board_id'] + ':' + data['section_id']) &&
+          Array.isArray(ids) && ids.length > 0 && ids.length <= 500 && ids.every((id: string,index: number): boolean => typeof id === 'string' && /^\d{1,30}$/.test(id) && ids.indexOf(id) === index && loadedIds.includes(id));
+        const targetSection: RegExpMatchArray | null = typeof o['url'] === 'string' ? (o['url'] as string).match(/^\/v3\/board\/sections\/(\d{1,30})\/$/) : null;
+        const pins: string[] | undefined = data?.['pins'] as string[] | undefined;
+        if(targetSection) permitted = basic && source === '/board/' + boardId + '/organize/repin/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/board/[id]/organize.js' &&
+          keys.length === 2 && !!data && !Array.isArray(data) && Object.keys(data).length === 2 &&
+          enabledTargets.includes('section:' + boardId + ':' + targetSection[1]) && Array.isArray(pins) && pins.length === 1 &&
+          typeof pins[0] === 'string' && loadedIds.includes(pins[0]) && /^\d{1,30}$/.test(pins[0]) &&
+          JSON.stringify(data['fields']) === JSON.stringify(['boardsection.board()','boardsection.id','boardsection.pin_count','boardsection.preview_pins()','boardsection.slug','boardsection.title','boardsection.type']);
       }
     }catch (_) {}
     return this.request(job, (): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});
@@ -1834,6 +1867,50 @@ export class PinmonyNativeNetwork {
       this.jobs.delete(id); this.pending.delete(id); this.sentJobs.delete(id); this.cancelled.delete(id);
     }
   }
+  async readPhotoHistory(cursor: string, imageUrl: string, session: () => PinmonyBusinessSessionContext,
+      owner: () => boolean, id: string): Promise<ArrayBuffer> {
+    const state: PinmonyBusinessSessionContext = session();
+    const account: string = state.accountId, epoch: number = state.generation, origin: string = state.origin, generation: number = this.generation;
+    const current = (): boolean => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return this.foreground && owner() && generation === this.generation && actual.authenticated &&
+        actual.accountId === account && actual.generation === epoch && actual.origin === origin;
+    };
+    if (!PIN_BUSINESS_PIN_READ_ENABLED || !current() || !account || !/^https:\/\/(?:www|uk)\.pinterest\.com$/.test(origin) ||
+      !/^native_photo_history_\d+$/.test(id) || cursor.length > 4096 || this.pending.has(id) ||
+      imageUrl && !/^https:\/\/i\.pinimg\.com\/[A-Za-z0-9_/.%-]+\.(?:jpg|jpeg|png|webp)$/i.test(imageUrl)) throw new Error('history-unavailable');
+    const options: PhotoHistoryOptions = { url: '/v3/visual_search/lens/history/', data: {} };
+    if (cursor) options.bookmarks = [cursor];
+    const envelope: PhotoHistoryEnvelope = { options: options, context: {} };
+    const source: string = '/?search_box_open=true';
+    const url: string = imageUrl || origin + '/resource/ApiResource/get/?source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
+    this.pending.add(id); this.cancelled.delete(id);
+    const live = (): boolean => current() && this.pending.has(id) && !this.cancelled.has(id);
+    try {
+      const headers: Record<string, string> = { 'User-Agent': state.userAgent };
+      if (!imageUrl) {
+        headers['Cookie'] = await this.credentials.read(url);
+        headers['Referer'] = origin + '/search/'; headers['X-Requested-With'] = 'XMLHttpRequest';
+        headers['X-Pinterest-Source-Url'] = source; headers['X-Pinterest-Pws-Handler'] = 'www/index.js';
+      }
+      if (!live()) throw new Error('stale');
+      const request: rcp.Request = new rcp.Request(url, 'GET', headers, undefined, undefined, undefined,
+        { transfer: { autoRedirect: false, timeout: { connectMs: 10000, transferMs: 30000 } } });
+      this.jobs.set(id, request);
+      const response: rcp.Response = await NetworkManager.enqueue(Priority.NORMAL, (): Promise<rcp.Response> => {
+        if (!live()) return Promise.reject(new Error('stale'));
+        return NetworkManager.getSession().fetch(request);
+      });
+      if (!live()) throw new Error('stale');
+      if (!imageUrl) {
+        const cookies: string | string[] | undefined = response.headers['set-cookie'];
+        if (cookies) await this.credentials.update(url, typeof cookies === 'string' ? [cookies] : cookies, live);
+      }
+      if (!live() || response.statusCode !== 200 || !response.body || response.body.byteLength > 8 * 1024 * 1024) throw new Error('history-response');
+      return response.body;
+    } finally { this.jobs.delete(id); this.pending.delete(id); this.cancelled.delete(id); }
+  }
+
   async searchUploadedPhoto(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
       owner: () => boolean, id: string, crop?: PhotoSearchRegion): Promise<string> {
     const region: PhotoSearchRegion = crop || { x: 0, y: 0, w: 1, h: 1 };
@@ -1998,6 +2075,10 @@ export class PinmonyNativeNetwork {
   }
   async request(job: PinmonyNetworkJob, context: () => PinmonyNetworkContext, attempt: number = 0): Promise<PinmonyNetworkReply> {
     const startedAt: number = Date.now();
+    // Only the constructed read-only startup settings probe gets the shorter budget.
+    const sessionProbe: boolean = /^session_probe_\d+$/.test(job.id) && job.method === 'GET' && job.body === '' &&
+      /^https:\/\/(?:www|uk)\.pinterest\.com\/settings\/$/.test(job.page) &&
+      /^https:\/\/(?:www|uk)\.pinterest\.com\/resource\/ApiResource\/get\/\?/.test(job.url);
     const detailRead: boolean = job.method === 'GET' && (/\/resource\/(PinResource|RelatedModulesResource|UnifiedCommentsPreviewResource|UnifiedCommentsResource|AggregatedCommentReplyFeedResource|DidItCommentsResource)\/get\//.test(job.url) ||
       job.id.startsWith('native_translation_') && /\/resource\/ApiResource\/get\//.test(job.url));
     const pathMatch: RegExpMatchArray | null = job.url.match(/\/resource\/([A-Za-z]+Resource)\/(get|create|update|delete)\//);
@@ -2063,17 +2144,19 @@ export class PinmonyNativeNetwork {
         /\/resource\/UserHomefeedResource\/get\//.test(job.url);
       request = new rcp.Request(job.url, job.method === 'POST' ? 'POST' : 'GET',
         headers, job.method === 'POST' ? job.body : undefined, undefined, undefined,
-        { transfer: { autoRedirect: false, timeout: { connectMs: detailRead ? 4000 : 10000, transferMs: detailRead || isHomeFeedRead ? 5000 : 20000 } },
+        { transfer: { autoRedirect: false, timeout: { connectMs: sessionProbe ? 3000 : detailRead ? 4000 : 10000,
+          transferMs: sessionProbe || detailRead || isHomeFeedRead ? 5000 : 20000 } },
           tracing: { collectTimeInfo: true } });
       this.jobs.set(job.id, request);
       const session: rcp.Session = NetworkManager.getSession();
       stage = 'fetch';
       trace('dispatched');
       PinmonyRuntimeLog.info('NativeNetwork: request dispatched');
+      if (sessionProbe) PinmonyRuntimeLog.info('NetworkTrace: session-probe-budget connectMs=3000 transferMs=5000 retries=1 baseDelayMs=100');
       const response: rcp.Response = await NetworkManager.enqueue(priorityForJob(job), (): Promise<rcp.Response> => {
         if (!current()) return Promise.reject(new Error('stale'));
         this.sentJobs.add(job.id);
-        return NetworkManager.requestWithRetry(session, request!, detailRead ? 1 : 2, 300,
+        return NetworkManager.requestWithRetry(session, request!, sessionProbe || detailRead ? 1 : 2, sessionProbe ? 100 : 300,
           (_retryAttempt: number, _status: number): void => {
             traceAttempt++;
             trace('retry');
@@ -2144,8 +2227,13 @@ export class PinmonyNativeNetwork {
       // Only SDK numeric error codes are diagnostic; never log request/response or exception messages.
       const code: number = (error as BusinessError).code || 0;
       trace((current() ? 'failed.code' : 'cancelled.code') + code.toString());
-      PinmonyRuntimeLog.warn('NativeNetwork: request failed at ' + stage + ', code ' + code.toString() + ', current ' + current().toString());
-      PinmonyRuntimeLog.warn('NetworkTrace: failed ' + requestLabel + ' elapsedMs=' + (Date.now() - startedAt).toString());
+      if (current()) {
+        PinmonyRuntimeLog.warn('NativeNetwork: request failed at ' + stage + ', code ' + code.toString() + ', current true');
+        PinmonyRuntimeLog.warn('NetworkTrace: failed ' + requestLabel + ' elapsedMs=' + (Date.now() - startedAt).toString());
+      } else {
+        PinmonyRuntimeLog.info('NetworkTrace: cancelled ' + requestLabel + ' stage=' + stage +
+          ' code=' + code.toString() + ' elapsedMs=' + (Date.now() - startedAt).toString());
+      }
       const deadlineExpired: boolean = detailRead && Date.now() - startedAt >= 12000 &&
         this.generation === generation && !this.cancelled.has(job.id) && acceptsNetworkJob(job, context());
       const limited: boolean = error instanceof Error && error.message === 'rate-limited';

@@ -1,3 +1,5 @@
+import { ImageFlightRect, imageContainRect } from '../services/PinmonyImageTransition';
+import { curves } from '@kit.ArkUI';
 import { PinmonyDetailSnapshot, PinmonyDetailAction } from '../models/PinmonyDetail';
 import { AnimatorResult } from '@kit.ArkUI';
 import { imagePanBounds, imageFling, imageFlingDistance } from '../services/PinmonyImageMotion';
@@ -7,6 +9,78 @@ export struct PinmonyImageViewer {
   @Prop detail: PinmonyDetailSnapshot;
   @Prop imageUrl: string = '';
   @Prop previewUrl: string = '';
+  @Prop origin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
+  @Prop @Watch('transitionChanged') closing: boolean = false;
+  onClosed?: () => void;
+  onReady?: () => void;
+  @State private frameX: number = 0;
+  @State private frameY: number = 0;
+  @State private frameWidth: number = 360;
+  @State private frameHeight: number = 720;
+  @State private frameRadius: number = 18;
+  @State private backdrop: number = 0;
+  @State private transitioning: boolean = true;
+  private transitionVersion: number = 0;
+  private transitionTimer: number = -1;
+  private transitionStarted: boolean = false;
+  private mounted: boolean = false;
+  private viewportMeasured: boolean = false;
+  private naturalWidth: number = 0;
+  private naturalHeight: number = 0;
+  private originalDecoded: boolean = false;
+  aboutToAppear(): void {
+    this.mounted = true;
+    this.setFrame(this.origin.width > 0 && this.origin.height > 0 ? this.origin : this.containRect());
+  }
+  private imageDecoded(status: number, original: boolean, width: number = 0, height: number = 0): void {
+    if (!this.mounted || status !== 1) return;
+    if (!this.transitionStarted && width > 0 && height > 0) { this.naturalWidth = width; this.naturalHeight = height; }
+    if (original) {
+      this.originalDecoded = true;
+      if (!this.previewReady || !this.transitioning) this.originalReady = true;
+    } else this.previewReady = true;
+    this.beginTransition();
+  }
+  private beginTransition(): void {
+    if (!this.mounted || !this.viewportMeasured || this.transitionStarted || (!this.previewReady && !this.originalReady)) return;
+    this.transitionStarted = true; this.onReady?.();
+    this.transitionTimer = setTimeout(() => { if (this.mounted) this.transitionChanged(); }, 0);
+  }
+  private containRect(): ImageFlightRect {
+    return imageContainRect(this.viewportWidth, this.viewportHeight, this.naturalWidth || this.detail.imageWidth, this.naturalHeight || this.detail.imageHeight);
+  }
+  private setFrame(rect: ImageFlightRect): void {
+    this.frameX = rect.x; this.frameY = rect.y;
+    this.frameWidth = rect.width; this.frameHeight = rect.height;
+  }
+  private transitionChanged(): void {
+    if (!this.mounted) return;
+    clearTimeout(this.transitionTimer);
+    if (!this.previewReady && !this.originalReady) {
+      if (this.closing) this.onClosed?.();
+      return;
+    }
+    const version: number = ++this.transitionVersion;
+    this.transitioning = true;
+    this.stopInertia();
+    const closing: boolean = this.closing;
+    const target: ImageFlightRect = closing && this.origin.width > 0 && this.origin.height > 0 ? this.origin : this.containRect();
+    this.getUIContext().animateTo({ duration: closing ? 400 : 420,
+      curve: curves.springMotion(closing ? 0.42 : 0.34, 0.9),
+      onFinish: () => {
+        if (!this.mounted || version !== this.transitionVersion) return;
+        if (!closing) {
+          this.transitioning = false;
+          if (this.originalDecoded) this.originalReady = true;
+          return;
+        }
+        if (this.closing) this.onClosed?.();
+      } }, () => {
+      this.setFrame(target); this.frameRadius = closing ? 18 : 0;
+      this.backdrop = closing ? 0 : 1;
+      this.scaleValue = 1; this.dx = 0; this.dy = 0;
+    });
+  }
   @Prop actionsReady: boolean = false;
   @State private controls: boolean = true;
   @State private scaleValue: number = 1;
@@ -27,7 +101,7 @@ export struct PinmonyImageViewer {
   private motionVersion: number = 0;
   @Prop @Watch('activeChanged') active: boolean = true;
   private activeChanged(): void { if (!this.active) this.stopInertia(); }
-  aboutToDisappear(): void { this.stopInertia(); }
+  aboutToDisappear(): void { this.mounted = false; this.transitionVersion++; clearTimeout(this.transitionTimer); this.stopInertia(); }
   onControlsChange?: (visible: boolean) => void;
   onClose?: () => void;
   onAction?: (id: string, kind: string) => void;
@@ -111,16 +185,20 @@ export struct PinmonyImageViewer {
   @Builder
   private imageContent() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Image(this.previewUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
+      Column().width('100%').height('100%').backgroundColor($r('app.color.page_background')).opacity(this.previewReady || this.originalReady ? this.backdrop : 0)
+        .hitTestBehavior(HitTestMode.None)
+      Stack() {
+      Image(this.previewUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Cover).syncLoad(true)
         .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
         .opacity(this.previewReady && !this.originalReady ? 1 : 0)
-        .onComplete((event) => { if (event?.loadingStatus === 1) this.previewReady = true; })
+        .onComplete((event) => this.imageDecoded(event?.loadingStatus ?? -1, false, event?.width || 0, event?.height || 0))
       Image(this.imageUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain)
         .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
         .opacity(this.originalReady ? 1 : 0)
-        .onComplete((event) => { if (event?.loadingStatus === 1) this.originalReady = true; })
-    }.width('100%').height('100%')
-      .backgroundColor(this.previewReady || this.originalReady ? $r('app.color.page_background') : Color.Transparent).clip(true)
+        .onComplete((event) => this.imageDecoded(event?.loadingStatus ?? -1, true, event?.width || 0, event?.height || 0))
+      }.width(this.frameWidth).height(this.frameHeight).position({ x: this.frameX, y: this.frameY })
+        .borderRadius(this.frameRadius).clip(this.transitioning)
+    }.width('100%').height('100%').clip(true)
       // Keep gesture coordinates in the untransformed viewport, independent of image scale.
       .gesture(GestureGroup(GestureMode.Parallel,
           GestureGroup(GestureMode.Exclusive,
@@ -145,7 +223,9 @@ export struct PinmonyImageViewer {
       .onTouch((event: TouchEvent) => this.trackTouch(event))
       .onAreaChange((_old: Area, area: Area) => {
         this.stopInertia(); this.viewportWidth = Number(area.width); this.viewportHeight = Number(area.height);
-        this.moveImage(this.dx, this.dy);
+        this.viewportMeasured = true;
+        if (!this.transitionStarted) this.beginTransition();
+        else this.transitionChanged();
       })
   }
 

@@ -60,6 +60,8 @@ export class PinmonyRuntimeLog {
       history.split('\n').filter((line: string): boolean => line.length > 0).slice(-PinmonyRuntimeLog.MAX_MEMORY_LINES)
         .forEach((line: string): void => PinmonyRuntimeLog.lines.push(PinmonyRuntimeLog.sanitize(line)));
       current.forEach((line: string): void => PinmonyRuntimeLog.lines.push(line));
+      PinmonyRuntimeLog.info('StartupBoundary: log-history-restored elapsedMs=' +
+        (Date.now() - PinmonyRuntimeLog.sessionStartedAt).toString());
     }).catch((): void => {});
     PinmonyRuntimeLog.info('Runtime: application started');
     return PinmonyRuntimeLog.restoration;
@@ -231,7 +233,9 @@ export class PinmonyRuntimeLog {
       const buffer: ArrayBuffer = new ArrayBuffer(65536);
       const decoder: util.TextDecoder = util.TextDecoder.create('utf-8');
       while (true) {
-        const read: number = await fs.read(file.fd, buffer);
+        let read: number;
+        try { read = await fs.read(file.fd, buffer); }
+        catch (_) { throw new Error('diagnostics-read-failed'); }
         if (!read) break;
         const text: string = decoder.decodeToString(new Uint8Array(buffer, 0, read), { stream: true });
         summary.add(text);
@@ -242,7 +246,10 @@ export class PinmonyRuntimeLog {
       summary.finish();
       if (remaining) await PinmonyRuntimeLog.writeFile(destination, remaining, true);
       return true;
-    } finally { await fs.close(file); }
+    } finally {
+      try { await fs.close(file); }
+      catch (_) { throw new Error('diagnostics-close-failed'); }
+    }
   }
 }
 

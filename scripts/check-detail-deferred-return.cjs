@@ -13,7 +13,7 @@ function compile(file, deps = () => ({}), globals = {}) {
   const exports = {};
   require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
-  }).outputText, { exports, require: deps, ...globals });
+  }).outputText, { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps), ...globals });
   return exports;
 }
 const host = { PINTEREST_URL: 'https://www.pinterest.com/', PIN_POST_API_ENABLED: true,

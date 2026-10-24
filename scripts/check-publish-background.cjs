@@ -67,7 +67,7 @@ const create = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyP
 assert(create.includes('height: SheetSize.MEDIUM'));
 assert(create.includes('HdsNavigationTitleMode.MODAL'));
 assert(create.includes('detents: [SheetSize.MEDIUM]'));
-assert(create.includes("Button('创建图板').width('100%')"));
+assert(create.includes('Button(this.uiText("pm_create_board_513babc9")).width(\'100%\')'));
 const section = fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardSectionPage.ets', 'utf8');
 assert(section.includes('height: SheetSize.MEDIUM'));
 assert(section.includes('HdsNavigationTitleMode.MODAL'));

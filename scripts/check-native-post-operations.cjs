@@ -21,6 +21,7 @@ return {ops,store,requests,cancelled,messages,commits,session:()=>session,setSes
 async function openSave(f,base=raw){const start=f.requests.length,p=f.ops.openSave(pin);f.requests[start].resolve(resource(base));await flush();f.requests[start+1].resolve(resource(boards));await flush();assert.equal(f.store.saveResult.items.length,3,'observable picker includes current boards and profile');f.requests[start+2].resolve(JSON.stringify({data:{v3GetPinQueryv2:{data:{id:Buffer.from('Pin:11').toString('base64'),boardTitleSuggestions:[{title:'Suggested'}]}}}}));await p;assert.deepEqual(Array.from(f.store.saveResult.suggestions),['Suggested']);}
 async function openEdit(f,base=owned,g=graph){const start=f.requests.length,p=f.ops.openEdit(pin);f.requests[start].resolve(resource(base));await flush();if(f.requests.length>start+1)f.requests[start+1].resolve(JSON.stringify(g));await p;}
 async function main(){
+await sectionSaveChecks();
 const f=fixture();await openSave(f);let p=f.ops.saveAction('boardsSave',',"100"');const save=f.requests[3];assert.equal(f.store.saveResult.busy,true);await f.ops.saveAction('boardsSave',',"100"');f.ops.dismiss('save');assert.equal(f.sheet(),'save');assert.equal(f.requests.length,4);assert.deepEqual(JSON.parse(new URLSearchParams(save.job.body).get('data')).options,{pin_id:'11',user_id:'42',board_id:'100',clientTrackingParams:'synthetic'});save.resolve(resource(savedCopy(),'v3_repin_handler'));await p;assert.equal(f.sheet(),'');assert(f.store.confirmedSaves.isSaved('11'));assert.equal(f.dismissed(),1);assert(f.store.detail.actions.find(a=>a.kind==='save').selected);
 p=f.ops.cancelSave(pin);f.requests[4].resolve(resource(raw));await flush();assert.equal(JSON.parse(new URLSearchParams(new URL(f.requests[5].job.url).search).get('data')).options.id,'77');f.requests[5].resolve(resource(savedCopy()));await flush();const copyDelete=f.requests[6];copyDelete.resolve(resource(null,'v3_delete_pin_handler'));await p;assert(!f.store.confirmedSaves.isSaved('11'));assert(f.messages.includes('已取消本次收藏'));
 const like=fixture();p=like.ops.like(pin);like.requests[0].resolve(resource(raw));await flush();const react=like.requests[1];assert.equal(JSON.parse(new URLSearchParams(react.job.body).get('data')).options.url,'/v3/pins/11/react/');react.resolve(resource({id:'11'}));await p;assert(like.store.detail.actions[0].selected);assert.equal(like.store.detail.actions[0].enabled,false);p=like.ops.like(pin);like.requests[2].resolve(resource({...raw,reaction_data:{reaction_by_me:1}}));await p;assert.equal(like.requests.length,3,'already liked never unlikes or repeats POST');like.store.detail.actions[0].selected=false;like.ops.apply();assert(like.store.detail.actions[0].selected);
@@ -42,6 +43,45 @@ const concurrent=fixture();p=concurrent.ops.openSave(pin);concurrent.requests[0]
 const rootUndo=fixture();await openSave(rootUndo);p=rootUndo.ops.saveAction('boardsSave',',"100"');rootUndo.requests[3].resolve(resource(savedCopy(),'v3_repin_handler'));await p;rootUndo.store.saveUndoPin=pin;rootUndo.store.saveUndoId='77';rootUndo.setOwned(false);assert(rootUndo.ops.owns(pin),'confirmed save remains undoable on its unchanged root');rootUndo.setScope('root-2');assert(!rootUndo.ops.owns(pin),'switching root revokes undo');await rootUndo.ops.cancelSave(pin);assert.equal(rootUndo.requests.length,4);rootUndo.setScope('root-1');p=rootUndo.ops.cancelSave(pin);rootUndo.requests[4].resolve(resource(raw));await flush();rootUndo.requests[5].resolve(resource(savedCopy()));await flush();rootUndo.requests[6].resolve(resource(null,'v3_delete_pin_handler'));await p;assert.equal(rootUndo.store.saveUndoId,'');
 await policy([f.requests[0],f.requests[1],f.requests[2],save,react,update,deleteJob,copyDelete,createBoard,quick.requests[3]]);await wiring();assert(!logs.some(s=>s.includes('synthetic')||s.includes('/pin/11')));
 console.log('Native post operations passed: picker/GraphQL reads, save/quick-save/create/copy cancellation, like, owned edit/delete, strict policy, observable state, stale/cancel/unknown isolation and zero Web submit.');}
+async function sectionSaveChecks(){
+  const plain=fixture();await openSave(plain);let direct=plain.ops.saveAction('boardsSections',',"100"');
+  assert.equal(plain.store.saveResult.targetBoardId,undefined,'loading does not open section selection');
+  plain.requests[3].resolve(resource([],'get_all_boards_sections'));await flush();
+  assert.equal(plain.requests.length,5,'confirmed empty sections saves directly');
+  assert.equal(plain.store.saveResult.targetBoardId,undefined,'empty board never opens section selection');
+  assert.equal(JSON.parse(new URLSearchParams(plain.requests[4].job.body).get('data')).options.section,undefined);
+  plain.requests[4].resolve(resource(savedCopy(),'v3_repin_handler'));await direct;assert(plain.store.confirmedSaves.isSaved('11'));
+  const failed=fixture();await openSave(failed);let failedRead=failed.ops.saveAction('boardsSections',',"100"');
+  failed.requests[3].resolve('',503,'network');await failedRead;assert.equal(failed.requests.length,4,'failed read cannot infer empty sections and save');
+  const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonySaveSheet.ets','utf8');
+  assert(ui.includes(".align(Alignment.TopStart)"));assert(ui.includes("back:true,labelKey:'pm_back_to_boards_dcf21f0d'"));
+  assert(!ui.includes("Button(this.uiText('pm_back_to_boards_dcf21f0d'))"),'section return uses fixed footer');
+  const sections=[{id:'300',type:'board_section',title:'Section',board:{id:'100'}}];
+  const f=fixture();await openSave(f);let p=f.ops.saveAction('boardsSections',',"100"');
+  await f.ops.saveAction('boardsSections',',"100"');assert.equal(f.requests.length,4,'duplicate section reads blocked');
+  const read=f.requests[3];read.resolve(resource(sections,'get_all_boards_sections'));await p;
+  assert.equal(f.store.saveResult.targetSections[0].id,'300');
+  await f.ops.saveAction('boardsSave',',"100","301"');assert.equal(f.requests.length,4,'unknown section cannot submit');
+  p=f.ops.saveAction('boardsSave',',"100","300"');const write=f.requests[4];
+  assert.equal(JSON.parse(new URLSearchParams(write.job.body).get('data')).options.section,'300');
+  await f.ops.saveAction('boardsSave',',"100","300"');assert.equal(f.requests.length,5);
+  write.resolve(resource({...savedCopy(),section:{id:'300'}},'v3_repin_handler'));await p;
+  assert(f.store.confirmedSaves.isSaved('11'));assert.equal(f.sheet(),'');
+  const net=new Network();net.request=async(job,current)=>({error:acceptsNetworkJob(job,current())?'':'reject'});
+  const send=(r,job=r.job,args=r.args)=>net.requestBusinessPost(job,f.session,...args.slice(1,-1),()=>true);
+  assert.equal((await send(read)).error,'');assert.equal((await send(write)).error,'');
+  const args=write.args.map((v,i)=>i===3?['100']:v);assert.equal((await send(write,write.job,args)).error,'reject','transport requires section ownership');
+  const q=new URLSearchParams(write.job.body),e=JSON.parse(q.get('data'));e.options.section='301';q.set('data',JSON.stringify(e));
+  assert.equal((await send(write,{...write.job,body:q.toString()})).error,'reject');
+  for(const result of [{...savedCopy(),section:{id:'301'}},savedCopy()]){
+    const bad=fixture();await openSave(bad);let work=bad.ops.saveAction('boardsSections',',"100"');bad.requests[3].resolve(resource(sections,'get_all_boards_sections'));await work;
+    work=bad.ops.saveAction('boardsSave',',"100","300"');bad.requests[4].resolve(resource(result,'v3_repin_handler'));await work;
+    assert(bad.store.saveResult.uncertain);assert(!bad.store.confirmedSaves.isSaved('11'));
+    await bad.ops.saveAction('boardsBack');await bad.ops.saveAction('boardsSections',',"100"');await bad.ops.saveAction('boardsSave',',"100","300"');assert.equal(bad.requests.length,5,'unknown response cannot unlock via section navigation');
+  }
+  const foreign=fixture();await openSave(foreign);p=foreign.ops.saveAction('boardsSections',',"100"');foreign.requests[3].resolve(resource([{...sections[0],board:{id:'200'}}],'get_all_boards_sections'));await p;
+  assert(foreign.store.saveResult.error);assert.equal(foreign.store.saveResult.targetSections.length,0);
+}
 async function policy(requests){const net=new Network();let session=fixture().session(),sent=0,owner=true,context;net.request=async(job,current)=>{context=current;const allowed=acceptsNetworkJob(job,current());if(allowed)sent++;return {error:allowed?'':'reject'}};const send=(r,job=r.job,args=r.args)=>net.requestBusinessPost(job,()=>session,...args.slice(1,-1),()=>owner);for(const r of requests)assert.equal((await send(r)).error,'',r.job.url);
 const save=requests[3],edit=requests[5],copy=requests[7];function mutate(r,fn){const job=r.job,get=job.method==='GET',u=get?new URL(job.url):null,q=get?u.searchParams:new URLSearchParams(job.body),e=JSON.parse(q.get('data'));fn(e);q.set('data',JSON.stringify(e));return {...job,...(get?{url:u.href}:{body:q.toString()})};}const before=sent;
 for(const job of [{...save.job,id:'bridge'},{...save.job,epoch:99},{...save.job,page:origin+'/'},{...save.job,method:'GET'},mutate(save,e=>e.options.user_id='99'),mutate(save,e=>e.options.board_id='200'),mutate(save,e=>e.options.extra=true),mutate(save,e=>e.context=[]),{...save.job,body:save.job.body+'&extra=1'},{...save.job,headers:{...save.job.headers,'X-Pinterest-Pws-Handler':'www/index.js'}}])assert((await send(save,job)).error);

@@ -37,13 +37,13 @@ module.exports=async function({fixture,loader,ts,flush,page}){
  const account=setup();account.server.social.is_partner=business;account.st.screen='socialMessages';await account.settings.requestAction('socialRead','');
  const view=new Interaction();view.visible=true;view.confirming=false;view.store=account.st;view.scroller={scrollTo(){}};let pending;view.onRequest=(a,v)=>{pending=account.settings.requestAction(a,v);};
  for(const [screen,id] of [['socialFriends',0],['socialFollowers',1],['socialFollowing',2],['socialOthers',4]]){
-   const before=account.req.length;await account.settings.requestAction('socialMessage',JSON.stringify({group:id,level:2}));assert(!account.req.slice(before).some(r=>r.job.method==='POST'),'message index cannot write group preferences');
-   view.open(screen);await pending;assert.equal(account.st.screen,screen);assert.equal(view.groupId(),id);view.choose(2);await pending;assert.equal(account.st.social.groups.find(g=>g.id===id).selected,2);assert(!account.st.writeUncertain);
-   store.screen=account.st.screen;store.back();account.st.screen=store.screen;assert.equal(account.st.screen,'socialMessages','each detail returns to the four-entry list');
+   account.st.socialMessageGroup=business ? -1 : id===0 ? 4 : 0;const before=account.req.length;await account.settings.requestAction('socialMessage',JSON.stringify({group:id,level:2}));assert(!account.req.slice(before).some(r=>r.job.method==='POST'),'only current personal tab or business subpage may write');
+   {const count=account.req.length;view.selectMessageTab(view.messageTabIds().indexOf(id));assert.equal(account.req.length,count);assert.equal(account.st.screen,'socialMessages');}assert.equal(view.groupId(),id);view.choose(2);await pending;assert.equal(account.st.social.groups.find(g=>g.id===id).selected,2);assert(!account.st.writeUncertain);
+   if(business){view.selectMessageTab(0);assert.equal(view.groupId(),-1);const before=account.req.length;view.choose(2);assert.equal(account.req.length,before,'business overview has no inferred write');}
  }
  store.screen=account.st.screen;store.back();assert.equal(store.screen,'social');
  }
- assert(!ui.includes('CapsuleSegmentButtonV2'));assert(!ui.includes('selectGroup'));assert(ui.includes('pm_social_others_short'));
+ assert(!ui.includes('CapsuleSegmentButtonV2'));assert(ui.includes('ButtonType.Capsule'));assert(ui.includes('app.color.home_category_selected'));assert(ui.includes('selectMessageTab'));assert(ui.includes('pm_social_others_short'));
  store.screen='socialBlocked';store.error='read failure';store.writeUncertain=false;store.back();assert.equal(store.screen,'social');assert.equal(store.error,'','child read errors do not leak to parent');store.screen='socialBlocked';store.error='unknown write';store.writeUncertain=true;store.back();assert.equal(store.error,'unknown write','unconfirmed write warning survives back');
  const root=fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets','utf8');assert(root.includes("'social', 'notifications'"));assert(ui.includes('.bindToScrollable([this.scroller])'));assert(ui.includes('HdsNavDestinationTitleMode.MINI'));assert(!ui.includes('Web('));
  console.log('Social permissions: native reads/writes, eligible levels, mentions, blocked/unblock, guards, unknown/stale results, confirmation and hierarchical back passed');

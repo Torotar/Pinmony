@@ -24,8 +24,8 @@ page.pinStore.editResult.busy = false; page.pinStore.editResult.picker.busy = tr
 page.closeNativeModal(); assert.equal(calls.length, 0);
 page.pinStore.editResult.picker.busy = false; page.pinStore.editResult.phase = 'boards';
 page.closeNativeModal(); assert.deepEqual(calls.pop(), ['editPhase', ',"edit"']);
-const title = fs.readFileSync('common_ui/src/main/ets/components/PinmonyModalTitle.ets', 'utf8');
-assert(title.includes('HdsNavigationTitleMode.MODAL'));
-assert(title.includes('hdsMaterial.MaterialType.IMMERSIVE'));
-assert(title.includes('if (this.closeEnabled) this.onClose()'));
+assert(source.includes('title: { title: this.nativeModalLabel() }'));
+assert(source.includes('showClose: true')); // Sheet now owns its native title and close button.
+assert(source.includes('PinmonyImmersiveLight.effect('));
+assert(source.includes('private closeNativeModal()'));
 console.log('Modal title: native HDS material, close routing, edit/picker busy gates and child-phase back passed');

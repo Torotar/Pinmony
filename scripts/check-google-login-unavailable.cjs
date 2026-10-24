@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const ts=require(process.argv[2]||'typescript');
 function compile(source,deps=()=>({}),globals={}){const out={};vm.runInNewContext(ts.transpileModule(source,{
  compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}
-}).outputText,{exports:out,require:deps,...globals});return out;}
+}).outputText,{exports:out,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),...globals});return out;}
 const contract=compile(fs.readFileSync('common_session/src/main/ets/services/PinmonyGoogleLoginUnavailable.ets','utf8'));
 const {PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT:script,GOOGLE_LOGIN_UNAVAILABLE_EVENT:signal,isGoogleLoginTarget}=contract;
 const auth=compile(fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets','utf8'));
@@ -45,11 +45,11 @@ assert.equal(lifecycleCalls,1,'blocked Google navigations do not start coordinat
 assert.equal(intercept({data:{isMainFrame:()=>true,getRequestUrl:()=> 'https://www.pinterest.com/login/'}}),false);
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const methods=['showUnsupportedLogin','showNetworkNotice'].map(name=>{const start=index.indexOf('  private '+name+'(');const tail=index.slice(start);return tail.slice(0,tail.slice(1).search(/\n  private /)+1);});
-const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{});
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages});
 const h=new Host();let timer,scheduled=0;Object.assign(h,{authStatus:'unauthenticated',authWebVisible:()=>true,networkNotice:'',networkNoticeTimer:-1,
  pageTasks:{timeout:(fn,ms)=>{assert.equal(ms,4500);timer=fn;scheduled++;return 1;},cancelTimeout(){}}});
 h.showUnsupportedLogin();h.showUnsupportedLogin();assert.equal(h.networkNotice,'该登录方式暂不可用');assert.equal(scheduled,1);timer();assert.equal(h.networkNotice,'');
 h.authStatus='authenticated';h.showUnsupportedLogin();assert.equal(scheduled,1);
 for(const token of ['loginComparison','PIN_GOOGLE_LOGIN_DIAGNOSTICS','Google 登录对照测试','记录环境诊断'])assert(!index.includes(token),token+' removed');
-assert(fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets','utf8').includes('setWebDebuggingAccess(false)'));
+assert(fs.readFileSync('entry/src/main/ets/startup/WebEngineTask.ets','utf8').includes('setWebDebuggingAccess(false)'));
 console.log('Google unavailable: capture activation, keyboard/Tab, deduped hint, visibility/stale guards, navigation fallback, password pass-through and cleanup passed');

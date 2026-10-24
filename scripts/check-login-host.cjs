@@ -34,7 +34,7 @@ const native = { authStatus: 'authenticated', sessionEnvironment: environment, b
   controller: { getUserAgent() { throw Error('controller detached'); } } };
 vm.runInNewContext(ts.transpileModule('function confirm(appVersion: string = "") {' + confirm.split('{').slice(1).join('{').replace(/}\s*$/, '') + '}', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
-}).outputText + ';confirm.call(native, "fixture.1");', { native, PIN_NATIVE_HOME_READS_ENABLED: false, PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: false });
+}).outputText + ';confirm.call(native, "fixture.1");', { native, PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages, PIN_NATIVE_HOME_READS_ENABLED: false, PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: false });
 assert.equal(native.businessSession.context('authenticated').userAgent, 'fixture-agent');
 assert.equal(native.businessSession.context('authenticated').appVersion, 'fixture.1');
 console.log('Login host: hidden/accessibility contract, lifecycle capture and controller-independent business confirmation passed');

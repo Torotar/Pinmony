@@ -21,6 +21,7 @@ export interface PinmonyRelatedPin {
 }
 
 export interface PinmonyCarouselItem {
+  video?: PinmonyVideo;
   id: string;
   imageUrl: string;
   imageWidth: number;

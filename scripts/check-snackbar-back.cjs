@@ -27,7 +27,7 @@ class HdsSnackBar {
     if (failDismiss) throw new Error('native close failed');
   }
 }
-const context = { HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 },
+const context = { $r:value=>value,SnackBarIconType:{NORMAL:0},HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 },
   Date: { now: () => now },
   PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native { ' + source.slice(start, end) +

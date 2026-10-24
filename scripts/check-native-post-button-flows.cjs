@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:deps,setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const deps=n=>n==='feature_profile'?{PIN_PROFILE_ORGANIZE_ENABLED:true}:n==='feature_pin'?{PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_EDIT_API_ENABLED:true}:n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){},warn(){}},PinmonyTaskRegistry:class{invalidate(){}}}:{};
 const Ops=load('entry/src/main/ets/app/PinmonyPostNativeOperations.ets',deps).PinmonyPostNativeOperations;
 const Confirmed=load('feature_pin/src/main/ets/services/PinmonyConfirmedSaves.ets').PinmonyConfirmedSaves;
@@ -23,7 +23,8 @@ async function picker(f){const start=f.requests.length,p=f.ops.openSave(pin);f.r
 }
 const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
 function method(name){const start=ui.search(new RegExp('  private '+name+'\\('));assert(start>=0);return ui.slice(start,ui.indexOf('\n  private ',start+1));}
-const View=vm.runInNewContext(ts.transpileModule('class View {'+['action','acceptsActionIntent','titleBarOptions','leftActions'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},TextStyleMode:{NORMAL:0}});
+const View=vm.runInNewContext(ts.transpileModule('class View {'+['action','acceptsActionIntent','titleBarOptions','leftActions'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},Color:{Transparent:0},$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},TextStyleMode:{NORMAL:0}});
+View.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
 function view(f){const v=new View();Object.assign(v,{detail:f.store.detail,imageLayer:'',shareActionsReady:true,postActionsReady:true,commentActionsReady:true,actionsReady:false,deferredActions:false,auxiliaryReady:true,likeBlocked:f.ops.likeBlocked(pin),saveBusy:false});return v;}
 async function main(){
  // Actual UI menu -> actual Index native dispatch -> real DetailController; no Web control or document.
@@ -60,7 +61,7 @@ async function main(){
  // The production native base mapper has no Web actions. Confirm writes and verify the actual displayed controls.
  const s=fixture();await picker(s);let p=s.ops.saveAction('boardsSave',',"100"');
  s.requests[3].resolve(resource({...saved,id:'77'},'v3_repin_handler'));await p;
- assert(s.store.confirmedSaves.isSaved('11'));let rendered=view(s);assert(rendered.action('save').selected);assert.equal(rendered.action('save').label,'已收藏');
+ assert(s.store.confirmedSaves.isSaved('11'));let rendered=view(s);assert(rendered.action('save').selected);assert.equal(rendered.action('save').label,'Target');
  // Headerless image viewing must not be used as a second source of save state.
  assert.equal(view(s).action('save').selected,true);
  p=s.ops.detailAction('save');s.requests[4].resolve(resource(raw));await flush();assert.match(s.requests[5].job.url,/PinResource\/get/);

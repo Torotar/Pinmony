@@ -1,6 +1,54 @@
 {
   "string": [
     {
+      "name": "pm_board_recovery_title",
+      "value": "图板恢复"
+    },
+    {
+      "name": "pm_board_recovery_description",
+      "value": "你可以在 7 天内恢复最近删除的图板。"
+    },
+    {
+      "name": "pm_board_recovery_submit",
+      "value": "恢复所选图板"
+    },
+    {
+      "name": "pm_board_recovery_restored",
+      "value": "（已恢复）"
+    },
+    {
+      "name": "pm_board_recovery_counts",
+      "value": "{pins} 张 Pin 图 · {sections} 个图板区块"
+    },
+    {
+      "name": "pm_board_recovery_total",
+      "value": "{count} 块图板"
+    },
+    {
+      "name": "pm_board_recovery_empty",
+      "value": "暂无可恢复的图板"
+    },
+    {
+      "name": "pm_board_recovery_selected",
+      "value": "已选中"
+    },
+    {
+      "name": "pm_board_recovery_select",
+      "value": "选择图板"
+    },
+    {
+      "name": "pm_load_more_merge_boards",
+      "value": "加载更多"
+    },
+    {
+      "name": "pm_no_merge_target_boards",
+      "value": "暂无可用图板"
+    },
+    {
+      "name": "pm_merge_board_menu",
+      "value": "合并"
+    },
+    {
       "name": "pm_loading_please_wait_b6aaac70",
       "value": "正在加载，请稍候…"
     },
@@ -38,7 +86,7 @@
     },
     {
       "name": "pm_unable_to_verify_the_session_retry_or_sign_in_again_fb5c22fa",
-      "value": "无法确认当前会话，请重试；也可以重新登录"
+      "value": "暂时无法确认登录状态，请稍后重试"
     },
     {
       "name": "pm_left_board_af0547a0",
@@ -214,7 +262,7 @@
     },
     {
       "name": "pm_collaborators_can_82551ec5",
-      "value": "合作用户可以…"
+      "value": "合作用户可以..."
     },
     {
       "name": "pm_collaborators_7b9e7279",
@@ -254,7 +302,7 @@
     },
     {
       "name": "pm_search_by_name_or_username_59fb9fda",
-      "value": "按姓名或用户名搜索"
+      "value": "通过名字或用户名搜索"
     },
     {
       "name": "pm_no_users_available_to_invite_3e007a00",
@@ -278,7 +326,7 @@
     },
     {
       "name": "pm_invite_collaborators_602179cf",
-      "value": "＋ 邀请合作用户"
+      "value": "邀请合作用户"
     },
     {
       "name": "pm_saved_to_b23743c1",
@@ -366,7 +414,7 @@
     },
     {
       "name": "pm_unsaved_it_will_disappear_when_you_reopen_the_board_04bda668",
-      "value": "已取消收藏，重新进入图板后移除"
+      "value": "已取消收藏，刷新或重新进入图板后移除"
     },
     {
       "name": "pm_unsave_dca60869",
@@ -374,7 +422,7 @@
     },
     {
       "name": "pm_save_to_48bf7c69",
-      "value": "收藏至"
+      "value": "收藏 Pin 图至 "
     },
     {
       "name": "pm_more_options_c611656f",
@@ -410,7 +458,7 @@
     },
     {
       "name": "pm_this_board_will_be_removed_from_your_profile_you_will_no_longer__774c3739",
-      "value": "此图板将从你的个人资料中移除，你将无法继续向此图板收藏 Pin 图。"
+      "value": "离开此群组图板并将其从个人资料中移除。你将无法将新的 Pin 图收藏到此图板。"
     },
     {
       "name": "pm_leave_7345ed45",
@@ -418,7 +466,7 @@
     },
     {
       "name": "pm_section_bc71e92e",
-      "value": "图板区块："
+      "value": "图板区块。"
     },
     {
       "name": "pm_section_name_0e25c295",
@@ -434,7 +482,7 @@
     },
     {
       "name": "pm_permanently_delete_this_section_and_all_its_pins_this_cannot_be__f7229feb",
-      "value": "永久删除此图板区块和其中的所有 Pin 图。此操作无法撤销！"
+      "value": "一旦删除图板区块及其所有 Pin 图，你将无法撤销操作！"
     },
     {
       "name": "pm_name_d44e9b3d",
@@ -544,9 +592,10 @@
       "name": "pm_secret_board_afc1422a",
       "value": "私密图板"
     },
+    { "name": "pm_public_board", "value": "公开图板" },
     {
       "name": "pm_featured_board_4b3cbe23",
-      "value": "特色图板 ·"
+      "value": "特色图板"
     },
     {
       "name": "pm_sections_68d526a8",
@@ -554,7 +603,7 @@
     },
     {
       "name": "pm_from_df6e36f7",
-      "value": "来自 "
+      "value": "自 "
     },
     {
       "name": "pm_and_3d711428",
@@ -562,7 +611,7 @@
     },
     {
       "name": "pm_verified_9a64637b",
-      "value": "已认证"
+      "value": "已验证"
     },
     {
       "name": "pm_featured_sponsor_beab5d83",
@@ -574,7 +623,7 @@
     },
     {
       "name": "pm_invite_collaborators_42600def",
-      "value": "邀请协作者"
+      "value": "邀请合作用户"
     },
     {
       "name": "pm_open_section_3bcd9df8",
@@ -582,7 +631,7 @@
     },
     {
       "name": "pm_view_section_c6bcaa05",
-      "value": "查看区块"
+      "value": "查看图板区块"
     },
     {
       "name": "pm_other_pins_e6a0e45e",
@@ -602,7 +651,7 @@
     },
     {
       "name": "pm_loading_board_3d66e034",
-      "value": "正在加载图板…"
+      "value": "正在加载图板"
     },
     {
       "name": "pm_no_saved_pins_yet_24c645e0",
@@ -634,7 +683,7 @@
     },
     {
       "name": "pm_section_name_e63b3281",
-      "value": "区块名称"
+      "value": "图板区块名称"
     },
     {
       "name": "pm_restoring_board_please_wait_9e819a8a",
@@ -706,7 +755,7 @@
     },
     {
       "name": "pm_view_all_b92c0ea9",
-      "value": "查看全部 ›"
+      "value": "查看全部"
     },
     {
       "name": "pm_preview_13d61fea",
@@ -782,7 +831,7 @@
     },
     {
       "name": "pm_copy_message_text_280f1f93",
-      "value": "复制消息文字"
+      "value": "复制消息文本"
     },
     {
       "name": "pm_save_60a53514",
@@ -798,15 +847,15 @@
     },
     {
       "name": "pm_delete_this_message_94c4bcb6",
-      "value": "确认删除这条消息？"
+      "value": "要删除此消息？"
     },
     {
       "name": "pm_you_can_view_follow_message_or_save_their_pins_after_you_unblock_74bd9651",
-      "value": "你可以查看、关注、发送消息或收藏对方的 Pin 图。取消屏蔽后，对方可以再次与你互动。"
+      "value": "根据您的设置，您将可以看到、关注和联系对方，并收藏对方的 Pin 图。了解更多"
     },
     {
       "name": "pm_you_will_not_be_able_to_view_follow_contact_them_or_save_their_p_8111b778",
-      "value": "你将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。屏蔽后，对方不会收到通知。"
+      "value": "你们将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。当你屏蔽某人时，对方不会收到通知。"
     },
     {
       "name": "pm_not_now_6b758902",
@@ -866,7 +915,7 @@
     },
     {
       "name": "pm_write_a_message_2156709a",
-      "value": "输入消息…"
+      "value": "输入消息……"
     },
     {
       "name": "pm_send_edecf0ae",
@@ -874,7 +923,7 @@
     },
     {
       "name": "pm_send_a_heart_dccfdd46",
-      "value": "发送爱心"
+      "value": "发送爱心表情"
     },
     {
       "name": "pm_reload_conversation_585a78c6",
@@ -882,11 +931,11 @@
     },
     {
       "name": "pm_unblock_contact_4b2a7e25",
-      "value": "取消屏蔽联系人"
+      "value": "取消屏蔽"
     },
     {
       "name": "pm_block_contact_a32510e0",
-      "value": "屏蔽联系人"
+      "value": "屏蔽"
     },
     {
       "name": "pm_new_message_3fc957bf",
@@ -926,7 +975,7 @@
     },
     {
       "name": "pm_read_efdd1a47",
-      "value": "已读"
+      "value": "已阅"
     },
     {
       "name": "pm_load_more_af90a08f",
@@ -970,7 +1019,7 @@
     },
     {
       "name": "pm_translating_07f81963",
-      "value": "翻译中…"
+      "value": "正在翻译..."
     },
     {
       "name": "pm_show_original_098e6618",
@@ -986,11 +1035,11 @@
     },
     {
       "name": "pm_translate_a52a0833",
-      "value": "翻译"
+      "value": "显示译文"
     },
     {
       "name": "pm_show_original_comment_373f6052",
-      "value": "显示评论原文"
+      "value": "显示原文"
     },
     {
       "name": "pm_translate_comment_8a5fdd65",
@@ -1014,11 +1063,11 @@
     },
     {
       "name": "pm_loading_comments_dded3fba",
-      "value": "正在加载评论…"
+      "value": "正在加载评论"
     },
     {
       "name": "pm_hide_replies_c6edf966",
-      "value": "收起回复"
+      "value": "隐藏回复"
     },
     {
       "name": "pm_replies_37b37671",
@@ -1078,7 +1127,7 @@
     },
     {
       "name": "pm_pin_image_c269651e",
-      "value": "Pin 图片"
+      "value": "Pin 图图片"
     },
     {
       "name": "pm_loading_image_8fbf0f33",
@@ -1142,7 +1191,7 @@
     },
     {
       "name": "pm_secret_03a32629",
-      "value": " · 私密"
+      "value": "私密"
     },
     {
       "name": "pm_reload_boards_c3e7cfa5",
@@ -1170,7 +1219,7 @@
     },
     {
       "name": "pm_no_boards_yet_43790af9",
-      "value": "暂无图板"
+      "value": "无图板"
     },
     {
       "name": "pm_or_tap_to_create_a_new_board_4c13492c",
@@ -1278,15 +1327,15 @@
     },
     {
       "name": "pm_select_pins_09909cdf",
-      "value": "选择 Pin"
+      "value": "选择 Pin 图"
     },
     {
       "name": "pm_secret_board_a61a7ae3",
-      "value": "，私密图板"
+      "value": "私密图板"
     },
     {
       "name": "pm_make_secret_228cf25e",
-      "value": "设为私密图板"
+      "value": "将此图板设为私密图板"
     },
     {
       "name": "pm_profile_picture_5c814f4f",
@@ -1294,7 +1343,7 @@
     },
     {
       "name": "pm_about_this_account_581b25c0",
-      "value": "关于此账户……"
+      "value": "关于此帐户……"
     },
     {
       "name": "pm_more_5a6d7865",
@@ -1434,7 +1483,7 @@
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
-      "value": "输入链接以创建 Pin 图，https://…"
+      "value": "输入链接以创建 Pin 图，https://..."
     },
     {
       "name": "pm_no_images_available_to_create_a_pin_b7fe6e0c",
@@ -1490,7 +1539,7 @@
     },
     {
       "name": "pm_price_range_e8debe5f",
-      "value": "价格范围"
+      "value": "设置价格范围筛选器"
     },
     {
       "name": "pm_drag_to_change_price_9c52f526",
@@ -1510,7 +1559,7 @@
     },
     {
       "name": "pm_selected_4689290d",
-      "value": "，已选中"
+      "value": "已选择"
     },
     {
       "name": "pm_close_idea_recommendations_86934aff",
@@ -1518,7 +1567,7 @@
     },
     {
       "name": "pm_selected_657a8c2d",
-      "value": "，已选择"
+      "value": "已选择"
     },
     {
       "name": "pm_no_recommendations_yet_841e1d2f",
@@ -1650,7 +1699,7 @@
     },
     {
       "name": "pm_account_management_3c072712",
-      "value": "账户管理"
+      "value": "帐户管理"
     },
     {
       "name": "pm_personal_information_640803d8",
@@ -1690,7 +1739,7 @@
     },
     {
       "name": "pm_saving_6bdb4435",
-      "value": "正在保存…"
+      "value": "正在保存"
     },
     {
       "name": "pm_your_account_d80b3d08",
@@ -1746,7 +1795,7 @@
     },
     {
       "name": "pm_your_date_of_birth_helps_personalize_recommendations_and_ads_and_00165eee",
-      "value": "出生日期有助于为你提供更加个性化的体验，例如相关推荐内容和广告，其还有助于维护 Pinterest 社区的安全。此信息在你的个人资料中不可见。"
+      "value": "出生日期有助于为你提供更加个性化的体验，例如相关推荐内容和广告。其还有助于维护 Pinterest 社区的安全。此信息在你的个人资料中不可见。"
     },
     {
       "name": "pm_learn_why_we_ask_for_your_date_of_birth_09763a7d",
@@ -1834,7 +1883,7 @@
     },
     {
       "name": "pm_help_pinterest_understand_you_better_edit_the_details_used_to_re_20d62659",
-      "value": "让 Pinterest 更懂你。编辑详细信息，以便 Pinterest 利用这些信息向你推荐帖子。这些详细信息不会公开显示。"
+      "value": "让 Pinterest 更懂你。编辑详细信息，以便 Pinterest 利用这些信息向你推荐点子。这些详细信息不会公开显示。"
     },
     {
       "name": "pm_got_it_de32e201",
@@ -1878,7 +1927,7 @@
     },
     {
       "name": "pm_adjust_ai_modified_content_in_product_feeds_you_can_see_less_of__6f514185",
-      "value": "调整商品目录源内的 AI 修改内容。你可以减少看到的 AI 修改内容，但后续仍可能会出现部分此类内容。"
+      "value": "调整商品目录源中的 AI 修改内容。你可以减少看到的 AI 修改内容，但后续仍可能会出现部分此类内容。"
     },
     {
       "name": "pm_show_ai_content_409fe4d8",
@@ -1898,7 +1947,7 @@
     },
     {
       "name": "pm_hide_pins_related_to_those_you_recently_saved_or_opened_2e744f08",
-      "value": "隐藏与你最近收藏或点击放大查看的 Pin 图相关的帖子。"
+      "value": "隐藏与你最近收藏或点按放大查看的 Pin 图相关的点子。"
     },
     {
       "name": "pm_no_recent_activity_360e0904",
@@ -1946,7 +1995,7 @@
     },
     {
       "name": "pm_with_a_private_profile_only_people_you_approve_can_see_your_prof_5be21c6f",
-      "value": "当你的个人资料为私密状态时，仅获得你批准的用户可以查看你的个人资料、Pin 图、图板、粉丝和关注列表。了解更多"
+      "value": "当你的个人资料为私密状态时，仅获得你批准的用户可以查看你的个人资料、Pin图、图板、粉丝和关注列表。"
     },
     {
       "name": "pm_search_privacy_d041067d",
@@ -1954,7 +2003,7 @@
     },
     {
       "name": "pm_hide_your_profile_and_boards_from_search_engines_such_as_google__8bb0a7fb",
-      "value": "在搜索引擎（例如，Google）中隐藏你的个人资料和图板。了解更多"
+      "value": "在搜索引擎（例如，Google）中隐藏你的个人资料和图板。"
     },
     {
       "name": "pm_make_profile_private_5d577229",
@@ -1998,7 +2047,7 @@
     },
     {
       "name": "pm_home_203c08e0",
-      "value": "首页"
+      "value": "主页"
     },
     {
       "name": "pm_search_44ce7ae9",
@@ -2006,7 +2055,7 @@
     },
     {
       "name": "pm_profile_7f1d9dd0",
-      "value": "我的"
+      "value": "个人资料"
     },
     {
       "name": "pm_search_your_pins_e0d101c6",
@@ -2194,7 +2243,7 @@
     },
     {
       "name": "pm_loading_21bd738e",
-      "value": "正在加载…"
+      "value": "正在加载"
     },
     {
       "name": "pm_blocked_eb3c6420",
@@ -2218,7 +2267,7 @@
     },
     {
       "name": "pm_copied_8f6f8d97",
-      "value": "已复制"
+      "value": "已复制！"
     },
     {
       "name": "pm_unable_to_copy_please_retry_86ee2899",
@@ -2238,7 +2287,7 @@
     },
     {
       "name": "pm_unable_to_load_current_session_447e235d",
-      "value": "当前会话加载失败"
+      "value": "暂时无法加载"
     },
     {
       "name": "pm_loading_existing_session_f538c37e",
@@ -2358,7 +2407,7 @@
     },
     {
       "name": "pm_visit_website_ac9d562e",
-      "value": "访问网站，"
+      "value": "访问网站"
     },
     {
       "name": "pm_see_more_feedback_submitted_a391370a",
@@ -2374,7 +2423,7 @@
     },
     {
       "name": "pm_more_to_explore_f7cba896",
-      "value": "更多探索内容"
+      "value": "探索更多"
     },
     {
       "name": "pm_reload_url_84763306",
@@ -2458,15 +2507,15 @@
     },
     {
       "name": "pm_unfollow_board_ac069feb",
-      "value": "取消关注图板"
+      "value": "取消关注"
     },
     {
       "name": "pm_follow_board_3813420f",
-      "value": "关注图板"
+      "value": "关注"
     },
     {
       "name": "pm_followers_b06be4eb",
-      "value": " 位粉丝"
+      "value": "粉丝"
     },
     {
       "name": "pm_submitting_profile_follow_action_9167e789",
@@ -2474,11 +2523,11 @@
     },
     {
       "name": "pm_unfollow_profile_16f4c576",
-      "value": "取消关注用户"
+      "value": "取消关注"
     },
     {
       "name": "pm_follow_profile_655e46b4",
-      "value": "关注用户"
+      "value": "关注"
     },
     {
       "name": "pm_that_does_not_seem_to_work_59c83091",
@@ -2510,11 +2559,11 @@
     },
     {
       "name": "pm_we_could_not_find_anyone_named_a06407b4",
-      "value": "我们找不到任何叫“"
+      "value": "我们找不到任何叫 “"
     },
     {
       "name": "pm_text_c74084fe",
-      "value": "”的人。"
+      "value": "” 的人。"
     },
     {
       "name": "pm_sorry_we_could_not_find_any_pins_for_this_search_80dcc4da",
@@ -2778,7 +2827,7 @@
     },
     {
       "name": "pm_recommendations_3da0bf16",
-      "value": "推荐内容"
+      "value": "推荐"
     },
     {
       "name": "pm_unable_to_load_collaborators_please_retry_b78a9b74",
@@ -2810,7 +2859,7 @@
     },
     {
       "name": "pm_you_will_see_more_pins_like_this_6dc4ff37",
-      "value": "将为你显示更多此类 Pin"
+      "value": "知道了！我们会显示更多此类 Pin 图。"
     },
     {
       "name": "pm_unable_to_copy_link_please_retry_a34acdfe",
@@ -3070,11 +3119,11 @@
     },
     {
       "name": "pm_you_sent_a_board_9a08dbbf",
-      "value": "你发送了一个图板"
+      "value": "你发送了一块图板"
     },
     {
       "name": "pm_sent_a_board_8870ec6d",
-      "value": "发送了一个图板"
+      "value": "发送了一块图板"
     },
     {
       "name": "pm_you_sent_a_pin_4788181d",
@@ -3142,7 +3191,7 @@
     },
     {
       "name": "pm_share_link_10ba6479",
-      "value": "分享链接"
+      "value": "分享 Pin 图链接"
     },
     {
       "name": "pm_move_to_another_board_62574b0d",
@@ -3190,7 +3239,7 @@
     },
     {
       "name": "pm_see_less_9c80a8dc",
-      "value": "查看更少"
+      "value": "减少推荐"
     },
     {
       "name": "pm_see_fewer_like_this_7904e8ad",
@@ -3242,7 +3291,7 @@
     },
     {
       "name": "pm_saved_to_b75786b2",
-      "value": "已收藏至“"
+      "value": "已收藏至 "
     },
     {
       "name": "pm_save_result_not_confirmed_close_and_reload_to_check_it_will_not__1f283f26",
@@ -3394,7 +3443,7 @@
     },
     {
       "name": "pm_username_already_taken_b003d15d",
-      "value": "用户名已被使用"
+      "value": "用户名已被使用。"
     },
     {
       "name": "pm_changes_saved_0027fdbb",
@@ -3570,11 +3619,11 @@
     },
     {
       "name": "pm_boards_53f23afe",
-      "value": "画板"
+      "value": "图板"
     },
     {
       "name": "pm_products_58fdb094",
-      "value": "商品"
+      "value": "产品"
     },
     {
       "name": "pm_products_aea82737",
@@ -4273,7 +4322,7 @@
     {"name":"pm_light_gentle","value":"柔和"},
     {"name":"pm_light_immersive","value":"沉浸"},
     {"name":"pm_light_exquisite","value":"精致"},
-    {"name":"pm_inbox_search_username","value":"搜索联系人用户名"},
+    {"name":"pm_inbox_search_username","value":"通过名字或用户名搜索"},
     {"name":"pm_inbox_no_matching_username","value":"没有匹配的用户名"},
     {"name":"pm_photo_search","value":"照片搜索"},
     {"name":"pm_photo_search_loading","value":"正在搜索照片…"},
@@ -4300,24 +4349,24 @@
     {"name":"pm_social_business_messages","value":"允许其他人向我的企业发送消息"},
     {"name":"pm_social_business_detail","value":"你的个人资料中将显示消息按钮，以便其他用户向你发送消息。"},
     {"name":"pm_social_unavailable","value":"暂不可用"},
-    {"name":"pm_social_direct","value":"直接发送消息"},
+    {"name":"pm_social_direct","value":"收件箱"},
     {"name":"pm_social_requests","value":"消息请求"},
     {"name":"pm_social_ignore","value":"忽略"},
     {"name":"pm_social_delivery","value":"选择消息投放位置"},
     {"name":"pm_social_friends_detail","value":"你和用户互相关注"},
-    {"name":"pm_social_followers_detail","value":"关注你的用户和品牌。要向关注你的用户发送消息，你必须关注他们"},
-    {"name":"pm_social_following_detail","value":"你关注的用户和品牌。要向你关注的用户发送消息，他们必须关注你"},
+    {"name":"pm_social_followers_detail","value":"关注你的用户和品牌。要向关注你的用户发送消息，你必须关注他们。"},
+    {"name":"pm_social_following_detail","value":"你关注的用户和品牌。要向你关注的用户发送消息，他们必须关注你。"},
     {"name":"pm_social_others_detail","value":"Pinterest 上你尚未与之交流或合作的用户。"},
-    {"name":"pm_social_blocked_intro","value":"当你屏蔽某人后，你们将无法查看、关注或联系对方，也无法收藏对方的 Pin 图。"},
+    {"name":"pm_social_blocked_intro","value":"你们将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。当你屏蔽某人时，对方不会收到通知。"},
     {"name":"pm_social_no_blocked","value":"你目前没有屏蔽任何人"},
     {"name":"pm_social_no_matches","value":"没有匹配的帐户"},
     {"name":"pm_social_search","value":"搜索"},
     {"name":"pm_social_unblock","value":"取消屏蔽"},
     {"name":"pm_social_unblock_title","value":"取消屏蔽 {0}？"},
-    {"name":"pm_social_unblock_description","value":"根据你的设置，你将可以看到、关注和联系对方，并收藏对方的 Pin 图。"},
+    {"name":"pm_social_unblock_description","value":"根据您的设置，您将可以看到、关注和联系对方，并收藏对方的 Pin 图。了解更多"},
     {"name":"pm_social_mentions_anyone","value":"Pinterest 上的任何人"},
     {"name":"pm_social_mentions_following","value":"仅限你关注的人"},
-    {"name":"pm_social_mentions_off","value":"关闭 - 没有人可以 @提到你"},
+    {"name":"pm_social_mentions_off","value":"没有人可以 @提及你"},
     {"name":"pm_social_others_short","value":"其他人"},
     {"name":"pm_settings_help_center","value":"帮助中心"},
     {"name":"pm_settings_terms_of_service","value":"服务条款"},
@@ -4328,7 +4377,7 @@
     {"name":"pm_notify_category_published_comments","value":"评论"},
     {"name":"pm_notify_category_published_reactions","value":"回应"},
     {"name":"pm_notify_category_published_saves","value":"收藏"},
-    {"name":"pm_notify_category_views_and_impressions","value":"浏览和展示次数"},
+    {"name":"pm_notify_category_views_and_impressions","value":"查看和浏览"},
     {"name":"pm_notify_category_published_collages","value":"拼贴"},
     {"name":"pm_notify_category_saved_pin_comments","value":"评论"},
     {"name":"pm_notify_category_saved_pin_mentions","value":"提及"},
@@ -4338,37 +4387,37 @@
     {"name":"pm_notify_category_group_board_invites","value":"群组图板邀请"},
     {"name":"pm_notify_category_messages","value":"消息"},
     {"name":"pm_notify_category_followers","value":"粉丝"},
-    {"name":"pm_notify_category_homefeed_pins","value":"来自主页推荐的灵感"},
-    {"name":"pm_notify_category_pins_picked_for_you","value":"根据你的兴趣"},
-    {"name":"pm_notify_category_based_on_activity","value":"根据你的活动"},
+    {"name":"pm_notify_category_homefeed_pins","value":"灵感来自你的首页动态"},
+    {"name":"pm_notify_category_pins_picked_for_you","value":"根据你的兴趣做的推荐"},
+    {"name":"pm_notify_category_based_on_activity","value":"基于你的动态"},
     {"name":"pm_notify_category_board_recommendations","value":"你可能喜欢的图板"},
-    {"name":"pm_notify_category_search_recommendations","value":"你可能喜欢的搜索"},
-    {"name":"pm_notify_category_followee_pins","value":"你关注的人发布的 Pin 图"},
-    {"name":"pm_notify_category_shadow_followee_pins","value":"你可能喜欢的人发布的 Pin 图"},
+    {"name":"pm_notify_category_search_recommendations","value":"你可能喜欢的搜索内容"},
+    {"name":"pm_notify_category_followee_pins","value":"你关注的用户的 Pin 图"},
+    {"name":"pm_notify_category_shadow_followee_pins","value":"你可能喜欢的用户的 Pin 图"},
     {"name":"pm_notify_category_shopping_recommendations","value":"购物 Pin 图"},
     {"name":"pm_notify_category_pinterest_announcements","value":"Pinterest 公告"},
-    {"name":"pm_notify_category_surveys_and_quizzes","value":"调查和测验"},
-    {"name":"pm_notify_category_reports_and_violations_center","value":"举报与违规中心更新"},
+    {"name":"pm_notify_category_surveys_and_quizzes","value":"问卷调查和测验"},
+    {"name":"pm_notify_category_reports_and_violations_center","value":"违规内容举报中心资讯"},
     {"name":"pm_notify_category_shuffles_activity","value":"Shuffles 动态"},
     {"name":"pm_notify_group_created","value":"你创建的 Pin 图"},
     {"name":"pm_notify_group_saved","value":"你收藏的 Pin 图"},
-    {"name":"pm_notify_group_social","value":"社交动态"},
+    {"name":"pm_notify_group_social","value":"社交活动"},
     {"name":"pm_notify_group_recommendations","value":"推荐"},
     {"name":"pm_notify_group_other","value":"其他通知"},
-    {"name":"pm_notify_group_delivery","value":"通知接收方式"},
+    {"name":"pm_notify_group_delivery","value":"如何接收通知"},
     {"name":"pm_notify_title","value":"管理通知"},
-    {"name":"pm_notify_how","value":"你希望以何种方式接收通知？"},
+    {"name":"pm_notify_how","value":"你想要如何收到通知？"},
     {"name":"pm_notify_push","value":"推送"},
     {"name":"pm_notify_email","value":"电子邮件"},
-    {"name":"pm_notify_news","value":"应用内"},
+    {"name":"pm_notify_news","value":"应用程序内"},
     {"name":"pm_notify_on","value":"已开启"},
     {"name":"pm_notify_off","value":"已关闭"},
-    {"name":"pm_notify_comments_description","value":"当有人评论你创建的 Pin 图时接收通知"},
-    {"name":"pm_notify_search_description","value":"获取个性化搜索词，发现更多你喜欢的内容"},
+    {"name":"pm_notify_comments_description","value":"有人评论了你创建的 Pin 图时接收通知"},
+    {"name":"pm_notify_search_description","value":"获取个性化搜索词，帮助你发现更多你喜爱的内容"},
     {"name":"pm_notify_global_description","value":"Pinterest 会持续向你发送关于你帐户的重要更新"},
     {"name":"pm_autoplay_video_title","value":"自动播放视频"},
     {"name":"pm_autoplay_video_cellular","value":"使用移动数据时自动播放视频"},
-    {"name":"pm_autoplay_video_wifi","value":"使用 Wi-Fi 时自动播放视频"},
+    {"name":"pm_autoplay_video_wifi","value":"使用 WiFi 时自动播放视频"},
     {"name":"pm_custom_gender_fallback","value":"自定义"},
     {"name":"pm_board_load_section_details_failed","value":"区块资料读取失败，请重试"},
     {"name":"pm_board_load_section_tools_failed","value":"区块工具读取失败，请重试"},
@@ -4401,6 +4450,27 @@
     {"name":"pm_notify_description_reports_and_violations_center","value":"获取有关你的内容和已举报内容的举报和违规行为的更新"},
     {"name":"pm_notify_description_shuffles_activity","value":"获取关于 Shuffles 动态的更新"},
     {"name":"pm_social_blocked_partial","value":"已显示当前返回的账户，尚未确认完整屏蔽列表。"},
+    {
+      "name": "pm_view_comment_replies",
+      "value": "查看 {0} 条回复"
+    },
+    {"name":"pm_photo_upload","value":"上传照片"},
+    {"name":"pm_photo_history","value":"照片搜索历史"},
+    {"name":"pm_photo_history_select","value":"选择历史照片"},
+    {"name":"pm_photo_history_confirm","value":"确认"},
+    {"name":"pm_photo_history_empty","value":"暂无照片搜索历史"},
+    {"name":"pm_photo_history_error","value":"无法加载照片，请重试"},
+    {"name":"pm_social_business_tab","value":"企业"},
+    {"name":"pm_photo_history_single_only","value":"只能选择一张照片进行搜索，请先取消已选照片"},
+    { "name": "pm_press_back_again_to_exit", "value": "再按一次返回退出应用" }
+,
+    {"value":"将此图板设为公开","name":"pm_board_make_public"},
+    {"value":"任何人都可以看到此图板。它会出现在你的个人资料中，可能在 Pinterest 上的搜索和其他地方显示。","name":"pm_board_public_description"},
+    {"value":"此图板为公开","name":"pm_board_public_title"},
+    {"value":"任何人都能够看到此图板","name":"pm_board_public_visibility"},
+    {"value":"仅合作用户可查看该图板。该图板不会展示在你的个人主页、搜索结果以及 Pinterest 的其他位置。","name":"pm_board_secret_description"},
+    {"value":"此图板为私密","name":"pm_board_secret_title"},
+    {"value":"仅合作用户可查看该图板","name":"pm_board_secret_visibility"},
     {"name":"pm_video_connection_timeout","value":"视频连接超时"},
     {"name":"pm_video_proxy_timeout_hint","value":"视频连接超时，请检查代理规则是否将 pinimg.com 指向 DIRECT，或切换代理节点（建议使用全局模式）"}
   ]

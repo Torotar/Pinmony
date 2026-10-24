@@ -5,6 +5,6 @@ const icon = fs.readFileSync('common_ui/src/main/resources/base/media/copy_link.
 const share=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyShareSheet.ets','utf8');
 assert(share.includes('this.isCopyLink(option.label)'));
 assert(!share.includes("$r('app.media.copy_link')"), 'detail share contract retains only contacts');
-assert(index.includes("this.activeSheetKind === 'more' ? '选项'"));
+assert(index.includes('this.activeSheetKind === \'more\' ? this.uiText("pm_options_bb7486f4")'));
 assert(icon.includes('stroke="#fff"'));
 console.log('Post panel: contacts-only detail share and options title are wired');

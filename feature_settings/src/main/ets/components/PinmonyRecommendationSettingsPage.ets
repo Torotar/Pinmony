@@ -1,11 +1,26 @@
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
-import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier, ComponentContent } from '@kit.ArkUI';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyAiTopic, PinmonyRecentActivity } from '../models/PinmonyAccountSettings';
 import { PinmonyRuntimeLog } from 'common_foundation';
+interface RecommendationInfoOptions { source: string; }
+@Component
+struct RecommendationInfoContent {
+  @StorageLink('pinmonyLanguage') private language: string = 'zh';
+  source: string = '';
+  build() {
+    Text(PinmonyI18n.text(this.source, this.language))
+      .fontSize(16).fontColor($r('app.color.primary_text'))
+      .padding(16).constraintSize({ maxWidth: 300 })
+  }
+}
+@Builder
+function buildRecommendationInfo(options: RecommendationInfoOptions) {
+  RecommendationInfoContent({ source: options.source })
+}
 @Component
 export struct PinmonyRecommendationSettingsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -20,8 +35,10 @@ export struct PinmonyRecommendationSettingsPage {
   private errorSnack: HdsSnackBar | undefined = undefined;
   private errorSnackKey: string = '';
   private pageVisible: boolean = false;
+  private infoContent: ComponentContent<RecommendationInfoOptions> | undefined = undefined;
+  private infoOpen: boolean = false;
   aboutToAppear(): void { this.pageVisible = true; this.paths.pushPath({ name: 'recommend' }, false); this.syncErrorSnack(); }
-  aboutToDisappear(): void { this.pageVisible = false; this.dismissErrorSnack(); }
+  aboutToDisappear(): void { this.pageVisible = false; this.dismissRecommendationInfo(); this.dismissErrorSnack(); }
   private dismissErrorSnack(): void { this.errorSnack?.dismiss(); this.errorSnackKey = ''; }
   private syncErrorSnack(): void {
     if (!this.pageVisible || !this.store.error || this.store.loading || this.store.busy || this.store.confirmOpen) {
@@ -31,7 +48,7 @@ export struct PinmonyRecommendationSettingsPage {
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
-    this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
+    this.errorSnack.show({ icon: $r('sys.symbol.exclamationmark_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
       content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
       contentAccessibilityText: this.uiText("pm_reload_current_settings_d2b82d8a"),
@@ -76,17 +93,33 @@ export struct PinmonyRecommendationSettingsPage {
       },
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.store.screen === 'recommend' ? [{ content: {
+          componentId: 'pinmony-recommendation-info',
           icon: new SymbolGlyphModifier($r('sys.symbol.exclamationmark_circle'))
             .fontColor([$r('app.color.primary_text')]),
           label: this.uiText("pm_about_recommendations_03c3b26e"), action: () => { this.showRecommendationInfo(); }
         } }] : [] } } };
   }
-  private showRecommendationInfo(): void {
-    this.getUIContext().showAlertDialog({
-      title: this.uiText("pm_refine_your_recommendations_92ce2929"),
-      message: this.uiText("pm_help_pinterest_understand_you_better_edit_the_details_used_to_re_20d62659"),
-      confirm: { value: this.uiText("pm_got_it_de32e201"), action: () => {} }
-    });
+  private async showRecommendationInfo(): Promise<void> {
+    if (!this.pageVisible) return;
+    if (this.infoOpen) { await this.dismissRecommendationInfo(); return; }
+    this.infoOpen = true;
+    try {
+      const options: RecommendationInfoOptions = { source: 'pm_help_pinterest_understand_you_better_edit_the_details_used_to_re_20d62659' };
+      if (!this.infoContent) this.infoContent = new ComponentContent(this.getUIContext(), wrapBuilder(buildRecommendationInfo), options);
+      await this.getUIContext().getPromptAction().openPopup(this.infoContent, { id: 'pinmony-recommendation-info' }, {
+        placement: Placement.BottomRight, enableArrow: true, autoCancel: true,
+        popupColor: $r('app.color.page_background'),
+        onStateChange: (event: PopupStateChangeParam) => { this.infoOpen = event.isVisible; }
+      });
+      if (!this.pageVisible) await this.dismissRecommendationInfo();
+    } catch (_) { this.infoOpen = false; }
+  }
+  private async dismissRecommendationInfo(): Promise<void> {
+    if (this.infoContent && this.infoOpen) {
+      try { await this.getUIContext().getPromptAction().closePopup(this.infoContent); }
+      catch (_) { /* The system may already have dismissed the popup. */ }
+    }
+    this.infoOpen = false;
   }
   @Builder
   private activityColumn(parity: number) {

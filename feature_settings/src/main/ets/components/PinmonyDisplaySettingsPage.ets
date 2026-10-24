@@ -4,7 +4,7 @@ import { PinmonyI18n } from 'common_foundation';
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { window } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
@@ -38,7 +38,7 @@ export struct PinmonyDisplaySettingsPage {
     if (key === this.errorSnackKey) return;
     this.dismissErrorSnack(); this.errorSnackKey = key;
     if (!this.errorSnack) this.errorSnack = new HdsSnackBar(this.getUIContext());
-    this.errorSnack.show({}, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
+    this.errorSnack.show({ icon: $r('sys.symbol.exclamationmark_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(this.store.error, this.uiLanguage) }, {
       operationType: SnackBarOperationType.TEXT_ONLY,
       content: PinmonyI18n.isUnconfirmed(this.store.error) ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
       contentAccessibilityText: this.uiText("pm_reload_current_settings_d2b82d8a"),
@@ -91,7 +91,9 @@ export struct PinmonyDisplaySettingsPage {
       await mainWindow.setPreferredOrientation(orientations[index]);
       this.orientationPreference = value;
     } catch (_) {
-      this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 });
+      } catch (_) { PinmonyRuntimeLog.warn('OrientationPreference: failure feedback unavailable'); }
     } finally { this.orientationBusy = false; }
   }
   private logMaterialMode(): void {
@@ -218,6 +220,16 @@ export struct PinmonyDisplaySettingsPage {
       }, (language: string): string => language)
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 12 }) {
+        Text(this.uiText('pm_board_recovery_title')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+      }.width('100%')
+    }.width('100%').padding(16).backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+      .enabled(!this.store.busy && !this.store.loading).onClick(() => {
+        this.store.screen = 'boardRecovery';this.store.error = '';this.store.boardRecoveryReady = false;this.store.recoverableBoards = [];
+        this.onRequest?.('boardRecoveryRead', '');
+      })
     Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:16 })
     ForEach(['autoplayCellular','autoplayWifi'], (action: string) => {
       this.autoplayOption(action, action === 'autoplayWifi' ? 'pm_autoplay_video_wifi' : 'pm_autoplay_video_cellular', action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular)

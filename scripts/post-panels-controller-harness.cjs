@@ -1,5 +1,11 @@
 const { runtime } = require('./return-coordinator-harness.cjs');
-function create(ts, globals = {}) { const r = runtime(ts, globals); return r.compile('feature_pin/src/main/ets/controllers/PinmonyPostPanelsController.ets', () => r.foundation); }
+function create(ts, globals = {}) {
+  const r = runtime(ts, globals);
+  const fs = require('node:fs');
+  const copy = Object.fromEntries(JSON.parse(fs.readFileSync('common_foundation/src/main/resources/base/element/string.json', 'utf8')).string.map(row => [row.name, row.value]));
+  r.foundation.PinmonyI18n = { message: key => copy[key] || key, render: value => value };
+  return r.compile('feature_pin/src/main/ets/controllers/PinmonyPostPanelsController.ets', () => r.foundation);
+}
 function bind(native, ts, globals = {}) {
   const { PinmonyPostPanelsController } = create(ts, globals);
   native.postPanelsController = new PinmonyPostPanelsController(native.pinStore, {

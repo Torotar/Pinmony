@@ -56,6 +56,6 @@ function walk(dir) {
 }
 for (const root of fs.readdirSync('.').filter(name => /^(feature_|entry$|common_ui$)/.test(name))) walk(path.join(root, 'src'));
 assert(components >= 20);
-assert(fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8')
+assert(fs.readFileSync('entry/src/main/ets/startup/PreferencesTask.ets', 'utf8')
   .includes("PersistentStorage.persistProp('immersiveLightMode', AppStorage.get<boolean>('immersiveLightEnabled') === false ? 'off' : 'immersive')"));
 console.log('Immersive light: four material modes, scroll effect, safe area, global bindings and persisted migration passed');

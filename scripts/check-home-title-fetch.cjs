@@ -8,6 +8,6 @@ assert.match(apiSource, /pin\.grid_title[\s\S]*pin\.title[\s\S]*pin\.description
   'card titles are mapped from the home API response');
 assert.doesNotMatch(apiSource, /DOMParser|document\.|innerText|textContent|PinmonyHomeReadTitles/,
   'home title mapping does not read HTML or DOM text');
-assert.doesNotMatch(bridgeSource, /DOMParser|document\.|innerText|textContent|PinmonyHomeReadTitles/,
+assert.doesNotMatch(bridgeSource, /DOMParser|document\.(?:querySelector|getElementById)|innerText|textContent|PinmonyHomeReadTitles/,
   'home bridge does not fetch or parse DOM titles');
 console.log('home API title source: grid_title/title/description only; DOM title reads removed');

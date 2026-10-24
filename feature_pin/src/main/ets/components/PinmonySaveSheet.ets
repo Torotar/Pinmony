@@ -1,6 +1,6 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySaveBoard, PinmonySaveResult } from '../models/PinmonyComments';
-import { PinmonyBoardPlaceholder } from 'common_ui';
+import { PinmonyBoardPlaceholder, PinmonyBoardPickerRow, PinmonyBoardPickerFooter } from 'common_ui';
 
 @Component
 export struct PinmonySaveSheet {
@@ -11,7 +11,9 @@ export struct PinmonySaveSheet {
   @State private name: string = '';
   @State private secret: boolean = false;
   onRetry?: () => void;
-  onSave?: (id: string) => void;
+  onSave?: (id: string, section?: string) => void;
+  onOpenBoard?: (id: string) => void;
+  onBack?: () => void;
   onCreate?: (name: string, secret: boolean) => void;
   onRemove?: () => void;
   onCreatingChange?: (creating: boolean) => void;
@@ -37,26 +39,10 @@ export struct PinmonySaveSheet {
 
   @Builder
   private boardRow(board: PinmonySaveBoard) {
-    Button({ type: ButtonType.Normal }) {
-      Row({ space: 12 }) {
-        if (board.imageUrl) {
-          Image(board.imageUrl).width(44).height(44).borderRadius(10).objectFit(ImageFit.Cover)
-        } else if (board.id === 'profile-quick-saves') {
-          Stack({ alignContent: Alignment.Center }) {
-            Image($r('app.media.profile_quick_save')).width(26).height(26)
-              .fillColor($r('app.color.primary_text'))
-          }.width(44).height(44).backgroundColor($r('app.color.surface_muted')).borderRadius(10)
-        } else {
-          PinmonyBoardPlaceholder({ coverSize: 44 })
-        }
-        Text(board.name + (board.secret ? this.uiText("pm_secret_03a32629") : '')).fontSize(16).fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.primary_text')).layoutWeight(1)
-      }.width('100%')
-    }.width('100%').height(60).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
-      .enabled(board.enabled && !this.result.busy && !this.result.loading)
-      .onClick(() => { if (this.onSave) this.onSave(board.id); })
+    PinmonyBoardPickerRow({title:board.name,imageUrl:board.imageUrl,secret:board.secret,hasSections:board.hasSections === true,quickSave:board.id === 'profile-quick-saves',
+      actionEnabled:board.enabled && !this.result.busy && !this.result.loading,
+      onSelect:() => {if(this.onOpenBoard && board.id !== 'profile-quick-saves')this.onOpenBoard(board.id);else this.onSave?.(board.id);}})
   }
-
   build() {
     if (this.result.error && !this.result.items.length && !this.result.shortlist.length && !this.creating) {
       Column({ space: 16 }) {
@@ -101,15 +87,30 @@ export struct PinmonySaveSheet {
       } else {
         Scroll() {
           Column({ space: 8 }) {
+            if(this.result.targetBoardId) {
+              ForEach(this.result.items.concat(this.result.shortlist).filter((board: PinmonySaveBoard,index: number,all: PinmonySaveBoard[]): boolean => board.id === this.result.targetBoardId && all.findIndex((b: PinmonySaveBoard): boolean => b.id === board.id) === index), (board: PinmonySaveBoard) => {
+                PinmonyBoardPickerRow({title:board.name,imageUrl:board.imageUrl,secret:board.secret,
+                  actionEnabled:board.enabled && !this.result.busy && !this.result.loading && !this.result.error,
+                  onSelect:() => this.onSave?.(board.id)})
+              }, (board: PinmonySaveBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
+              ForEach(this.result.targetSections || [], (section: PinmonySaveBoard) => {
+                PinmonyBoardPickerRow({title:section.name,imageUrl:section.imageUrl,secret:section.secret,indented:true,
+                  actionEnabled:section.enabled && !this.result.busy && !this.result.loading && !this.result.error,
+                  onSelect:() => this.onSave?.(this.result.targetBoardId || '',section.id)})
+              }, (section: PinmonySaveBoard) => JSON.stringify(section) + ':' + this.uiLanguage)
+              if(!this.result.loading && !this.result.error && !this.result.targetSections?.length) {
+                Text(this.uiText('pm_this_board_has_no_sections_yet_2eb7dc0a')).fontColor($r('app.color.secondary_text'))
+              }
+            } else {
             if (!this.result.loading && this.result.shortlist.length) {
               Text(this.uiText("pm_featured_15b26cda")).fontColor($r('app.color.secondary_text')).width('100%')
-              ForEach(this.result.shortlist, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => board.id)
+              ForEach(this.result.shortlist, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
             }
             if (!this.result.loading) {
               Text(this.uiText("pm_all_boards_f1847589")).fontColor($r('app.color.secondary_text')).width('100%')
             }
             if (!this.result.loading) {
-              ForEach(this.result.items, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => board.id)
+              ForEach(this.result.items, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
             }
             if (!this.result.loading && !this.result.error && !this.result.items.length) {
               Text(this.uiText("pm_no_boards_yet_43790af9")).fontColor($r('app.color.secondary_text'))
@@ -130,23 +131,21 @@ export struct PinmonySaveSheet {
                   .onClick(() => this.beginCreate(suggestion))
               }, (suggestion: string) => (suggestion) + ':' + this.uiLanguage)
             }
+            }
           }.width('100%')
-        }.layoutWeight(1).width('100%')
-        if (!this.result.loading) {
+        }.layoutWeight(1).width('100%').align(Alignment.TopStart)
+        if(this.result.targetBoardId) {
+          Divider().color($r('app.color.secondary_text')).opacity(0.15)
+          PinmonyBoardPickerFooter({inset:0,back:true,labelKey:'pm_back_to_boards_dcf21f0d',
+            actionEnabled:!this.result.busy && !this.result.loading && !this.result.uncertain,onSelect:() => this.onBack?.()})
+        } else {
+        if (!this.result.loading && !this.result.targetBoardId) {
         Divider().color($r('app.color.secondary_text')).opacity(0.15)
-        Button({ type: ButtonType.Normal }) {
-          Row({ space: 12 }) {
-            Text('+').fontSize(26).width(44).height(44).textAlign(TextAlign.Center)
-              .backgroundColor($r('app.color.surface_muted')).borderRadius(10)
-              .fontColor($r('app.color.primary_text'))
-            Text(this.uiText("pm_create_board_513babc9")).fontSize(16).fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.primary_text')).layoutWeight(1)
-          }.width('100%')
-        }.width('100%').height(56).padding(0).borderRadius(0).backgroundColor(Color.Transparent)
-          .enabled(!this.result.busy && !this.result.loading && !this.result.error)
-          .onClick(() => this.beginCreate())
+        PinmonyBoardPickerFooter({inset:0,actionEnabled:!this.result.busy && !this.result.loading && !this.result.error,
+          onSelect:() => this.beginCreate()})
         } else {
           Blank().height(68)
+        }
         }
         if (this.result.savedId) {
           Button(this.uiText("pm_undo_save_8245d6cd") + this.result.savedBoard).enabled(!this.result.busy)
@@ -156,7 +155,7 @@ export struct PinmonySaveSheet {
           Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
         }
       }
-    }.width('100%').height('100%').padding(20).backgroundColor($r('app.color.page_background'))
+    }.width('100%').height('100%').padding({left:16,right:16,top:16,bottom:0}).backgroundColor($r('app.color.page_background'))
     }
   }
 }

@@ -48,7 +48,7 @@ class Credentials {
   async read() { reads++; if(missingCookie) throw new Error('missing-session'); return 'fixture_session=synthetic'; }
   async update(url, values, current) { assert(current()); writes += values.length; }
 }
-const rcp = { Request: class { constructor(url, method, headers) { Object.assign(this, { url, method, headers }); } },
+const rcp = { Request: class { constructor(url, method, headers, content, range, cookies, configuration) { Object.assign(this, { url, method, headers, configuration }); } },
   createSession() { return { fetch(request) { sent.push(request); return response ? Promise.resolve(response) :
     new Promise(resolve => { resolveFetch = resolve; }); }, cancel() {}, close() {} }; } };
 const policy = compile('common_network/src/main/ets/PinmonyRequestPolicy.ets', () => ({ PinmonyRuntimeLog: log }));
@@ -57,6 +57,8 @@ const { PinmonyNativeNetwork, NetworkManager } = compile('common_network/src/mai
     { PinmonyRuntimeLog: log } : name === './PinmonyRequestPolicy' ? policy : { rcp });
 const { PinmonySessionVerification } = compile('entry/src/main/ets/app/PinmonySessionVerification.ets', name =>
   name === 'common_session' ? session : { PinmonyRuntimeLog: log });
+const retryPolicies = [], originalRetry = NetworkManager.requestWithRetry;
+NetworkManager.requestWithRetry = (...args) => { retryPolicies.push([args[2], args[3]]); return originalRetry(...args); };
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function reply() { return { statusCode: 200, headers: { 'set-cookie': 'fixture=synthetic; Path=/; Secure' },
   toString: () => JSON.stringify(body()) }; }
@@ -82,6 +84,9 @@ async function main() {
   assert.equal(url.pathname, '/resource/ApiResource/get/'); assert.equal(url.searchParams.get('source_url'), '/settings/');
   assert.equal(request.headers['X-Pinterest-Pws-Handler'], 'www/settings.js');
   assert.equal(request.headers.Cookie, 'fixture_session=synthetic');
+  assert.equal(request.configuration.transfer.timeout.connectMs, 3000);
+  assert.equal(request.configuration.transfer.timeout.transferMs, 5000);
+  assert.deepEqual(retryPolicies[0], [1, 100], 'session probe gets one retry with a shorter backoff');
   assert.equal(envelope.options.field_sets.length, 34); assert.equal(Object.keys(envelope.context).length, 0);
   const before = reads;
   for (const args of [['https://example.com', 'fixture', 1, 'session_probe_1'], [origin, 'fixture', 1, 'wrong'],

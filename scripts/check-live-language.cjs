@@ -59,7 +59,7 @@ module.exports = function checkLiveLanguage(ts, i18n) {
       assert(source.includes("@StorageLink('pinmonyLanguage') @Watch('syncErrorSnack')"));
       const sf=ts.createSourceFile(page,source.replace(/\bstruct\b/g, 'class'),99,true);let method;
       function find(n){if(ts.isMethodDeclaration(n)&&n.name.getText(sf)==='syncErrorSnack')method=n;ts.forEachChild(n,find);}find(sf);
-      const Type=vm.runInNewContext(ts.transpileModule('class Host {'+method.getText(sf)+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyI18n:i18n,SnackBarOperationType:{TEXT_ONLY:1}});
+      const Type=vm.runInNewContext(ts.transpileModule('class Host {'+method.getText(sf)+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyI18n:i18n,$r:name=>name,SnackBarIconType:{NORMAL:1},SnackBarOperationType:{TEXT_ONLY:1}});
       const shows=[],store={screen:'display',recommendationTab:'ai',token:1,error:i18n.message('pm_unable_to_load_please_reload_d84df6b3')};
       const host=new Type();Object.assign(host,{uiLanguage:'en',store,pageVisible:true,errorSnackKey:'',errorSnack:{show(_a,b){shows.push(b.title);}},dismissErrorSnack(){this.errorSnackKey='';},uiText(key){return i18n.text(key,this.uiLanguage);}});
       host.syncErrorSnack();host.syncErrorSnack();assert.equal(shows.length,1);

@@ -292,6 +292,9 @@ async function main() {
   assert.equal(guardedCalls,1,'stale retry is not dispatched after the retry callback invalidates the context');
   assert.equal(skipped.error,'cancelled');
   const logMessages = runtimeLogs.map(entry => entry.message);
+  assert(runtimeLogs.some(entry => entry.level === 'info' && entry.message.startsWith('NetworkTrace: cancelled ')), 'obsolete requests are logged as cancellation');
+  assert(!runtimeLogs.some(entry => entry.level === 'warn' && entry.message.includes('current false')), 'stale cancellation is not reported as a live network failure');
+  assert(runtimeLogs.some(entry => entry.level === 'warn' && entry.message.includes('current true')), 'real current request failures remain warnings');
   assert(logMessages.some(message => message.includes('NetworkTrace: session-created generation=')), 'shared Session creation is logged');
   assert(logMessages.some(message => message.includes('NetworkTrace: session-reused generation=')), 'shared Session reuse is logged');
   assert(logMessages.some(message => message.includes('NetworkTrace: session-destroy generation=')), 'shared Session destruction is logged');

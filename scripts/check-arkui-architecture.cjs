@@ -39,7 +39,8 @@ for (const marker of ['avoidAreaChange', 'setWindowLayoutFullScreen', 'setWindow
 }
 
 for (const marker of ['@kit.ArkWeb', 'PinmonyAuth', 'onPageBegin', 'onPageEnd', 'no-hide-descendants']) {
-  assert(index.includes(marker), `missing ArkWeb boundary marker: ${marker}`);
+  const login = require('node:fs').readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets', 'utf8');
+  assert((index + login).includes(marker), `missing ArkWeb boundary marker: ${marker}`);
 }
 for (const marker of ['@kit.ShareKit', '@kit.CoreFileKit', '@kit.MediaLibraryKit', '@kit.BasicServicesKit']) {
   assert(index.includes(marker) || systemActions.includes(marker), `missing product system capability marker: ${marker}`);
@@ -63,7 +64,7 @@ assert.match(index, /pendingAfter=.*pendingCount\(\)/s);
 
 for (const marker of ['accessibilityText', 'accessibilitySelected', 'layoutWeight', 'onAreaChange',
   'animateTo', 'transition', 'PersistentStorage', 'AppStorage', 'setTimeout', 'clearTimeout']) {
-  assert(uiSources.includes(marker) || ability.includes(marker), `missing ArkUI foundation marker: ${marker}`);
+  assert(uiSources.includes(marker) || ability.includes(marker) || fs.readdirSync('entry/src/main/ets/startup').filter(name=>name.endsWith('.ets')).some(name=>fs.readFileSync('entry/src/main/ets/startup/'+name,'utf8').includes(marker)), `missing ArkUI foundation marker: ${marker}`);
 }
 for (const heading of ['## 工程边界', '## Ability 与生命周期', '## ArkUI 页面与状态管理',
   '## 网络请求与并发生命周期', '## 缓存与数据一致性']) {

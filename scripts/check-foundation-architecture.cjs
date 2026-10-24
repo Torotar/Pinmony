@@ -78,7 +78,7 @@ const rcpFiles = [];
 for (const { file, source } of [...sourcesFor('entry'), ...modules.flatMap(sourcesFor)]) {
   if (source.includes('@kit.RemoteCommunicationKit') || /\brcp\./.test(source)) rcpFiles.push(file);
 }
-const rcpOwners = ['PinmonyNativeNetwork.ets', 'PinmonyMediaFile.ets'].map(name =>
+const rcpOwners = ['PinmonyNativeNetwork.ets', 'PinmonyMediaFile.ets', 'PinmonyImageDownload.ets'].map(name =>
   path.join('common_network', 'src', 'main', 'ets', name));
 assert(rcpFiles.some(file => file.endsWith(rcpOwners[0])), 'RCP business transport must stay in PinmonyNativeNetwork');
 for (const file of rcpFiles) assert(rcpOwners.some(owner => file.endsWith(owner)),

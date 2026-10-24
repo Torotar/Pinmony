@@ -1,3 +1,4 @@
+import { PinmonyBoardRecoveryPage } from './PinmonyBoardRecoveryPage';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -19,7 +20,10 @@ export struct PinmonySettingsPage {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @StorageLink('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   @State private exportingLog: boolean = false;
+  private restoringRootScroll: boolean = false;
+  private restoreRevision: number = 0;
   private logoutConfirmOpen: boolean = false;
   private pageVisible: boolean = false;
   @ObjectLink store: PinmonySettingsStore;
@@ -28,6 +32,19 @@ export struct PinmonySettingsPage {
   onBack?: () => void;
   onOpenExternalLink?: (url: string) => Promise<void>;
 
+  private captureRootScroll(): void {
+    if (this.restoringRootScroll || this.store.screen !== 'root') return;
+    try { this.store.rootScrollOffset = Math.max(0, this.contentScroller.currentOffset().yOffset); } catch (_) {}
+  }
+  private restoreRootScroll(): void {
+    this.restoringRootScroll = true;
+    const revision: number = ++this.restoreRevision;
+    setTimeout((): void => {
+      if (revision !== this.restoreRevision || !this.pageVisible || this.store.screen !== 'root') return;
+      try { this.contentScroller.scrollTo({ xOffset: 0, yOffset: this.store.rootScrollOffset, animation: false }); } catch (_) {}
+      this.restoringRootScroll = false;
+    }, 0);
+  }
   private async exportLog(): Promise<void> {
     if (this.exportingLog) return;
     this.exportingLog = true;
@@ -107,6 +124,10 @@ export struct PinmonySettingsPage {
                   .fontSize(17)
                   .fontColor($r('app.color.primary_text'))
                   .layoutWeight(1)
+                Badge({ value: '', position: BadgePosition.Right,
+                  style: { badgeSize: id === 'about' && this.updateUnread ? 6 : 0, fontSize: 0 } }) {
+                  Row().width(1).height(16)
+                }.accessibilityLevel('no')
                 SymbolGlyph($r('sys.symbol.chevron_right'))
                   .fontSize(16)
                   .fontColor([$r('app.color.secondary_text')])
@@ -118,7 +139,7 @@ export struct PinmonySettingsPage {
             .width('100%')
             .backgroundColor(Color.Transparent)
             .enabled(!this.store.busy && !this.store.loading && (id !== 'logs' || !this.exportingLog))
-            .onClick(() => { if (id === 'profile' && this.onEditProfile) this.onEditProfile();
+            .onClick(() => { this.captureRootScroll(); if (id === 'profile' && this.onEditProfile) this.onEditProfile();
               if (id === 'notifications') { this.store.screen = 'notifications'; if (this.onRequest) this.onRequest('notifications', ''); }
               if (id === 'social') { this.store.screen = 'social'; if (this.onRequest) this.onRequest('socialRead', ''); }
               if (id === 'display') { this.store.screen = 'display'; if (this.onRequest) this.onRequest('read', ''); }
@@ -135,6 +156,8 @@ export struct PinmonySettingsPage {
         }, (id: string) => id + this.uiLanguage) }
       }
       .width('100%').height('100%')
+      .onAppear(() => this.restoreRootScroll())
+      .onDidScroll(() => this.captureRootScroll())
       .contentEndOffset(this.getUIContext().px2vp(this.gestureBarHeightPx) + 12)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
@@ -152,7 +175,9 @@ export struct PinmonySettingsPage {
   }
 
   build() {
-    if (this.store.screen === 'about') {
+    if (this.store.screen === 'boardRecovery') {
+      PinmonyBoardRecoveryPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
+    } else if (this.store.screen === 'about') {
       PinmonyAboutPage({ onBack: this.onBack, onOpenExternalLink: this.onOpenExternalLink })
     } else if (this.store.screen.startsWith('social')) {
       PinmonySocialPermissionsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })

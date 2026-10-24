@@ -124,7 +124,7 @@ export struct PinmonyProfilePanelPage {
           if (!this.snapshot.loading && this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
           else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
             PinmonyUserAvatar({ image: this.snapshot.avatarPreview || this.snapshot.avatar, name: this.firstNameDraft + ' ' + this.lastNameDraft, avatarSize: 120 })
-            Button(this.snapshot.avatarBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.avatarAction === 'refresh' ? this.uiText("pm_refresh_profile_picture_96fa37f1") : this.snapshot.avatarAction === 'check' ? this.uiText("pm_check_status_7c5569c3") : this.uiText("pm_change_6b01fce4")).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
+            Button(this.snapshot.avatarBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.avatarAction === 'refresh' ? this.uiText("pm_refresh_profile_picture_96fa37f1") : this.snapshot.avatarAction === 'check' ? this.uiText("pm_check_status_7c5569c3") : this.uiText("pm_change_6b01fce4")).type(ButtonType.Normal).borderRadius(16).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
               .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
             if (this.snapshot.avatarError) { Text(PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')) }
             this.field('名字', this.firstNameDraft)
@@ -164,7 +164,7 @@ export struct PinmonyProfilePanelPage {
                   Text(PinmonyI18n.render(item.name, this.uiLanguage)).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
                     .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
                   Text(PinmonyI18n.render((item.pinCount || '') + (item.updated ? ' · ' + item.updated : ''), this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
-                  Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
+                  Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).type(ButtonType.Normal).borderRadius(16).fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
                     .enabled(!this.followingBusy && item.canFollow === true).onClick(() => { if(this.onFollow)this.onFollow(item.id); })
                 }.width('48%').margin({ bottom: 24 }).alignItems(HorizontalAlign.Start)
               }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage)
@@ -175,13 +175,13 @@ export struct PinmonyProfilePanelPage {
                 PinmonyUserAvatar({ image: item.avatar || '', name: item.name, avatarSize: 48 })
                   .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
                 Text(PinmonyI18n.render(item.name, this.uiLanguage)).layoutWeight(1).fontColor($r('app.color.primary_text'))
-                Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).enabled(!this.followingBusy && item.canFollow !== false).onClick(() => { if (this.onFollow) this.onFollow(item.id); })
+                Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).type(ButtonType.Normal).borderRadius(16).enabled(!this.followingBusy && item.canFollow !== false).onClick(() => { if (this.onFollow) this.onFollow(item.id); })
               }.width('100%')
             }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage)
             }
           }
           if (this.snapshot.mode === 'followers' && this.snapshot.hasMore) {
-            Button(this.snapshot.moreLoading ? this.uiText("pm_loading_4927a53b") : this.snapshot.moreError ? this.uiText("pm_retry_loading_followers_db11cdc1") : this.uiText("pm_load_more_followers_76e47179"))
+            Button(this.snapshot.moreLoading ? this.uiText("pm_loading_4927a53b") : this.snapshot.moreError ? this.uiText("pm_retry_loading_followers_db11cdc1") : this.uiText("pm_load_more_followers_76e47179")).type(ButtonType.Normal).borderRadius(16)
               .enabled(!this.snapshot.moreLoading && !this.followingBusy && !this.saving)
               .onClick(() => { if(this.onLoadMore)this.onLoadMore(); })
           }
