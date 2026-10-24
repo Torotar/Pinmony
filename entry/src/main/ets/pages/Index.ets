@@ -1,4 +1,5 @@
 import { PinmonyUpdateNotice } from 'feature_settings';
+import { PinmonyBoardRecoveryPage } from 'feature_settings';
 import { PinmonySessionHistory } from 'common_session';
 import { PinmonyProfileSearchPage, PinmonyProfileSearchPin } from 'feature_profile';
 import { PinmonyProfileSearchNativeReads } from '../app/PinmonyProfileSearchNativeReads';
@@ -277,6 +278,7 @@ struct Index {
   @State private pinStore: PinmonyPinStore = new PinmonyPinStore();
   @State private boardStore: PinmonyBoardStore = new PinmonyBoardStore();
   @State private settingsStore: PinmonySettingsStore = new PinmonySettingsStore();
+  @State private boardRecoveryVisible: boolean = false;
   @State private profileStore: PinmonyProfileStore = new PinmonyProfileStore();
   @State private inboxStore: PinmonyInboxStore = new PinmonyInboxStore();
   @State private searchStore: PinmonySearchStore = new PinmonySearchStore();
@@ -647,7 +649,7 @@ struct Index {
     nativeRequest: (action: string,value: string): Promise<void> => this.settingsNativeFlow.requestAction(action,value),
     nativePause: (): void => this.settingsNativeFlow.pause(),
     authenticated: (): boolean => this.authStatus === 'authenticated', foreground: (): boolean => !this.businessSuspended,
-    epoch: (): number => this.authEpoch, visible: (): boolean => this.profileSettingsVisible,
+    epoch: (): number => this.authEpoch, visible: (): boolean => this.profileSettingsVisible || this.boardRecoveryVisible,
     document: (): string => this.sessionDocumentUrl(), currentProfile: (): string => this.currentProfileUrl(),
     profileAddress: (page: string): string => this.profileUrlFromAddress(page),
     prepare: (current: () => boolean): Promise<boolean> => this.ensureRootActionContext(3, true, '', current),
@@ -1417,7 +1419,7 @@ struct Index {
 
   private readonly settingsNativeFlow: PinmonySettingsNativeFlow = new PinmonySettingsNativeFlow({
     store: (): PinmonySettingsStore => this.settingsStore,session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),network: (): PinmonyNativeNetwork => this.nativeNetwork,
-    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.profileSettingsVisible,
+    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && (this.profileSettingsVisible || this.boardRecoveryVisible),
     page: (): string => this.profileUrlFromAddress(this.authenticatedProfileUrl)
   } as PinmonySettingsNativePorts);
   private readonly profileNativeActions: PinmonyProfileNativeActions = new PinmonyProfileNativeActions({
@@ -2393,7 +2395,7 @@ struct Index {
 
   private cancelNativeNetwork(id: string): void { return this.networkBridgeCoordinator.cancelNativeNetwork(id); }
 
-  private resetAuthenticatedContent(): void { this.profileSearchReads.close(); this.inboxMenuNative.pause();this.boardInvitationNative.pause(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
+  private resetAuthenticatedContent(): void { this.boardRecoveryVisible = false; this.profileSearchReads.close(); this.inboxMenuNative.pause();this.boardInvitationNative.pause(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
 
   private updateAuthState(value: string): void {
     if(this.nativeLoginEnabled && !this.loginHostMounted)return;
@@ -3928,6 +3930,17 @@ struct Index {
     if(!PIN_NATIVE_DETAIL_READS_ENABLED || !PIN_NATIVE_BOARD_READS_ENABLED || !PIN_NATIVE_PROFILE_READS_ENABLED)return false;
     const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
     if(!session.authenticated || !target.startsWith(session.origin + '/'))return false;
+    if (this.profileSettingsVisible && target === session.origin + '/edit/activity/') {
+      this.returnCoordinator.cancel(); this.pageBackToken++;
+      this.clearDetail(); this.boardNativeReads.pause();
+      this.boardStore.boardDetail = undefined; this.boardStore.pendingBoardUrl = ''; this.boardStore.pendingBoardSource = '';
+      this.nativeBackTarget = ''; this.nativeRootOnly = this.profileStore.origins.length === 0;
+      const page: string = this.settingsStore.data?.page || this.currentProfileUrl() || session.origin + '/';
+      this.pageHistory.cancelBack(); this.pageHistory.visit(page, 'load'); this.navigationAddress = page;
+      this.nativeChildBackUntil = Date.now() + 300;
+      PinmonyRuntimeLog.info('PinmonyReturn: recommendation activity restored');
+      this.syncFloatingTabsMotion(); return true;
+    }
     if(this.returnToNativeProfile(target))return true;
     if (PIN_NATIVE_SEARCH_READS_ENABLED && this.searchUrlFromAddress(target)) {
       this.clearDetail(); this.searchNativeReads.pause(); this.commitNativeSearchReturn(target); return true;
@@ -4021,6 +4034,7 @@ struct Index {
     const origin: string = this.extractPinUrl(parent) || this.searchUrlFromAddress(parent) ||
       (this.profileUrlFromAddress(parent) || this.boardUrlFromAddress(parent) || this.isHomeRootAddress(parent) ? parent : '');
     this.pinStore.leaveDetailOrigin(current);
+    if (this.profileSettingsVisible && parent === this.nativeBusinessSessionContext().origin + '/edit/activity/' && this.completeNativeBack(parent)) return;
     if(this.returnToNativeProfile(parent))return;
     if(PIN_NATIVE_PROFILE_READS_ENABLED && this.profileStore.origins.length > 0 && this.extractPinUrl(parent)){this.beginDetailOpening(this.extractPinUrl(parent));return;}
     this.backOnePage(parent || PINTEREST_URL, origin);
@@ -5903,17 +5917,34 @@ struct Index {
     await this.settingsController.request(action, value);
   }
 
-  private closeProfileSettings(): void { try {
+  @Builder
+  private boardRecoverySheet() {
+    PinmonyBoardRecoveryPage({ store:this.settingsStore, panelMode:true,
+      onRequest:(action:string,value:string): Promise<void> => this.requestAccountSettings(action,value) })
+  }
+  private closeBoardRecovery(): void {
+    const restored: boolean = this.settingsStore.recoverableBoards.some((board): boolean => board.restored);
+    this.boardRecoveryVisible = false; this.cancelAccountSettings(); this.settingsStore.reset(true);
+    if (restored) { this.profileStore.profileCache.clear(); this.profileNativeReads.refresh(); }
+    this.rootContextCoordinator.notify();
+  }
+  private closeProfileSettings(): void {
+    if (this.pinStore.detail || this.pinStore.detailOpeningPin) { this.backFromDetail(); return; }
+    if (Date.now() < this.nativeChildBackUntil) return;
+    try {
     this.nativeChildBackUntil = Date.now() + 220;
     if (this.settingsStore.back()) { if (!this.settingsStore.busy) this.cancelAccountSettings(); return; }
+    const recoveredFromProfile: boolean = this.settingsStore.boardRecoveryFromProfile && this.settingsStore.recoverableBoards.some((board): boolean => board.restored);
     this.cancelAccountSettings(); this.settingsStore.reset(true);
     this.nativeChildBackUntil = Date.now() + 220;
     this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => { this.profileSettingsVisible = false; });
+    if (recoveredFromProfile) { this.profileStore.profileCache.clear(); this.profileNativeReads.refresh(); }
    } finally { this.rootContextCoordinator.notify(); } }
 
   private rootExitBackAt: number = 0;
   private rootExitBackHandled: boolean = false;
   onBackPress(): boolean {
+    if (this.boardRecoveryVisible) { if (!this.settingsStore.busy) this.boardRecoveryVisible = false; return true; }
     this.rootExitBackHandled = false;
     const handled: boolean = this.navigationCoordinator.onBackPress();
     if (!this.rootExitBackHandled) this.rootExitBackAt = 0;
@@ -6199,6 +6230,14 @@ struct Index {
       openProfilePinMenu: (id: string): Promise<void> => this.openProfilePinMenu(id),
       openProfileSearch: (): void => { if (this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 3 && this.profileStore.profile?.isOwn === true && !this.activeSheetKind) { this.profileStore.searchBack = () => this.profileSearchReads.close(); this.profileSearchReads.open(); this.syncFloatingTabsMotion(); } },
       openProfilePublish: (): void => this.openProfilePublish(),
+      sortProfileBoards: (value: string): void => { if (this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 3 && !this.activeSheetKind) this.profileNativeReads.sortBoards(value).then((): void => { if (!value) this.profileNativeReads.loadBoardVisibility(); }); },
+      loadBoardVisibility: (value?: boolean): void => { if (this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 3 && !this.activeSheetKind) this.profileNativeReads.loadBoardVisibility(value); },
+      openBoardRecovery: (): void => {
+        if (this.authStatus !== 'authenticated' || this.businessSuspended || this.activeTab !== 3 || this.profileStore.profile?.isOwn !== true || this.profileStore.profile?.section !== 'saved' || this.activeSheetKind) return;
+        this.cancelAccountSettings(); this.settingsStore.reset(true);
+        this.settingsStore.boardRecoveryFromProfile = true; this.settingsStore.screen = 'boardRecovery';
+        this.boardRecoveryVisible = true; this.requestAccountSettings('boardRecoveryRead', '');
+      },
       openProfileShare: (): Promise<void> => this.openProfileShare(),
       openProfileMenu: (): void => this.openProfileMenu(),
       openWebsite: (url: string): void => this.openProfileWebsite(url),
@@ -6372,8 +6411,16 @@ struct Index {
               .width('100%').height('100%').transition(NATIVE_PAGE_TRANSITION)
           }
 
+          Column().width(0).height(0)
+            .bindSheet($$this.boardRecoveryVisible, this.boardRecoverySheet(), {
+              height:'75%', showClose:true, backgroundColor:$r('app.color.page_background'),
+              onWillDismiss:(action:DismissSheetAction): void => { if (!this.settingsStore.busy) action.dismiss(); },
+              onDisappear:(): void => this.closeBoardRecovery() })
           if (this.profileSettingsVisible) {
-            PinmonySettingsPage({ store: this.settingsStore, onOpenExternalLink: (url: string): Promise<void> => this.systemActions.openLink(url), onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
+            PinmonySettingsPage({ store: this.settingsStore, onPin: (id: string): void => {
+              if (this.authStatus !== 'authenticated' || this.businessSuspended || this.settingsStore.busy || this.settingsStore.loading || !this.settingsStore.data?.activities.some((pin): boolean => pin.id === id)) return;
+              this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + id + '/', this.nativeBusinessSessionContext().origin + '/edit/activity/');
+            }, onOpenExternalLink: (url: string): Promise<void> => this.systemActions.openLink(url), onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
               .width('100%').height('100%')
               .transition(NATIVE_PAGE_TRANSITION)
           }

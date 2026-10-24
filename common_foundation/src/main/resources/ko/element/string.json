@@ -1,0 +1,5064 @@
+{
+  "string": [
+    {
+      "name": "pm_board_recovery_title",
+      "value": "보드 복구"
+    },
+    {
+      "name": "pm_board_recovery_description",
+      "value": "최근 삭제한 보드는 7일 이내에 복원할 수 있습니다."
+    },
+    {
+      "name": "pm_board_recovery_submit",
+      "value": "선택한 보드 복원"
+    },
+    {
+      "name": "pm_board_recovery_restored",
+      "value": "(복원됨)"
+    },
+    {
+      "name": "pm_board_recovery_counts",
+      "value": "핀 {pins}개 · 보드 섹션 {sections}개"
+    },
+    {
+      "name": "pm_board_recovery_total",
+      "value": "보드 {count}개"
+    },
+    {
+      "name": "pm_board_recovery_empty",
+      "value": "복원할 수 있는 보드가 없습니다"
+    },
+    {
+      "name": "pm_board_recovery_selected",
+      "value": "선택됨"
+    },
+    {
+      "name": "pm_board_recovery_select",
+      "value": "보드 선택"
+    },
+    {
+      "name": "pm_load_more_merge_boards",
+      "value": "불러오기 더"
+    },
+    {
+      "name": "pm_no_merge_target_boards",
+      "value": "사용 가능한 보드가 없습니다"
+    },
+    {
+      "name": "pm_merge_board_menu",
+      "value": "병합"
+    },
+    {
+      "name": "pm_loading_please_wait_b6aaac70",
+      "value": "불러오는 중입니다. 잠시 기다려 주세요…"
+    },
+    {
+      "name": "pm_retry_b8784c8d",
+      "value": "다시 시도"
+    },
+    {
+      "name": "pm_back_572cf45b",
+      "value": "뒤로"
+    },
+    {
+      "name": "pm_video_duration_9d94bbe8",
+      "value": "동영상 길이 "
+    },
+    {
+      "name": "pm_image_failed_to_load_572993f5",
+      "value": "이미지를 불러오지 못했습니다"
+    },
+    {
+      "name": "pm_loading_profile_503bfab4",
+      "value": "프로필 불러오는 중…"
+    },
+    {
+      "name": "pm_reload_df7392cc",
+      "value": "새로고침"
+    },
+    {
+      "name": "pm_connection_unstable_retrying_d0b9af7d",
+      "value": "연결이 불안정합니다. 다시 연결하는 중…"
+    },
+    {
+      "name": "pm_pinterest_profile_ccf1ac90",
+      "value": "Pinterest 프로필"
+    },
+    {
+      "name": "pm_unable_to_verify_the_session_retry_or_sign_in_again_fb5c22fa",
+      "value": "현재 로그인 상태를 확인할 수 없습니다. 나중에 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_left_board_af0547a0",
+      "value": "보드에서 나왔습니다"
+    },
+    {
+      "name": "pm_pin_removed_from_your_board_d44f44e2",
+      "value": "보드에서 핀을 삭제했습니다"
+    },
+    {
+      "name": "pm_changes_saved_1045a8e6",
+      "value": "변경사항이 저장됨"
+    },
+    {
+      "name": "pm_board_created_f7d22eaf",
+      "value": "보드가 생성됨"
+    },
+    {
+      "name": "pm_published_58e1bd74",
+      "value": "게시됨 "
+    },
+    {
+      "name": "pm_pins_0a89904f",
+      "value": "개 핀"
+    },
+    {
+      "name": "pm_unable_to_open_pin_please_retry_1260c20b",
+      "value": "핀을 열 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_too_many_requests_retry_in_b763b85d",
+      "value": "요청이 너무 많습니다. 다음 시간 후에 다시 시도하세요: "
+    },
+    {
+      "name": "pm_seconds_0c31c123",
+      "value": "초."
+    },
+    {
+      "name": "pm_checking_service_availability_please_retry_later_849dea59",
+      "value": "서비스 복구 상태를 확인하고 있습니다. 잠시 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_you_are_offline_connect_and_retry_0bc36d3c",
+      "value": "오프라인입니다. 연결한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_session_not_ready_please_retry_12de001e",
+      "value": "세션이 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_session_verification_timed_out_please_retry_a77e4178",
+      "value": "세션 확인 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_this_sign_in_method_is_currently_unavailable_d38f16a5",
+      "value": "이 로그인 방법은 현재 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_loading_contacts_6c983c5f",
+      "value": "연락처 불러오는 중…"
+    },
+    {
+      "name": "pm_processing_574ec751",
+      "value": "처리 중…"
+    },
+    {
+      "name": "pm_sms_81a4ceb7",
+      "value": "SMS"
+    },
+    {
+      "name": "pm_unable_to_return_to_search_please_retry_3ef58654",
+      "value": "돌아갈 수 없습니다  검색. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_search_this_tag_please_retry_2b12d7c6",
+      "value": "이 태그를 검색할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_board_please_retry_846bb29a",
+      "value": "열 수 없습니다 보드. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_refresh_timed_out_please_retry_371c624f",
+      "value": "새로고침 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_updates_3055a035",
+      "value": "업데이트"
+    },
+    {
+      "name": "pm_inbox_63a5e7b7",
+      "value": "받은편지함"
+    },
+    {
+      "name": "pm_page_preparation_timed_out_please_retry_33a2bee0",
+      "value": "페이지 준비 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_page_data_not_ready_please_retry_cfdc4c01",
+      "value": "페이지 데이터가 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_recent_cache_unavailable_connect_and_retry_bf4baad7",
+      "value": "최근 캐시를 사용할 수 없습니다. 연결한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_pin_unavailable_refresh_the_home_feed_and_retry_90e61e50",
+      "value": "핀 사용할 수 없습니다. 새로고침  홈 피드 및 다시 시도."
+    },
+    {
+      "name": "pm_board_bd3f17ee",
+      "value": "보드"
+    },
+    {
+      "name": "pm_board_session_not_ready_please_retry_a1710cad",
+      "value": "보드 세션이 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_service_not_ready_please_retry_c1a3998b",
+      "value": "보드 서비스가 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_the_previous_page_1589d5b1",
+      "value": "이전 페이지를 불러올 수 없습니다."
+    },
+    {
+      "name": "pm_unable_to_sync_board_please_retry_f0f531e0",
+      "value": "보드를 동기화할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_sync_timed_out_please_retry_a00c8b96",
+      "value": "보드 동기화 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_go_back_please_retry_15d11c57",
+      "value": "이전 화면으로 돌아갈 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_browser_7048491c",
+      "value": "브라우저를 열 수 없습니다"
+    },
+    {
+      "name": "pm_this_action_is_unavailable_offline_2fc3526f",
+      "value": "오프라인에서는 이 작업을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_board_messaging_unavailable_only_two_person_chats_are_supported_4240c5cb",
+      "value": "보드 메시지를 사용할 수 없습니다. 일대일 채팅만 지원합니다."
+    },
+    {
+      "name": "pm_chat_unavailable_please_retry_fcee3c6e",
+      "value": "채팅을 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_invited_board_please_retry_f782ac68",
+      "value": "초대받은 보드를 열 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_sharing_unavailable_please_retry_3883cb6a",
+      "value": "공유할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_all_pins_9a2e0270",
+      "value": "모든 핀"
+    },
+    {
+      "name": "pm_unable_to_return_to_profile_please_retry_a60ed98f",
+      "value": "돌아갈 수 없습니다  프로필. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_invite_collaborators_d6dc0e1e",
+      "value": "공동 작업자 초대"
+    },
+    {
+      "name": "pm_collaborators_can_82551ec5",
+      "value": "공동 작업자는…"
+    },
+    {
+      "name": "pm_collaborators_7b9e7279",
+      "value": " 공동 작업자"
+    },
+    {
+      "name": "pm_done_c0b3fbff",
+      "value": "완료"
+    },
+    {
+      "name": "pm_invite_1955b265",
+      "value": "초대"
+    },
+    {
+      "name": "pm_owner_43a7f4b4",
+      "value": "소유자"
+    },
+    {
+      "name": "pm_collaborator_59fa99bc",
+      "value": "공동 작업자"
+    },
+    {
+      "name": "pm_invited_b43e8a99",
+      "value": "초대됨"
+    },
+    {
+      "name": "pm_do_almost_everything_15d2faac",
+      "value": "거의 모든 작업"
+    },
+    {
+      "name": "pm_save_and_comment_90e113d5",
+      "value": "저장 및 댓글"
+    },
+    {
+      "name": "pm_add_move_or_delete_pins_and_sections_comment_and_react_fd71094d",
+      "value": "핀과 섹션을 추가, 이동, 삭제하고 댓글과 반응을 남길 수 있습니다"
+    },
+    {
+      "name": "pm_search_by_name_or_username_59fb9fda",
+      "value": "이름 또는 사용자 이름으로 검색"
+    },
+    {
+      "name": "pm_no_users_available_to_invite_3e007a00",
+      "value": "초대할 수 있는 사용자가 없습니다"
+    },
+    {
+      "name": "pm_permissions_978cbca6",
+      "value": "권한"
+    },
+    {
+      "name": "pm_save_and_organize_pins_comment_and_react_contact_the_board_owner_8f42b5cd",
+      "value": "핀을 저장하고 정리하거나 댓글과 반응을 추가할 수 있습니다. 더 많은 권한은 보드 소유자에게 문의하세요."
+    },
+    {
+      "name": "pm_invite_others_7610922d",
+      "value": "다른 사람 초대"
+    },
+    {
+      "name": "pm_collaborators_can_invite_others_to_this_board_ccf60f85",
+      "value": "공동 작업자는 이 보드에 다른 사람을 초대할 수 있습니다"
+    },
+    {
+      "name": "pm_invite_collaborators_602179cf",
+      "value": "＋ 공동 작업자 초대"
+    },
+    {
+      "name": "pm_saved_to_b23743c1",
+      "value": "저장 위치: "
+    },
+    {
+      "name": "pm_delete_board_193df6a1",
+      "value": "보드 삭제"
+    },
+    {
+      "name": "pm_permanently_delete_this_board_and_all_its_pins_this_cannot_be_un_6c0d51fd",
+      "value": "이 보드와 모든 핀이 영구적으로 삭제됩니다. 이 작업은 취소할 수 없습니다."
+    },
+    {
+      "name": "pm_cancel_2cd0f3be",
+      "value": "취소"
+    },
+    {
+      "name": "pm_share_board_c77612ba",
+      "value": "보드 공유"
+    },
+    {
+      "name": "pm_processing_d3d21191",
+      "value": "처리 중…"
+    },
+    {
+      "name": "pm_unfollow_dc89d336",
+      "value": "팔로우 취소"
+    },
+    {
+      "name": "pm_follow_eb137dee",
+      "value": "팔로우"
+    },
+    {
+      "name": "pm_board_options_33bd1089",
+      "value": "보드 옵션"
+    },
+    {
+      "name": "pm_add_section_779008ec",
+      "value": "섹션 추가"
+    },
+    {
+      "name": "pm_select_pins_46854e37",
+      "value": "핀 선택"
+    },
+    {
+      "name": "pm_select_section_c87be634",
+      "value": "섹션 선택"
+    },
+    {
+      "name": "pm_edit_section_60525d3b",
+      "value": "섹션 수정"
+    },
+    {
+      "name": "pm_more_ideas_8f569818",
+      "value": "더 많은 아이디어"
+    },
+    {
+      "name": "pm_edit_board_2fd3c40f",
+      "value": "보드 수정"
+    },
+    {
+      "name": "pm_close_editor_64280f04",
+      "value": "편집기 닫기"
+    },
+    {
+      "name": "pm_close_organizer_a3fa0809",
+      "value": "정리 도구 닫기"
+    },
+    {
+      "name": "pm_next_acfc4e74",
+      "value": "다음"
+    },
+    {
+      "name": "pm_skip_fc50a99c",
+      "value": "건너뛰기"
+    },
+    {
+      "name": "pm_section_options_1e74fdd5",
+      "value": "섹션 옵션"
+    },
+    {
+      "name": "pm_boards_049d08f1",
+      "value": "보드"
+    },
+    {
+      "name": "pm_unsaved_it_will_disappear_when_you_reopen_the_board_04bda668",
+      "value": "저장되지 않았습니다. 새로고침하거나 보드를 다시 열면 사라집니다."
+    },
+    {
+      "name": "pm_unsave_dca60869",
+      "value": "저장 취소"
+    },
+    {
+      "name": "pm_save_to_48bf7c69",
+      "value": "저장 위치"
+    },
+    {
+      "name": "pm_more_options_c611656f",
+      "value": "옵션 더보기"
+    },
+    {
+      "name": "pm_open_pin_e0bdd278",
+      "value": "핀 열기"
+    },
+    {
+      "name": "pm_this_board_has_no_sections_yet_2eb7dc0a",
+      "value": "이 보드에는 아직 섹션이 없습니다"
+    },
+    {
+      "name": "pm_all_boards_f1847589",
+      "value": "모든 보드"
+    },
+    {
+      "name": "pm_board_archived_03322af8",
+      "value": "보드를 보관했습니다"
+    },
+    {
+      "name": "pm_close_3fd47edc",
+      "value": "닫기"
+    },
+    {
+      "name": "pm_messages_4da199fa",
+      "value": "메시지"
+    },
+    {
+      "name": "pm_leave_board_25f267d9",
+      "value": "보드에서 나가시겠습니까?"
+    },
+    {
+      "name": "pm_this_board_will_be_removed_from_your_profile_you_will_no_longer__774c3739",
+      "value": "이 보드는 프로필에서 삭제되며 더 이상 핀을 저장할 수 없습니다."
+    },
+    {
+      "name": "pm_leave_7345ed45",
+      "value": "나가기"
+    },
+    {
+      "name": "pm_section_bc71e92e",
+      "value": "섹션: "
+    },
+    {
+      "name": "pm_section_name_0e25c295",
+      "value": "섹션 이름"
+    },
+    {
+      "name": "pm_actions_ed31fbb4",
+      "value": "작업"
+    },
+    {
+      "name": "pm_delete_section_dc032a0b",
+      "value": "섹션 삭제"
+    },
+    {
+      "name": "pm_permanently_delete_this_section_and_all_its_pins_this_cannot_be__f7229feb",
+      "value": "이 섹션과 모든 핀을 영구적으로 삭제합니다. 이 작업은 취소할 수 없습니다."
+    },
+    {
+      "name": "pm_name_d44e9b3d",
+      "value": "이름"
+    },
+    {
+      "name": "pm_description_dc2ba467",
+      "value": "설명"
+    },
+    {
+      "name": "pm_add_7a8a11ea",
+      "value": "추가"
+    },
+    {
+      "name": "pm_keep_this_board_secret_4ca2f51d",
+      "value": "이 보드를 비공개로 유지"
+    },
+    {
+      "name": "pm_only_you_and_your_collaborators_can_see_this_910cbc39",
+      "value": "나와 공동 작업자만 볼 수 있습니다"
+    },
+    {
+      "name": "pm_add_collaborators_99ac9cf0",
+      "value": "공동 작업자 추가"
+    },
+    {
+      "name": "pm_settings_df3d58c7",
+      "value": "설정"
+    },
+    {
+      "name": "pm_personalization_38c043e0",
+      "value": "맞춤 설정"
+    },
+    {
+      "name": "pm_show_pins_inspired_by_this_board_in_your_home_feed_87893338",
+      "value": "이 보드에서 영감을 받은 핀을 홈 피드에 표시"
+    },
+    {
+      "name": "pm_board_requests_6a81235a",
+      "value": "보드 가입 요청"
+    },
+    {
+      "name": "pm_people_can_request_to_join_this_board_0e65b91a",
+      "value": "사람들이 이 보드 가입을 요청할 수 있음"
+    },
+    {
+      "name": "pm_leave_board_16a08fc5",
+      "value": "보드에서 나가기"
+    },
+    {
+      "name": "pm_leave_this_group_board_and_remove_it_from_your_profile_you_will__9ee2741a",
+      "value": "이 그룹 보드에서 나가고 프로필에서 삭제합니다. 더 이상 새 핀을 저장할 수 없습니다."
+    },
+    {
+      "name": "pm_archive_board_b37a311e",
+      "value": "보드를 보관하시겠습니까?"
+    },
+    {
+      "name": "pm_if_you_archive_cb914746",
+      "value": "보관하면 "
+    },
+    {
+      "name": "pm_it_will_no_longer_appear_on_your_profile_and_you_cannot_save_new_d6e15b6f",
+      "value": "프로필에 더 이상 표시되지 않으며 새 핀을 저장할 수 없습니다. 나중에 보관을 해제할 수 있습니다."
+    },
+    {
+      "name": "pm_archive_c73a6774",
+      "value": "보관"
+    },
+    {
+      "name": "pm_edit_05183656",
+      "value": "수정"
+    },
+    {
+      "name": "pm_share_7e564575",
+      "value": "공유"
+    },
+    {
+      "name": "pm_edit_details_and_settings_14e9f0ef",
+      "value": "세부정보 및 설정 편집"
+    },
+    {
+      "name": "pm_deselect_all_f4d4bae5",
+      "value": "모두 선택 해제"
+    },
+    {
+      "name": "pm_select_all_3a5040b6",
+      "value": "모두 선택"
+    },
+    {
+      "name": "pm_invited_you_to_collaborate_on_this_board_261f393f",
+      "value": " 이 보드 공동 작업에 초대했습니다"
+    },
+    {
+      "name": "pm_decline_136de7a8",
+      "value": "거절"
+    },
+    {
+      "name": "pm_accept_329fcec6",
+      "value": "수락"
+    },
+    {
+      "name": "pm_secret_412677b5",
+      "value": "비밀"
+    },
+    {
+      "name": "pm_secret_board_afc1422a",
+      "value": "비밀 보드"
+    },
+    {
+      "name": "pm_public_board",
+      "value": "공개 보드"
+    },
+    {
+      "name": "pm_featured_board_4b3cbe23",
+      "value": "추천 보드 ·"
+    },
+    {
+      "name": "pm_sections_68d526a8",
+      "value": " 섹션"
+    },
+    {
+      "name": "pm_from_df6e36f7",
+      "value": "작성자: "
+    },
+    {
+      "name": "pm_and_3d711428",
+      "value": "및"
+    },
+    {
+      "name": "pm_verified_9a64637b",
+      "value": "인증됨"
+    },
+    {
+      "name": "pm_featured_sponsor_beab5d83",
+      "value": "추천 스폰서"
+    },
+    {
+      "name": "pm_organize_ff093473",
+      "value": "정리"
+    },
+    {
+      "name": "pm_invite_collaborators_42600def",
+      "value": "공동 작업자 초대"
+    },
+    {
+      "name": "pm_open_section_3bcd9df8",
+      "value": "열기 섹션: "
+    },
+    {
+      "name": "pm_view_section_c6bcaa05",
+      "value": "섹션 보기"
+    },
+    {
+      "name": "pm_other_pins_e6a0e45e",
+      "value": "기타 핀"
+    },
+    {
+      "name": "pm_retry_loading_sections_0d100b07",
+      "value": "섹션 다시 불러오기"
+    },
+    {
+      "name": "pm_section_6d4e3a60",
+      "value": "섹션"
+    },
+    {
+      "name": "pm_there_are_no_pins_in_this_section_yet_694eda70",
+      "value": "이 섹션에는 아직 핀이 없습니다."
+    },
+    {
+      "name": "pm_loading_board_3d66e034",
+      "value": "보드 불러오는 중…"
+    },
+    {
+      "name": "pm_no_saved_pins_yet_24c645e0",
+      "value": "저장한 핀이 아직 없습니다"
+    },
+    {
+      "name": "pm_no_more_ideas_35120ab6",
+      "value": "더 이상 아이디어가 없습니다"
+    },
+    {
+      "name": "pm_publish_b61f333b",
+      "value": "게시"
+    },
+    {
+      "name": "pm_submitting_please_wait_e7f123ba",
+      "value": "제출 중입니다. 잠시만 기다려 주세요…"
+    },
+    {
+      "name": "pm_loading_saved_boards_4262c72d",
+      "value": "로드 중 저장한 보드…"
+    },
+    {
+      "name": "pm_loading_board_b5e739be",
+      "value": "로드 중 보드"
+    },
+    {
+      "name": "pm_this_action_is_unavailable_f3ea5b4e",
+      "value": "이 작업을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_section_name_e63b3281",
+      "value": "섹션 이름"
+    },
+    {
+      "name": "pm_restoring_board_please_wait_9e819a8a",
+      "value": "보드를 복원하고 있습니다. 잠시만 기다려 주세요…"
+    },
+    {
+      "name": "pm_creation_not_confirmed_close_and_refresh_to_check_before_submitt_99e27f05",
+      "value": "생성이 확인되지 않았습니다. 다시 제출하기 전에 닫고 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_unconfirmed_c098e854",
+      "value": "확인되지 않음"
+    },
+    {
+      "name": "pm_share_to_5f41162f",
+      "value": "공유 대상"
+    },
+    {
+      "name": "pm_you_are_offline_this_category_has_no_cached_images_connect_and_r_a67bd3fa",
+      "value": "오프라인 상태이며 이 카테고리에는 캐시된 이미지가 없습니다. 네트워크에 연결한 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_loading_interrupted_please_retry_6fe00867",
+      "value": "불러오기가 중단되었습니다. 다시 시도해 주세요"
+    },
+    {
+      "name": "pm_no_pins_in_this_category_yet_3202c6eb",
+      "value": "이 카테고리에는 아직 핀이 없습니다"
+    },
+    {
+      "name": "pm_offline_showing_recent_cache_5bff694a",
+      "value": "오프라인 상태입니다. 최근 캐시를 표시합니다."
+    },
+    {
+      "name": "pm_offline_showing_recent_cache_you_can_retry_236c20a9",
+      "value": "오프라인 상태입니다. 최근 캐시를 표시합니다. 다시 시도할 수 있습니다."
+    },
+    {
+      "name": "pm_showing_previous_content_f821f683",
+      "value": "이전 콘텐츠를 표시합니다."
+    },
+    {
+      "name": "pm_refreshing_home_feed_eeb8a65d",
+      "value": "홈 피드를 새로고침하는 중…"
+    },
+    {
+      "name": "pm_loading_home_feed_1d83a335",
+      "value": "홈 피드를 불러오는 중…"
+    },
+    {
+      "name": "pm_reconnecting_home_feed_58971515",
+      "value": "홈 피드 다시 연결 중…"
+    },
+    {
+      "name": "pm_loading_home_content_03c47493",
+      "value": "로드 중 홈 콘텐츠…"
+    },
+    {
+      "name": "pm_loading_home_content_8884d492",
+      "value": "로드 중 홈 콘텐츠"
+    },
+    {
+      "name": "pm_requests_393e1241",
+      "value": "요청"
+    },
+    {
+      "name": "pm_board_invitations_c4c41664",
+      "value": "보드 초대"
+    },
+    {
+      "name": "pm_view_all_b92c0ea9",
+      "value": "모두 보기 ›"
+    },
+    {
+      "name": "pm_preview_13d61fea",
+      "value": "미리보기"
+    },
+    {
+      "name": "pm_no_board_invitations_48691bd4",
+      "value": "보드 초대가 없습니다"
+    },
+    {
+      "name": "pm_board_link_unavailable_87c6bb44",
+      "value": "보드 링크를 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_contacts_3303b569",
+      "value": "연락처"
+    },
+    {
+      "name": "pm_sunday_7e06f314",
+      "value": "일요일"
+    },
+    {
+      "name": "pm_monday_56451fdf",
+      "value": "월요일"
+    },
+    {
+      "name": "pm_tuesday_8621c00d",
+      "value": "화요일"
+    },
+    {
+      "name": "pm_wednesday_23ae0a11",
+      "value": "수요일"
+    },
+    {
+      "name": "pm_thursday_478911d2",
+      "value": "목요일"
+    },
+    {
+      "name": "pm_friday_6e5969e5",
+      "value": "금요일"
+    },
+    {
+      "name": "pm_saturday_7bb2f5ec",
+      "value": "토요일"
+    },
+    {
+      "name": "pm_chat_4b3510b8",
+      "value": "채팅"
+    },
+    {
+      "name": "pm_select_beb4816b",
+      "value": "선택 "
+    },
+    {
+      "name": "pm_unblock_e2c88959",
+      "value": "차단 해제"
+    },
+    {
+      "name": "pm_block_5e2a9472",
+      "value": "차단"
+    },
+    {
+      "name": "pm_share_pin_d85b11f9",
+      "value": "핀 공유"
+    },
+    {
+      "name": "pm_save_pin_d5491456",
+      "value": "핀 저장"
+    },
+    {
+      "name": "pm_copy_63d90d97",
+      "value": "복사"
+    },
+    {
+      "name": "pm_copy_message_text_280f1f93",
+      "value": "메시지 텍스트 복사"
+    },
+    {
+      "name": "pm_save_60a53514",
+      "value": "저장"
+    },
+    {
+      "name": "pm_delete_2f9daa82",
+      "value": "삭제"
+    },
+    {
+      "name": "pm_delete_message_053d6b4d",
+      "value": "삭제 메시지"
+    },
+    {
+      "name": "pm_delete_this_message_94c4bcb6",
+      "value": "이 메시지를 삭제할까요?"
+    },
+    {
+      "name": "pm_you_can_view_follow_message_or_save_their_pins_after_you_unblock_74bd9651",
+      "value": "차단을 해제하면 상대방을 보고 팔로우하거나 메시지를 보내고 핀을 저장할 수 있습니다. 상대방도 다시 회원님과 교류할 수 있습니다."
+    },
+    {
+      "name": "pm_you_will_not_be_able_to_view_follow_contact_them_or_save_their_p_8111b778",
+      "value": "상대방을 보거나 팔로우하거나 연락하거나 핀을 저장할 수 없습니다. 상대방에게 알림이 전송되지 않습니다."
+    },
+    {
+      "name": "pm_not_now_6b758902",
+      "value": "나중에"
+    },
+    {
+      "name": "pm_view_9ae8f7e3",
+      "value": "보기 "
+    },
+    {
+      "name": "pm_s_profile_66416c2f",
+      "value": "님의 프로필"
+    },
+    {
+      "name": "pm_you_deleted_a_message_4ed92139",
+      "value": "메시지를 삭제했습니다"
+    },
+    {
+      "name": "pm_deleted_a_message_4d82968b",
+      "value": "님이 메시지를 삭제했습니다"
+    },
+    {
+      "name": "pm_pin_image_unavailable_3240b81a",
+      "value": "핀 이미지 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_choose_a_message_reaction_caf4b514",
+      "value": "메시지 반응 선택"
+    },
+    {
+      "name": "pm_turn_off_updates_for_this_pin_01676b9f",
+      "value": "이 핀 업데이트 끄기"
+    },
+    {
+      "name": "pm_delete_update_b051285c",
+      "value": "삭제 업데이트"
+    },
+    {
+      "name": "pm_view_notification_settings_c3a6f9ff",
+      "value": "알림 설정 보기"
+    },
+    {
+      "name": "pm_you_will_no_longer_receive_notifications_about_this_pin_75459ce5",
+      "value": "이 핀에 관한 알림을 더 이상 받지 않습니다."
+    },
+    {
+      "name": "pm_update_options_c3643cd9",
+      "value": "업데이트 옵션"
+    },
+    {
+      "name": "pm_search_by_name_or_email_0c503b47",
+      "value": "이름 또는 이메일로 검색"
+    },
+    {
+      "name": "pm_good_things_could_be_on_their_way_3f8e968c",
+      "value": "좋은 소식이 곧 찾아올 수 있습니다"
+    },
+    {
+      "name": "pm_write_a_message_2156709a",
+      "value": "메시지 작성…"
+    },
+    {
+      "name": "pm_send_edecf0ae",
+      "value": "보내기"
+    },
+    {
+      "name": "pm_send_a_heart_dccfdd46",
+      "value": "하트 보내기"
+    },
+    {
+      "name": "pm_reload_conversation_585a78c6",
+      "value": "대화 새로고침"
+    },
+    {
+      "name": "pm_unblock_contact_4b2a7e25",
+      "value": "연락처 차단 해제"
+    },
+    {
+      "name": "pm_block_contact_a32510e0",
+      "value": "연락처 차단"
+    },
+    {
+      "name": "pm_new_message_3fc957bf",
+      "value": "새 메시지"
+    },
+    {
+      "name": "pm_message_settings_57326743",
+      "value": "메시지 설정"
+    },
+    {
+      "name": "pm_minutes_40de5434",
+      "value": "분"
+    },
+    {
+      "name": "pm_hours_8f82ece0",
+      "value": "시간"
+    },
+    {
+      "name": "pm_days_4ce3054e",
+      "value": "일"
+    },
+    {
+      "name": "pm_more_actions_9f07d2ce",
+      "value": "추가 작업"
+    },
+    {
+      "name": "pm_service_unavailable_87f44469",
+      "value": "서비스를 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_loading_inbox_b0cbe6ba",
+      "value": "받은 편지함 불러오는 중…"
+    },
+    {
+      "name": "pm_unread_4d0680f9",
+      "value": "읽지 않음"
+    },
+    {
+      "name": "pm_read_efdd1a47",
+      "value": "읽음"
+    },
+    {
+      "name": "pm_load_more_af90a08f",
+      "value": "더 불러오기"
+    },
+    {
+      "name": "pm_no_updates_yet_7891215d",
+      "value": "업데이트가 아직 없습니다"
+    },
+    {
+      "name": "pm_loading_contacts_54858f2d",
+      "value": "로드 중 연락처…"
+    },
+    {
+      "name": "pm_no_suggested_contacts_03b9d232",
+      "value": "추천 연락처가 없습니다"
+    },
+    {
+      "name": "pm_just_now_de6785d9",
+      "value": "방금"
+    },
+    {
+      "name": "pm_m_bd957bc4",
+      "value": "분"
+    },
+    {
+      "name": "pm_h_3b6fefc5",
+      "value": "시간"
+    },
+    {
+      "name": "pm_d_49da61ce",
+      "value": "일"
+    },
+    {
+      "name": "pm_mo_e5afd16c",
+      "value": "개월"
+    },
+    {
+      "name": "pm_y_62ef900a",
+      "value": "년"
+    },
+    {
+      "name": "pm_translating_07f81963",
+      "value": "번역 중…"
+    },
+    {
+      "name": "pm_show_original_098e6618",
+      "value": "원문 보기"
+    },
+    {
+      "name": "pm_show_translation_7cd62999",
+      "value": "번역 보기"
+    },
+    {
+      "name": "pm_translate_again_496b5f08",
+      "value": "다시 번역"
+    },
+    {
+      "name": "pm_translate_a52a0833",
+      "value": "번역"
+    },
+    {
+      "name": "pm_show_original_comment_373f6052",
+      "value": "원래 댓글 보기"
+    },
+    {
+      "name": "pm_translate_comment_8a5fdd65",
+      "value": "댓글 번역"
+    },
+    {
+      "name": "pm_reply_cf945e21",
+      "value": "답글"
+    },
+    {
+      "name": "pm_unlike_3ab399c7",
+      "value": "좋아요 취소"
+    },
+    {
+      "name": "pm_like_aced5d7f",
+      "value": "좋아요"
+    },
+    {
+      "name": "pm_comment_options_8216ef81",
+      "value": "댓글 옵션"
+    },
+    {
+      "name": "pm_loading_comments_dded3fba",
+      "value": "댓글 불러오는 중…"
+    },
+    {
+      "name": "pm_hide_replies_c6edf966",
+      "value": "답글 숨기기"
+    },
+    {
+      "name": "pm_replies_37b37671",
+      "value": "개 답글"
+    },
+    {
+      "name": "pm_reload_replies_e32b3f23",
+      "value": "새로고침 답글"
+    },
+    {
+      "name": "pm_no_replies_yet_1ff6ef41",
+      "value": "아직 답글이 없습니다"
+    },
+    {
+      "name": "pm_write_a_comment_share_feedback_or_send_a_high_five_2ef32875",
+      "value": "댓글을 작성하거나 의견을 공유하거나 하이파이브를 보내 보세요"
+    },
+    {
+      "name": "pm_edit_your_comment_398c2214",
+      "value": "수정 내 댓글"
+    },
+    {
+      "name": "pm_reply_to_3376176c",
+      "value": "답글 대상: "
+    },
+    {
+      "name": "pm_cancel_reply_d346633d",
+      "value": "취소 답글"
+    },
+    {
+      "name": "pm_remove_selected_image_37e8126a",
+      "value": "선택한 이미지 삭제"
+    },
+    {
+      "name": "pm_add_a_comment_c56d162d",
+      "value": "댓글 추가"
+    },
+    {
+      "name": "pm_add_image_9f0d4e46",
+      "value": "이미지 추가"
+    },
+    {
+      "name": "pm_save_comment_80c50b4a",
+      "value": "저장 댓글"
+    },
+    {
+      "name": "pm_send_comment_d25f5715",
+      "value": "댓글 보내기"
+    },
+    {
+      "name": "pm_are_you_sure_8889016c",
+      "value": "확실한가요?"
+    },
+    {
+      "name": "pm_this_comment_will_be_deleted_0b66ff46",
+      "value": "이 댓글이 삭제됩니다"
+    },
+    {
+      "name": "pm_pin_image_c269651e",
+      "value": "핀 이미지"
+    },
+    {
+      "name": "pm_loading_image_8fbf0f33",
+      "value": "이미지 불러오는 중"
+    },
+    {
+      "name": "pm_image_loading_timed_out_b829c7d3",
+      "value": "이미지 불러오기 시간이 초과되었습니다"
+    },
+    {
+      "name": "pm_reload_image_0ad285f1",
+      "value": "새로고침 이미지"
+    },
+    {
+      "name": "pm_image_search_74a83573",
+      "value": "이미지 검색"
+    },
+    {
+      "name": "pm_comments_6849b825",
+      "value": "댓글"
+    },
+    {
+      "name": "pm_currently_saved_pin_cff5382b",
+      "value": "현재 저장된 핀"
+    },
+    {
+      "name": "pm_pin_title_06aa0cfe",
+      "value": "핀 제목"
+    },
+    {
+      "name": "pm_pin_description_d61717a6",
+      "value": "핀 설명"
+    },
+    {
+      "name": "pm_label_as_ai_modified_ebf5fa46",
+      "value": "AI 수정으로 라벨 지정"
+    },
+    {
+      "name": "pm_content_made_entirely_or_partly_with_ai_3beb552d",
+      "value": "AI로 전체 또는 일부가 제작된 콘텐츠"
+    },
+    {
+      "name": "pm_delete_pin_e216e3fe",
+      "value": "삭제 핀"
+    },
+    {
+      "name": "pm_remove_this_pin_from_your_board_0b19fa7e",
+      "value": "보드에서 이 핀 삭제"
+    },
+    {
+      "name": "pm_delete_this_pin_bd01697d",
+      "value": "삭제 이 핀?"
+    },
+    {
+      "name": "pm_this_cannot_be_undone_55d5e34b",
+      "value": "이 작업은 취소할 수 없습니다."
+    },
+    {
+      "name": "pm_loading_options_a22ab0b2",
+      "value": "옵션 불러오는 중…"
+    },
+    {
+      "name": "pm_secret_03a32629",
+      "value": " · 비밀"
+    },
+    {
+      "name": "pm_reload_boards_c3e7cfa5",
+      "value": "새로고침 보드"
+    },
+    {
+      "name": "pm_board_name_dd9a7122",
+      "value": "보드 이름"
+    },
+    {
+      "name": "pm_keep_board_secret_2264c319",
+      "value": "비밀 보드로 설정"
+    },
+    {
+      "name": "pm_back_to_boards_dcf21f0d",
+      "value": "보드로 돌아가기"
+    },
+    {
+      "name": "pm_create_cde2cd07",
+      "value": "생성"
+    },
+    {
+      "name": "pm_featured_15b26cda",
+      "value": "추천"
+    },
+    {
+      "name": "pm_no_boards_yet_43790af9",
+      "value": "아직 보드가 없습니다"
+    },
+    {
+      "name": "pm_or_tap_to_create_a_new_board_4c13492c",
+      "value": "또는 탭하여 새 보드 만들기"
+    },
+    {
+      "name": "pm_create_board_513babc9",
+      "value": "보드 만들기"
+    },
+    {
+      "name": "pm_undo_save_8245d6cd",
+      "value": "저장 취소 · "
+    },
+    {
+      "name": "pm_loading_share_options_1790123c",
+      "value": "공유 옵션 불러오는 중…"
+    },
+    {
+      "name": "pm_loading_contacts_72ddd22e",
+      "value": "로드 중 연락처"
+    },
+    {
+      "name": "pm_share_link_not_ready_please_retry_c89077a2",
+      "value": "공유 링크가 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_no_contacts_available_5eaa443a",
+      "value": "사용 가능한 연락처가 없습니다"
+    },
+    {
+      "name": "pm_pause_video_550c18fe",
+      "value": "동영상 일시중지"
+    },
+    {
+      "name": "pm_retry_playback_f867a4c8",
+      "value": "다시 시도 재생"
+    },
+    {
+      "name": "pm_replay_4c5a69ac",
+      "value": "다시 재생"
+    },
+    {
+      "name": "pm_play_c3396195",
+      "value": "재생"
+    },
+    {
+      "name": "pm_video_progress_73fbb1f1",
+      "value": "동영상 진행 상태"
+    },
+    {
+      "name": "pm_unmute_8d01732e",
+      "value": "음소거 해제"
+    },
+    {
+      "name": "pm_mute_7db2e189",
+      "value": "음소거"
+    },
+    {
+      "name": "pm_loading_video_url_3669a32d",
+      "value": "동영상 URL 불러오는 중"
+    },
+    {
+      "name": "pm_loading_video_url_please_wait_3788d096",
+      "value": "동영상 주소를 불러오는 중입니다. 잠시만 기다려 주세요…"
+    },
+    {
+      "name": "pm_preparing_video_d20d6092",
+      "value": "동영상 준비 중…"
+    },
+    {
+      "name": "pm_loading_video_843966d2",
+      "value": "동영상 불러오는 중"
+    },
+    {
+      "name": "pm_adjust_search_area_corner_af495c18",
+      "value": "검색 영역 모서리 조정"
+    },
+    {
+      "name": "pm_open_related_pin_e1e5dfc7",
+      "value": "관련 핀 열기"
+    },
+    {
+      "name": "pm_no_related_images_8c34996f",
+      "value": "관련 이미지가 없습니다"
+    },
+    {
+      "name": "pm_move_search_area_e4eb45c8",
+      "value": "검색 영역 이동"
+    },
+    {
+      "name": "pm_more_pins_like_this_6e224087",
+      "value": "이와 비슷한 핀 더 보기"
+    },
+    {
+      "name": "pm_organize_into_boards_ce266233",
+      "value": "보드로 정리"
+    },
+    {
+      "name": "pm_save_to_board_0233a416",
+      "value": "보드에 저장"
+    },
+    {
+      "name": "pm_close_publisher_06b27c24",
+      "value": "게시 도구 닫기"
+    },
+    {
+      "name": "pm_select_pins_09909cdf",
+      "value": "핀 선택"
+    },
+    {
+      "name": "pm_secret_board_a61a7ae3",
+      "value": ", 비밀 보드"
+    },
+    {
+      "name": "pm_make_secret_228cf25e",
+      "value": "비공개로 설정"
+    },
+    {
+      "name": "pm_profile_picture_5c814f4f",
+      "value": "프로필 사진"
+    },
+    {
+      "name": "pm_about_this_account_581b25c0",
+      "value": "이 계정 정보…"
+    },
+    {
+      "name": "pm_more_5a6d7865",
+      "value": " 더보기"
+    },
+    {
+      "name": "pm_open_website_in_browser_b91ebfa8",
+      "value": "브라우저에서 웹사이트 열기"
+    },
+    {
+      "name": "pm_about_e499019e",
+      "value": "정보 "
+    },
+    {
+      "name": "pm_monthly_views_39c13292",
+      "value": " 월간 조회수"
+    },
+    {
+      "name": "pm_edit_profile_3b0b2bb8",
+      "value": "프로필 수정"
+    },
+    {
+      "name": "pm_open_original_pin_42977656",
+      "value": "원본 핀 열기"
+    },
+    {
+      "name": "pm_no_created_pins_yet_3a38cb23",
+      "value": "아직 만든 핀이 없습니다"
+    },
+    {
+      "name": "pm_unable_to_load_more_retry_1ad5594f",
+      "value": "로드할 수 없습니다 더. 다시 시도."
+    },
+    {
+      "name": "pm_share_profile_6cc3a1d5",
+      "value": "공유 프로필"
+    },
+    {
+      "name": "pm_profile_cover_0ecaa53c",
+      "value": "프로필 커버"
+    },
+    {
+      "name": "pm_created_80bfa30d",
+      "value": "만든 핀"
+    },
+    {
+      "name": "pm_saved_471dd4d7",
+      "value": "저장한 핀"
+    },
+    {
+      "name": "pm_unorganized_ideas_0e240c35",
+      "value": "정리되지 않은 아이디어"
+    },
+    {
+      "name": "pm_profiles_0d0e1a86",
+      "value": "프로필"
+    },
+    {
+      "name": "pm_followers_261c51c9",
+      "value": "팔로워"
+    },
+    {
+      "name": "pm_following_7dfa5d8f",
+      "value": "팔로잉"
+    },
+    {
+      "name": "pm_username_1a3f0617",
+      "value": "사용자 이름"
+    },
+    {
+      "name": "pm_first_name_67733104",
+      "value": "이름"
+    },
+    {
+      "name": "pm_last_name_b85f26df",
+      "value": "성"
+    },
+    {
+      "name": "pm_website_fb8d739d",
+      "value": "웹사이트"
+    },
+    {
+      "name": "pm_refresh_profile_picture_96fa37f1",
+      "value": "새로고침 프로필 사진"
+    },
+    {
+      "name": "pm_check_status_7c5569c3",
+      "value": "상태 확인"
+    },
+    {
+      "name": "pm_change_6b01fce4",
+      "value": "변경"
+    },
+    {
+      "name": "pm_about_52d25a9e",
+      "value": "정보"
+    },
+    {
+      "name": "pm_tell_your_story_42ba0e47",
+      "value": "나의 이야기를 소개해 보세요"
+    },
+    {
+      "name": "pm_add_a_link_to_bring_visitors_to_your_website_82987d9c",
+      "value": "웹사이트 링크를 추가하여 방문자를 유도하세요"
+    },
+    {
+      "name": "pm_no_followers_yet_480f3c81",
+      "value": "팔로워가 아직 없습니다"
+    },
+    {
+      "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
+      "value": "아직 팔로우하는 보드가 없습니다"
+    },
+    {
+      "name": "pm_you_are_not_following_anyone_yet_6289b8af",
+      "value": "아직 팔로우하는 사람이 없습니다"
+    },
+    {
+      "name": "pm_loading_4927a53b",
+      "value": "로드 중…"
+    },
+    {
+      "name": "pm_retry_loading_followers_db11cdc1",
+      "value": "다시 시도 불러오는 중 팔로워"
+    },
+    {
+      "name": "pm_load_more_followers_76e47179",
+      "value": "팔로워 더 불러오기"
+    },
+    {
+      "name": "pm_choose_image_9ad12a1a",
+      "value": "이미지 선택"
+    },
+    {
+      "name": "pm_photos_7b50017a",
+      "value": "사진"
+    },
+    {
+      "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
+      "value": "링크를 입력하여 핀 만들기, https://…"
+    },
+    {
+      "name": "pm_no_images_available_to_create_a_pin_b7fe6e0c",
+      "value": "핀을 만들 수 있는 이미지가 없습니다"
+    },
+    {
+      "name": "pm_go_back_and_retry_fa25b166",
+      "value": "돌아가서 다시 시도"
+    },
+    {
+      "name": "pm_choose_photo_cae3ab4b",
+      "value": "사진 선택"
+    },
+    {
+      "name": "pm_loading_photos_35b3ef9b",
+      "value": "로드 중 사진…"
+    },
+    {
+      "name": "pm_loading_website_images_4300f2d6",
+      "value": "웹사이트 이미지를 불러오는 중…"
+    },
+    {
+      "name": "pm_open_pinterest_creation_flow_006166f5",
+      "value": "Pinterest 만들기 화면 열기"
+    },
+    {
+      "name": "pm_this_option_is_unavailable_on_the_current_page_423e6914",
+      "value": "현재 페이지에서는 이 옵션을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_preparing_to_publish_97f29dc9",
+      "value": "게시 준비 중…"
+    },
+    {
+      "name": "pm_publishing_not_ready_please_retry_8ec4cc6d",
+      "value": "게시할 준비가 되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_maximum_price_dcb810cc",
+      "value": "최대 가격 "
+    },
+    {
+      "name": "pm_minimum_price_fc7533e3",
+      "value": "최소 가격 "
+    },
+    {
+      "name": "pm_loading_filters_e07a2b70",
+      "value": "로드 중 필터…"
+    },
+    {
+      "name": "pm_retry_loading_1133d675",
+      "value": "다시 불러오기"
+    },
+    {
+      "name": "pm_price_range_e8debe5f",
+      "value": "가격 범위"
+    },
+    {
+      "name": "pm_drag_to_change_price_9c52f526",
+      "value": "드래그하여 가격 변경"
+    },
+    {
+      "name": "pm_merchants_d5bae996",
+      "value": "판매자"
+    },
+    {
+      "name": "pm_clear_bce23772",
+      "value": "지우기"
+    },
+    {
+      "name": "pm_apply_63c73c47",
+      "value": "적용"
+    },
+    {
+      "name": "pm_selected_4689290d",
+      "value": ", 선택됨"
+    },
+    {
+      "name": "pm_close_idea_recommendations_86934aff",
+      "value": "아이디어 추천 닫기"
+    },
+    {
+      "name": "pm_selected_657a8c2d",
+      "value": ", 선택됨"
+    },
+    {
+      "name": "pm_no_recommendations_yet_841e1d2f",
+      "value": "추천 항목이 아직 없습니다"
+    },
+    {
+      "name": "pm_view_results_d06bc6ef",
+      "value": "결과 보기"
+    },
+    {
+      "name": "pm_selected_3f4ebc4a",
+      "value": "선택됨 "
+    },
+    {
+      "name": "pm_images_up_to_10_b15e8d17",
+      "value": "개 이미지(최대 10개)"
+    },
+    {
+      "name": "pm_loading_86b6d0d6",
+      "value": "로드 중…"
+    },
+    {
+      "name": "pm_checking_for_updates_91834aeb",
+      "value": "업데이트 확인 중…"
+    },
+    {
+      "name": "pm_version_information_unavailable_7d6fa6b1",
+      "value": "버전 정보를 사용할 수 없음"
+    },
+    {
+      "name": "pm_unable_to_compare_versions_check_the_releases_page_82efead4",
+      "value": "버전을 비교할 수 없습니다. 릴리스 페이지를 확인해 주세요."
+    },
+    {
+      "name": "pm_latest_release_80413ee5",
+      "value": "최신 릴리스: "
+    },
+    {
+      "name": "pm_you_are_up_to_date_6e865701",
+      "value": "최신 버전입니다"
+    },
+    {
+      "name": "pm_no_stable_releases_yet_b8a12ee2",
+      "value": "안정적인 릴리스가 아직 없습니다"
+    },
+    {
+      "name": "pm_update_check_failed_tap_to_retry_7cc33419",
+      "value": "업데이트 확인에 실패했습니다. 탭하여 다시 시도하세요."
+    },
+    {
+      "name": "pm_opening_links_unavailable_2fcda15e",
+      "value": "링크 열기를 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_unable_to_open_link_please_retry_99322633",
+      "value": "링크를 열 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_pinmony_app_icon_66c94919",
+      "value": "Pinmony 앱 아이콘"
+    },
+    {
+      "name": "pm_find_inspiration_save_what_you_love_2499cd29",
+      "value": "영감을 얻고 마음에 드는 콘텐츠를 저장하세요."
+    },
+    {
+      "name": "pm_current_version_837bc957",
+      "value": "현재 버전"
+    },
+    {
+      "name": "pm_new_version_available_596dd46c",
+      "value": "새 버전: "
+    },
+    {
+      "name": "pm_app_updates_42e40f43",
+      "value": "앱 업데이트"
+    },
+    {
+      "name": "pm_update_check_failed_d07abfb1",
+      "value": "업데이트 확인에 실패했습니다"
+    },
+    {
+      "name": "pm_download_55c561dc",
+      "value": "다운로드"
+    },
+    {
+      "name": "pm_open_releases_in_browser_5cb655da",
+      "value": "브라우저에서 릴리스 열기"
+    },
+    {
+      "name": "pm_release_notes_e0b4bf83",
+      "value": " 릴리스 노트"
+    },
+    {
+      "name": "pm_no_release_notes_provided_for_this_version_631cfa84",
+      "value": "이 버전에 대한 릴리스 노트가 없습니다"
+    },
+    {
+      "name": "pm_about_the_project_224e0b60",
+      "value": "프로젝트 정보"
+    },
+    {
+      "name": "pm_an_unofficial_pinterest_client_for_harmonyos_with_a_native_arkui_5990368f",
+      "value": "네이티브 ArkUI 인터페이스를 갖춘 HarmonyOS용 비공식 Pinterest 클라이언트입니다. 학습과 기술 연구 및 탐구를 위한 개인 프로젝트입니다."
+    },
+    {
+      "name": "pm_source_code_606a4e58",
+      "value": "소스 코드"
+    },
+    {
+      "name": "pm_source_code_open_the_pinmony_github_repository_491e45d7",
+      "value": "소스 코드: Pinmony GitHub 저장소 열기"
+    },
+    {
+      "name": "pm_feedback_55a2ce13",
+      "value": "피드백"
+    },
+    {
+      "name": "pm_submit_on_github_issues_e4865aa9",
+      "value": "GitHub Issues에 제출"
+    },
+    {
+      "name": "pm_feedback_open_github_issues_3c152b53",
+      "value": "피드백 보내기: GitHub Issues 열기"
+    },
+    {
+      "name": "pm_open_source_license_038ad816",
+      "value": "오픈소스 라이선스"
+    },
+    {
+      "name": "pm_account_management_3c072712",
+      "value": "계정 관리"
+    },
+    {
+      "name": "pm_personal_information_640803d8",
+      "value": "개인 정보"
+    },
+    {
+      "name": "pm_date_of_birth_1c54caca",
+      "value": "생년월일"
+    },
+    {
+      "name": "pm_gender_a752a7d8",
+      "value": "성별"
+    },
+    {
+      "name": "pm_country_region_45e22a8a",
+      "value": "국가/지역"
+    },
+    {
+      "name": "pm_month_1625179b",
+      "value": "월"
+    },
+    {
+      "name": "pm_day_85217f7a",
+      "value": "일"
+    },
+    {
+      "name": "pm_female_0ab4610b",
+      "value": "여성"
+    },
+    {
+      "name": "pm_male_4e79758a",
+      "value": "남성"
+    },
+    {
+      "name": "pm_custom_4eafa9e9",
+      "value": "맞춤"
+    },
+    {
+      "name": "pm_saving_6bdb4435",
+      "value": "저장 중…"
+    },
+    {
+      "name": "pm_your_account_d80b3d08",
+      "value": "내 계정"
+    },
+    {
+      "name": "pm_email_1b2714b8",
+      "value": "이메일"
+    },
+    {
+      "name": "pm_password_a621ab60",
+      "value": "비밀번호"
+    },
+    {
+      "name": "pm_change_password_946e28f6",
+      "value": "비밀번호 변경"
+    },
+    {
+      "name": "pm_phone_number_8e87c0dd",
+      "value": "전화번호"
+    },
+    {
+      "name": "pm_add_number_9d820e33",
+      "value": "전화번호 추가"
+    },
+    {
+      "name": "pm_convert_to_a_business_account_4935be59",
+      "value": "비즈니스 계정으로 전환"
+    },
+    {
+      "name": "pm_a_business_account_gives_you_tools_such_as_ads_and_analytics_to__50598c20",
+      "value": "비즈니스 계정은 광고와 분석 등의 도구를 제공하여 Pinterest에서 비즈니스를 성장시킬 수 있도록 합니다."
+    },
+    {
+      "name": "pm_deactivation_and_deletion_75be0aea",
+      "value": "비활성화 및 삭제"
+    },
+    {
+      "name": "pm_deactivate_your_account_06052a52",
+      "value": "계정 비활성화"
+    },
+    {
+      "name": "pm_temporarily_hide_your_profile_pins_and_boards_a6d31140",
+      "value": "프로필, 핀 및 보드를 일시적으로 숨깁니다"
+    },
+    {
+      "name": "pm_delete_your_data_and_account_ff4cef48",
+      "value": "데이터 및 계정 삭제"
+    },
+    {
+      "name": "pm_permanently_delete_your_data_and_everything_associated_with_your_2cb85273",
+      "value": "계정과 관련된 모든 데이터와 정보를 영구적으로 삭제합니다"
+    },
+    {
+      "name": "pm_your_date_of_birth_helps_personalize_recommendations_and_ads_and_00165eee",
+      "value": "생년월일은 추천과 광고를 맞춤 설정하고 Pinterest 커뮤니티를 안전하게 유지하는 데 사용됩니다. 프로필에는 표시되지 않습니다."
+    },
+    {
+      "name": "pm_learn_why_we_ask_for_your_date_of_birth_09763a7d",
+      "value": "생년월일을 묻는 이유 알아보기"
+    },
+    {
+      "name": "pm_enter_your_gender_e4d76c65",
+      "value": "성별 입력"
+    },
+    {
+      "name": "pm_search_countries_regions_79d74e48",
+      "value": "국가/지역 검색"
+    },
+    {
+      "name": "pm_reload_current_settings_d2b82d8a",
+      "value": "새로고침 현재 설정"
+    },
+    {
+      "name": "pm_theme_788db1cf",
+      "value": "테마"
+    },
+    {
+      "name": "pm_display_settings_32e62ed0",
+      "value": "화면 설정"
+    },
+    {
+      "name": "pm_dark_a6b75d06",
+      "value": "다크"
+    },
+    {
+      "name": "pm_light_aa0819df",
+      "value": "라이트"
+    },
+    {
+      "name": "pm_follow_system_217cfe7d",
+      "value": "시스템 설정 사용"
+    },
+    {
+      "name": "pm_unable_to_change_theme_please_retry_e0cd6314",
+      "value": "테마를 변경할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_change_orientation_please_retry_c7c24220",
+      "value": "화면 방향을 변경할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_theme_0fa0bfe4",
+      "value": "테마, "
+    },
+    {
+      "name": "pm_screen_orientation_60cc99cc",
+      "value": "화면 방향"
+    },
+    {
+      "name": "pm_always_rotate_automatically_d3a0ff23",
+      "value": "항상 자동 회전"
+    },
+    {
+      "name": "pm_portrait_c35bd83b",
+      "value": "세로"
+    },
+    {
+      "name": "pm_landscape_055a6b3a",
+      "value": "가로"
+    },
+    {
+      "name": "pm_bottom_bar_collapse_animation_4b0bb564",
+      "value": "하단 바 접기 애니메이션"
+    },
+    {
+      "name": "pm_no_notification_settings_available_b02ac445",
+      "value": "알림 설정을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_notifications_4b6ded8a",
+      "value": "알림"
+    },
+    {
+      "name": "pm_refine_your_recommendations_92ce2929",
+      "value": "추천 맞춤 설정"
+    },
+    {
+      "name": "pm_about_recommendations_03c3b26e",
+      "value": "추천 정보"
+    },
+    {
+      "name": "pm_help_pinterest_understand_you_better_edit_the_details_used_to_re_20d62659",
+      "value": "Pinterest가 회원님을 더 잘 이해할 수 있도록 핀 추천에 사용되는 정보를 수정하세요. 이 정보는 공개되지 않습니다."
+    },
+    {
+      "name": "pm_got_it_de32e201",
+      "value": "확인"
+    },
+    {
+      "name": "pm_recently_viewed_or_saved_pins_b669376f",
+      "value": "최근에 본 핀 또는 저장한 핀"
+    },
+    {
+      "name": "pm_recommendations_turned_off_for_this_pin_4355c3b5",
+      "value": "이 핀에 대한 추천을 끕니다"
+    },
+    {
+      "name": "pm_change_not_confirmed_0bb5d703",
+      "value": "변경 사항이 확인되지 않았습니다"
+    },
+    {
+      "name": "pm_this_pin_05e8eaee",
+      "value": "이 핀"
+    },
+    {
+      "name": "pm_recommendations_off_7dd43c85",
+      "value": ", 추천 끔"
+    },
+    {
+      "name": "pm_change_not_confirmed_ccc2d77c",
+      "value": ", 변경 확인 안 됨"
+    },
+    {
+      "name": "pm_turn_off_recommendations_629265e0",
+      "value": ", 추천 끄기"
+    },
+    {
+      "name": "pm_ai_content_7cdf4844",
+      "value": "AI 콘텐츠"
+    },
+    {
+      "name": "pm_activity_780353e5",
+      "value": "활동"
+    },
+    {
+      "name": "pm_adjust_ai_modified_content_in_product_feeds_you_can_see_less_of__6f514185",
+      "value": "피드에 표시되는 AI 수정 콘텐츠를 조정할 수 있습니다. 표시를 줄여도 일부 콘텐츠는 계속 나타날 수 있습니다."
+    },
+    {
+      "name": "pm_show_ai_content_409fe4d8",
+      "value": "AI 콘텐츠 표시"
+    },
+    {
+      "name": "pm_turn_off_to_see_less_ai_content_in_product_feeds_b51424cd",
+      "value": "끄면 피드에 표시되는 AI 콘텐츠가 줄어듭니다."
+    },
+    {
+      "name": "pm_manage_ai_content_by_topic_ed79d1c5",
+      "value": "주제별 AI 콘텐츠 관리"
+    },
+    {
+      "name": "pm_no_ai_topics_available_to_adjust_2f24acde",
+      "value": "조정할 AI 주제가 없습니다"
+    },
+    {
+      "name": "pm_hide_pins_related_to_those_you_recently_saved_or_opened_2e744f08",
+      "value": "최근에 저장하거나 열어 본 핀과 관련된 핀을 숨깁니다."
+    },
+    {
+      "name": "pm_no_recent_activity_360e0904",
+      "value": "최근 활동이 없습니다"
+    },
+    {
+      "name": "pm_logs_exported_2e45dbce",
+      "value": "로그를 내보냈습니다"
+    },
+    {
+      "name": "pm_unable_to_export_logs_please_retry_2a73568e",
+      "value": "로그를 내보낼 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_account_management_c410cbe5",
+      "value": "계정 관리"
+    },
+    {
+      "name": "pm_profile_visibility_6fedc091",
+      "value": "프로필 공개 설정"
+    },
+    {
+      "name": "pm_log_out_e7677436",
+      "value": "로그아웃"
+    },
+    {
+      "name": "pm_logs_7dbac1c2",
+      "value": "로그"
+    },
+    {
+      "name": "pm_log_out_of_this_account_ad88739b",
+      "value": "이 계정에서 로그아웃하시겠습니까?"
+    },
+    {
+      "name": "pm_logging_out_0ae60dd3",
+      "value": "로그아웃 중…"
+    },
+    {
+      "name": "pm_exporting_logs_2a89f720",
+      "value": "로그 내보내는 중…"
+    },
+    {
+      "name": "pm_private_profile_b16cc2bf",
+      "value": "비공개 프로필"
+    },
+    {
+      "name": "pm_with_a_private_profile_only_people_you_approve_can_see_your_prof_5be21c6f",
+      "value": "비공개 프로필에서는 승인한 사람만 프로필, 핀, 보드, 팔로워 및 팔로잉 목록을 볼 수 있습니다. 자세히 알아보기"
+    },
+    {
+      "name": "pm_search_privacy_d041067d",
+      "value": "검색 개인정보 보호"
+    },
+    {
+      "name": "pm_hide_your_profile_and_boards_from_search_engines_such_as_google__8bb0a7fb",
+      "value": "Google과 같은 검색 엔진에서 프로필과 보드를 숨깁니다. 자세히 알아보기"
+    },
+    {
+      "name": "pm_make_profile_private_5d577229",
+      "value": "프로필을 비공개로 설정할까요??"
+    },
+    {
+      "name": "pm_make_profile_public_147d123a",
+      "value": "프로필을 공개로 설정할까요??"
+    },
+    {
+      "name": "pm_only_your_followers_can_see_your_profile_and_its_content_0ca3b7cb",
+      "value": "팔로워만 프로필과 콘텐츠를 볼 수 있습니다."
+    },
+    {
+      "name": "pm_anyone_can_see_your_profile_pins_followers_and_boards_44055147",
+      "value": "누구나 프로필, 핀, 팔로워 및 보드를 볼 수 있습니다."
+    },
+    {
+      "name": "pm_your_profile_will_not_appear_in_pinterest_search_results_20307e8e",
+      "value": "프로필이 Pinterest 검색 결과에 표시되지 않습니다."
+    },
+    {
+      "name": "pm_your_profile_will_appear_in_pinterest_search_results_ca924e80",
+      "value": "프로필이 Pinterest 검색 결과에 표시됩니다."
+    },
+    {
+      "name": "pm_make_private_c25c078d",
+      "value": "비공개로 설정"
+    },
+    {
+      "name": "pm_make_public_7a73baf0",
+      "value": "공개로 설정"
+    },
+    {
+      "name": "pm_language_9f6fee1a",
+      "value": "언어"
+    },
+    {
+      "name": "pm_unable_to_change_language_please_retry_f77e9a24",
+      "value": "언어를 변경할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_home_203c08e0",
+      "value": "홈"
+    },
+    {
+      "name": "pm_search_44ce7ae9",
+      "value": "검색"
+    },
+    {
+      "name": "pm_profile_7f1d9dd0",
+      "value": "프로필"
+    },
+    {
+      "name": "pm_search_your_pins_e0d101c6",
+      "value": "내 핀 검색"
+    },
+    {
+      "name": "pm_search_pinterest_3a2ae4e9",
+      "value": "Pinterest 검색"
+    },
+    {
+      "name": "pm_page_not_ready_please_retry_e6aeff92",
+      "value": "페이지가 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_profile_please_retry_7395435e",
+      "value": "열 수 없습니다 프로필. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_website_please_retry_02ccbc57",
+      "value": "웹사이트를 열 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_photo_selected_but_upload_details_are_incomplete_nothing_has_bee_a5c05c90",
+      "value": "사진을 선택했지만 업로드 정보가 완전하지 않습니다. 업로드되거나 저장된 항목은 없습니다."
+    },
+    {
+      "name": "pm_unable_to_select_this_photo_please_retry_ba873d07",
+      "value": "이 사진을 선택할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_this_page_action_is_unavailable_please_retry_f7a12cc1",
+      "value": "이 페이지 작업을 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_share_data_not_ready_please_retry_fa0dd1d7",
+      "value": "공유 데이터가 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_share_data_please_retry_0afbe6f0",
+      "value": "로드할 수 없습니다 공유 데이터. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_profile_options_344df243",
+      "value": "프로필 옵션"
+    },
+    {
+      "name": "pm_board_not_ready_close_this_panel_and_retry_337e96bd",
+      "value": "보드가 준비되지 않았습니다. 이 패널을 닫고 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_creation_in_progress_please_wait_242ae2da",
+      "value": "생성 중입니다. 잠시 기다려 주세요."
+    },
+    {
+      "name": "pm_cannot_create_a_section_on_this_board_close_this_panel_and_retry_6716f2be",
+      "value": "이 보드에 섹션을 만들 수 없습니다. 이 패널을 닫고 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_image_loading_incomplete_5dab7b4b",
+      "value": "이미지 불러오기가 완료되지 않았습니다"
+    },
+    {
+      "name": "pm_image_transfer_incomplete_e1d6ffba",
+      "value": "이미지 전송이 완료되지 않았습니다"
+    },
+    {
+      "name": "pm_image_selection_incomplete_please_retry_f48e5cbe",
+      "value": "이미지 선택이 완료되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_pin_loading_timed_out_please_retry_b940342e",
+      "value": "핀 불러오는 중 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_related_pin_please_retry_473d0b1f",
+      "value": "관련 핀을 열 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_this_image_is_currently_unavailable_for_download_755fd218",
+      "value": "현재 이 이미지를 다운로드할 수 없습니다"
+    },
+    {
+      "name": "pm_download_could_not_start_please_retry_54407e7d",
+      "value": "다운로드를 시작할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_image_selection_incomplete_216e6d3a",
+      "value": "이미지를 선택하지 못했습니다"
+    },
+    {
+      "name": "pm_reload_share_link_6a0a897d",
+      "value": "공유 링크 새로고침"
+    },
+    {
+      "name": "pm_dismiss_notice_d301bc12",
+      "value": "알림 닫기"
+    },
+    {
+      "name": "pm_undo_926a50b9",
+      "value": "실행 취소"
+    },
+    {
+      "name": "pm_undo_this_action_fab003cc",
+      "value": "이 작업 실행 취소"
+    },
+    {
+      "name": "pm_update_deleted_509d0754",
+      "value": "업데이트를 삭제했습니다"
+    },
+    {
+      "name": "pm_undo_update_deletion_98448231",
+      "value": "업데이트 삭제 취소"
+    },
+    {
+      "name": "pm_update_deletion_undone_e4e5cba0",
+      "value": "업데이트 삭제를 취소했습니다"
+    },
+    {
+      "name": "pm_undo_incomplete_please_retry_e69779de",
+      "value": "실행 취소가 완료되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_undo_failed_please_retry_ea519ad9",
+      "value": "실행 취소에 실패했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_related_pin_9d577ebe",
+      "value": "관련 핀을 열 수 없습니다"
+    },
+    {
+      "name": "pm_pin_service_unavailable_reopen_this_pin_adbeebe1",
+      "value": "핀 서비스를 사용할 수 없습니다. 이 핀을 다시 열어 주세요."
+    },
+    {
+      "name": "pm_unable_to_get_this_pin_s_link_e2a9f1db",
+      "value": "이 핀의 링크를 가져올 수 없습니다"
+    },
+    {
+      "name": "pm_unable_to_open_share_panel_43eea06a",
+      "value": "열 수 없습니다 공유 패널"
+    },
+    {
+      "name": "pm_logout_not_confirmed_wait_for_session_verification_it_will_not_b_cfc74ac5",
+      "value": "로그아웃이 확인되지 않았습니다. 세션 확인을 기다려 주세요. 다시 전송되지 않습니다."
+    },
+    {
+      "name": "pm_logout_was_not_sent_please_retry_6bd93118",
+      "value": "로그아웃 요청을 보내지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_logged_out_but_the_sign_in_page_could_not_load_please_retry_93441c6b",
+      "value": "로그아웃했지만 로그인 페이지를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_logout_not_confirmed_please_retry_later_ec7c6e06",
+      "value": "로그아웃이 확인되지 않았습니다. 나중에 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_add_to_section_d7aed82c",
+      "value": "섹션에 추가"
+    },
+    {
+      "name": "pm_add_pins_or_sections_2274f06f",
+      "value": "핀 또는 섹션 추가"
+    },
+    {
+      "name": "pm_add_to_profile_e076cb80",
+      "value": "프로필에 추가"
+    },
+    {
+      "name": "pm_edit_pin_f9119bcf",
+      "value": "수정 핀"
+    },
+    {
+      "name": "pm_what_do_you_think_e8fb167b",
+      "value": "어떻게 생각하시나요?"
+    },
+    {
+      "name": "pm_options_bb7486f4",
+      "value": "옵션"
+    },
+    {
+      "name": "pm_filters_8d35790c",
+      "value": "필터"
+    },
+    {
+      "name": "pm_loading_21bd738e",
+      "value": "로드 중…"
+    },
+    {
+      "name": "pm_blocked_eb3c6420",
+      "value": "차단됨 "
+    },
+    {
+      "name": "pm_unblocked_16369d5f",
+      "value": "차단 해제됨 "
+    },
+    {
+      "name": "pm_home_3e0d676d",
+      "value": "홈"
+    },
+    {
+      "name": "pm_loading_content_2b1fde91",
+      "value": "콘텐츠를 불러오는 중…"
+    },
+    {
+      "name": "pm_unable_to_load_d1d04482",
+      "value": "로드할 수 없습니다"
+    },
+    {
+      "name": "pm_copied_8f6f8d97",
+      "value": "복사됨"
+    },
+    {
+      "name": "pm_unable_to_copy_please_retry_86ee2899",
+      "value": "복사할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_loading_pin_0eab4d34",
+      "value": "로드 중 핀…"
+    },
+    {
+      "name": "pm_loading_pin_options_9d18460b",
+      "value": "로드 중 핀 옵션…"
+    },
+    {
+      "name": "pm_loading_recent_cache_21b2ed90",
+      "value": "로드 중 최근 캐시…"
+    },
+    {
+      "name": "pm_unable_to_load_current_session_447e235d",
+      "value": "현재 불러올 수 없습니다"
+    },
+    {
+      "name": "pm_loading_existing_session_f538c37e",
+      "value": "기존 세션을 불러오는 중…"
+    },
+    {
+      "name": "pm_sign_in_99232cdd",
+      "value": "로그인"
+    },
+    {
+      "name": "pm_value_pins_d1922567",
+      "value": "핀 {0}개"
+    },
+    {
+      "name": "pm_open_board_value_value_pins_134006a7",
+      "value": "보드 열기: {0}, 핀 {1}개"
+    },
+    {
+      "name": "pm_pin_234ff540",
+      "value": "핀"
+    },
+    {
+      "name": "pm_image_failed_to_load_open_details_8406e8c5",
+      "value": ", 이미지를 불러오지 못했습니다. 세부정보 열기"
+    },
+    {
+      "name": "pm_connect_and_retry_a25c5d3e",
+      "value": "연결 후 다시 시도"
+    },
+    {
+      "name": "pm_retry_loading_8924c788",
+      "value": "다시 시도 불러오는 중"
+    },
+    {
+      "name": "pm_no_more_pins_dda147ad",
+      "value": "더 이상 핀이 없습니다"
+    },
+    {
+      "name": "pm_image_value_of_value_value_66dd48e8",
+      "value": "이미지 {0}/{1}. {2}"
+    },
+    {
+      "name": "pm_image_value_of_value_2349ba46",
+      "value": "이미지 {0}/{1}"
+    },
+    {
+      "name": "pm_loading_media_01cf18eb",
+      "value": "로드 중 미디어"
+    },
+    {
+      "name": "pm_carousel_unavailable_093874a4",
+      "value": "캐러셀을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_reload_media_57dfcd7b",
+      "value": "새로고침 미디어"
+    },
+    {
+      "name": "pm_no_playable_video_url_available_a548116d",
+      "value": "재생 가능한 동영상 URL이 없습니다"
+    },
+    {
+      "name": "pm_reload_video_1472e7f1",
+      "value": "새로고침 동영상"
+    },
+    {
+      "name": "pm_search_image_8f938fb8",
+      "value": "검색 이미지"
+    },
+    {
+      "name": "pm_find_related_content_in_this_image_20372b79",
+      "value": "이 이미지에서 관련 콘텐츠 찾기"
+    },
+    {
+      "name": "pm_retry_loading_details_94912123",
+      "value": "다시 시도 불러오는 중 세부 정보"
+    },
+    {
+      "name": "pm_syncing_pin_status_e1429d05",
+      "value": "핀 상태 동기화 중…"
+    },
+    {
+      "name": "pm_verifying_pin_content_cbcfd002",
+      "value": "핀 콘텐츠 확인 중…"
+    },
+    {
+      "name": "pm_syncing_interactions_and_recommendations_d5a043fa",
+      "value": "활동 및 추천 동기화 중…"
+    },
+    {
+      "name": "pm_cancelling_75dfaf26",
+      "value": "취소 중"
+    },
+    {
+      "name": "pm_unsaving_84e400ee",
+      "value": "저장 취소 중"
+    },
+    {
+      "name": "pm_show_less_afd4b783",
+      "value": "간략히 보기"
+    },
+    {
+      "name": "pm_see_more_92b2b2de",
+      "value": "더 보기"
+    },
+    {
+      "name": "pm_view_all_comments_11ef17e2",
+      "value": "모든 댓글 보기"
+    },
+    {
+      "name": "pm_retry_loading_comment_preview_1703ef13",
+      "value": "댓글 미리보기 다시 불러오기"
+    },
+    {
+      "name": "pm_visit_website_04913c22",
+      "value": "웹사이트 방문"
+    },
+    {
+      "name": "pm_visit_website_ac9d562e",
+      "value": "웹사이트 방문, "
+    },
+    {
+      "name": "pm_see_more_feedback_submitted_a391370a",
+      "value": "제출한 피드백 더 보기"
+    },
+    {
+      "name": "pm_load_recommendations_08df83f8",
+      "value": "불러오기 추천 콘텐츠"
+    },
+    {
+      "name": "pm_retry_recommendations_83cd903e",
+      "value": "다시 시도 추천 콘텐츠"
+    },
+    {
+      "name": "pm_more_to_explore_f7cba896",
+      "value": "더 탐색하기"
+    },
+    {
+      "name": "pm_reload_url_84763306",
+      "value": "URL 새로고침"
+    },
+    {
+      "name": "pm_reload_video_url_f620176f",
+      "value": "동영상 URL 새로고침"
+    },
+    {
+      "name": "pm_search_value_1c227be4",
+      "value": "검색 {0}"
+    },
+    {
+      "name": "pm_image_6fd6014d",
+      "value": "이미지 "
+    },
+    {
+      "name": "pm_of_0cad3498",
+      "value": " 중 "
+    },
+    {
+      "name": "pm_featured_images_0c27f683",
+      "value": "개의 추천 이미지"
+    },
+    {
+      "name": "pm_open_recommended_idea_cfa1d1fd",
+      "value": ", 추천 아이디어 열기"
+    },
+    {
+      "name": "pm_view_all_of_value_946da294",
+      "value": "{0} 모두 보기"
+    },
+    {
+      "name": "pm_no_discovery_content_available_6ab3cb41",
+      "value": "표시할 탐색 콘텐츠가 없습니다"
+    },
+    {
+      "name": "pm_the_current_pinterest_page_has_no_supported_featured_images_or_r_e04c587f",
+      "value": "현재 Pinterest 페이지에는 지원되는 추천 이미지나 아이디어가 없습니다"
+    },
+    {
+      "name": "pm_reload_pinterest_discovery_content_f7efbeaf",
+      "value": "Pinterest 탐색 콘텐츠 새로고침"
+    },
+    {
+      "name": "pm_loading_search_content_41fcd6d9",
+      "value": "검색 결과를 불러오는 중…"
+    },
+    {
+      "name": "pm_no_suggested_topics_yet_15697bb3",
+      "value": "아직 추천 주제가 없습니다"
+    },
+    {
+      "name": "pm_no_preview_image_baafb7eb",
+      "value": "미리보기 이미지 없음"
+    },
+    {
+      "name": "pm_image_failed_to_load_75349c88",
+      "value": ", 이미지 실패했습니다  불러오기"
+    },
+    {
+      "name": "pm_no_preview_image_c39e69a8",
+      "value": ", 미리보기 이미지 없음"
+    },
+    {
+      "name": "pm_title_unavailable_844e209b",
+      "value": "제목을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_pin_options_7227a477",
+      "value": "핀 옵션"
+    },
+    {
+      "name": "pm_open_search_result_143231c5",
+      "value": ", 검색 결과 열기"
+    },
+    {
+      "name": "pm_submitting_board_follow_action_882403f9",
+      "value": "보드 팔로우 요청 전송 중"
+    },
+    {
+      "name": "pm_unfollow_board_ac069feb",
+      "value": "팔로우 취소 보드"
+    },
+    {
+      "name": "pm_follow_board_3813420f",
+      "value": "팔로우 보드"
+    },
+    {
+      "name": "pm_followers_b06be4eb",
+      "value": "팔로워"
+    },
+    {
+      "name": "pm_submitting_profile_follow_action_9167e789",
+      "value": "프로필 팔로우 요청 전송 중"
+    },
+    {
+      "name": "pm_unfollow_profile_16f4c576",
+      "value": "팔로우 취소 프로필"
+    },
+    {
+      "name": "pm_follow_profile_655e46b4",
+      "value": "팔로우 프로필"
+    },
+    {
+      "name": "pm_that_does_not_seem_to_work_59c83091",
+      "value": "작동하지 않는 것 같습니다"
+    },
+    {
+      "name": "pm_no_results_match_the_selected_filters_try_changing_your_filters_59447648",
+      "value": "선택한 필터와 일치하는 결과가 없습니다. 필터를 변경해 보세요."
+    },
+    {
+      "name": "pm_adjust_your_search_72f85b23",
+      "value": "검색 조정"
+    },
+    {
+      "name": "pm_no_pins_match_your_search_try_changing_or_removing_filters_7e39c540",
+      "value": "검색과 일치하는 핀이 없습니다. 필터를 변경하거나 삭제해 보세요."
+    },
+    {
+      "name": "pm_remove_price_94a31c30",
+      "value": "가격 삭제"
+    },
+    {
+      "name": "pm_remove_retailers_3b034b33",
+      "value": "판매자 삭제"
+    },
+    {
+      "name": "pm_press_search_to_see_results_9e79a655",
+      "value": "검색을 눌러 결과 보기"
+    },
+    {
+      "name": "pm_we_could_not_find_anyone_named_a06407b4",
+      "value": "다음 이름을 가진 사용자를 찾을 수 없습니다: “"
+    },
+    {
+      "name": "pm_text_c74084fe",
+      "value": "”."
+    },
+    {
+      "name": "pm_sorry_we_could_not_find_any_pins_for_this_search_80dcc4da",
+      "value": "이 검색에서 핀을 찾을 수 없습니다."
+    },
+    {
+      "name": "pm_no_search_results_available_6025e7b5",
+      "value": "없음:검색 결과 사용할 수 있습니다"
+    },
+    {
+      "name": "pm_no_pinterest_discovery_content_available_557fb101",
+      "value": "Pinterest에 표시할 탐색 콘텐츠가 없습니다"
+    },
+    {
+      "name": "pm_back_to_search_590f562a",
+      "value": "검색으로 돌아가기"
+    },
+    {
+      "name": "pm_show_filters_12e6eb18",
+      "value": "필터 표시"
+    },
+    {
+      "name": "pm_loading_search_suggestions_4ff5d4ed",
+      "value": "로드 중 검색 제안"
+    },
+    {
+      "name": "pm_deleting_search_history_2674b330",
+      "value": "검색 기록 삭제 중"
+    },
+    {
+      "name": "pm_delete_search_history_80b537e5",
+      "value": "검색 기록 삭제"
+    },
+    {
+      "name": "pm_this_type_of_search_history_cannot_be_deleted_yet_00762b84",
+      "value": "이 유형의 검색 기록은 아직 삭제할 수 없습니다."
+    },
+    {
+      "name": "pm_choose_inspiration_up_to_10_images_19ae0263",
+      "value": "참고 이미지 선택(최대 10장)"
+    },
+    {
+      "name": "pm_inspiration_results_ffbd36b2",
+      "value": "영감 검색 결과"
+    },
+    {
+      "name": "pm_logs_are_saved_in_the_app_and_can_be_exported_to_files_3ee4ffb4",
+      "value": "로그는 앱에 저장되며 파일로 내보낼 수 있습니다"
+    },
+    {
+      "name": "pm_automatic_log_saving_failed_you_can_try_exporting_the_records_in_08bd2e9b",
+      "value": "로그를 자동으로 저장하지 못했습니다. 메모리에 있는 기록을 내보낼 수 있습니다."
+    },
+    {
+      "name": "pm_server_certificate_validation_failed_4f25ad9c",
+      "value": "서버 인증서 검증에 실패했습니다"
+    },
+    {
+      "name": "pm_file_read_failed_3d943f80",
+      "value": "파일 읽기에 실패했습니다"
+    },
+    {
+      "name": "pm_preparation_timed_out_1d63c7d0",
+      "value": "준비 시간이 초과되었습니다"
+    },
+    {
+      "name": "pm_video_frame_loading_timed_out_3a6409cf",
+      "value": "동영상 프레임 불러오기 시간이 초과되었습니다"
+    },
+    {
+      "name": "pm_initialization_timed_out_4ed9caea",
+      "value": "초기화 시간이 초과되었습니다"
+    },
+    {
+      "name": "pm_media_read_failed_249712fb",
+      "value": "미디어 읽기에 실패했습니다"
+    },
+    {
+      "name": "pm_unsupported_format_c2cf10f3",
+      "value": "지원되지 않는 형식"
+    },
+    {
+      "name": "pm_secure_connection_failed_3cb70417",
+      "value": "보안 연결에 실패했습니다"
+    },
+    {
+      "name": "pm_playback_failed_20cca83d",
+      "value": "재생에 실패했습니다"
+    },
+    {
+      "name": "pm_video_certificate_validation_failed_check_device_time_and_networ_a74a0baf",
+      "value": "동영상 인증서를 확인하지 못했습니다. 기기 시간, 네트워크 또는 프록시 인증서를 확인한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_secure_connection_failed_check_your_network_or_proxy_and_r_778ace9e",
+      "value": "동영상 보안 연결에 실패했습니다. 네트워크 또는 프록시를 확인한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_read_video_file_check_your_network_or_proxy_and_retry_4b86bf25",
+      "value": "동영상 파일을 읽을 수 없습니다. 네트워크 또는 프록시를 확인한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unsupported_video_format_reload_the_video_url_ff25eaf5",
+      "value": "지원되지 않는 동영상 형식입니다. 동영상 URL을 새로고침해 주세요."
+    },
+    {
+      "name": "pm_video_request_failed_check_your_connection_and_retry_ef503f99",
+      "value": "동영상 요청에 실패했습니다. 연결을 확인한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_read_video_media_check_your_network_or_proxy_and_retry_aaece788",
+      "value": "동영상 미디어를 읽을 수 없습니다. 네트워크 또는 프록시를 확인한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_preparation_timed_out_retry_playback_b863b478",
+      "value": "동영상 준비 시간이 초과되었습니다. 재생을 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_frame_loading_timed_out_retry_playback_4a0c6364",
+      "value": "동영상 프레임을 불러오는 시간이 초과되었습니다. 재생을 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_player_initialization_timed_out_retry_playback_e12ca055",
+      "value": "플레이어 초기화 시간이 초과되었습니다. 재생을 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_playback_failed_retry_or_reload_the_url_fac62be1",
+      "value": "동영상을 재생하지 못했습니다. 다시 시도하거나 URL을 새로고침해 주세요."
+    },
+    {
+      "name": "pm_result_not_confirmed_close_and_reopen_to_check_before_submitting_2fcbc18d",
+      "value": "결과가 확인되지 않았습니다. 다시 제출하기 전에 닫았다가 다시 열어 상태를 확인해 주세요."
+    },
+    {
+      "name": "pm_1_invitation_sent_9473de94",
+      "value": "초대 1개를 보냈습니다!"
+    },
+    {
+      "name": "pm_permissions_updated_d72fbc80",
+      "value": "권한이 업데이트되었습니다"
+    },
+    {
+      "name": "pm_result_not_confirmed_close_and_refresh_to_check_it_will_not_be_r_b66391e3",
+      "value": "결과가 확인되지 않았습니다. 다시 제출되지 않습니다. 닫고 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_board_action_unavailable_close_and_refresh_to_check_a98c4c4a",
+      "value": "보드 작업을 사용할 수 없습니다. 닫고 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_selected_pins_are_no_longer_available_select_them_again_74617dc8",
+      "value": "선택한 핀을 더 이상 사용할 수 없습니다. 다시 선택해 주세요."
+    },
+    {
+      "name": "pm_invalid_section_name_or_board_permissions_1ca679ce",
+      "value": "섹션 이름이 잘못되었거나 보드 권한이 없습니다"
+    },
+    {
+      "name": "pm_save_verification_failed_nothing_was_unsaved_ff9e39f2",
+      "value": "저장 상태를 확인하지 못했습니다. 저장 취소는 수행되지 않았습니다."
+    },
+    {
+      "name": "pm_save_verification_interrupted_nothing_was_unsaved_7e2833d3",
+      "value": "저장 상태 확인이 중단되었습니다. 저장 취소는 수행되지 않았습니다."
+    },
+    {
+      "name": "pm_action_interrupted_nothing_was_submitted_3bf2295c",
+      "value": "작업이 중단되었습니다. 제출되지 않았습니다."
+    },
+    {
+      "name": "pm_save_verification_failed_or_loading_was_interrupted_nothing_was__c9dabe4b",
+      "value": "저장 확인에 실패했거나 불러오기가 중단되었습니다. 저장 취소는 수행되지 않았습니다."
+    },
+    {
+      "name": "pm_the_website_rejected_this_board_follow_action_you_can_retry_768968ce",
+      "value": "웹사이트에서 보드 팔로우를 거부했습니다. 다시 시도할 수 있습니다."
+    },
+    {
+      "name": "pm_board_followed_99719d35",
+      "value": "보드를 팔로우했습니다"
+    },
+    {
+      "name": "pm_board_unfollowed_b3151db9",
+      "value": "보드 팔로우를 취소했습니다"
+    },
+    {
+      "name": "pm_board_follow_result_not_confirmed_refresh_to_check_before_submit_b77726df",
+      "value": "보드 팔로우 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_invitation_status_preview_it_again_bc00bb66",
+      "value": "초대 상태를 불러올 수 없습니다. 미리보기를 다시 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_board_invitations_please_retry_1e408667",
+      "value": "로드할 수 없습니다 보드 초대. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_you_have_joined_save_pins_and_plan_together_with_collaborators_23584a97",
+      "value": "참여했습니다! 공동 작업자와 함께 핀을 저장하고 계획을 세워 보세요."
+    },
+    {
+      "name": "pm_invitation_was_not_accepted_please_retry_fd33b3d4",
+      "value": "초대를 수락하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_join_result_not_confirmed_preview_again_to_check_it_will_not_be__33091292",
+      "value": "참여 결과가 확인되지 않았습니다. 자동으로 다시 수락되지 않습니다. 미리보기를 다시 열어 확인해 주세요."
+    },
+    {
+      "name": "pm_loading_interrupted_please_retry_b469c1dd",
+      "value": "로드가 중단되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_not_ready_or_invalid_section_name_ce4d4aa7",
+      "value": "보드가 준비되지 않았거나 섹션 이름이 잘못되었습니다"
+    },
+    {
+      "name": "pm_save_verification_failed_or_was_cancelled_nothing_was_unsaved_7ea6297e",
+      "value": "저장 확인에 실패했거나 취소되었습니다. 저장 취소는 수행되지 않았습니다."
+    },
+    {
+      "name": "pm_section_added_01c771d6",
+      "value": "섹션을 추가했습니다!"
+    },
+    {
+      "name": "pm_unfollowed_07fa3b45",
+      "value": "팔로우를 취소했습니다"
+    },
+    {
+      "name": "pm_section_content_has_not_fully_loaded_organizing_is_temporarily_u_8d3b8bfa",
+      "value": "섹션이 완전히 로드되지 않아 정리 기능을 일시적으로 사용할 수 없습니다."
+    },
+    {
+      "name": "pm_section_name_updated_373a284b",
+      "value": "섹션 이름을 업데이트했습니다"
+    },
+    {
+      "name": "pm_section_deleted_73959940",
+      "value": "섹션을 삭제했습니다"
+    },
+    {
+      "name": "pm_selected_pins_moved_ddba8b7a",
+      "value": "선택한 핀을 이동했습니다"
+    },
+    {
+      "name": "pm_unable_to_load_please_retry_b22c1af1",
+      "value": "로드할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_target_sections_please_retry_701b528d",
+      "value": "대상 섹션을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_section_details_4a003afa",
+      "value": "섹션 세부정보"
+    },
+    {
+      "name": "pm_section_tools_02146fbd",
+      "value": "섹션 도구"
+    },
+    {
+      "name": "pm_recommendations_3da0bf16",
+      "value": "추천"
+    },
+    {
+      "name": "pm_unable_to_load_collaborators_please_retry_b78a9b74",
+      "value": "불러올 수 없습니다 공동 작업자. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_details_0ca25b51",
+      "value": "보드 세부 정보"
+    },
+    {
+      "name": "pm_board_content_71989c6a",
+      "value": "보드 콘텐츠"
+    },
+    {
+      "name": "pm_unable_to_load_more_pins_please_retry_e4cd3927",
+      "value": "핀을 더 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_sections_please_retry_9c2e737e",
+      "value": "로드할 수 없습니다 섹션. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_section_content_please_retry_03225906",
+      "value": "불러올 수 없습니다 섹션 콘텐츠. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27",
+      "value": "결과가 확인되지 않았습니다. 새로고침하여 확인해 주세요; 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_you_will_see_more_pins_like_this_6dc4ff37",
+      "value": "이와 비슷한 핀이 더 표시됩니다"
+    },
+    {
+      "name": "pm_unable_to_copy_link_please_retry_a34acdfe",
+      "value": "복사할 수 없습니다 링크. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_link_copied_6ce7dfa5",
+      "value": "링크를 복사했습니다"
+    },
+    {
+      "name": "pm_choose_in_the_system_share_panel_85022692",
+      "value": "시스템 공유 패널에서 선택해 주세요: "
+    },
+    {
+      "name": "pm_action_failed_please_retry_e113c7d1",
+      "value": "작업에 실패했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_result_not_confirmed_close_and_reload_to_check_it_will_not_be_re_d952b803",
+      "value": "결과가 확인되지 않았습니다. 창을 닫고 새로고침해 확인해 주세요. 작업은 자동으로 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_image_upload_or_comment_preparation_incomplete_the_comment_has_n_c87c853f",
+      "value": "이미지 업로드 또는 댓글 준비가 완료되지 않아 댓글이 제출되지 않았습니다."
+    },
+    {
+      "name": "pm_unable_to_prepare_comment_action_reload_to_retry_19845ac7",
+      "value": "댓글 작업을 준비하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_media_loading_paused_please_retry_67a4be3d",
+      "value": "미디어 불러오기가 일시 중지되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_image_search_paused_please_retry_c19326c2",
+      "value": "이미지 검색이 일시 중지되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_media_url_please_retry_e2d8f3d2",
+      "value": "미디어 주소를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_video_url_please_retry_5854ca89",
+      "value": "불러올 수 없습니다 동영상 URL. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_carousel_please_retry_e43842b8",
+      "value": "캐러셀을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_image_search_failed_please_retry_a1c501c4",
+      "value": "이미지 검색에 실패했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_missing_comment_id_retry_the_comment_preview_b1b3707a",
+      "value": "댓글 ID가 없습니다. 댓글 미리보기를 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_reply_loading_interrupted_please_retry_0ee5475c",
+      "value": "답글 불러오기가 중단되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_loading_interrupted_please_retry_96182a1c",
+      "value": "댓글 불러오기가 중단되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_translation_interrupted_please_retry_010117c5",
+      "value": "번역이 중단되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_session_not_ready_reopen_the_pin_ca5a4313",
+      "value": "댓글 세션이 준비되지 않았습니다. 핀을 다시 열어 주세요."
+    },
+    {
+      "name": "pm_missing_comment_id_return_to_the_pin_and_retry_the_preview_e1f7470d",
+      "value": "댓글 ID가 없습니다. 핀으로 돌아가 미리보기를 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_request_not_ready_please_retry_2a902071",
+      "value": "댓글 요청 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_comments_please_retry_eccfe65c",
+      "value": "로드할 수 없습니다 댓글. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_invalid_comment_response_please_retry_d0bf35c9",
+      "value": "댓글 응답이 올바르지 않습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_account_verification_failed_34d6e3c6",
+      "value": "댓글 계정을 확인하지 못했습니다"
+    },
+    {
+      "name": "pm_unsupported_comment_format_please_retry_25ae935c",
+      "value": "지원하지 않는 댓글 형식입니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_reply_request_not_ready_please_retry_e555cdf8",
+      "value": "답글 요청 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_replies_unavailable_http_404_ce396bf4",
+      "value": "답글을 사용할 수 없습니다 (HTTP 404)."
+    },
+    {
+      "name": "pm_unable_to_load_replies_please_retry_81668953",
+      "value": "로드할 수 없습니다 답글. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_invalid_reply_response_please_retry_7f846edb",
+      "value": "답글 응답이 올바르지 않습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unexpected_reply_response_please_retry_37cf2c84",
+      "value": "예상하지 못한 답글 응답입니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_more_replies_exist_but_pagination_is_not_supported_yet_fe6ddfb2",
+      "value": "답글이 더 있지만 페이지 나누기는 아직 지원되지 않습니다."
+    },
+    {
+      "name": "pm_translation_request_not_ready_please_retry_bfacc5b2",
+      "value": "번역 요청을 처리할 준비가 되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_translation_request_failed_please_retry_9ff98b48",
+      "value": "댓글 번역 요청에 실패했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_invalid_comment_translation_response_please_retry_2f478594",
+      "value": "댓글 번역 응답이 올바르지 않습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_no_translation_available_52561070",
+      "value": "번역을 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_unsupported_translation_format_9a4c1587",
+      "value": "지원되지 않는 번역 형식입니다"
+    },
+    {
+      "name": "pm_comment_translation_failed_please_retry_0c86faa9",
+      "value": "댓글 번역에 실패했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_comment_preview_please_retry_38deac0d",
+      "value": "댓글 미리보기를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_preview_request_not_ready_please_retry_bcf43624",
+      "value": "댓글 미리보기 요청을 처리할 준비가 되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_recommendations_please_retry_87984c87",
+      "value": "로드할 수 없습니다 추천 콘텐츠. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_connection_failed_pin_could_not_load_please_retry_3ed4ae9b",
+      "value": "연결에 실패하여 핀을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_pin_please_retry_252ec41d",
+      "value": "로드할 수 없습니다 핀. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_home_connection_failed_please_retry_e3e24ceb",
+      "value": "홈에 연결하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_search_connection_failed_please_retry_33910319",
+      "value": "검색에 연결하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_inbox_connection_failed_please_retry_252d0d5b",
+      "value": "받은 편지함에 연결하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_profile_connection_failed_please_retry_5023a1d2",
+      "value": "프로필에 연결하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_website_certificate_validation_failed_check_your_network_or_prox_4312cbb1",
+      "value": "웹사이트 인증서를 확인하지 못했습니다. 네트워크 또는 프록시를 확인한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_connection_unstable_unable_to_load_page_please_retry_4dc450df",
+      "value": "연결이 불안정하여 페이지를 불러올 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_connection_failed_please_retry_1fec6693",
+      "value": "보드에 연결하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_https_negotiation_failed_bbd70909",
+      "value": "HTTPS 협상 실패 · "
+    },
+    {
+      "name": "pm_website_certificate_validation_failed_check_your_network_or_prox_28bdbe6e",
+      "value": "웹사이트 인증서를 확인하지 못했습니다. 네트워크 또는 프록시를 확인해 주세요 · "
+    },
+    {
+      "name": "pm_connection_closed_bce0d511",
+      "value": "연결이 종료되었습니다 · "
+    },
+    {
+      "name": "pm_error_code_8b1edb5e",
+      "value": "오류 코드 "
+    },
+    {
+      "name": "pm_all_ae99f297",
+      "value": "모두"
+    },
+    {
+      "name": "pm_unable_to_load_more_pins_please_retry_0a0a8b67",
+      "value": "핀을 더 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_home_feed_please_retry_cc9728f6",
+      "value": "로드할 수 없습니다 홈 피드. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_saved_board_categories_pull_down_to_retry_e1dd3288",
+      "value": "저장한 보드 카테고리를 불러오지 못했습니다. 아래로 당겨 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_undo_result_not_confirmed_refresh_to_check_it_will_not_be_resubm_4a85600e",
+      "value": "실행 취소 결과가 확인되지 않았습니다. 새로고침하여 확인해 주세요. 작업은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_action_was_not_submitted_please_retry_af0579a9",
+      "value": "작업이 제출되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_loading_paused_please_retry_a1928a5f",
+      "value": "불러오기가 일시 중지되었습니다. 다시 시도해 주세요"
+    },
+    {
+      "name": "pm_start_a_conversation_54f04e75",
+      "value": "대화 시작"
+    },
+    {
+      "name": "pm_your_conversations_will_appear_here_2f066d17",
+      "value": "대화가 여기에 표시됩니다."
+    },
+    {
+      "name": "pm_this_message_was_deleted_815a781f",
+      "value": "이 메시지는 삭제되었습니다"
+    },
+    {
+      "name": "pm_you_sent_a_profile_d437aeb2",
+      "value": "프로필을 보냈습니다."
+    },
+    {
+      "name": "pm_sent_a_profile_e003c0d2",
+      "value": "프로필을 전송했습니다."
+    },
+    {
+      "name": "pm_you_sent_a_board_9a08dbbf",
+      "value": "보드를 보냈습니다."
+    },
+    {
+      "name": "pm_sent_a_board_8870ec6d",
+      "value": "보드를 전송했습니다."
+    },
+    {
+      "name": "pm_you_sent_a_pin_4788181d",
+      "value": "핀을 보냈습니다."
+    },
+    {
+      "name": "pm_sent_a_pin_b874b586",
+      "value": "핀을 전송했습니다."
+    },
+    {
+      "name": "pm_unable_to_load_messages_please_retry_c314c819",
+      "value": "메시지를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_contacts_please_retry_9942b99b",
+      "value": "로드할 수 없습니다 연락처. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_conversation_creation_not_confirmed_reload_to_check_it_will_not__f93a5214",
+      "value": "대화 생성 결과가 확인되지 않았습니다. 새로고침해 확인해 주세요. 대화는 자동으로 다시 생성되지 않습니다."
+    },
+    {
+      "name": "pm_block_result_not_confirmed_and_status_cannot_be_checked_yet_it_w_1ef0fcac",
+      "value": "차단 결과가 확인되지 않아 현재 상태를 확인할 수 없습니다. 요청은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_account_identity_not_confirmed_reload_before_continuing_98f1dc26",
+      "value": "계정 소유자를 확인하지 못했습니다. 계속하기 전에 새로고침해 주세요."
+    },
+    {
+      "name": "pm_no_verified_conversation_found_reload_later_it_will_not_be_creat_b25689d2",
+      "value": "확인된 대화가 없습니다. 대화가 자동으로 다시 생성되지 않으니 나중에 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_conversation_result_still_not_confirmed_reload_later_it_will_not_1fcf6846",
+      "value": "대화 생성 결과가 아직 확인되지 않았습니다. 대화는 자동으로 다시 생성되지 않으니 나중에 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_conversation_please_retry_7ad950dd",
+      "value": "불러올 수 없습니다 대화. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_conversation_messages_please_retry_bd2a42fe",
+      "value": "대화 메시지를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_result_not_confirmed_reload_to_check_it_will_not_be_resubmitted__94b9c148",
+      "value": "결과가 확인되지 않았습니다. 다시 불러와 확인해 주세요; 다시 제출되지 않습니다 자동으로."
+    },
+    {
+      "name": "pm_send_result_not_confirmed_reload_the_conversation_to_check_it_wi_0a599e63",
+      "value": "메시지 전송 결과가 확인되지 않았습니다. 대화를 새로고침해 확인해 주세요. 메시지는 자동으로 다시 전송되지 않습니다."
+    },
+    {
+      "name": "pm_browse_home_feed_e6d5315a",
+      "value": "홈 피드 둘러보기"
+    },
+    {
+      "name": "pm_unable_to_load_more_updates_please_retry_3408b84f",
+      "value": "로드할 수 없습니다 더 업데이트. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_updates_please_retry_3ac4923b",
+      "value": "로드할 수 없습니다 업데이트. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_share_link_10ba6479",
+      "value": "공유 링크"
+    },
+    {
+      "name": "pm_move_to_another_board_62574b0d",
+      "value": "다른 보드로 이동"
+    },
+    {
+      "name": "pm_download_4673a230",
+      "value": "다운로드"
+    },
+    {
+      "name": "pm_system_share_13a1c63f",
+      "value": "시스템 공유"
+    },
+    {
+      "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
+      "value": "핀 작업을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unsaved_7fa7b63b",
+      "value": "저장되지 않음"
+    },
+    {
+      "name": "pm_unsave_result_not_confirmed_close_and_refresh_to_check_it_will_n_65520a27",
+      "value": "저장 취소 결과가 확인되지 않았습니다. 창을 닫고 새로고침해 확인해 주세요. 작업은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_unsave_result_not_confirmed_close_and_refresh_to_check_e3502b14",
+      "value": "저장 취소 결과가 확인되지 않았습니다. 창을 닫고 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_this_action_is_temporarily_unavailable_please_retry_2b85a100",
+      "value": "이 작업을 일시적으로 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_this_pin_s_options_retry_on_the_detail_page_21f990d8",
+      "value": "이 핀의 옵션을 불러오지 못했습니다. 상세 페이지에서 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_this_pin_s_detail_options_please_retry_43f33d4a",
+      "value": "이 핀의 상세 옵션을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_download_image_8894375c",
+      "value": "이미지 다운로드"
+    },
+    {
+      "name": "pm_see_less_9c80a8dc",
+      "value": "더 적게 보기"
+    },
+    {
+      "name": "pm_see_fewer_like_this_7904e8ad",
+      "value": "이와 유사한 핀 줄이기"
+    },
+    {
+      "name": "pm_learn_about_ai_labels_0794696e",
+      "value": "AI 라벨 알아보기"
+    },
+    {
+      "name": "pm_unable_to_load_service_options_please_retry_3b2d272d",
+      "value": "서비스 옵션을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_see_less_feedback_submitted_e4ba54ed",
+      "value": "제출한 피드백 간략히 보기"
+    },
+    {
+      "name": "pm_feedback_was_not_submitted_please_retry_e44cb016",
+      "value": "의견을 제출하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_feedback_result_not_confirmed_refresh_to_check_it_will_not_be_re_a6581062",
+      "value": "의견 제출 결과가 확인되지 않았습니다. 새로고침해 확인해 주세요. 의견은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_see_more_feedback_undone_6fb3b185",
+      "value": "피드백 더 보기 취소됨"
+    },
+    {
+      "name": "pm_undo_was_not_submitted_please_retry_d5a531f7",
+      "value": "실행 취소 요청이 제출되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_loading_interrupted_please_reload_67acc483",
+      "value": "불러오기가 중단되었습니다. 다시 불러와 주세요."
+    },
+    {
+      "name": "pm_profile_b94d13a4",
+      "value": "프로필"
+    },
+    {
+      "name": "pm_unable_to_load_boards_please_reload_6b4b6f3e",
+      "value": "보드를 불러오지 못했습니다. 새로고침해 주세요."
+    },
+    {
+      "name": "pm_account_editing_details_not_confirmed_please_reload_6061ba9a",
+      "value": "계정 수정 내용이 확인되지 않았습니다. 새로고침해 주세요."
+    },
+    {
+      "name": "pm_saved_to_b75786b2",
+      "value": "저장 위치: "
+    },
+    {
+      "name": "pm_save_result_not_confirmed_close_and_reload_to_check_it_will_not__1f283f26",
+      "value": "저장 결과가 확인되지 않았습니다. 창을 닫고 새로고침해 확인해 주세요. 요청은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_action_not_submitted_or_loading_failed_check_before_retrying_93362fa3",
+      "value": "작업이 제출되지 않았거나 불러오기에 실패했습니다. 다시 시도하기 전에 상태를 확인해 주세요."
+    },
+    {
+      "name": "pm_save_undone_7d8baadf",
+      "value": "저장을 취소했습니다."
+    },
+    {
+      "name": "pm_unsave_result_not_confirmed_reload_to_check_before_submitting_ag_aba92f81",
+      "value": "저장 취소 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_unsave_result_not_confirmed_reload_to_check_it_will_not_be_resub_97357a44",
+      "value": "저장 취소 결과가 확인되지 않았습니다. 새로고침하여 확인해 주세요. 작업은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_saved_copy_verification_failed_nothing_was_unsaved_f0d571ad",
+      "value": "저장 항목을 확인하지 못해 저장 취소가 진행되지 않았습니다."
+    },
+    {
+      "name": "pm_like_result_not_confirmed_refresh_to_check_before_submitting_aga_35091826",
+      "value": "좋아요 처리 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_like_result_not_confirmed_reload_to_check_it_will_not_be_resubmi_30ddc2ea",
+      "value": "좋아요 처리 결과가 확인되지 않았습니다. 새로고침하여 확인해 주세요. 작업은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_like_status_or_tracking_details_not_confirmed_5341ec8c",
+      "value": "좋아요 상태 또는 추적 정보를 확인하지 못했습니다."
+    },
+    {
+      "name": "pm_unable_to_load_boards_please_retry_04bec826",
+      "value": "로드할 수 없습니다 보드. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_tracking_details_missing_from_the_last_upload_refresh_your_profi_3da9d0c3",
+      "value": "마지막 업로드의 추적 정보가 없습니다. 다시 업로드하기 전에 프로필 사진을 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_profile_picture_processing_not_confirmed_tap_check_status_to_que_d349978e",
+      "value": "프로필 사진 처리 여부가 확인되지 않았습니다. 업로드를 다시 하지 말고 상태 확인을 눌러 조회해 주세요."
+    },
+    {
+      "name": "pm_profile_picture_upload_paused_1d4af343",
+      "value": "프로필 사진 업로드가 일시 중지되었습니다"
+    },
+    {
+      "name": "pm_follow_result_not_confirmed_reload_to_check_dde5efc6",
+      "value": "팔로우 결과 확인되지 않음. 다시 불러와 확인해 주세요."
+    },
+    {
+      "name": "pm_save_result_not_confirmed_reload_to_check_before_submitting_agai_b813e8b7",
+      "value": "저장 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_organize_result_not_confirmed_close_and_refresh_to_check_before__d161e558",
+      "value": "정리 결과가 확인되지 않았습니다. 다시 제출하기 전에 창을 닫고 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_loading_paused_please_reload_06c5d032",
+      "value": "불러오기가 일시 중지되었습니다. 다시 불러와 주세요."
+    },
+    {
+      "name": "pm_profile_picture_processing_not_confirmed_check_status_without_up_f4547bd7",
+      "value": "프로필 사진 처리 여부가 확인되지 않았습니다. 다시 업로드하지 말고 상태를 확인해 주세요."
+    },
+    {
+      "name": "pm_previous_save_not_confirmed_check_your_current_profile_before_su_2a81fa99",
+      "value": "이전 저장 결과가 확인되지 않았습니다. 다시 제출하기 전에 현재 프로필을 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_please_reload_d84df6b3",
+      "value": "불러올 수 없습니다. 다시 불러와 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_followers_please_retry_7ce0b640",
+      "value": "로드할 수 없습니다 팔로워. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_follow_result_still_not_confirmed_check_again_later_83effe90",
+      "value": "팔로우 결과가 아직 확인되지 않았습니다. 나중에 다시 확인해 주세요."
+    },
+    {
+      "name": "pm_follow_result_not_confirmed_reload_to_check_before_submitting_ag_002f7a05",
+      "value": "팔로우 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_the_website_rejected_this_action_6d58f2a6",
+      "value": "웹사이트에서 이 작업을 거부했습니다."
+    },
+    {
+      "name": "pm_board_follow_result_not_confirmed_reload_to_check_before_submitt_44c2a0cd",
+      "value": "보드 팔로우 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_read_photo_choose_a_png_jpeg_or_webp_image_of_4_mb_or__2ad5f56a",
+      "value": "사진을 읽을 수 없습니다. 4MB 이하의 PNG, JPEG 또는 WebP 이미지를 선택해 주세요."
+    },
+    {
+      "name": "pm_reloading_profile_picture_2f61cdcd",
+      "value": "새로고침 중 프로필 사진…"
+    },
+    {
+      "name": "pm_checking_profile_picture_status_03291105",
+      "value": "프로필 사진 상태를 확인하는 중…"
+    },
+    {
+      "name": "pm_uploading_profile_picture_dd6b1b58",
+      "value": "프로필 사진을 업로드하는 중…"
+    },
+    {
+      "name": "pm_photo_uploaded_processing_profile_picture_2fb3d576",
+      "value": "사진을 업로드했습니다. 프로필 사진을 처리하는 중…"
+    },
+    {
+      "name": "pm_profile_picture_reloaded_previous_upload_still_not_confirmed_upl_f11d47a5",
+      "value": "프로필 사진을 새로고침했습니다. 이전 업로드 결과가 아직 확인되지 않아 다시 업로드할 수 없습니다."
+    },
+    {
+      "name": "pm_profile_picture_refreshed_8b32b462",
+      "value": "프로필 사진을 새로고침했습니다"
+    },
+    {
+      "name": "pm_profile_picture_updated_a938ed15",
+      "value": "프로필 사진을 업데이트했습니다"
+    },
+    {
+      "name": "pm_the_website_could_not_process_your_profile_picture_you_can_selec_e9547476",
+      "value": "웹사이트에서 프로필 사진을 처리하지 못했습니다. 다른 사진을 선택할 수 있습니다."
+    },
+    {
+      "name": "pm_profile_picture_not_confirmed_tap_refresh_profile_picture_before_d22d4fa3",
+      "value": "프로필 사진 변경 결과가 확인되지 않았습니다. 다시 업로드하기 전에 프로필 사진을 새로고침해 주세요."
+    },
+    {
+      "name": "pm_profile_picture_not_uploaded_you_can_select_another_photo_8eb8ddd3",
+      "value": "프로필 사진이 업로드되지 않았습니다. 다른 사진을 선택할 수 있습니다."
+    },
+    {
+      "name": "pm_username_already_taken_28339665",
+      "value": "이미 사용 중인 사용자 이름입니다."
+    },
+    {
+      "name": "pm_username_already_taken_b003d15d",
+      "value": "이미 사용 중인 사용자 이름입니다"
+    },
+    {
+      "name": "pm_changes_saved_0027fdbb",
+      "value": "변경사항이 저장됨"
+    },
+    {
+      "name": "pm_days_ago_5972982c",
+      "value": "일 전"
+    },
+    {
+      "name": "pm_weeks_ago_2ad8bd1c",
+      "value": "주 전"
+    },
+    {
+      "name": "pm_months_ago_1bb931f2",
+      "value": "개월 전"
+    },
+    {
+      "name": "pm_years_ago_c533a6c6",
+      "value": "년 전"
+    },
+    {
+      "name": "pm_unable_to_verify_identity_close_and_retry_80632869",
+      "value": "본인 확인에 실패했습니다. 닫은 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_previous_organize_result_not_confirmed_refresh_to_check_before_s_b7a64551",
+      "value": "이전 정리 작업의 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_board_created_but_you_do_not_have_write_access_choose_another_bo_181fc3db",
+      "value": "보드는 만들었지만 수정 권한이 없습니다. 다른 보드를 선택해 주세요."
+    },
+    {
+      "name": "pm_contact_bfc96732",
+      "value": "연락처"
+    },
+    {
+      "name": "pm_followers_7c3af361",
+      "value": "팔로워"
+    },
+    {
+      "name": "pm_following_52ff9a6f",
+      "value": "팔로잉"
+    },
+    {
+      "name": "pm_today_d5f5a7a0",
+      "value": "오늘"
+    },
+    {
+      "name": "pm_unable_to_load_profile_please_retry_6dbb335a",
+      "value": "로드할 수 없습니다 프로필. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_content_please_retry_95306b92",
+      "value": "불러올 수 없습니다 콘텐츠. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_unorganized_pins_please_retry_df900d1b",
+      "value": "정리되지 않은 핀을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_the_website_rejected_this_action_10efc2d0",
+      "value": "웹사이트에서 이 작업을 거부했습니다."
+    },
+    {
+      "name": "pm_result_not_confirmed_close_and_refresh_to_check_before_submittin_5d6ac26e",
+      "value": "작업 결과가 확인되지 않았습니다. 다시 제출하기 전에 창을 닫고 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_loading_paused_go_back_and_retry_0ff69868",
+      "value": "불러오기가 일시 중지되었습니다. 이전 화면으로 돌아간 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_verify_account_go_back_refresh_and_retry_94555b9f",
+      "value": "계정을 확인하지 못했습니다. 이전 화면으로 돌아가 새로고침한 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_images_please_retry_de205818",
+      "value": "로드할 수 없습니다 이미지. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_created_but_you_do_not_have_publishing_access_choose_anoth_ca935e3f",
+      "value": "보드는 만들었지만 게시 권한이 없습니다. 다른 보드를 선택해 주세요."
+    },
+    {
+      "name": "pm_select_images_and_a_writable_board_422d3694",
+      "value": "이미지와 수정 가능한 보드를 선택해 주세요."
+    },
+    {
+      "name": "pm_confirmed_published_94dca36d",
+      "value": "게시 확인됨: "
+    },
+    {
+      "name": "pm_images_af788d11",
+      "value": " 이미지."
+    },
+    {
+      "name": "pm_page_actions_not_ready_please_retry_22ecc344",
+      "value": "페이지 작업을 사용할 준비가 되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_page_url_not_confirmed_please_retry_later_4d7b5e4b",
+      "value": "페이지 주소를 확인하지 못했습니다. 나중에 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_restore_home_session_please_retry_f8a861ac",
+      "value": "홈 세션을 복원하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_restore_profile_session_please_retry_978e1f96",
+      "value": "프로필 세션을 복원하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_page_please_retry_72a01316",
+      "value": "페이지를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_search_discovery_please_retry_f37a889f",
+      "value": "검색 탐색 결과를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_based_on_your_preferences_ecca4403",
+      "value": "회원님의 환경설정 기반"
+    },
+    {
+      "name": "pm_ideas_13319317",
+      "value": "아이디어"
+    },
+    {
+      "name": "pm_unable_to_load_inspiration_please_retry_f3a36d60",
+      "value": "영감 콘텐츠를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_deletion_was_not_submitted_please_retry_cecb3a50",
+      "value": "삭제 요청이 제출되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_deletion_not_confirmed_refresh_history_to_check_it_will_not_be_r_c0622bda",
+      "value": "삭제 결과가 확인되지 않았습니다. 기록을 새로고침해 확인해 주세요. 삭제 요청은 다시 제출되지 않습니다."
+    },
+    {
+      "name": "pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a",
+      "value": "이 필터 매개변수는 아직 네이티브 화면에서 지원되지 않습니다."
+    },
+    {
+      "name": "pm_weeks_5d7d6353",
+      "value": "주"
+    },
+    {
+      "name": "pm_unable_to_load_more_search_results_please_retry_8ba01840",
+      "value": "로드할 수 없습니다 더 검색 결과. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_search_results_please_retry_27aeffd1",
+      "value": "로드할 수 없습니다 검색 결과. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_search_suggestions_please_retry_547b05bc",
+      "value": "로드할 수 없습니다 검색 제안. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_wait_for_search_results_to_finish_loading_then_retry_5baf3b75",
+      "value": "검색 결과가 모두 표시될 때까지 기다린 다음 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_all_ideas_5c6d4a4e",
+      "value": "모든 아이디어"
+    },
+    {
+      "name": "pm_videos_c20f7618",
+      "value": "동영상"
+    },
+    {
+      "name": "pm_boards_53f23afe",
+      "value": "보드"
+    },
+    {
+      "name": "pm_products_58fdb094",
+      "value": "제품"
+    },
+    {
+      "name": "pm_products_aea82737",
+      "value": "제품"
+    },
+    {
+      "name": "pm_no_filters_available_for_this_search_7a80df5e",
+      "value": "없음:필터 사용할 수 있습니다  이 검색"
+    },
+    {
+      "name": "pm_unable_to_load_filters_please_retry_7c8fa733",
+      "value": "로드할 수 없습니다 필터. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_enter_a_valid_whole_number_price_range_minimum_cannot_exceed_max_2a617055",
+      "value": "정수로 올바른 가격 범위를 입력해 주세요. 최솟값은 최댓값보다 클 수 없습니다."
+    },
+    {
+      "name": "pm_the_website_rejected_this_follow_action_you_can_retry_d6d60818",
+      "value": "웹사이트에서 팔로우 요청을 거부했습니다. 다시 시도할 수 있습니다."
+    },
+    {
+      "name": "pm_profile_followed_6c9e8457",
+      "value": "프로필을 팔로우했습니다"
+    },
+    {
+      "name": "pm_profile_unfollowed_ecb7bb9d",
+      "value": "프로필 팔로우를 취소했습니다"
+    },
+    {
+      "name": "pm_profile_follow_result_not_confirmed_refresh_to_check_before_subm_1218b98b",
+      "value": "프로필 팔로우 결과가 확인되지 않았습니다. 다시 제출하기 전에 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_verify_session_please_reload_661f4ee3",
+      "value": "확인할 수 없습니다 세션. 다시 불러와 주세요."
+    },
+    {
+      "name": "pm_session_page_is_retrying_please_try_again_later_0393e43e",
+      "value": "세션 페이지를 다시 불러오는 중입니다. 잠시 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_session_page_unavailable_please_retry_d209f31a",
+      "value": "세션 페이지를 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_save_result_not_confirmed_reload_to_check_saving_will_not_be_ret_f7c0a062",
+      "value": "저장 결과가 확인되지 않았습니다. 새로고침해 확인해 주세요. 저장 요청은 자동으로 다시 시도되지 않습니다."
+    },
+    {
+      "name": "pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92",
+      "value": "이전 저장 결과가 확인되지 않았습니다. 현재 설정을 불러왔습니다. 다시 제출하지 마세요."
+    },
+    {
+      "name": "pm_reload_to_check_the_save_result_first_ebb8aa60",
+      "value": "먼저 새로고침하여 저장 결과를 확인해 주세요."
+    },
+    {
+      "name": "pm_settings_or_permissions_not_confirmed_reload_and_retry_ed2905c0",
+      "value": "설정 또는 권한을 확인하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238",
+      "value": "전송 결과가 확인되지 않았습니다. 다시 보내기 전에 대화를 확인해 주세요."
+    },
+    {
+      "name": "pm_share_loading_paused_please_retry_1a0f4d77",
+      "value": "공유 불러오는 중 일시 중지되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_the_website_rejected_this_send_action_bedc7ede",
+      "value": "웹사이트에서 전송 작업을 거부했습니다."
+    },
+    {
+      "name": "pm_send_to_5cf7607a",
+      "value": "보내기 "
+    },
+    {
+      "name": "pm_send_to_contacts_8760742d",
+      "value": "연락처로 보내기"
+    },
+    {
+      "name": "pm_search_people_62eb3f93",
+      "value": "사람 검색"
+    },
+    {
+      "name": "pm_copy_link_8e86f9b1",
+      "value": "복사 링크"
+    },
+    {
+      "name": "pm_unable_to_load_share_link_please_retry_677a539d",
+      "value": "불러올 수 없습니다 공유 링크. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_sharing_incomplete_please_retry_2a3623dc",
+      "value": "공유가 완료되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_send_details_missing_for_this_pin_reopen_sharing_b785bbba",
+      "value": "이 핀을 보낼 정보가 없습니다. 공유 화면을 다시 열어 주세요."
+    },
+    {
+      "name": "pm_sent_60823aae",
+      "value": "전송됨"
+    },
+    {
+      "name": "pm_unable_to_copy_link_please_retry_d1b1765b",
+      "value": "복사할 수 없습니다 링크. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_choose_photo_please_retry_50d94255",
+      "value": "선택할 수 없습니다 사진. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_read_photo_please_retry_b7f672b3",
+      "value": "읽을 수 없습니다 사진. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_downloading_to_the_selected_folder_7f7c1d0f",
+      "value": "선택한 폴더에 다운로드하는 중"
+    },
+    {
+      "name": "pm_download_complete_check_the_selected_folder_bac45b27",
+      "value": "다운로드가 완료되었습니다. 선택한 폴더를 확인해 주세요."
+    },
+    {
+      "name": "pm_download_failed_please_retry_45f5dfb2",
+      "value": "다운로드에 실패했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_access_download_folder_32830afc",
+      "value": "다운로드 폴더에 접근할 수 없습니다."
+    },
+    {
+      "name": "pm_unable_to_start_download_7e24b28f",
+      "value": "시작할 수 없습니다 다운로드"
+    },
+    {
+      "name": "pm_session_page_loading_timed_out_please_retry_6a97119e",
+      "value": "세션 페이지를 불러오는 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_collaborators_unavailable_go_back_and_retry_aefe5f42",
+      "value": "공동 작업자를 사용할 수 없습니다. 이전 화면으로 돌아가 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_collaborator_status_go_back_and_reopen_81943de5",
+      "value": "공동 작업자 상태를 불러오지 못했습니다. 이전 화면으로 돌아가 다시 열어 주세요."
+    },
+    {
+      "name": "pm_unable_to_reopen_board_please_retry_4c48ed5a",
+      "value": "보드를 다시 열지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_pin_unavailable_please_retry_da7269cf",
+      "value": "핀 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_service_unavailable_please_retry_54ecc389",
+      "value": "보드 서비스를 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_category_loading_timed_out_please_retry_221c2005",
+      "value": "카테고리를 불러오는 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_home_feed_sync_timed_out_please_retry_4743a0b5",
+      "value": "홈 피드를 동기화하는 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_the_current_pinterest_home_feed_534c116d",
+      "value": "현재 Pinterest 홈 피드를 불러오지 못했습니다."
+    },
+    {
+      "name": "pm_unable_to_load_home_feed_pull_down_to_retry_8109cb8c",
+      "value": "홈 피드를 불러오지 못했습니다. 아래로 당겨 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_category_please_retry_b9d681bc",
+      "value": "불러올 수 없습니다 카테고리. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_saved_board_categories_please_retry_9898146b",
+      "value": "저장한 보드 카테고리를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_category_unavailable_please_retry_ffd3c0c8",
+      "value": "카테고리 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_category_sync_timed_out_pull_down_to_retry_0ef0ac15",
+      "value": "카테고리 동기화 시간이 초과되었습니다. 아래로 당겨 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_saved_board_category_retry_unavailable_please_retry_b497b177",
+      "value": "저장한 보드 카테고리를 다시 불러올 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_saved_board_category_retry_failed_please_retry_8dd349ed",
+      "value": "저장한 보드 카테고리를 다시 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_refresh_home_feed_please_retry_2a2d3d08",
+      "value": "할 수 없습니다: 새로고침 홈 피드. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_home_refresh_timed_out_pull_down_to_retry_e58a0305",
+      "value": "홈 새로고침 시간이 초과되었습니다. 아래로 당겨 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_board_invitations_4d08df75",
+      "value": "로드할 수 없습니다 보드 초대"
+    },
+    {
+      "name": "pm_preview_again_8b57e592",
+      "value": ". 미리보기 다시"
+    },
+    {
+      "name": "pm_unable_to_load_invitation_status_3b7db431",
+      "value": "불러올 수 없습니다 초대 상태"
+    },
+    {
+      "name": "pm_invitation_status_mismatch_5dd76795",
+      "value": "초대 상태가 일치하지 않습니다."
+    },
+    {
+      "name": "pm_invitation_acceptance_not_confirmed_28de5619",
+      "value": "초대 수락 확인되지 않음"
+    },
+    {
+      "name": "pm_inbox_service_unavailable_please_retry_dc0da88f",
+      "value": "받은 편지함 서비스를 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_message_action_unavailable_please_retry_e826e521",
+      "value": "메시지 작업 사용할 수 없음. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_pinterest_inbox_please_retry_bec7d32f",
+      "value": "Pinterest 받은 편지함을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unsupported_inbox_content_please_retry_43d4cd41",
+      "value": "지원하지 않는 받은 편지함 콘텐츠입니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_restore_inbox_tab_please_retry_d832e51b",
+      "value": "받은 편지함 탭을 복원하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_inbox_tab_restoration_timed_out_please_retry_fd70c4b2",
+      "value": "받은 편지함 탭을 복원하는 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_updates_please_retry_676b7924",
+      "value": "로드할 수 없습니다 업데이트. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_conversations_please_retry_3dd73816",
+      "value": "대화를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_inbox_switch_timed_out_please_retry_e57432cd",
+      "value": "받은 편지함을 전환하는 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_current_tab_unavailable_please_retry_4b80dd7e",
+      "value": "현재 탭 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_more_updates_please_retry_0e6baee9",
+      "value": "로드할 수 없습니다 더 업데이트. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_reload_inbox_please_retry_later_d9b4baf8",
+      "value": "받은 편지함을 새로고침하지 못했습니다. 나중에 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_reload_contacts_please_retry_c055739a",
+      "value": "할 수 없습니다: 다시 불러오기 연락처. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_pin_status_not_confirmed_please_retry_1912a724",
+      "value": "핀 상태 확인되지 않음. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_prepare_pin_status_please_retry_fc28066e",
+      "value": "핀 상태를 확인할 준비를 하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_source_link_unavailable_227bfbcd",
+      "value": "소스 링크를 사용할 수 없음"
+    },
+    {
+      "name": "pm_unable_to_open_source_link_please_retry_4c76fd4e",
+      "value": "원본 링크를 열지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_this_action_is_temporarily_unavailable_please_retry_2285ed75",
+      "value": "이 작업을 일시적으로 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_image_search_incomplete_please_retry_d0495d24",
+      "value": "이미지 검색이 완료되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_image_search_unavailable_please_retry_61274e69",
+      "value": "이미지 검색 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unsave_result_not_confirmed_reload_the_pin_to_check_e46e897b",
+      "value": "저장 취소 결과가 확인되지 않았습니다. 핀을 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_unsave_not_confirmed_reload_to_check_bf5bd2e0",
+      "value": "저장 취소 여부가 확인되지 않았습니다. 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_video_url_loading_unavailable_please_retry_2847c034",
+      "value": "동영상 주소를 불러올 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_url_result_not_confirmed_please_retry_23ffdee3",
+      "value": "동영상 URL 결과 확인되지 않음. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_service_unavailable_please_retry_79dca73d",
+      "value": "동영상 서비스를 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_like_not_confirmed_please_retry_840b5e22",
+      "value": "좋아요 처리 여부가 확인되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_like_did_not_take_effect_returned_to_the_detail_session_e201c241",
+      "value": "좋아요가 적용되지 않았습니다. 상세 화면으로 돌아왔습니다."
+    },
+    {
+      "name": "pm_ai_modified_24e3f775",
+      "value": "AI로 수정됨"
+    },
+    {
+      "name": "pm_service_unavailable_please_reload_e513bb12",
+      "value": "서비스를 사용할 수 없습니다. 다시 불러와 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_status_reload_to_check_69a1522f",
+      "value": "불러올 수 없습니다 상태. 다시 불러와 확인해 주세요."
+    },
+    {
+      "name": "pm_result_not_confirmed_close_and_reload_to_check_9a764aad",
+      "value": "결과가 확인되지 않았습니다. 창을 닫고 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_action_please_retry_60515dd2",
+      "value": "불러올 수 없습니다 작업. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_comment_submission_not_confirmed_reload_to_check_8698f5b2",
+      "value": "댓글 제출 결과가 확인되지 않았습니다. 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_option_loading_paused_please_retry_aedb895b",
+      "value": "옵션 불러오기가 일시 중지되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_pinterest_share_panel_reopen_sharing_2f7f03b8",
+      "value": "Pinterest 공유 패널을 불러오지 못했습니다. 공유를 다시 열어 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_share_data_please_retry_1f9affe6",
+      "value": "로드할 수 없습니다 공유 데이터. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_share_options_temporarily_unavailable_e5eb170e",
+      "value": "공유 옵션을 일시적으로 사용할 수 없습니다."
+    },
+    {
+      "name": "pm_unable_to_close_website_options_please_retry_4162f998",
+      "value": "웹사이트 옵션을 닫지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_pinterest_options_reopen_the_options_menu_16720c78",
+      "value": "Pinterest 옵션을 불러오지 못했습니다. 옵션 메뉴를 다시 열어 주세요."
+    },
+    {
+      "name": "pm_options_temporarily_unavailable_839cbe86",
+      "value": "옵션을 일시적으로 사용할 수 없음"
+    },
+    {
+      "name": "pm_unable_to_open_pinterest_share_options_reopen_sharing_bc040277",
+      "value": "Pinterest 공유 옵션을 열지 못했습니다. 공유 메뉴를 다시 열어 주세요."
+    },
+    {
+      "name": "pm_contact_search_unavailable_00543593",
+      "value": "연락처를 검색할 수 없습니다."
+    },
+    {
+      "name": "pm_unable_to_reload_share_options_close_and_retry_1cf702a7",
+      "value": "할 수 없습니다: 다시 불러오기 공유 옵션. 닫기 및 다시 시도."
+    },
+    {
+      "name": "pm_unable_to_reload_share_options_ed329738",
+      "value": "할 수 없습니다: 다시 불러오기 공유 옵션"
+    },
+    {
+      "name": "pm_this_option_is_unavailable_9fcf4515",
+      "value": "이 옵션은 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_action_could_not_be_sent_please_retry_9ba04b0e",
+      "value": "작업을 전송하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_reload_options_close_and_retry_f384fda1",
+      "value": "할 수 없습니다: 다시 불러오기 옵션. 닫기 및 다시 시도."
+    },
+    {
+      "name": "pm_unable_to_reload_options_5bae4308",
+      "value": "할 수 없습니다: 다시 불러오기 옵션"
+    },
+    {
+      "name": "pm_unable_to_send_please_retry_bbf944b6",
+      "value": "보낼 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_share_link_not_ready_50227487",
+      "value": "공유 링크 준비되지 않았습니다"
+    },
+    {
+      "name": "pm_this_share_option_is_unavailable_1fb6c5df",
+      "value": "이 공유 옵션은 사용할 수 없습니다"
+    },
+    {
+      "name": "pm_action_incomplete_please_retry_bb26135d",
+      "value": "작업이 완료되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_video_url_needs_to_be_reloaded_284e10da",
+      "value": "동영상 URL을 다시 불러와야 합니다"
+    },
+    {
+      "name": "pm_detail_connection_unavailable_please_retry_ea1c8156",
+      "value": "상세 페이지에 연결할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_detail_connection_not_ready_please_retry_f7c2eb9f",
+      "value": "상세 페이지 연결이 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_profile_session_not_ready_please_retry_e69d88f3",
+      "value": "프로필 세션 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_6aa27f14",
+      "value": "로드할 수 없습니다"
+    },
+    {
+      "name": "pm_follow_result_not_confirmed_refresh_to_check_ade045cc",
+      "value": "팔로우 결과 확인되지 않음. 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_save_result_not_confirmed_reload_the_profile_to_check_63f4845d",
+      "value": "저장 결과를 확인하지 못했습니다. 프로필을 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_profile_tab_not_ready_please_retry_31a9567e",
+      "value": "프로필 탭이 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_profile_tab_has_not_switched_yet_please_retry_2456e537",
+      "value": "프로필 탭이 아직 전환되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_switch_profile_tab_please_retry_f8e71b53",
+      "value": "프로필 탭을 전환하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_this_action_is_unavailable_refresh_and_retry_b8e900b6",
+      "value": "이 작업을 사용할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_organize_result_not_confirmed_refresh_to_check_4be7f3cf",
+      "value": "정리 작업 결과가 확인되지 않았습니다. 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_organize_refresh_and_retry_b830cf7b",
+      "value": "정리할 수 없습니다. 새로고침한 후 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_the_current_pinterest_profile_a117bd19",
+      "value": "현재 Pinterest 프로필을 불러오지 못했습니다."
+    },
+    {
+      "name": "pm_profile_session_not_ready_please_retry_f72f27fd",
+      "value": "프로필 세션 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_profile_data_please_retry_c7797c89",
+      "value": "불러올 수 없습니다 프로필 데이터. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_publishing_not_ready_close_and_retry_ba174c2b",
+      "value": "게시 중 준비되지 않았습니다. 닫기 및 다시 시도."
+    },
+    {
+      "name": "pm_publishing_service_unavailable_go_back_and_retry_771a82b9",
+      "value": "게시 서비스를 사용할 수 없습니다. 이전 화면으로 돌아가 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_publishing_status_go_back_and_retry_ade379b3",
+      "value": "게시 상태를 불러오지 못했습니다. 이전 화면으로 돌아가 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_action_unavailable_go_back_and_retry_4ce37c85",
+      "value": "작업을 사용할 수 없습니다. 이전 화면으로 돌아가 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_choose_a_photo_of_4_mb_or_less_df3ed00c",
+      "value": "4MB 이하의 사진을 선택하세요"
+    },
+    {
+      "name": "pm_png_jpeg_and_webp_photos_are_supported_1f142b57",
+      "value": "PNG, JPEG, WebP 사진을 지원합니다"
+    },
+    {
+      "name": "pm_filter_loading_cancelled_please_retry_a3e57b38",
+      "value": "필터 불러오기가 취소되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_search_actions_not_ready_please_retry_later_bd323e4c",
+      "value": "검색 작업을 아직 사용할 수 없습니다. 나중에 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_filters_for_this_pinterest_page_08763816",
+      "value": "현재 Pinterest 페이지의 필터를 불러오지 못했습니다."
+    },
+    {
+      "name": "pm_unable_to_load_filters_please_retry_39cd5364",
+      "value": "로드할 수 없습니다 필터. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_invalid_filter_bridge_response_please_retry_ebae09ee",
+      "value": "필터 연결 응답이 올바르지 않습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_search_session_not_synced_reopen_filters_c6d2f15c",
+      "value": "검색 세션이 동기화되지 않았습니다. 필터를 다시 열어 주세요."
+    },
+    {
+      "name": "pm_current_search_data_not_ready_for_filters_please_retry_ded4c504",
+      "value": "현재 검색 데이터가 필터를 표시할 준비가 되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_filters_returned_an_empty_list_please_retry_01f82407",
+      "value": "필터 목록이 비어 있습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_no_filters_available_on_the_current_page_9fef2239",
+      "value": "현재 페이지에 사용할 수 있는 필터가 없습니다"
+    },
+    {
+      "name": "pm_filter_navigation_failed_please_retry_a23560f3",
+      "value": "필터 화면으로 이동하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_the_current_pinterest_search_f8b2770a",
+      "value": "현재 Pinterest 검색 결과를 불러오지 못했습니다."
+    },
+    {
+      "name": "pm_unsupported_pinterest_search_content_fdfec055",
+      "value": "지원하지 않는 Pinterest 검색 콘텐츠입니다."
+    },
+    {
+      "name": "pm_search_input_unavailable_please_retry_c06b9cf0",
+      "value": "검색어를 입력할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_submit_search_please_retry_3940e2b2",
+      "value": "검색을 실행하지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_search_history_deletion_not_confirmed_refresh_history_to_check_faf71160",
+      "value": "검색 기록 삭제 결과가 확인되지 않았습니다. 기록을 새로고침해 확인해 주세요."
+    },
+    {
+      "name": "pm_unable_to_open_this_search_category_please_retry_379bc598",
+      "value": "이 검색 카테고리를 열지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_pin_link_unavailable_reload_search_results_bcf030ed",
+      "value": "핀 링크 사용할 수 없음. 새로고침 검색 결과."
+    },
+    {
+      "name": "pm_unable_to_open_this_pinterest_content_please_retry_c117d1cf",
+      "value": "이 Pinterest 콘텐츠를 열지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_topic_link_expired_please_reload_0e9eac32",
+      "value": "토픽 링크가 만료되었습니다. 다시 불러와 주세요."
+    },
+    {
+      "name": "pm_search_category_has_not_updated_please_retry_780f80cc",
+      "value": "검색 카테고리가 업데이트되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_search_option_unavailable_please_retry_b12ab3e3",
+      "value": "검색 옵션을 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_reload_search_content_e56b6f94",
+      "value": "할 수 없습니다: 다시 불러오기 검색 콘텐츠"
+    },
+    {
+      "name": "pm_inspiration_action_not_ready_please_retry_942ba63e",
+      "value": "영감 기능을 사용할 준비가 되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_use_inspiration_action_please_retry_5927da2f",
+      "value": "영감 기능을 사용할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_notification_settings_timed_out_please_retry_5b47d36f",
+      "value": "알림 설정을 불러오는 시간이 초과되었습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_unable_to_load_notification_settings_please_retry_c76a03e7",
+      "value": "알림 설정을 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_profile_session_not_ready_please_retry_fc9bf8b4",
+      "value": "프로필 세션 준비되지 않았습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_update_check_failed_incomplete_release_history_tap_to_retry_59646f2e",
+      "value": "릴리스 기록이 불완전하여 업데이트를 확인하지 못했습니다. 탭하여 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_github_connection_exceeded_12_seconds_f13449d8",
+      "value": "GitHub 연결 시간이 12초를 초과했습니다"
+    },
+    {
+      "name": "pm_github_access_restricted_http_f36de88e",
+      "value": "GitHub 액세스가 제한되었습니다. HTTP "
+    },
+    {
+      "name": "pm_github_returned_http_8ae4d6ab",
+      "value": "GitHub에서 반환한 HTTP 상태: "
+    },
+    {
+      "name": "pm_invalid_release_information_1050d6f8",
+      "value": "릴리스 정보가 잘못되었습니다"
+    },
+    {
+      "name": "pm_network_error_d8e20c2f",
+      "value": "네트워크 오류 "
+    },
+    {
+      "name": "pm_unable_to_connect_to_github_a30d0dd6",
+      "value": "GitHub에 연결할 수 없습니다"
+    },
+    {
+      "name": "pm_update_check_failed_eaae93d1",
+      "value": "업데이트 확인 실패 ("
+    },
+    {
+      "name": "pm_tap_to_retry_66897f19",
+      "value": "). 탭하여 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_1_section_4d13c778",
+      "value": "1 섹션"
+    },
+    {
+      "name": "pm_birthdate_display",
+      "value": "{1}/{2}/{0}"
+    },
+    {
+      "name": "pm_one_day_ago_suffix",
+      "value": "일 전"
+    },
+    {
+      "name": "pm_one_week_ago_suffix",
+      "value": "주 전"
+    },
+    {
+      "name": "pm_one_month_ago_suffix",
+      "value": "개월 전"
+    },
+    {
+      "name": "pm_one_year_ago_suffix",
+      "value": "년 전"
+    },
+    {
+      "name": "pm_immersive_light",
+      "value": "몰입형 조명"
+    },
+    {
+      "name": "pm_light_off",
+      "value": "끔"
+    },
+    {
+      "name": "pm_light_gentle",
+      "value": "부드럽게"
+    },
+    {
+      "name": "pm_light_immersive",
+      "value": "몰입형"
+    },
+    {
+      "name": "pm_light_exquisite",
+      "value": "정교하게"
+    },
+    {
+      "name": "pm_inbox_search_username",
+      "value": "사용자 이름 검색"
+    },
+    {
+      "name": "pm_inbox_no_matching_username",
+      "value": "일치하는 사용자 이름이 없습니다"
+    },
+    {
+      "name": "pm_photo_search",
+      "value": "사진 검색"
+    },
+    {
+      "name": "pm_photo_search_loading",
+      "value": "사진 검색 중…"
+    },
+    {
+      "name": "pm_photo_search_empty",
+      "value": "일치하는 핀이 없습니다"
+    },
+    {
+      "name": "pm_photo_search_unconfirmed",
+      "value": "사진 검색이 완료되지 않았거나 결과가 확인되지 않았습니다. 닫고 사진을 다시 선택해 주세요."
+    },
+    {
+      "name": "pm_notifications_turn_off_all",
+      "value": "모두 끄기"
+    },
+    {
+      "name": "pm_notifications_disable_push",
+      "value": "중요 업데이트, 계정 설정 및 개인정보 보호 관련 이메일을 제외하고 Pinterest 개인 계정의 푸시 알림을 더 이상 받지 않습니다."
+    },
+    {
+      "name": "pm_notifications_disable_email",
+      "value": "중요 업데이트, 계정 설정 및 개인정보 보호 관련 이메일을 제외하고 Pinterest 개인 계정의 이메일 알림을 더 이상 받지 않습니다."
+    },
+    {
+      "name": "pm_notifications_disable_news",
+      "value": "중요 업데이트, 계정 설정 및 개인정보 보호 관련 이메일을 제외하고 Pinterest 개인 계정의 앱 내 알림을 더 이상 받지 않습니다."
+    },
+    {
+      "name": "pm_social_title",
+      "value": "소셜 권한"
+    },
+    {
+      "name": "pm_social_messages",
+      "value": "메시지"
+    },
+    {
+      "name": "pm_social_message_settings",
+      "value": "메시지 설정"
+    },
+    {
+      "name": "pm_social_blocked",
+      "value": "차단된 계정"
+    },
+    {
+      "name": "pm_social_mentions",
+      "value": "@멘션"
+    },
+    {
+      "name": "pm_social_friends",
+      "value": "친구"
+    },
+    {
+      "name": "pm_social_followers",
+      "value": "팔로워"
+    },
+    {
+      "name": "pm_social_following",
+      "value": "팔로잉"
+    },
+    {
+      "name": "pm_social_others",
+      "value": "그 외 모든 사람"
+    },
+    {
+      "name": "pm_social_intro",
+      "value": "Pinterest에서 다른 사람이 나와 소통하는 방법과 이전에 교류한 핀을 찾아보는 방법을 설정하세요."
+    },
+    {
+      "name": "pm_social_message_settings_detail",
+      "value": "나에게 메시지를 보내고 그룹 대화에 추가할 수 있는 사람을 선택합니다"
+    },
+    {
+      "name": "pm_social_blocked_detail",
+      "value": "차단한 사람을 관리합니다"
+    },
+    {
+      "name": "pm_social_mentions_detail",
+      "value": "댓글에서 나를 멘션할 수 있는 사람을 선택합니다"
+    },
+    {
+      "name": "pm_social_message_intro",
+      "value": "메시지를 받은편지함이나 요청으로 전달할지 또는 무시할지 선택합니다"
+    },
+    {
+      "name": "pm_social_business_messages",
+      "value": "다른 사람이 내 비즈니스 계정에 메시지를 보낼 수 있도록 허용"
+    },
+    {
+      "name": "pm_social_business_detail",
+      "value": "프로필의 메시지 버튼을 통해 다른 사람이 내 비즈니스에 메시지를 보낼 수 있습니다."
+    },
+    {
+      "name": "pm_social_unavailable",
+      "value": "현재 이용할 수 없음"
+    },
+    {
+      "name": "pm_social_direct",
+      "value": "받은편지함"
+    },
+    {
+      "name": "pm_social_requests",
+      "value": "요청"
+    },
+    {
+      "name": "pm_social_ignore",
+      "value": "전달하지 않음"
+    },
+    {
+      "name": "pm_social_delivery",
+      "value": "메시지가 전달될 위치를 선택합니다"
+    },
+    {
+      "name": "pm_social_friends_detail",
+      "value": "회원님이 팔로우하며 상대방도 회원님을 팔로우하는 사람입니다."
+    },
+    {
+      "name": "pm_social_followers_detail",
+      "value": "회원님을 팔로우하는 사람과 브랜드입니다. 팔로워에게 메시지를 보내려면 회원님도 상대방을 팔로우해야 합니다."
+    },
+    {
+      "name": "pm_social_following_detail",
+      "value": "회원님이 팔로우하는 사람과 브랜드입니다. 메시지를 보내려면 상대방도 회원님을 팔로우해야 합니다."
+    },
+    {
+      "name": "pm_social_others_detail",
+      "value": "Pinterest에서 아직 교류하거나 공동 작업을 한 적이 없는 사람입니다."
+    },
+    {
+      "name": "pm_social_blocked_intro",
+      "value": "차단하면 서로를 보거나 팔로우하거나 연락하거나 서로의 핀을 저장할 수 없습니다."
+    },
+    {
+      "name": "pm_social_no_blocked",
+      "value": "현재 차단한 계정이 없습니다"
+    },
+    {
+      "name": "pm_social_no_matches",
+      "value": "일치하는 계정이 없습니다"
+    },
+    {
+      "name": "pm_social_search",
+      "value": "검색"
+    },
+    {
+      "name": "pm_social_unblock",
+      "value": "차단 해제"
+    },
+    {
+      "name": "pm_social_unblock_title",
+      "value": "{0} 차단을 해제할까요?"
+    },
+    {
+      "name": "pm_social_unblock_description",
+      "value": "설정에 따라 이 사람의 콘텐츠를 보고, 팔로우하거나 연락할 수 있으며 핀을 저장할 수 있습니다."
+    },
+    {
+      "name": "pm_social_mentions_anyone",
+      "value": "Pinterest의 모든 사용자"
+    },
+    {
+      "name": "pm_social_mentions_following",
+      "value": "내가 팔로우하는 사람만"
+    },
+    {
+      "name": "pm_social_mentions_off",
+      "value": "끄기"
+    },
+    {
+      "name": "pm_social_others_short",
+      "value": "기타"
+    },
+    {
+      "name": "pm_settings_help_center",
+      "value": "고객센터"
+    },
+    {
+      "name": "pm_settings_terms_of_service",
+      "value": "서비스 약관"
+    },
+    {
+      "name": "pm_settings_privacy_policy",
+      "value": "개인정보 처리방침"
+    },
+    {
+      "name": "pm_profile_search_your_pins",
+      "value": "내 핀"
+    },
+    {
+      "name": "pm_profile_search_recent",
+      "value": "최근 검색"
+    },
+    {
+      "name": "pm_profile_search_empty",
+      "value": "일치하는 핀이 없습니다"
+    },
+    {
+      "name": "pm_notify_category_published_comments",
+      "value": "댓글"
+    },
+    {
+      "name": "pm_notify_category_published_reactions",
+      "value": "반응"
+    },
+    {
+      "name": "pm_notify_category_published_saves",
+      "value": "저장"
+    },
+    {
+      "name": "pm_notify_category_views_and_impressions",
+      "value": "조회수 및 노출수"
+    },
+    {
+      "name": "pm_notify_category_published_collages",
+      "value": "콜라주"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_comments",
+      "value": "댓글"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_mentions",
+      "value": "멘션"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_reminders",
+      "value": "알림"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_tries",
+      "value": "사진이 포함된 댓글"
+    },
+    {
+      "name": "pm_notify_category_group_board_updates",
+      "value": "그룹 보드 업데이트"
+    },
+    {
+      "name": "pm_notify_category_group_board_invites",
+      "value": "그룹 보드 초대"
+    },
+    {
+      "name": "pm_notify_category_messages",
+      "value": "메시지"
+    },
+    {
+      "name": "pm_notify_category_followers",
+      "value": "팔로워"
+    },
+    {
+      "name": "pm_notify_category_homefeed_pins",
+      "value": "홈 피드에서 추천"
+    },
+    {
+      "name": "pm_notify_category_pins_picked_for_you",
+      "value": "관심사 기반 추천"
+    },
+    {
+      "name": "pm_notify_category_based_on_activity",
+      "value": "활동 기반 추천"
+    },
+    {
+      "name": "pm_notify_category_board_recommendations",
+      "value": "추천 보드"
+    },
+    {
+      "name": "pm_notify_category_search_recommendations",
+      "value": "추천 검색"
+    },
+    {
+      "name": "pm_notify_category_followee_pins",
+      "value": "팔로우하는 사람들의 핀"
+    },
+    {
+      "name": "pm_notify_category_shadow_followee_pins",
+      "value": "관심을 가질 만한 사람들의 핀"
+    },
+    {
+      "name": "pm_notify_category_shopping_recommendations",
+      "value": "쇼핑 핀"
+    },
+    {
+      "name": "pm_notify_category_pinterest_announcements",
+      "value": "Pinterest 공지"
+    },
+    {
+      "name": "pm_notify_category_surveys_and_quizzes",
+      "value": "설문조사 및 퀴즈"
+    },
+    {
+      "name": "pm_notify_category_reports_and_violations_center",
+      "value": "신고 및 위반 센터 업데이트"
+    },
+    {
+      "name": "pm_notify_category_shuffles_activity",
+      "value": "Shuffles 활동"
+    },
+    {
+      "name": "pm_notify_group_created",
+      "value": "내가 만든 핀"
+    },
+    {
+      "name": "pm_notify_group_saved",
+      "value": "내가 저장한 핀"
+    },
+    {
+      "name": "pm_notify_group_social",
+      "value": "소셜 활동"
+    },
+    {
+      "name": "pm_notify_group_recommendations",
+      "value": "추천"
+    },
+    {
+      "name": "pm_notify_group_other",
+      "value": "기타 알림"
+    },
+    {
+      "name": "pm_notify_group_delivery",
+      "value": "알림 수신 방법"
+    },
+    {
+      "name": "pm_notify_title",
+      "value": "알림 관리"
+    },
+    {
+      "name": "pm_notify_how",
+      "value": "알림을 받을 방법"
+    },
+    {
+      "name": "pm_notify_push",
+      "value": "푸시"
+    },
+    {
+      "name": "pm_notify_email",
+      "value": "이메일"
+    },
+    {
+      "name": "pm_notify_news",
+      "value": "앱 내"
+    },
+    {
+      "name": "pm_notify_on",
+      "value": "켜짐"
+    },
+    {
+      "name": "pm_notify_off",
+      "value": "꺼짐"
+    },
+    {
+      "name": "pm_notify_comments_description",
+      "value": "내가 만든 핀에 댓글이 달리면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_search_description",
+      "value": "좋아하는 콘텐츠를 더 찾을 수 있도록 맞춤 검색어를 받습니다"
+    },
+    {
+      "name": "pm_notify_global_description",
+      "value": "계정에 관한 중요한 업데이트는 Pinterest에서 계속 보내드립니다"
+    },
+    {
+      "name": "pm_autoplay_video_title",
+      "value": "동영상 자동 재생"
+    },
+    {
+      "name": "pm_autoplay_video_cellular",
+      "value": "모바일 데이터에서 동영상 자동 재생"
+    },
+    {
+      "name": "pm_autoplay_video_wifi",
+      "value": "Wi-Fi에서 동영상 자동 재생"
+    },
+    {
+      "name": "pm_custom_gender_fallback",
+      "value": "맞춤"
+    },
+    {
+      "name": "pm_board_load_section_details_failed",
+      "value": "로드할 수 없습니다 섹션 세부 정보. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_load_section_tools_failed",
+      "value": "섹션 도구를 불러오지 못했습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_load_recommendations_failed",
+      "value": "로드할 수 없습니다 추천 콘텐츠. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_load_board_details_failed",
+      "value": "로드할 수 없습니다 보드 세부 정보. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_board_load_board_content_failed",
+      "value": "불러올 수 없습니다 보드 콘텐츠. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_notify_description_published_comments",
+      "value": "내가 만든 핀에 댓글이 달리면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_published_reactions",
+      "value": "내가 만든 핀에 반응이 있으면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_published_saves",
+      "value": "내가 만든 핀이 저장되면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_views_and_impressions",
+      "value": "내 핀의 조회수와 노출수 업데이트를 받습니다"
+    },
+    {
+      "name": "pm_notify_description_published_collages",
+      "value": "내 핀이 포함된 콜라주에 대한 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_comments",
+      "value": "내가 저장한 핀에 달린 댓글 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_mentions",
+      "value": "내가 저장한 핀에서 언급되면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_reminders",
+      "value": "저장한 핀에 대한 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_tries",
+      "value": "내가 저장한 핀에 사진 댓글이 달리면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_group_board_updates",
+      "value": "그룹 보드 활동 업데이트를 받습니다"
+    },
+    {
+      "name": "pm_notify_description_group_board_invites",
+      "value": "그룹 보드 초대를 보내거나 받으면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_messages",
+      "value": "메시지를 받으면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_followers",
+      "value": "누군가 나를 팔로우하면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_homefeed_pins",
+      "value": "놓쳤을 수 있는 홈 피드의 인기 핀을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_pins_picked_for_you",
+      "value": "관심사에 맞는 인기 핀 추천을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_based_on_activity",
+      "value": "활동, 관심사 및 보드를 바탕으로 핀을 추천받습니다"
+    },
+    {
+      "name": "pm_notify_description_board_recommendations",
+      "value": "보드 추천을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_search_recommendations",
+      "value": "좋아하는 콘텐츠를 더 찾을 수 있도록 맞춤 검색어를 받습니다"
+    },
+    {
+      "name": "pm_notify_description_followee_pins",
+      "value": "팔로우하는 사람이 새 핀을 게시하면 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_shadow_followee_pins",
+      "value": "좋아할 만한 사람들의 핀 알림을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_shopping_recommendations",
+      "value": "저장한 핀의 가격이 내려가면 알려드립니다"
+    },
+    {
+      "name": "pm_notify_description_pinterest_announcements",
+      "value": "Pinterest 최신 소식을 받습니다"
+    },
+    {
+      "name": "pm_notify_description_surveys_and_quizzes",
+      "value": "설문조사에 참여해 Pinterest 개선을 돕고 새로운 퀴즈를 찾아보세요"
+    },
+    {
+      "name": "pm_notify_description_reports_and_violations_center",
+      "value": "내 콘텐츠 또는 신고한 콘텐츠와 관련된 신고 및 위반 업데이트를 받습니다"
+    },
+    {
+      "name": "pm_notify_description_shuffles_activity",
+      "value": "Shuffles 활동 업데이트를 받습니다"
+    },
+    {
+      "name": "pm_social_blocked_partial",
+      "value": "현재 응답에 포함된 계정만 표시하고 있습니다. 차단된 계정 전체 목록은 아직 확인되지 않았습니다."
+    },
+    {
+      "name": "pm_view_comment_replies",
+      "value": "답글 {0}개 보기"
+    },
+    {
+      "name": "pm_photo_upload",
+      "value": "사진 업로드"
+    },
+    {
+      "name": "pm_photo_history",
+      "value": "사진 검색 기록"
+    },
+    {
+      "name": "pm_photo_history_select",
+      "value": "기록 사진 선택"
+    },
+    {
+      "name": "pm_photo_history_confirm",
+      "value": "확인"
+    },
+    {
+      "name": "pm_photo_history_empty",
+      "value": "사진 검색 기록이 없습니다"
+    },
+    {
+      "name": "pm_photo_history_error",
+      "value": "사진을 불러올 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_social_business_tab",
+      "value": "비즈니스"
+    },
+    {
+      "name": "pm_photo_history_single_only",
+      "value": "검색에는 사진 한 장만 선택할 수 있습니다."
+    },
+    {
+      "name": "pm_press_back_again_to_exit",
+      "value": "뒤로 버튼을 한 번 더 누르면 종료됩니다"
+    },
+    {
+      "value": "이 보드를 공개로 설정",
+      "name": "pm_board_make_public"
+    },
+    {
+      "value": "누구나 이 보드를 볼 수 있습니다. 프로필에 표시되며 Pinterest의 검색 결과나 다른 영역에도 나타날 수 있습니다.",
+      "name": "pm_board_public_description"
+    },
+    {
+      "value": "이 보드는 공개 상태입니다",
+      "name": "pm_board_public_title"
+    },
+    {
+      "value": "누구나 이 보드를 볼 수 있습니다",
+      "name": "pm_board_public_visibility"
+    },
+    {
+      "value": "나와 공동 작업자만 이 보드를 볼 수 있습니다. 공개 프로필이나 검색 결과를 비롯한 Pinterest의 다른 영역에는 표시되지 않습니다.",
+      "name": "pm_board_secret_description"
+    },
+    {
+      "value": "이 보드는 비밀 보드입니다",
+      "name": "pm_board_secret_title"
+    },
+    {
+      "value": "나와 공동 작업자만 볼 수 있습니다",
+      "name": "pm_board_secret_visibility"
+    },
+    {
+      "name": "pm_video_connection_timeout",
+      "value": "동영상 연결 시간이 초과되었습니다."
+    },
+    {
+      "name": "pm_video_proxy_timeout_hint",
+      "value": "동영상 연결 시간이 초과되었습니다. pinimg.com 규칙이 DIRECT로 설정되어 있는지 확인하거나 프록시 노드를 변경해 주세요(글로벌 모드 권장)."
+    },
+    {
+      "name": "pm_profile_content_search",
+      "value": "내 핀 검색"
+    },
+    {
+      "name": "pm_profile_board_sort",
+      "value": "보드 옵션"
+    },
+    {
+      "name": "pm_profile_sort_name",
+      "value": "알파벳순"
+    },
+    {
+      "name": "pm_profile_sort_recent",
+      "value": "최근 저장순"
+    },
+    {
+      "name": "pm_profile_sort_custom",
+      "value": "맞춤 순서"
+    },
+    {
+      "name": "pm_profile_sort_load_error",
+      "value": "정렬 순서를 불러올 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_profile_sort_save_error",
+      "value": "정렬 순서가 저장되었는지 확인할 수 없습니다. 새로고침하여 확인해 주세요."
+    },
+    {
+      "name": "pm_account_language",
+      "value": "계정 언어"
+    },
+    {
+      "name": "pm_language_simplified_chinese",
+      "value": "중국어(간체)"
+    },
+    {
+      "name": "pm_language_traditional_chinese",
+      "value": "중국어(번체)"
+    },
+    {
+      "name": "pm_language_english",
+      "value": "영어"
+    },
+    {
+      "name": "pm_language_english_uk",
+      "value": "영어(영국)"
+    },
+    {
+      "name": "pm_language_japanese",
+      "value": "일본어"
+    },
+    {
+      "name": "pm_language_korean",
+      "value": "한국어"
+    },
+    {
+      "name": "pm_profile_organize_heading",
+      "value": "프로필 정리"
+    },
+    {
+      "name": "pm_profile_auto_sort",
+      "value": "보드 자동 정렬"
+    },
+    {
+      "name": "pm_profile_auto_sort_description",
+      "value": "Pinterest에서 보드를 표시하는 방법 선택"
+    },
+    {
+      "name": "pm_profile_layout_heading",
+      "value": "레이아웃"
+    },
+    {
+      "name": "pm_profile_edit_board_visibility",
+      "value": "보드 공개 설정 편집"
+    },
+    {
+      "name": "pm_profile_manage_visibility",
+      "value": "공개 설정 관리"
+    },
+    {
+      "name": "pm_profile_show_all_pins",
+      "value": "모든 핀 표시"
+    },
+    {
+      "name": "pm_profile_show_all_pins_description",
+      "value": "프로필을 보는 사람에게 모든 핀이 표시됩니다"
+    },
+    {
+      "name": "pm_profile_visibility_load_error",
+      "value": "공개 설정을 불러올 수 없습니다. 다시 시도하세요."
+    },
+    {
+      "name": "pm_profile_visibility_save_error",
+      "value": "저장 결과를 확인할 수 없습니다. 공개 설정을 다시 불러오세요."
+    },
+    {
+      "name": "pm_clear_logs",
+      "value": "로그 삭제"
+    },
+    {
+      "name": "pm_clear_logs_confirm",
+      "value": "앱에 저장된 로그를 삭제할까요? 내보낸 파일은 유지됩니다."
+    },
+    {
+      "name": "pm_logs_cleared",
+      "value": "로그가 삭제되었습니다"
+    },
+    {
+      "name": "pm_logs_clear_failed",
+      "value": "모든 로그를 삭제할 수 없습니다. 다시 시도하세요."
+    },
+    {
+      "name": "pm_profile_sort_heading",
+      "value": "정렬 방식"
+    },
+    {
+      "name": "pm_activity_yesterday",
+      "value": "어제"
+    },
+    {
+      "name": "pm_activity_open_all",
+      "value": "모두 켜기"
+    },
+    {
+      "name": "pm_activity_close_all",
+      "value": "모두 끄기"
+    },
+    {
+      "name": "pm_activity_date_unknown",
+      "value": "기타 활동"
+    }
+  ]
+}

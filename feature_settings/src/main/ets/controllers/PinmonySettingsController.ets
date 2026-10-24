@@ -120,9 +120,11 @@ export class PinmonySettingsController {
         if (!result.loading) {
           if (!Array.isArray(result.countries) || result.countries.length > 400 || typeof result.email !== 'string' || result.email.length > 320 ||
               typeof result.birthdate !== 'string' || typeof result.gender !== 'string' || typeof result.customGender !== 'string' || result.customGender.length > 500 ||
+              typeof result.accountLanguage !== 'string' || result.accountLanguage.length > 16 ||
               !Array.isArray(result.topics) || result.topics.length > 1000 || !Array.isArray(result.activities) || result.activities.length > 2000 ||
               typeof result.error !== 'string' || typeof result.ready !== 'boolean' || typeof result.saved !== 'boolean') throw new Error('Invalid settings');
           this.store.data = result; this.store.error = result.error;
+          if (result.ready && !result.error) PinmonyI18n.syncAccountLanguage(result.accountLanguage);
           if (result.ready && !result.error) PinmonyRuntimeLog.info('AccountSettingsTrace: validBirthdate=' + (!!result.birthdate).toString());
           this.store.writeUncertain = write ? !result.saved : !result.ready || !!result.error;
           this.writeDispatched = false; return;

@@ -26,7 +26,7 @@ export class PinmonyRouteParser {
     if (PinmonyRouteParser.inboxUrlFromAddress(address)) return '';
     const match: RegExpMatchArray | null = address.match(
       /^(https:\/\/(?:[^/]+\.)?pinterest\.com)\/([^/?#]+)(?:\/(_saved|_created))?\/?(?:[?#]|$)/i);
-    if (match && !/^(pin|search|messages|inbox|login|signup|ideas|today|settings)$/i.test(match[2])) {
+    if (match && !/^(pin|search|messages|inbox|login|signup|ideas|today|settings|edit)$/i.test(match[2])) {
       return match[1] + '/' + match[2] + '/';
     }
     return '';
@@ -35,7 +35,7 @@ export class PinmonyRouteParser {
   static boardUrlFromAddress(address: string): string {
     const match: RegExpMatchArray | null = address.match(
       /^(https:\/\/(?:[^/]+\.)?pinterest\.com)\/([^/?#]+)\/([^/?#]+)\/?(?:[?#]|$)/i);
-    if (!match || /^_|^(pin|users|search|ideas|today|settings|messages|inbox|login|signup|business|explore)$/i.test(match[2]) ||
+    if (!match || /^_|^(pin|users|search|ideas|today|settings|edit|messages|inbox|login|signup|business|explore)$/i.test(match[2]) ||
         /^_|^(followers|following)$/i.test(match[3])) return '';
     return match[1] + '/' + match[2] + '/' + match[3] + '/';
   }

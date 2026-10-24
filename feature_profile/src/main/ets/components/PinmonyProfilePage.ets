@@ -47,6 +47,12 @@ export struct PinmonyProfilePage {
   onPinMore?: (id: string) => void;
   onSearch?: () => void;
   onPublish?: () => void;
+  onBoardSort?: (value: string) => void;
+  @State private sortVisible: boolean = false;
+  private pendingVisibility: boolean | undefined = undefined;
+  onBoardVisibility?: (value?: boolean) => void;
+  private recoveryRequested: boolean = false;
+  onBoardRecovery?: () => void;
   @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   onSettings?: () => void;
   onShare?: () => void;
@@ -65,8 +71,13 @@ export struct PinmonyProfilePage {
   }
 
   private onProfileChanged(): void {
+    if (this.pendingVisibility !== undefined && this.profile.showAllPins === this.pendingVisibility && !this.profile.visibilityError) {
+      this.pendingVisibility = undefined;
+      this.sortVisible = false;
+    } else if (this.profile.visibilityError) this.pendingVisibility = undefined;
     if (this.activeProfile !== this.profile.profileUrl) { this.backRequested = false; this.profileNameBottom = 0; this.compactHeader = false; }
     if (this.activeProfile !== this.profile.profileUrl || this.activeSection !== this.profile.section) {
+      this.sortVisible = false;
       this.activeProfile = this.profile.profileUrl;
       this.activeSection = this.profile.section;
       this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
@@ -621,7 +632,7 @@ export struct PinmonyProfilePage {
         Text(this.profile.displayName || this.profile.handle)
           .fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
-      }.width('100%').padding({ left: 18, right: 168 }).constraintSize({ maxHeight: 48 })
+      }.width('100%').padding({ left: 18, right: 64 }).constraintSize({ maxHeight: 48 })
     }
   }
 
@@ -644,11 +655,111 @@ export struct PinmonyProfilePage {
           }
         },
         content: { title: { mainTitle: '' }, stackBuilder: this.rootCompactTitleBuilder,
-          menu: { value: [{ content: { icon: $r('app.media.inbox_search_outline'), label: this.uiText("pm_search_44ce7ae9"),
-            action: () => { if (this.onSearch) this.onSearch(); } } }, { content: { icon: $r('sys.symbol.plus'), label: this.uiText("pm_publish_b61f333b"),
-            action: () => { if (this.onPublish) this.onPublish(); } } },
-            { content: { icon: $r('sys.symbol.gearshape'), label: this.uiText("pm_settings_df3d58c7"), action: () => this.openSettings() }, badge: this.updateUnread ? { value: '', accessibilityText: this.uiText('pm_new_version_available_596dd46c') } : undefined }] } }
+          menu: { value: [{ content: { icon: $r('sys.symbol.gearshape'), label: this.uiText("pm_settings_df3d58c7"), action: () => this.openSettings() }, badge: this.updateUnread ? { value: '', accessibilityText: this.uiText('pm_new_version_available_596dd46c') } : undefined }] } }
       })
+  }
+  @Builder
+  private boardSortOption(value: string, label: string) {
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 12 }) {
+        Text(this.uiText(label)).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        if (this.profile.boardSortBusy && this.profile.boardSortPending === value) {
+          LoadingProgress().width(20).height(20)
+        } else if (!this.profile.boardSortBusy && this.profile.boardSort === value) {
+          SymbolGlyph($r('sys.symbol.checkmark')).fontSize(20).fontColor([$r('app.color.primary_text')])
+        }
+      }.width('100%').padding({ left: 24, right: 20, top: 14, bottom: 14 })
+    }.width('100%').padding(0).backgroundColor(Color.Transparent)
+    .enabled(this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.boardSortError && !!this.profile.boardSort)
+    .accessibilityText(this.uiText(label)).accessibilitySelected(this.profile.boardSort === value)
+    .onClick(() => { if (this.onBoardSort) this.onBoardSort(value); })
+  }
+
+  @Builder
+  private boardSortSheet() {
+    Column({ space: 0 }) {
+      Text(this.uiText('pm_profile_board_sort')).fontSize(20).fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start).padding({ left:24, right:64, top:16, bottom:16 })
+      Text(this.uiText('pm_profile_sort_heading')).fontSize(16).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.secondary_text')).width('100%').padding({ left:24, top:16, bottom:6 })
+      if (this.profile.boardSortError || !this.profile.boardSort && !this.profile.boardSortBusy) {
+        Text(this.uiText(this.profile.boardSortError || 'pm_profile_sort_load_error')).fontColor($r('app.color.secondary_text')).padding(16)
+        Button(this.uiText('pm_retry_b8784c8d')).onClick(() => { if (this.onBoardSort) this.onBoardSort(''); })
+          .enabled(!this.profile.boardSortBusy)
+      }
+      this.boardSortOption('alphabetical', 'pm_profile_sort_name')
+      this.boardSortOption('custom', 'pm_profile_sort_custom')
+      this.boardSortOption('last_pinned_to', 'pm_profile_sort_recent')
+      Text(this.uiText('pm_profile_layout_heading')).fontSize(16).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.secondary_text')).width('100%').padding({ left:24, top:16, bottom:6 })
+      this.boardVisibilityControl()
+      Button({ type: ButtonType.Normal }) {
+        Row({ space: 12 }) {
+          Text(this.uiText('pm_board_recovery_title')).fontSize(17).fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.primary_text')).layoutWeight(1)
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+        }.width('100%').padding({ left: 24, right: 20, top: 14, bottom: 14 })
+      }.width('100%').padding(0).backgroundColor(Color.Transparent)
+        .enabled(this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy)
+        .accessibilityText(this.uiText('pm_board_recovery_title'))
+        .onClick(() => { this.recoveryRequested = true; this.sortVisible = false; })
+    }.width('100%').padding({ bottom: 20 })
+  }
+  @Builder
+  private boardVisibilityControl() {
+    Column({ space:16 }) {
+      Row({ space:16 }) {
+        Column({ space:6 }) {
+          Text(this.uiText('pm_profile_edit_board_visibility')).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+          Text(this.uiText('pm_profile_show_all_pins_description')).fontSize(14).fontColor($r('app.color.secondary_text'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        if (this.profile.visibilityBusy) {
+          LoadingProgress().width(40).height(24)
+        } else if (typeof this.profile.showAllPins === 'boolean') {
+          Toggle({ type:ToggleType.Switch, isOn:this.profile.showAllPins === true })
+            .enabled(this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.visibilityError)
+            .onChange((value: boolean) => { if (this.interactionReady && !this.profile.visibilityBusy && !this.profile.visibilityError && value !== this.profile.showAllPins && this.onBoardVisibility) { this.pendingVisibility = value; this.onBoardVisibility(value); } })
+            .accessibilityText(this.uiText('pm_profile_show_all_pins'))
+        }
+      }.width('100%')
+      if (this.profile.visibilityError) {
+        Text(this.uiText(this.profile.visibilityError)).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+        Button(this.uiText('pm_retry_b8784c8d')).onClick(() => { if (this.onBoardVisibility) this.onBoardVisibility(); })
+      }
+    }.width('100%').padding({ left:24, right:20, top:14, bottom:14 }).backgroundColor(Color.Transparent)
+  }
+
+  @Builder
+  private contentToolbar() {
+    Row({ space: 8 }) {
+      Button({ type: ButtonType.Normal }) {
+        Row({ space: 10 }) {
+          Image($r('app.media.inbox_search_outline')).width(20).height(20).fillColor($r('app.color.primary_text'))
+          Text(this.uiText('pm_profile_content_search')).fontSize(16).fontColor($r('app.color.secondary_text'))
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+        }.width('100%').padding({ left: 14, right: 14 })
+      }.layoutWeight(1).height(48).borderRadius(18).backgroundColor($r('app.color.input_surface'))
+        .enabled(this.interactionReady).accessibilityText(this.uiText('pm_profile_search_your_pins'))
+        .onClick(() => { if (this.onSearch) this.onSearch(); })
+      Button({ type: ButtonType.Circle }) {
+        Image($r('app.media.profile_sliders')).width(26).height(26).fillColor($r('app.color.primary_text'))
+      }.width(48).height(48).backgroundColor($r('app.color.input_surface'))
+        .enabled(this.interactionReady && this.readsReady && this.profile.section === 'saved')
+        .accessibilityText(this.uiText('pm_profile_board_sort'))
+        .onClick(() => { this.sortVisible = true; if (this.onBoardSort) this.onBoardSort(''); })
+        .bindSheet($$this.sortVisible, this.boardSortSheet(), { height: SheetSize.FIT_CONTENT,
+          backgroundColor: $r('app.color.page_background'), showClose: true,
+          onDisappear: () => {
+            if (!this.recoveryRequested) return;
+            this.recoveryRequested = false;
+            if (this.interactionReady && this.profile.isOwn === true && this.onBoardRecovery) this.onBoardRecovery();
+          } })
+      Button({ type: ButtonType.Circle }) {
+        SymbolGlyph($r('sys.symbol.plus')).fontSize(28).fontColor([$r('app.color.primary_text')])
+      }.width(48).height(48).backgroundColor($r('app.color.input_surface')).enabled(this.interactionReady)
+        .accessibilityText(this.uiText('pm_publish_b61f333b'))
+        .onClick(() => { if (this.onPublish) this.onPublish(); })
+    }.width('100%').padding({ left: 16, right: 16 }).margin({ bottom: 18 })
   }
   @Builder
   private profileBody() {
@@ -674,8 +785,9 @@ export struct PinmonyProfilePage {
           }
           .width('100%')
           .height(72)
-          .margin({ top: this.profile.isOwn === false ? 16 : 34, bottom: 24 })
+          .margin({ top: this.profile.isOwn === false ? 16 : 34, bottom: this.profile.isOwn === true && !this.onBack ? 8 : 24 })
           .justifyContent(FlexAlign.Center)
+          if (this.profile.isOwn === true && !this.onBack) { this.contentToolbar() }
           Column() {
             this.profileContent()
             if (this.profile.section === 'saved') { this.unorganizedContent() }

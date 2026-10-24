@@ -11,3 +11,4 @@ export { NotificationChannel, NotificationChoice, notificationWritable, notifica
 export { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from './src/main/ets/models/PinmonySocialPermissions';
 
 export { PinmonyUpdateNotice } from './src/main/ets/services/PinmonyUpdateNotice';
+export { PinmonyBoardRecoveryPage } from './src/main/ets/components/PinmonyBoardRecoveryPage';

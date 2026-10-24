@@ -1,7 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require(process.argv[2]);
 const {createArktsLoader}=require('./arkts-module-loader.cjs');
 const resources=Object.fromEntries(['base','en_US'].map(locale=>[locale,Object.fromEntries(JSON.parse(fs.readFileSync(`common_foundation/src/main/resources/${locale}/element/string.json`,'utf8')).string.map(r=>[r.name,r.value]))]));
-const loader=createArktsLoader(ts,{common_foundation:{PinmonyI18n:{text:(key,language)=>resources[language==='en'?'en_US':'base'][key]??key}}});
+const ukResources=Object.fromEntries(JSON.parse(fs.readFileSync('common_foundation/src/main/resources/en_GB/element/string.json','utf8')).string.map(r=>[r.name,r.value]));
+const loader=createArktsLoader(ts,{common_foundation:{PinmonyI18n:{text:(key,language)=>language==='en_GB'?(ukResources[key]??key):resources[language==='en'?'en_US':'base'][key]??key}}});
 const {PinmonyNotificationCopy:copy}=loader.loadFile('feature_settings/src/main/ets/models/PinmonyNotificationCopy.ets');
 const source=fs.readFileSync('feature_settings/src/main/ets/models/PinmonyNotificationCopy.ets','utf8');
 const map=JSON.parse(source.match(/const CATEGORY_COPY[^=]*= (\{[\s\S]*?\});/)[1]);

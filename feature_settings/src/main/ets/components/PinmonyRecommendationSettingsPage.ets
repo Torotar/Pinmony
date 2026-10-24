@@ -30,6 +30,7 @@ export struct PinmonyRecommendationSettingsPage {
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
+  onPin?: (id: string) => void;
   private paths: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
   private errorSnack: HdsSnackBar | undefined = undefined;
@@ -121,18 +122,37 @@ export struct PinmonyRecommendationSettingsPage {
     }
     this.infoOpen = false;
   }
+  private activityDay(pin: PinmonyRecentActivity): string {
+    if (!pin.activityTimestamp) return '';
+    const date: Date = new Date(pin.activityTimestamp * 1000);
+    return date.getFullYear() + '-' + (date.getMonth() + 1).toString().padStart(2, '0') + '-' + date.getDate().toString().padStart(2, '0');
+  }
+  private activityDays(): string[] { return Array.from(new Set((this.store.data?.activities || []).map((pin: PinmonyRecentActivity): string => this.activityDay(pin)))); }
+  private dayPins(day: string): PinmonyRecentActivity[] { return (this.store.data?.activities || []).filter((pin: PinmonyRecentActivity): boolean => this.activityDay(pin) === day); }
+  private allClosed(day: string): boolean { return this.dayPins(day).every((pin: PinmonyRecentActivity): boolean => pin.recommendationClosed); }
+  private dayTitle(day: string): string {
+    if (!day) return this.uiText('pm_activity_date_unknown');
+    const now: Date = new Date();
+    const today: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const date: Date = new Date(day + 'T00:00:00');
+    if (date.getTime() === today.getTime()) return this.uiText('pm_today_d5f5a7a0');
+    today.setDate(today.getDate() - 1);
+    if (date.getTime() === today.getTime()) return this.uiText('pm_activity_yesterday');
+    return date.toLocaleDateString(this.uiLanguage.replace('_', '-'));
+  }
   @Builder
-  private activityColumn(parity: number) {
+  private activityColumn(day: string, parity: number) {
     Column({ space: 12 }) {
-      ForEach((this.store.data?.activities || []).filter((_pin: PinmonyRecentActivity, index: number) => index % 2 === parity), (pin: PinmonyRecentActivity) => {
+      ForEach(this.dayPins(day).filter((_pin: PinmonyRecentActivity, index: number) => index % 2 === parity), (pin: PinmonyRecentActivity) => {
         Stack({ alignContent: Alignment.BottomEnd }) {
           Image(pin.image).width('100%').aspectRatio(pin.width / pin.height).objectFit(ImageFit.Cover)
             .accessibilityText(pin.title || this.uiText("pm_recently_viewed_or_saved_pins_b669376f"))
+            .onClick(() => { if (this.available()) this.onPin?.(pin.id); })
           if (pin.recommendationClosed || pin.closeUncertain) {
             Column() {
               Text(pin.recommendationClosed ? this.uiText("pm_recommendations_turned_off_for_this_pin_4355c3b5") : this.uiText("pm_change_not_confirmed_0bb5d703"))
                 .width('100%').fontSize(14).fontColor(Color.White).padding(12)
-            }.width('100%').height('100%').backgroundColor('#66000000').alignItems(HorizontalAlign.Start)
+            }.width('100%').height('100%').backgroundColor('#66000000').alignItems(HorizontalAlign.Start).hitTestBehavior(HitTestMode.None)
           }
           Button({ type: ButtonType.Normal }) {
             Stack() {
@@ -142,11 +162,11 @@ export struct PinmonyRecommendationSettingsPage {
             }.width(26).height(26).borderRadius(8)
               .backgroundColor(pin.recommendationClosed || pin.closeUncertain ? Color.White : $r('app.color.recommendation_selection'))
           }.width(44).height(44).backgroundColor(Color.Transparent).margin(4)
-            .enabled(this.available() && !pin.recommendationClosed && !pin.closeUncertain)
-            .onClick(() => { if (this.available() && !pin.recommendationClosed && !pin.closeUncertain) this.request('activityClose', pin.id); })
+            .enabled(this.available() && !pin.closeUncertain)
+            .onClick(() => { if (this.available() && !pin.closeUncertain) this.request(pin.recommendationClosed ? 'activityOpen' : 'activityClose', pin.id); })
             .accessibilityText((pin.title || this.uiText("pm_this_pin_05e8eaee")) + (pin.recommendationClosed ? this.uiText("pm_recommendations_off_7dd43c85") : pin.closeUncertain ? this.uiText("pm_change_not_confirmed_ccc2d77c") : this.uiText("pm_turn_off_recommendations_629265e0")))
         }.width('100%').aspectRatio(pin.width / pin.height).borderRadius(16).clip(true)
-      }, (pin: PinmonyRecentActivity) => (pin.id) + ':' + this.uiLanguage)
+      }, (pin: PinmonyRecentActivity) => pin.id + ':' + pin.recommendationClosed + ':' + pin.closeUncertain + ':' + this.uiLanguage)
     }.layoutWeight(1)
   }
   @Builder
@@ -185,7 +205,18 @@ export struct PinmonyRecommendationSettingsPage {
     } else {
       Text(this.uiText("pm_hide_pins_related_to_those_you_recently_saved_or_opened_2e744f08")).width('100%').textAlign(TextAlign.Center).fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 16 })
       if (this.store.data?.ready && !this.store.loading && !this.store.error && !this.store.data.activities.length) { Text(this.uiText("pm_no_recent_activity_360e0904")).fontColor($r('app.color.secondary_text')) }
-      Row({ space: 12 }) { this.activityColumn(0); this.activityColumn(1) }.width('100%').alignItems(VerticalAlign.Top)
+      ForEach(this.activityDays(), (day: string) => {
+        Column({ space: 12 }) {
+          Row({ space: 12 }) {
+            Text(this.dayTitle(day)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
+            Button(this.uiText(this.allClosed(day) ? 'pm_activity_open_all' : 'pm_activity_close_all')).type(ButtonType.Normal)
+              .borderRadius(16).fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
+              .enabled(this.available() && !this.dayPins(day).some((pin: PinmonyRecentActivity): boolean => pin.closeUncertain))
+              .onClick(() => { this.request('activityGroup', JSON.stringify({ ids: this.dayPins(day).map((pin: PinmonyRecentActivity): string => pin.id), enabled: this.allClosed(day) })); })
+          }.width('100%')
+          Row({ space: 12 }) { this.activityColumn(day, 0); this.activityColumn(day, 1) }.width('100%').alignItems(VerticalAlign.Top)
+        }.width('100%').margin({ bottom: 16 })
+      }, (day: string) => day + ':' + this.uiLanguage)
     }
   }
   @Builder

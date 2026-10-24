@@ -8,13 +8,14 @@ import { PinmonySettingsStore, PinmonyRecoverableBoard } from '../stores/Pinmony
 export struct PinmonyBoardRecoveryPage {
   @StorageLink('pinmonyLanguage') private language: string = 'zh';
   @ObjectLink store: PinmonySettingsStore;
+  @Prop panelMode: boolean = false;
   @State private selected: string = '';
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
   private paths: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
   private text(key: string): string { return PinmonyI18n.text(key,this.language); }
-  aboutToAppear(): void { this.paths.pushPath({name:'boardRecovery'},false); }
+  aboutToAppear(): void { if (!this.panelMode) this.paths.pushPath({name:'boardRecovery'},false); }
   private canRestore(): boolean {
     return this.store.boardRecoveryReady && !this.store.loading && !this.store.busy && !this.store.writeUncertain && !this.store.error &&
       this.store.recoverableBoards.some((b: PinmonyRecoverableBoard): boolean => b.id === this.selected && !b.restored);
@@ -51,8 +52,7 @@ export struct PinmonyBoardRecoveryPage {
       .accessibilityText(board.name + ' ' + this.text(board.restored ? 'pm_board_recovery_restored' : this.selected === board.id ? 'pm_board_recovery_selected' : 'pm_board_recovery_select'))
   }
   @Builder
-  private destination() {
-    HdsNavDestination() {
+  private recoveryContent() {
       Scroll(this.scroller) {
         Column({space:16}) {
           Text(this.text('pm_board_recovery_description')).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
@@ -72,13 +72,29 @@ export struct PinmonyBoardRecoveryPage {
             }
           }
         }.width('100%').padding({left:20,right:20,top:16,bottom:32}).alignItems(HorizontalAlign.Start)
-      }.width('100%').height('100%').align(Alignment.TopStart)
+      }.width('100%').layoutWeight(1).align(Alignment.TopStart)
+  }
+  @Builder
+  private destination() {
+    HdsNavDestination() {
+      this.recoveryContent()
     }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false).bindToScrollable([this.scroller])
       .onBackPressed(() => {if(!this.store.busy)this.onBack?.();return true;})
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
   build() {
+    if (this.panelMode) {
+      Column() {
+        Text(this.text('pm_board_recovery_title')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+          .width('100%').padding({left:24,right:64,top:16,bottom:16})
+        this.recoveryContent()
+        Button(this.text('pm_board_recovery_submit'), { type: ButtonType.Normal })
+          .width('90%').height(48).borderRadius(16).enabled(this.canRestore())
+          .onClick(() => {if(this.canRestore())this.onRequest?.('boardRecoveryRestore',this.selected);}).margin({top:8,bottom:20})
+      }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+    } else {
     HdsNavigation(this.paths) { Column().width('100%').height('100%') }
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
+    }
   }
 }

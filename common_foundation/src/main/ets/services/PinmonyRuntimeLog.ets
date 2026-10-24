@@ -25,6 +25,7 @@ export class PinmonyRuntimeLog {
   private static restoration: Promise<void> = Promise.resolve();
   private static snapshotRead: Promise<void> = Promise.resolve();
   private static exporting: boolean = false;
+  private static clearing: boolean = false;
   private static initializationGeneration: number = 0;
   private static sessionIncomplete: boolean = false;
   private static sessionPath: string = '';
@@ -100,6 +101,7 @@ export class PinmonyRuntimeLog {
   }
 
   static flush(): Promise<void> {
+    if (PinmonyRuntimeLog.clearing) return Promise.resolve();
     if (PinmonyRuntimeLog.flushTimer >= 0) clearTimeout(PinmonyRuntimeLog.flushTimer);
     PinmonyRuntimeLog.flushTimer = -1;
     if (PinmonyRuntimeLog.writing) return PinmonyRuntimeLog.writing;
@@ -190,8 +192,43 @@ export class PinmonyRuntimeLog {
     }
   }
 
+  static async clear(): Promise<boolean> {
+    if (PinmonyRuntimeLog.exporting || PinmonyRuntimeLog.clearing || !PinmonyRuntimeLog.path) return false;
+    PinmonyRuntimeLog.clearing = true;
+    try {
+      if (PinmonyRuntimeLog.flushTimer >= 0) clearTimeout(PinmonyRuntimeLog.flushTimer);
+      PinmonyRuntimeLog.flushTimer = -1;
+      await PinmonyRuntimeLog.restoration;
+      await PinmonyRuntimeLog.writing;
+      PinmonyRuntimeLog.lines.clear();
+      PinmonyRuntimeLog.pending = [];
+      PinmonyRuntimeLog.pendingBytes = 0;
+      PinmonyRuntimeLog.dropped = 0;
+      PinmonyRuntimeLog.snapshotDirty = false;
+      PinmonyRuntimeLog.actionStage = 'none';
+      PinmonyRuntimeLog.actionAt = 0;
+      // Truncate only app-owned log files; previously exported documents remain untouched.
+      await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.previousPath, '', false);
+      await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.sessionPath, '', false);
+      await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.path, '', false);
+      PinmonyRuntimeLog.initializing = false;
+      PinmonyRuntimeLog.sessionPersisted = true;
+      PinmonyRuntimeLog.sessionIncomplete = false;
+      PinmonyRuntimeLog.info('Runtime: logs cleared');
+      return true;
+    } catch (_) {
+      PinmonyRuntimeLog.sessionPersisted = false;
+      PinmonyRuntimeLog.sessionIncomplete = true;
+      PinmonyRuntimeLog.warn('Runtime: log clear incomplete');
+      return false;
+    } finally {
+      PinmonyRuntimeLog.clearing = false;
+      await PinmonyRuntimeLog.flush();
+    }
+  }
+
   static async export(context: common.UIAbilityContext): Promise<boolean> {
-    if (PinmonyRuntimeLog.exporting) return false;
+    if (PinmonyRuntimeLog.exporting || PinmonyRuntimeLog.clearing) return false;
     PinmonyRuntimeLog.exporting = true;
     try {
       PinmonyRuntimeLog.info('Runtime: log export requested');

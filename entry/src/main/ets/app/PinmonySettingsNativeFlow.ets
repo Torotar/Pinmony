@@ -18,6 +18,7 @@ interface User {
     gender?: string;
     custom_gender?: string;
     country?: string;
+    locale?: string;
     opt_in_private_account?: boolean;
     search_privacy_enabled?: boolean;
     exclude_from_search?: boolean;
@@ -38,7 +39,9 @@ interface Image {
     width?: number;
     height?: number;
 }
+interface ActivityChoice { ids: string[]; enabled: boolean; }
 interface Pin {
+    activity_timestamp?: number;
     id: string;
     type: string;
     grid_title?: string;
@@ -112,7 +115,7 @@ interface ActivityFeedback {
     pin: string;
     feedback_type: number;
     through_id: string;
-    rec_reason_type: number;
+    rec_reason_type?: number;
 }
 export interface PinmonySettingsNativePorts extends ProfileSettingsPorts {
     store: () => PinmonySettingsStore;
@@ -184,7 +187,7 @@ export class PinmonySettingsNativeFlow {
         this.store.data = JSON.parse(JSON.stringify(this.value)) as PinmonyAccountSettings;
         this.store.writeUncertain = this.uncertain.size > 0;
     }
-    private empty(): PinmonyAccountSettings { return { page: this.page, token: this.token, loading: false, error: '', saved: false, ready: false, email: '', confirmedEmail: false, birthdate: '', gender: '', customGender: '', country: '', countries: [], privateProfile: false, searchPrivacy: false, canChangePrivacy: false, canEditSearchPrivacy: false, topics: [], activities: [], activityBookmark: '', activityHasMore: false }; }
+    private empty(): PinmonyAccountSettings { return { page: this.page, token: this.token, loading: false, error: '', saved: false, ready: false, email: '', confirmedEmail: false, birthdate: '', gender: '', customGender: '', country: '', accountLanguage: '', countries: [], privateProfile: false, searchPrivacy: false, canChangePrivacy: false, canEditSearchPrivacy: false, topics: [], activities: [], activityBookmark: '', activityHasMore: false }; }
     private emptyOptions(): Record<string, string> { return {}; }
     private async request(name: string, verb: string, options: Object, source: string, revision: number): Promise<ProfileSettingsResponse> { return this.client.request(this.page, name, verb, options, source, (): boolean => this.current(revision)); }
     private date(v: string | undefined): string {
@@ -211,6 +214,7 @@ export class PinmonySettingsNativeFlow {
         v.gender = (account.gender || '').slice(0, 30);
         v.customGender = (account.custom_gender || '').slice(0, 500);
         v.country = (account.country || '').slice(0, 2);
+        v.accountLanguage = typeof account.locale === 'string' && /^(?:zh|en|ja|ko)(?:[-_][A-Z]{2})?$/.test(account.locale) ? account.locale : '';
         v.privateProfile = account.opt_in_private_account === true;
         v.searchPrivacy = typeof account.search_privacy_enabled === 'boolean' ? account.search_privacy_enabled : account.exclude_from_search === true;
         v.canChangePrivacy = account.allow_switch_between_private_and_public_profile === true && account.is_parental_control_passcode_enabled !== true && account.is_parental_control_passcode_verification_pending !== true;
@@ -395,9 +399,9 @@ export class PinmonySettingsNativeFlow {
     async requestAction(action: string, value: string): Promise<void> {
         if (['autoplayWifi','autoplayCellular'].includes(action) && this.store.screen !== 'display') return;
         if(action.startsWith('boardRecovery') && this.store.screen !== 'boardRecovery')return;
-        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','autoplayWifi','autoplayCellular','boardRecoveryRead','boardRecoveryRestore'].includes(action))
+        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityOpen', 'activityGroup', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','autoplayWifi','autoplayCellular','boardRecoveryRead','boardRecoveryRestore'].includes(action))
             return;
-        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','autoplayWifi','autoplayCellular','boardRecoveryRestore'].includes(action);
+        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityOpen', 'activityGroup', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','autoplayWifi','autoplayCellular','boardRecoveryRestore'].includes(action);
         this.bind();
         if (write && this.uncertain.size) {
             this.store.writeUncertain = true;
@@ -522,7 +526,7 @@ export class PinmonySettingsNativeFlow {
                     this.value.saved = true;
                 }
             }
-            else if (action === 'activityRead' || action === 'activityClose') {
+            else if (action === 'activityRead' || action === 'activityClose' || action === 'activityOpen' || action === 'activityGroup') {
                 if (action === 'activityClose' && (!/^\d{1,40}$/.test(value) || this.activityUnknown.has(value) || this.activityClosed.has(value) || !this.store.data?.activities.some((p: PinmonyRecentActivity): boolean => p.id === value)))
                     throw new Error('activity');
                 const options: ActivityOptions = { username: 'me', filter_type: 'all' };
@@ -534,33 +538,35 @@ export class PinmonySettingsNativeFlow {
                     const im: Image | undefined = p.images?.['474x'] || p.images?.['236x'] || p.images?.orig;
                     if (!/^\d{1,40}$/.test(p.id) || !im || !/^https:\/\/(?:[^/.]+\.)?pinimg\.com\//.test(im.url))
                         throw new Error('pin');
-                    return { id: p.id, title: (p.grid_title || p.title || p.description || '').slice(0, 300), image: im.url, width: im.width! > 0 ? im.width! : 236, height: im.height! > 0 ? im.height! : 300, recommendationClosed: this.activityClosed.has(p.id), closeUncertain: this.activityUnknown.has(p.id) };
+                    return { id: p.id, title: (p.grid_title || p.title || p.description || '').slice(0, 300), image: im.url, activityTimestamp: typeof p.activity_timestamp === 'number' && Number.isFinite(p.activity_timestamp) && p.activity_timestamp > 0 ? p.activity_timestamp : undefined, width: im.width! > 0 ? im.width! : 236, height: im.height! > 0 ? im.height! : 300, recommendationClosed: this.activityClosed.has(p.id), closeUncertain: this.activityUnknown.has(p.id) };
                 });
                 this.value.activityBookmark = (response.resource_response!.bookmark || '').slice(0, 4096);
                 this.value.activityHasMore = !!this.value.activityBookmark && this.value.activityBookmark !== '-end-';
-                if (action === 'activityClose') {
-                    if (!this.value.activities.some((p: PinmonyRecentActivity): boolean => p.id === value))
-                        throw new Error('activity');
-                    this.client.allowed = ['pin:' + value];
-                    const data: ActivityFeedback = { pin: value, feedback_type: 4, through_id: value, rec_reason_type: 4 }, options: Api = { url: '/v3/pfy/' + value + '/feedback/', data: data };
-                    this.pending = 'activity:' + value;
-                    this.activityUnknown.add(value);
-                    this.uncertain.set(this.pending, value);
-                    this.sent = true;
-                    response = await this.request('ApiResource', 'update', options, '/edit/activity/', revision);
-                    const result: Pin = response.resource_response!.data as Pin;
-                    if (response.resource_response?.endpoint_name !== 'v3_provide_pfy_pin_feedback' || result?.id !== value || result.type !== 'pin')
-                        throw new Error('feedback');
-                    this.activityUnknown.delete(value);
-                    this.activityClosed.add(value);
-                    this.uncertain.delete(this.pending);
-                    this.sent = false;
-                    this.value.activities.forEach((p: PinmonyRecentActivity): void => {
-                        if (p.id === value) {
-                            p.recommendationClosed = true;
-                            p.closeUncertain = false;
-                        }
+                if (action !== 'activityRead') {
+                    const choice: ActivityChoice = action === 'activityGroup' ? JSON.parse(value) as ActivityChoice : { ids: [value], enabled: action === 'activityOpen' };
+                    if (!Array.isArray(choice.ids) || !choice.ids.length || choice.ids.length > 100 || typeof choice.enabled !== 'boolean' ||
+                        !choice.ids.every((id: string, index: number): boolean => /^\d{1,40}$/.test(id) && choice.ids.indexOf(id) === index && !this.activityUnknown.has(id) && !!this.store.data?.activities.some((p: PinmonyRecentActivity): boolean => p.id === id))) throw new Error('activity');
+                    const selected: PinmonyRecentActivity[] = choice.ids.map((id: string): PinmonyRecentActivity => {
+                        const pin: PinmonyRecentActivity | undefined = this.value!.activities.find((p: PinmonyRecentActivity): boolean => p.id === id);
+                        if (!pin) throw new Error('activity'); return pin;
                     });
+                    for (const pin of selected) {
+                        if (pin.recommendationClosed === !choice.enabled) continue;
+                        const id: string = pin.id;
+                        this.client.allowed = ['pin:' + id];
+                        const data: ActivityFeedback = choice.enabled ? { pin: id, feedback_type: 4, through_id: id } : { pin: id, feedback_type: 4, through_id: id, rec_reason_type: 4 };
+                        const options: Api = { url: '/v3/pfy/' + id + '/feedback/' + (choice.enabled ? 'undo/' : ''), data: data };
+                        this.pending = 'activity:' + id; this.activityUnknown.add(id); pin.closeUncertain = true;
+                        this.uncertain.set(this.pending, id); this.sent = true;
+                        response = await this.request('ApiResource', 'update', options, '/edit/activity/', revision);
+                        if (!this.current(revision)) return;
+                        const result: Pin = response.resource_response!.data as Pin;
+                        if (response.resource_response?.endpoint_name !== (choice.enabled ? 'v3_provide_pfy_pin_feedback_undo' : 'v3_provide_pfy_pin_feedback') || result?.id !== id || result.type !== 'pin') throw new Error('feedback');
+                        this.activityUnknown.delete(id);
+                        if (choice.enabled) this.activityClosed.delete(id); else this.activityClosed.add(id);
+                        this.uncertain.delete(this.pending); this.sent = false;
+                        pin.recommendationClosed = !choice.enabled; pin.closeUncertain = false;
+                    }
                     this.value.saved = true;
                 }
             }
@@ -653,6 +659,7 @@ export class PinmonySettingsNativeFlow {
                     this.uncertain.delete(this.pending);
                     if (this.pending.startsWith('activity:'))
                         this.activityUnknown.delete(this.pending.slice(9));
+                    this.value?.activities.forEach((pin: PinmonyRecentActivity): void => { if (pin.id === this.pending.slice(9)) pin.closeUncertain = false; });
                     this.sent = false;
                 }
                 this.store.error = this.sent ? PinmonyI18n.message("pm_save_result_not_confirmed_reload_to_check_saving_will_not_be_ret_f7c0a062") : error instanceof ProfileSettingsRejected ? PinmonyI18n.message("pm_the_website_rejected_this_action_10efc2d0") : write ? PinmonyI18n.message("pm_settings_or_permissions_not_confirmed_reload_and_retry_ed2905c0") : PinmonyI18n.message("pm_unable_to_load_please_retry_b22c1af1");

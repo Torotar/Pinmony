@@ -73,6 +73,11 @@ export struct PinmonyAccountPage {
     return p.length === 3 ? PinmonyI18n.format('pm_birthdate_display', [p[0], p[1], p[2]], this.uiLanguage) : '';
   }
   private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("pm_female_0ab4610b") : this.store.data?.gender === 'male' ? this.uiText("pm_male_4e79758a") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || this.uiText('pm_custom_gender_fallback') : ''; }
+  private accountLanguage(): string {
+    const locale: string = this.store.data?.accountLanguage || '';
+    const key: string = locale === 'zh-CN' || locale === 'zh_CN' ? 'pm_language_simplified_chinese' : locale === 'zh-TW' || locale === 'zh_TW' ? 'pm_language_traditional_chinese' : locale === 'en-GB' || locale === 'en_GB' ? 'pm_language_english_uk' : locale === 'en-US' || locale === 'en_US' || locale === 'en' ? 'pm_language_english' : locale === 'ja-JP' || locale === 'ja_JP' || locale === 'ja' ? 'pm_language_japanese' : locale === 'ko-KR' || locale === 'ko_KR' || locale === 'ko' ? 'pm_language_korean' : '';
+    return key ? this.uiText(key) : locale;
+  }
   @Builder
   private dateField(field: string, value: string) {
     Column({ space: 6 }) {
@@ -119,6 +124,7 @@ export struct PinmonyAccountPage {
               if (this.birthday()) { this.row(this.uiText("pm_date_of_birth_1c54caca"), this.birthday()) }
               this.row(this.uiText("pm_gender_a752a7d8"), this.gender())
               this.row(this.uiText("pm_country_region_45e22a8a"), this.store.data.country)
+              if (this.accountLanguage()) { this.row(this.uiText("pm_account_language"), this.accountLanguage()) }
             } else if (this.store.screen === 'birthdate') {
               Text(this.uiText("pm_your_date_of_birth_helps_personalize_recommendations_and_ads_and_00165eee")).fontSize(15).fontColor($r('app.color.secondary_text'))
               Text(this.uiText("pm_learn_why_we_ask_for_your_date_of_birth_09763a7d")).fontSize(14).fontColor($r('app.color.secondary_text')).decoration({ type: TextDecorationType.Underline }).onClick(() => {})

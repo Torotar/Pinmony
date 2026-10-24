@@ -25,6 +25,9 @@ export interface PinmonyProfileRootView {
   openProfilePinMenu: (id: string) => Promise<void>;
   openProfileSearch: () => void;
   openProfilePublish: () => void;
+  sortProfileBoards: (value: string) => void;
+  loadBoardVisibility: (value?: boolean) => void;
+  openBoardRecovery: () => void;
   openProfileShare: () => Promise<void>;
   openProfileMenu: () => void;
   loadMoreProfile: () => void;
@@ -70,6 +73,9 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                   onPinMore: (id: string) => view.openProfilePinMenu(id),
                   onSearch: () => view.openProfileSearch(),
                   onPublish: () => view.openProfilePublish(),
+                  onBoardSort: (value: string) => view.sortProfileBoards(value),
+                  onBoardVisibility: (value?: boolean) => view.loadBoardVisibility(value),
+                  onBoardRecovery: () => view.openBoardRecovery(),
                   onSettings: () => view.onSettings(),
                   followingBusy: view.profileStore.followingBusy, onShare: () => view.openProfileShare(),
                   onMenu: () => view.openProfileMenu(),

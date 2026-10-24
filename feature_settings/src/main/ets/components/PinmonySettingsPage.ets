@@ -22,6 +22,9 @@ export struct PinmonySettingsPage {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   @State private exportingLog: boolean = false;
+  @State private clearingLog: boolean = false;
+  private clearLogConfirmOpen: boolean = false;
+  private suppressLogClick: boolean = false;
   private restoringRootScroll: boolean = false;
   private restoreRevision: number = 0;
   private logoutConfirmOpen: boolean = false;
@@ -30,6 +33,7 @@ export struct PinmonySettingsPage {
   onRequest?: (action: string, value: string) => Promise<void>;
   onEditProfile?: () => void;
   onBack?: () => void;
+  onPin?: (id: string) => void;
   onOpenExternalLink?: (url: string) => Promise<void>;
 
   private captureRootScroll(): void {
@@ -46,7 +50,8 @@ export struct PinmonySettingsPage {
     }, 0);
   }
   private async exportLog(): Promise<void> {
-    if (this.exportingLog) return;
+    if (this.suppressLogClick) { this.suppressLogClick = false; return; }
+    if (this.exportingLog || this.clearingLog || this.clearLogConfirmOpen) return;
     this.exportingLog = true;
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
@@ -60,6 +65,32 @@ export struct PinmonySettingsPage {
     } finally { this.exportingLog = false; }
   }
   private readonly pathStack: NavPathStack = new NavPathStack();
+  private confirmClearLog(): void {
+    if (this.exportingLog || this.clearingLog || this.clearLogConfirmOpen || !this.pageVisible) return;
+    this.suppressLogClick = true;
+    this.clearLogConfirmOpen = true;
+    this.getUIContext().showAlertDialog({
+      title: this.uiText('pm_clear_logs'), message: this.uiText('pm_clear_logs_confirm'),
+      primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => {
+        this.clearLogConfirmOpen = false; this.suppressLogClick = false;
+      } },
+      secondaryButton: { value: this.uiText('pm_clear_logs'), action: () => {
+        this.clearLogConfirmOpen = false; this.suppressLogClick = false;
+        if (this.pageVisible && this.store.screen === 'root') this.clearLog();
+      } },
+      cancel: () => { this.clearLogConfirmOpen = false; this.suppressLogClick = false; }
+    });
+  }
+  private async clearLog(): Promise<void> {
+    if (this.exportingLog || this.clearingLog) return;
+    this.clearingLog = true;
+    try {
+      const cleared: boolean = await PinmonyRuntimeLog.clear();
+      if (this.pageVisible) this.getUIContext().getPromptAction().showToast({
+        message: this.uiText(cleared ? 'pm_logs_cleared' : 'pm_logs_clear_failed'), duration: 3000
+      });
+    } finally { this.clearingLog = false; }
+  }
   private readonly contentScroller: Scroller = new Scroller();
   private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'logout', 'logs', 'help', 'terms', 'privacy', 'about'];
   private optionLabel(id: string): string {
@@ -138,7 +169,10 @@ export struct PinmonySettingsPage {
             }
             .width('100%')
             .backgroundColor(Color.Transparent)
-            .enabled(!this.store.busy && !this.store.loading && (id !== 'logs' || !this.exportingLog))
+            .enabled(!this.store.busy && !this.store.loading && (id !== 'logs' || (!this.exportingLog && !this.clearingLog)))
+            .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+              if (id === 'logs') this.confirmClearLog();
+            }))
             .onClick(() => { this.captureRootScroll(); if (id === 'profile' && this.onEditProfile) this.onEditProfile();
               if (id === 'notifications') { this.store.screen = 'notifications'; if (this.onRequest) this.onRequest('notifications', ''); }
               if (id === 'social') { this.store.screen = 'social'; if (this.onRequest) this.onRequest('socialRead', ''); }
@@ -184,7 +218,7 @@ export struct PinmonySettingsPage {
     } else if (this.store.screen === 'notifications') {
       PinmonyNotificationsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack, onRetry: () => { if (this.onRequest) this.onRequest('notifications', ''); } })
     } else if (['display', 'theme', 'recommend', 'visibility'].includes(this.store.screen)) {
-      PinmonyPreferencesPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
+      PinmonyPreferencesPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack, onPin: this.onPin })
     } else if (this.store.screen !== 'root') {
       PinmonyAccountPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
     } else {

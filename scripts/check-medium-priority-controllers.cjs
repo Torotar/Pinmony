@@ -17,7 +17,7 @@ function harness(){
     ensureRootActionContext:async()=>true,showMessage:s=>feedback.push(s),
     controller:{getUrl:()=>page,runJavaScript:s=>{calls.push(s);if(s.includes('.close()'))return Promise.resolve('true');return new Promise((resolve,reject)=>pending.push({resolve,reject}));}}};
   bind(n,ts,globals);
-  const result=(saved=false)=>({page,token:settingsStore.token,loading:false,error:'',saved,ready:true,email:'',birthdate:'',gender:'',customGender:'',countries:[],topics:[],activities:[]});
+  const result=(saved=false)=>({page,token:settingsStore.token,loading:false,error:'',saved,ready:true,email:'',accountLanguage:'',birthdate:'',gender:'',customGender:'',countries:[],topics:[],activities:[]});
   return {n,settingsStore,inboxStore,calls,pending,feedback,timers,result,visit:s=>page=s};
 }
 (async()=>{

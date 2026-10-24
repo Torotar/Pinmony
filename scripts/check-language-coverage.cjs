@@ -4,7 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
-const locales = ['base', 'zh_CN', 'en_US'];
+const locales = ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko'];
 const tables = locales.map(locale => JSON.parse(read(`common_foundation/src/main/resources/${locale}/element/string.json`)).string);
 const names = tables[0].map(row => row.name).sort();
 for (let i = 0; i < tables.length; i++) {
@@ -16,7 +16,9 @@ for (let i = 0; i < tables.length; i++) {
     assert.deepEqual((values.get(row.name).match(/\{\d+\}/g) || []).sort(), (row.value.match(/\{\d+\}/g) || []).sort(), `Placeholder mismatch: ${row.name}`);
   }
 }
-for (const row of tables[2]) assert(!/[\u3400-\u9fff]/.test(row.value), `Chinese in English resource: ${row.name}`);
+for (const localeIndex of [3, 4]) {
+  for (const row of tables[localeIndex]) assert(!/[\u3400-\u9fff]/.test(row.value), `Chinese in English resource: ${locales[localeIndex]}:${row.name}`);
+}
 const known = new Set(names), errors = [];
 function walk(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : entry.name.endsWith('.ets') ? [path.join(dir, entry.name)] : []);

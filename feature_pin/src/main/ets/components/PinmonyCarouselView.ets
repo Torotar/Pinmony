@@ -22,6 +22,7 @@ export struct PinmonyCarouselView {
   onFirstImageSettled?: (failed: boolean) => void;
   private identity: string = '';
   private controller: SwiperController = new SwiperController();
+  private indicatorController: IndicatorComponentController = new IndicatorComponentController();
 
   aboutToAppear(): void { this.identity = this.carousel.pinId; }
 
@@ -77,12 +78,15 @@ export struct PinmonyCarouselView {
         }, (item: PinmonyCarouselItem): string => (`${this.carousel.pinId}:${item.id}:${this.revision}`) + ':' + this.uiLanguage)
       }
       .width('100%').height(this.mediaHeight()).loop(false).autoPlay(false)
-      .indicator(Indicator.dot().bottom(14)
-        .itemWidth(7).itemHeight(7).selectedItemWidth(7).selectedItemHeight(7)
-        .color('#66000000').selectedColor('#EEFFFFFF'))
+      .indicator(this.indicatorController)
       .borderRadius(18).clip(true)
       .onChange((index: number) => { this.page = index; })
       .accessibilityText(this.uiFormat("pm_image_value_of_value_2349ba46", [this.page + 1, this.carousel.items.length]))
+      IndicatorComponent(this.indicatorController)
+        .count(this.carousel.items.length)
+        .style(Indicator.dot().itemWidth(7).itemHeight(7).selectedItemWidth(7).selectedItemHeight(7)
+          .color($r('app.color.secondary_text')).selectedColor($r('app.color.primary_text')))
+        .width('100%').height(28)
     }.width('100%')
   }
 }

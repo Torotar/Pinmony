@@ -9,9 +9,10 @@ export struct PinmonyPreferencesPage {
   @ObjectLink store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
+  onPin?: (id: string) => void;
   build() {
     if (this.store.screen === 'recommend') {
-      PinmonyRecommendationSettingsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
+      PinmonyRecommendationSettingsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack, onPin: this.onPin })
     } else if (this.store.screen === 'visibility') {
       PinmonyVisibilitySettingsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
     } else {

@@ -133,18 +133,18 @@ export struct PinmonyDisplaySettingsPage {
       Text(this.uiText("pm_language_9f6fee1a")).fontSize(18).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
-        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: 'English' }])
-        .selected(Math.max(0, ['system', 'zh', 'en'].indexOf(this.languagePreference)))
-        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'en' ? 'English' : this.uiText("pm_follow_system_217cfe7d"))
+        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }])
+        .selected(Math.max(0, ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko'].indexOf(this.languagePreference)))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.uiText("pm_follow_system_217cfe7d"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-        .backgroundColor($r('app.color.display_settings_control'))
+        .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
-          if (index >= 0 && index < 3) {
-            const value: string = ['system', 'zh', 'en'][index];
+          if (index >= 0 && index < 7) {
+            const value: string = ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko'][index];
             try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
             catch (_) {
               PinmonyRuntimeLog.warn('LanguagePreference: save failed');
@@ -163,7 +163,7 @@ export struct PinmonyDisplaySettingsPage {
         .selected(this.themePreference === 'light' ? 1 : this.themePreference === 'dark' ? 2 : 0)
         .value(this.themeLabel())
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-        .backgroundColor($r('app.color.display_settings_control'))
+        .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
@@ -182,7 +182,7 @@ export struct PinmonyDisplaySettingsPage {
           .selected(Math.max(0, ['system', 'auto', 'portrait', 'landscape'].indexOf(this.orientationPreference)))
           .value(this.orientationPreference === 'auto' ? this.uiText("pm_always_rotate_automatically_d3a0ff23") : this.orientationPreference === 'portrait' ? this.uiText("pm_portrait_c35bd83b") : this.orientationPreference === 'landscape' ? this.uiText("pm_landscape_055a6b3a") : this.uiText("pm_follow_system_217cfe7d"))
           .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-          .backgroundColor($r('app.color.display_settings_control')).enabled(!this.orientationBusy)
+          .backgroundColor($r('app.color.display_settings_control')).borderRadius(16).enabled(!this.orientationBusy)
           .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
       }, (language: string): string => language)
@@ -207,7 +207,7 @@ export struct PinmonyDisplaySettingsPage {
         .value(this.uiText(this.immersiveLightMode === 'off' ? 'pm_light_off' : this.immersiveLightMode === 'gentle' ?
           'pm_light_gentle' : this.immersiveLightMode === 'exquisite' ? 'pm_light_exquisite' : 'pm_light_immersive'))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
-        .backgroundColor($r('app.color.display_settings_control'))
+        .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text')).optionFontColor($r('app.color.primary_text'))
         .accessibilityText(this.uiText('pm_immersive_light'))
@@ -220,16 +220,6 @@ export struct PinmonyDisplaySettingsPage {
       }, (language: string): string => language)
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
-    Button({ type: ButtonType.Normal }) {
-      Row({ space: 12 }) {
-        Text(this.uiText('pm_board_recovery_title')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
-      }.width('100%')
-    }.width('100%').padding(16).backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
-      .enabled(!this.store.busy && !this.store.loading).onClick(() => {
-        this.store.screen = 'boardRecovery';this.store.error = '';this.store.boardRecoveryReady = false;this.store.recoverableBoards = [];
-        this.onRequest?.('boardRecoveryRead', '');
-      })
     Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:16 })
     ForEach(['autoplayCellular','autoplayWifi'], (action: string) => {
       this.autoplayOption(action, action === 'autoplayWifi' ? 'pm_autoplay_video_wifi' : 'pm_autoplay_video_cellular', action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular)

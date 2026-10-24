@@ -5,6 +5,7 @@ const resolve = source => copy[source] ?? source;
 // at that boundary; check-language.cjs exercises the real message/storage service.
 const rawLocalMessages = {
   message: resolve, text: resolve, render: source => source,
+  syncAccountLanguage: () => {}, // Real locale persistence is covered by check-language.cjs.
   format: (source, values) => resolve(source).replace(/\{(\d+)\}/g, (m,i) => values[i] === undefined ? m : String(values[i])),
   isText: (value, source) => value === resolve(source),
   includesText: (value, source) => value.includes(resolve(source)),

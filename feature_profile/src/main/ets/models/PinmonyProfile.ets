@@ -46,6 +46,13 @@ export interface PinmonyOrganizeSnapshot {
 }
 
 export interface PinmonyProfileSnapshot {
+  boardSort?: string;
+  showAllPins?: boolean;
+  visibilityBusy?: boolean;
+  visibilityError?: string;
+  boardSortBusy?: boolean;
+  boardSortPending?: string;
+  boardSortError?: string;
   contextEpoch?: number;
   nativeOwn?: boolean;
   nativeVersion?: number;

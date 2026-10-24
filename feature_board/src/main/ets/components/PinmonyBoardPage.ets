@@ -742,9 +742,9 @@ export struct PinmonyBoardPage {
               Text(this.uiText('pm_no_merge_target_boards')).fontColor($r('app.color.secondary_text'))
             }
           }.width('100%')
-        }.layoutWeight(1).width('100%')
+        }.layoutWeight(1).width('100%').align(Alignment.TopStart).scrollBar(BarState.Auto)
       } else { LoadingProgress().width(28).height(28) }
-    }.width('100%').height('100%').padding({ left: 20, right: 20, bottom: 20 }).backgroundColor($r('app.color.page_background'))
+    }.width('100%').height('100%').justifyContent(FlexAlign.Start).padding({ left: 20, right: 20, top: 8, bottom: 20 }).backgroundColor($r('app.color.page_background'))
   }
 
   @Builder
@@ -1148,6 +1148,7 @@ export struct PinmonyBoardPage {
       radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardPage.menuOpen radius=four-corners-32vp'); },
       height: this.mergeOpen ? SheetSize.LARGE : SheetSize.FIT_CONTENT, showClose: true, dragBar: true,
+      scrollSizeMode: ScrollSizeMode.CONTINUOUS,
       title: { title: this.mergeOpen ? this.uiText('pm_merge_board_menu') : this.phase() === 'section' ? this.uiText("pm_section_options_1e74fdd5") : this.uiText("pm_board_options_33bd1089") }, maskColor: '#66000000',
       backgroundColor: $r('app.color.page_background'),
       onDisappear: () => {

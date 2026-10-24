@@ -12,6 +12,7 @@ export interface PinmonyAccountSettings {
   gender: string;
   customGender: string;
   country: string;
+  accountLanguage: string;
   countries: PinmonyCountry[];
   privateProfile: boolean;
   searchPrivacy: boolean;
@@ -26,4 +27,4 @@ export interface PinmonyAccountSettings {
 }
 
 export interface PinmonyAiTopic { key: string; text: string; enabled: boolean; }
-export interface PinmonyRecentActivity { id: string; title: string; image: string; width: number; height: number; recommendationClosed: boolean; closeUncertain: boolean; }
+export interface PinmonyRecentActivity { id: string; title: string; image: string; width: number; height: number; activityTimestamp?: number; recommendationClosed: boolean; closeUncertain: boolean; }

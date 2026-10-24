@@ -533,7 +533,7 @@ onBackPress(): boolean {
         this.ports.dismissProfileMenu();
         return true;
     }
-    if (this.ports.profileSettingsVisible()) {
+    if (this.ports.profileSettingsVisible() && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.ports.currentPinUrl()) {
         this.ports.closeProfileSettings();
         return true;
     }
