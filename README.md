@@ -8,29 +8,28 @@
   <a href="./README.zh-CN.md">中文</a> | <a href="./README.en.md">English</a>
 </p>
 
-Pinmony 是个人为了兴趣开发的 HarmonyOS 应用，主要用于学习、技术研究、界面探索和移动端体验测试。应用通过当前登录会话读取目标网站公开返回的页面或接口数据，并使用 ArkUI 提供原生界面。
+Pinmony 是个人为了兴趣开发的 HarmonyOS 应用，主要用于学习、技术研究、界面探索和移动端体验测试。账号登录使用 ArkWeb，登录后的业务界面使用 ArkUI 原生呈现。部分功能依赖当前登录会话及 Pinterest 网站内部同源资源；这些资源不是 Pinterest 官方开放 API。
 
 ## 功能
 
-- 首页浏览推荐 Pin、图板和分类内容
-- 搜索 Pin、分类、主题和相关内容，并支持选择照片进行图片搜索
-- 查看 Pin 详情、作者、评论、相关推荐和支持的视频；详情中可选取图片区域并查找相关内容
-- 浏览个人资料、已保存内容、图板和收件箱；个人主页支持搜索自己的 Pin 和最近搜索
-- 收件箱支持消息与联系人切换，并可按用户名搜索
-- 支持 Pin、图板和联系人分享，分享入口按具体页面流程展示
-- 应用界面支持跟随系统、中文和 English；应用自有文案可即时切换并保存语言偏好
-- 设置支持通知、社交权限、视频自动播放、显示偏好和脱敏运行日志导出
-- 支持手机和平板自适应布局
-- 保留页面状态、滚动位置、返回层级和加载状态
+- **发现与搜索**：浏览首页推荐和分类内容，搜索 Pin、图板与主题；支持照片搜索、历史照片选择及图片局部识别。
+- **Pin 浏览与互动**：查看图片、视频、作者、评论和相关推荐，支持图片放大、收藏、评论及分享。
+- **个人主页与图板**：查看个人资料和已保存内容，搜索自己的 Pin；支持图板排序、合并、恢复及“所有 Pin 图”可见性管理。
+- **内容发布与整理**：支持照片和网站链接发布，以及 Pin 整理与移动；图板发布按钮可长按拖动并贴边停靠。
+- **消息与联系人**：查看收件箱和聊天消息，在消息与联系人之间切换，按用户名搜索联系人并发送 Pin。
+- **推荐与隐私设置**：按日期查看近期活动，管理相关内容推荐、通知、消息权限、@提及和已屏蔽账号。
+- **显示与播放偏好**：提供沉浸光感和显示设置，可分别控制移动数据与 Wi-Fi 下的视频自动播放。
+- **多语言与设备适配**：提供简体中文、繁体中文、英语（美国）、英语（英国）、日语和韩语界面资源，支持手机和平板布局。
+- **运行日志**：支持脱敏日志导出和清理，便于反馈与排查问题。
 
 ## 使用条件
 
 | 条件 | 要求 |
 | --- | --- |
 | 设备与系统 | HarmonyOS 6.1.1（API 24）以上版本 |
-| 开发环境 | DevEco Studio、ArkTS、Hvigor 和 HarmonyOS SDK |
 | 网络与账号 | 可访问 Pinterest，并在应用内使用账号密码完成登录。Google 登录暂不可用。 |
 
+应用已进行平板适配，但尚未经过平板真机测试，暂无法保证所有页面的布局和内容显示均正确。如遇显示异常、遮挡或操作问题，欢迎通过 [GitHub Issues](https://github.com/Torotar/Pinmony/issues) 反馈，并附上设备型号、系统版本、截图及复现步骤。
 
 ## 技术架构
 
@@ -45,15 +44,29 @@ Pinmony 是个人为了兴趣开发的 HarmonyOS 应用，主要用于学习、�
 - `common_session`：登录证据、会话和凭据适配
 - `common_network`：原生 RCP 网络传输和请求生命周期
 - `common_ui`：跨特性复用的 UI 组件和公共展示状态
-- `common_foundation`：中英文语言资源与偏好、缓存、日志、任务登记和基础运行时能力
+- `common_foundation`：多语言资源与偏好、缓存、日志、任务登记和基础运行时能力
 
 ## 语言资源与偏好
 
-应用自有文案统一维护在 `common_foundation/src/main/resources/{base,zh_CN,en_US}/element/string.json`，使用稳定资源名。语言选择入口位于显示设置，支持跟随系统、中文和 English，偏好会在重启后恢复。网站和用户内容保持原文，仅对已确认的固定控件按语义标识显示本地文案。
+应用自有文案统一维护在 `common_foundation/src/main/resources/{base,zh_CN,zh_TW,en_US,en_GB,ja,ko}/element/string.json`，使用稳定资源名。目前提供简体中文、繁体中文、英语（美国）、英语（英国）、日语和韩语界面资源，语言偏好会在重启后恢复，并接入账号语言同步。网站和用户内容保持原文，仅对已确认的固定控件按语义标识显示本地文案。
 
-## 构建 HAP
+语言选择入口位于“设置 → 显示设置”，支持跟随系统或手动选择语言。读取到受支持的账号语言时，应用会同步界面语言。
 
-在 PowerShell 中配置本机 HarmonyOS SDK 后执行：
+部分译文可能存在不准确或不自然的表达。如遇翻译、文字截断或显示问题，欢迎通过 [GitHub Issues](https://github.com/Torotar/Pinmony/issues) 反馈，并注明所用语言及对应页面。
+
+### Release 构建
+
+在项目根目录运行 PowerShell 命令：
+
+```powershell
+./build-release.ps1 -DevEcoHome '<DevEco Studio 安装目录>'
+```
+
+SDK 不在默认位置时，可通过 `-SdkHome '<HarmonyOS SDK 目录>'` 指定。脚本也支持读取 `DEVECO_STUDIO_HOME` 和 `DEVECO_SDK_HOME` 环境变量。
+
+输出文件为 `release/Pinmony-release-unsigned.hap`。脚本会验证包内为 Release 模式、`debug=false`，且不含 Debug 源码映射；签名和真机测试仍需另行完成。
+
+### 普通模块构建
 
 ```powershell
 $env:DEVECO_SDK_HOME = '<HarmonyOS SDK 目录>'
@@ -61,12 +74,11 @@ $env:JAVA_HOME = '<DevEco Studio 安装目录>\jbr'
 & '<DevEco Studio 安装目录>\tools\hvigor\bin\hvigorw.bat' --mode module -p module=entry assembleHap --no-daemon
 ```
 
-
 ## 隐私与会话
 
 Pinmony 使用 ArkWeb 保留当前网站登录会话。原生网络按请求临时读取必要的 Cookie，并在需要时将 Set-Cookie 同步回当前 ArkWeb 会话。Cookie、CSRF、账号标识、访问令牌和响应凭据不会写入源码、仓库或持久化日志。
 
-运行日志仅保存脱敏诊断信息，不记录 Cookie、CSRF、账号令牌、请求正文或完整敏感 URL。设置页提供运行日志导出入口。
+运行日志仅保存脱敏诊断信息，不记录 Cookie、CSRF、账号令牌、请求正文或完整敏感 URL。设置页提供运行日志导出和清理入口；清理应用内日志不会删除此前导出的文件。
 
 ## 免责声明
 

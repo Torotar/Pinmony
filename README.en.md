@@ -8,28 +8,28 @@
   <a href="./README.zh-CN.md">中文</a> | <a href="./README.en.md">English</a>
 </p>
 
-Pinmony is a personal-interest HarmonyOS app built for learning, technical research, interface exploration, and mobile experience testing. It reads pages or resource data publicly returned by the target website through the current login session, and presents a native interface with ArkUI.
+Pinmony is a personal-interest HarmonyOS app built for learning, technical research, interface exploration, and mobile experience testing. Sign-in uses ArkWeb, while business screens after sign-in use native ArkUI. Some features depend on the active login session and Pinterest's internal same-origin resources, which are not official public APIs.
 
 ## Features
 
-- Browse recommended Pins, boards, and category content on the home page
-- Search for Pins, categories, topics, and related content, including selecting a photo for image search
-- View Pin details, authors, comments, related recommendations, and supported videos; select an image region in details to find related content
-- Browse profiles, saved content, boards, and the inbox; search your own Pins and view recent searches on your profile
-- Switch between messages and contacts in the inbox, and search by username
-- Share Pins, boards, and contacts; share entries follow the flow of each page
-- Use the app UI in system language, Chinese, or English; app-owned copy switches immediately and the language preference is saved
-- Configure notifications, social permissions, video autoplay, display preferences, and export sanitized runtime logs in Settings
-- Use adaptive layouts on phones and tablets
-- Preserve page state, scroll position, navigation hierarchy, and loading state
+- **Discovery and search**: browse recommendations and categories; search Pins, boards, and topics, or search using photos, photo history, and selected image regions.
+- **Pin viewing and interaction**: view images, videos, authors, comments, and related recommendations; zoom images, save Pins, comment, and share.
+- **Profiles and boards**: browse profiles and saved content, search your own Pins, sort and merge boards, restore eligible deleted boards, and manage All Pins visibility.
+- **Publishing and organization**: publish photos and website links, organize and move Pins, and reposition the board publish button by dragging it to an edge.
+- **Messages and contacts**: browse inbox and chat messages, switch between messages and contacts, search contacts by username, and send Pins.
+- **Recommendations and privacy**: browse recent activity by date and manage related recommendations, notifications, message permissions, mentions, and blocked accounts.
+- **Display and playback**: configure immersive lighting and display preferences, with separate video autoplay controls for mobile data and Wi-Fi.
+- **Languages and devices**: UI resources for Simplified Chinese, Traditional Chinese, US English, UK English, Japanese, and Korean, with phone and tablet layouts.
+- **Runtime logs**: export and clear sanitized diagnostic logs to help report and investigate issues.
 
 ## Requirements
 
 | Requirement | Details |
 | --- | --- |
 | Device and system | HarmonyOS 6.1.1 (API 24) or later |
-| Development environment | DevEco Studio, ArkTS, Hvigor, and the HarmonyOS SDK |
 | Network and account | Access to Pinterest and sign-in with an account and password in the app. Google sign-in is currently unavailable. |
+
+Tablet layouts have been adapted but have not been tested on physical tablets. Correct layout and content display on all pages cannot be guaranteed. Please report display, overlap, or interaction issues through [GitHub Issues](https://github.com/Torotar/Pinmony/issues), including the device model, system version, screenshots, and steps to reproduce.
 
 ## Architecture
 
@@ -44,15 +44,29 @@ Pinmony is a personal-interest HarmonyOS app built for learning, technical resea
 - `common_session`: login evidence, session, and credential adaptation
 - `common_network`: native RCP transport and request lifecycle
 - `common_ui`: reusable UI components and shared presentation state
-- `common_foundation`: Chinese and English resources and preferences, caching, logging, task registration, and base runtime capabilities
+- `common_foundation`: multilingual resources and preferences, caching, logging, task registration, and base runtime capabilities
 
 ## Language Resources and Preferences
 
-App-owned copy is maintained in `common_foundation/src/main/resources/{base,zh_CN,en_US}/element/string.json` with stable resource names. The language selector is available in Display Settings and supports System, Chinese, and English; the preference is restored after restart. Website and user content remains in its original form, and only confirmed fixed controls use localized copy based on semantic identifiers.
+App-owned copy uses stable resource names in `common_foundation/src/main/resources/{base,zh_CN,zh_TW,en_US,en_GB,ja,ko}/element/string.json`. UI resources are provided for Simplified Chinese, Traditional Chinese, US English, UK English, Japanese, and Korean. Preferences are restored after restart, and account language synchronization is integrated. Website and user content remains in its original form; only confirmed fixed controls use localized copy based on semantic identifiers.
 
-## Building the HAP
+Choose a language or follow the system under Settings → Display Settings. When a supported account language is read, the app synchronizes its UI language.
 
-Configure the local HarmonyOS SDK in PowerShell, then run:
+Some translations may be inaccurate or unnatural. Please report translation, text truncation, or display issues through [GitHub Issues](https://github.com/Torotar/Pinmony/issues), including the language and affected page.
+
+### Release Build
+
+Run this PowerShell command from the project root:
+
+```powershell
+./build-release.ps1 -DevEcoHome '<DevEco Studio installation directory>'
+```
+
+If the SDK is installed elsewhere, add `-SdkHome '<HarmonyOS SDK directory>'`. The script also accepts the `DEVECO_STUDIO_HOME` and `DEVECO_SDK_HOME` environment variables.
+
+The output is `release/Pinmony-release-unsigned.hap`. The script verifies Release mode, `debug=false`, and the absence of Debug source maps. Signing and physical-device testing are separate steps.
+
+### Standard Module Build
 
 ```powershell
 $env:DEVECO_SDK_HOME = '<HarmonyOS SDK directory>'
@@ -64,7 +78,7 @@ $env:JAVA_HOME = '<DevEco Studio installation directory>\jbr'
 
 Pinmony uses ArkWeb to retain the current website login session. Native networking reads the required Cookies temporarily for each request and synchronizes Set-Cookie values back to the current ArkWeb session when needed. Cookies, CSRF values, account identifiers, access tokens, and response credentials are not written to source code, the repository, or persistent logs.
 
-Runtime logs contain sanitized diagnostic information only and do not record Cookies, CSRF values, account tokens, request bodies, or complete sensitive URLs. Settings provides an entry point for exporting runtime logs.
+Runtime logs contain sanitized diagnostic information only and do not record Cookies, CSRF values, account tokens, request bodies, or complete sensitive URLs. Settings provides log export and clearing controls. Clearing in-app logs does not delete previously exported files.
 
 ## Disclaimer
 
