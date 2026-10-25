@@ -4,7 +4,7 @@ const imageContainRect=vm.runInNewContext(ts.transpileModule(geometry+';imageCon
 const wide=imageContainRect(360,720,800,400);assert.equal(wide.width,360);assert.equal(wide.height,180);assert.equal(wide.y,270);
 const tall=imageContainRect(720,360,400,800);assert.equal(tall.width,180);assert.equal(tall.x,270);
 const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyImageViewer.ets','utf8');const sf=ts.createSourceFile('viewer.ts',source.replace(/\bstruct\b/g,'class'),99,true);
-const names=['aboutToAppear','aboutToDisappear','imageDecoded','beginTransition','containRect','setFrame','transitionChanged'];const methods=[];
+const names=['aboutToAppear','aboutToDisappear','imageDecoded','beginTransition','containRect','sourceRect','sourceRadius','setFrame','transitionChanged'];const methods=[];
 function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(sf)))methods.push(n.getText(sf));ts.forEachChild(n,visit);}visit(sf);
 const timers=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;', {compilerOptions:{target:99}}).outputText,{imageContainRect,curves:{springMotion:()=>0},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{}});
 const x=new Host(),animations=[];let closed=0,ready=0;
@@ -12,7 +12,13 @@ Object.assign(x,{origin:{x:12,y:90,width:336,height:400},detail:{imageWidth:800,
 x.aboutToAppear();assert.equal(x.frameY,90);x.beginTransition();assert.equal(ready,0);x.imageDecoded(0,false);assert.equal(ready,0);x.imageDecoded(1,false,800,400);assert.equal(ready,1);timers.shift()();assert.equal(x.frameHeight,180);assert.equal(x.frameRadius,0);
 x.imageDecoded(1,true,800,400);assert.equal(x.originalReady,false,'original waits for opening animation');animations.at(-1).onFinish();assert.equal(x.originalReady,true);
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');assert(!page.includes('opacity(this.viewerMounted ? 0 : 1)'), 'source image stays visible until decoded handoff');
-x.scaleValue=3;x.dx=100;x.closing=true;x.transitionChanged();const old=animations.at(-1);assert.equal(x.scaleValue,1);assert.equal(x.dx,0);assert.equal(x.frameY,90);
+x.scaleValue=3;x.dx=100;x.closing=true;x.transitionChanged();const old=animations.at(-1);assert.equal(x.scaleValue,1);assert.equal(x.dx,0);assert.equal(x.frameY,206);assert.equal(x.frameHeight,168);assert.equal(x.frameRadius,0,'letterboxed image remains square during return');
+const originalOrigin=x.origin;x.origin={x:0,y:0,width:336,height:168};assert.equal(x.sourceRadius(),18,'filled rounded source retains its corners');x.origin=originalOrigin;
+assert.equal(x.frameY + x.frameHeight / 2, x.origin.y + x.origin.height / 2, 'close targets actual contained photo bounds rather than letterboxed frame');
+const carousel=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets','utf8');
+assert.match(carousel,/\.id\(this.sourceId\)\.opacity\(this.imageHidden \? 0 : 1\)/);
+assert.match(page,/sourceId: 'pinmony-photo-source-' \+ this.traceId.toString\(\)/);
+assert(!page.includes(".id('pinmony-photo-source-' + this.traceId.toString()).opacity(this.viewerMounted && this.viewerImageReady ? 0 : 1)\n          } else if"), 'carousel indicator must not be part of measured or hidden photo frame');
 x.closing=false;x.transitionChanged();old.onFinish();assert.equal(closed,0,'interrupted close cannot remove reopened viewer');
 x.closing=true;x.transitionChanged();animations.at(-1).onFinish();assert.equal(closed,1);
 x.transitionChanged();const late=animations.at(-1);x.aboutToDisappear();late.onFinish();assert.equal(closed,1,'disposed transition cannot close newer page');

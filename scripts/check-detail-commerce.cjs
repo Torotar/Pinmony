@@ -13,6 +13,19 @@ const root = 'feature_pin/src/main/ets/';
 const { mapPrefetchedDetail, PinmonyDetailPrefetch } = load(root + 'services/PinmonyDetailPrefetch.ets');
 const { PinmonyDetailCache } = load(root + 'services/PinmonyDetailCache.ets');
 const { readProductPresentation } = load(root + 'services/PinmonyProductPresentation.ets');
+const galleryBody = images => JSON.stringify({ data: { v3GetPinQueryv2: { data: {
+  entityId: '101', richMetadata: { products: [{ image_736x: images.map(canonicalImage => ({ canonicalImage })) }] }
+} } } });
+const goodImage = { url: 'https://i.pinimg.com/736x/synthetic-product.jpg', width: 736, height: 1400 };
+const gallery = readProductPresentation(galleryBody([goodImage, goodImage,
+  { ...goodImage, url: 'https://example.invalid/image.jpg' },
+  { ...goodImage, width: 0 }, { ...goodImage, height: 50001 },
+  { ...goodImage, url: 'https://i.pinimg.com/736x/second.jpg' }]), '101');
+assert.equal(gallery.images.length, 2);
+assert.equal(gallery.images[0].imageHeight, 1400);
+assert.equal(gallery.images[1].imageUrl, 'https://i.pinimg.com/736x/second.jpg');
+assert.equal(readProductPresentation(galleryBody(Array.from({ length: 30 }, (_, index) =>
+  ({ ...goodImage, url: 'https://i.pinimg.com/736x/synthetic-' + index + '.jpg' }))), '101').images.length, 20);
 const productBody = (id = '101') => JSON.stringify({ data: { v3GetPinQueryv2: { data: {
   entityId: id, link: 'https://example.invalid/product', linkDomain: { name: 'Example' },
   formattedCloseupDescription: { components: [

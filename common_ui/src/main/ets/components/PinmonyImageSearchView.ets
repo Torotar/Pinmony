@@ -12,6 +12,31 @@ export struct PinmonyImageSearchView {
   @Prop imageWidth: number = 1;
   @Prop imageHeight: number = 1;
   @Prop uploadedPhoto: boolean = false;
+  @Prop animatePhoto: boolean = false;
+  @Prop originX: number = 0;
+  @Prop originY: number = 0;
+  @Prop originWidth: number = 0;
+  @Prop originHeight: number = 0;
+  @Prop @Watch('closeTransition') closing: boolean = false;
+  onTransitionClosed?: () => void;
+  onTransitionReady?: () => void;
+  @State private frameX: number = 0;
+  @State private frameY: number = 0;
+  @State private frameWidth: number = 1;
+  @State private frameHeight: number = 1;
+  @State private frameRadius: number = 18;
+  @State private backdrop: number = 0;
+  @State private chrome: number = 0;
+  private measured: boolean = false;
+  private decoded: boolean = false;
+  private started: boolean = false;
+  private transitionVersion: number = 0;
+  private transitionTimer: number = -1;
+  private sourceX: number = 0;
+  private sourceY: number = 0;
+  private sourceWidth: number = 1;
+  private sourceHeight: number = 1;
+  private closeRequested: boolean = false;
   @State private intrinsicWidth: number = 1;
   @State private intrinsicHeight: number = 1;
   @Prop result: PinmonyVisualResult;
@@ -36,11 +61,53 @@ export struct PinmonyImageSearchView {
     if (this.uploadedPhoto) this.crop = { x: 0, y: 0, w: 1, h: 1 };
     this.initial = setTimeout(() => {
       if (!this.alive) return;
-      this.sheetVisible = true;
+      if (!this.animatePhoto) this.sheetVisible = true;
       if (!this.uploadedPhoto && this.onSearch) this.onSearch(this.crop, false, true);
     }, 100);
   }
-  aboutToDisappear(): void { this.alive = false; clearTimeout(this.debounce); clearTimeout(this.initial); }
+  aboutToDisappear(): void { this.alive = false; this.transitionVersion++; clearTimeout(this.transitionTimer); clearTimeout(this.debounce); clearTimeout(this.initial); }
+  private beginTransition(): void {
+    if (!this.animatePhoto || this.started || !this.measured || !this.decoded || !this.alive) return;
+    this.started = true;
+    try {
+      const ui = this.getUIContext();
+      const root = ui.getComponentUtils().getRectangleById('pinmony-search-flight-' + this.pin);
+      const ratio: number = this.imageWidth / Math.max(1, this.imageHeight);
+      this.sourceWidth = Math.min(this.originWidth, this.originHeight * ratio);
+      this.sourceHeight = this.sourceWidth / ratio;
+      this.sourceX = this.originX - ui.px2vp(root.windowOffset.x) + (this.originWidth - this.sourceWidth) / 2;
+      this.sourceY = this.originY - ui.px2vp(root.windowOffset.y) + (this.originHeight - this.sourceHeight) / 2;
+    } catch (_) { this.sourceX = this.photoX(); this.sourceY = this.photoY(); this.sourceWidth = this.photoWidth(); this.sourceHeight = this.photoHeight(); }
+    if (this.sourceWidth <= 0 || this.sourceHeight <= 0) {
+      this.sourceX = this.photoX(); this.sourceY = this.photoY(); this.sourceWidth = this.photoWidth(); this.sourceHeight = this.photoHeight();
+    }
+    this.frameX = this.sourceX; this.frameY = this.sourceY;
+    this.frameWidth = this.sourceWidth; this.frameHeight = this.sourceHeight;
+    this.onTransitionReady?.();
+    this.transitionTimer = setTimeout(() => { if (this.alive) this.runTransition(this.closing); }, 0);
+  }
+  private closeTransition(): void {
+    if (!this.animatePhoto || !this.alive) return;
+    if (!this.closing) { if (this.started) this.runTransition(false); return; }
+    clearTimeout(this.initial); clearTimeout(this.debounce); clearTimeout(this.transitionTimer);
+    this.sheetVisible = false;
+    this.closeRequested = true;
+    if (!this.started) { this.onTransitionClosed?.(); return; }
+    this.runTransition(true);
+  }
+  private runTransition(closing: boolean): void {
+    const version: number = ++this.transitionVersion;
+    if (!closing) { this.closeRequested = false; this.sheetVisible = true; }
+    this.getUIContext().animateTo({ duration: closing ? 200 : 240, curve: Curve.EaseOut,
+      onFinish: () => {
+        if (!this.alive || version !== this.transitionVersion) return;
+        if (closing) this.onTransitionClosed?.();
+      } }, () => {
+      this.frameX = closing ? this.sourceX : this.photoX(); this.frameY = closing ? this.sourceY : this.photoY();
+      this.frameWidth = closing ? this.sourceWidth : this.photoWidth(); this.frameHeight = closing ? this.sourceHeight : this.photoHeight();
+      this.frameRadius = closing ? 18 : 0; this.backdrop = closing ? 0 : 1; this.chrome = closing ? 0 : 1;
+    });
+  }
   private photoWidth(): number { return Math.min(this.widthValue, this.heightValue * 0.6 * (this.uploadedPhoto ? this.intrinsicWidth / this.intrinsicHeight : this.imageWidth / this.imageHeight)); }
   private photoHeight(): number { return this.photoWidth() * (this.uploadedPhoto ? this.intrinsicHeight / this.intrinsicWidth : this.imageHeight / this.imageWidth); }
   private photoX(): number { return (this.widthValue - this.photoWidth()) / 2; }
@@ -126,13 +193,21 @@ export struct PinmonyImageSearchView {
   @Builder
   private searchContent() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Image(this.imageUrl).width(this.photoWidth()).height(this.photoHeight()).objectFit(ImageFit.Contain)
+      Column().width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+        .opacity(this.animatePhoto ? this.backdrop : 1).hitTestBehavior(HitTestMode.None)
+      Image(this.imageUrl).width(this.animatePhoto ? this.frameWidth : this.photoWidth())
+        .height(this.animatePhoto ? this.frameHeight : this.photoHeight()).objectFit(ImageFit.Contain)
         .onComplete((event) => {
           if (this.uploadedPhoto && event && event.width > 0 && event.height > 0) {
             this.intrinsicWidth = event.width; this.intrinsicHeight = event.height;
           }
+          if (event?.loadingStatus === 1) { this.decoded = true; this.beginTransition(); }
         })
-        .position({ x: this.photoX(), y: this.photoY() }).hitTestBehavior(HitTestMode.None)
+        .onError(() => { this.decoded = true; this.beginTransition(); })
+        .position({ x: this.animatePhoto ? this.frameX : this.photoX(), y: this.animatePhoto ? this.frameY : this.photoY() })
+        .borderRadius(this.animatePhoto ? this.frameRadius : 0).clip(true)
+        .opacity(this.animatePhoto && !this.started ? 0 : 1).hitTestBehavior(HitTestMode.None)
+      Stack({ alignContent: Alignment.TopStart }) {
       Rect().fill('#77000000').width(this.photoWidth()).height(this.crop.y * this.photoHeight())
         .position({ x: this.photoX(), y: this.photoY() }).hitTestBehavior(HitTestMode.None)
       Rect().fill('#77000000').width(this.photoWidth()).height((1 - this.crop.y - this.crop.h) * this.photoHeight())
@@ -150,8 +225,14 @@ export struct PinmonyImageSearchView {
       this.corner(1)
       this.corner(2)
       this.corner(3)
-    }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
-      .onAreaChange((_old: Area, area: Area) => { this.widthValue = Number(area.width); this.heightValue = Number(area.height); })
+      }.width('100%').height('100%').opacity(this.animatePhoto ? this.chrome : 1)
+        .animation({ duration: 100, curve: Curve.EaseOut })
+        .hitTestBehavior(this.animatePhoto && this.chrome < 1 ? HitTestMode.None : HitTestMode.Default)
+    }.width('100%').height('100%').id('pinmony-search-flight-' + this.pin)
+      .onAreaChange((_old: Area, area: Area) => {
+        this.widthValue = Number(area.width); this.heightValue = Number(area.height);
+        this.measured = this.widthValue > 0 && this.heightValue > 0; this.beginTransition();
+      })
       .onTouch((event: TouchEvent) => {
         if (event.type !== TouchType.Down || !event.touches.length) return;
         const x: number = event.touches[0].x;
@@ -184,7 +265,17 @@ export struct PinmonyImageSearchView {
         onDetentsDidChange: (height: number) => {
           this.sheetHeight = this.getUIContext().px2vp(height) > this.heightValue * 0.7 ? SheetSize.LARGE : '40%';
         },
-        onDisappear: () => { if (this.alive && this.onClose) this.onClose(); }
+        onWillDismiss: (action: DismissSheetAction) => {
+          action.dismiss();
+          if (this.alive && !this.closing && !this.closeRequested) {
+            this.closeRequested = true; this.onClose?.();
+          }
+        },
+        onDisappear: () => {
+          if (this.alive && !this.closing && !this.closeRequested) {
+            this.closeRequested = true; this.onClose?.();
+          }
+        }
       })
   }
 }

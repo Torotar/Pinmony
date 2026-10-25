@@ -43,11 +43,26 @@ export struct PinmonyImageViewer {
   }
   private beginTransition(): void {
     if (!this.mounted || !this.viewportMeasured || this.transitionStarted || (!this.previewReady && !this.originalReady)) return;
+    // Match the visible image bounds, excluding letterboxing and carousel controls.
+    this.setFrame(this.sourceRect());
+    this.frameRadius = this.sourceRadius();
     this.transitionStarted = true; this.onReady?.();
     this.transitionTimer = setTimeout(() => { if (this.mounted) this.transitionChanged(); }, 0);
   }
   private containRect(): ImageFlightRect {
     return imageContainRect(this.viewportWidth, this.viewportHeight, this.naturalWidth || this.detail.imageWidth, this.naturalHeight || this.detail.imageHeight);
+  }
+  private sourceRect(): ImageFlightRect {
+    if (this.origin.width <= 0 || this.origin.height <= 0) return this.containRect();
+    const image: ImageFlightRect = imageContainRect(this.origin.width, this.origin.height,
+      this.naturalWidth || this.detail.imageWidth, this.naturalHeight || this.detail.imageHeight);
+    return { x: this.origin.x + image.x, y: this.origin.y + image.y, width: image.width, height: image.height };
+  }
+  private sourceRadius(): number {
+    const image: ImageFlightRect = this.sourceRect();
+    // Contain images with letterboxing do not reach the rounded container corners.
+    return this.origin.width > 0 && this.origin.height > 0 &&
+      Math.abs(image.width - this.origin.width) < 0.5 && Math.abs(image.height - this.origin.height) < 0.5 ? 18 : 0;
   }
   private setFrame(rect: ImageFlightRect): void {
     this.frameX = rect.x; this.frameY = rect.y;
@@ -64,7 +79,7 @@ export struct PinmonyImageViewer {
     this.transitioning = true;
     this.stopInertia();
     const closing: boolean = this.closing;
-    const target: ImageFlightRect = closing && this.origin.width > 0 && this.origin.height > 0 ? this.origin : this.containRect();
+    const target: ImageFlightRect = closing ? this.sourceRect() : this.containRect();
     this.getUIContext().animateTo({ duration: closing ? 400 : 420,
       curve: curves.springMotion(closing ? 0.42 : 0.34, 0.9),
       onFinish: () => {
@@ -76,7 +91,7 @@ export struct PinmonyImageViewer {
         }
         if (this.closing) this.onClosed?.();
       } }, () => {
-      this.setFrame(target); this.frameRadius = closing ? 18 : 0;
+      this.setFrame(target); this.frameRadius = closing ? this.sourceRadius() : 0;
       this.backdrop = closing ? 0 : 1;
       this.scaleValue = 1; this.dx = 0; this.dy = 0;
     });

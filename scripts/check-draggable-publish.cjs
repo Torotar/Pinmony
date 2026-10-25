@@ -10,11 +10,11 @@ h.start();h.move({offsetX:10000,offsetY:10000});h.settle();assert.equal(h.x,328)
 h.areaWidth=200;h.areaHeight=300;h.resize();assert.equal(h.x,128);assert.equal(h.y,224,'resize keeps edge and relative vertical position');
 h.actionEnabled=false;h.start();h.move({offsetX:-100,offsetY:-100});assert.equal(h.x,128);assert(!h.dragging);
 for(const [w,t] of [[56,56],[80,100],[320,640],[1000,500]]){h.areaWidth=w;h.areaHeight=t;h.resize();assert(h.x>=0&&h.x+56<=w);assert(h.y>=0&&h.y+56<=t);}
-const restored=new Host();Object.assign(restored,{areaWidth:400,areaHeight:700,moved:true,right:false,fraction:0.5});
+const restored=new Host();Object.assign(restored,{areaWidth:400,areaHeight:700,moved:true,right:false,xFraction:0,fraction:0.5});
 restored.aboutToAppear();assert.equal(restored.x,16);assert.equal(restored.y,320,'remounted publish button restores application-owned position');
 restored.actionEnabled=true;restored.start();restored.move({offsetX:300,offsetY:-100});
 restored.areaWidth=500;restored.resize();assert(restored.moved);assert(restored.right);
-assert.equal(restored.x,428);assert.equal(restored.y,220,'layout change saves in-flight drag using previous dimensions');
+assert(Math.abs(restored.x-(16+300/312*412))<0.001);assert.equal(restored.y,220,'layout change saves in-flight drag using previous dimensions');
 const anchor=restored.fraction;restored.areaHeight=0;restored.resize();assert.equal(restored.fraction,anchor);
 restored.areaHeight=700;restored.resize();assert.equal(restored.y,220,'transient zero layout cannot overwrite anchor');
 const ability=fs.readFileSync('entry/src/main/ets/startup/PreferencesTask.ets','utf8');
@@ -23,9 +23,10 @@ assert(saves.length>=3,'settled and interrupted drags explicitly save');
 const service=fs.readFileSync('common_foundation/src/main/ets/services/PinmonyPublishAnchor.ets','utf8');
 let disk='',pending='',flushes=0;
 function freshRuntime(){const state=new Map(),exports={};vm.runInNewContext(ts.transpileModule(service,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,AppStorage:{setOrCreate:(k,v)=>state.set(k,v)},require:name=>name==='@kit.ArkData'?{preferences:{getPreferencesSync:()=>({getSync:()=>disk,putSync:(_,v)=>pending=v,flushSync:()=>{disk=pending;flushes++}})}}:{PinmonyRuntimeLog:{info(){},warn(){}}}});return {anchor:exports.PinmonyPublishAnchor,state};}
-const first=freshRuntime();first.anchor.initialize({});first.anchor.save(false,0.37);assert.equal(flushes,1);
+const first=freshRuntime();first.anchor.initialize({});first.anchor.save(false,0.37,0.46);assert.equal(flushes,1);
 const reboot=freshRuntime();reboot.anchor.initialize({});assert.equal(reboot.state.get('pinmonyPublishAnchorMoved'),true);assert.equal(reboot.state.get('pinmonyPublishAnchorRight'),false);assert.equal(reboot.state.get('pinmonyPublishAnchorFraction'),0.37);
-reboot.anchor.save(true,NaN);assert.equal(flushes,1,'invalid layouts cannot overwrite disk');
+assert.equal(reboot.state.get('pinmonyPublishAnchorXFraction'),0.46);reboot.anchor.save(true,NaN);assert.equal(flushes,1,'invalid layouts cannot overwrite disk');
 disk='{"right":false,"fraction":5}';const corrupt=freshRuntime();corrupt.anchor.initialize({});assert.equal(corrupt.state.size,0,'invalid disk data does not enter layout');
+h.areaWidth=400;h.areaHeight=700;h.actionEnabled=true;h.resize();h.start();h.move({offsetX:172-h.x,offsetY:320-h.y});h.settle();assert.equal(h.x,172,'release in center does not snap');h.resize();assert.equal(h.x,172,'center survives layout restore');
 assert(src.includes('GestureGroup(GestureMode.Sequence')&&src.includes('LongPressGesture')&&src.includes('onCancel'));
-console.log('Publish drag: default position, bounds, edge snap, resize, disabled state and click suppression passed');
+console.log('Publish drag: default position, bounds, free placement, resize, disabled state and click suppression passed');

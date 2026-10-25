@@ -1,4 +1,5 @@
 import { PinmonyUpdateNotice } from 'feature_settings';
+import { display } from '@kit.ArkUI';
 import { PinmonyBoardOrderPage } from 'feature_profile';
 import { PinmonyBoardRecoveryPage } from 'feature_settings';
 import { PinmonySessionHistory } from 'common_session';
@@ -51,7 +52,7 @@ import { PinmonyMoreSheet, PinmonyShareSheet, PinmonySharePanelsController, Pinm
   PinmonyDetailImageStagePorts, PinmonyDetailDocumentBinding, PinmonyDetailDocumentBindingPorts,
   PinmonyPostResult, ShareSheetOption, PinmonyDetailPage, PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin,
   PIN_DETAIL_API_ENABLED, PIN_POST_API_ENABLED, PIN_POST_EXTENSIONS_ENABLED, PinmonyEditPinSheet,
-  PinmonySaveSheet, PinmonyCommentsSheet } from 'feature_pin';
+  PinmonySaveSheet, PinmonyCommentsSheet, PinmonyDetailEntryPhoto } from 'feature_pin';
 
 import { PinmonyBoardOperationsController, PinmonyBoardOperationsPorts, PinmonyBoardStateController,
   PinmonyBoardStatePorts, PinmonyBoardCollaboratorsController, PinmonyBoardCollaboratorsPorts,
@@ -1487,6 +1488,7 @@ struct Index {
       this.retainedBoardContent = board; this.pinStore.detailReturnUrl = board.pageKey;
       this.pinStore.rememberDetailOrigin(this.pinIdentity(pin.pinUrl),board.pageKey);
       this.pinStore.confirmedSaves.confirm(this.pinIdentity(pin.pinUrl),true,'',board.title);
+      this.capturePinEntryPhoto(pin.pinUrl, pin.imageUrl, 'pinmony-board-photo-' + pin.id, pin.imageWidth, pin.imageHeight);
       this.beginDetailOpening(pin.pinUrl,board.pageKey); if(!PIN_NATIVE_DETAIL_READS_ENABLED)this.loadSessionDocument(pin.pinUrl);
     }
   } as PinmonyBoardNativeReadsPorts);
@@ -3065,7 +3067,11 @@ struct Index {
     if(!search.results.some((p): boolean => p.targetUrl === target && p.enabled) && !search.quiz?.cards.some((p): boolean => p.targetUrl === target))return;
     if(!target.startsWith(this.nativeBusinessSessionContext().origin + '/'))return;
     const pin: string = this.extractPinUrl(target),board: string = this.boardUrlFromAddress(target),profile: string = this.profileUrlFromAddress(target);
-    if(pin){this.beginDetailOpening(pin,source);return;}
+    if(pin){
+      const card = search.results.find((item): boolean => item.targetUrl === target);
+      if (card) this.capturePinEntryPhoto(pin, card.imageUrl, 'pinmony-search-photo-' + target, card.imageWidth, card.imageHeight);
+      this.beginDetailOpening(pin,source);return;
+    }
     if(profile){this.openUserProfile(profile);return;}
     if(!board)return;
     this.searchStore.searchCache.put(search,this.searchStore.searchScrollOffset);this.pageHistory.visit(source,'load');
@@ -3764,7 +3770,39 @@ struct Index {
   }
 
   private async openHomePin(id: string): Promise<void> {
+    this.homeEntryPhoto = undefined; this.homeEntryClosing = false;
+    this.homeEntryBackCommitted = false;
+    this.homeEntryCardId = 'pinmony-home-photo-' + id;
+    const home: PinmonyHomeSnapshot | undefined = this.homeStore.homeForPresentation(
+      this.homePresentationPageKey() || this.retainedHomeRootPageKey());
+    const pin: PinmonyHomePin | undefined = home?.pins.find((item: PinmonyHomePin): boolean => item.id === id);
+    if (pin && this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 0) {
+      try {
+        const ui = this.getUIContext();
+        const rect = ui.getComponentUtils().getRectangleById('pinmony-home-photo-' + id);
+        const width: number = ui.px2vp(rect.size.width), height: number = ui.px2vp(rect.size.height);
+        if (width > 0 && height > 0) this.homeEntryPhoto = { pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
+          x: ui.px2vp(rect.windowOffset.x), y: ui.px2vp(rect.windowOffset.y), width: width, height: height };
+      } catch (_) {}
+    }
     return this.homeController.openHomePin(id);
+  }
+  @State private homeEntryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
+  @State private homeEntryClosing: boolean = false;
+  private homeEntryCardId: string = '';
+  private homeEntryBackCommitted: boolean = false;
+  private capturePinEntryPhoto(pinUrl: string, imageUrl: string, sourceId: string, imageWidth: number, imageHeight: number): void {
+    this.homeEntryPhoto = undefined; this.homeEntryClosing = false; this.homeEntryBackCommitted = false;
+    this.homeEntryCardId = sourceId;
+    if (!imageUrl || this.authStatus !== 'authenticated' || this.businessSuspended) return;
+    try {
+      const ui = this.getUIContext();
+      const rect = ui.getComponentUtils().getRectangleById(sourceId);
+      const width: number = ui.px2vp(rect.size.width), height: number = ui.px2vp(rect.size.height);
+      if (width > 0 && height > 0) this.homeEntryPhoto = { pinUrl: pinUrl, imageUrl: imageUrl,
+        x: ui.px2vp(rect.windowOffset.x), y: ui.px2vp(rect.windowOffset.y), width: width, height: height,
+        imageWidth: imageWidth, imageHeight: imageHeight };
+    } catch (_) {}
   }
 
   private homeMenuReady(): boolean {
@@ -4077,6 +4115,20 @@ struct Index {
     if (this.showNativeSheet || this.activeSheetKind) {
       this.onBackPress();
       return;
+    }
+    if (this.homeEntryPhoto && !this.homeEntryBackCommitted && this.homeEntryPhoto.pinUrl === this.pinStore.detail?.pinUrl && !this.pinStore.imageLayer) {
+      if (this.homeEntryClosing) return;
+      try {
+        const ui = this.getUIContext();
+        const rect = ui.getComponentUtils().getRectangleById(this.homeEntryCardId);
+        const y: number = ui.px2vp(rect.windowOffset.y), height: number = ui.px2vp(rect.size.height);
+        if (rect.size.width > 0 && height > 0 && y >= 0 && y + height <= this.getUIContext().px2vp(display.getDefaultDisplaySync().height)) {
+          this.homeEntryPhoto = { pinUrl: this.homeEntryPhoto.pinUrl, imageUrl: this.homeEntryPhoto.imageUrl,
+            x: ui.px2vp(rect.windowOffset.x), y: y, width: ui.px2vp(rect.size.width), height: height };
+          this.homeEntryClosing = true; return;
+        }
+      } catch (_) {}
+      this.homeEntryPhoto = undefined;
     }
     this.lastRootBackAt = 0;
     if (this.backInProgress) return;
@@ -5153,6 +5205,9 @@ struct Index {
   }
 
   private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false): void {
+    if (this.homeEntryPhoto?.pinUrl !== pinUrl) {
+      this.homeEntryPhoto = undefined; this.homeEntryClosing = false; this.homeEntryBackCommitted = false;
+    }
     this.detailReturnJourney?.close();
     const clickAt: number = this.detailClickedAt > 0 && Date.now() - this.detailClickedAt < 20000 ? this.detailClickedAt : Date.now();
     this.detailClickedAt = 0;
@@ -5196,11 +5251,11 @@ struct Index {
     this.detailRelatedMeasured = false;
     PinmonyRuntimeLog.info('DetailTrace: open openId=' + token.toString());
     if (PIN_DETAIL_API_ENABLED && !this.pinStore.detail) {
-      const imageUrl: string = card?.imageUrl || relatedCard?.imageUrl || '';
+      const imageUrl: string = card?.imageUrl || relatedCard?.imageUrl || this.homeEntryPhoto?.imageUrl || '';
       this.pinStore.detail = {
         kind: 'opening', dataSource: 'api', session: 0, pinUrl: pinUrl,
-        imageUrl: imageUrl, imageWidth: card?.imageWidth || relatedCard?.imageWidth || 0,
-        imageHeight: card?.imageHeight || relatedCard?.imageHeight || 0,
+        imageUrl: imageUrl, imageWidth: card?.imageWidth || relatedCard?.imageWidth || this.homeEntryPhoto?.imageWidth || 0,
+        imageHeight: card?.imageHeight || relatedCard?.imageHeight || this.homeEntryPhoto?.imageHeight || 0,
         title: card?.title || relatedCard?.title || '', description: '', creator: '', creatorAvatar: '', sourceLabel: '',
         actions: [], related: []
       };
@@ -6427,6 +6482,8 @@ struct Index {
             .scrollable(false)
             .barOverlap(true)
             .barHeight(56)
+            .padding({ top: this.homeEntryPhoto && this.homeEntryCardId.startsWith('pinmony-home-photo-') && (this.pinStore.detail || this.pinStore.detailOpeningPin) ?
+              this.getUIContext().px2vp(this.statusBarHeightPx) : 0 })
             .barBackgroundColor(this.immersiveLightMode !== 'off' ? Color.Transparent : $r('app.color.surface_muted'))
             .barFloatingStyle({
               barBottomMargin: 28,
@@ -6639,6 +6696,13 @@ struct Index {
                   detail: this.pinStore.detail,
                   renderIdentity: this.detailRenderIdentity(),
                   traceId: this.pinStore.detailOpeningToken,
+                  entryPhoto: this.homeEntryPhoto?.pinUrl === this.pinStore.detail?.pinUrl ? this.homeEntryPhoto : undefined,
+                  entryClosing: this.homeEntryClosing,
+                  onEntryClosed: () => {
+                    if (!this.homeEntryClosing || this.homeEntryBackCommitted || this.homeEntryPhoto?.pinUrl !== this.pinStore.detail?.pinUrl) return;
+                    this.homeEntryBackCommitted = true;
+                    this.backFromDetail();
+                  },
                   contentError: this.pinStore.detailApiError,
                   contentRetryable: this.pinStore.detailApiRetryable,
                   onContentRetry: () => this.retryDetailApi(),
@@ -6792,7 +6856,7 @@ struct Index {
             }
             .width('100%')
             .height('100%')
-            .transition(NATIVE_PAGE_TRANSITION)
+            .transition(this.homeEntryPhoto ? TransitionEffect.IDENTITY : NATIVE_PAGE_TRANSITION)
           }
           if (this.homeStore.pendingHomeMorePin && !this.loadFailed) {
             Column({ space: 16 }) {

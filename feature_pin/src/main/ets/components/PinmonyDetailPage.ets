@@ -8,10 +8,12 @@ import { splitDescriptionTags, PinmonyDescriptionPart } from '../services/Pinmon
 import { PinmonyVisualSearchView } from './PinmonyVisualSearchView';
 import { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from '../models/PinmonyVisualSearch';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin, PinmonyRelatedTopic } from '../models/PinmonyDetail';
+import { PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin, PinmonyRelatedTopic, PinmonyCarouselItem } from '../models/PinmonyDetail';
 import { PinmonyCarouselView } from './PinmonyCarouselView';
 import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
 import { PinmonyDetailHero, DetailHeroSource } from './PinmonyDetailHero';
+import { PinmonyDetailEntryPhoto } from '../services/PinmonyImageTransition';
+import { PinmonyDetailEntryMotion } from './PinmonyDetailEntryMotion';
 import { display } from '@kit.ArkUI';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { SmartImage, getRecommendCardWidth, getRecommendColumnCount, RECOMMEND_CARD_RADIUS_VP,
@@ -28,6 +30,12 @@ export struct PinmonyDetailPage {
   @Prop @Watch('onPinChanged') detail: PinmonyDetailSnapshot = {} as PinmonyDetailSnapshot;
   @Prop @Watch('onRenderIdentityChanged') renderIdentity: string = '';
   @Prop traceId: number = 0;
+  @Prop entryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
+  @Prop entryClosing: boolean = false;
+  onEntryClosed?: () => void;
+  @State private entryOpacity: number = 1;
+  @State private entryPhotoHidden: boolean = false;
+  @State private entryMotionComplete: boolean = false;
   @Prop @Watch('updateDetailLayout') actionsReady: boolean = true;
   @Prop postActionsReady: boolean = false;
   @Prop shareActionsReady: boolean = false;
@@ -47,8 +55,24 @@ export struct PinmonyDetailPage {
   @State private viewerImageReady: boolean = false;
   @State private viewerClosing: boolean = false;
   @State private viewerOrigin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
+  @State private searchMounted: boolean = false;
+  @State private searchClosing: boolean = false;
+  @State private searchImageReady: boolean = false;
+  @State private searchOrigin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
   private onImageLayerChanged(): void {
     this.viewerControls = true;
+    if (this.imageLayer === 'search') {
+      if (!this.searchMounted) {
+        try {
+          const ui = this.getUIContext();
+          const source = ui.getComponentUtils().getRectangleById('pinmony-photo-source-' + this.traceId.toString());
+          this.searchOrigin = { x: ui.px2vp(source.windowOffset.x), y: ui.px2vp(source.windowOffset.y),
+            width: ui.px2vp(source.size.width), height: ui.px2vp(source.size.height) };
+        } catch (_) { this.searchOrigin = { x: 0, y: 0, width: 0, height: 0 }; }
+        this.searchImageReady = false;
+      }
+      this.searchClosing = false; this.searchMounted = true;
+    } else if (this.searchMounted) this.searchClosing = true;
     if (this.imageLayer === 'zoom') {
       if (!this.viewerMounted) this.viewerImageReady = false;
       this.viewerOrigin = this.measureViewerOrigin();
@@ -61,7 +85,10 @@ export struct PinmonyDetailPage {
   private measureViewerOrigin(): ImageFlightRect {
     try {
       const ui = this.getUIContext();
-      const source = ui.getComponentUtils().getRectangleById('pinmony-photo-source-' + this.traceId.toString());
+      const selectedIndex: number = this.detail.carousel?.freeScroll ?
+        this.detail.carousel.items.findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.zoomImageUrl) : -1;
+      const source = ui.getComponentUtils().getRectangleById('pinmony-photo-source-' + this.traceId.toString() +
+        (selectedIndex >= 0 ? '-' + selectedIndex.toString() : ''));
       const root = ui.getComponentUtils().getRectangleById('pinmony-photo-root-' + this.traceId.toString());
       return { x: ui.px2vp(source.windowOffset.x - root.windowOffset.x),
         y: ui.px2vp(source.windowOffset.y - root.windowOffset.y),
@@ -70,6 +97,7 @@ export struct PinmonyDetailPage {
   }
   @Prop visualResult: PinmonyVisualResult = emptyVisualResult();
   @State private zoomImageUrl: string = '';
+  private productGalleryOffset: number = 0;
   @State private searchLabelVisible: boolean = true;
   private searchLabelTimer: number = -1;
   onImageLayer?: (layer: string) => void;
@@ -125,10 +153,12 @@ export struct PinmonyDetailPage {
   private onPinChanged(): void {
     if (this.activePin !== this.detail.pinUrl) {
       this.viewerMounted = false; this.viewerClosing = false;
+      this.searchMounted = false; this.searchImageReady = false; this.searchClosing = false;
       this.activePin = this.detail.pinUrl;
       this.decodedHeroSource = undefined;
       this.expanded = false;
       this.zoomImageUrl = '';
+      this.productGalleryOffset = 0;
       this.textOverflowing = false;
       this.videoFailure = ''; this.videoRetryRevision = 0;
       this.restoreScrollPosition();
@@ -155,6 +185,7 @@ export struct PinmonyDetailPage {
 
   aboutToAppear(): void {
     this.heroVisible = true;
+    if (this.entryPhoto) this.entryOpacity = 0;
     this.activePin = this.detail.pinUrl;
     this.updateDetailLayout();
     this.auditRecommendationGate('appear');
@@ -549,12 +580,20 @@ export struct PinmonyDetailPage {
   private detailPaneWidth(): number {
     return Math.max(1, this.wideDetail() ? (this.contentWidth - 56) / 2 : this.contentWidth - 36);
   }
+  private detailMediaWidth(): number {
+    return this.detail.carousel?.freeScroll && !this.wideDetail() ? this.contentWidth : this.detailPaneWidth();
+  }
 
   @Builder
   private detailMedia() {
     Column() {
           if (this.detail.carousel) {
-            PinmonyCarouselView({ carousel: this.detail.carousel, contentWidth: this.detailPaneWidth(),
+            PinmonyCarouselView({ carousel: this.detail.carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
+              productOffset: this.productGalleryOffset,
+              onProductOffset: (offset: number) => { this.productGalleryOffset = offset; },
+              sourceId: 'pinmony-photo-source-' + this.traceId.toString(),
+              imageHidden: this.viewerMounted && this.viewerImageReady || this.searchMounted && this.searchImageReady,
+              hiddenImageUrl: this.zoomImageUrl,
               active: this.videoActive && !this.imageLayer,
               sessionReady: this.actionsReady || this.readsReady,
               mediaOwner: this.detail.pinUrl + '|' + this.traceId.toString(), openId: this.traceId,
@@ -564,7 +603,6 @@ export struct PinmonyDetailPage {
                 else this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
               },
               onImageTap: (url: string) => { this.zoomImageUrl = url; if (this.onImageLayer) this.onImageLayer('zoom'); } })
-              .id('pinmony-photo-source-' + this.traceId.toString()).opacity(this.viewerMounted && this.viewerImageReady ? 0 : 1)
           } else if (((this.detail.mediaLoading || this.mediaReadBusy) && !this.detail.video) || (this.detail.mediaKind === 'carousel' && !this.detail.carousel)) {
             Stack({ alignContent: Alignment.Center }) {
               if (this.detail.imageUrl) this.heroImage()
@@ -578,6 +616,10 @@ export struct PinmonyDetailPage {
                 }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
               }
             }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
+            if (this.detail.mediaKind === 'carousel') {
+              // Reserve the indicator row before the validated slots are ready.
+              Row().width('100%').height(28)
+            }
           } else if (this.detail.video && this.detail.isVideo) {
             PinmonyVideoPlayer({ video: this.detail.video, poster: this.detail.imageUrl, active: this.videoActive, openId: this.traceId,
               autoplayWifi: this.detail.autoplayWifi === true, autoplayCellular: this.detail.autoplayCellular === true,
@@ -636,7 +678,10 @@ export struct PinmonyDetailPage {
           }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
           }
 
-    }.width(this.detailPaneWidth())
+    }.width(this.detailMediaWidth()).id('pinmony-entry-target-' + this.traceId.toString())
+      .opacity(this.entryPhotoHidden ? 0 : 1)
+      .margin({ left: this.detail.carousel?.freeScroll && !this.wideDetail() ? -18 : 0,
+        right: this.detail.carousel?.freeScroll && !this.wideDetail() ? -18 : 0 })
   }
 
   @Builder
@@ -867,8 +912,9 @@ export struct PinmonyDetailPage {
         }, onRetry: () => this.retryHeroImage(source.key),
         onTap: () => { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } })
     }, (source: DetailHeroSource): string => source.key)
-    }.width('100%').height(this.heroHeight())
-      .id('pinmony-photo-source-' + this.traceId.toString()).opacity(this.viewerMounted && this.viewerImageReady ? 0 : 1)
+    }.width('100%').height(this.heroHeight()).borderRadius(18).clip(true)
+      .id('pinmony-photo-source-' + this.traceId.toString())
+      .opacity(this.viewerMounted && this.viewerImageReady || this.searchMounted && this.searchImageReady ? 0 : 1)
   }
 
   private heroImageSources(url: string, pinUrl: string): DetailHeroSource[] {
@@ -985,10 +1031,14 @@ export struct PinmonyDetailPage {
     HdsNavDestination() {
       Stack() {
         Column() { this.detailContent() }.width('100%').height('100%')
-          .visibility(this.imageLayer === 'search' ? Visibility.Hidden : Visibility.Visible)
-      if (this.imageLayer === 'search') {
+          .hitTestBehavior(this.searchMounted ? HitTestMode.None : HitTestMode.Default)
+      if (this.searchMounted) {
         PinmonyVisualSearchView({ pin: this.detail.pinUrl, imageUrl: this.detail.originalImageUrl || this.detail.imageUrl,
           imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight, result: this.visualResult,
+          animatePhoto: true, originX: this.searchOrigin.x, originY: this.searchOrigin.y,
+          originWidth: this.searchOrigin.width, originHeight: this.searchOrigin.height, closing: this.searchClosing,
+          onTransitionReady: () => { this.searchImageReady = true; },
+          onTransitionClosed: () => { this.searchMounted = false; this.searchImageReady = false; this.searchClosing = false; },
           onSearch: this.onVisualSearch,
           onClose: () => { if (this.onImageLayer) this.onImageLayer(''); },
           onRelated: (id: string) => {
@@ -1004,6 +1054,7 @@ export struct PinmonyDetailPage {
     .hideTitleBar(false)
     .onBackPressed(() => {
       PinmonyRuntimeLog.info('PinmonyReturn: detail destination back');
+      if (this.searchMounted && this.searchClosing) return true;
       if (this.imageLayer && this.onImageLayer) this.onImageLayer('');
       else if (this.onBack) this.onBack();
       return true;
@@ -1020,6 +1071,23 @@ export struct PinmonyDetailPage {
       .width('100%').height('100%').hideTitleBar(true)
       .navDestination(this.detailDestination).backgroundColor($r('app.color.page_background'))
       .hitTestBehavior(this.viewerMounted ? HitTestMode.None : HitTestMode.Default)
+      .opacity(this.entryOpacity)
+      if (this.entryPhoto && (!this.entryMotionComplete || this.entryClosing)) {
+        PinmonyDetailEntryMotion({ photo: this.entryPhoto,
+          targetId: 'pinmony-entry-target-' + this.traceId.toString(),
+          rootId: 'pinmony-photo-root-' + this.traceId.toString(),
+          imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight,
+          bottomInset: this.detail.carousel ? 28 : 0, closing: this.entryClosing,
+          onReveal: (closing: boolean) => {
+            this.entryPhotoHidden = true;
+            this.getUIContext().animateTo({ duration: 240, curve: Curve.EaseOut }, () => {
+              this.entryOpacity = closing ? 0 : 1;
+            });
+          },
+          onOpened: () => { this.entryOpacity = 1; this.entryPhotoHidden = false; this.entryMotionComplete = true; },
+          onClosed: () => { this.entryPhotoHidden = false; this.onEntryClosed?.(); } })
+          .hitTestBehavior(HitTestMode.None)
+      }
       if (this.viewerMounted) {
         PinmonyImageViewer({ detail: this.detail, imageUrl: this.zoomImageUrl || this.detail.originalImageUrl || this.detail.imageUrl,
           previewUrl: this.zoomImageUrl || this.detail.imageUrl,
@@ -1050,6 +1118,6 @@ export struct PinmonyDetailPage {
           this.viewportHeight = height;
           this.updateDetailLayout();
         }
-      }).backgroundColor($r('app.color.page_background'))
+      }).backgroundColor(this.entryPhoto ? Color.Transparent : $r('app.color.page_background'))
   }
 }

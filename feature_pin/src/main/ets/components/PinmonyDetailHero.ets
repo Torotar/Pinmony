@@ -95,7 +95,7 @@ export struct PinmonyDetailHero {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       // State feedback never removes the Image while its source is still current.
-      Image(this.source.url).width('100%').height(this.heightVp).objectFit(ImageFit.Cover).borderRadius(18)
+      Image(this.source.url).width('100%').height(this.heightVp).objectFit(ImageFit.Contain).borderRadius(18).clip(true)
         .opacity(this.previewAvailable && this.imageState !== 'loaded' ? 0 : 1)
         .onComplete((event) => this.completeImage(event?.loadingStatus ?? -1))
         .onError((event) => this.failImage(event?.error?.code || 0))
@@ -111,6 +111,6 @@ export struct PinmonyDetailHero {
           Button(this.uiText("pm_reload_image_0ad285f1")).onClick(() => this.retryImage())
         }.padding(12).borderRadius(12).backgroundColor($r('app.color.page_background'))
       }
-    }.width('100%').height(this.heightVp)
+    }.width('100%').height(this.heightVp).borderRadius(18).clip(true)
   }
 }

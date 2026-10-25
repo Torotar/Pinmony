@@ -1,5 +1,6 @@
 {
   "color": [
+    {"name":"publish_button_glass","value":"#66202020"},
     { "name": "display_settings_card", "value": "#202020" },
     { "name": "display_settings_control", "value": "#303030" },
     { "name": "immersive_title_scrolled", "value": "#AD12141A" },

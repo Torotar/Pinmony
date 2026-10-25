@@ -451,6 +451,7 @@ export struct PinmonyBoardPage {
           .accessibilityText(this.snapshot.flow?.saved.includes(pin.id) ? this.uiText("pm_unsave_dca60869") : this.uiText("pm_save_to_48bf7c69") + this.snapshot.title)
       }
       }.width('100%').borderRadius(this.selectingPins() ? 12 : 16).clip(true)
+      .id('pinmony-board-photo-' + pin.id)
       .border({ width: this.selectingPins() && this.selectedIds.includes(pin.id) ? 2 : 0,
         color: $r('app.color.primary_text') })
       .onClick(() => {

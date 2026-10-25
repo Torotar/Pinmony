@@ -4,7 +4,7 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyRouteParser } from './PinmonyRouteParser';
-import { readProductPresentation, ProductPresentation } from 'feature_pin';
+import { readProductPresentation, ProductPresentation, PinmonyCarouselItem } from 'feature_pin';
 
 export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
 interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
@@ -226,6 +226,15 @@ export class PinmonyDetailNativeReads {
       if (!product) throw new Error('invalid-product');
       const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
       if (product.description) next.richDescription = product.description;
+      if (!next.isVideo && !next.carousel && product.images.length > 0) {
+        const items: PinmonyCarouselItem[] = [{ id: 'product-main', imageUrl: next.originalImageUrl || next.imageUrl,
+          imageWidth: next.imageWidth, imageHeight: next.imageHeight, title: next.title }];
+        product.images.forEach((image: PinmonyCarouselItem): void => {
+          if (!items.some((item: PinmonyCarouselItem): boolean =>
+            item.imageUrl.split('/').pop() === image.imageUrl.split('/').pop())) items.push(image);
+        });
+        if (items.length > 1) next.carousel = { pinId: pinId, items: items, freeScroll: true };
+      }
       if (product.source && PinmonyRouteParser.externalSourceUrl(product.source)) {
         next.sourceUrl = product.source; next.sourceLabel = product.sourceLabel;
       }

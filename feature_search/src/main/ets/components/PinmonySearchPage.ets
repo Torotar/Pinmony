@@ -976,6 +976,7 @@ export struct PinmonySearchPage {
       if (result.video) {
         PinmonyVideoCard({ video: result.video, poster: result.imageUrl, active: this.mediaActive && (this.actionsReady || this.resultsReadsReady) && !this.quizSheetOpen })
           .width('100%').height(this.imageHeight(result))
+          .id('pinmony-search-photo-' + result.targetUrl)
           .onClick(() => {
             if (this.interactionReady && result.enabled && this.onResult) this.onResult(result.targetUrl);
           })
@@ -993,6 +994,7 @@ export struct PinmonySearchPage {
         .accessibilityText(result.title + (result.imageUrl ? this.uiText("pm_image_failed_to_load_75349c88") : this.uiText("pm_no_preview_image_c39e69a8")))
       } else {
         Image(result.imageUrl)
+          .id('pinmony-search-photo-' + result.targetUrl)
           .width('100%')
           .height(this.imageHeight(result))
           .objectFit(ImageFit.Cover)

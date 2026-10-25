@@ -11,6 +11,7 @@ export struct PinmonyDraggablePublishButton {
   @State private y: number = 0;
   @StorageLink('pinmonyPublishAnchorMoved') private moved: boolean = false;
   @StorageLink('pinmonyPublishAnchorRight') private right: boolean = true;
+  @StorageLink('pinmonyPublishAnchorXFraction') private xFraction: number = 1;
   @StorageLink('pinmonyPublishAnchorFraction') private fraction: number = 1;
   private dragging: boolean = false;
   private startX: number = 0;
@@ -25,6 +26,7 @@ export struct PinmonyDraggablePublishButton {
   private maxY(): number { return Math.max(this.top(), this.areaHeight - 76); }
   private clamp(value: number, min: number, max: number): number { return Math.max(min, Math.min(max, value)); }
   aboutToAppear(): void {
+    this.xFraction = Number.isFinite(this.xFraction) ? this.clamp(this.xFraction,0,1) : (this.right ? 1 : 0);
     this.fraction = Number.isFinite(this.fraction) ? this.clamp(this.fraction, 0, 1) : 1; this.resize();
   }
   private resize(): void {
@@ -33,7 +35,7 @@ export struct PinmonyDraggablePublishButton {
     if (this.dragging) this.remember(this.layoutWidth, this.layoutHeight);
     this.dragging = false;
     this.layoutWidth = this.areaWidth; this.layoutHeight = this.areaHeight;
-    this.x = this.moved ? (this.right ? this.maxX() : this.left()) : Math.max(0, (this.areaWidth - 56) / 2);
+    this.x = this.moved ? this.left() + (this.maxX() - this.left()) * this.clamp(this.xFraction,0,1) : Math.max(0, (this.areaWidth - 56) / 2);
     this.y = this.top() + (this.maxY() - this.top()) * this.fraction;
     PinmonyRuntimeLog.info('PublishAnchorTrace: event=restore moved=' + this.moved + ' right=' + this.right);
   }
@@ -41,10 +43,13 @@ export struct PinmonyDraggablePublishButton {
     if (width < 56 || height < 56) return;
     const top = Math.min(16, Math.max(0, (height - 76) / 2));
     const bottom = Math.max(top, height - 76);
+    const left = Math.min(16, Math.max(0, (width - 56) / 2));
+    const end = Math.max(left,width - 72);
     this.right = this.x + 28 >= width / 2;
+    this.xFraction = end > left ? this.clamp((this.x - left) / (end - left),0,1) : this.xFraction;
     this.fraction = bottom > top ? this.clamp((this.y - top) / (bottom - top), 0, 1) : this.fraction;
     this.moved = true;
-    PinmonyPublishAnchor.save(this.right,this.fraction);
+    PinmonyPublishAnchor.save(this.right,this.fraction,this.xFraction);
   }
   private start(): void {
     if (!this.actionEnabled) return;
@@ -63,14 +68,12 @@ export struct PinmonyDraggablePublishButton {
     this.suppressClickUntil = Date.now() + 400;
     this.remember(this.layoutWidth, this.layoutHeight);
     PinmonyRuntimeLog.info('PublishAnchorTrace: event=save right=' + this.right);
-    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-      this.x = this.right ? this.maxX() : this.left();
-      this.y = this.clamp(this.y, this.top(), this.maxY());
-    });
   }
   build() {
-    Button('+').width(56).height(56).fontSize(32)
-      .backgroundColor($r('app.color.page_background')).fontColor($r('app.color.primary_text'))
+    Button('+', {type:ButtonType.Normal}).width(56).height(56).fontSize(32)
+      .backgroundColor(Color.Transparent)
+      .backgroundEffect({radius:20,saturation:1,brightness:1,color:$r('app.color.publish_button_glass')})
+      .borderRadius(16).clip(true).fontColor($r('app.color.primary_text'))
       .position({ x: this.x, y: this.y })
       .enabled(this.actionEnabled)
       .visibility(this.areaWidth >= 56 && this.areaHeight >= 56 ? Visibility.Visible : Visibility.Hidden)

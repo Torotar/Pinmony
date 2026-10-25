@@ -2,6 +2,7 @@ export { PinmonyDetailAction, PinmonyRelatedPin, PinmonyCarouselItem, PinmonyCar
 export { PinmonyComment, PinmonyCommentResult, PinmonySaveBoard, PinmonySaveResult, PinmonyPostResult, PinmonySaveOperationResult } from './src/main/ets/models/PinmonyComments';
 export { PinmonyEditPinResult } from './src/main/ets/models/PinmonyEditPin';
 export { PinmonyDetailPage } from './src/main/ets/components/PinmonyDetailPage';
+export { PinmonyDetailEntryPhoto } from './src/main/ets/services/PinmonyImageTransition';
 export { descriptionTagSearchUrl } from './src/main/ets/services/PinmonyDescriptionTags';
 export { relatedTopicSearchUrl } from './src/main/ets/services/PinmonyRelatedPresentation';
 export { PinmonyCarouselView } from './src/main/ets/components/PinmonyCarouselView';

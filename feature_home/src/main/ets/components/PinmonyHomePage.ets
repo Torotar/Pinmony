@@ -555,6 +555,7 @@ export struct PinmonyHomePage {
       if (pin.video) {
         PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady })
           .width('100%').height(this.imageHeight(pin))
+          .id('pinmony-home-photo-' + pin.id)
           .onClick(() => { if (!this.suppressSwipeClick && this.onPin) this.onPin(pin.id); })
       } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
         Column() {
@@ -613,6 +614,7 @@ export struct PinmonyHomePage {
               .borderRadius(18).clip(true).hitTestBehavior(HitTestMode.None)
           }
         }.width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
+          .id('pinmony-home-photo-' + pin.id)
       }
       Row({ space: 4 }) {
         if (pin.title.trim().length > 0) {

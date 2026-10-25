@@ -39,6 +39,7 @@ export interface PinmonyCarouselItem {
 }
 
 export interface PinmonyCarousel {
+  freeScroll?: boolean;
   pinId: string;
   items: PinmonyCarouselItem[];
 }

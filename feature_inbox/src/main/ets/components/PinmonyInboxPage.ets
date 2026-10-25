@@ -224,12 +224,12 @@ export struct PinmonyInboxPage {
         Column({ space: 8 }) {
           if (this.timeText(item)) {
             Column({ space: 4 }) {
-              Text(PinmonyI18n.render(this.timeText(item).split('\n')[0], this.uiLanguage))
-                .fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
               if (this.timeText(item).includes('\n')) {
                 Text(this.timeText(item).split('\n')[1])
                   .fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
               }
+              Text(PinmonyI18n.render(this.timeText(item).split('\n')[0], this.uiLanguage))
+                .fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
             }.alignItems(HorizontalAlign.End)
           }
           if (item.moreId) {
