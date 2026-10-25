@@ -366,6 +366,11 @@ export const PIN_BOARD_API_SCRIPT: string = `
           !selectedIds.every(function (id) { return pins.some(function (pin) { return pin.id === id; }); })) return;
       name = 'ApiResource'; verb = 'create'; endpoint = 'v3_move_pins';
       options = { url: '/v3/pins/bulk/move/', data: { board_id: target.id, pin_ids: selectedIds.slice() } };
+    } else if (action === 'deleteSelected') {
+      if (flow.phase !== 'select' || !selectedIds.length || selectedIds.length > 500 ||
+          !selectedIds.every(function (id) { return pins.some(function (pin) { return pin.id === id; }); })) return;
+      name = 'ApiResource'; verb = 'delete'; endpoint = 'v3_delete_pins';
+      options = { url: '/v3/pins/bulk/', data: { pin_ids: selectedIds.slice() } };
     } else if (action === 'save') {
       if (flow.phase !== 'ideas' || !sourcePins[value] || flow.saved.indexOf(value) >= 0 || pendingSave[value]) return;
       name = 'RepinResource'; verb = 'create'; endpoint = 'v3_repin_handler';
@@ -414,6 +419,14 @@ export const PIN_BOARD_API_SCRIPT: string = `
         if (typeof board.pin_count === 'number') board.pin_count = Math.max(0, board.pin_count - moved.length);
         selectedIds = []; flowEpoch++; flow = emptyFlow(); targetBookmark = '';
         // Invalidate in-flight feed reads and fetch the source again after the confirmed mutation.
+        generation++; aborts.forEach(function (abort) { abort.abort(); }); aborts = [];
+        feedBusy = false;
+      } else if (action === 'deleteSelected') {
+        if (data !== null) throw new Error('unconfirmed-delete');
+        var deleted = options.data.pin_ids;
+        pins = pins.filter(function (pin) { return deleted.indexOf(pin.id) < 0; });
+        if (typeof board.pin_count === 'number') board.pin_count = Math.max(0, board.pin_count - deleted.length);
+        selectedIds = []; flowEpoch++; flow = emptyFlow(); targetBookmark = '';
         generation++; aborts.forEach(function (abort) { abort.abort(); }); aborts = [];
         feedBusy = false;
       } else if (action === 'save') {

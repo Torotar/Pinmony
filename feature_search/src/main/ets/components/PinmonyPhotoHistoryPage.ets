@@ -31,7 +31,11 @@ export struct PinmonyPhotoHistoryView {
     if (this.confirming) return;
     if (this.selected === id) { this.selected = ''; return; }
     if (this.selected) {
-      this.getUIContext().getPromptAction().showToast({ message: this.text('pm_photo_history_single_only') });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: this.text('pm_photo_history_single_only') });
+      } catch (_) {
+        // The page may already be leaving while the selection callback runs.
+      }
       return;
     }
     this.selected = id;
@@ -57,9 +61,30 @@ export struct PinmonyPhotoHistoryView {
     catch (_) { if (this.alive) this.failed = true; }
     finally { if (this.alive) this.confirming = false; }
   }
+  private deleteLoadedHistory(): void {
+    if (this.busy || this.confirming || !this.items.length) return;
+    this.getUIContext().showAlertDialog({
+      title: this.text('pm_delete_search_history_80b537e5'),
+      message: this.text('pm_this_cannot_be_undone_55d5e34b'),
+      primaryButton: { value: this.text('pm_cancel_2cd0f3be'), action: () => {} },
+      secondaryButton: { value: this.text('pm_delete_search_history_80b537e5'), action: () => {
+        this.items = []; this.selected = ''; this.cursor = ''; this.ended = true; this.syncSections();
+      } }
+    });
+  }
   build() {
     HdsNavDestination() {
       Column({ space: 12 }) {
+        Row() {
+          Blank().layoutWeight(1)
+          Button({ type: ButtonType.Circle }) {
+            SymbolGlyph($r('sys.symbol.trash')).fontSize(22).fontColor([$r('app.color.primary_text')])
+          }.width(44).height(44).backgroundColor($r('app.color.input_surface'))
+            .enabled(!this.busy && !this.confirming && this.items.length > 0)
+            .accessibilityText(this.text('pm_delete_search_history_80b537e5'))
+            .onClick(() => this.deleteLoadedHistory())
+        }.width('100%').height(44)
+        if (this.items.length > 0) {
         WaterFlow({ scroller: this.scroller, sections: this.sections }) {
           ForEach(this.items, (item: PinmonyPhotoHistoryItem) => {
             FlowItem() {
@@ -76,17 +101,24 @@ export struct PinmonyPhotoHistoryView {
                 .onClick(() => this.selectPhoto(item.id))
             }.width(this.cardWidth()).height(this.cardHeight(item))
           }, (item: PinmonyPhotoHistoryItem) => item.id + ':' + this.language)
-        }.columnsGap(RECOMMEND_PHONE_GAP_VP).rowsGap(RECOMMEND_PHONE_GAP_VP).layoutWeight(1).width('100%')
+        }.columnsGap(RECOMMEND_PHONE_GAP_VP).rowsGap(RECOMMEND_PHONE_GAP_VP)
+          .layoutWeight(1).width('100%')
           .onReachEnd(() => { if (!this.failed) this.load(); }).scrollBar(BarState.Off)
           .onAreaChange((_old: Area, area: Area) => {
             const width: number = Number(area.width);
             if (width > 0 && Math.abs(width - this.widthValue) > 1) { this.widthValue = width; this.syncSections(); }
           })
+        }
         if (this.busy || this.confirming) { LoadingProgress().width(30).height(30) }
         if (this.failed) {
           Text(this.text('pm_photo_history_error')).fontColor($r('app.color.secondary_text'))
           Button(this.text('pm_retry_b8784c8d')).onClick(() => this.load())
-        } else if (!this.busy && !this.items.length) { Text(this.text('pm_photo_history_empty')) }
+        } else if (!this.busy && !this.items.length) {
+          Column({ space: 8 }) {
+            Text(this.text('pm_photo_history_empty')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+            Text(this.text('pm_photo_history_empty_hint')).fontSize(15).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
+          }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        }
       }.width('100%').height('100%').padding(16)
     }.titleMode(HdsNavDestinationTitleMode.MINI)
       .systemBarStyle({ statusBarContentColor: this.dark ? '#F7F8FA' : '#1B1E25' }, { statusBarContentColor: this.dark ? '#F7F8FA' : '#1B1E25' })

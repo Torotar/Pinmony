@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "pm_detail_paid_link",
+      "value": "有料リンク"
+    },
+    {
       "name": "pm_board_recovery_title",
       "value": "ボードの復元"
     },
@@ -47,6 +51,18 @@
     {
       "name": "pm_merge_board_menu",
       "value": "統合"
+    },
+    {
+      "name": "pm_merge_board_confirm_title",
+      "value": "ボードを統合しますか？"
+    },
+    {
+      "name": "pm_merge_board_confirm_message",
+      "value": "「{source}」のすべてのPinを「{target}」の新しいセクションに移動します。"
+    },
+    {
+      "name": "pm_merge_board_confirm_action",
+      "value": "Pinを移動してボードを削除"
     },
     {
       "name": "pm_loading_please_wait_b6aaac70",
@@ -5059,6 +5075,10 @@
     {
       "name": "pm_activity_date_unknown",
       "value": "その他のアクティビティ"
-    }
+    },
+    {"name":"pm_photo_history_empty_hint","value":"画像をアップロードして検索すると、ここに表示され、もう一度検索に使用できます。"},
+    {"name":"pm_order_discard_title","value":"未保存の並び順を破棄しますか？"},
+    {"name":"pm_order_discard_message","value":"変更したボードの並び順は保存されていません。戻ると変更が破棄されます。"},
+    {"name":"pm_order_discard_action","value":"変更を破棄"}
   ]
 }

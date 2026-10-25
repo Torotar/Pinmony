@@ -25,3 +25,5 @@ export { PinmonyProfileActionsController, PinmonyProfileActionsPorts } from './s
 
 export { PinmonyProfileSearchPin, PinmonyProfileSearchSuggestion, PinmonyProfileSearchSnapshot } from './src/main/ets/models/PinmonyProfileSearch';
 export { PinmonyProfileSearchPage } from './src/main/ets/components/PinmonyProfileSearchPage';
+
+export { PinmonyBoardOrderPage } from './src/main/ets/components/PinmonyBoardOrderPage';

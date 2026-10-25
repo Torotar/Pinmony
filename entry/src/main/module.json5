@@ -18,6 +18,9 @@
       },
       {
         "name": "ohos.permission.GET_NETWORK_INFO"
+      },
+      {
+        "name": "ohos.permission.VIBRATE"
       }
     ],
     "pages": "$profile:main_pages",

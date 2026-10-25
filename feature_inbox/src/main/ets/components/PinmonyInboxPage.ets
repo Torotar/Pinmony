@@ -223,8 +223,14 @@ export struct PinmonyInboxPage {
       if (!contact && (this.timeText(item) || item.moreId)) {
         Column({ space: 8 }) {
           if (this.timeText(item)) {
-            Text(this.timeText(item)).fontSize(12).fontColor($r('app.color.secondary_text'))
-              .textAlign(TextAlign.Center).width('100%')
+            Column({ space: 4 }) {
+              Text(PinmonyI18n.render(this.timeText(item).split('\n')[0], this.uiLanguage))
+                .fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
+              if (this.timeText(item).includes('\n')) {
+                Text(this.timeText(item).split('\n')[1])
+                  .fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
+              }
+            }.alignItems(HorizontalAlign.End)
           }
           if (item.moreId) {
             Button({ type: ButtonType.Circle }) {
@@ -241,7 +247,7 @@ export struct PinmonyInboxPage {
                 if (item.moreId && this.onAction) this.onAction(item.moreId);
               })
           }
-        }.width(48).alignItems(HorizontalAlign.Center).alignSelf(ItemAlign.Start)
+        }.constraintSize({ minWidth: 40 }).flexShrink(0).alignItems(HorizontalAlign.End).alignSelf(ItemAlign.Center)
       } else if (contact && item.enabled) {
         SymbolGlyph($r('sys.symbol.chevron_right'))
         .fontSize(18)

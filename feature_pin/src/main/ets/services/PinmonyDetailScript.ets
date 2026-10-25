@@ -417,7 +417,7 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
         availableActions = actions(hero.closest('main, [role="main"]') || root, hero);
       }
     }
-    var data = api.detail, creator = data.origin_pinner || data.pinner || {};
+    var data = api.detail, creator = data.closeup_unified_attribution || data.closeup_attribution || data.origin_pinner || data.pinner || {};
     if (window.PinmonyVideoApi) window.PinmonyVideoApi.nativeMode(String(data.id), api.isVideo === true && !webFlowActive);
     var preview = window.PinmonyPostApi && window.PinmonyPostApi.previewRead && window.PinmonyPostApi.previewRead(pin, true);
     if (window.PinmonyPostApi) availableActions = window.PinmonyPostApi.detailActions(pin, availableActions, schedule);
@@ -425,7 +425,17 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
       if (action.kind === 'like' && !action.countText) action.countText = api.reactionCount;
     });
     function clean(value) { return typeof value === 'string' ? value.trim() : ''; }
-    var sourceUrl = '', sourceLabel = clean(data.link_domain) || clean(data.domain);
+    var amount = Number(data.price_value), priceText = '';
+    if ((typeof data.price_value === 'number' || typeof data.price_value === 'string' && /^\\d+(?:\\.\\d{1,4})?$/.test(data.price_value)) &&
+        isFinite(amount) && amount > 0 && amount <= 1000000000000 &&
+        typeof data.price_currency === 'string' && /^[A-Z]{3}$/.test(data.price_currency)) {
+      priceText = data.price_currency + ' ' + amount.toFixed(2);
+    }
+    var metadata = data.rich_metadata || {}, summary = data.rich_summary || {};
+    var firstProduct = Array.isArray(summary.products) && summary.products[0];
+    priceText = clean(firstProduct && firstProduct.offer_summary && firstProduct.offer_summary.price).slice(0, 80) || priceText;
+    var sourceName = (clean(metadata.site_name) || clean(summary.site_name)).slice(0, 180);
+    var sourceUrl = '', sourceLabel = clean(data.link_domain) || clean(data.domain) || sourceName;
     var sourceFields = ['link', 'mobile_link', 'tracked_link', 'utm_link', 'affiliate_link', 'pin_direct_to_site_url'];
     for (var sourceIndex = 0; sourceIndex < sourceFields.length && !sourceUrl; sourceIndex++) {
       var candidate = clean(data[sourceFields[sourceIndex]]);
@@ -436,6 +446,17 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
             !sourceAddress.username && !sourceAddress.password) sourceUrl = sourceAddress.href;
       } catch (_) {}
     }
+    if (!sourceUrl) [metadata.url, summary.url].some(function (candidate) {
+      if (typeof candidate !== 'string' || candidate.length > 2000 || !/^https:\\/\\//i.test(candidate)) return false;
+      try {
+        var address = new URL(candidate);
+        if (!address.username && !address.password &&
+            !/(^|\\.)(pinterest\\.com|pinimg\\.com|pin\\.it)$/i.test(address.hostname)) {
+          sourceUrl = address.href; return true;
+        }
+      } catch (_) {}
+      return false;
+    });
     if (sourceUrl) {
       if (!sourceLabel) {
         try { sourceLabel = new URL(sourceUrl).hostname; } catch (_) {}
@@ -454,6 +475,10 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
       imageUrl: api.image.url, imageWidth: api.image.width, imageHeight: api.image.height,
       title: clean(data.closeup_unified_title) || clean(data.title) || clean(data.grid_title),
       description: clean(data.closeup_unified_description) || clean(data.description),
+      priceText: priceText,
+      richDescription: clean(metadata.description).slice(0, 12000),
+      affiliateDisclosure: clean(data.affiliate_disclosure).slice(0, 300),
+      sourceName: sourceName, creatorVerified: creator.is_verified_merchant === true,
       creator: clean(creator.full_name) || clean(creator.username),
       creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? location.origin + '/' + creator.username + '/' : '',
       creatorAvatar: /^https:\\/\\//i.test(creator.image_medium_url || '') ? creator.image_medium_url : '',

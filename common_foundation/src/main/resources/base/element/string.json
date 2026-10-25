@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "pm_detail_paid_link",
+      "value": "付费链接"
+    },
+    {
       "name": "pm_board_recovery_title",
       "value": "图板恢复"
     },
@@ -47,6 +51,18 @@
     {
       "name": "pm_merge_board_menu",
       "value": "合并"
+    },
+    {
+      "name": "pm_merge_board_confirm_title",
+      "value": "合并图板？"
+    },
+    {
+      "name": "pm_merge_board_confirm_message",
+      "value": "你即将把“{source}”图板内的所有 Pin 图移动至“{target}”图板的新图板区块中。"
+    },
+    {
+      "name": "pm_merge_board_confirm_action",
+      "value": "移动 Pin 图并删除图板"
     },
     {
       "name": "pm_loading_please_wait_b6aaac70",
@@ -1171,7 +1187,7 @@
     },
     {
       "name": "pm_delete_pin_e216e3fe",
-      "value": "删除 Pin 图"
+      "value": "删除此 Pin 图"
     },
     {
       "name": "pm_remove_this_pin_from_your_board_0b19fa7e",
@@ -1179,7 +1195,7 @@
     },
     {
       "name": "pm_delete_this_pin_bd01697d",
-      "value": "确定删除 Pin 图？"
+      "value": "确定要永久删除此 Pin 图吗？"
     },
     {
       "name": "pm_this_cannot_be_undone_55d5e34b",
@@ -4458,7 +4474,8 @@
     {"name":"pm_photo_history","value":"照片搜索历史"},
     {"name":"pm_photo_history_select","value":"选择历史照片"},
     {"name":"pm_photo_history_confirm","value":"确认"},
-    {"name":"pm_photo_history_empty","value":"暂无照片搜索历史"},
+    {"name":"pm_photo_history_empty","value":"还没有上传"},
+    {"name":"pm_photo_history_empty_hint","value":"当你上传图片进行搜索时，它会出现在这里，方便你再次使用它进行搜索。"},
     {"name":"pm_photo_history_error","value":"无法加载照片，请重试"},
     {"name":"pm_social_business_tab","value":"企业"},
     {"name":"pm_photo_history_single_only","value":"只能选择一张照片进行搜索，请先取消已选照片"},
@@ -4505,6 +4522,9 @@
     {"name":"pm_activity_yesterday","value":"昨天"},
     {"name":"pm_activity_open_all","value":"打开全部"},
     {"name":"pm_activity_close_all","value":"关闭全部"},
-    {"name":"pm_activity_date_unknown","value":"其他动态"}
-]
+    {"name":"pm_activity_date_unknown","value":"其他动态"},
+    {"name":"pm_order_discard_title","value":"放弃未保存的排序？"},
+    {"name":"pm_order_discard_message","value":"你调整的图板顺序尚未保存，返回将放弃这些更改。"},
+    {"name":"pm_order_discard_action","value":"放弃更改"}
+  ]
 }

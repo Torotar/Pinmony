@@ -3,6 +3,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { PinmonySessionCredentials, PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyRequestPolicy, PinmonyRequestPermit } from './PinmonyRequestPolicy';
+interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
 export interface PinmonySearchProductRoute {
   domains: string | null;
   priceMin: number | null;
@@ -1268,6 +1269,9 @@ export class PinmonyNativeNetwork {
         permitted = basic && source === '/board/create/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/board/create.js' && keys.length === 2 &&
           typeof o['name'] === 'string' && !!(o['name'] as string).trim() && o['name'] === (o['name'] as string).trim() && (o['name'] as string).length <= 100 &&
           ['public','secret'].includes(o['privacy'] as string);
+      }else if(job.url === captured.origin + '/resource/ApiResource/delete/') {
+        const data: Record<string,Object> = o['data'] as Record<string,Object>, ids: string[] = data?.['pin_ids'] as string[];
+        permitted = basic && source === path && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug]/_tools/organize.js' && keys.length === 2 && o['url'] === '/v3/pins/bulk/' && !!data && Object.keys(data).length === 1 && Array.isArray(ids) && ids.length > 0 && ids.length <= 500 && ids.every((id: string,index: number): boolean => typeof id === 'string' && /^\d{1,30}$/.test(id) && ids.indexOf(id) === index && loadedIds.includes(id));
       }else if(job.url === captured.origin + '/resource/ApiResource/create/') {
         const data: Record<string,Object> = o['data'] as Record<string,Object>, ids: string[] = data['pin_ids'] as string[];
         permitted = basic && source === '/board/' + boardId + '/organize/repin/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/board/[id]/organize.js' &&
@@ -1478,6 +1482,9 @@ export class PinmonyNativeNetwork {
       const o: Record<string,Object | null> = envelope.options, data: Record<string,Object | null> = o['data'] as Record<string,Object | null>;
       const visibilityRead: boolean = !write && o['url'] === '/v3/users/settings/' && Object.keys(o).length === 2 && !!data && !Array.isArray(data) && Object.keys(data).length === 0;
       const visibilityWrite: boolean = write && job.url === captured.origin + '/resource/UserSettingsResource/update/' && Object.keys(o).length === 2 && o['surface_tag'] === 'holistic_profile_prompt' && typeof o['show_all_pins'] === 'boolean';
+      const reorder: boolean = write && !Array.isArray(o) && Object.keys(o).length === 2 && o['url'] === '/v3/users/boards/partial_reorder/' && !!data && !Array.isArray(data) &&
+        Object.keys(data).length === 1 && Array.isArray(data['board_ids']) && (data['board_ids'] as Object[]).length <= 2000 &&
+        (data['board_ids'] as Object[]).every((id: Object): boolean => typeof id === 'string' && /^\d{1,40}$/.test(id as string));
       const metadata: boolean = !Array.isArray(o) && Object.keys(o).length === 2 && o['url'] === (write ? '/v3/users/me/metadata/' : '/v3/users/' + path.split('/')[1] + '/metadata/') && !!data && !Array.isArray(data) &&
         (write ? Object.keys(data).length === 2 && data['orbac_subject_id'] === '' && ['alphabetical','last_pinned_to','custom'].includes(data['most_recent_board_sort_order'] as string) : Object.keys(data).length === 0);
       permitted = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
@@ -1485,7 +1492,7 @@ export class PinmonyNativeNetwork {
         job.epoch === captured.generation && job.id.startsWith('native_profile_sort_') && !!match && decodeURIComponent(match[1]) === path &&
         Object.keys(envelope).length === 2 && !Array.isArray(envelope.context) && Object.keys(envelope.context).length === 0 &&
         job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['Accept'] === 'application/json' && job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' &&
-        (write ? job.headers['Content-Type'] === 'application/x-www-form-urlencoded' && (visibilityWrite || metadata && job.url === captured.origin + '/resource/ApiResource/create/') :
+        (write ? job.headers['Content-Type'] === 'application/x-www-form-urlencoded' && (visibilityWrite || metadata && job.url === captured.origin + '/resource/ApiResource/create/' || reorder && job.url === captured.origin + '/resource/ApiResource/create/') :
           job.method === 'GET' && job.body === '' && job.url.startsWith(captured.origin + '/resource/ApiResource/get/?') && (metadata || visibilityRead));
     } catch (_) {}
     return this.request(job, (): PinmonyNetworkContext => { const actual: PinmonyBusinessSessionContext = session(); return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent}; });
@@ -1773,6 +1780,31 @@ export class PinmonyNativeNetwork {
       const actual: PinmonyBusinessSessionContext = session();
       return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
         actual.origin === captured.origin && actual.generation === captured.generation, epoch: captured.generation, page: job.page, userAgent: actual.userAgent };
+    });
+  }
+  async requestBusinessProductRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    pin: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    try {
+      const query: Record<string, Object> = JSON.parse(job.body) as Record<string, Object>;
+      const variables: Record<string, Object> = query['variables'] as Record<string, Object>;
+      const expected: ProductVariables = { isAuth: true, isAuthDesktop: false, isDesktop: false,
+        isUnauth: false, pinId: pin.split('/pin/')[1].split('/')[0], shouldDefer: false,
+        shouldFetchAIInsight: false, shouldFetchDesktopShoppingModule: false, shouldFetchMobileShoppingModule: true,
+        shouldFetchUnauthAmazonModule: false, shouldShowSeoDrawerOption: false };
+      permitted = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId &&
+        /^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pin) && pin.startsWith(captured.origin + '/') &&
+        job.page === pin && job.epoch === captured.generation && job.id.startsWith('native_product_') &&
+        job.url === captured.origin + '/_/graphql/' && job.method === 'POST' && job.headers['Content-Type'] === 'application/json' &&
+        Object.keys(query).length === 2 && query['queryHash'] === '43164757b22ade73c6219d2108b664c014b574d314f725af6b16036188662335' &&
+        !!variables && Object.keys(variables).length === Object.keys(expected).length &&
+        Object.keys(expected).every((key: string): boolean => variables[key] === (expected as Object as Record<string, Object>)[key]);
+    } catch (_) {}
+    return this.request(job, (): PinmonyNetworkContext => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
+        actual.generation === captured.generation && actual.origin === captured.origin,
+        epoch: captured.generation, page: job.page, userAgent: actual.userAgent };
     });
   }
   async requestBusinessPinRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,

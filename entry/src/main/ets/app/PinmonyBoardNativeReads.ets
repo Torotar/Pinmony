@@ -301,7 +301,7 @@ export class PinmonyBoardNativeReads {
       return true;
     }
     if(a.action === 'save' && this.flow?.sectionId)return true;
-    if(a.action === 'save' || a.action === 'move' || a.action === 'createTarget'){if(this.bind() && typeof a.value === 'string')await this.pinWrites.submit(a.action,a.value);return true;}
+    if(a.action === 'save' || a.action === 'move' || a.action === 'createTarget' || a.action === 'deleteSelected'){if(this.bind() && typeof a.value === 'string')await this.pinWrites.submit(a.action,a.value);return true;}
     if(a.action === 'followToggle') {
       if(this.bind() && this.verified && this.ready && this.board && this.board.owner.id !== this.viewer && !this.collection()) {
         const revision: number = this.revision, page: string = this.page;

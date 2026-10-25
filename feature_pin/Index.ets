@@ -3,6 +3,7 @@ export { PinmonyComment, PinmonyCommentResult, PinmonySaveBoard, PinmonySaveResu
 export { PinmonyEditPinResult } from './src/main/ets/models/PinmonyEditPin';
 export { PinmonyDetailPage } from './src/main/ets/components/PinmonyDetailPage';
 export { descriptionTagSearchUrl } from './src/main/ets/services/PinmonyDescriptionTags';
+export { relatedTopicSearchUrl } from './src/main/ets/services/PinmonyRelatedPresentation';
 export { PinmonyCarouselView } from './src/main/ets/components/PinmonyCarouselView';
 export { PinmonyVideoPlayer } from './src/main/ets/components/PinmonyVideoPlayer';
 export { PinmonyCommentsSheet } from './src/main/ets/components/PinmonyCommentsSheet';
@@ -47,3 +48,5 @@ export { PinmonySharePanelsController, PinmonySharePanelsControllerPorts } from 
 export { PinmonyShareSheet } from './src/main/ets/components/PinmonyShareSheet';
 
 export { PinmonyMoreSheet } from './src/main/ets/components/PinmonyMoreSheet';
+
+export { readProductPresentation, ProductPresentation } from './src/main/ets/services/PinmonyProductPresentation';

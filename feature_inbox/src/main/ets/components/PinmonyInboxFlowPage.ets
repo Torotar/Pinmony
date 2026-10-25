@@ -166,8 +166,12 @@ export struct PinmonyInboxFlowPage {
     if (!Number.isFinite(date.getTime())) return '';
     const today: Date = new Date();
     const time: string = date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
-    return date.toDateString() === today.toDateString() ? time :
-      [this.uiText("pm_sunday_7e06f314"), this.uiText("pm_monday_56451fdf"), this.uiText("pm_tuesday_8621c00d"), this.uiText("pm_wednesday_23ae0a11"), this.uiText("pm_thursday_478911d2"), this.uiText("pm_friday_6e5969e5"), this.uiText("pm_saturday_7bb2f5ec")][date.getDay()] + time;
+    if (date.toDateString() === today.toDateString()) return time;
+    const yesterday: Date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    const datePart: string = this.uiLanguage === 'en' ?
+      (date.getMonth() + 1).toString() + '/' + date.getDate().toString() + '/' + date.getFullYear().toString() :
+      date.getFullYear().toString() + '年' + (date.getMonth() + 1).toString() + '月' + date.getDate().toString() + '日';
+    return date.toDateString() === yesterday.toDateString() ? this.uiText('pm_activity_yesterday') + ' ' + time : datePart + ' ' + time;
   }
 
   @Builder
@@ -409,7 +413,8 @@ export struct PinmonyInboxFlowPage {
                 .backgroundColor($r('app.color.page_background')).clip(true).zIndex(1)
               Text(message.profile.name).fontSize(17).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
             }.width('100%').alignItems(HorizontalAlign.Center).hitTestBehavior(HitTestMode.None)
-            }.width(240).padding(0).borderRadius(18).backgroundColor(Color.Transparent)
+            }.width(240).padding(0).borderRadius(18).clip(true).backgroundColor(Color.Transparent)
+              .border({ width: 1, color: $r('app.color.surface_muted'), radius: 18 })
               .accessibilityText(this.uiText("pm_view_9ae8f7e3") + message.profile.name + this.uiText("pm_s_profile_66416c2f"))
               .onClick(() => this.openSharedProfile(message.id))
           } else if (message.board && !message.deleted) {

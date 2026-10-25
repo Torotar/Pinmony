@@ -62,6 +62,18 @@ export class PinmonyInboxMessagesNativeReads {
   private readonly knownBlocks: Map<string,boolean> = new Map<string,boolean>();
   private readonly uncertainBlocks: Set<string> = new Set<string>();
   private readonly uncertainCreations: Set<string> = new Set<string>();
+  private conversationTime(date: Date): string {
+    if (!Number.isFinite(date.getTime())) return '';
+    const now: Date = new Date();
+    const time: string = date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+    const age: number = (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) / 86400000;
+    const weekdays: string[] = ['pm_sunday_7e06f314', 'pm_monday_56451fdf', 'pm_tuesday_8621c00d', 'pm_wednesday_23ae0a11', 'pm_thursday_478911d2', 'pm_friday_6e5969e5', 'pm_saturday_7bb2f5ec'];
+    if (age >= 0 && age < 7) return PinmonyI18n.message(weekdays[date.getDay()]) + '\n' + time;
+    const english: boolean = PinmonyI18n.message('pm_today_d5f5a7a0') === 'Today';
+    const datePart: string = english ? (date.getMonth() + 1).toString() + '/' + date.getDate().toString() + (date.getFullYear() === now.getFullYear() ? '' : '/' + date.getFullYear().toString()) :
+      (date.getFullYear() === now.getFullYear() ? '' : date.getFullYear().toString() + '年') + (date.getMonth() + 1).toString() + '月' + date.getDate().toString() + '日';
+    return datePart + '\n' + time;
+  }
   constructor(ports: PinmonyInboxMessagesNativeReadsPorts) {
     this.ports = ports;this.store = ports.store();
     this.writes = new PinmonyInboxNativeWrites({
@@ -190,7 +202,7 @@ export class PinmonyInboxMessagesNativeReads {
         if(!c || typeof c.id !== 'string' || !/^\d{1,40}$/.test(c.id) || !Array.isArray(c.users) || c.users.length > 1000)throw new Error('conversation-format');
         const users: InboxFlowUser[] = c.users.map((u: RawUser): InboxFlowUser => this.user(u)).filter((u: InboxFlowUser): boolean => !u.self);
         if(ids.has(c.id))return; ids.add(c.id); conversations.push(c); const last: RawMessage | undefined = c.last_message; const date: Date = new Date(last?.created_at || '');
-        rows.push({id:'conversation:' + c.id,usernames:c.users.filter((u: RawUser): boolean => !this.self(u)).map((u: RawUser): string => this.clean(u.username)).filter((name: string): boolean => !!name),title:(users.length === 1 ? users[0].name : this.clean(c.name)) || users.map((u: InboxFlowUser): string => u.name).join('、') || PinmonyI18n.message('pm_messages_4da199fa'),outgoing:this.self(last?.sender),subtitle:this.clean(last?.text) || (last?.user ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_profile_d437aeb2') : PinmonyI18n.message('pm_sent_a_profile_e003c0d2')) : last?.board ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_board_9a08dbbf') : PinmonyI18n.message('pm_sent_a_board_8870ec6d')) : last?.pin ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_pin_4788181d') : PinmonyI18n.message('pm_sent_a_pin_b874b586')) : ''),profileUrl:users.length === 1 ? users[0].profileUrl : '',imageUrl:users[0]?.avatar || '',enabled:true,unread:!!c.unread,timeLabel:Number.isFinite(date.getTime()) ? date.getHours().toString().padStart(2,'0') + ':' + date.getMinutes().toString().padStart(2,'0') : ''});
+        rows.push({id:'conversation:' + c.id,usernames:c.users.filter((u: RawUser): boolean => !this.self(u)).map((u: RawUser): string => this.clean(u.username)).filter((name: string): boolean => !!name),title:(users.length === 1 ? users[0].name : this.clean(c.name)) || users.map((u: InboxFlowUser): string => u.name).join('、') || PinmonyI18n.message('pm_messages_4da199fa'),outgoing:this.self(last?.sender),subtitle:this.clean(last?.text) || (last?.user ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_profile_d437aeb2') : PinmonyI18n.message('pm_sent_a_profile_e003c0d2')) : last?.board ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_board_9a08dbbf') : PinmonyI18n.message('pm_sent_a_board_8870ec6d')) : last?.pin ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_pin_4788181d') : PinmonyI18n.message('pm_sent_a_pin_b874b586')) : ''),profileUrl:users.length === 1 ? users[0].profileUrl : '',imageUrl:users[0]?.avatar || '',enabled:true,unread:!!c.unread,timeLabel:this.conversationTime(date)});
       });
       if(!live())return; this.rows = rows; this.conversations = conversations; this.listReady = true; this.listError = '';
       PinmonyRuntimeLog.info('InboxMessagesNativeTrace: list committed count=' + rows.length.toString());

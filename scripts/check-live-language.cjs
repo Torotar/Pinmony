@@ -46,6 +46,28 @@ module.exports = function checkLiveLanguage(ts, i18n) {
   assert(profile.includes("this.profile.boards[start].id + ':' + this.uiLanguage"));
   assert(profile.includes("(pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage"));
   if (i18n) {
+    const homeSource=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
+    const methods=['emptyFeedMessage','feedStatusText'].map(name=>{
+      const start=homeSource.indexOf('  private '+name+'(');
+      return homeSource.slice(start,homeSource.indexOf('\n  }',start)+4);
+    }).join('\n');
+    const homeContext={PinmonyI18n:i18n};
+    vm.runInNewContext(ts.transpileModule('class HomeErrorCopy { uiText(key: string): string { return PinmonyI18n.text(key,this.uiLanguage); } '+methods+' } globalThis.HomeErrorCopy=HomeErrorCopy;',{
+      compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,homeContext);
+    const homeCopy=new homeContext.HomeErrorCopy();
+    Object.assign(homeCopy,{error:i18n.message('pm_unable_to_load_home_feed_please_retry_cc9728f6'),home:{categorySourceFailure:false}});
+    for(const language of ['zh','en','zh']) {
+      homeCopy.uiLanguage=language;
+      const expected=i18n.text('pm_unable_to_load_home_feed_please_retry_cc9728f6',language);
+      assert.equal(homeCopy.emptyFeedMessage(),expected);
+      assert.equal(homeCopy.feedStatusText(),expected+i18n.text('pm_showing_previous_content_f821f683',language));
+      assert(!/pm_|\uE000|\uE001/.test(homeCopy.feedStatusText()),'Home errors must render resource tokens');
+      homeCopy.home.categorySourceFailure=true;
+      assert.equal(homeCopy.feedStatusText(),expected);
+      homeCopy.home.categorySourceFailure=false;
+    }
+    homeCopy.error='Website error text';
+    assert.equal(homeCopy.emptyFeedMessage(),'Website error text','Unmarked website text stays verbatim');
     const state={section:'saved',boards:[{id:'22',title:'插画'}]};
     const keys=['pm_created_80bfa30d','pm_saved_471dd4d7'];
     const host={uiLanguage:'en',profile:state};

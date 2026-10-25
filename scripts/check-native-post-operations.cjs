@@ -56,11 +56,18 @@ async function sectionSaveChecks(){
   const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonySaveSheet.ets','utf8');
   assert(ui.includes(".align(Alignment.TopStart)"));assert(ui.includes("back:true,labelKey:'pm_back_to_boards_dcf21f0d'"));
   assert(!ui.includes("Button(this.uiText('pm_back_to_boards_dcf21f0d'))"),'section return uses fixed footer');
-  const sections=[{id:'300',type:'board_section',title:'Section',board:{id:'100'}}];
+  const sections=[{id:'300',type:'board_section',title:'Section',board:{id:'100'},
+    preview_pins:[{image_medium_url:'https://i.pinimg.com/synthetic-section.jpg'}]},
+    {id:'302',type:'board_section',title:'Legacy',board:{id:'100'},
+      preview_pins:[{image_medium_url:'javascript:invalid',images:{'236x':{url:'https://i.pinimg.com/synthetic-legacy.jpg'}}}]},
+    {id:'303',type:'board_section',title:'Empty',board:{id:'100'}}];
   const f=fixture();await openSave(f);let p=f.ops.saveAction('boardsSections',',"100"');
   await f.ops.saveAction('boardsSections',',"100"');assert.equal(f.requests.length,4,'duplicate section reads blocked');
   const read=f.requests[3];read.resolve(resource(sections,'get_all_boards_sections'));await p;
   assert.equal(f.store.saveResult.targetSections[0].id,'300');
+  assert.equal(f.store.saveResult.targetSections[0].imageUrl,'https://i.pinimg.com/synthetic-section.jpg');
+  assert.equal(f.store.saveResult.targetSections[1].imageUrl,'https://i.pinimg.com/synthetic-legacy.jpg');
+  assert.equal(f.store.saveResult.targetSections[2].imageUrl,'');
   await f.ops.saveAction('boardsSave',',"100","301"');assert.equal(f.requests.length,4,'unknown section cannot submit');
   p=f.ops.saveAction('boardsSave',',"100","300"');const write=f.requests[4];
   assert.equal(JSON.parse(new URLSearchParams(write.job.body).get('data')).options.section,'300');

@@ -7,7 +7,7 @@ export const PIN_NATIVE_PROFILE_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_E
 interface ProfileImage { url?: string; width?: number; height?: number; }
 interface ProfileCover { source?: string; images?: Record<string,ProfileImage>; }
 interface ProfileUser { profile_cover?: ProfileCover; should_show_messaging?: boolean; profile_reach?: number; id: string; type: string; username: string; full_name?: string; image_large_url?: string; image_medium_url?: string; image_small_url?: string; follower_count?: number; following_count?: number; pin_count?: number; last_pin_save_time?: string; is_partner?: boolean; about?: string; website_url?: string; explicitly_followed_by_me?: boolean; blocked_by_me?: boolean; }
-interface ProfileRow { privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
+interface ProfileRow { access?: string[]; privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
 interface ProfileTitle { text?: string; format?: string; }
 interface ProfileAction { url?: string; }
 interface ProfileResource { status: string; code?: number; error?: Object; data: ProfileUser | ProfileRow[]; bookmark?: string; }
@@ -16,7 +16,9 @@ interface ProfileResourceOptions { options?: ProfileOptions; }
 interface ProfileClient { user?: ProfileUser; }
 interface ProfileOptions { field_set_key: string; username?: string; filter_stories?: boolean; sort?: string; privacy_filter?: string; page_size?: number; group_by?: string; include_archived?: boolean; filter_all_pins?: boolean; add_fields?: string; exclude_add_pin_rep?: boolean; is_own_profile_pins?: boolean; user_id?: string; userId?: string; redux_normalize_feed?: boolean; bookmarks?: string[]; }
 interface ProfileEnvelope { options: ProfileOptions; context: Record<string,string>; }
-interface ProfileSortData { most_recent_board_sort_order?: string; orbac_subject_id?: string; show_all_pins?: boolean; }
+interface ProfileMergeResponse { resource_response?: ProfileMergeResource; client_context?: ProfileClient; }
+interface ProfileMergeResource { status: string; code: number; endpoint_name: string; error?: Object; data?: ProfileRow; }
+interface ProfileSortData { most_recent_board_sort_order?: string; orbac_subject_id?: string; show_all_pins?: boolean; board_ids?: string[]; }
 interface ProfileVisibilityWrite { show_all_pins: boolean; surface_tag: string; }
 interface ProfileVisibilityEnvelope { options: ProfileSortOptions | ProfileVisibilityWrite; context: Record<string,string>; }
 interface ProfileSortOptions { url: string; data: ProfileSortData; }
@@ -124,6 +126,81 @@ export class PinmonyProfileNativeReads {
       if (reload) { this.saved.ready = false; this.saved.cursor = ''; this.saved.ended = false; this.saved.error = ''; }
     } catch (_) { if (live()) this.sortError = value ? 'pm_profile_sort_save_error' : 'pm_profile_sort_load_error'; }
     finally { if (revision === this.revision) { if (live() && reload) await this.read(false,false); if (revision === this.revision) { this.busy = false; this.sortBusy = false; this.boardSortPending = ''; this.requestId = ''; if (live()) this.apply(); this.ports.settled(); } } }
+  }
+  private uncertainMerges: Set<string> = new Set<string>();
+  async mergeBoards(sourceId: string, targetId: string): Promise<string> {
+    if (!this.bind() || !this.identityVerified || !this.info?.isOwn || this.section !== 'saved' || this.busy || this.sortBusy) return 'unavailable';
+    const source: PinmonyBoard | undefined = this.saved.boards.find((b: PinmonyBoard): boolean => b.id === sourceId && b.mergeable === true);
+    const target: PinmonyBoard | undefined = this.saved.boards.find((b: PinmonyBoard): boolean => b.id === targetId && b.mergeable === true);
+    const from: string = sourceId.replace(/^profile-api-native-/, ''), to: string = targetId.replace(/^profile-api-native-/, '');
+    const key: string = this.account + ':' + this.generation.toString() + ':' + from + ':' + to;
+    if (!source || !target || sourceId === targetId || !/^\d{1,30}$/.test(from) || !/^\d{1,30}$/.test(to) || !source.targetUrl) return 'unavailable';
+    if (this.uncertainMerges.has(key)) return 'uncertain';
+    const revision: number = this.revision, page: string = this.page;
+    const live = (): boolean => revision === this.revision && this.owned() && this.page === page && this.info?.isOwn === true;
+    this.busy = true; this.sortBusy = true; this.sortError = ''; this.apply();
+    let result: string = 'uncertain';
+    // A response lost after dispatch cannot safely be replayed.
+    this.uncertainMerges.add(key);
+    try {
+      const envelope: ProfileSortEnvelope = { options: { url: '/v3/boards/' + from + '/merge/' + to + '/', data: {} }, context: {} };
+      const job: PinmonyNetworkJob = { id: 'native_board_management_write_profile_' + (++this.sequence).toString(), epoch: this.generation,
+        page: source.targetUrl, url: this.origin + '/resource/ApiResource/create/', method: 'POST',
+        body: 'source_url=' + encodeURIComponent(source.targetUrl.slice(this.origin.length)) + '&data=' + encodeURIComponent(JSON.stringify(envelope)),
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/[username]/[slug].js' } };
+      this.requestId = job.id;
+      const reply = await this.ports.network().requestBusinessBoardManagementWrite(job, (): PinmonyBusinessSessionContext => this.ports.session(),
+        from, this.info.viewerId, this.info.viewerId, false, live, [to]);
+      if (!live() || reply.error || reply.status !== 200 || !reply.body || reply.body.length > 6000000) throw new Error('merge-request');
+      const response: ProfileMergeResponse = JSON.parse(reply.body) as ProfileMergeResponse, r: ProfileMergeResource | undefined = response.resource_response;
+      if (!r || r.status !== 'success' || r.code !== 0 || r.error || r.endpoint_name !== 'v3_board_merge' || r.data?.type !== 'board' ||
+        r.data.id !== to || response.client_context?.user?.id && response.client_context.user.id !== this.info.viewerId) throw new Error('merge-response');
+      result = 'confirmed'; this.uncertainMerges.delete(key); this.store.profileCache.clear();
+      this.saved.boards = this.saved.boards.filter((b: PinmonyBoard): boolean => b.id !== sourceId);
+      this.saved.ready = false; this.saved.cursor = ''; this.saved.ended = false; this.saved.error = '';
+    } catch (_) { if (live()) this.sortError = 'pm_unconfirmed_c098e854'; }
+    finally {
+      if (revision === this.revision) {
+        if (live() && result === 'confirmed') await this.read(false, false);
+        if (revision === this.revision) { this.busy = false; this.sortBusy = false; this.requestId = ''; if (live()) this.apply(); this.ports.settled(); }
+      }
+    }
+    return result;
+  }
+  async reorderBoards(boardIds: string[]): Promise<void> {
+    if (!this.bind() || !this.identityVerified || !this.info?.isOwn || this.section !== 'saved' || this.busy || this.sortBusy) return;
+    const ids: string[] = boardIds.filter((id: string): boolean => /^\d{1,40}$/.test(id));
+    if (!ids.length || new Set(ids).size !== ids.length) return;
+    const revision: number = this.revision, page: string = this.page;
+    const live = (): boolean => revision === this.revision && this.owned() && this.page === page && this.info?.isOwn === true;
+    this.busy = true; this.sortBusy = true; this.boardSortPending = 'custom'; this.sortError = ''; this.apply();
+    try {
+      const options: ProfileSortOptions = { url: '/v3/users/boards/partial_reorder/', data: { board_ids: ids } as ProfileSortData };
+      const envelope: ProfileSortEnvelope = { options: options, context: {} }, source: string = page.slice(this.origin.length);
+      const form: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
+      const id: string = 'native_profile_sort_reorder_' + (++this.sequence).toString(); this.requestId = id;
+      const job: PinmonyNetworkJob = { id: id, epoch: this.generation, page: page, url: this.origin + '/resource/ApiResource/create/', method: 'POST', body: form,
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/index.js' } };
+      const reply = await this.ports.network().requestBusinessProfileSort(job, (): PinmonyBusinessSessionContext => this.ports.session(), this.info.userId, this.info.viewerId, live);
+      if (!live() || reply.error || reply.status !== 200 || !reply.body || reply.body.length > 100000) throw new Error('reorder-request');
+      const response: ProfileSortResponse = JSON.parse(reply.body) as ProfileSortResponse, resource: ProfileSortResource | undefined = response.resource_response;
+      if (!resource || resource.status !== 'success' || resource.code !== 0 || resource.error || resource.endpoint_name !== 'v3_partial_reorder_boards_handler' || resource.data !== null) throw new Error('reorder-response');
+      if (response.client_context?.user?.id && response.client_context.user.id !== this.info.viewerId) throw new Error('reorder-viewer');
+      // Reordering positions does not persist the profile's active sort preference.
+      const preference: ProfileSortEnvelope = { options: { url: '/v3/users/me/metadata/', data: { most_recent_board_sort_order: 'custom', orbac_subject_id: '' } }, context: {} };
+      const preferenceId: string = 'native_profile_sort_' + (++this.sequence).toString(); this.requestId = preferenceId;
+      const preferenceJob: PinmonyNetworkJob = { id: preferenceId, epoch: this.generation, page: page,
+        url: this.origin + '/resource/ApiResource/create/', method: 'POST',
+        body: 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(preference)), headers: job.headers };
+      const preferenceReply = await this.ports.network().requestBusinessProfileSort(preferenceJob, (): PinmonyBusinessSessionContext => this.ports.session(), this.info.userId, this.info.viewerId, live);
+      if (!live() || preferenceReply.error || preferenceReply.status !== 200 || !preferenceReply.body || preferenceReply.body.length > 100000) throw new Error('reorder-preference-request');
+      const preferenceResponse: ProfileSortResponse = JSON.parse(preferenceReply.body) as ProfileSortResponse;
+      const confirmed: ProfileSortResource | undefined = preferenceResponse.resource_response;
+      if (!confirmed || confirmed.status !== 'success' || confirmed.code !== 0 || confirmed.error || confirmed.endpoint_name !== 'v3_user_metdata_set' ||
+        confirmed.data !== null || preferenceResponse.client_context?.user?.id && preferenceResponse.client_context.user.id !== this.info.viewerId) throw new Error('reorder-preference-response');
+      this.boardSort = 'custom'; this.store.profileCache.clear(); this.saved.ready = false; this.saved.cursor = ''; this.saved.ended = false; this.saved.error = '';
+    } catch (_) { if (live()) this.sortError = 'pm_profile_sort_save_error'; }
+    finally { if (revision === this.revision) { if (live() && !this.sortError) await this.read(false, false); if (revision === this.revision) { this.busy = false; this.sortBusy = false; this.boardSortPending = ''; this.requestId = ''; if (live()) this.apply(); this.ports.settled(); } } }
   }
   private async requestVisibility(value: boolean | undefined, revision: number): Promise<boolean> {
     const write: boolean = typeof value === 'boolean';
@@ -243,7 +320,7 @@ export class PinmonyProfileNativeReads {
     const metadata: string = (count !== null ? count.toString() + PinmonyI18n.message("pm_pins_0a89904f") : '') +
       (sections !== null && Number.isInteger(sections) && sections > 0 ? (count !== null ? ' · ' : '') +
         (sections === 1 ? PinmonyI18n.message("pm_1_section_4d13c778") : sections.toString() + PinmonyI18n.message("pm_sections_68d526a8")) : '');
-    return {secret:row.type === 'board' && row.privacy === 'secret',id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
+    return {mergeable:row.type === 'board' && row.owner?.id === this.info?.viewerId && !!row.access?.includes('write') && !!row.access?.includes('delete'),sortable:row.type === 'board',secret:row.type === 'board' && row.privacy === 'secret',id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
   }
   private async request(resource: string, options: ProfileOptions, source: string, revision: number): Promise<ProfileResponse> {
     const id: string = 'native_profile_' + (++this.sequence).toString(); this.requestId = id;

@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "pm_detail_paid_link",
+      "value": "付費連結"
+    },
+    {
       "name": "pm_board_recovery_title",
       "value": "圖板恢復"
     },
@@ -5060,5 +5064,12 @@
       "name": "pm_activity_date_unknown",
       "value": "其他動態"
     }
+    ,{"name":"pm_merge_board_confirm_title","value":"合併圖板？"}
+    ,{"name":"pm_merge_board_confirm_message","value":"你即將把「{source}」圖板內的所有 Pin 圖移動至「{target}」圖板的新圖板區塊中。"}
+    ,{"name":"pm_merge_board_confirm_action","value":"移動 Pin 圖並刪除圖板"}
+    ,{"name":"pm_photo_history_empty_hint","value":"當你上傳圖片進行搜尋時，它會出現在這裡，方便你再次使用它進行搜尋。"},
+    {"name":"pm_order_discard_title","value":"捨棄未儲存的排序？"},
+    {"name":"pm_order_discard_message","value":"你調整的圖板順序尚未儲存，返回將捨棄這些變更。"},
+    {"name":"pm_order_discard_action","value":"捨棄變更"}
   ]
 }

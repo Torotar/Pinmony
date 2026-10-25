@@ -11,14 +11,50 @@ const board=id=>({type:'board',id:String(id),name:'Board '+id,url:'/sample/board
 const body=(data,bookmark='-end-',extra={})=>JSON.stringify({resource_response:{status:'success',code:0,data,bookmark},...extra});
 const userBody=(extra={})=>body(user,'',{client_context:{user:{id:'42'}},...extra});
 const flush=()=>new Promise(r=>setImmediate(r));
-function fixture(){let session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'},target=page,active=true,selected=true,document=origin+'/',epoch=7;
+function fixture(mergeRequest){let session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'},target=page,active=true,selected=true,document=origin+'/',epoch=7;
 const store={profileSession:0,profileActionsReady:false,profileSessionReady:false,profileScrollOffset:0,profileCache:new Cache(),origins:[]},requests=[],cancelled=[],addresses=[];
-const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({cancel:id=>cancelled.push(id),requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
+const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({requestBusinessBoardManagementWrite: (...args)=>mergeRequest(...args),requestBusinessProfileSort:(job,session,user,viewer,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
 return {reader,store,requests,cancelled,addresses,getSession:()=>session,setSession:s=>session=s,setPage:p=>target=p,setActive:v=>active=v,setSelected:v=>selected=v,setDocument:d=>document=d,setEpoch:v=>epoch=v};}
 function options(job){return JSON.parse(new URL(job.url).searchParams.get('data')).options;}
 function endpoint(job){return new URL(job.url).pathname;}
 async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
 async function main(){
+
+const mergeBoards=[{...board(1),access:['write','delete']},{...board(2),access:['write','delete']}];
+let mergeJob, resolveMerge, mergeCalls=0;
+const mergeFixture=fixture((job,session,source,viewer,owner,member,live,targets)=>{
+  mergeCalls++; mergeJob=job; assert.equal(source,'1');assert.equal(viewer,'42');assert.equal(owner,'42');assert(live());assert.equal(JSON.stringify(targets),'["2"]');
+  return new Promise(resolve=>{resolveMerge=resolve;});
+});
+await first(mergeFixture,mergeBoards);assert(mergeFixture.store.profile.boards.every(b=>b.mergeable));
+assert.equal(await mergeFixture.reader.mergeBoards('profile-api-native-1','profile-api-native-1'),'unavailable');assert.equal(mergeCalls,0);
+const mergePending=mergeFixture.reader.mergeBoards('profile-api-native-1','profile-api-native-2');
+assert.equal(JSON.parse(new URLSearchParams(mergeJob.body).get('data')).options.url,'/v3/boards/1/merge/2/');
+resolveMerge({status:200,error:'',body:JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_board_merge',data:{type:'board',id:'2'}}})});
+await flush();assert.equal(mergeFixture.requests.length,4);mergeFixture.requests[3].resolve(body([mergeBoards[1]]));
+assert.equal(await mergePending,'confirmed');assert.equal(mergeFixture.store.profile.boards.length,1);
+const unknownMerge=fixture(()=>Promise.resolve({status:200,error:'',body:JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_board_merge',data:{type:'board',id:'99'}}})}));
+await first(unknownMerge,mergeBoards);assert.equal(await unknownMerge.reader.mergeBoards('profile-api-native-1','profile-api-native-2'),'uncertain');
+assert.equal(unknownMerge.store.profile.boards.length,2);assert.equal(await unknownMerge.reader.mergeBoards('profile-api-native-1','profile-api-native-2'),'uncertain');
+const staleMerge=fixture(()=>new Promise(resolve=>{resolveMerge=resolve;}));await first(staleMerge,mergeBoards);
+const stalePending=staleMerge.reader.mergeBoards('profile-api-native-1','profile-api-native-2');staleMerge.reader.pause();resolveMerge({status:200,error:'',body:JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_board_merge',data:{type:'board',id:'2'}}})});
+assert.equal(await stalePending,'uncertain');assert.equal(staleMerge.store.profile.boards.length,2);
+console.log('Profile drag merge: confirmed target, same-board rejection, response identity, no replay and stale response passed');
+
+const sorted=fixture();await first(sorted,[board(1),board(2)]);sorted.reader.boardSort='alphabetical';
+let saving=sorted.reader.reorderBoards(['2','1']);assert.equal(sorted.requests.length,4);
+const sortReply=(endpoint,data=null)=>JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:endpoint,data},client_context:{user:{id:'42'}}});
+sorted.requests[3].resolve(sortReply('v3_partial_reorder_boards_handler'));await flush();
+assert.equal(sorted.store.profile.boardSort,'alphabetical','do not confirm custom before preference is saved');
+assert.equal(sorted.store.profile.boardSortPending,'custom');
+assert.equal(JSON.parse(new URLSearchParams(sorted.requests[4].job.body).get('data')).options.data.most_recent_board_sort_order,'custom');
+sorted.requests[4].resolve(sortReply('v3_user_metdata_set'));await flush();sorted.requests[5].resolve(body([board(2),board(1)]));await saving;
+assert.equal(sorted.store.profile.boardSort,'custom');assert.equal(sorted.store.profile.boardSortBusy,false);
+let reread=sorted.reader.sortBoards('');sorted.requests[6].resolve(sortReply('v3_user_metdata_get',{most_recent_board_sort_order:'custom'}));await reread;assert.equal(sorted.store.profile.boardSort,'custom','reopened sort panel retains confirmed custom preference');
+const rejectedSort=fixture();await first(rejectedSort);rejectedSort.reader.boardSort='last_pinned_to';saving=rejectedSort.reader.reorderBoards(['1']);
+rejectedSort.requests[3].resolve(sortReply('v3_partial_reorder_boards_handler'));await flush();rejectedSort.requests[4].resolve('invalid');await saving;
+assert.equal(rejectedSort.store.profile.boardSort,'last_pinned_to');assert(rejectedSort.store.profile.boardSortError);assert.equal(rejectedSort.requests.length,5);
+console.log('Custom order preference: persist after reorder, pending state, reopened panel and failed preference validation passed');
 const sectionFixture=fixture();await first(sectionFixture,[{...board(1),pin_count:2,section_count:1},{...board(2),pin_count:0,section_count:0}]);assert.equal(sectionFixture.store.profile.boards[0].pinCount,'2 张 Pin 图 · 1 个图板区块');assert.equal(sectionFixture.store.profile.boards[1].pinCount,'0 张 Pin 图');
 
 const f=fixture();await first(f);assert(f.store.profileNativeReadsReady);assert.equal(f.store.profile.coverUrl,avatar,'cover mapped from verified current UserResource without extra requests');assert.equal(f.store.profileActionsReady,false);assert.equal(f.store.profileSessionReady,false);assert.equal(f.store.profile.boards.length,1);assert.equal(f.store.profile.boards[0].collaboratorAvatars.length,2);assert.equal(f.store.profile.unorganizedPins[0].targetUrl,origin+'/pin/3/');assert.equal(f.store.profile.followers,'12 粉丝');

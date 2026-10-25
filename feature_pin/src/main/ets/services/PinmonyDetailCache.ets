@@ -1,5 +1,5 @@
 import { PinmonyI18n } from 'common_foundation';
-import { PinmonyDetailSnapshot, PinmonyDetailAction, PinmonyRelatedPin } from '../models/PinmonyDetail';
+import { PinmonyDetailSnapshot, PinmonyDetailAction, PinmonyRelatedPin, PinmonyRelatedTopic } from '../models/PinmonyDetail';
 
 const MAX_DETAIL_CACHE_ENTRIES: number = 10;
 
@@ -65,6 +65,9 @@ export class PinmonyDetailCache {
       imageHeight: detail.imageHeight,
       title: detail.title,
       description: detail.description,
+      priceText: detail.priceText, richDescription: detail.richDescription,
+      affiliateDisclosure: detail.affiliateDisclosure, sourceName: detail.sourceName,
+      creatorVerified: detail.creatorVerified,
       creator: detail.creator,
       creatorAvatar: detail.creatorAvatar, creatorUrl: detail.creatorUrl,
       sourceLabel: detail.sourceLabel, sourceUrl: detail.sourceUrl,
@@ -90,7 +93,9 @@ export class PinmonyDetailCache {
         selected: item.selected
       })),
       related: detail.related.map((item: PinmonyRelatedPin, index: number): PinmonyRelatedPin => ({
-        id: `cached-${identity}-related-${index}`,
+        id: item.kind === 'topics' ? item.id : `cached-${identity}-related-${index}`,
+        kind: item.kind,
+        topics: item.topics?.map((topic: PinmonyRelatedTopic): PinmonyRelatedTopic => ({ id: topic.id, title: topic.title, imageUrl: topic.imageUrl, targetUrl: topic.targetUrl })),
         pinUrl: item.pinUrl,
         imageUrl: item.imageUrl,
         images: item.images,

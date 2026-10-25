@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "pm_detail_paid_link",
+      "value": "Paid link"
+    },
+    {
       "name": "pm_board_recovery_title",
       "value": "Board recovery"
     },
@@ -47,6 +51,18 @@
     {
       "name": "pm_merge_board_menu",
       "value": "Merge"
+    },
+    {
+      "name": "pm_merge_board_confirm_title",
+      "value": "Merge boards?"
+    },
+    {
+      "name": "pm_merge_board_confirm_message",
+      "value": "All Pins in “{source}” will be moved to a new section in “{target}”."
+    },
+    {
+      "name": "pm_merge_board_confirm_action",
+      "value": "Move Pins and delete board"
     },
     {
       "name": "pm_loading_please_wait_b6aaac70",
@@ -5059,6 +5075,10 @@
     {
       "name": "pm_activity_date_unknown",
       "value": "Other activity"
-    }
+    },
+    {"name":"pm_photo_history_empty_hint","value":"Images you upload for search will appear here so you can use them to search again."},
+    {"name":"pm_order_discard_title","value":"Discard unsaved order?"},
+    {"name":"pm_order_discard_message","value":"Your board order has not been saved. Going back will discard these changes."},
+    {"name":"pm_order_discard_action","value":"Discard changes"}
   ]
 }

@@ -95,12 +95,18 @@ export struct PinmonyInboxListPage {
           }
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.section === 'messages' && item.timeLabel) {
-          Text(item.timeLabel).fontSize(12).fontColor($r('app.color.secondary_text'))
+          Column({ space: 4 }) {
+            Text(PinmonyI18n.render(item.timeLabel.split('\n')[0], this.uiLanguage)).fontSize(12)
+              .fontColor($r('app.color.secondary_text')).maxLines(1)
+            if (item.timeLabel.includes('\n')) {
+              Text(item.timeLabel.split('\n')[1]).fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
+            }
+          }.alignItems(HorizontalAlign.End).flexShrink(0)
         }
         if (this.section === 'contacts') {
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
         }
-      }.width('100%')
+      }.width('100%').alignItems(VerticalAlign.Center)
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
       .backgroundColor(Color.Transparent).enabled(this.actionsReady && item.enabled)
       .accessibilityText(item.title + ' ' + item.subtitle).onClick(() => this.onAction(item.id))

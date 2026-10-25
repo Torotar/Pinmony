@@ -12,7 +12,7 @@ interface Art { url: string; }
 interface NativePin { id: string; pinner?: Owner; board?: PinBoard; is_repin?: boolean; title?: string; description?: string;
   section?: Owner;
   tracking_params?: string; client_tracking_params?: string; reaction_by_me?: number; reaction_data?: Reaction;
-  ai_disclosures?: number[]; images?: Record<string,Art>; }
+  ai_disclosures?: number[]; image_medium_url?: string; images?: Record<string,Art>; }
 interface NativeBoard { id: string; name: string; privacy?: string; section_count?: number; image_cover_url?: string; image_cover_hd_url?: string; access?: string[]; owner?: Owner; }
 interface PickerData { all_boards: NativeBoard[]; boards_shortlist: NativeBoard[]; }
 interface NativeSection {id: string; type: string; title: string; board: Owner; preview_pins?: NativePin[];}
@@ -193,7 +193,9 @@ export class PinmonyPostNativeOperations {
       const rows: NativeSection[] = r.data as NativeSection[];
       if(r.code !== 0 || r.endpoint_name !== 'get_all_boards_sections' || !Array.isArray(rows) || rows.length > 500 || !rows.every((v: NativeSection): boolean => v?.type === 'board_section' && this.digits(v.id) && v.board?.id === boardId && typeof v.title === 'string' && !!v.title.trim()))throw new Error('sections');
       const board: PinmonySaveBoard | undefined = this.picker().items.concat(this.picker().shortlist).find((b: PinmonySaveBoard): boolean => b.id === boardId);
-      this.picker().targetSections = rows.map((v: NativeSection): PinmonySaveBoard => ({id:v.id,name:v.title,imageUrl:this.image(v.preview_pins?.[0]?.images?.['236x']?.url),enabled:true,secret:board?.secret === true}));
+      this.picker().targetSections = rows.map((v: NativeSection): PinmonySaveBoard => ({id:v.id,name:v.title,
+        imageUrl:this.image(v.preview_pins?.[0]?.image_medium_url) || this.image(v.preview_pins?.[0]?.images?.['236x']?.url),
+        enabled:true,secret:board?.secret === true}));
       if(rows.length)this.picker().targetBoardId = boardId;else {this.picker().targetBoardId = undefined;directSave = true;}
     }catch (_) {if(this.valid(revision)){this.picker().targetBoardId = boardId;this.picker().error = PinmonyI18n.message('pm_unable_to_load_target_sections_please_retry_701b528d');}}
     finally {if(this.valid(revision)){this.busy = false;this.picker().loading = false;this.publish();}}

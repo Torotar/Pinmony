@@ -8,7 +8,7 @@ import { splitDescriptionTags, PinmonyDescriptionPart } from '../services/Pinmon
 import { PinmonyVisualSearchView } from './PinmonyVisualSearchView';
 import { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from '../models/PinmonyVisualSearch';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin } from '../models/PinmonyDetail';
+import { PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin, PinmonyRelatedTopic } from '../models/PinmonyDetail';
 import { PinmonyCarouselView } from './PinmonyCarouselView';
 import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
 import { PinmonyDetailHero, DetailHeroSource } from './PinmonyDetailHero';
@@ -111,6 +111,7 @@ export struct PinmonyDetailPage {
   onUser?: (url: string) => void;
   onAction?: (id: string, kind: string) => void;
   onRelated?: (id: string) => void;
+  onRelatedTopic?: (moduleId: string, topicId: string, pinUrl: string) => void;
   onImageError?: (pinUrl: string) => void;
   onVideoRetry?: () => void;
   onLoadMore?: () => void;
@@ -378,6 +379,7 @@ export struct PinmonyDetailPage {
   }
 
   private acceptsActionIntent(item: PinmonyDetailAction): boolean {
+    if (item.kind === 'source' && this.readsReady && item.enabled) return true;
     if (item.kind === 'save' && this.saveBusy || item.kind === 'like' && this.likeBlocked) return false;
     if (item.kind === 'share' && this.shareActionsReady) return true;
     if (item.kind === 'more' && this.menuActionsReady) return true;
@@ -492,11 +494,39 @@ export struct PinmonyDetailPage {
       // Include the image source in the reuse key so a reused Pin card cannot
       // retain the previous bitmap when its recommendation source changes.
       ForEach(this.relatedColumn(index, columnCount), (pin: PinmonyRelatedPin) => {
-        this.relatedCard(pin)
+        if (pin.kind === 'topics') {
+          this.relatedTopicModule(pin)
+        } else {
+          this.relatedCard(pin)
+        }
       }, (pin: PinmonyRelatedPin) => pin.id + ':' + pin.imageUrl)
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private relatedTopicModule(module: PinmonyRelatedPin) {
+    Column({ space: 10 }) {
+      Text(module.title).fontSize(17).fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.primary_text')).width('100%')
+      ForEach(module.topics || [], (topic: PinmonyRelatedTopic) => {
+        Button({ type: ButtonType.Normal }) {
+          Stack() {
+            SmartImage({ url: topic.imageUrl, images: {}, widthVp: this.recommendCardWidth(),
+              heightVp: 96, targetPx: this.recommendCardWidth() * this.recommendDensity(), borderRadiusVp: 16 })
+              .width('100%').height(96)
+            Column().width('100%').height(96).backgroundColor('#66000000')
+            Text(topic.title).fontSize(17).fontWeight(FontWeight.Bold).fontColor(Color.White)
+              .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.Center).padding(10)
+          }.width('100%').height(96).borderRadius(16).clip(true)
+        }.width('100%').padding(0).backgroundColor(Color.Transparent).borderRadius(16)
+          .enabled(this.videoActive && !this.contentError)
+          .onClick(() => {
+            if (this.videoActive && !this.contentError && this.onRelatedTopic) this.onRelatedTopic(module.id, topic.id, this.detail.pinUrl);
+          }).accessibilityText(topic.title)
+      }, (topic: PinmonyRelatedTopic) => topic.id + ':' + topic.imageUrl + ':' + topic.targetUrl)
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -660,11 +690,15 @@ export struct PinmonyDetailPage {
                 PinmonyUserAvatar({ image: this.detail.creatorAvatar, name: this.detail.creator, avatarSize: 32 })
                 Text(this.detail.creator)
                   .fontSize(this.creatorFontSize())
-                  .layoutWeight(1)
+                  .constraintSize({ maxWidth: '80%' })
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.primary_text'))
                   .maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
+                if (this.detail.creatorVerified) {
+                  Image($r('app.media.pinmony_verified_badge')).width(16).height(16)
+                    .accessibilityText(this.uiText('pm_verified_9a64637b'))
+                }
               }
               .width('100%')
               .onClick(() => {
@@ -680,6 +714,17 @@ export struct PinmonyDetailPage {
                 .maxLines(this.expanded ? undefined : 2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .width('100%')
+            }
+            if (this.detail.sourceName && this.detail.sourceName !== this.detail.creator) {
+              Text(this.detail.sourceName).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+            }
+            if (this.detail.priceText) {
+              Text(this.detail.priceText).fontSize(18).fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.primary_text')).width('100%')
+            }
+            if (this.detail.affiliateDisclosure) {
+              Text(this.detail.affiliateDisclosure).fontSize(13)
+                .fontColor($r('app.color.secondary_text')).width('100%')
             }
             if (this.detail.description.length > 0) {
               Text() {
@@ -708,6 +753,10 @@ export struct PinmonyDetailPage {
                 .fontColor($r('app.color.primary_text'))
                 .onClick(() => this.expanded = !this.expanded)
               }.width('100%')
+            }
+            if (this.detail.richDescription && this.detail.richDescription !== this.detail.description) {
+              Text(this.detail.richDescription).fontSize(16).lineHeight(24)
+                .fontColor($r('app.color.secondary_text')).width('100%')
             }
           if ((this.readsReady || this.actionsReady && this.detail.imageStageReady !== false ||
               this.detail.kind === 'cached' || this.detail.commentsRetained) && !this.detail.commentEmpty &&
@@ -976,7 +1025,16 @@ export struct PinmonyDetailPage {
           previewUrl: this.zoomImageUrl || this.detail.imageUrl,
           origin: this.viewerOrigin, closing: this.viewerClosing,
           onReady: () => { this.viewerImageReady = true; },
-          onClosed: () => { if (this.imageLayer !== 'zoom') { this.viewerMounted = false; this.viewerImageReady = false; } },
+          onClosed: () => {
+            // The close animation can finish before the parent receives the new layer prop.
+            // `viewerClosing` is the local source of truth for that transition, so the
+            // carousel (including its indicator) is always restored after the viewer exits.
+            if (this.imageLayer !== 'zoom' || this.viewerClosing) {
+              this.viewerMounted = false;
+              this.viewerImageReady = false;
+              this.viewerClosing = false;
+            }
+          },
           active: this.videoActive,
           actionsReady: this.actionsReady,
           onClose: () => { if (this.onImageLayer) this.onImageLayer(''); }, onAction: this.onAction,

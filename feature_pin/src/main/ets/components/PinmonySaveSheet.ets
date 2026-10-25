@@ -133,7 +133,7 @@ export struct PinmonySaveSheet {
             }
             }
           }.width('100%')
-        }.layoutWeight(1).width('100%').align(Alignment.TopStart)
+        }.layoutWeight(1).width('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
         if(this.result.targetBoardId) {
           Divider().color($r('app.color.secondary_text')).opacity(0.15)
           PinmonyBoardPickerFooter({inset:0,back:true,labelKey:'pm_back_to_boards_dcf21f0d',

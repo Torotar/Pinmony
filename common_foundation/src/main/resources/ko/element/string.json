@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "pm_detail_paid_link",
+      "value": "유료 링크"
+    },
+    {
       "name": "pm_board_recovery_title",
       "value": "보드 복구"
     },
@@ -47,6 +51,18 @@
     {
       "name": "pm_merge_board_menu",
       "value": "병합"
+    },
+    {
+      "name": "pm_merge_board_confirm_title",
+      "value": "보드를 병합하시겠습니까?"
+    },
+    {
+      "name": "pm_merge_board_confirm_message",
+      "value": "“{source}” 보드의 모든 Pin이 “{target}” 보드의 새 섹션으로 이동합니다."
+    },
+    {
+      "name": "pm_merge_board_confirm_action",
+      "value": "Pin 이동 및 보드 삭제"
     },
     {
       "name": "pm_loading_please_wait_b6aaac70",
@@ -5059,6 +5075,10 @@
     {
       "name": "pm_activity_date_unknown",
       "value": "기타 활동"
-    }
+    },
+    {"name":"pm_photo_history_empty_hint","value":"검색을 위해 업로드한 이미지는 여기에 표시되며 다시 검색하는 데 사용할 수 있습니다."},
+    {"name":"pm_order_discard_title","value":"저장하지 않은 순서를 버릴까요?"},
+    {"name":"pm_order_discard_message","value":"변경한 보드 순서가 저장되지 않았습니다. 돌아가면 변경 사항이 사라집니다."},
+    {"name":"pm_order_discard_action","value":"변경 사항 버리기"}
   ]
 }

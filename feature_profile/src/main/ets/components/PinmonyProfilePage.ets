@@ -7,6 +7,7 @@ import { HdsNavigation, HdsNavigationTitleMode, HdsNavDestination, HdsNavDestina
 import { PinmonyBoard, PinmonyCreatedPin, PinmonyProfileAction, PinmonyProfileSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 
+
 @Component
 export struct PinmonyProfilePage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -49,6 +50,7 @@ export struct PinmonyProfilePage {
   onPublish?: () => void;
   onBoardSort?: (value: string) => void;
   @State private sortVisible: boolean = false;
+  @StorageLink('pinmonyBoardOrderVisible') private customOrderVisible: boolean = false;
   private pendingVisibility: boolean | undefined = undefined;
   onBoardVisibility?: (value?: boolean) => void;
   private recoveryRequested: boolean = false;
@@ -664,15 +666,15 @@ export struct PinmonyProfilePage {
       Row({ space: 12 }) {
         Text(this.uiText(label)).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
         if (this.profile.boardSortBusy && this.profile.boardSortPending === value) {
-          LoadingProgress().width(20).height(20)
+          LoadingProgress().width(20).height(20).color($r('app.color.detail_accent'))
         } else if (!this.profile.boardSortBusy && this.profile.boardSort === value) {
-          SymbolGlyph($r('sys.symbol.checkmark')).fontSize(20).fontColor([$r('app.color.primary_text')])
+          SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(24).fontColor([$r('app.color.detail_accent')])
         }
       }.width('100%').padding({ left: 24, right: 20, top: 14, bottom: 14 })
     }.width('100%').padding(0).backgroundColor(Color.Transparent)
-    .enabled(this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.boardSortError && !!this.profile.boardSort)
+    .enabled(true)
     .accessibilityText(this.uiText(label)).accessibilitySelected(this.profile.boardSort === value)
-    .onClick(() => { if (this.onBoardSort) this.onBoardSort(value); })
+    .onClick(() => { if (this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.boardSortError && !!this.profile.boardSort) { if (value === 'custom') { this.sortVisible = false; this.customOrderVisible = true; } else if (this.onBoardSort) this.onBoardSort(value); } })
   }
 
   @Builder
@@ -700,9 +702,9 @@ export struct PinmonyProfilePage {
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
         }.width('100%').padding({ left: 24, right: 20, top: 14, bottom: 14 })
       }.width('100%').padding(0).backgroundColor(Color.Transparent)
-        .enabled(this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy)
+        .enabled(true)
         .accessibilityText(this.uiText('pm_board_recovery_title'))
-        .onClick(() => { this.recoveryRequested = true; this.sortVisible = false; })
+        .onClick(() => { if (this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy) { this.recoveryRequested = true; this.sortVisible = false; } })
     }.width('100%').padding({ bottom: 20 })
   }
   @Builder
@@ -717,7 +719,7 @@ export struct PinmonyProfilePage {
           LoadingProgress().width(40).height(24)
         } else if (typeof this.profile.showAllPins === 'boolean') {
           Toggle({ type:ToggleType.Switch, isOn:this.profile.showAllPins === true })
-            .enabled(this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.visibilityError)
+            .enabled(true)
             .onChange((value: boolean) => { if (this.interactionReady && !this.profile.visibilityBusy && !this.profile.visibilityError && value !== this.profile.showAllPins && this.onBoardVisibility) { this.pendingVisibility = value; this.onBoardVisibility(value); } })
             .accessibilityText(this.uiText('pm_profile_show_all_pins'))
         }

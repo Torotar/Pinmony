@@ -2,7 +2,10 @@ import { PinmonyDetailSnapshot, PinmonyVideo, PinmonyVideoSource } from '../mode
 import { PinmonyRuntimeLog } from 'common_foundation';
 
 interface PrefetchImage { url: string; width: number; height: number; }
-interface PrefetchCreator { full_name?: string; username?: string; image_medium_url?: string; }
+interface PrefetchCreator { full_name?: string; username?: string; image_medium_url?: string; is_verified_merchant?: boolean; }
+interface PrefetchOfferSummary { price?: string; }
+interface PrefetchProduct { offer_summary?: PrefetchOfferSummary; }
+interface PrefetchRichMetadata { description?: string; site_name?: string; url?: string; products?: PrefetchProduct[]; }
 interface PrefetchVideo extends PrefetchImage { duration?: number; }
 interface PrefetchVideoList { V_HLSV4?: PrefetchVideo; V_720P?: PrefetchVideo; }
 interface PrefetchVideos { video_list?: PrefetchVideoList; }
@@ -14,6 +17,11 @@ interface PrefetchPin {
   id: string; type: string; images: Record<string, PrefetchImage>;
   title?: string; grid_title?: string; closeup_unified_title?: string;
   description?: string; closeup_unified_description?: string;
+  rich_metadata?: PrefetchRichMetadata; rich_summary?: PrefetchRichMetadata;
+  price_value?: number | string; price_currency?: string; affiliate_disclosure?: string;
+  closeup_attribution?: PrefetchCreator; closeup_unified_attribution?: PrefetchCreator;
+  link?: string; mobile_link?: string; tracked_link?: string; utm_link?: string;
+  affiliate_link?: string; pin_direct_to_site_url?: string;
   origin_pinner?: PrefetchCreator; pinner?: PrefetchCreator;
   link_domain?: string; domain?: string; ai_disclosures?: number[];
   gen_ai_topics?: PrefetchAiTopic[]; digital_media_source_type?: number;
@@ -40,6 +48,8 @@ function detailResource(body: string, pinUrl: string): string {
   const selected: Record<string, Object> = {};
   const fields: string[] = ['id', 'type', 'images', 'title', 'grid_title', 'closeup_unified_title',
     'description', 'closeup_unified_description', 'origin_pinner', 'pinner', 'link_domain', 'domain',
+    'rich_metadata', 'rich_summary', 'price_value', 'price_currency', 'affiliate_disclosure',
+    'closeup_attribution', 'closeup_unified_attribution',
     'link', 'mobile_link', 'tracked_link', 'utm_link', 'affiliate_link', 'pin_direct_to_site_url',
     'ai_disclosures', 'gen_ai_topics', 'digital_media_source_type', 'is_video', 'videos', 'story_pin_data', 'carousel_data', 'aggregated_pin_id',
     'aggregated_pin_data', 'comment_count', 'tracking_params', 'client_tracking_params', 'reaction_data', 'reaction_by_me', 'reaction_counts',
@@ -52,6 +62,26 @@ function detailResource(body: string, pinUrl: string): string {
 
 function clean(value: string | undefined, limit: number = 4000): string {
   return typeof value === 'string' ? value.trim().slice(0, limit) : '';
+}
+
+// Zero is also used by non-commerce Pins: require a positive, finite amount and an ISO currency.
+export function detailPriceText(value: number | string | undefined, currency: string | undefined): string {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^\d+(?:\.\d{1,4})?$/.test(value))) return '';
+  const amount: number = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000000000 ||
+      typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) return '';
+  return currency + ' ' + amount.toFixed(2);
+}
+
+function detailSourceUrl(pin: PrefetchPin): string {
+  const candidates: (string | undefined)[] = [pin.link, pin.mobile_link, pin.tracked_link, pin.utm_link,
+    pin.affiliate_link, pin.pin_direct_to_site_url, pin.rich_metadata?.url, pin.rich_summary?.url];
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string' || candidate.length > 2000 || /[\s\\]/.test(candidate)) continue;
+    const host: RegExpMatchArray | null = candidate.match(/^https:\/\/([^/?#]+)(?:[/?#]|$)/i);
+    if (host && !/[@:]/.test(host[1]) && !/(^|\.)(pinterest\.com|pinimg\.com|pin\.it)$/i.test(host[1])) return candidate;
+  }
+  return '';
 }
 function imageValid(image: PrefetchImage | undefined): boolean {
   return !!image && typeof image.url === 'string' && image.url.length <= 2000 &&
@@ -96,16 +126,22 @@ export function mapPrefetchedDetail(body: string, pinUrl: string, allowPendingMe
       width: Number.isFinite(primary.width) ? Math.max(0, primary.width) : 0,
       height: Number.isFinite(primary.height) ? Math.max(0, primary.height) : 0,
       duration: Number.isFinite(primary.duration) ? Math.max(0, Math.min(86400000, primary.duration || 0)) : 0 } : undefined;
-    const creator: PrefetchCreator = pin.origin_pinner || pin.pinner || {};
+    const creator: PrefetchCreator = pin.closeup_unified_attribution || pin.closeup_attribution || pin.origin_pinner || pin.pinner || {};
     return { kind: 'cached', dataSource: 'api', session: 0, pinUrl: pinUrl,
       imageUrl: image.url, imageWidth: image.width, imageHeight: image.height,
       originalImageUrl: imageValid(images['orig']) ? images['orig'].url : image.url,
       title: clean(pin.closeup_unified_title || pin.title || pin.grid_title, 500),
       description: clean(pin.closeup_unified_description || pin.description),
+      priceText: clean(pin.rich_summary?.products?.[0]?.offer_summary?.price, 80) || detailPriceText(pin.price_value, pin.price_currency),
+      richDescription: clean(pin.rich_metadata?.description, 12000),
+      affiliateDisclosure: clean(pin.affiliate_disclosure, 300),
+      sourceName: clean(pin.rich_metadata?.site_name || pin.rich_summary?.site_name, 180),
+      creatorVerified: creator.is_verified_merchant === true,
       creator: clean(creator.full_name || creator.username, 180),
       creatorAvatar: /^https:\/\/[^\s]+$/i.test(creator.image_medium_url || '') ? clean(creator.image_medium_url, 2000) : '',
       creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? pinUrl.slice(0, pinUrl.indexOf('/', 8)) + '/' + creator.username + '/' : '',
-      sourceLabel: clean(pin.link_domain || pin.domain, 180),
+      sourceLabel: detailSourceUrl(pin) ? (clean(pin.link_domain, 180) || clean(pin.domain, 180) || clean(pin.rich_metadata?.site_name, 180) || clean(pin.rich_summary?.site_name, 180) || detailSourceUrl(pin).split('/')[2]) : '',
+      sourceUrl: detailSourceUrl(pin),
       aiLabel: (Array.isArray(pin.ai_disclosures) && pin.ai_disclosures.includes(1) ||
         Array.isArray(pin.gen_ai_topics) && pin.gen_ai_topics.some((topic: PrefetchAiTopic): boolean =>
           !!topic && typeof topic.name === 'string' && !!topic.name.trim())) ? '由 AI 修改' : '',
@@ -184,6 +220,9 @@ export class PinmonyDetailPrefetch {
       if (!current()) throw new Error('stale-detail');
       const resource: string = detailResource(body, pin);
       const detail: PinmonyDetailSnapshot | undefined = mapPrefetchedDetail(resource, pin);
+      if (detail) PinmonyRuntimeLog.info('DetailCommerceTrace: stage=mapped price=' + (!!detail.priceText).toString() +
+        ' description=' + (!!detail.richDescription).toString() + ' disclosure=' + (!!detail.affiliateDisclosure).toString() +
+        ' source=' + (!!detail.sourceUrl).toString() + ' attribution=' + (!!detail.creator).toString());
       if (detail) {
         this.entries = this.entries.filter((item: PrefetchEntry): boolean => item.pinUrl !== pin && item.expiresAt > Date.now());
         this.entries.push({ pinUrl: pin, detail: detail, expiresAt: Date.now() + 120000 });

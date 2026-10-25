@@ -56,6 +56,7 @@ export struct PinmonyInboxBoardCard {
       }
     }.width(220).constraintSize({ maxWidth: '100%' }).alignItems(HorizontalAlign.Start)
       .padding({ bottom: 12 }).borderRadius(18)
+      .border({ width: 1, color: $r('app.color.surface_muted'), radius: 18 })
       .accessibilityGroup(true).accessibilityText((this.board.title || this.uiText("pm_board_bd3f17ee")) + '，' + this.countLabel())
       .onClick(() => { if (this.board.url && this.onOpen) this.onOpen(); })
   }

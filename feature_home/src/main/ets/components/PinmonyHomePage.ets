@@ -363,7 +363,7 @@ export struct PinmonyHomePage {
 
   private emptyFeedMessage(): string {
     if (this.offlinePreview) return this.uiText("pm_you_are_offline_this_category_has_no_cached_images_connect_and_r_a67bd3fa");
-    if (this.error) return this.error;
+    if (this.error) return PinmonyI18n.render(this.error, this.uiLanguage);
     if (this.home.kind === 'loading') return this.uiText("pm_loading_interrupted_please_retry_6fe00867");
     return this.uiText("pm_no_pins_in_this_category_yet_3202c6eb");
   }
@@ -501,7 +501,8 @@ export struct PinmonyHomePage {
 
   private feedStatusText(): string {
     if (this.offlinePreview) return this.uiText("pm_offline_showing_recent_cache_5bff694a");
-    if (this.error) return this.home.categorySourceFailure ? this.error : this.error + this.uiText("pm_showing_previous_content_f821f683");
+    if (this.error) return PinmonyI18n.render(this.error, this.uiLanguage) +
+      (this.home.categorySourceFailure ? '' : this.uiText("pm_showing_previous_content_f821f683"));
     if (this.refreshing || this.home.refreshing) return this.uiText("pm_refreshing_home_feed_eeb8a65d");
     if (this.loading) return this.uiText("pm_loading_home_feed_1d83a335");
     return this.uiText("pm_reconnecting_home_feed_58971515");

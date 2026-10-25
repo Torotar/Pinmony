@@ -10,7 +10,16 @@ export interface PinmonyDetailAction {
   selected: boolean;
 }
 
+export interface PinmonyRelatedTopic {
+  id: string;
+  title: string;
+  imageUrl: string;
+  targetUrl: string;
+}
+
 export interface PinmonyRelatedPin {
+  kind?: string;
+  topics?: PinmonyRelatedTopic[];
   id: string;
   pinUrl: string;
   imageUrl: string;
@@ -35,6 +44,11 @@ export interface PinmonyCarousel {
 }
 
 export interface PinmonyDetailSnapshot {
+  priceText?: string;
+  richDescription?: string;
+  affiliateDisclosure?: string;
+  sourceName?: string;
+  creatorVerified?: boolean;
   autoplayWifi?: boolean;
   autoplayCellular?: boolean;
   aiLabel?: string;

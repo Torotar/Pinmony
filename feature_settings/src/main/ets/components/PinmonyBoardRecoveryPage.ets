@@ -63,12 +63,16 @@ export struct PinmonyBoardRecoveryPage {
           }
           if(this.store.loading || this.store.busy) { LoadingProgress().width(32).height(32) }
           if(this.store.boardRecoveryReady) {
-            Text(this.text('pm_board_recovery_total').replace('{count}',this.store.recoverableBoards.length.toString()))
-              .fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
+            if (this.store.recoverableBoards.length > 0) {
+              Text(this.text('pm_board_recovery_total').replace('{count}',this.store.recoverableBoards.length.toString()))
+                .fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
+            }
             ForEach(this.store.recoverableBoards,(board:PinmonyRecoverableBoard) => {this.boardRow(board)},
               (board:PinmonyRecoverableBoard) => board.id + ':' + board.restored.toString() + ':' + this.language)
             if(!this.store.recoverableBoards.length && !this.store.error && !this.store.loading) {
-              Text(this.text('pm_board_recovery_empty')).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
+              Column() {
+                Text(this.text('pm_board_recovery_empty')).fontSize(15).fontColor($r('app.color.secondary_text'))
+              }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
             }
           }
         }.width('100%').padding({left:20,right:20,top:16,bottom:32}).alignItems(HorizontalAlign.Start)

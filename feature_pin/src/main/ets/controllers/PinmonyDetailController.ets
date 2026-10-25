@@ -50,6 +50,16 @@ export class PinmonyDetailController {
     const store = this.ports.store;
     this.ports.traceAction('detail.action.' + kind, id);
     if (this.ports.isOffline('detail.' + kind) || !this.ports.isAuthenticated()) return;
+    if (kind === 'source' && store.detailNativeReadsReady) {
+      const detail = store.detail;
+      if (!detail || !this.ports.isForeground() || detail.pinUrl !== this.ports.currentPinUrl() ||
+          !detail.actions.some((action: PinmonyDetailAction): boolean => action.id === id && action.kind === 'source' && action.enabled)) return;
+      const source: string = this.ports.externalSourceUrl(detail.sourceUrl || '');
+      if (!source) return;
+      try { await this.ports.openExternalLink(source); }
+      catch (_) { this.ports.showMessage(PinmonyI18n.message("pm_unable_to_open_source_link_please_retry_4c76fd4e")); }
+      return;
+    }
     if(this.ports.nativePostAction && ['like','save','share','comment','more'].includes(kind) && await this.ports.nativePostAction(kind))return;
     if (store.detailPresentationOnly) {
       if (!await this.ensureActionContext()) return;

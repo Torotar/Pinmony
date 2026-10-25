@@ -3,8 +3,11 @@ import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyRelatedPin, readRelatedP
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyRouteParser } from './PinmonyRouteParser';
+import { readProductPresentation, ProductPresentation } from 'feature_pin';
 
 export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
 interface CommentClient { user?: CommentUser; }
 interface RetainedRelatedRead {
   at: number;
@@ -47,6 +50,7 @@ interface TranslationOptions { url: string; }
 interface TranslationResponse { resource_response: TranslationResource; }
 interface TranslationResource { status: string; code?: number; error?: Object; endpoint_name: string; data: string | null; }
 interface ReadEnvelope { options: Object; context: Record<string, string>; }
+interface ProductQuery { queryHash: string; variables: ProductVariables; }
 interface RelatedOptions { pin_id: string; page_size: number; context_pin_ids: string[]; homefeed_source_sig: boolean;
   search_query: string; source: string; top_level_source: string; top_level_source_depth: number; is_pdp: boolean;
   additional_fields: string[]; bookmarks?: string[]; }
@@ -132,6 +136,10 @@ export class PinmonyDetailNativeReads {
     if (!detail || detail.pinUrl !== this.pin) return;
     this.store.detailNativeReadsReady = true;
     const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
+    const source: string = next.sourceUrl ? PinmonyRouteParser.externalSourceUrl(next.sourceUrl) : '';
+    next.actions = next.actions.filter((item): boolean => item.kind !== 'source');
+    if (source && next.sourceLabel) next.actions.push({ id: 'native-source', kind: 'source',
+      label: next.sourceLabel, countText: '', enabled: true, selected: false });
     next.autoplayWifi = this.autoplayWifi; next.autoplayCellular = this.autoplayCellular;
     next.commentPreview = this.previewText; next.commentLoading = this.previewLoading;
     next.commentEmpty = this.previewEmpty; next.commentError = this.previewError; next.commentsAvailable = this.previewAvailable;
@@ -180,12 +188,53 @@ export class PinmonyDetailNativeReads {
     this.relatedLoading = !retained; this.relatedEnded = retained?.ended || false; this.relatedError = '';
     this.previewText = ''; this.previewError = this.aggregate ? '' : PinmonyI18n.message("pm_missing_comment_id_retry_the_comment_preview_b1b3707a"); this.previewEmpty = false;
     this.previewAvailable = !!this.aggregate; this.previewLoading = !!this.aggregate; this.apply();
+    const presentation: PinmonyDetailSnapshot | undefined = this.store.detail;
+    PinmonyRuntimeLog.info('DetailCommerceTrace: stage=native-ready descriptionLength=' +
+      (presentation?.richDescription?.length || 0).toString() + ' source=' + (!!presentation?.sourceUrl).toString() +
+      ' sourceLabel=' + (!!presentation?.sourceLabel).toString() + ' sourceAction=' +
+      (!!presentation?.actions.some((item): boolean => item.kind === 'source')).toString());
     const revision: number = this.revision;
     this.readAutoplay();
+    this.readProduct();
     await this.readPreview();
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
     if (retained) { this.ports.mark('related.native.retained'); return retained.reply; }
     return this.readRelated(false);
+  }
+  private async readProduct(): Promise<void> {
+    if (!this.owned() || !this.store.detail?.priceText && !this.store.detail?.affiliateDisclosure) return;
+    const revision: number = this.revision, pin: string = this.pin;
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    const pinId: string = pin.split('/pin/')[1].split('/')[0];
+    const id: string = 'native_product_' + (++this.sequence).toString();
+    const variables: ProductVariables = { isAuth: true, isAuthDesktop: false, isDesktop: false,
+      isUnauth: false, pinId: pinId, shouldDefer: false, shouldFetchAIInsight: false,
+      shouldFetchDesktopShoppingModule: false, shouldFetchMobileShoppingModule: true,
+      shouldFetchUnauthAmazonModule: false, shouldShowSeoDrawerOption: false };
+    const query: ProductQuery = { queryHash: '43164757b22ade73c6219d2108b664c014b574d314f725af6b16036188662335', variables: variables };
+    const job: PinmonyNetworkJob = { id: id, epoch: session.generation, page: pin, method: 'POST',
+      url: session.origin + '/_/graphql/', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Source-Url': pin.slice(session.origin.length) },
+      body: JSON.stringify(query) };
+    this.requests.add(id);
+    try {
+      const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessProductRead(job,
+        (): PinmonyBusinessSessionContext => this.ports.session(), pin, (): boolean => revision === this.revision && this.owned());
+      if (reply.status !== 200) throw new Error('product-http');
+      if (revision !== this.revision || !this.owned() || this.store.detail?.pinUrl !== pin) return;
+      const product: ProductPresentation | undefined = readProductPresentation(reply.body, pinId);
+      if (!product) throw new Error('invalid-product');
+      const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
+      if (product.description) next.richDescription = product.description;
+      if (product.source && PinmonyRouteParser.externalSourceUrl(product.source)) {
+        next.sourceUrl = product.source; next.sourceLabel = product.sourceLabel;
+      }
+      this.store.detail = next; this.apply();
+      PinmonyRuntimeLog.info('DetailCommerceTrace: stage=product-ready descriptionLength=' +
+        (next.richDescription?.length || 0).toString() + ' source=' + (!!next.sourceUrl).toString());
+    } catch (_) {
+      if (revision === this.revision && this.owned()) this.ports.mark('detail.product.failed');
+    } finally { this.requests.delete(id); }
   }
   retryPreview(): boolean {
     if (!this.owned() || !this.aggregate) return false;
@@ -467,7 +516,8 @@ export class PinmonyDetailNativeReads {
       const mapped: RelatedPresentation | undefined = !reply.error && reply.status === 200 ? readRelatedPresentation(reply.body, this.pin) : undefined;
       if (!mapped) throw new Error('related-unavailable');
       const merged: PinmonyRelatedPin[] = append ? this.related.slice() : [];
-      mapped.pins.forEach((pin: PinmonyRelatedPin) => { if (!merged.some((existing: PinmonyRelatedPin): boolean => existing.pinUrl === pin.pinUrl)) merged.push(pin); });
+      mapped.pins.forEach((pin: PinmonyRelatedPin) => { if (!merged.some((existing: PinmonyRelatedPin): boolean =>
+        pin.kind === 'topics' ? existing.id === pin.id : existing.pinUrl === pin.pinUrl)) merged.push(pin); });
       this.related = merged; this.bookmark = mapped.bookmark || '';
       this.relatedEnded = mapped.ended || append && this.bookmark === previous;
       this.retainedRelated.delete(this.pin);

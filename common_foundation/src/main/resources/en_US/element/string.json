@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "pm_detail_paid_link",
+      "value": "Paid link"
+    },
+    {
       "name": "pm_board_recovery_title",
       "value": "Board recovery"
     },
@@ -47,6 +51,18 @@
     {
       "name": "pm_merge_board_menu",
       "value": "Merge"
+    },
+    {
+      "name": "pm_merge_board_confirm_title",
+      "value": "Merge boards?"
+    },
+    {
+      "name": "pm_merge_board_confirm_message",
+      "value": "All Pins in “{source}” will be moved to a new section in “{target}”."
+    },
+    {
+      "name": "pm_merge_board_confirm_action",
+      "value": "Move Pins and delete board"
     },
     {
       "name": "pm_loading_please_wait_b6aaac70",
@@ -4458,7 +4474,8 @@
     {"name":"pm_photo_history","value":"Photo search history"},
     {"name":"pm_photo_history_select","value":"Select history photo"},
     {"name":"pm_photo_history_confirm","value":"Confirm"},
-    {"name":"pm_photo_history_empty","value":"No photo search history"},
+    {"name":"pm_photo_history_empty","value":"No uploads yet"},
+    {"name":"pm_photo_history_empty_hint","value":"Images you upload for search will appear here so you can use them again."},
     {"name":"pm_photo_history_error","value":"Unable to load photos. Please retry."},
     {"name":"pm_social_business_tab","value":"Business"},
     {"name":"pm_photo_history_single_only","value":"Only one photo can be selected for search."},
@@ -4505,6 +4522,9 @@
     {"name":"pm_activity_yesterday","value":"Yesterday"},
     {"name":"pm_activity_open_all","value":"Turn on all"},
     {"name":"pm_activity_close_all","value":"Turn off all"},
-    {"name":"pm_activity_date_unknown","value":"Other activity"}
-]
+    {"name":"pm_activity_date_unknown","value":"Other activity"},
+    {"name":"pm_order_discard_title","value":"Discard unsaved order?"},
+    {"name":"pm_order_discard_message","value":"Your board order has not been saved. Going back will discard these changes."},
+    {"name":"pm_order_discard_action","value":"Discard changes"}
+  ]
 }
