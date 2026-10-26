@@ -1,3 +1,4 @@
+import { isProductPin } from 'common_foundation';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeStore, PinmonyHomeSnapshot, PinmonyHomePin, PinmonyHomeTab, PinmonyHomeBoard } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -195,7 +196,7 @@ export class PinmonyHomeNativeReads {
       const data: HomeResource = (JSON.parse(reply.body) as HomeResponse).resource_response;
       if (data?.status !== 'success' || data.error || data.code !== undefined && data.code !== 0 || !Array.isArray(data.data) || data.data.length > 3000) throw new Error('invalid-home');
       const incoming: PinmonyHomePin[] = this.mapPins(data.data);
-      if (data.data.length && !incoming.length) throw new Error('invalid-pins');
+      if (data.data.some((item: HomeItem): boolean => !isProductPin(item)) && !incoming.length) throw new Error('invalid-pins');
       const pins: PinmonyHomePin[] = append ? (this.store.home?.pins || []).slice() : [];
       incoming.forEach((pin: PinmonyHomePin): void => { if (pins.length < 3000 && !pins.some((old: PinmonyHomePin): boolean => old.id === pin.id)) pins.push(pin); });
       const cursor: string = typeof data.bookmark === 'string' && data.bookmark.length <= 4096 ? data.bookmark : '';
@@ -249,7 +250,7 @@ export class PinmonyHomeNativeReads {
   private mapPins(data: HomeItem[]): PinmonyHomePin[] {
     const pins: PinmonyHomePin[] = [];
     data.forEach((item: HomeItem): void => {
-      if (!item || item.type !== 'pin' || !/^\d+$/.test(String(item.id || '')) || pins.some((pin: PinmonyHomePin): boolean => pin.id === String(item.id))) return;
+      if (!item || isProductPin(item) || item.type !== 'pin' || !/^\d+$/.test(String(item.id || '')) || pins.some((pin: PinmonyHomePin): boolean => pin.id === String(item.id))) return;
       const image: HomeImage | undefined = ['474x', '736x', '564x', 'orig', '236x'].map((size: string): HomeImage | undefined => item.images?.[size])
         .find((value: HomeImage | undefined): boolean => !!value && !!this.imageUrl(value.url || '') && value.width > 0 && value.height > 0);
       if (!image) return;

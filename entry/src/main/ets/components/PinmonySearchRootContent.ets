@@ -13,6 +13,7 @@ export interface PinmonySearchRootView {
   openPhotoResult: (id: string) => void;
   searchStore: PinmonySearchStore;
   shouldKeepSearchRootMounted: () => boolean;
+  preparingDetailReturn: boolean;
   pinStore: PinmonyPinStore;
   loadFailed: boolean;
   activeTab: number;
@@ -45,7 +46,7 @@ export interface PinmonySearchRootView {
 
 @Builder
 export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
-          if (view.shouldKeepSearchRootMounted() && !view.pinStore.detail && !view.loadFailed) {
+          if ((view.shouldKeepSearchRootMounted() && !view.pinStore.detail || view.preparingDetailReturn) && !view.loadFailed) {
             PinmonySearchPage({
               onPhotoSearch: view.photoSearch,
               onPhotoHistory: view.photoHistory,
@@ -58,8 +59,9 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
                 view.syncFloatingTabsMotion();
               },
               active: view.nativeSearchPageVisible(),
-              interactionReady: view.activeTab === 1 && view.authStatus === 'authenticated',
-              automaticLoadingEnabled: view.activeTab === 1 && (!view.nativeRootOnly || view.rootContentInteracted),
+              detailReturnPreview: view.preparingDetailReturn,
+              interactionReady: !view.preparingDetailReturn && view.activeTab === 1 && view.authStatus === 'authenticated',
+              automaticLoadingEnabled: !view.preparingDetailReturn && view.activeTab === 1 && (!view.nativeRootOnly || view.rootContentInteracted),
               mediaActive: view.activeTab === 1 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.currentPinUrl(),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               snapshot: view.searchStore.search || view.searchPlaceholder(),
@@ -114,7 +116,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
             })
             .width('100%')
             .height('100%')
-            .visibility(view.nativeSearchPageVisible() ? Visibility.Visible : Visibility.Hidden)
+            .visibility(view.nativeSearchPageVisible() || view.preparingDetailReturn ? Visibility.Visible : Visibility.Hidden)
             .hitTestBehavior(view.nativeSearchPageVisible() ? HitTestMode.Default : HitTestMode.None)
             .onTouch((event: TouchEvent) => view.onTouch(event))
           }

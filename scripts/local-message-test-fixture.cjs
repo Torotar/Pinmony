@@ -14,7 +14,11 @@ const rawLocalMessages = {
 function withLocalMessages(requireDependency) {
   return name => {
     const dependency = requireDependency(name);
-    return name === 'common_foundation' ? { PinmonyI18n: rawLocalMessages, ...dependency } : dependency;
+    if (name !== 'common_foundation') return dependency;
+    const { createArktsLoader } = require('./arkts-module-loader.cjs');
+    const ts = require(process.argv[2] || 'typescript');
+    const product = createArktsLoader(ts, {}).loadFile('common_foundation/src/main/ets/PinmonyProductPin.ets');
+    return { PinmonyI18n: rawLocalMessages, ...product, ...dependency };
   };
 }
 module.exports = { rawLocalMessages, withLocalMessages };

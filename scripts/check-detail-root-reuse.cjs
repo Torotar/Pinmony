@@ -9,14 +9,27 @@ assert(rootMethod, 'detailRootIdentity must exist');
 assert(rootMethod[1].includes('this.pinIdentity('), 'root identity must use normalized Pin identity');
 assert(!rootMethod[1].includes('detailOpeningToken'), 'root identity must not include opening token');
 assert(!rootMethod[1].includes('detail.session'), 'root identity must not include snapshot session');
-assert(index.includes('ForEach([this.detailRootIdentity()]'),
+assert(index.includes('ForEach(this.detailPresentationIdentities()'),
   'detail root ForEach must use stable Pin identity');
-assert(index.includes('renderIdentity: this.detailRenderIdentity()'),
+assert(index.includes('? this.detailRenderIdentity() : _identity'),
   'volatile render identity must remain available to the detail component');
 assert(detail.includes('ForEach(this.heroImageSources(this.detail.imageUrl, this.detail.pinUrl)') && detail.includes('=> source.key'),
   'hero image source identity controls structural node reuse');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
+const routeMethods = ['detailRootIdentity','detailPresentationIdentities','detailPresentation'].map(name =>
+  index.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0]).join('\n');
+const Routes = vm.runInNewContext(ts.transpileModule('class Routes {'+routeMethods+'} Routes;',
+  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const routes = new Routes();
+const parent = {pinUrl:'https://www.pinterest.com/pin/101/'}, child = {pinUrl:'https://www.pinterest.com/pin/102/'};
+Object.assign(routes,{pinStore:{detail:parent},pinIdentity:v=>v.match(/\/pin\/(\d+)/)?.[1] || '',homeEntryCardId:'',homeEntryPhoto:undefined});
+assert.equal(routes.detailPresentationIdentities().join(','),'101');
+routes.relatedEntryParent=parent;routes.homeEntryPhoto={pinUrl:child.pinUrl};routes.homeEntryCardId='pinmony-related-photo-parent-child';routes.pinStore.detail=child;
+assert.equal(routes.detailPresentationIdentities().join(','),'101,102','child insertion retains the mounted parent key in the same ForEach');
+assert.equal(routes.detailPresentation('101'),parent);
+routes.pinStore.detail=parent;routes.homeEntryPhoto=undefined;
+assert.equal(routes.detailPresentationIdentities().join(','),'101','return removes only the child, preserving the original parent node');
 const method = name => detail.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0];
 const context = {};
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page {

@@ -32,6 +32,10 @@ export struct PinmonySettingsPage {
   @ObjectLink store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onEditProfile?: () => void;
+  onViewProfile?: () => void;
+  @Prop profileName: string = '';
+  @Prop profileAvatar: string = '';
+  @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
   onBack?: () => void;
   onPin?: (id: string) => void;
   onOpenExternalLink?: (url: string) => Promise<void>;
@@ -92,9 +96,9 @@ export struct PinmonySettingsPage {
     } finally { this.clearingLog = false; }
   }
   private readonly contentScroller: Scroller = new Scroller();
-  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'logout', 'logs', 'help', 'terms', 'privacy', 'about'];
+  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'logout', 'logs', 'about'];
   private optionLabel(id: string): string {
-    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', 'pm_social_title', '通知', '退出账号', '日志', 'pm_settings_help_center', 'pm_settings_terms_of_service', 'pm_settings_privacy_policy', '关于'];
+    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', 'pm_social_title', '通知', '退出账号', '日志', '关于'];
     return this.uiText(labels[this.options.indexOf(id)] || '');
   }
 
@@ -141,6 +145,21 @@ export struct PinmonySettingsPage {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
       List({ space: 0, scroller: this.contentScroller }) {
+        if(!this.legacyProfile && this.onViewProfile) {
+          ListItem() {
+            Button({type:ButtonType.Normal}) {
+              Row({space:16}) {
+                Image(this.profileAvatar).width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover)
+                Column({space:4}) {
+                  Text(this.profileName).fontSize(20).fontColor($r('app.color.primary_text'))
+                  Text(this.uiText('pm_settings_view_profile')).fontSize(16).fontColor($r('app.color.secondary_text'))
+                }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+              }.width('100%').padding({left:20,right:20,top:20,bottom:24})
+            }.width('100%').backgroundColor(Color.Transparent)
+              .onClick(() => {this.captureRootScroll();if(this.onViewProfile)this.onViewProfile();})
+          }
+        }
         if (this.store.error) {
           ListItem() {
             Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
@@ -181,9 +200,6 @@ export struct PinmonySettingsPage {
               if (id === 'account') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
               if (id === 'logout') this.confirmLogout();
               if (id === 'logs') this.exportLog();
-              if (id === 'help' && this.onOpenExternalLink) this.onOpenExternalLink('https://www.pinterest.com/_/_/help/?source=gear_menu_web');
-              if (id === 'terms' && this.onOpenExternalLink) this.onOpenExternalLink('https://www.pinterest.com/_/_/policy/terms-of-service/');
-              if (id === 'privacy' && this.onOpenExternalLink) this.onOpenExternalLink('https://www.pinterest.com/_/_/policy/privacy-policy/');
               if (id === 'about') this.store.screen = 'about'; })
             .accessibilityText(id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
           }
@@ -208,7 +224,8 @@ export struct PinmonySettingsPage {
     .backgroundColor($r('app.color.page_background'))
   }
 
-  build() {
+  @Builder
+  private settingsSubpage() {
     if (this.store.screen === 'boardRecovery') {
       PinmonyBoardRecoveryPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
     } else if (this.store.screen === 'about') {
@@ -221,7 +238,11 @@ export struct PinmonySettingsPage {
       PinmonyPreferencesPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack, onPin: this.onPin })
     } else if (this.store.screen !== 'root') {
       PinmonyAccountPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
-    } else {
+    }
+  }
+
+  build() {
+    Stack() {
     HdsNavigation(this.pathStack) {
       Column().width('100%').height('100%')
     }
@@ -229,7 +250,15 @@ export struct PinmonySettingsPage {
     .hideTitleBar(true)
     .navDestination(this.destination)
     .backgroundColor($r('app.color.page_background'))
-    }
+    .hitTestBehavior(this.store.screen === 'root' ? HitTestMode.Default : HitTestMode.None)
+    .accessibilityLevel(this.store.screen === 'root' ? 'auto' : 'no-hide-descendants')
+    ForEach(this.store.screen === 'root' ? [] : [this.store.screen], (_screen: string) => {
+      Column() { this.settingsSubpage() }.width('100%').height('100%')
+        .backgroundColor($r('app.color.page_background'))
+        .transition(TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
+          TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn})))
+    }, (screen: string): string => screen)
+    }.width('100%').height('100%')
   }
 }
 

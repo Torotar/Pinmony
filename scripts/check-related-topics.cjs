@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const ts=require(process.argv[2]||'typescript');
-function load(file,deps={}){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,{exports,require:name=>deps[name]||{PinmonyI18n:{message:k=>k}},URL});return exports;}
+function load(file,deps={}){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,{exports,require:require('./local-message-test-fixture.cjs').withLocalMessages(name=>deps[name]||{PinmonyI18n:{message:k=>k}}),URL});return exports;}
 const root='feature_pin/src/main/ets/';
 const {readRelatedPresentation,relatedTopicSearchUrl}=load(root+'services/PinmonyRelatedPresentation.ets');
 const parent='https://www.pinterest.com/pin/100/';

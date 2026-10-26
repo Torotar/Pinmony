@@ -63,10 +63,7 @@ export struct PinmonyOrganizePage {
         title: { mainTitle: this.state.phase === 'select' ? (this.publishing ? this.uiText("pm_select_pins_46854e37") : this.uiText("pm_organize_into_boards_ce266233")) :
           this.state.phase === 'create' ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416") },
         backIcon: {
-          icon: new SymbolGlyphModifier(this.state.phase === 'select' ?
-            $r('sys.symbol.xmark') : $r('sys.symbol.chevron_left'))
-            .fontColor([$r('app.color.primary_text')]),
-          label: this.state.phase === 'select' ? (this.publishing ? this.uiText("pm_close_publisher_06b27c24") : this.uiText("pm_close_organizer_a3fa0809")) : this.uiText("pm_back_572cf45b"),
+          label: this.uiText("pm_back_572cf45b"),
           isEnabled: !this.state.busy,
           action: () => this.back()
         },

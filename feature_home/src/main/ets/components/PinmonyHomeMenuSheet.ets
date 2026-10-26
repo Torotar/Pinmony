@@ -76,7 +76,9 @@ export struct PinmonyHomeMenuSheet {
         ForEach(this.menu.actions, (option: PinmonyHomeMenuOption) => {
           Button({ type: ButtonType.Normal }) {
             Row({ space: 14 }) {
-              if (option.id === 'board-menu-move') {
+              if(option.id === 'home-favorite') {
+                SymbolGlyph($r('sys.symbol.star')).fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
+              } else if (option.id === 'board-menu-move') {
                 SymbolGlyph($r('sys.symbol.arrow_right'))
                   .fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
               } else {

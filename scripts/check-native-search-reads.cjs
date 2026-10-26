@@ -25,7 +25,7 @@ const nextEmpty=feedReq(empty).at(-1);nextEmpty.resolve(result([]));await new Pr
 const f=fixture();
 const ordinary={id:'123',type:'pin',images:{'474x':{url:'https://i.pinimg.com/fixture.jpg',width:474,height:650}}};
 assert(f.reader.map(ordinary));
-const commerce=f.reader.map({...ordinary,rich_summary:{site_name:'Shop',products:[{offer_summary:{price:'£3.79',standard_price:'£5.00'}}]}});assert.equal(commerce.price,'£3.79');assert.equal(commerce.merchant,'Shop');assert.equal(commerce.standardPrice,'£5.00');
+const commerce=f.reader.map({...ordinary,rich_summary:{site_name:'Shop',products:[{offer_summary:{price:'£3.79',standard_price:'£5.00'}}]}});assert.equal(commerce,undefined,'product results are hidden outside saved/created');
 const collage=f.reader.map({id:'998',type:'board',name:'Board',url:'/fixture/board/',owner:{username:'owner'},board_order_modified_at:new Date(Date.now()-2*86400000).toISOString(),images:{'236x':[{url:'https://i.pinimg.com/a.jpg'},{url:'https://i.pinimg.com/b.jpg'},{url:'https://i.pinimg.com/c.jpg'}]}});assert.equal(collage.boardImages.length,3);assert.equal(collage.ownerName,'owner');assert.equal(collage.updated,'2 天');
 assert.equal(f.reader.map({id:'997',type:'board',name:'Board',url:'/fixture/board/',pin_count:225,section_count:4}).subtitle,'225 张 Pin 图 · 4 个图板区块');
 assert.equal(f.reader.map({id:'997',type:'board',name:'Board',url:'/fixture/board/',pin_count:3994,section_count:0}).subtitle,'3,994 张 Pin 图');

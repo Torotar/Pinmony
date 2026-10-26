@@ -36,6 +36,8 @@ export struct PinmonyMoreSheet {
                     option.id === 'detail-see-more' ? $r('app.media.lucide_heart') :
                     option.id === 'detail-see-less' ? $r('app.media.lucide_eye_off') : $r('app.media.lucide_share_2'))
                     .width(28).height(28).objectFit(ImageFit.Contain)
+                } else if (option.id === 'detail-favorite') {
+                  SymbolGlyph($r('sys.symbol.star')).fontSize(28).fontColor([$r('app.color.primary_text')])
                 } else if (option.id === 'detail-edit') {
                   Image($r('app.media.lucide_pencil')).width(28).height(28)
                     .objectFit(ImageFit.Contain)
@@ -72,7 +74,7 @@ export struct PinmonyMoreSheet {
               .onClick(() => {
                 if (option.enabled) this.onAction(option.id);
               })
-            }, (option: MoreSheetOption) => option.id + this.uiLanguage)
+            }, (option: MoreSheetOption) => option.id + ':' + option.enabled.toString() + ':' + this.uiLanguage)
           }
           .width('100%')
         }

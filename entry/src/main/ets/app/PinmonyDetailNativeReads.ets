@@ -143,7 +143,7 @@ export class PinmonyDetailNativeReads {
     next.autoplayWifi = this.autoplayWifi; next.autoplayCellular = this.autoplayCellular;
     next.commentPreview = this.previewText; next.commentLoading = this.previewLoading;
     next.commentEmpty = this.previewEmpty; next.commentError = this.previewError; next.commentsAvailable = this.previewAvailable;
-    next.commentsRetained = false; next.related = this.related.slice(); next.relatedLoading = this.relatedLoading;
+    next.commentsRetained = this.previewLoading && !!this.previewText; next.related = this.related.slice(); next.relatedLoading = this.relatedLoading;
     next.relatedEnded = this.relatedEnded; next.relatedError = this.relatedError; next.relatedRetained = false;
     this.store.detail = next;
     this.store.detailCache.put(this.pin.split('/pin/')[1].split('/')[0], next, this.store.detailScrollOffset);
@@ -165,6 +165,8 @@ export class PinmonyDetailNativeReads {
     const direct: string = String(resource.data.aggregated_pin_id || '');
     const nested: string = String(resource.data.aggregated_pin_data?.id || '');
     this.aggregate = /^\d+$/.test(direct) ? direct : /^\d+$/.test(nested) ? nested : '';
+    PinmonyRuntimeLog.info('CommentsTrace: identitySource=' +
+      (/^\d+$/.test(direct) ? 'direct' : /^\d+$/.test(nested) ? 'nested' : 'missing'));
     if (this.owned() && this.store.detail?.pinUrl === pin) {
       const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
       const raw: BasePin = resource.data, reaction: BaseReaction = raw.reaction_data || raw;
@@ -186,7 +188,9 @@ export class PinmonyDetailNativeReads {
     const retained: RetainedRelatedRead | undefined = cached && Date.now() - cached.at < 300000 ? cached : undefined;
     this.bookmark = retained?.bookmark || ''; this.related = retained ? retained.pins.slice() : existing?.pinUrl === pin ? existing.related.slice() : [];
     this.relatedLoading = !retained; this.relatedEnded = retained?.ended || false; this.relatedError = '';
-    this.previewText = ''; this.previewError = this.aggregate ? '' : PinmonyI18n.message("pm_missing_comment_id_retry_the_comment_preview_b1b3707a"); this.previewEmpty = false;
+    this.previewText = this.aggregate ? existing?.commentPreview || '' : '';
+    this.previewError = this.aggregate ? '' : PinmonyI18n.message("pm_missing_comment_id_retry_the_comment_preview_b1b3707a");
+    this.previewEmpty = existing?.commentEmpty === true;
     this.previewAvailable = !!this.aggregate; this.previewLoading = !!this.aggregate; this.apply();
     const presentation: PinmonyDetailSnapshot | undefined = this.store.detail;
     PinmonyRuntimeLog.info('DetailCommerceTrace: stage=native-ready descriptionLength=' +

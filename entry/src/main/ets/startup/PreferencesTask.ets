@@ -13,6 +13,7 @@ export default class PreferencesTask extends StartupTask {
     PinmonyRuntimeLog.info('LanguagePreference: restored=' + (AppStorage.get<string>('pinmonyLanguagePreference') || 'system') +
       ' effective=' + (AppStorage.get<string>('pinmonyLanguage') || 'unknown'));
     PersistentStorage.persistProp('themePreference', 'system');
+    PersistentStorage.persistProp('profileLegacyLayout', false);
     PinmonyPublishAnchor.initialize(context);
     PersistentStorage.persistProp('immersiveLightEnabled', true);
     PersistentStorage.persistProp('immersiveLightMode', AppStorage.get<boolean>('immersiveLightEnabled') === false ? 'off' : 'immersive');

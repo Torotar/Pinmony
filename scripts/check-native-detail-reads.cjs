@@ -66,6 +66,8 @@ async function main() {
   retained.controller.pause();
   retaining = retained.controller.start(pinUrl(1), 1, base(1));
   assert.equal(retained.store.detail.relatedLoading, false);
+  assert.equal(retained.store.detail.commentPreview, 'preview', 'revalidation keeps the existing preview until the response replaces it');
+  assert.equal(retained.store.detail.commentsRetained, true);
   retained.requests[2].resolve(preview('fresh preview')); await retaining;
   assert.equal(retained.requests.length, 3, 'return retains recommendations without fetching their first page');
   retained.controller.loadMore();
@@ -317,11 +319,11 @@ async function main() {
   const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
   const visibility = page.match(/if \(\((this\.readsReady \|\| this\.actionsReady && this\.detail\.imageStageReady[^]*?)\) \{/)[1];
   const shows = view => !!vm.runInNewContext('(function(){return ((' + visibility + ');}).call(view)', { view });
-  const view = { readsReady: true, actionsReady: false, detail: { kind: 'state', imageStageReady: false, commentsAvailable: true, commentEmpty: false } };
+  const view = { readsReady: true, actionsReady: false, detail: { kind: 'state', imageStageReady: false, commentsAvailable: true, commentEmpty: false, commentPreview: 'preview' } };
   assert.equal(shows(view), true, 'native preview does not wait for Web mutation/image readiness');
   view.detail.commentsAvailable = false; view.detail.commentError = 'missing metadata';
-  assert.equal(shows(view), true, 'metadata errors expose the preview retry entry');
-  view.detail.commentError = ''; assert.equal(shows(view), false);
+  assert.equal(shows(view), true, 'retained text remains visible while metadata is unavailable');
+  view.detail.commentError = ''; view.detail.commentPreview = ''; assert.equal(shows(view), false);
   view.detail.commentsAvailable = true; view.detail.commentEmpty = true; assert.equal(shows(view), false);
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
   const retryStart = index.indexOf('  private retryDetailPreview(): void');
@@ -334,16 +336,18 @@ async function main() {
   assert.equal(freshReads, 1, 'missing aggregate retry reacquires the verified base');
   previewRetry.detailNativeReads.retryPreview = () => true; previewRetry.retryDetailPreview();
   assert.equal(freshReads, 1, 'normal preview retry does not restart base');
-  const cardStart = page.indexOf('.enabled(((this.readsReady');
+  const relatedCard = page.slice(page.indexOf('private relatedCard('), page.indexOf('private relatedColumn('));
+  assert(!relatedCard.includes('.enabled('), 'cached photographs must retain their colors while session actions prepare');
+  const cardStart = page.indexOf('.stateEffect(((this.readsReady');
   const clickStart = page.indexOf('.onClick(() => {', cardStart) + '.onClick(() => {'.length;
   const clickBody = page.slice(clickStart, page.indexOf('})', clickStart));
   let navigations = 0;
   const card = { readsReady: true, actionsReady: false, deferredActions: false, detail: { kind: 'cached', relatedRetained: false },
-    onRelated(id) { assert.equal(id, 'api:2'); navigations++; } };
-  vm.runInNewContext('(function(){' + clickBody + '}).call(card)', { card, pin: { id: 'api:2' } });
+    onRelated(id) { assert.equal(id, pinUrl(2)); navigations++; } };
+  vm.runInNewContext('(function(){' + clickBody + '}).call(card)', { card, pin: { id: 'api:2', pinUrl: pinUrl(2) } });
   assert.equal(navigations, 1, 'native read readiness enables related navigation without mutation readiness');
   card.readsReady = false;
-  vm.runInNewContext('(function(){' + clickBody + '}).call(card)', { card, pin: { id: 'api:2' } });
+  vm.runInNewContext('(function(){' + clickBody + '}).call(card)', { card, pin: { id: 'api:2', pinUrl: pinUrl(2) } });
   assert.equal(navigations, 1, 'unconfirmed presentation remains gated');
   assert(page.includes('@Prop readsReady: boolean = false;'));
   const mediaBinding = page.slice(page.indexOf('PinmonyVideoPlayer({'), page.indexOf('readingAddress:', page.indexOf('PinmonyVideoPlayer({')));

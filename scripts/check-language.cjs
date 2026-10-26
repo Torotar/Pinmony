@@ -92,6 +92,8 @@ const profile = Object.create(ProfileReader.prototype);
 Object.assign(profile, { owned: () => true, store: {}, section: 'saved', page: 'https://www.pinterest.com/test/', origin: 'https://www.pinterest.com',
   info: { isOwn:true, followers:0, following:2, pinCount:88, userId:'1', name:'john fige', handle:'figefar', about:'寻找属于我的灵感' },
   feed: () => ({scroll:0, boards:[], pins:[], ready:false}), unorganized: {pins:[]}, busy:false });
+profile.suggestions = [];
+profile.attemptedSuggestions = new Set();
 profile.apply();
 const ps = profile.store.profile;
 assert.equal(f.api.render(ps.followers, 'en'), '0 followers');
@@ -200,7 +202,7 @@ const searchView = methodView('feature_search/src/main/ets/components/PinmonySea
 searchView.snapshot = {placeholder:'搜索'}; assert.equal(searchView.searchPlaceholder(),'Search');
 searchView.snapshot.placeholder='风景灵感'; assert.equal(searchView.searchPlaceholder(),'风景灵感');
 searchView.uiLanguage='zh'; searchView.snapshot.placeholder='Search'; assert.equal(searchView.searchPlaceholder(),'搜索');
-assert.equal(f.api.optionLabel('home-system-share','系统分享','en'),'System share');
+assert.equal(f.api.optionLabel('home-system-share','系统分享','en'),'Share');
 const accountView = methodView('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','birthday(', '  private gender(');
 accountView.store = {data:{birthdate:'1999-12-02'}}; assert.equal(accountView.birthday(),'12/02/1999');
 accountView.uiLanguage='zh'; assert.equal(accountView.birthday(),'1999年12月02日');

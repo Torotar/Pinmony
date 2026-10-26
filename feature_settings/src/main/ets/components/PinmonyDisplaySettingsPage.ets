@@ -17,6 +17,7 @@ export struct PinmonyDisplaySettingsPage {
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
   @StorageLink('bottomBarScrollCollapseEnabled') private collapseEnabled: boolean = true;
+  @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
   @StorageLink('themePreference') private themePreference: string = 'system';
   @StorageLink('pinmonyLanguagePreference') private languagePreference: string = 'system';
   @StorageLink('screenOrientationPreference') private orientationPreference: string = 'system';
@@ -220,6 +221,11 @@ export struct PinmonyDisplaySettingsPage {
       }, (language: string): string => language)
     }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    Row({ space: 16 }) {
+      Text(this.uiText('pm_profile_legacy_layout')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+      Toggle({ type: ToggleType.Switch, isOn: this.legacyProfile }).onChange((value: boolean) => { this.legacyProfile = value; })
+        .accessibilityText(this.uiText('pm_profile_legacy_layout'))
+    }.width('100%').padding(16).backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
     Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:16 })
     ForEach(['autoplayCellular','autoplayWifi'], (action: string) => {
       this.autoplayOption(action, action === 'autoplayWifi' ? 'pm_autoplay_video_wifi' : 'pm_autoplay_video_cellular', action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular)

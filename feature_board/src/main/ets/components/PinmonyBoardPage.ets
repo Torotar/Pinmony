@@ -8,7 +8,7 @@ import { boardSectionPreviewImages } from '../services/PinmonyBoardPresentation'
 import { PinmonyDraggablePublishButton } from './PinmonyDraggablePublishButton';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay, PinmonyBoardPickerRow, PinmonyBoardPickerFooter } from 'common_ui';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
+import { HdsTabs, HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
   HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 
 interface BoardTitleMenuItem {
@@ -33,6 +33,12 @@ interface BoardEditValues {
 
 @Component
 export struct PinmonyBoardPage {
+  @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
+  @State private viewOpen: boolean = false;
+  @State private density: number = 1;
+  @State private draftDensity: number = 1;
+  @State private draftFavorites: boolean = false;
+  private viewPage: string = '';
   @State private publishAreaWidth: number = 0;
   @State private publishAreaHeight: number = 0;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -68,6 +74,8 @@ export struct PinmonyBoardPage {
   onBack?: () => void;
   onPin?: (id: string) => void;
   onMore?: (id: string) => void;
+  onFavorite?: (id: string) => Promise<void>;
+  @State private favoritePending: string = '';
   onCollaborators?: () => void;
   onMessage?: () => void;
   @Prop invitationName: string = '';
@@ -376,6 +384,8 @@ export struct PinmonyBoardPage {
   @State private contentWidth: number = 360;
 
   private contentColumns(): number {
+    if (this.modernBoardActions() && this.density === 0) return Math.max(1, Math.floor(this.contentWidth / 360));
+    if (this.modernBoardActions() && this.density === 2) return Math.max(3, Math.floor(this.contentWidth / 122));
     return Math.max(2, Math.floor((this.contentWidth - 32 + 12) / 192));
   }
 
@@ -464,6 +474,24 @@ export struct PinmonyBoardPage {
           Column({ space: 2 }) {
             if (pin.title) { Text(PinmonyI18n.render(pin.title, this.uiLanguage)).fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          if ((!this.phase() || this.phase() === 'section') && typeof pin.favorite === 'boolean') {
+            Button({ type: ButtonType.Circle }) {
+              if (this.favoritePending === pin.id) {
+                LoadingProgress().width(22).height(22)
+              } else {
+                SymbolGlyph(pin.favorite ? $r('sys.symbol.star_fill') : $r('sys.symbol.star'))
+                  .fontSize(22).fontColor([$r('app.color.primary_text')])
+              }
+            }.width(32).height(32).backgroundColor(Color.Transparent)
+              .enabled(!pin.cancelled && this.snapshot.ready && !this.snapshot.flow?.busy && !this.favoritePending)
+              .accessibilityText(this.uiText(pin.favorite ? 'pm_star_remove' : 'pm_star_add'))
+              .accessibilitySelected(pin.favorite)
+              .onClick(async () => {
+                if (this.favoritePending || !this.onFavorite) return;
+                this.favoritePending = pin.id;
+                try { await this.onFavorite(pin.id); } finally { this.favoritePending = ''; }
+              })
+          }
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.lucide_ellipsis')).width(20).height(20).objectFit(ImageFit.Contain)
               .fillColor($r('app.color.primary_text'))
@@ -795,6 +823,86 @@ export struct PinmonyBoardPage {
   }
 
   @Builder
+  private viewOption(key: string, selected: boolean, action: () => void, enabled: boolean = true) {
+    Button({type:ButtonType.Normal}) {
+      Row() {
+        Text(this.uiText(key)).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
+        if(selected){SymbolGlyph($r('sys.symbol.checkmark')).fontSize(22).fontColor([$r('app.color.primary_text')])}
+      }.width('100%')
+    }.width('100%').height(52).backgroundColor(Color.Transparent).enabled(enabled).accessibilityChecked(selected).onClick(action)
+  }
+
+  @Builder
+  private boardViewSheet() {
+    Column({space:8}) {
+      Text(this.uiText('pm_board_view_type')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+      this.viewOption('pm_all_pins_9a2e0270',!this.draftFavorites,()=>{this.draftFavorites=false;})
+      this.viewOption('pm_board_view_favorites',this.draftFavorites,()=>{this.draftFavorites=true;},this.snapshot.canFilterFavorites===true)
+      Text(this.uiText('pm_board_view_density')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%').margin({top:16})
+      this.viewOption('pm_board_view_wide',this.draftDensity===0,()=>{this.draftDensity=0;})
+      this.viewOption('pm_board_view_default',this.draftDensity===1,()=>{this.draftDensity=1;})
+      this.viewOption('pm_board_view_compact',this.draftDensity===2,()=>{this.draftDensity=2;})
+      Row({space:8}) {
+        Button(this.uiText('pm_close_3fd47edc')).layoutWeight(1).onClick(()=>{this.viewOpen=false;})
+        Button(this.uiText('pm_board_view_apply')).layoutWeight(1)
+          .enabled(this.viewPage===this.snapshot.pageKey && this.boardActionEnabled(1) && (this.draftDensity!==this.density || this.draftFavorites!==(this.snapshot.favoriteOnly===true)))
+          .onClick(()=>{
+            if(this.viewPage!==this.snapshot.pageKey || !this.boardActionEnabled(1))return;
+            this.density=this.draftDensity;this.viewOpen=false;
+            if(this.snapshot.canFilterFavorites && this.draftFavorites!==(this.snapshot.favoriteOnly===true))this.act('favorites');
+          })
+      }.width('100%').margin({top:16})
+    }.width('100%').padding({left:24,right:24,top:12,bottom:24})
+  }
+
+  private modernBoardActions(): boolean {
+    return !this.legacyProfile && this.snapshot.editable === true && !this.phase() && !this.isDiscoveryBoard();
+  }
+
+  private boardActionEnabled(index: number): boolean {
+    return this.snapshot.ready && !this.snapshot.loading && !this.snapshot.refreshing &&
+      !this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain &&
+      (index !== 0 || this.snapshot.pins.length > 0);
+  }
+
+  @Builder
+  private boardActionTab(label: string, icon: Resource, index: number) {
+    Column({ space: 2 }) {
+      if (index === 0) {
+        Image(icon).width(24).height(24).fillColor($r('app.color.primary_text'))
+      } else {
+        SymbolGlyph(icon).fontSize(24).fontColor([$r('app.color.primary_text')])
+      }
+      Text(this.uiText(label)).fontSize(11).lineHeight(14).height(14).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.primary_text')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+    }.width('100%').height(56).padding({top:4,bottom:4}).justifyContent(FlexAlign.Start)
+      .opacity(this.boardActionEnabled(index) ? 1 : 0.4).accessibilityText(this.uiText(label))
+  }
+
+  @Builder
+  private boardActionTabs() {
+    HdsTabs({ barPosition: BarPosition.End }) {
+      TabContent() { Column() }
+        .tabBar(this.boardActionTab('pm_organize_ff093473', $r('app.media.lucide_brush_cleaning'), 0))
+      TabContent() { Column() }
+        .tabBar(this.boardActionTab('pm_publish_b61f333b', $r('sys.symbol.plus'), 1))
+      TabContent() { Column() }
+        .tabBar(this.boardActionTab('pm_more_ideas_8f569818', $r('sys.symbol.square_grid_2x2'), 2))
+    }.width('100%').height('100%').barHeight(56).barMode(BarMode.Fixed)
+      .scrollable(false).barOverlap(true).animationDuration(0)
+      .barBackgroundColor(this.immersiveLightEnabled ? Color.Transparent : $r('app.color.surface_muted'))
+      .barFloatingStyle({barBottomMargin:28,systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode)})
+      .backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Transparent)
+      .onContentWillChange((): boolean => false)
+      .onTabBarClick((index: number) => {
+        if (!this.boardActionEnabled(index)) return;
+        if (index === 0) this.act('select');
+        else if (index === 1 && this.onPublish) this.onPublish();
+        else if (index === 2) this.act('ideas');
+      })
+  }
+
+  @Builder
   private actionTile(label: string, icon: Resource, action: string, imageIcon: boolean = false) {
     Column({ space: 6 }) {
       Button({ type: ButtonType.Normal }) {
@@ -1079,13 +1187,33 @@ export struct PinmonyBoardPage {
                 Image($r('app.media.lucide_user_round_plus')).width(20).height(20)
               }.width(36).height(36).backgroundColor($r('app.color.surface_muted'))
                 .onClick(() => { if (this.onCollaborators) this.onCollaborators(); }).accessibilityText(this.uiText("pm_invite_collaborators_42600def"))
+              if (this.modernBoardActions()) {
+                Blank().layoutWeight(1)
+                Button({type:ButtonType.Circle}) {
+                  Image($r('app.media.profile_sliders')).width(22).height(22).fillColor($r('app.color.primary_text'))
+                }.width(48).height(48).backgroundColor($r('app.color.input_surface'))
+                  .enabled(this.boardActionEnabled(1)).accessibilityText(this.uiText('pm_board_view_title'))
+                  .onClick(() => {this.viewPage=this.snapshot.pageKey;this.draftDensity=this.density;this.draftFavorites=this.snapshot.favoriteOnly===true;this.viewOpen=true;})
+                  .bindSheet($$this.viewOpen,this.boardViewSheet(),{height:SheetSize.FIT_CONTENT,showClose:true,dragBar:true,
+                    title:{title:this.uiText('pm_board_view_title')},backgroundColor:$r('app.color.page_background')})
+              }
             }.width('100%')
+            if (!this.modernBoardActions()) {
             Row({ space: 12 }) {
               if (this.snapshot.pins.length > 0) {
                 this.actionTile(this.uiText("pm_organize_ff093473"), $r('app.media.lucide_brush_cleaning'), 'select', true)
               }
               this.actionTile(this.uiText("pm_more_ideas_8f569818"), $r('sys.symbol.square_grid_2x2'), 'ideas')
             }.width('100%')
+            }
+          }
+          if (!this.phase() && this.snapshot.canFilterFavorites) {
+            Button(this.uiText(this.snapshot.favoriteOnly ? 'pm_star_filter_active' : 'pm_star_filter'), {type:ButtonType.Normal})
+              .height(40).borderRadius(20).padding({left:16,right:16})
+              .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+              .enabled(!this.snapshot.loading && !this.snapshot.loadingMore && !this.snapshot.refreshing)
+              .accessibilityText(this.uiText(this.snapshot.favoriteOnly ? 'pm_star_filter_active' : 'pm_star_filter'))
+              .onClick(() => this.act('favorites'))
           }
           if (!this.phase() && this.snapshot.sections?.length) {
             if (this.isDiscoveryBoard()) {
@@ -1187,7 +1315,7 @@ export struct PinmonyBoardPage {
           const width: number = Number(area.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
         })
-        .padding({ left: 16, right: 16, top: 18, bottom: 40 })
+        .padding({ left: 16, right: 16, top: 18, bottom: this.modernBoardActions() ? 132 : 40 })
       }
       .width('100%').height('100%').scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
@@ -1209,11 +1337,12 @@ export struct PinmonyBoardPage {
         PinmonyRuntimeLog.info('BoardRefreshTrace: stage=gesture');
         if (this.onRefresh) this.onRefresh();
       })
-      if (this.snapshot.editable === true && (!this.phase() || this.phase() === 'section') && !this.isDiscoveryBoard()) {
+      if (this.snapshot.editable === true && (!this.phase() || this.phase() === 'section') && !this.isDiscoveryBoard() && !this.modernBoardActions()) {
         PinmonyDraggablePublishButton({ areaWidth: this.publishAreaWidth, areaHeight: this.publishAreaHeight,
           actionEnabled: !this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain,
           onPublish: () => { if ((!this.phase() || this.phase() === 'section') && this.onPublish) this.onPublish(); } })
       }
+      if (this.modernBoardActions()) { this.boardActionTabs() }
       }.width('100%').height('100%')
       .onAreaChange((_oldArea: Area, area: Area) => {
         this.publishAreaWidth = Number(area.width);

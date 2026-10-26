@@ -45,6 +45,15 @@ function harness() {
   const completedPublish = harness();completedPublish.flow();completedPublish.store.publishFlow.completed = 1;completedPublish.controller.close();assert.deepEqual(completedPublish.restoreModes,[true],'completed publish revalidates board');
   const unknownPublish = harness();unknownPublish.flow();unknownPublish.store.publishFlow.uncertain = true;unknownPublish.controller.close();assert.deepEqual(unknownPublish.restoreModes,[true],'unknown write revalidates without replay');
 
+  const closing = harness(); closing.controller.openMenu();
+  closing.store.publishOptions = [{id:'board',kind:'board',label:'Board',enabled:true}];
+  closing.store.publishLoading = false;
+  const closingOptions = closing.store.publishOptions;
+  closing.hideSheet(); closing.controller.dismissMenu();
+  assert.equal(closing.store.publishOptions, closingOptions, 'dismissal retains rendered options during Sheet exit');
+  assert.equal(closing.store.publishLoading, false, 'dismissal releases business loading state');
+  closing.controller.openMenu();
+  assert.equal(closing.store.publishOptions.length, 0, 'next opening clears the old menu before reading');
   const hidden = harness(); hidden.controller.openMenu(); hidden.hideSheet(); hidden.controller.dismissMenu();
   assert.equal(hidden.store.publishLoading, false);
   assert.equal(hidden.store.publishPreparing, false);

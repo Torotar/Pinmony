@@ -554,6 +554,7 @@ export struct PinmonyInboxFlowPage {
   @Builder
   private flowDestination() {
     HdsNavDestination() {
+    Stack({ alignContent: Alignment.Center }) {
     Column() {
       if (this.snapshot.screen === 'compose') {
         TextInput({ text: this.query, placeholder: this.uiText("pm_search_by_name_or_email_0c503b47") }).margin({ left: 16, right: 16, bottom: 8 })
@@ -573,7 +574,7 @@ export struct PinmonyInboxFlowPage {
           }
         }.padding(16)
       }
-      if (this.snapshot.loading) { LoadingProgress().width(28).height(28) }
+      if (this.snapshot.loading && this.snapshot.screen !== 'chat') { LoadingProgress().width(28).height(28) }
 
       Scroll(this.scroller) {
         Column() {
@@ -652,6 +653,10 @@ export struct PinmonyInboxFlowPage {
         backgroundColor: $r('app.color.page_background'),
         onWillDismiss: (action: DismissSheetAction) => { action.dismiss(); this.showMessageMenu = false; this.selectedMessage = undefined; this.blockTarget = undefined; }
       })
+    if (this.snapshot.loading && this.snapshot.screen === 'chat') {
+      LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+    }
+    }.width('100%').height('100%')
     }.width('100%').height('100%')
       .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
         style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,

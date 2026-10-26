@@ -9,8 +9,9 @@ export struct PinmonyDetailEntryMotion {
   @Prop imageWidth: number = 1;
   @Prop imageHeight: number = 1;
   @Prop bottomInset: number = 0;
+  @Prop restoredOffset: number = 0;
   @Prop @Watch('closeChanged') closing: boolean = false;
-  onReveal?: (closing: boolean) => void;
+  onReveal?: (closing: boolean, pageExit: boolean) => void;
   onOpened?: () => void;
   onClosed?: () => void;
   @State private frame: ImageFlightRect = { x: 0, y: 0, width: 1, height: 1 };
@@ -42,6 +43,18 @@ export struct PinmonyDetailEntryMotion {
         width: contained.width, height: contained.height };
     } catch (_) { return undefined; }
   }
+  private heroVisible(): boolean {
+    try {
+      const ui = this.getUIContext();
+      const root = ui.getComponentUtils().getRectangleById(this.rootId);
+      const hero = ui.getComponentUtils().getRectangleById(this.targetId);
+      const top: number = ui.px2vp(hero.windowOffset.y - root.windowOffset.y);
+      const height: number = ui.px2vp(hero.size.height) - this.bottomInset;
+      const viewport: number = ui.px2vp(root.size.height);
+      const visible: number = Math.max(0, Math.min(top + height, viewport) - Math.max(top, 56));
+      return height > 0 && visible >= Math.min(height, viewport - 56) * 0.8;
+    } catch (_) { return false; }
+  }
   private begin(): void {
     if (!this.alive || this.started || !this.decoded || !this.measured) return;
     const target: ImageFlightRect | undefined = this.target();
@@ -57,7 +70,8 @@ export struct PinmonyDetailEntryMotion {
       return;
     }
     this.started = true;
-    this.frame = this.closing ? target : this.source; this.showing = true;
+    this.frame = this.closing ? target : this.source;
+    this.showing = this.closing ? this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible();
     // Commit the source frame before starting the destination animation.
     this.timer = setTimeout(() => { if (this.alive) this.move(this.closing); }, 32);
   }
@@ -71,11 +85,14 @@ export struct PinmonyDetailEntryMotion {
     const target: ImageFlightRect | undefined = this.target();
     if (!target) { if (closing) this.onClosed?.(); else this.onOpened?.(); return; }
     const version: number = ++this.version;
+    const pageExit: boolean = !this.heroVisible() || !closing && this.restoredOffset > 0;
     if (!this.showing) this.frame = target;
-    this.showing = true;
+    this.showing = !pageExit;
     PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (closing ? 'close-start' : 'open-start'));
-    this.onReveal?.(closing);
-    this.getUIContext().animateTo({ duration: 240, curve: Curve.EaseOut,
+    PinmonyRuntimeLog.info('DetailMotionTrace: phase=' + (closing ? 'close' : 'open') +
+      ' mode=' + (pageExit ? 'page' : 'photo') + ' restored=' + (this.restoredOffset > 0).toString());
+    this.onReveal?.(closing, pageExit);
+    this.getUIContext().animateTo({ duration: closing ? 200 : 240, curve: Curve.EaseOut,
       onFinish: () => {
         if (!this.alive || version !== this.version) return;
         this.showing = false;

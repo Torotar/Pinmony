@@ -70,22 +70,22 @@ async function productionMenus(){
   let pending=h.openCustomHomeMenu(pin,origin+'/');f.jobs.at(-1).resolve(body(raw));await pending;
   assert.equal(h.homeStore.customHomeMenu.options.length,0);assert(h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-system-share'));assert.equal(web,0);
   await h.performCustomHomeAction('home-download');assert.equal(effects.at(-1)[0],'download');
-  pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);assert(h.homeStore.customHomeMenu,'home menu retained until disappearance');assert.notEqual(effects.at(-1)[0],'system-share');h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;assert.equal(effects.at(-1)[0],'system-share');assert.equal(web,0);
+  pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);assert(h.homeStore.customHomeMenu,'home menu retained until disappearance');assert.notEqual(effects.at(-1)[0],'contacts');h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;assert.equal(effects.at(-1)[0],'contacts');assert.equal(web,0);assert(!effects.some(e=>e[0]==='system-share'),'card sharing never invokes ShareKit');
   route=origin+'/visitor/board/';h.boardStore.boardDetail={pageKey:route,editable:false,pins:[{id:'11',pinUrl:pin}]};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-move'));assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-edit'),'board menu excludes edit even for an owned Pin');
-  assert.equal(h.homeStore.customHomeMenu.actions.find(o=>o.id==='home-system-share').label,'系统分享');
-  const boardShares=effects.filter(e=>e[0]==='system-share').length;
+  assert.equal(h.homeStore.customHomeMenu.actions.find(o=>o.id==='home-system-share').label,'分享');
+  const boardShares=effects.filter(e=>e[0]==='contacts').length;
   pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);
-  assert.equal(effects.filter(e=>e[0]==='system-share').length,boardShares,'board share waits for menu disappearance');
+  assert.equal(effects.filter(e=>e[0]==='contacts').length,boardShares,'board share waits for menu disappearance');
   assert.equal(h.activeSheetKind,'share');assert(h.homeStore.customHomeMenu,'keep board menu mounted during exit');
-  h.notifyDetailSystemShareClosed();await flush();assert.equal(effects.filter(e=>e[0]==='system-share').length,boardShares);
-  frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['system-share',pin]);
-  const sharesBeforeRouteChange=effects.filter(e=>e[0]==='system-share').length;
+  h.notifyDetailSystemShareClosed();await flush();assert.equal(effects.filter(e=>e[0]==='contacts').length,boardShares);
+  frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['contacts','pin',pin]);
+  const sharesBeforeRouteChange=effects.filter(e=>e[0]==='contacts').length;
   pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   pending=h.performCustomHomeAction('home-system-share');h.notifyDetailSystemShareClosed();await flush();
   const originalRoute=route;route=origin+'/other/board/';frames.shift().onIdle();await pending;
-  assert.equal(effects.filter(e=>e[0]==='system-share').length,sharesBeforeRouteChange,'route change during menu dismissal cancels system share');route=originalRoute;
+  assert.equal(effects.filter(e=>e[0]==='contacts').length,sharesBeforeRouteChange,'route change during menu dismissal cancels contact sharing');route=originalRoute;
   h.boardStore.boardDetail={pageKey:route,editable:true,pins:[{id:'11',pinUrl:pin}]};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body({...raw,is_repin:true}));await pending;
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-edit'),'owned board menu excludes edit');
   const edits=effects.filter(e=>e[0]==='edit').length;await h.performCustomHomeAction('home-edit');assert.equal(effects.filter(e=>e[0]==='edit').length,edits,'hidden edit cannot be dispatched');
@@ -130,3 +130,34 @@ function legacySuppression(){
   vm.runInNewContext(load('feature_pin/src/main/ets/services/PinmonyPostExtensionsScript.ets').PIN_POST_EXTENSIONS_SCRIPT,ctx);
   assert.equal(window.PinmonyPostApi.homeMenuOpen(1,pin,origin+'/'),false);assert.equal(window.PinmonyPostApi.detailMoreOpen(1,pin),false);assert.equal(window.PinmonyPostApi.moreAction(1,pin,'detail-see-more',()=>{}),false);assert.equal(window.PinmonyPostApi.feedbackUndo(pin,1),false);assert.equal(fetches,0);
 }
+
+async function favoriteContract(){
+ for(const initial of [false,true]) {
+  const f=fixture();await open(f,{...raw,favorited_by_me:initial});
+  assert(f.store.moreOptions.some(o=>o.id==='detail-favorite'&&o.enabled));
+  const pending=f.menu.action('detail-favorite');const n=f.jobs.length;
+  await f.menu.action('detail-favorite');assert.equal(f.jobs.length,n);
+  assert(f.jobs.at(-1).job.url.endsWith('/ApiResource/'+(initial?'delete':'create')+'/'));
+  assert.deepEqual(JSON.parse(JSON.stringify(options(f.jobs.at(-1).job))),{url:'/v3/pins/11/favorite/'});
+  f.jobs.at(-1).resolve(body({id:'11'},initial?'v3_unfavorite_pin':'v3_favorite_pin'));await pending;
+  assert(f.messages.length);
+ }
+ const f=fixture();await open(f,{...raw,favorited_by_me:false});let p=f.menu.action('detail-favorite');
+ f.jobs.at(-1).resolve(body({id:'99'},'v3_favorite_pin'));await p;
+ await open(f,{...raw,favorited_by_me:false});assert(!f.store.moreOptions.find(o=>o.id==='detail-favorite').enabled);
+ const n=f.jobs.length;await f.menu.action('detail-favorite');assert.equal(f.jobs.length,n,'uncertain write is never replayed');
+ console.log('Favorite writes: strict transport, add/remove, duplicate lock and mismatched identity lock passed');
+}
+favoriteContract().catch(e=>{console.error(e);process.exitCode=1;});
+
+async function directFavoriteContract(){
+ const f=fixture();const pending=f.menu.toggleFavorite(pin);assert.equal(f.jobs.length,1);
+ f.jobs.at(-1).resolve(body({...raw,favorited_by_me:false}));await flush();
+ assert(f.jobs.at(-1).job.url.endsWith('/ApiResource/create/'));
+ f.jobs.at(-1).resolve(body({id:'11'},'v3_favorite_pin'));await pending;assert(f.messages.length);
+ const stale=fixture();const loading=stale.menu.toggleFavorite(pin);stale.setRoute(origin+'/sample/board/');
+ stale.jobs.at(-1).resolve(body({...raw,favorited_by_me:false}));await loading;assert.equal(stale.jobs.length,1,'route change during fresh read prevents write');
+ const ui=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');assert(ui.includes('sys.symbol.star_fill'));assert(ui.includes('await this.onFavorite(pin.id)'));
+ console.log('Direct board star: fresh state, native transport, feedback, route cancellation and card binding passed');
+}
+directFavoriteContract().catch(e=>{console.error(e);process.exitCode=1;});

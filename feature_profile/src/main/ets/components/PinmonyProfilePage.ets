@@ -17,6 +17,15 @@ export struct PinmonyProfilePage {
   @Prop automaticLoadingEnabled: boolean = true;
   @Prop @Watch('onProfileChanged') profile: PinmonyProfileSnapshot = {} as PinmonyProfileSnapshot;
   @Prop loading: boolean = false;
+  @Prop hubPane: boolean = false;
+  @Prop denseHubPins: boolean = false;
+  @State private hubSearchPosition: number = 0;
+  @State private hubChromeCollapsed: boolean = false;
+  @Prop hubChromeHidden: boolean = false;
+  private hubChromeScrollDistance: number = 0;
+  onHubScroll?: (offset: number, state: ScrollState, position: number) => void;
+  @State private hubSnapshots: PinmonyProfileSnapshot[] = [];
+  private readonly hubSwiper: SwiperController = new SwiperController();
   @Prop readsReady: boolean = false;
   @Prop actionsReady: boolean = true;
   @Prop interactionReady: boolean = true;
@@ -65,14 +74,141 @@ export struct PinmonyProfilePage {
   onRefresh?: () => void;
   onOrganize?: (action: string, value: string, secret: boolean) => void;
 
+  @StorageLink('profileLegacyLayout') @Watch('layoutChanged') private legacyProfile: boolean = false;
+  @State private collageDrafts: boolean = false;
+  @State private collageCreated: boolean = false;
+  @State private densePins: boolean = false;
+  @State private hubTab: string = 'boards';
+  @State private favoriteFilter: boolean = false;
+  @State private createdFilter: boolean = false;
+  @State private boardFilter: string = '';
+  private hubRequested: boolean = false;
+  private modern(): boolean { return !this.legacyProfile && this.profile.isOwn === true && !this.onBack; }
+  private updateHubChrome(offset: number, state: ScrollState, position: number): void {
+    if (!this.modern() || !this.interactionReady || this.refreshing || this.loading || this.sortVisible) return;
+    if (position <= 1) {
+      this.hubChromeScrollDistance = 0;
+      this.setHubChromeCollapsed(false);
+      return;
+    }
+    if (state !== ScrollState.Scroll || !Number.isFinite(offset) || Math.abs(offset) < 0.1) return;
+    if (this.hubChromeScrollDistance * offset < 0) this.hubChromeScrollDistance = 0;
+    this.hubChromeScrollDistance += offset;
+    if (Math.abs(this.hubChromeScrollDistance) < 20) return;
+    const collapsed: boolean = this.hubChromeScrollDistance > 0;
+    this.hubChromeScrollDistance = 0;
+    this.setHubChromeCollapsed(collapsed);
+  }
+  private setHubChromeCollapsed(collapsed: boolean): void {
+    if (this.hubChromeCollapsed === collapsed) return;
+    this.getUIContext().animateTo({duration:180,curve:Curve.EaseOut}, () => {
+      this.hubChromeCollapsed = collapsed;
+    });
+  }
+  private layoutChanged(): void {
+    if(this.hubPane)return;
+    this.hubRequested = false;
+    if(this.modern())this.requestHub();else if(this.profile.hubMode && this.onTab)this.onTab('saved');
+  }
+  private retainHubSnapshot(): void {
+    if(this.hubPane || !this.modern() || !this.profile.hubMode)return;
+    const tab: string = ['boards','groups','secret'].includes(this.profile.hubMode) ? 'boards' : this.profile.hubMode === 'drafts' ? 'collages' : this.profile.hubMode;
+    this.hubSnapshots = this.hubSnapshots.filter((p: PinmonyProfileSnapshot): boolean => {
+      const oldTab: string = ['boards','groups','secret'].includes(p.hubMode || '') ? 'boards' : p.hubMode === 'drafts' ? 'collages' : p.hubMode || '';
+      return oldTab !== tab && p.profileUrl === this.profile.profileUrl && p.session === this.profile.session;
+    }).concat([this.profile]);
+  }
+  private hubSnapshot(tab: string): PinmonyProfileSnapshot {
+    const saved: PinmonyProfileSnapshot | undefined = this.hubSnapshots.find((p: PinmonyProfileSnapshot): boolean => {
+      const oldTab: string = ['boards','groups','secret'].includes(p.hubMode || '') ? 'boards' : p.hubMode === 'drafts' ? 'collages' : p.hubMode || '';
+      return oldTab === tab && p.profileUrl === this.profile.profileUrl && p.session === this.profile.session;
+    });
+    if(saved)return saved;
+    const pending: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.profile)) as PinmonyProfileSnapshot;
+    pending.hubMode = tab;pending.section = tab === 'boards' ? 'saved' : 'created';
+    pending.boards = [];pending.createdPins = [];pending.unorganizedPins = [];pending.suggestions = [];
+    pending.contentLoading = true;pending.contentError = '';pending.contentHasMore = false;
+    return pending;
+  }
+  @Builder
+  private hubPager() {
+    Column() {
+      this.hubHeader()
+      Stack({alignContent:Alignment.TopStart}) {
+      Swiper(this.hubSwiper) {
+        ForEach(['pins','boards','collages'], (tab: string) => {
+          PinmonyProfilePage({
+            hubPane:true,hubChromeHidden:this.hubChromeCollapsed,denseHubPins:this.densePins,profile:this.hubSnapshot(tab),interactionReady:this.interactionReady && this.hubTab === tab,
+            readsReady:this.readsReady && this.hubTab === tab,actionsReady:this.actionsReady && this.hubTab === tab,
+            automaticLoadingEnabled:this.automaticLoadingEnabled && this.hubTab === tab,
+            refreshing:this.refreshing && this.hubTab === tab,initialScrollOffset:0,
+            onBoard:this.onBoard,onPin:this.onPin,onPinMore:this.onPinMore,onOrganize:this.onOrganize,onSearch:this.onSearch,onPublish:this.onPublish,
+            onRetry:this.onRetry,onRefresh:this.onRefresh,onLoadMore:this.onLoadMore,
+            onContentScroll:this.onContentScroll,
+            onHubScroll:(offset: number,state: ScrollState,position: number) => {
+              if(this.hubTab === tab)this.updateHubChrome(offset,state,position);
+            },
+            onScrollPosition:this.onScrollPosition,
+            onBoardSort:this.onBoardSort,onBoardVisibility:this.onBoardVisibility,onBoardRecovery:this.onBoardRecovery,
+            onTab:(section: string) => {
+              if(section.startsWith('hub:')) {
+                const parts: string[] = section.split(':');
+                if(parts[1] === 'pins'){this.favoriteFilter = parts[2] === '1';this.createdFilter = parts[3] === '1';}
+                if(['boards','groups','secret'].includes(parts[1]))this.boardFilter = parts[1] === 'boards' ? '' : parts[1];
+                if(['collages','drafts'].includes(parts[1]))this.collageDrafts = parts[1] === 'drafts';
+              }
+              if(this.onTab)this.onTab(section);
+            }
+          }).width('100%').height('100%')
+        }, (tab: string): string => tab)
+      }.index(['pins','boards','collages'].indexOf(this.hubTab))
+        .loop(false).indicator(false).itemSpace(16).duration(280).cachedCount(2)
+        .disableSwipe(!this.interactionReady || this.profile.suggestionWriting || this.sortVisible)
+        .onChange((index: number) => {
+          const tab: string = ['pins','boards','collages'][index];
+          if(tab && this.hubTab !== tab){this.hubChromeScrollDistance = 0;this.setHubChromeCollapsed(false);this.hubTab = tab;this.requestHub();}
+        })
+        .onContentDidScroll((_selectedIndex: number,index: number,position: number,_mainAxisLength: number) => {
+          if(index === 1)this.hubSearchPosition = Math.max(-1,Math.min(0,position));
+        })
+        .onAnimationEnd((index: number) => {this.hubSearchPosition = index === 2 ? -1 : 0;})
+        .width('100%').height('100%')
+        Column() { this.hubSearch() }.width('100%')
+          .height(this.hubChromeCollapsed ? 0 : 60).opacity(this.hubChromeCollapsed ? 0 : 1).clip(true)
+          .translate({x:this.hubSearchPosition * (this.contentWidth + 16)})
+          .hitTestBehavior(this.hubChromeCollapsed || this.hubTab === 'collages' ? HitTestMode.None : HitTestMode.Default)
+          .accessibilityLevel(this.hubChromeCollapsed || this.hubTab === 'collages' ? 'no-hide-descendants' : 'auto')
+      }.width('100%').layoutWeight(1).clip(true)
+        .onAreaChange((_old: Area,area: Area) => {const width: number = Number(area.width);if(width > 0)this.contentWidth = width;})
+    }.width('100%').height('100%')
+  }
+  private requestHub(): void {
+    if(!this.modern() || !this.onTab)return;
+    this.hubRequested = true;
+    const mode: string = this.hubTab === 'boards' ? this.boardFilter || 'boards' : this.hubTab === 'collages' && this.collageDrafts ? 'drafts' : this.hubTab;
+    this.onTab('hub:' + mode + ':' + (this.favoriteFilter ? '1' : '0') + ':' + (this.createdFilter ? '1' : '0'));
+  }
   aboutToAppear(): void {
+    this.retainHubSnapshot();
     if (this.onBack) this.profilePaths.pushPath({ name: 'user-profile' }, false);
+    if(this.profile.hubMode) {
+      this.hubTab = ['groups','secret','boards'].includes(this.profile.hubMode) ? 'boards' : this.profile.hubMode === 'drafts' ? 'collages' : this.profile.hubMode;
+      this.collageDrafts = this.profile.hubMode === 'drafts';
+      this.boardFilter = ['groups','secret'].includes(this.profile.hubMode) ? this.profile.hubMode : '';
+      this.favoriteFilter = this.profile.hubFavorite === true;this.createdFilter = this.profile.hubCreated === true;
+    }
+    if(!this.hubPane)this.hubSearchPosition = this.hubTab === 'collages' ? -1 : 0;
     this.restoringScroll = this.initialScrollOffset > 0;
     this.activeProfile = this.profile.profileUrl;
     this.activeSection = this.profile.section;
+    if(!this.hubPane && this.modern() && !this.profile.hubMode)this.requestHub();
   }
 
   private onProfileChanged(): void {
+    this.retainHubSnapshot();
+    if(this.hubPane && this.profile.hubMode){this.hubTab = ['boards','groups','secret'].includes(this.profile.hubMode) ? 'boards' : this.profile.hubMode === 'drafts' ? 'collages' : this.profile.hubMode;this.boardFilter = ['groups','secret'].includes(this.profile.hubMode) ? this.profile.hubMode : '';this.favoriteFilter = this.profile.hubFavorite === true;this.createdFilter = this.profile.hubCreated === true;this.collageDrafts = this.profile.hubMode === 'drafts';}
+    if(!this.hubPane && this.legacyProfile && this.profile.hubMode && !this.profile.suggestionWriting && this.onTab)this.onTab('saved');
+    if(!this.hubPane && this.modern() && !this.profile.hubMode && !this.hubRequested)this.requestHub();
     if (this.pendingVisibility !== undefined && this.profile.showAllPins === this.pendingVisibility && !this.profile.visibilityError) {
       this.pendingVisibility = undefined;
       this.sortVisible = false;
@@ -134,7 +270,7 @@ export struct PinmonyProfilePage {
   }
 
   private contentColumns(): number {
-    return Math.max(2, Math.floor((this.contentWidth - 20) / 192));
+    return Math.max(this.modern() && (this.densePins || this.denseHubPins) && this.hubTab !== 'boards' ? 3 : 2, Math.floor((this.contentWidth - 20) / 192));
   }
 
   private columnSlots(): number[] {
@@ -405,12 +541,12 @@ export struct PinmonyProfilePage {
       if(board.secret) {
         Stack({alignContent:Alignment.Center}) {
           Image($r('app.media.board_private_lock')).width(16).height(16).fillColor($r('app.color.primary_text'))
-        }.width(30).height(30).borderRadius(15).backgroundColor($r('app.color.page_background'))
+        }.width(30).height(30).borderRadius(this.modern() ? 9 : 15).backgroundColor($r('app.color.page_background'))
           .margin({left:10,top:10}).accessibilityText(this.uiText('pm_secret_board_afc1422a'))
       }
     }
     .width('100%')
-    .height(158)
+    .height(this.modern() ? Math.max(100,(this.contentWidth - 32 - (this.contentColumns() - 1) * 12) / this.contentColumns() * 0.66) : 158)
     .borderRadius(16)
     .clip(true)
   }
@@ -462,6 +598,7 @@ export struct PinmonyProfilePage {
         .height(this.pinHeight(pin))
         .objectFit(ImageFit.Cover)
         .borderRadius(16)
+        .border({width:0.5,color:$r('app.color.surface_muted'),radius:16})
         .onClick(() => { if (this.interactionReady && this.onPin) this.onPin(pin.id); })
       Row({ space: 4 }) {
         if (pin.title.length > 0) {
@@ -475,6 +612,10 @@ export struct PinmonyProfilePage {
             .onClick(() => { if (this.interactionReady && this.onPin) this.onPin(pin.id); })
         } else {
           Blank().layoutWeight(1)
+        }
+        if(this.modern() && typeof pin.favorite === 'boolean') {
+          SymbolGlyph(pin.favorite ? $r('sys.symbol.star_fill') : $r('sys.symbol.star')).fontSize(22).fontColor([$r('app.color.primary_text')])
+            .accessibilityText(this.uiText('pm_profile_hub_favorites')).accessibilitySelected(pin.favorite)
         }
         if (pin.targetUrl) {
           Button({ type: ButtonType.Circle }) {
@@ -532,7 +673,7 @@ export struct PinmonyProfilePage {
         .width('100%')
         .alignItems(VerticalAlign.Top)
         .margin({ bottom: 24 })
-      }, (start: number) => this.contentColumns().toString() + ':' + start.toString() + ':' + this.profile.boards[start].id + ':' + this.uiLanguage)
+      }, (start: number) => this.contentColumns().toString() + ':' + start.toString() + ':' + this.profile.boards[start].id + ':' + this.uiLanguage + ':' + JSON.stringify(this.profile.boards.slice(start,start + this.contentColumns())))
     } else if (this.profile.section === 'created' && this.profile.createdPins.length > 0) {
       WaterFlow() {
         ForEach(this.profile.createdPins, (pin: PinmonyCreatedPin) => {
@@ -540,15 +681,17 @@ export struct PinmonyProfilePage {
             this.createdPinCard(pin)
           }
           .width('100%')
-        }, (pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage)
+        }, (pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage + ':' + JSON.stringify(pin))
       }
       .width('100%')
       .columnsTemplate(this.contentColumnsTemplate())
       .columnsGap(12)
       .rowsGap(14)
+    } else if(this.modern() && !this.profile.contentHasMore && !this.profile.contentError && !this.syncError) {
+      this.hubEmptyState()
     } else {
       Column({ space: 12 }) {
-        Text(this.profile.section === 'saved' ? this.uiText("pm_no_saved_pins_yet_24c645e0") : this.uiText("pm_no_created_pins_yet_3a38cb23"))
+        Text(this.modern() ? this.profile.contentHasMore ? this.uiText('pm_load_more_af90a08f') : this.uiText(this.favoriteFilter ? 'pm_profile_hub_favorite_empty' : 'pm_profile_hub_empty') : this.profile.section === 'saved' ? this.uiText("pm_no_saved_pins_yet_24c645e0") : this.uiText("pm_no_created_pins_yet_3a38cb23"))
           .fontSize(17)
           .fontColor($r('app.color.primary_text'))
       }
@@ -556,6 +699,13 @@ export struct PinmonyProfilePage {
       .height(220)
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
+    }
+    if(this.modern() && this.hubTab === 'pins' && (this.favoriteFilter || this.createdFilter) && !this.profile.contentHasMore && !this.profile.contentLoading && !this.profile.contentError && this.profile.createdPins.length > 0) {
+      Text(PinmonyI18n.format('pm_profile_hub_result_count',[this.profile.createdPins.length.toString(),String(Number(this.favoriteFilter) + Number(this.createdFilter))],this.uiLanguage))
+        .fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).margin({top:28,bottom:28})
+    }
+    if(this.modern() && this.profile.contentHasMore && !this.profile.contentLoadingMore) {
+      Button(this.uiText('pm_load_more_af90a08f')).onClick(() => {if(this.onLoadMore)this.onLoadMore();})
     }
     if (this.profile.contentLoadingMore) {
       LoadingProgress().width(28).height(28)
@@ -763,17 +913,199 @@ export struct PinmonyProfilePage {
         .onClick(() => { if (this.onPublish) this.onPublish(); })
     }.width('100%').padding({ left: 16, right: 16 }).margin({ bottom: 18 })
   }
+  private emptyKind(): string {
+    if(this.hubTab === 'collages')return this.collageDrafts ? 'collage_drafts' : 'collages';
+    if(this.hubTab === 'boards')return this.boardFilter === 'groups' ? 'groups' : 'boards';
+    return this.favoriteFilter && this.createdFilter ? 'combined' : this.favoriteFilter ? 'favorites' : 'created';
+  }
+  private emptyIllustration(): Resource {
+    const kind: string = this.emptyKind();
+    if(kind === 'groups')return $r('app.media.profile_empty_groups');
+    if(kind === 'collages' || kind === 'collage_drafts')return $r('app.media.profile_empty_collages');
+    if(kind === 'favorites')return $r('app.media.profile_empty_favorites');
+    if(kind === 'combined')return $r('app.media.profile_empty_combined');
+    return $r('app.media.profile_empty_created');
+  }
+  @Builder
+  private hubEmptyState() {
+    Column({space:16}) {
+      Image(this.emptyIllustration()).width(Math.min(240,this.contentWidth * 0.60)).height(Math.min(240,this.contentWidth * 0.60)).objectFit(ImageFit.Contain)
+        .accessibilityLevel('no')
+      Text(this.uiText('pm_profile_empty_' + this.emptyKind() + '_title')).fontSize(23).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center).margin({top:12})
+      Text(this.uiText('pm_profile_empty_' + this.emptyKind() + '_body')).fontSize(17).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center).constraintSize({maxWidth:340})
+      if(this.emptyKind() === 'groups' || this.hubTab === 'collages') {
+        Button(this.uiText(this.emptyKind() === 'groups' ? 'pm_profile_invite_collaborators' : 'pm_profile_create_collage'))
+          .fontSize(18).fontWeight(FontWeight.Bold).height(50).borderRadius(18).backgroundColor($r('app.color.detail_accent')).fontColor(Color.White)
+      }
+    }.width('100%').padding({top:24,left:20,right:20,bottom:44})
+  }
+  private async createSuggestedBoard(board: PinmonyBoard): Promise<void> {
+    if(!this.interactionReady || this.profile.contentLoadingMore)return;
+    try {
+      const result = await this.getUIContext().getPromptAction().showDialog({title:board.title,message:this.uiText('pm_profile_suggestion_confirm'),buttons:[{text:this.uiText('pm_cancel_2cd0f3be'),color:$r('app.color.secondary_text')},{text:this.uiText('pm_create_cde2cd07'),color:$r('app.color.primary_text')}]});
+      if(result.index === 1 && this.onTab)this.onTab('hub-create:' + board.id);
+    } catch (_) {}
+  }
+  @Builder
+  private hubSuggestions() {
+    if((this.profile.suggestions || []).length > 0) {
+      Column({space:12}) {
+        Text(this.uiText('pm_profile_hub_suggestions')).fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        Scroll() {
+          Row({space:12}) {
+            ForEach(this.profile.suggestions || [], (board: PinmonyBoard) => {
+              Column({space:6}) {
+                Stack() {
+                  Image(board.covers[0]).width(170).height(112).objectFit(ImageFit.Cover).borderRadius(18)
+                  Button(this.uiText('pm_create_cde2cd07'), {type:ButtonType.Normal}).borderRadius(14).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+                    .enabled(this.interactionReady && !this.profile.contentLoadingMore && !this.profile.suggestionWriting && !(this.profile.suggestionUnavailableIds || []).includes(board.id)).onClick(() => this.createSuggestedBoard(board))
+                }
+                Text(board.title).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
+                Text(PinmonyI18n.format('pm_value_pins_d1922567',[board.pinCount],this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
+              }.alignItems(HorizontalAlign.Start).width(170)
+            }, (board: PinmonyBoard): string => board.id + ':' + this.uiLanguage + ':' + JSON.stringify(board))
+          }.constraintSize({minWidth:'100%'}).justifyContent(FlexAlign.Start).alignItems(VerticalAlign.Top)
+        }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%').align(Alignment.TopStart)
+      }.alignItems(HorizontalAlign.Start).width('100%').margin({bottom:24})
+    }
+    if(this.profile.suggestionError) {
+      Text(PinmonyI18n.render(this.profile.suggestionError,this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
+      Button(this.uiText('pm_retry_b8784c8d')).onClick(() => {if(this.onRetry)this.onRetry();})
+    }
+  }
+  private hubSelected(kind: string): boolean {
+    if(kind === 'favorite')return this.favoriteFilter;
+    if(kind === 'created')return this.createdFilter;
+    if(kind === 'groups' || kind === 'secret')return this.boardFilter === kind;
+    return kind === 'collage-drafts' ? this.collageDrafts : this.collageCreated;
+  }
+  @Builder
+  private hubStateButton(label: string, kind: string) {
+    Toggle({type:ToggleType.Button,isOn:this.hubSelected(kind)}) {
+      Row({space:6}) {
+        if(kind === 'favorite') {
+          SymbolGlyph($r('sys.symbol.star_fill')).fontSize(18)
+            .fontColor([this.hubSelected(kind) ? $r('app.color.page_background') : $r('app.color.primary_text')])
+        }
+        Text(this.uiText(label)).fontSize(16).fontWeight(FontWeight.Medium).maxLines(1)
+          .fontColor(this.hubSelected(kind) ? $r('app.color.page_background') : $r('app.color.primary_text'))
+      }.padding({left:16,right:16}).hitTestBehavior(HitTestMode.None)
+    }.height(40).borderRadius(16)
+      .backgroundColor(this.hubSelected(kind) ? $r('app.color.primary_text') : $r('app.color.surface_muted')).selectedColor($r('app.color.primary_text'))
+      .accessibilityText(this.uiText(label)).accessibilitySelected(this.hubSelected(kind))
+      .enabled(this.interactionReady && !this.profile.suggestionWriting)
+      .onClick(() => {
+        if(!this.interactionReady || this.profile.suggestionWriting)return;
+        const value: boolean = !this.hubSelected(kind);
+        if(kind === 'favorite')this.favoriteFilter = value;
+        else if(kind === 'created')this.createdFilter = value;
+        else if(kind === 'groups' || kind === 'secret')this.boardFilter = value ? kind : '';
+        else {
+          this.collageDrafts = kind === 'collage-drafts' && value;
+          this.collageCreated = kind === 'collage-created' && value;
+        }
+        this.requestHub();
+      })
+  }
+  @Builder
+  private hubFilters() {
+      Row({space:8}) {
+        if(this.hubTab === 'pins') {
+          Button({type:ButtonType.Normal}) {
+            SymbolGlyph($r('sys.symbol.square_grid_2x2')).fontSize(22).fontColor([$r('app.color.primary_text')])
+          }.width(40).height(40).borderRadius(14).backgroundColor($r('app.color.surface_muted'))
+            .accessibilityText(this.uiText('pm_profile_layout_heading')).accessibilitySelected(this.densePins)
+            .onClick(() => {this.densePins = !this.densePins;})
+          this.hubStateButton('pm_profile_hub_favorites','favorite')
+          this.hubStateButton('pm_profile_hub_created','created')
+        } else if(this.hubTab === 'boards') {
+          Button({type:ButtonType.Normal}) {
+            Row({space:6}) {
+              Image($r('app.media.profile_sliders')).width(22).height(22).fillColor($r('app.color.primary_text'))
+            }
+          }.width(58).height(40).borderRadius(14).backgroundColor($r('app.color.surface_muted'))
+            .accessibilityText(this.uiText('pm_profile_board_sort')).enabled(this.interactionReady && !this.boardFilter && !this.profile.suggestionWriting)
+            .onClick(() => {this.sortVisible = true;if(this.onBoardSort)this.onBoardSort('');})
+            .bindSheet($$this.sortVisible,this.boardSortSheet(),{height:SheetSize.FIT_CONTENT,showClose:true,backgroundColor:$r('app.color.page_background'),
+              onDisappear: () => {
+                if (!this.recoveryRequested) return;
+                this.recoveryRequested = false;
+                if (this.interactionReady && this.profile.isOwn === true && this.onBoardRecovery) this.onBoardRecovery();
+              }})
+          this.hubStateButton('pm_profile_hub_groups','groups')
+          this.hubStateButton('pm_profile_hub_secret','secret')
+        } else {
+          this.hubStateButton('pm_profile_hub_created','collage-created')
+          this.hubStateButton('pm_profile_hub_in_progress','collage-drafts')
+        }
+      }.width('100%').padding({left:16,right:16,bottom:12})
+  }
+  @Builder
+  private hubSearch() {
+
+      Row({space:12}) {
+        Button({type:ButtonType.Normal}) {
+          Row({space:10}) {
+            SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(22).fontColor([$r('app.color.primary_text')])
+            Text(this.uiText('pm_search_your_pins_e0d101c6')).fontSize(17).fontColor($r('app.color.secondary_text')).layoutWeight(1)
+          }.width('100%').padding({left:16,right:16})
+        }.layoutWeight(1).height(48).backgroundColor(Color.Transparent).border({width:1,color:$r('app.color.secondary_text')}).borderRadius(18)
+          .onClick(() => {if(this.onSearch)this.onSearch();}).enabled(this.interactionReady && !this.profile.suggestionWriting)
+        Button({type:ButtonType.Circle}) {
+          SymbolGlyph($r('sys.symbol.plus')).fontSize(30).fontColor([$r('app.color.primary_text')])
+        }.width(44).height(44).backgroundColor($r('app.color.input_surface')).accessibilityText(this.uiText('pm_publish_b61f333b'))
+          .onClick(() => {if(this.onPublish)this.onPublish();}).enabled(this.interactionReady && !this.profile.suggestionWriting)
+      }.width('100%').padding({left:16,right:16,bottom:12})
+  }
+  @Builder
+  private hubHeader() {
+    Column({space:12}) {
+      Row({space:12}) {
+        Image(this.profile.avatarUrl).width(44).height(44).borderRadius(22).objectFit(ImageFit.Cover)
+          .accessibilityText(this.uiText('pm_settings_df3d58c7')).onClick(() => this.openSettings())
+        Tabs({index:['pins','boards','collages'].indexOf(this.hubTab)}) {
+          ForEach(['pins','boards','collages'], (tab: string) => {
+            TabContent() { Column() }
+              .tabBar(SubTabBarStyle.of(this.uiText('pm_profile_hub_' + tab))
+                .padding({top:12,bottom:12}).indicator({color:$r('app.color.primary_text'),height:2,borderRadius:0})
+                .labelStyle({selectedColor:$r('app.color.primary_text'),unselectedColor:$r('app.color.primary_text'),font:{size:18,weight:FontWeight.Bold}}))
+          }, (tab: string): string => tab + ':' + this.uiLanguage)
+        }.layoutWeight(1).height(64).barHeight(64).barMode(BarMode.Fixed).scrollable(false).animationDuration(0)
+          .enabled(this.interactionReady && !this.profile.suggestionWriting)
+          .onChange((index: number) => {
+            const tab: string = ['pins','boards','collages'][index];
+            if(this.interactionReady && !this.profile.suggestionWriting && tab && this.hubTab !== tab){
+              // An index update from a tab click can finish without a Swiper
+              // animation callback. Settle the shared toolbar in the same turn.
+              this.hubSearchPosition = tab === 'collages' ? -1 : 0;
+              this.hubChromeScrollDistance = 0;this.setHubChromeCollapsed(false);
+              this.hubTab = tab;this.requestHub();
+            }
+          })
+      }.width('100%')
+
+    }.width('100%').padding({left:16,right:16,top:12,bottom:12})
+  }
   @Builder
   private profileBody() {
 
     Column() {
-      if (!this.onBack) {
+      if (!this.onBack && !this.modern()) {
       this.rootTitleBar()
 
+      }
+      if(this.modern() && !this.hubPane) { this.hubPager() } else {
+      if(this.modern() && this.hubPane) {
+        if(this.hubTab !== 'collages') { Row().width('100%').height(this.hubChromeHidden ? 0 : 60) }
+        Column() { this.hubFilters() }.width('100%').height(this.hubChromeHidden ? 0 : 52)
+          .opacity(this.hubChromeHidden ? 0 : 1).clip(true)
+          .hitTestBehavior(this.hubChromeHidden ? HitTestMode.None : HitTestMode.Default)
+          .accessibilityLevel(this.hubChromeHidden ? 'no-hide-descendants' : 'auto')
       }
       Refresh({ refreshing: this.refreshing }) {
       Scroll(this.scroller) {
         Column() {
+          if(this.modern()) { if(!this.hubPane)this.hubHeader() } else {
           if (this.profileCoverHeight() > 0) {
             Image(this.profile.coverUrl).width('100%').height(this.profileCoverHeight()).objectFit(ImageFit.Cover)
               .accessibilityText(this.uiText("pm_profile_cover_0ecaa53c"))
@@ -790,9 +1122,14 @@ export struct PinmonyProfilePage {
           .margin({ top: this.profile.isOwn === false ? 16 : 34, bottom: this.profile.isOwn === true && !this.onBack ? 8 : 24 })
           .justifyContent(FlexAlign.Center)
           if (this.profile.isOwn === true && !this.onBack) { this.contentToolbar() }
+          }
           Column() {
+            if(this.modern() && this.hubTab === 'pins' && !this.favoriteFilter && !this.createdFilter) {
+              this.hubSuggestions()
+              Text(this.uiText('pm_profile_hub_saved')).fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).width('100%').margin({top:12,bottom:16})
+            }
             this.profileContent()
-            if (this.profile.section === 'saved') { this.unorganizedContent() }
+            if (this.profile.section === 'saved' && (!this.modern() || this.hubTab === 'boards' && !this.boardFilter)) { this.unorganizedContent() }
           }
           .width('100%')
           .translate({ x: this.sectionMotion })
@@ -811,8 +1148,12 @@ export struct PinmonyProfilePage {
       .scrollBar(BarState.Off)
       .align(Alignment.TopStart)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+
       .onAppear(() => this.restoreScroll())
       .onDidScroll((_xOffset: number, offset: number, state: ScrollState) => {
+          if(this.hubPane && !this.restoringScroll && this.interactionReady && this.onHubScroll) {
+            this.onHubScroll(offset,state,this.scroller.offset()?.yOffset || 0);
+          }
           this.updateCompactHeader();
           this.reportScroll();
           if (this.onContentScroll) this.onContentScroll(offset, state);
@@ -822,6 +1163,7 @@ export struct PinmonyProfilePage {
       .width('100%').layoutWeight(1)
       .pullToRefresh(this.interactionReady && !this.refreshing && !this.loading)
       .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
+      }
     }
     .width('100%')
     .height('100%')

@@ -9,6 +9,8 @@ const start = releaseStart >= 0 ? releaseStart : source.indexOf('  private dismi
 const end = source.indexOf('  private async undoSavedPin()', start);
 const shown = []; const events = []; const logs = [];
 let now = 1000;
+const deferredBack=[];
+const drainBack=()=>{while(deferredBack.length)deferredBack.shift()();};
 let reentrantDismiss;
 let failDismiss = false;
 class HdsSnackBar {
@@ -41,12 +43,13 @@ function nativeCallback(presentation, callback, closeBefore = true) {
   if (closeBefore) nativeClose();
   callback();
   if (!closeBefore) nativeClose();
+  drainBack();
 }
 function close(presentation) { nativeCallback(presentation, () => presentation.operation.onCloseButtonClick()); }
 function back(presentation, closeBefore = true) { nativeCallback(presentation, () => presentation.style.pressBackCallback(), closeBefore); }
 const native = require('./product-coordination-harness.cjs').createHost(context.Native, ts); let undo = 0, retry = 0;
 Object.assign(native, {
-    postSnackToken: 0, getUIContext: () => ({}),
+    postSnackToken: 0, coordinatorTasks: {timeout:fn=>deferredBack.push(fn)}, getUIContext: () => ({}),
     onBackPress: () => { events.push('page-back'); return true; },
     currentPinUrl: () => 'pin', pinIdentity: value => value,
     activeSheetKind: 'share', showNativeSheet: true, refreshShareSheet: () => retry++,
@@ -77,7 +80,7 @@ assert.equal(shown.at(-1).style.duration, 4000);
 back(shown.at(-1));
 assert.equal(retry, 0);
 native.showShareFeedbackSnack();
-shown.at(-1).style.pressBackCallback();
+shown.at(-1).style.pressBackCallback();drainBack();
 assert.equal(events.filter(event => event === 'page-back').length, 3);
 // An older snackbar cannot dismiss a newer one or return its page.
 native.showUndoSnack('first', 'pin', () => undo++);
@@ -123,7 +126,7 @@ native.showUndoSnack('callback before close', 'pin', () => undo++);
 const callbackBefore = shown.at(-1);
 const callbackEvents = events.length;
 back(callbackBefore, false);
-assert.deepEqual(events.slice(callbackEvents), ['page-back', 'native-close']);
+assert.deepEqual(events.slice(callbackEvents), ['native-close', 'page-back']);
 native.showUndoSnack('close fails', 'pin', () => undo++);
 failDismiss = true;
 assert.doesNotThrow(() => native.dismissPostSnack());
@@ -174,3 +177,6 @@ assert.equal(retry, 1);
 assert.equal(events.length, otherSessionEvents);
 native.dismissPostSnack();
 console.log('Snackbar lifecycle: back/close/undo, six entry points, duplicate/reentrant cleanup, automatic expiry, stale callbacks and close failure passed');
+
+native.showShareFeedbackSnack();const staleBack=shown.at(-1);staleBack.style.pressBackCallback();const beforeStale=events.filter(x=>x==='page-back').length;native.showUndoSnack('new owner','pin',()=>{});drainBack();assert.equal(events.filter(x=>x==='page-back').length,beforeStale,'replacement invalidates deferred return');
+console.log('Deferred snackbar back: native closure precedes page return and new owner cancels stale return passed');

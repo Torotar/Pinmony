@@ -8,7 +8,7 @@ export const PIN_NATIVE_PIN_MENUS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABL
 interface Image { url?: string; }
 interface User { id?: string; }
 interface Topic { name?: string; }
-interface Pin { id: string; pinner?: User; is_repin?: boolean; images?: Record<string,Image>; ai_disclosures?: number[]; gen_ai_topics?: Topic[];
+interface Pin { favorited_by_me?: boolean; id: string; pinner?: User; is_repin?: boolean; images?: Record<string,Image>; ai_disclosures?: number[]; gen_ai_topics?: Topic[];
   client_tracking_params?: string; tracking_params?: string; through_id?: string; rec_reason_type?: number; source?: number; }
 interface Resource { status: string; code?: number; endpoint_name?: string; error?: Object; data?: Pin; }
 interface Response { resource_response: Resource; client_context?: Client; }
@@ -24,30 +24,32 @@ export interface PinmonyPinMenuNativePorts {
   active: () => boolean; route: () => string; owns: (pin: string) => boolean; sheet: () => string;
   show: () => void; dismiss: () => void; download: (url: string) => void; help: (url: string) => void;
   edit: (pin: string) => Promise<void>; share: (pin: string) => Promise<void>;
+  favoriteChanged?: (pin: string, favorite: boolean) => void;
   message: (value: string) => void; undoSnack: (value: string,pin: string) => void;
 }
 export class PinmonyPinMenuNative {
   private readonly ports: PinmonyPinMenuNativePorts; private readonly store: PinmonyPinStore;
   private revision: number = 0; private sequence: number = 0; private requestId: string = '';
   private account: string = ''; private pin: string = ''; private route: string = ''; private token: number = 0;
-  private raw: Pin | undefined = undefined; private viewer: string = ''; private photo: boolean = false; private busy: boolean = false;
+  private raw: Pin | undefined = undefined; private viewer: string = ''; private direct: boolean = false; private photo: boolean = false; private busy: boolean = false;
   private readonly submitted: Set<string> = new Set<string>();
+  private readonly favoriteIntents: Map<string, boolean> = new Map();
   private undo: Undo | undefined = undefined;
   constructor(ports: PinmonyPinMenuNativePorts) {this.ports = ports;this.store = ports.store();}
   private key(): string {const s: PinmonyBusinessSessionContext = this.ports.session();return s.authenticated && s.accountId ? s.accountId + ':' + s.generation.toString() + ':' + s.origin : '';}
   private id(pin: string = this.pin): string {return pin.match(/\/pin\/(\d{1,30})\/$/)?.[1] || '';}
   pause(): void {this.revision++;if(this.requestId)this.ports.network().cancel(this.requestId);this.requestId = '';this.busy = false;this.store.feedbackUndoBusy = false;}
   private current(revision: number): boolean {return revision === this.revision && this.key() === this.account && this.ports.active() && this.route === this.ports.route() && this.ports.owns(this.pin) &&
-    (this.photo ? this.ports.sheet() === 'share' && this.store.shareSession === this.token : this.ports.sheet() === 'more' && this.store.moreSession === this.token);}
+    (this.direct || (this.photo ? this.ports.sheet() === 'share' && this.store.shareSession === this.token : this.ports.sheet() === 'more' && this.store.moreSession === this.token));}
   private bind(pin: string,token: number,photo: boolean): number {
-    this.pause();const key: string = this.key();if(key !== this.account){this.submitted.clear();this.undo = undefined;}this.account = key;this.pin = pin;this.token = token;this.photo = photo;this.route = this.ports.route();this.raw = undefined;this.viewer = '';return this.revision;
+    this.pause();this.direct = false;const key: string = this.key();if(key !== this.account){this.submitted.clear();this.favoriteIntents.clear();this.undo = undefined;}this.account = key;this.pin = pin;this.token = token;this.photo = photo;this.route = this.ports.route();this.raw = undefined;this.viewer = '';return this.revision;
   }
-  private async request(options: Options,revision: number,undo: boolean = false): Promise<Resource> {
+  private async request(options: Options,revision: number,undo: boolean = false, favorite: string = ''): Promise<Resource> {
     const s: PinmonyBusinessSessionContext = this.ports.session(), get: boolean = !options.url;
     const envelope: Envelope = {options:options,context:{}}, path: string = '/pin/' + this.id() + '/';
     const id: string = 'native_pin_menu_' + (++this.sequence).toString();this.requestId = id;
     const live = (): boolean => undo ? revision === this.revision && this.key() === this.account && this.ports.active() && this.ports.owns(this.pin) && this.route === this.ports.route() : this.current(revision);
-    const job: PinmonyNetworkJob = {id:id,epoch:s.generation,page:this.pin,url:s.origin + '/resource/' + (get ? 'PinResource/get/?source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope)) : 'ApiResource/update/'),
+    const job: PinmonyNetworkJob = {id:id,epoch:s.generation,page:this.pin,url:s.origin + '/resource/' + (get ? 'PinResource/get/?source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope)) : 'ApiResource/' + (favorite || 'update') + '/'),
       method:get ? 'GET' : 'POST',body:get ? '' : 'source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope)),
       headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':'www/pin/[id].js','X-Pinterest-Source-Url':path,'Content-Type':'application/x-www-form-urlencoded'}};
     const reply = await this.ports.network().requestBusinessPinMenu(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.pin,live);
@@ -55,8 +57,9 @@ export class PinmonyPinMenuNative {
     if(!live())throw new Error('stale');if(reply.error || reply.status !== 200 || reply.body.length > 6000000)throw new Error('request');
     const body: Response = JSON.parse(reply.body) as Response,r: Resource = body.resource_response;
     if(r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0)throw new PinMenuRejected('rejected');
+    if(body.client_context?.user && this.viewer && body.client_context.user.id !== this.viewer)throw new Error('viewer');
     if(!r || r.status !== 'success' || r.error || r.code !== undefined && r.code !== 0)throw new Error('response');
-    if(get){if(!r.data || r.data.id !== this.id())throw new Error('pin');this.raw = r.data;this.viewer = body.client_context?.user?.id || '';
+    if(get){if(!r.data || r.data.id !== this.id())throw new Error('pin');this.raw = r.data;if(typeof r.data.favorited_by_me === 'boolean' && this.favoriteIntents.get(this.pin) === r.data.favorited_by_me){this.favoriteIntents.delete(this.pin);this.submitted.delete(this.pin + ':favorite');}this.viewer = body.client_context?.user?.id || '';
       const identityReady: boolean = /^\d{1,30}$/.test(this.viewer) && typeof this.raw.pinner?.id === 'string' && /^\d{1,30}$/.test(this.raw.pinner.id);
       PinmonyRuntimeLog.info('PinEditTrace: phase=menu-read identity=' + (identityReady ? 'ready' : 'missing') +
         ' owner=' + (this.raw.pinner?.id === this.viewer && !!this.viewer ? 'self' : 'other') +
@@ -74,9 +77,10 @@ export class PinmonyPinMenuNative {
     const revision: number = this.bind(pin,token,true);
     const state: PinmonyHomeMenuState = {session:token,pinUrl:pin,loading:false,busy:false,error:'',feedback:'',options:[],actions:[]};
     try {await this.read(revision);if(!this.current(revision))return state;
+      if(typeof this.raw?.favorited_by_me === 'boolean')state.actions.push({id:'home-favorite',label:PinmonyI18n.message(this.raw.favorited_by_me ? 'pm_star_remove' : 'pm_star_add'),enabled:this.enabled('favorite')});
       state.canCancelSave = this.raw?.is_repin === true && this.raw?.pinner?.id === this.viewer;
-      state.actions = [{id:'home-save',label:PinmonyI18n.message("pm_save_60a53514"),enabled:true},{id:'home-download',label:PinmonyI18n.message("pm_download_image_8894375c"),enabled:!!this.image()},
-        {id:'home-see-more',label:PinmonyI18n.message("pm_see_more_92b2b2de"),enabled:this.enabled('more')},{id:'home-see-less',label:PinmonyI18n.message("pm_see_less_9c80a8dc"),enabled:this.enabled('less')}];
+      state.actions = state.actions.concat([{id:'home-save',label:PinmonyI18n.message("pm_save_60a53514"),enabled:true},{id:'home-download',label:PinmonyI18n.message("pm_download_image_8894375c"),enabled:!!this.image()},
+        {id:'home-see-more',label:PinmonyI18n.message("pm_see_more_92b2b2de"),enabled:this.enabled('more')},{id:'home-see-less',label:PinmonyI18n.message("pm_see_less_9c80a8dc"),enabled:this.enabled('less')}]);
       if(this.canOpenEdit())state.actions.unshift({id:'home-edit',label:PinmonyI18n.message("pm_edit_pin_f9119bcf"),enabled:true});
     } catch (_) {state.error = PinmonyI18n.message("pm_unable_to_load_pin_actions_please_retry_1434adac");}
     return state;
@@ -88,6 +92,7 @@ export class PinmonyPinMenuNative {
     this.store.moreTitle = PinmonyI18n.message('pm_options_bb7486f4');this.store.moreOptions = [];this.store.moreLoading = true;this.store.moreError = '';this.store.ignoredMoreSession = 0;this.ports.show();
     const revision: number = this.bind(detail.pinUrl,token,false);
     try {await this.read(revision);if(!this.current(revision))return;const options: MoreSheetOption[] = [];
+      if(typeof this.raw?.favorited_by_me === 'boolean')options.push(this.option('detail-favorite',PinmonyI18n.message(this.raw.favorited_by_me ? 'pm_star_remove' : 'pm_star_add'),this.enabled('favorite')));
       if(this.canOpenEdit())options.push(this.option('detail-edit','编辑 Pin 图'));
       if(this.image())options.push(this.option('detail-download','下载图片'));
       options.push(this.option('detail-see-more','查看更多',this.enabled('more')),this.option('detail-see-less','减少推荐',this.enabled('less')));
@@ -97,7 +102,12 @@ export class PinmonyPinMenuNative {
     finally {if(this.current(revision))this.store.moreLoading = false;}
   }
   async action(id: string): Promise<void> {
-    const revision: number = this.revision;if(!this.current(revision) || this.busy || !this.raw)return;
+    const revision: number = this.revision;
+    if(id === 'home-favorite' || id === 'detail-favorite') {
+      PinmonyRuntimeLog.info('FavoriteTrace: phase=click current=' + this.current(revision).toString() + ' busy=' + this.busy.toString() + ' known=' + (typeof this.raw?.favorited_by_me === 'boolean').toString());
+      if(!this.current(revision) || !this.raw){this.ports.message(PinmonyI18n.message('pm_star_failed'));return;}
+    }
+    if(!this.current(revision) || this.busy || !this.raw)return;
     const photo: boolean = this.photo, pin: string = this.pin;
     const options = photo ? undefined : this.store.moreOptions;
     if(!photo && !options?.some((o: MoreSheetOption): boolean => o.id === id && o.enabled))return;
@@ -105,6 +115,7 @@ export class PinmonyPinMenuNative {
       if(!this.canOpenEdit() || photo && id !== 'home-edit' || !photo && id !== 'detail-edit')return;
       PinmonyRuntimeLog.info('PinEditTrace: phase=menu-open');this.ports.dismiss();await this.ports.edit(pin);return;
     }
+    if(id === 'home-favorite' || id === 'detail-favorite'){await this.favorite(revision);return;}
     if(id === 'detail-ai-help'){this.ports.help('https://help.pinterest.com/en/article/gen-ai-labels');return;}
     if(id === 'home-download' || id === 'detail-download'){const url: string = this.image();if(url)this.ports.download(url);return;}
     const less: boolean = id === 'home-see-less' || id === 'detail-see-less';
@@ -133,6 +144,41 @@ export class PinmonyPinMenuNative {
       if(this.current(revision)){const message: string = retry ? PinmonyI18n.message("pm_feedback_was_not_submitted_please_retry_e44cb016") : PinmonyI18n.message("pm_feedback_result_not_confirmed_refresh_to_check_it_will_not_be_re_a6581062");this.store.moreError = message;this.ports.message(message);}
     }
     finally {if(revision === this.revision)this.busy = false;}
+  }
+  async toggleFavorite(pin: string): Promise<void> {
+    if(this.busy || !this.ports.active() || !this.ports.owns(pin))return;
+    const revision: number = this.bind(pin,0,true);this.direct = true;
+    this.busy = true;
+    try {
+      await this.read(revision);
+      if(!this.current(revision))return;
+      this.busy = false;
+      if(typeof this.raw?.favorited_by_me !== 'boolean' || !this.enabled('favorite')){this.ports.message(PinmonyI18n.message('pm_star_unknown'));return;}
+      await this.favorite(revision);
+    } catch(_) {if(this.current(revision))this.ports.message(PinmonyI18n.message('pm_unable_to_load_pin_actions_please_retry_1434adac'));}
+    finally {if(revision === this.revision){this.direct = false;this.busy = false;}}
+  }
+  private async favorite(revision: number): Promise<void> {
+    if(typeof this.raw?.favorited_by_me !== 'boolean' || !this.enabled('favorite')){this.ports.message(PinmonyI18n.message('pm_star_unknown'));return;}
+    const desired: boolean = !this.raw.favorited_by_me, pin: string = this.pin;
+    this.busy = true;this.submitted.add(pin + ':favorite');this.favoriteIntents.set(pin,desired);
+    if(!this.photo)this.store.moreLoading = true;
+    this.store.moreOptions = this.store.moreOptions.map((o: MoreSheetOption): MoreSheetOption => this.option(o.id,o.label,false));
+    try {
+      PinmonyRuntimeLog.info('FavoriteTrace: phase=submit');
+      const r: Resource = await this.request({url:'/v3/pins/' + this.id() + '/favorite/'},revision,false,desired ? 'create' : 'delete');
+      if(!this.current(revision))return;
+      if(r.code !== 0 || r.endpoint_name !== (desired ? 'v3_favorite_pin' : 'v3_unfavorite_pin') || r.data?.id !== this.id())throw new Error('unconfirmed');
+      this.raw!.favorited_by_me = desired;this.submitted.delete(pin + ':favorite');this.favoriteIntents.delete(pin);
+      PinmonyRuntimeLog.info('FavoriteTrace: outcome=confirmed selected=' + desired.toString());
+      this.ports.favoriteChanged?.(pin,desired);if(!this.direct)this.ports.dismiss();
+      this.ports.message(PinmonyI18n.message(desired ? 'pm_star_added' : 'pm_star_removed'));
+    } catch(error) {
+      const retry: boolean = error instanceof PinMenuNotSent || error instanceof PinMenuRejected;
+      if(retry && this.key() === this.account){this.submitted.delete(pin + ':favorite');this.favoriteIntents.delete(pin);}
+      if(this.current(revision))PinmonyRuntimeLog.info('FavoriteTrace: outcome=' + (retry ? 'rejected-or-not-sent' : 'unknown'));
+      if(this.current(revision)){const message: string = PinmonyI18n.message(retry ? 'pm_star_failed' : 'pm_star_unknown');this.store.moreError = message;this.ports.message(message);}
+    } finally {if(revision === this.revision){this.busy = false;if(!this.photo)this.store.moreLoading = false;}}
   }
   async undoFeedback(): Promise<void> {
     const state: Undo | undefined = this.undo;

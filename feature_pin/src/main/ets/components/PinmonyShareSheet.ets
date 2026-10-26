@@ -72,6 +72,7 @@ export struct PinmonyShareSheet {
 
 
   build() {
+    Stack({ alignContent: Alignment.Center }) {
     Column() {
       if (this.pinStore.shareLoading) {
         Row({ space: 12 }) {
@@ -182,7 +183,7 @@ export struct PinmonyShareSheet {
         .margin({ left: 20, right: 20, top: 12 })
       }
       if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) &&
-          ['正在加载联系人…', '正在处理…', '没有可用的联系人'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source))) {
+          ['正在加载联系人…', '没有可用的联系人'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source))) {
         Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
@@ -197,6 +198,15 @@ export struct PinmonyShareSheet {
     .onAppear(() => {
       this.onReady();
     })
+    .enabled(!PinmonyI18n.isText(this.pinStore.shareFeedback, '正在处理…'))
+    if (PinmonyI18n.isText(this.pinStore.shareFeedback, '正在处理…')) {
+      Column({ space: 12 }) {
+        LoadingProgress().width(40).height(40).color($r('app.color.accent'))
+        Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage))
+          .fontSize(14).fontColor($r('app.color.secondary_text'))
+      }.padding(20).borderRadius(16).backgroundColor($r('app.color.input_surface'))
+    }
+    }.width('100%').height(this.pinStore.shareSearchActive ? '100%' : undefined)
   }
 
 

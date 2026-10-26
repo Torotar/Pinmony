@@ -1,3 +1,4 @@
+import { isProductPin } from 'common_foundation';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchUserFollow, PinmonySearchUserFollowPorts } from './PinmonySearchUserFollow';
 import { PinmonySearchBoardFollow, PinmonySearchBoardFollowPorts } from './PinmonySearchBoardFollow';
@@ -262,6 +263,7 @@ export class PinmonySearchNativeReads {
   }
   private map(item: Item): PinmonySearchResult | undefined {
     if (!item || !item.id) return undefined;
+    if (item.type === 'pin' && isProductPin(item)) return undefined;
     if (item.type === 'pin' && (item.is_promoted === true || item.ad_data || item.pin_promotion_id)) return undefined;
     let cover: ImageData | undefined = undefined; const sizes: Record<string, ImageData> = item.images || {};
     for (const size of ['474x', '736x', '564x', 'orig', '236x']) { const value: ImageData | undefined = sizes[size]; if (value && this.image(value.url) && Number.isFinite(value.width) && value.width > 0 && Number.isFinite(value.height) && value.height > 0) { cover = value; break; } }
@@ -309,7 +311,7 @@ export class PinmonySearchNativeReads {
         if (row.userId && typeof row.following === 'boolean') this.userFollow.reconcile(row.userId, row.following);
         if (row.boardId && typeof row.following === 'boolean') this.boardFollow.reconcile(row.boardId, row.following);
       });
-      if (resource.data.results.length && !incoming.length) throw new Error('unknown-search-items');
+      if (resource.data.results.some((item: Item): boolean => !isProductPin(item)) && !incoming.length) throw new Error('unknown-search-items');
       const results: PinmonySearchResult[] = append && feed ? feed.snapshot.results.slice() : []; incoming.forEach((item: PinmonySearchResult): void => { if (!results.some((value: PinmonySearchResult): boolean => value.id === item.id)) results.push(item); });
       const categories: PinmonySearchCategory[] = append && feed ? feed.snapshot.categories.slice() : [];
       if (!append && Array.isArray(resource.data.rankedGuides)) resource.data.rankedGuides.slice(0,40).forEach((guide: Guide): void => { if (!guide?.term?.trim() || guide.term.length > 300 || !guide.display?.trim() || categories.some((c: PinmonySearchCategory): boolean => c.id === 'api-guide-' + guide.term)) return; categories.push({ id: 'api-guide-' + guide.term, label: guide.display.slice(0,100), selected: false, enabled: true, targetUrl: this.origin + '/search/pins/?q=' + encodeURIComponent(guide.term), imageUrl: this.image(guide.image_medium_url), backgroundColor: /^#[0-9a-f]{6}$/i.test(guide.dominant_color || '') ? guide.dominant_color : '' }); });

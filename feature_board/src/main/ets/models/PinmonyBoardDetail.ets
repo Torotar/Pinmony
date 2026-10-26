@@ -1,4 +1,5 @@
 export interface PinmonyBoardPin {
+  favorite?: boolean;
   id: string;
   pinUrl: string;
   imageUrl: string;
@@ -11,6 +12,8 @@ export interface PinmonyBoardPin {
 }
 
 export interface PinmonyBoardDetail {
+  favoriteOnly?: boolean;
+  canFilterFavorites?: boolean;
   nativeAccountGeneration?: number;
   nativeWriteIntent?: number;
   nativeVersion?: number;

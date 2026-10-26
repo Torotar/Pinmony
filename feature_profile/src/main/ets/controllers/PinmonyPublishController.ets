@@ -151,7 +151,9 @@ export class PinmonyPublishController {
     this.store.publishPreparing = false;
     const session: number = this.store.profileSession, url: string = this.store.profileUrl;
     this.ports.setMenuVisible(false);
-    this.store.publishLoading = false; this.store.publishOptions = []; this.store.publishTitle = '';
+    this.store.publishLoading = false;
+    // Keep the rendered menu stable while the Sheet disappearance animation runs.
+    // openMenu clears it before the next request; generation invalidation above blocks late reads.
     if(!this.ports.nativeFlow?.())this.ports.runScript('window.PinmonyProfilePublishClose && window.PinmonyProfilePublishClose(' +
       session.toString() + ',' + JSON.stringify(url) + ')').catch(() => {});
     if (restore && !this.selecting && !this.store.publishFlow) this.ports.restoreBoard();

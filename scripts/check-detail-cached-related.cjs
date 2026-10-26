@@ -25,7 +25,7 @@ async function main() {
   function restoreParent() {
     Object.assign(n.pinStore, { detailPresentationOnly: true, detailPreparing: false,
       detailOpeningPin: '', detailPin: parent, detailActionsReady: false,
-      detail: { kind: 'cached', pinUrl: parent, related: [card] } });
+      detail: { kind: 'cached', dataSource:'api', pinUrl: parent, actions:[], related: [card] } });
   }
   Object.assign(n, { authStatus: 'authenticated', businessSuspended: false,
     pinStore: { videoForeground: true, detailOpeningToken: 3,
@@ -33,6 +33,8 @@ async function main() {
       detailOrigin: () => parent }, homeStore: {}, detailPrefetchTimer: -1,
     pinIdentity: value => String(value || '').match(/\/pin\/(\d+)\//)?.[1] || '',
     rejectOfflineAction: () => false, closeImageLayer() {}, clearRootTabGuard() {},
+    capturePinEntryPhoto(pinUrl,imageUrl) { this.homeEntryPhoto = {pinUrl,imageUrl,x:0,y:100,width:150,height:200}; },
+    pagePerformance: { beginSecondary() {} },
     pageHistory: { visit() {} }, detailJourney: { begin() {}, mark: name => marks.push(name) },
     clearDetail() { this.pinStore.detail = undefined; this.pinStore.detailPresentationOnly = false; this.pinStore.detailActionsReady = false; },
     restoreCachedDetail() {}, startOpeningDetailRead: url => reads.push(url), probeDetailDocument() {},
@@ -46,6 +48,8 @@ async function main() {
     } } });
   const {createArktsLoader}=require('./arkts-module-loader.cjs');
   const {PinmonyDetailReadCache}=createArktsLoader(ts).loadFile('feature_pin/src/main/ets/services/PinmonyDetailReadCache.ets');
+  const {PinmonyDetailCache}=createArktsLoader(ts).loadFile('feature_pin/src/main/ets/services/PinmonyDetailCache.ets');
+  n.pinStore.detailCache = new PinmonyDetailCache();
   n.detailReadCache=new PinmonyDetailReadCache({ detailPin:()=>n.pinStore.detailPin, currentPin:()=>parent,
     pinIdentity:n.pinIdentity,isAuthenticated:()=>n.authStatus==='authenticated',hasNativeBackTarget:()=>false,markJourney(){} });
   require('./medium-priority-controller-harness.cjs').bindWork(n, ts, context);
@@ -53,6 +57,8 @@ async function main() {
   assert.deepEqual(loads, [target]); assert.deepEqual(reads, [target]);
   assert.deepEqual(origins, [['102', parent]], 'back retains the native parent route');
   assert(marks.includes('related.cached.route.opened'));
+  assert.equal(n.relatedEntryParent.pinUrl,parent,'child flight retains its actual parent presentation');
+  assert.equal(n.relatedEntryParent.kind,'cached','animation underlay never authorizes live controls');
   for (const blocked of ['unknown', 'invalid-url', 'wrong-parent', 'logged-out', 'background', 'preparing', 'offline']) {
     restoreParent(); n.authStatus = 'authenticated'; n.businessSuspended = false;
     n.rejectOfflineAction = () => false; card.pinUrl = target;
@@ -66,6 +72,26 @@ async function main() {
     assert.equal(loads.length, 1, blocked + ' cannot start hidden navigation');
     assert.equal(reads.length, 1, blocked + ' cannot start a demand read');
   }
-  console.log('Cached related navigation: immediate target card, target-only read/navigation, native parent history and session/background/offline guards passed');
+  restoreParent(); n.authStatus = 'authenticated'; n.businessSuspended = false;
+  n.rejectOfflineAction = () => false; card.pinUrl = target;
+  card.id = 'api:102'; n.pinStore.detailNativeReadsReady = true;
+  n.detailNativeReads = { owned: () => true };
+  await n.openImageRelated(target);
+  assert.equal(reads.length, 2, 'retained image route resolves the current ID after cache replacement');
+  assert.equal(reads[1], target);
+  assert(fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8').includes('this.onRelated(pin.pinUrl)'),
+    'retained card callbacks pass stable routes instead of cached IDs');
+  const Back = vm.runInNewContext(ts.transpileModule('class Back {' + method('async backFromDetail') + '} Back;',
+    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info(){}},Date});
+  const back = new Back();
+  Object.assign(back,{activeSheetKind:'',showNativeSheet:false,pageHistory:{isPending:()=>false},
+    pinStore:{shareBackHandledUntil:0,detail:{pinUrl:target},detailOrigin:()=>parent},
+    pinIdentity:n.pinIdentity,homeEntryPhoto:{pinUrl:target,imageUrl:card.imageUrl},homeEntryBackCommitted:false,
+    homeEntryClosing:false,homeEntryCardId:'pinmony-related-photo-'+parent+'-'+target,relatedEntryParent:{pinUrl:parent},
+    getUIContext:()=>({getComponentUtils:()=>({getRectangleById:()=>{throw Error('parent layout pending');}})})});
+  await back.backFromDetail();
+  assert.equal(back.homeEntryClosing,true,'related back starts its exit even while parent geometry is pending');
+  assert.equal(back.homeEntryPhoto.pinUrl,target,'return does not discard the flight and instantly replace the page');
+  console.log('Cached related navigation: immediate target card, stable route after cache replacement, target-only read/navigation, native parent history and session/background/offline guards passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -184,6 +184,7 @@ export struct PinmonySearchPage {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
   @Prop @Watch('activeChanged') active: boolean = true;
+  @Prop @Watch('activeChanged') detailReturnPreview: boolean = false;
   @Prop automaticLoadingEnabled: boolean = true;
   @Prop @Watch('onSnapshotChanged') snapshot: PinmonySearchSnapshot = {} as PinmonySearchSnapshot;
   @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
@@ -220,14 +221,14 @@ export struct PinmonySearchPage {
   private presentationTrace: string = '';
 
   private ensureSearchDestination(): void {
-    if (!this.pagePresent || !this.active) return;
+    if (!this.pagePresent || !this.active && !this.detailReturnPreview) return;
     if (this.searchPathStack.size() === 0) this.searchPathStack.pushPath({ name: 'pin-web-search' }, false);
   }
 
   private activeChanged(): void {
     if (!this.active) this.closePhotoSearch();
     if (!this.pagePresent) return;
-    if (this.active) { this.restoreHeroPosition(); this.ensureSearchDestination(); }
+    if (this.active || this.detailReturnPreview) { this.restoreHeroPosition(); this.ensureSearchDestination(); }
     else this.searchPathStack.clear(false);
     this.tracePresentation();
   }
@@ -964,9 +965,9 @@ export struct PinmonySearchPage {
   private pinCardHeight(result: PinmonySearchResult): number {
     let height: number = this.imageHeight(result);
     if (result.title && result.title !== '标题暂不可用') height += 8 + 40;
+    else if (result.kind === 'pin') height += 8 + 32;
     if (result.merchant) height += 8 + 18;
     if (result.price) height += 8 + 20;
-    if (result.kind === 'pin') height += 8 + 32;
     return height;
   }
 
@@ -1007,6 +1008,8 @@ export struct PinmonySearchPage {
             }
           })
       }
+      if (result.title && result.title !== '标题暂不可用' || result.kind === 'pin') {
+      Row({ space: 4 }) {
       if (result.title && result.title !== '标题暂不可用') {
       Text(PinmonyI18n.render(result.title, this.uiLanguage))
         .fontSize(15)
@@ -1015,7 +1018,21 @@ export struct PinmonySearchPage {
         .fontColor($r('app.color.primary_text'))
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
+        .layoutWeight(1)
+      } else {
+        Blank().layoutWeight(1)
+      }
+      if (result.kind === 'pin') {
+        Button({ type: ButtonType.Circle }) {
+          Image($r('app.media.lucide_ellipsis')).width(20).height(20)
+            .fillColor($r('app.color.primary_text'))
+        }.width(32).height(32).flexShrink(0).backgroundColor(Color.Transparent)
+          .enabled(this.interactionReady && result.enabled)
+          .onClick(() => { if (this.onMore) this.onMore(result.targetUrl); })
+          .accessibilityText(this.uiText("pm_pin_options_7227a477"))
+      }
+      }.width('100%').height(result.title && result.title !== '标题暂不可用' ? 40 : 32)
+        .alignItems(VerticalAlign.Bottom).flexShrink(0)
       }
       if (result.merchant) {
         Text(result.merchant).height(18).lineHeight(18).fontSize(13).fontColor($r('app.color.secondary_text')).width('100%').maxLines(1)
@@ -1027,19 +1044,6 @@ export struct PinmonySearchPage {
             Text(result.standardPrice).fontSize(13).decoration({ type: TextDecorationType.LineThrough }).fontColor($r('app.color.secondary_text'))
           }
         }.width('100%').height(20)
-      }
-      if (result.kind === 'pin') {
-        Row() {
-          Blank()
-          Button({ type: ButtonType.Circle }) {
-            Image($r('app.media.lucide_ellipsis')).width(20).height(20)
-              .fillColor($r('app.color.primary_text'))
-          }.width(32).height(32).backgroundColor(Color.Transparent)
-            .enabled(this.interactionReady && result.enabled)
-            .onClick(() => {
-              if (this.onMore) this.onMore(result.targetUrl);
-            }).accessibilityText(this.uiText("pm_pin_options_7227a477"))
-        }.width('100%').height(32).flexShrink(0)
       }
     }
     .width('100%')
@@ -1472,6 +1476,7 @@ export struct PinmonySearchPage {
     })
     .bindToScrollable([this.committedQuery() ? this.resultsScroller : this.discoveryScroller])
     .onBackPressed(() => {
+      if (!this.active) return false;
       this.handleSearchBack();
       return true;
     })

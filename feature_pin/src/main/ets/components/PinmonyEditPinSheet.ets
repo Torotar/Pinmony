@@ -44,7 +44,8 @@ export struct PinmonyEditPinSheet {
     } else {
       Stack({ alignContent: Alignment.Bottom }) {
         Column({ space: 16 }) {
-          Scroll() {
+          List() {
+            ListItem() {
             Column({ space: 20 }) {
               if (this.result.loading || this.result.busy) { LoadingProgress().width(28).height(28) }
               if (this.result.error) {
@@ -113,7 +114,12 @@ export struct PinmonyEditPinSheet {
 
               }
             }.width('100%').padding({ right: 28 })
+            }
           }.width('100%').layoutWeight(1).clip(true)
+            .listDirection(Axis.Vertical).scrollBar(BarState.Auto)
+            .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+            .nestedScroll({ scrollForward: NestedScrollMode.SELF_ONLY,
+              scrollBackward: NestedScrollMode.SELF_ONLY })
           Button(this.uiText("pm_done_c0b3fbff")).width('100%').height(48)
             .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent'))
             .enabled(this.result.phase === 'edit' && !this.result.loading && !this.result.busy &&

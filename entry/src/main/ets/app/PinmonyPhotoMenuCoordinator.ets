@@ -85,9 +85,9 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
     this.pinStore.sharePin = pinUrl;
     this.pinStore.shareSession = token;
     this.pinStore.moreSession = token;
-    this.pinStore.shareTitle = !inboxAction && !profilePin &&
+    this.pinStore.shareTitle = !inboxAction && (profilePin ||
         (pageKey === this.ports.currentHomePageKey() || this.ports.isCurrentBoardMenuPin(pinUrl, pageKey) ||
-            this.ports.isCurrentSearchMenuPin(pinUrl, pageKey)) ? PinmonyI18n.message("pm_options_bb7486f4") : PinmonyI18n.message("pm_share_7e564575");
+            this.ports.isCurrentSearchMenuPin(pinUrl, pageKey))) ? PinmonyI18n.message("pm_options_bb7486f4") : PinmonyI18n.message("pm_share_7e564575");
     this.pinStore.shareSearchActive = false;
     this.ports.setActiveSheetKind('share');
     this.homeStore.customHomeMenu = { session: token, pinUrl: pinUrl, loading: true, busy: false,
@@ -117,9 +117,10 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
             const state: PinmonyHomeMenuState = JSON.parse(serialized) as PinmonyHomeMenuState;
             if (!state || state.session !== token || this.ports.pinIdentity(state.pinUrl) !== this.ports.pinIdentity(pinUrl))
                 break;
+            const favorite: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-favorite');
             if (!inboxAction && !profilePin && (pageKey === this.ports.currentHomePageKey() || this.ports.isCurrentSearchMenuPin(pinUrl, pageKey))) {
                 state.options = [];
-                state.actions.push({ id: 'home-system-share', label: PinmonyI18n.message("pm_share_link_10ba6479"), enabled: !state.loading && !state.error && !state.busy });
+                state.actions.push({ id: 'home-system-share', label: PinmonyI18n.message("pm_share_7e564575"), enabled: !state.loading && !state.error && !state.busy });
             }
             else if (!inboxAction && !profilePin && this.ports.isCurrentBoardMenuPin(pinUrl, pageKey)) {
                 const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
@@ -133,7 +134,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
                             !!board?.editable && (!board.flow?.phase || board.flow.phase === 'section') && boardVisiblePins(board).some((pin: PinmonyBoardPin): boolean => pin.pinUrl === pinUrl) },
                     { id: 'home-download', label: PinmonyI18n.message("pm_download_4673a230"), enabled: !!download?.enabled },
                     { id: 'home-see-more', label: PinmonyI18n.message("pm_see_more_92b2b2de"), enabled: !!more?.enabled },
-                    { id: 'home-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), enabled: !state.loading && !state.error && !state.busy }
+                    { id: 'home-system-share', label: PinmonyI18n.message("pm_share_7e564575"), enabled: !state.loading && !state.error && !state.busy }
                 ];
                 state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.enabled);
                 if (board && /\/pins\/$/i.test(board.pageKey)) {
@@ -143,8 +144,17 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
             }
             if (inboxAction)
                 state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.id === 'home-save');
-            if (profilePin)
-                state.actions = state.actions.filter((option: PinmonyHomeMenuOption): boolean => option.id !== 'home-see-more' && option.id !== 'home-see-less');
+            if (profilePin) {
+                const download: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-download');
+                const more: PinmonyHomeMenuOption | undefined = state.actions.find((option: PinmonyHomeMenuOption): boolean => option.id === 'home-see-more');
+                state.options = [];
+                state.actions = [
+                    {id:'home-download',label:PinmonyI18n.message('pm_download_image_8894375c'),enabled:!!download?.enabled},
+                    {id:'home-see-more',label:PinmonyI18n.message('pm_see_more_92b2b2de'),enabled:!!more?.enabled},
+                    {id:'home-system-share',label:PinmonyI18n.message('pm_share_7e564575'),enabled:!state.loading && !state.error && !state.busy}
+                ];
+            }
+            if(!inboxAction && favorite && !state.actions.some((option: PinmonyHomeMenuOption): boolean => option.id === favorite.id))state.actions.unshift(favorite);
             const snapshotKey: string = JSON.stringify(state);
             if (snapshotKey !== lastSnapshot) {
                 lastSnapshot = snapshotKey;

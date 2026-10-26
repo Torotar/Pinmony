@@ -21,6 +21,7 @@ export interface PinmonyBoard {
 export interface PinmonyCreatedPin {
   id: string;
   targetUrl?: string;
+  favorite?: boolean;
   title: string;
   imageUrl: string;
   imageWidth: number;
@@ -48,6 +49,13 @@ export interface PinmonyOrganizeSnapshot {
 }
 
 export interface PinmonyProfileSnapshot {
+  suggestionWriting?: boolean;
+  suggestionUnavailableIds?: string[];
+  suggestions?: PinmonyBoard[];
+  suggestionError?: string;
+  hubMode?: string;
+  hubFavorite?: boolean;
+  hubCreated?: boolean;
   boardSort?: string;
   showAllPins?: boolean;
   visibilityBusy?: boolean;

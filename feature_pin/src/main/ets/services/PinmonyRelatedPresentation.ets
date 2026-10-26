@@ -1,3 +1,4 @@
+import { isProductPin } from 'common_foundation';
 import { PinImageSources } from 'common_ui';
 import { PinmonyRelatedPin, PinmonyRelatedTopic } from '../models/PinmonyDetail';
 
@@ -66,7 +67,7 @@ export function readRelatedPresentation(body: string, pinUrl: string): RelatedPr
         if (story && !pins.some((item: PinmonyRelatedPin): boolean => item.id === story.id)) pins.push(story);
         continue;
       }
-      if (!pin || pin.type !== 'pin' || !/^\d+$/.test(String(pin.id))) continue;
+      if (!pin || isProductPin(pin) || pin.type !== 'pin' || !/^\d+$/.test(String(pin.id))) continue;
       const target: string = pinUrl.slice(0, pinUrl.indexOf('/', 8)) + '/pin/' + pin.id + '/';
       if (target === pinUrl || pins.some((item: PinmonyRelatedPin): boolean => item.pinUrl === target)) continue;
       const sizes: Record<string, RelatedImage> = pin.images || {};
@@ -85,7 +86,7 @@ export function readRelatedPresentation(body: string, pinUrl: string): RelatedPr
       pins.push({ id: 'api:' + pin.id, pinUrl: target, imageUrl: selected.url,
         imageWidth: selected.width, imageHeight: selected.height, images: images, title: title.trim().slice(0, 160) });
     }
-    if (resource.data.length > 0 && pins.length === 0) return undefined;
+    if (resource.data.some((item: RelatedPin): boolean => !isProductPin(item)) && pins.length === 0) return undefined;
     const bookmark: string = typeof resource.bookmark === 'string' && resource.bookmark.length <= 4096 ? resource.bookmark : '';
     return { pins: pins, bookmark: bookmark, ended: !bookmark || bookmark === '-end-' || resource.data.length === 0 };
   } catch (_) { return undefined; }

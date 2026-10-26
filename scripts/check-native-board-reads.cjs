@@ -118,3 +118,22 @@ const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');functio
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['boardOperation','updateBoard'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_BOARD_READS_ENABLED:true});let legacyCalls=0;const host=new Host();Object.assign(host,{boardNativeReads:f.reader,boardStore:f.store,boardOperationsController:{operate(){legacyCalls++}},boardStateController:{update(){throw Error('legacy main read')}},businessSuspended:false,pagePerformance:{markSecondary(){}}});host.boardOperation('more');await flush();assert.equal(legacyCalls,0);host.updateBoard(JSON.stringify({kind:'state',contextEpoch:1,pageKey:page,session:999}));assert.equal(f.store.boardDetail.pins[0].id,'5');
 console.log('Native board reads checks passed: identity, main/collection/sections, cursors, cancellation, retention, strict transport, adoption and write invalidation.');}
 const watchdog=setTimeout(()=>{console.error('native board test did not complete');process.exit(1)},15000);main().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1});
+
+async function favoriteFilter(){
+ const f=fixture();await first(f,{...board,section_count:0},[{...pin(1),favorited_by_me:true}],'-end-');
+ let p=f.reader.handle('flow',JSON.stringify({action:'favorites'}));let job=f.requests.at(-1).job;
+ const network=new Network();let accepted=false;network.request=async(job,current)=>{accepted=acceptsNetworkJob(job,current());return {error:accepted?'':'rejected'};};
+ await network.requestBusinessBoardRead(job,f.session,'100','','42',false,()=>true);assert(accepted,'real transport accepts captured favorite contract');
+ const tampered={...job,url:job.url.replace('currentFilter%22%3A6','currentFilter%22%3A7')};
+ accepted=true;await network.requestBusinessBoardRead(tampered,f.session,'100','','42',false,()=>true);assert(!accepted,'unknown filter is rejected');
+ assert.equal(opts(job).currentFilter,6);assert.equal(opts(job).filter_section_pins,false);assert(!opts(job).bookmarks);
+ f.requests.at(-1).resolve(body([{...pin(1),favorited_by_me:true}],'star-next',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_pins_by_type',data:[{...pin(1),favorited_by_me:true}],bookmark:'star-next'}}));await p;
+ assert(f.store.boardDetail.favoriteOnly);assert.equal(f.store.boardDetail.pins.length,1);
+ p=f.reader.more();assert.equal(opts(f.requests.at(-1).job).bookmarks[0],'star-next');
+ f.requests.at(-1).resolve(body([],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_pins_by_type',data:[]}}));await p;assert(!f.store.boardDetail.hasMore);
+ f.reader.favoriteChanged(origin+'/pin/1/',false);assert.equal(f.store.boardDetail.pins.length,0);
+ p=f.reader.handle('flow',JSON.stringify({action:'favorites'}));assert.equal(opts(f.requests.at(-1).job).filter_section_pins,true);assert(!opts(f.requests.at(-1).job).bookmarks);
+ f.requests.at(-1).resolve(body([pin(2)],'-end-'));await p;assert(!f.store.boardDetail.favoriteOnly);
+ console.log('Board favorites: server filter, independent cursors, empty terminal page, confirmed removal and return to all passed');
+}
+favoriteFilter().catch(e=>{console.error(e);process.exitCode=1;});

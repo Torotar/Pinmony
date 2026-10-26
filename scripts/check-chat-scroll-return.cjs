@@ -105,3 +105,18 @@ async function reply(endpoint, data, bookmark = '-end-') {
   api.reset(); assert.equal(api.retainHistory(7, '100', [old]), false, 'departed flow cannot be restored');
   console.log('PASS chat scroll return: layout races, clamping, user control, send revisions, Pin geometry, retained history, empty/error and script session guards');
 })().catch(error => { console.error(error); process.exitCode = 1; api.reset(); });
+
+// The native chat must be the explicit history target even with a stale home entry.
+{
+ const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+ const match=index.match(/const origin: string = this.extractPinUrl\(parent\)[\s\S]*?;/);assert(match);
+ const body=match[0].replace('const origin: string','const origin')+' return origin;';
+ const target=new Function('parent',body).call({extractPinUrl:()=>'',searchUrlFromAddress:()=>'',inboxUrlFromAddress:v=>v.includes('/inbox/')?v:'',profileUrlFromAddress:()=>'',boardUrlFromAddress:()=>'',isHomeRootAddress:()=>false},'https://www.pinterest.com/inbox/');
+ assert.equal(target,'https://www.pinterest.com/inbox/','chat return overrides stale home history');
+ const a=index.indexOf('  private completeNativeBack('),b=index.indexOf('\n  private ',a+1);
+ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+index.slice(a,b)+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_DETAIL_READS_ENABLED:true,PIN_NATIVE_BOARD_READS_ENABLED:true,PIN_NATIVE_PROFILE_READS_ENABLED:true,PIN_NATIVE_SEARCH_READS_ENABLED:true});
+ const h=new Host(),chat={screen:'chat',conversationId:'100'},calls=[];
+ Object.assign(h,{nativeBusinessSessionContext:()=>({authenticated:true,origin:'https://www.pinterest.com'}),profileSettingsVisible:false,returnToNativeProfile:()=>false,searchUrlFromAddress:()=>'',extractPinUrl:()=>'',boardUrlFromAddress:()=>'',rootTabIndexFromAddress:()=>2,returnCoordinator:{cancel(){}},pageHistory:{cancelBack(){},visit(){}},pageBackToken:0,inboxStore:{retainedChat:chat},presentNativeBackTarget(){},tabsController:{changeIndex:i=>calls.push(i)},rootTabAddresses:new Map(),boardStore:{},clearRootTabGuard:r=>calls.push(r),inboxMessagesNativeReads:{demand:()=>calls.push('demand')},syncFloatingTabsMotion(){}});
+ assert(h.completeNativeBack(target));assert.equal(h.activeTab,2);assert.equal(h.inboxStore.inboxFlow,chat);assert.equal(h.inboxStore.retainedChat,undefined);assert.equal(h.nativeRootOnly,false);assert(calls.includes('chat-return'));assert(calls.includes('demand'));
+ console.log('Chat Pin return: explicit inbox history target, active tab and native flow restoration passed');
+}
