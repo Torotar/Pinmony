@@ -1,5 +1,9 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+function diagnosticResourcePresent(body: string): boolean {
+    try { const value: DraftDiagnostic = JSON.parse(body) as DraftDiagnostic; return !!value.resource_response; } catch (_) { return false; }
+}
 let requestSequence: number = 0;
 export const PIN_NATIVE_SHARE_PUBLISH_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
 export interface PinmonySharePublishClientPorts {
@@ -12,8 +16,13 @@ export interface PinmonySharePublishOwner {
     objectId: string;
     viewer: string;
     contacts: string[];
+    topics?: string[];
+    sections?: string[];
     boards: string[];
 }
+interface DraftDiagnostic { resource_response?: DraftDiagnosticResource; error?: Object; status?: string; code?: number; }
+interface DraftDiagnosticError { code?: number; message?: string; }
+interface DraftDiagnosticResource { code?: number; endpoint_name?: string; status?: string; error?: DraftDiagnosticError; message?: string; }
 interface Envelope {
     options: Object;
     context: Record<string, string>;
@@ -38,11 +47,32 @@ export class PinmonySharePublishClient {
             job.headers['X-App-Version'] = session.appVersion;
         const stopped: Promise<PinmonyNetworkReply | undefined> = new Promise<PinmonyNetworkReply | undefined>((resolve): void => { this.waits.set(job.id, (): void => resolve(undefined)); });
         try {
-            const reply: PinmonyNetworkReply | undefined = await Promise.race([this.ports.network().requestBusinessSharePublish(job, (): PinmonyBusinessSessionContext => this.ports.session(), owner.mode, owner.objectId, owner.viewer, owner.contacts, owner.boards, current), stopped]);
+            const reply: PinmonyNetworkReply | undefined = await Promise.race([this.ports.network().requestBusinessSharePublish(job, (): PinmonyBusinessSessionContext => this.ports.session(), owner.mode, owner.objectId, owner.viewer, owner.contacts, owner.boards, current, owner.topics || [], owner.sections || []), stopped]);
             if (!current() || !reply || reply.error || !reply.body || reply.body.length > 8000000)
                 throw new Error('request');
-            if (reply.status < 200 || reply.status >= 300)
+            if (reply.status < 200 || reply.status >= 300) {
+                if (name === 'ApiResource' && (verb === 'create' || verb === 'update') && owner.mode === 'photo') {
+                    let code: number = -1;
+                    let endpoint: string = 'unknown';
+                    let category: string = 'unknown';
+                    try {
+                        const diagnostic: DraftDiagnostic = JSON.parse(reply.body) as DraftDiagnostic;
+                        if (typeof diagnostic.resource_response?.code === 'number') code = diagnostic.resource_response.code;
+                        const resource: DraftDiagnosticResource | undefined = diagnostic.resource_response;
+                        if (typeof resource?.error?.code === 'number') code = resource.error.code;
+                        const message: string = (resource?.error?.message || resource?.message || '').toLowerCase();
+                        if (/not found|does not exist/.test(message)) category = 'not-found';
+                        else if (/csrf/.test(message)) category = 'csrf';
+                        else if (/permission|unauthorized|forbidden/.test(message)) category = 'permission';
+                        else if (/image|media|upload/.test(message)) category = 'media';
+                        else if (/invalid|parameter|argument/.test(message)) category = 'invalid-input';
+                        const value: string = resource?.endpoint_name || '';
+                        if (/^[a-z_]{1,80}$/.test(value)) endpoint = value;
+                    } catch (_) {}
+                    PinmonyRuntimeLog.warn('DraftSaveTrace: http=' + reply.status.toString() + ' code=' + code.toString() + ' endpoint=' + endpoint + ' category=' + category + ' responsePresent=' + (!!diagnosticResourcePresent(reply.body)).toString());
+                }
                 throw new Error('http');
+            }
             return reply.body;
         }
         finally {

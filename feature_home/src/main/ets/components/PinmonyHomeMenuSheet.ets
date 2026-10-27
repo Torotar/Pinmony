@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeMenuOption, PinmonyHomeMenuState } from '../models/PinmonyHomeMenu';
 
@@ -67,18 +68,13 @@ export struct PinmonyHomeMenuSheet {
       if (this.menu.loading) {
         LoadingProgress().width(28).height(28)
       } else if (this.menu.error) {
-        Text(PinmonyI18n.render(this.menu.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-        if (!/取消收藏|收藏校验/.test(PinmonyI18n.render(this.menu.error, 'zh'))) {
-          Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
-        }
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.menu.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !/取消收藏|收藏校验/.test(PinmonyI18n.render(this.menu.error, 'zh')) })
       } else {
         Column() {
-        ForEach(this.menu.actions, (option: PinmonyHomeMenuOption) => {
+        ForEach(this.menu.actions.filter((option: PinmonyHomeMenuOption): boolean => option.id !== 'home-favorite'), (option: PinmonyHomeMenuOption) => {
           Button({ type: ButtonType.Normal }) {
             Row({ space: 14 }) {
-              if(option.id === 'home-favorite') {
-                SymbolGlyph($r('sys.symbol.star')).fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
-              } else if (option.id === 'board-menu-move') {
+              if (option.id === 'board-menu-move') {
                 SymbolGlyph($r('sys.symbol.arrow_right'))
                   .fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
               } else {
@@ -101,7 +97,7 @@ export struct PinmonyHomeMenuSheet {
       }
       if (this.menu.busy) { LoadingProgress().width(24).height(24) }
       if (this.menu.feedback) {
-        Text(PinmonyI18n.render(this.menu.feedback, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.menu.feedback, this.uiLanguage) })
       }
     }.width('100%').padding({ left: this.menu.options.length > 0 ? 20 : 0,
       right: this.menu.options.length > 0 ? 20 : 0, top: this.menu.options.length > 0 ? 16 : 0, bottom: 20 })

@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { MoreSheetOption } from '../models/PinmonySheets';
@@ -24,7 +25,7 @@ export struct PinmonyMoreSheet {
       } else {
         Scroll() {
           Column() {
-            ForEach(this.pinStore.moreOptions, (option: MoreSheetOption, index: number) => {
+            ForEach(this.pinStore.moreOptions.filter((option: MoreSheetOption): boolean => option.id !== 'detail-favorite'), (option: MoreSheetOption, index: number) => {
               if (index > 0 && option.group !== this.pinStore.moreOptions[index - 1].group) {
                 Divider()
                   .color('#4D8A8A8A')
@@ -36,8 +37,7 @@ export struct PinmonyMoreSheet {
                     option.id === 'detail-see-more' ? $r('app.media.lucide_heart') :
                     option.id === 'detail-see-less' ? $r('app.media.lucide_eye_off') : $r('app.media.lucide_share_2'))
                     .width(28).height(28).objectFit(ImageFit.Contain)
-                } else if (option.id === 'detail-favorite') {
-                  SymbolGlyph($r('sys.symbol.star')).fontSize(28).fontColor([$r('app.color.primary_text')])
+
                 } else if (option.id === 'detail-edit') {
                   Image($r('app.media.lucide_pencil')).width(28).height(28)
                     .objectFit(ImageFit.Contain)
@@ -83,12 +83,7 @@ export struct PinmonyMoreSheet {
       }
       if (this.pinStore.moreError) {
         Row({ space: 12 }) {
-          Text(PinmonyI18n.render(this.pinStore.moreError, this.uiLanguage))
-            .fontSize(14)
-            .fontColor('#D94A4A')
-            .layoutWeight(1)
-          Button(this.uiText("pm_retry_b8784c8d"))
-            .onClick(() => this.onRetry())
+          PinmonyActionNotice({ message: PinmonyI18n.render(this.pinStore.moreError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onRetry() })
         }
         .margin({ left: 20, right: 20, top: 12 })
       }

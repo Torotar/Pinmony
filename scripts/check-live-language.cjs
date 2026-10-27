@@ -43,7 +43,7 @@ module.exports = function checkLiveLanguage(ts, i18n) {
   const profile=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
   assert(!/sectionTab\('[^']+',\s*this\.uiText/.test(profile), 'Profile section builders must receive resource keys');
   assert(profile.includes('Text(PinmonyI18n.text(nameKey, this.uiLanguage))'));
-  assert(profile.includes("this.profile.boards[start].id + ':' + this.uiLanguage"));
+  assert(profile.includes("boards[start].id + ':' + this.uiLanguage"));
   assert(profile.includes("(pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage"));
   if (i18n) {
     const homeSource=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');

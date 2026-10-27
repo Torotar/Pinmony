@@ -77,7 +77,6 @@ export class PinmonyPinMenuNative {
     const revision: number = this.bind(pin,token,true);
     const state: PinmonyHomeMenuState = {session:token,pinUrl:pin,loading:false,busy:false,error:'',feedback:'',options:[],actions:[]};
     try {await this.read(revision);if(!this.current(revision))return state;
-      if(typeof this.raw?.favorited_by_me === 'boolean')state.actions.push({id:'home-favorite',label:PinmonyI18n.message(this.raw.favorited_by_me ? 'pm_star_remove' : 'pm_star_add'),enabled:this.enabled('favorite')});
       state.canCancelSave = this.raw?.is_repin === true && this.raw?.pinner?.id === this.viewer;
       state.actions = state.actions.concat([{id:'home-save',label:PinmonyI18n.message("pm_save_60a53514"),enabled:true},{id:'home-download',label:PinmonyI18n.message("pm_download_image_8894375c"),enabled:!!this.image()},
         {id:'home-see-more',label:PinmonyI18n.message("pm_see_more_92b2b2de"),enabled:this.enabled('more')},{id:'home-see-less',label:PinmonyI18n.message("pm_see_less_9c80a8dc"),enabled:this.enabled('less')}]);
@@ -92,7 +91,6 @@ export class PinmonyPinMenuNative {
     this.store.moreTitle = PinmonyI18n.message('pm_options_bb7486f4');this.store.moreOptions = [];this.store.moreLoading = true;this.store.moreError = '';this.store.ignoredMoreSession = 0;this.ports.show();
     const revision: number = this.bind(detail.pinUrl,token,false);
     try {await this.read(revision);if(!this.current(revision))return;const options: MoreSheetOption[] = [];
-      if(typeof this.raw?.favorited_by_me === 'boolean')options.push(this.option('detail-favorite',PinmonyI18n.message(this.raw.favorited_by_me ? 'pm_star_remove' : 'pm_star_add'),this.enabled('favorite')));
       if(this.canOpenEdit())options.push(this.option('detail-edit','编辑 Pin 图'));
       if(this.image())options.push(this.option('detail-download','下载图片'));
       options.push(this.option('detail-see-more','查看更多',this.enabled('more')),this.option('detail-see-less','减少推荐',this.enabled('less')));
@@ -103,10 +101,7 @@ export class PinmonyPinMenuNative {
   }
   async action(id: string): Promise<void> {
     const revision: number = this.revision;
-    if(id === 'home-favorite' || id === 'detail-favorite') {
-      PinmonyRuntimeLog.info('FavoriteTrace: phase=click current=' + this.current(revision).toString() + ' busy=' + this.busy.toString() + ' known=' + (typeof this.raw?.favorited_by_me === 'boolean').toString());
-      if(!this.current(revision) || !this.raw){this.ports.message(PinmonyI18n.message('pm_star_failed'));return;}
-    }
+    if(id === 'home-favorite' || id === 'detail-favorite')return;
     if(!this.current(revision) || this.busy || !this.raw)return;
     const photo: boolean = this.photo, pin: string = this.pin;
     const options = photo ? undefined : this.store.moreOptions;
@@ -115,7 +110,6 @@ export class PinmonyPinMenuNative {
       if(!this.canOpenEdit() || photo && id !== 'home-edit' || !photo && id !== 'detail-edit')return;
       PinmonyRuntimeLog.info('PinEditTrace: phase=menu-open');this.ports.dismiss();await this.ports.edit(pin);return;
     }
-    if(id === 'home-favorite' || id === 'detail-favorite'){await this.favorite(revision);return;}
     if(id === 'detail-ai-help'){this.ports.help('https://help.pinterest.com/en/article/gen-ai-labels');return;}
     if(id === 'home-download' || id === 'detail-download'){const url: string = this.image();if(url)this.ports.download(url);return;}
     const less: boolean = id === 'home-see-less' || id === 'detail-see-less';

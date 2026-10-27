@@ -3,6 +3,7 @@ export interface PinmonyBoardPin {
   id: string;
   pinUrl: string;
   imageUrl: string;
+  previewImageUrl?: string;
   imageWidth: number;
   imageHeight: number;
   title: string;
@@ -72,6 +73,9 @@ export interface PinmonyBoardTarget {
 }
 
 export interface PinmonyBoardFlow {
+  cover?: PinmonyBoardCoverState;
+  coverImage?: string;
+  coverPreview?: PinmonyBoardCoverPreview;
   targetBoardId?: string;
   targetSections?: PinmonyBoardSection[];
   phase: string;
@@ -90,6 +94,32 @@ export interface PinmonyBoardFlow {
   targets: PinmonyBoardTarget[];
   saved: string[];
   hasMore: boolean;
+}
+
+export interface PinmonyBoardCoverPreview {
+  imageUrl: string;
+  width: string;
+  height: string;
+  left: string;
+  top: string;
+}
+
+export interface PinmonyBoardCoverCrop {
+  pinId: string;
+  cropX: number;
+  cropY: number;
+  width: number;
+  height: number;
+  scale: number;
+}
+
+export interface PinmonyBoardCoverState {
+  pins: PinmonyBoardPin[];
+  selected?: PinmonyBoardCoverCrop;
+  loading: boolean;
+  hasMore: boolean;
+  status: string;
+  error: string;
 }
 
 export interface PinmonyBoardChatPeer { id: string; name: string; avatar: string; username: string; }

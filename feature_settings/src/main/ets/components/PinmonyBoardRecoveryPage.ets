@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
@@ -57,9 +58,7 @@ export struct PinmonyBoardRecoveryPage {
         Column({space:16}) {
           Text(this.text('pm_board_recovery_description')).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
           if(this.store.error) {
-            Text(PinmonyI18n.render(this.store.error,this.language)).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-            Button(this.text('pm_retry_b8784c8d')).enabled(!this.store.busy && !this.store.loading)
-              .onClick(() => {this.selected = '';this.onRequest?.('boardRecoveryRead','');})
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error,this.language), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {this.selected = '';this.onRequest?.('boardRecoveryRead','');}, actionEnabled: !this.store.busy && !this.store.loading })
           }
           if(this.store.loading || this.store.busy) { LoadingProgress().width(32).height(32) }
           if(this.store.boardRecoveryReady) {

@@ -14,6 +14,7 @@ interface PrefetchStoryPage { blocks?: PrefetchBlock[]; }
 interface PrefetchStory { pages?: PrefetchStoryPage[]; story_pages?: PrefetchStoryPage[]; is_deleted?: boolean; }
 interface PrefetchCarousel { pages?: Object[]; carousel_slots?: Object[]; }
 interface PrefetchPin {
+  shuffle?: PrefetchShuffle;
   id: string; type: string; images: Record<string, PrefetchImage>;
   title?: string; grid_title?: string; closeup_unified_title?: string;
   description?: string; closeup_unified_description?: string;
@@ -29,6 +30,7 @@ interface PrefetchPin {
   story_pin_data?: PrefetchStory; carousel_data?: PrefetchCarousel;
 }
 interface PrefetchAiTopic { name?: string; }
+interface PrefetchShuffle { id?: string; }
 interface PrefetchResource { status: string; data: PrefetchPin; }
 interface PrefetchResponse { resource_response: PrefetchResource; }
 interface PrefetchEntry { pinUrl: string; detail: PinmonyDetailSnapshot; expiresAt: number; }
@@ -56,6 +58,10 @@ function detailResource(body: string, pinUrl: string): string {
     'is_eligible_for_image_download', 'is_eligible_for_ai_comparison', 'has_hidden_inner_pin', 'board',
     'through_id', 'rec_reason_type', 'source'];
   fields.forEach((field: string) => { if (input[field] !== undefined) selected[field] = input[field]; });
+  if (typeof pin.shuffle?.id === 'string' && /^\d{1,40}$/.test(pin.shuffle.id)) {
+    const shuffleIdentity: PrefetchShuffle = { id: pin.shuffle.id };
+    selected['shuffle'] = shuffleIdentity;
+  }
   const result: SelectedPinResponse = { resource_response: { status: 'success', data: selected } };
   return JSON.stringify(result);
 }
@@ -128,6 +134,7 @@ export function mapPrefetchedDetail(body: string, pinUrl: string, allowPendingMe
       duration: Number.isFinite(primary.duration) ? Math.max(0, Math.min(86400000, primary.duration || 0)) : 0 } : undefined;
     const creator: PrefetchCreator = pin.closeup_unified_attribution || pin.closeup_attribution || pin.origin_pinner || pin.pinner || {};
     return { kind: 'cached', dataSource: 'api', session: 0, pinUrl: pinUrl,
+      shuffleId: typeof pin.shuffle?.id === 'string' && /^\d{1,40}$/.test(pin.shuffle.id) ? pin.shuffle.id : undefined,
       imageUrl: image.url, imageWidth: image.width, imageHeight: image.height,
       originalImageUrl: imageValid(images['orig']) ? images['orig'].url : image.url,
       title: clean(pin.closeup_unified_title || pin.title || pin.grid_title, 500),
@@ -150,6 +157,8 @@ export function mapPrefetchedDetail(body: string, pinUrl: string, allowPendingMe
 }
 
 export class PinmonyDetailPrefetch {
+  private readonly requestPrefix: string;
+  constructor(requestPrefix: string = 'detail_prefetch_') { this.requestPrefix = requestPrefix; }
   onReady?: (detail: PinmonyDetailSnapshot) => void;
   private entries: PrefetchEntry[] = [];
   private scope: string = '';
@@ -205,7 +214,7 @@ export class PinmonyDetailPrefetch {
   }
   private start(pin: string, read: DetailReader, homeCurrent: () => boolean): Promise<string> {
     const token: number = this.generation;
-    const id: string = 'detail_prefetch_' + (++this.sequence).toString();
+    const id: string = this.requestPrefix + (++this.sequence).toString();
     this.jobs.set(id, pin);
     const current = (): boolean => token === this.generation && this.jobs.has(id) &&
       (this.openingPin === pin && this.openingCurrent ? this.openingCurrent() : homeCurrent());

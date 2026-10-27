@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { SmartImage, RECOMMEND_CARD_RADIUS_VP, RECOMMEND_PHONE_GAP_VP } from 'common_ui';
 import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
@@ -92,7 +93,7 @@ export struct PinmonyPhotoHistoryView {
                 SmartImage({ url: item.imageUrl, widthVp: this.cardWidth(), heightVp: this.cardHeight(item),
                   borderRadiusVp: RECOMMEND_CARD_RADIUS_VP })
                 if (this.selected === item.id) {
-                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(28).fontColor([$r('app.color.primary_text')])
+                  SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(28).fontColor([$r('app.color.accent')])
                     .backgroundColor($r('app.color.page_background')).borderRadius(20).margin(8)
                 }
               }.width(this.cardWidth()).height(this.cardHeight(item))
@@ -111,8 +112,7 @@ export struct PinmonyPhotoHistoryView {
         }
         if (this.busy || this.confirming) { LoadingProgress().width(30).height(30) }
         if (this.failed) {
-          Text(this.text('pm_photo_history_error')).fontColor($r('app.color.secondary_text'))
-          Button(this.text('pm_retry_b8784c8d')).onClick(() => this.load())
+          PinmonyActionNotice({ message: this.text('pm_photo_history_error'), actionText: this.text('pm_retry_b8784c8d'), onAction: () => this.load() })
         } else if (!this.busy && !this.items.length) {
           Column({ space: 8 }) {
             Text(this.text('pm_photo_history_empty')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))

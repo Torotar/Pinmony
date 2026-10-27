@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from './PinmonyActionNotice';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin } from '../models/PinmonyImageSearch';
@@ -69,6 +70,7 @@ export struct PinmonyImageSearchView {
   private beginTransition(): void {
     if (!this.animatePhoto || this.started || !this.measured || !this.decoded || !this.alive) return;
     this.started = true;
+    PinmonyRuntimeLog.info('ImageSearchTrace: phase=transition-start');
     try {
       const ui = this.getUIContext();
       const root = ui.getComponentUtils().getRectangleById('pinmony-search-flight-' + this.pin);
@@ -171,10 +173,7 @@ export struct PinmonyImageSearchView {
             }.layoutWeight(1)
           }.width('100%').alignItems(VerticalAlign.Top)
           if (this.result.error) {
-            Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-            if (!this.uploadedPhoto) {
-              Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onSearch) this.onSearch(this.crop, this.result.items.length > 0, false); })
-            }
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onSearch) this.onSearch(this.crop, this.result.items.length > 0, false); }, actionEnabled: !this.uploadedPhoto })
           } else if (this.result.loading) {
             LoadingProgress().width(36).height(36)
             Text(this.uiText('pm_photo_search_loading')).fontColor($r('app.color.secondary_text'))
@@ -201,7 +200,12 @@ export struct PinmonyImageSearchView {
           if (this.uploadedPhoto && event && event.width > 0 && event.height > 0) {
             this.intrinsicWidth = event.width; this.intrinsicHeight = event.height;
           }
-          if (event?.loadingStatus === 1) { this.decoded = true; this.beginTransition(); }
+          // Data readiness must not wait for rendering of the hidden flight image.
+          if (event?.loadingStatus === 0 || event?.loadingStatus === 1) {
+            this.decoded = true;
+            PinmonyRuntimeLog.info('ImageSearchTrace: phase=image-ready rendered=' + (event.loadingStatus === 1).toString());
+            this.beginTransition();
+          }
         })
         .onError(() => { this.decoded = true; this.beginTransition(); })
         .position({ x: this.animatePhoto ? this.frameX : this.photoX(), y: this.animatePhoto ? this.frameY : this.photoY() })

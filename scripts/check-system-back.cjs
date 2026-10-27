@@ -48,5 +48,5 @@ const publishActions = []; publish.publishFlowAction = action => publishActions.
 assert.equal(publish.onBackPress(), true); assert.deepEqual(publishActions, ['back']);
 publish.profileStore.publishFlow.busy = true; assert.equal(publish.onBackPress(), true); assert.equal(publishActions.length, 1, 'in-flight write consumes back without navigation');
 publish.profileStore.publishFlow.busy = false; publish.profileStore.publishFlow.uncertain = true;
-assert.equal(publish.onBackPress(), true); assert.equal(publishActions.at(-1), 'close', 'unknown result closes without replay');
+assert.equal(publish.onBackPress(), true); assert.equal(publishActions.at(-1), 'back', 'publish controller decides whether an uncertain flow closes without replay');
 console.log('Publish nested/system back and pending-write protection passed');

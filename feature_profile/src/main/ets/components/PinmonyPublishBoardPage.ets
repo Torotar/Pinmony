@@ -1,11 +1,12 @@
+import { PinmonyBoardPickerRow, PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyCreatedPin, PinmonyOrganizeSnapshot } from '../models/PinmonyProfile';
+import { PinmonyCreatedPin, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
-import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 
 // Publish owns this entry point so its board flow can evolve independently
@@ -20,13 +21,15 @@ export struct PinmonyPublishBoardPage {
   @State private createVisible: boolean = false;
   @State private name: string = '';
   @State private secret: boolean = false;
+  private readonly sectionPaths: NavPathStack = new NavPathStack();
+  private readonly sectionsScroller: Scroller = new Scroller();
   private readonly createScroller: Scroller = new Scroller();
   @Prop pins: PinmonyCreatedPin[] = [];
   @Prop pinsLoading: boolean = false;
   onAction: (action: string, value: string, secret: boolean) => void = () => {};
 
   aboutToAppear(): void { this.syncCreate(); }
-  private syncCreate(): void { this.createVisible = this.state.phase === 'create'; }
+  private syncCreate(): void { this.createVisible = this.state.phase === 'create'; if (this.state.phase === 'sections' && !this.sectionPaths.size()) this.sectionPaths.pushPath({name:'sections'}); }
   private closeCreate(): void {
     this.onAction(this.state.kind === 'board' || this.state.uncertain ? 'close' : 'boards', '', false);
   }
@@ -37,10 +40,12 @@ export struct PinmonyPublishBoardPage {
         .enabled(!this.state.busy).onChange((value: string) => { this.name = value; })
       Row() {
         Text(this.uiText("pm_make_secret_228cf25e")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-        Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.state.busy)
+        Checkbox().select(this.secret).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(!this.state.busy)
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
-      if (this.state.error) { Text(PinmonyI18n.render(this.state.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+      if (this.state.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error, this.uiLanguage) }) }
       if (this.state.loading || this.state.busy) { LoadingProgress().width(28).height(28) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
@@ -89,7 +94,35 @@ export struct PinmonyPublishBoardPage {
       .backgroundColor($r('app.color.page_background'))
   }
 
+  @Builder
+  private sectionsDestination() {
+    HdsNavDestination() {
+      Scroll(this.sectionsScroller) {
+        Column({space:8}) {
+          if (this.state.loading) { LoadingProgress().width(28).height(28) }
+          else if (this.state.error) {
+            PinmonyActionNotice({message:PinmonyI18n.render(this.state.error,this.uiLanguage),actionText:this.uiText('pm_retry_b8784c8d'),onAction:() => this.onAction('retrySections','',false)})
+          } else {
+            PinmonyBoardPickerRow({title:this.state.boards.find((board: PinmonyOrganizeBoard) => board.id === this.state.sectionBoardId)?.title || this.uiText('pm_save_to_board_0233a416'),imageUrl:this.state.boards.find((board: PinmonyOrganizeBoard) => board.id === this.state.sectionBoardId)?.imageUrl || '',secret:this.state.boards.find((board: PinmonyOrganizeBoard) => board.id === this.state.sectionBoardId)?.secret === true,actionEnabled:!this.state.busy,onSelect:() => this.onAction('chooseSection','',false)})
+            ForEach(this.state.sections || [], (section: PinmonyOrganizeBoard) => {
+              PinmonyBoardPickerRow({title:section.title,imageUrl:section.imageUrl,secret:section.secret,indented:true,actionEnabled:!this.state.busy,onSelect:() => this.onAction('chooseSection',section.id,false)})
+            }, (section: PinmonyOrganizeBoard) => section.id + ':' + this.uiLanguage)
+          }
+        }.width('100%').padding({left:20,right:20,top:12,bottom:28})
+      }.width('100%').height('100%').align(Alignment.TopStart)
+    }.width('100%').height('100%').titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.sectionsScroller])
+      .titleBar({avoidLayoutSafeArea:true,enableComponentSafeArea:true,style:{scrollEffectOpts:{enableScrollEffect:false},originalStyle:{backgroundStyle:{backgroundColor:$r('app.color.page_background'),maskExtraHeight:0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}}},content:{title:{mainTitle:this.uiText('pm_select_section_c87be634')},backIcon:{action:() => this.onAction('back','',false)}}})
+      .onBackPressed(() => {this.onAction('back','',false);return true;})
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
+  }
+  @Builder
+  private sectionsPage() {
+    HdsNavigation(this.sectionPaths) { Column().width('100%').height('100%') }
+      .width('100%').height('100%').hideTitleBar(true).navDestination(this.sectionsDestination)
+  }
   build() {
+    if (this.state.phase === 'sections') { this.sectionsPage() }
+    else
     if (this.state.phase === 'create') {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
         .bindSheet($$this.createVisible, this.createSheet(), {

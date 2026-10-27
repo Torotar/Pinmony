@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchQuiz, PinmonySearchQuizTopic, PinmonySearchQuizCard } from '../models/PinmonySearch';
 
@@ -41,8 +42,7 @@ export struct PinmonySearchQuizPanel {
   private requestState() {
     if (this.quiz.busy) { LoadingProgress().width(28).height(28).alignSelf(ItemAlign.Center) }
     if (this.quiz.error) {
-      Text(PinmonyI18n.render(this.quiz.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')).padding(12)
-      Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.onAction('retry', ''))
+      PinmonyActionNotice({ message: PinmonyI18n.render(this.quiz.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onAction('retry', '') })
     }
   }
 

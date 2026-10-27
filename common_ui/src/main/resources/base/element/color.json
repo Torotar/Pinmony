@@ -1,12 +1,37 @@
 {
   "color": [
-    {"name":"publish_button_glass","value":"#66FFFFFF"},
-    { "name": "display_settings_card", "value": "#ECEFF1" },
-    { "name": "display_settings_control", "value": "#D5D9DF" },
-    { "name": "immersive_title_scrolled", "value": "#C2F7F8FC" },
-    { "name": "home_category_selected", "value": "#000000" },
-    { "name": "link_text", "value": "#065BD8" },
-    { "name": "recommendation_selection", "value": "#6155E8" },
+    {
+      "name": "shuffle_visit_background",
+      "value": "#D0D5DA"
+    },
+    {
+      "name": "publish_button_glass",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "display_settings_card",
+      "value": "#ECEFF1"
+    },
+    {
+      "name": "display_settings_control",
+      "value": "#D5D9DF"
+    },
+    {
+      "name": "immersive_title_scrolled",
+      "value": "#C2F7F8FC"
+    },
+    {
+      "name": "home_category_selected",
+      "value": "#000000"
+    },
+    {
+      "name": "link_text",
+      "value": "#065BD8"
+    },
+    {
+      "name": "recommendation_selection",
+      "value": "#6155E8"
+    },
     {
       "name": "page_background",
       "value": "#FFFFFF"
@@ -54,6 +79,26 @@
     {
       "name": "detail_saved_surface",
       "value": "#E9E9E9"
+    },
+    {
+      "name": "search_top_mask_start",
+      "value": "#C0FFFFFF"
+    },
+    {
+      "name": "search_top_mask_mid",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "search_top_mask_end",
+      "value": "#00FFFFFF"
+    },
+    {
+      "name": "publish_source_button_glass",
+      "value": "#CCFFFFFF"
+    },
+    {
+      "name": "publish_source_button_outline",
+      "value": "#22000000"
     }
   ]
 }

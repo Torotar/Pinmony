@@ -1,4 +1,5 @@
 import { PinImageSources, PinmonyVideo } from 'common_ui';
+import { PinmonyShuffleSnapshot } from './PinmonyShuffle';
 
 
 export interface PinmonyDetailAction {
@@ -45,6 +46,10 @@ export interface PinmonyCarousel {
 }
 
 export interface PinmonyDetailSnapshot {
+  shuffleId?: string;
+  shuffleLoading?: boolean;
+  shuffleError?: string;
+  shuffle?: PinmonyShuffleSnapshot;
   priceText?: string;
   richDescription?: string;
   affiliateDisclosure?: string;

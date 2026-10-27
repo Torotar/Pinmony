@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { ShareSheetOption } from '../models/PinmonySheets';
@@ -173,21 +174,13 @@ export struct PinmonyShareSheet {
 
       if (this.pinStore.shareError && !PinmonyI18n.isText(this.pinStore.shareError, "分享链接尚未就绪，请重试")) {
         Row({ space: 12 }) {
-          Text(PinmonyI18n.render(this.pinStore.shareError, this.uiLanguage))
-            .fontSize(14)
-            .fontColor('#D94A4A')
-            .layoutWeight(1)
-          Button(this.uiText("pm_retry_b8784c8d"))
-            .onClick(() => this.onRetry())
+          PinmonyActionNotice({ message: PinmonyI18n.render(this.pinStore.shareError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onRetry() })
         }
         .margin({ left: 20, right: 20, top: 12 })
       }
       if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) &&
           ['正在加载联系人…', '没有可用的联系人'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source))) {
-        Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage))
-          .fontSize(14)
-          .fontColor($r('app.color.secondary_text'))
-          .margin({ left: 20, right: 20, top: 12 })
+        Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
       }
     }
     .width('100%')
@@ -202,8 +195,7 @@ export struct PinmonyShareSheet {
     if (PinmonyI18n.isText(this.pinStore.shareFeedback, '正在处理…')) {
       Column({ space: 12 }) {
         LoadingProgress().width(40).height(40).color($r('app.color.accent'))
-        Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage))
-          .fontSize(14).fontColor($r('app.color.secondary_text'))
+        Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
       }.padding(20).borderRadius(16).backgroundColor($r('app.color.input_surface'))
     }
     }.width('100%').height(this.pinStore.shareSearchActive ? '100%' : undefined)

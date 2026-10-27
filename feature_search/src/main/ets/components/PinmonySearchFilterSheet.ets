@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchStore } from '../stores/PinmonySearchStore';
 import { PinmonySearchFilterOption } from '../models/PinmonySearch';
@@ -50,15 +51,7 @@ export struct PinmonySearchFilterSheet {
         .padding({ left: 24, right: 24 })
       }
       if (this.searchStore.searchFilterError) {
-        Text(PinmonyI18n.render(this.searchStore.searchFilterError, this.uiLanguage))
-          .fontSize(14)
-          .fontColor($r('app.color.secondary_text'))
-          .padding({ left: 24, right: 24, top: 18, bottom: 18 })
-          .width('100%')
-        Button(this.uiText("pm_retry_loading_1133d675"))
-          .height(42)
-          .margin({ left: 24, right: 24, bottom: 12 })
-          .onClick(() => this.onRetry())
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.searchStore.searchFilterError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_1133d675"), onAction: () => this.onRetry() })
       }
       if (this.searchStore.searchFilterOptions.length > 0 || this.searchStore.searchProductPrices || this.searchStore.searchProductDomains.length > 0) {
         Scroll() {
@@ -101,7 +94,7 @@ export struct PinmonySearchFilterSheet {
                       })
                   }.width('100%')
                 },(domain: PinmonySearchFilterOption) => (domain.id) + ':' + this.uiLanguage)
-                if(this.searchStore.searchProductError) { Text(PinmonyI18n.render(this.searchStore.searchProductError, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+                if(this.searchStore.searchProductError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.searchStore.searchProductError, this.uiLanguage) }) }
                 Row({space:12}) {
                   Button(this.uiText("pm_clear_bce23772")).layoutWeight(1).height(48).onClick(() => {
                     this.searchStore.searchProductMin = '';this.searchStore.searchProductMax = '';

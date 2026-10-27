@@ -1,10 +1,11 @@
+import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyProfileLayoutPreference } from 'common_foundation';
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { window } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
@@ -18,6 +19,7 @@ export struct PinmonyDisplaySettingsPage {
   onBack?: () => void;
   @StorageLink('bottomBarScrollCollapseEnabled') private collapseEnabled: boolean = true;
   @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
+  @StorageLink('profileAvatarRight') private avatarRight: boolean = false;
   @StorageLink('themePreference') private themePreference: string = 'system';
   @StorageLink('pinmonyLanguagePreference') private languagePreference: string = 'system';
   @StorageLink('screenOrientationPreference') private orientationPreference: string = 'system';
@@ -48,7 +50,7 @@ export struct PinmonyDisplaySettingsPage {
         this.dismissErrorSnack();
         this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
       }
-    }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
+    }, { duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
   private title(): string { return this.store.screen === 'theme' ? this.uiText("pm_theme_788db1cf") : this.uiText("pm_display_settings_32e62ed0"); }
   private themeLabel(): string { return this.themePreference === 'dark' ? this.uiText("pm_dark_a6b75d06") : this.themePreference === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_follow_system_217cfe7d"); }
@@ -57,12 +59,14 @@ export struct PinmonyDisplaySettingsPage {
   private autoplayOption(action: string, label: string, value: boolean | undefined) {
     Row({ space: 16 }) {
       Text(this.uiText(label)).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: value === true })
+      Checkbox().select(value === true).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
         .enabled(this.available() && !this.store.writeUncertain && typeof value === 'boolean')
         .accessibilityText(this.uiText(label))
         .onChange((next: boolean) => { if (this.available() && !this.store.writeUncertain && typeof value === 'boolean' && next !== value) this.request(action, String(next)); })
-    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
   }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private selectTheme(value: string): void {
@@ -129,9 +133,15 @@ export struct PinmonyDisplaySettingsPage {
         menu: { value: [] } } };
   }
   @Builder
+  private groupDivider() {
+    Row() { Divider().strokeWidth(0.5).color($r('app.color.secondary_text')).opacity(0.25) }
+      .width('100%').padding({left:16,right:16})
+  }
+  @Builder
   private display() {
+    Column() {
     Row({ space: 12 }) {
-      Text(this.uiText("pm_language_9f6fee1a")).fontSize(18).fontWeight(FontWeight.Bold)
+      Text(this.uiText("pm_language_9f6fee1a")).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
         Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }])
@@ -154,10 +164,11 @@ export struct PinmonyDisplaySettingsPage {
           }
         })
       }, (language: string): string => language)
-    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
+    this.groupDivider()
     Row({ space: 12 }) {
-      Text(this.uiText("pm_theme_788db1cf")).fontSize(18).fontWeight(FontWeight.Bold)
+      Text(this.uiText("pm_theme_788db1cf")).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
         Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_light_aa0819df") }, { value: this.uiText("pm_dark_a6b75d06") }])
@@ -173,9 +184,10 @@ export struct PinmonyDisplaySettingsPage {
           if (index >= 0 && index < 3) this.selectTheme(['system', 'light', 'dark'][index]);
         })
       }, (language: string): string => language)
-    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
     if (this.isTablet) {
+      this.groupDivider()
       Row({ space: 12 }) {
         Text(this.uiText("pm_screen_orientation_60cc99cc")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
         ForEach([this.uiLanguage], (language: string) => {
@@ -187,17 +199,22 @@ export struct PinmonyDisplaySettingsPage {
           .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
       }, (language: string): string => language)
-      }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+      }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
     }
+    }.width('100%').backgroundColor($r('app.color.display_settings_card')).borderRadius(20).clip(true)
+    Column() {
     Row({ space: 16 }) {
       Column({ space: 6 }) {
         Text(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564")).fontSize(17).fontColor($r('app.color.primary_text'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled }).onChange((value: boolean) => { this.collapseEnabled = value; })
+      Checkbox().select(this.collapseEnabled).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).onChange((value: boolean) => { this.collapseEnabled = value; })
         .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
-    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
+    this.groupDivider()
     Row({ space: 16 }) {
       Text(this.uiText('pm_immersive_light')).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -219,17 +236,36 @@ export struct PinmonyDisplaySettingsPage {
           }
         })
       }, (language: string): string => language)
-    }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
+    }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
+    }.width('100%').backgroundColor($r('app.color.display_settings_card')).borderRadius(20).clip(true)
+    Column() {
     Row({ space: 16 }) {
       Text(this.uiText('pm_profile_legacy_layout')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: this.legacyProfile }).onChange((value: boolean) => { this.legacyProfile = value; })
+      Checkbox().select(this.legacyProfile).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).onChange((value: boolean) => { this.legacyProfile = value; })
         .accessibilityText(this.uiText('pm_profile_legacy_layout'))
-    }.width('100%').padding(16).backgroundColor($r('app.color.display_settings_card')).borderRadius(20)
-    Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:16 })
+    }.width('100%').padding({left:16,right:16,top:8,bottom:8})
+    if (!this.legacyProfile) {
+      this.groupDivider()
+      Row({ space: 16 }) {
+        Text(this.uiText('pm_profile_avatar_right')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        Checkbox().select(this.avatarRight).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
+          .onChange((value: boolean) => { PinmonyProfileLayoutPreference.saveAvatarRight(value); })
+          .accessibilityText(this.uiText('pm_profile_avatar_right'))
+      }.width('100%').padding({left:16,right:16,top:8,bottom:8})
+    }
+    }.width('100%').backgroundColor($r('app.color.display_settings_card')).borderRadius(20).clip(true)
+    Text(this.uiText('pm_autoplay_video_title')).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top:4 })
+    Column() {
     ForEach(['autoplayCellular','autoplayWifi'], (action: string) => {
+      if(action === 'autoplayWifi') { this.groupDivider() }
       this.autoplayOption(action, action === 'autoplayWifi' ? 'pm_autoplay_video_wifi' : 'pm_autoplay_video_cellular', action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular)
     }, (action: string): string => action + ':' + (action === 'autoplayWifi' ? this.store.data?.autoplayWifi : this.store.data?.autoplayCellular) + ':' + this.store.token + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain)
+    }.width('100%').backgroundColor($r('app.color.display_settings_card')).borderRadius(20).clip(true)
   }
   @Builder
   private theme() {
@@ -237,6 +273,7 @@ export struct PinmonyDisplaySettingsPage {
       Row() {
         Text(value === 'system' ? this.uiText("pm_follow_system_217cfe7d") : value === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_dark_a6b75d06")).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1)
         Radio({ group: 'pinweb-theme', value }).checked(this.themePreference === value)
+        .radioStyle({ checkedBackgroundColor: $r('app.color.accent'), indicatorColor: Color.White })
           .onChange((selected: boolean) => { if (selected) this.selectTheme(value); })
           .accessibilityText(value === 'system' ? this.uiText("pm_follow_system_217cfe7d") : value === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_dark_a6b75d06"))
       }.width('100%').constraintSize({ minHeight: 56 })
@@ -247,7 +284,7 @@ export struct PinmonyDisplaySettingsPage {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
       Scroll(this.scroller) {
-        Column({ space: 8 }) {
+        Column({ space: 12 }) {
           if (this.store.screen === 'theme') { this.theme() } else { this.display() }
         }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)

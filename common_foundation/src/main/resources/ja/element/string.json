@@ -5076,59 +5076,649 @@
       "name": "pm_activity_date_unknown",
       "value": "その他のアクティビティ"
     },
-    {"name":"pm_photo_history_empty_hint","value":"画像をアップロードして検索すると、ここに表示され、もう一度検索に使用できます。"},
-    {"name":"pm_order_discard_title","value":"未保存の並び順を破棄しますか？"},
-    {"name":"pm_order_discard_message","value":"変更したボードの並び順は保存されていません。戻ると変更が破棄されます。"},
-    {"name":"pm_order_discard_action","value":"変更を破棄"},
-    {"name":"pm_profile_legacy_layout","value":"以前のプロフィールレイアウトを使用"},
-    {"name":"pm_profile_hub_pins","value":"ピン"},
-    {"name":"pm_profile_hub_boards","value":"ボード"},
-    {"name":"pm_profile_hub_collages","value":"コラージュ"},
-    {"name":"pm_profile_hub_favorites","value":"お気に入り"},
-    {"name":"pm_profile_hub_created","value":"作成したピン"},
-    {"name":"pm_profile_hub_groups","value":"グループ"},
-    {"name":"pm_profile_hub_secret","value":"シークレット"},
-    {"name":"pm_profile_hub_saved","value":"保存したピン"},
-    {"name":"pm_profile_hub_suggestions","value":"おすすめのボード"},
-    {"name":"pm_profile_hub_empty","value":"条件に一致するピンはありません"},
-    {"name":"pm_profile_hub_favorite_empty","value":"ピンをお気に入りに追加すると、ここに表示されます。"},
-    {"name":"pm_profile_suggestion_confirm","value":"ボードを作成して、このグループのピンを移動しますか？"},
-    {"name":"pm_profile_suggestion_unconfirmed","value":"結果を確認できません。再作成する前に更新してボードを確認してください。"},
-    {"name":"pm_profile_hub_result_count","value":"ピン {0} 件 · フィルター {1} 件を適用"},
-    {"name":"pm_profile_hub_in_progress","value":"作成中"},
-    {"name":"pm_profile_invite_collaborators","value":"共同編集者を招待"},
-    {"name":"pm_profile_create_collage","value":"コラージュを作成"},
-    {"name":"pm_profile_empty_favorites_title","value":"お気に入りのコンテンツ"},
-    {"name":"pm_profile_empty_favorites_body","value":"保存したピンの星をタップすると、ここに表示されます。"},
-    {"name":"pm_profile_empty_combined_title","value":"ピンをお気に入りに追加"},
-    {"name":"pm_profile_empty_combined_body","value":"作成したピンの星をタップすると、ここで簡単に見つけられます。"},
-    {"name":"pm_profile_empty_groups_title","value":"ボードで共同編集"},
-    {"name":"pm_profile_empty_groups_body","value":"共同編集者をボードに追加して、ピンやお気に入りを保存し、アイデアをまとめましょう。"},
-    {"name":"pm_profile_empty_collages_title","value":"コラージュを作成"},
-    {"name":"pm_profile_empty_collages_body","value":"ピンを切り抜いて組み合わせ、新しい作品を公開して、ほかのユーザーにアイデアを届けましょう。"},
-    {"name":"pm_profile_empty_created_title","value":"作成したピン"},
-    {"name":"pm_profile_empty_created_body","value":"作成したピンはここに表示されます。"},
-    {"name":"pm_profile_empty_boards_title","value":"ボードはまだありません"},
-    {"name":"pm_profile_empty_boards_body","value":"条件に一致するボードはここに表示されます。"},
-    {"name":"pm_profile_empty_collage_drafts_title","value":"作成中のコラージュはありません！"},
-    {"name":"pm_profile_empty_collage_drafts_body","value":"ひらめきをくれる画像を切り抜いて組み合わせ、コラージュを作りましょう。"}
-  ,
-    {"name":"pm_settings_view_profile","value":"プロフィールを見る"},
-    {"name":"pm_star_add","value":"お気に入りに追加"},
-    {"name":"pm_star_remove","value":"お気に入りから削除"},
-    {"name":"pm_star_added","value":"お気に入りに追加しました"},
-    {"name":"pm_star_removed","value":"お気に入りから削除しました"},
-    {"name":"pm_star_failed","value":"操作を送信できませんでした。メニューを開き直してお試しください。"},
-    {"name":"pm_star_unknown","value":"操作結果を確認できませんでした。更新して状態を確認してください。"},
-    {"name":"pm_star_filter","value":"お気に入り"},
-    {"name":"pm_star_filter_active","value":"お気に入り · 絞り込み中"},
-    {"name":"pm_board_view_title","value":"Board view"},
-    {"name":"pm_board_view_type","value":"Filter by type"},
-    {"name":"pm_board_view_favorites","value":"Favorites"},
-    {"name":"pm_board_view_density","value":"Set view to"},
-    {"name":"pm_board_view_wide","value":"Wide"},
-    {"name":"pm_board_view_default","value":"Default"},
-    {"name":"pm_board_view_compact","value":"Compact"},
-    {"name":"pm_board_view_apply","value":"Apply filters"}
+    {
+      "name": "pm_photo_history_empty_hint",
+      "value": "画像をアップロードして検索すると、ここに表示され、もう一度検索に使用できます。"
+    },
+    {
+      "name": "pm_order_discard_title",
+      "value": "未保存の並び順を破棄しますか？"
+    },
+    {
+      "name": "pm_order_discard_message",
+      "value": "変更したボードの並び順は保存されていません。戻ると変更が破棄されます。"
+    },
+    {
+      "name": "pm_order_discard_action",
+      "value": "変更を破棄"
+    },
+    {
+      "name": "pm_profile_legacy_layout",
+      "value": "以前のプロフィールレイアウトを使用"
+    },
+    {
+      "name": "pm_profile_hub_pins",
+      "value": "ピン"
+    },
+    {
+      "name": "pm_profile_hub_boards",
+      "value": "ボード"
+    },
+    {
+      "name": "pm_profile_hub_collages",
+      "value": "コラージュ"
+    },
+    {
+      "name": "pm_profile_hub_favorites",
+      "value": "お気に入り"
+    },
+    {
+      "name": "pm_profile_hub_created",
+      "value": "作成したピン"
+    },
+    {
+      "name": "pm_profile_hub_groups",
+      "value": "グループ"
+    },
+    {
+      "name": "pm_profile_hub_secret",
+      "value": "シークレット"
+    },
+    {
+      "name": "pm_profile_hub_saved",
+      "value": "保存したピン"
+    },
+    {
+      "name": "pm_profile_hub_suggestions",
+      "value": "おすすめのボード"
+    },
+    {
+      "name": "pm_profile_hub_empty",
+      "value": "条件に一致するピンはありません"
+    },
+    {
+      "name": "pm_profile_hub_favorite_empty",
+      "value": "ピンをお気に入りに追加すると、ここに表示されます。"
+    },
+    {
+      "name": "pm_profile_suggestion_confirm",
+      "value": "ボードを作成して、このグループのピンを移動しますか？"
+    },
+    {
+      "name": "pm_profile_suggestion_unconfirmed",
+      "value": "結果を確認できません。再作成する前に更新してボードを確認してください。"
+    },
+    {
+      "name": "pm_profile_hub_result_count",
+      "value": "ピン {0} 件 · フィルター {1} 件を適用"
+    },
+    {
+      "name": "pm_profile_hub_in_progress",
+      "value": "作成中"
+    },
+    {
+      "name": "pm_profile_invite_collaborators",
+      "value": "共同編集者を招待"
+    },
+    {
+      "name": "pm_profile_create_collage",
+      "value": "コラージュを作成"
+    },
+    {
+      "name": "pm_profile_empty_favorites_title",
+      "value": "お気に入りのコンテンツ"
+    },
+    {
+      "name": "pm_profile_empty_favorites_body",
+      "value": "保存したピンの星をタップすると、ここに表示されます。"
+    },
+    {
+      "name": "pm_profile_empty_combined_title",
+      "value": "ピンをお気に入りに追加"
+    },
+    {
+      "name": "pm_profile_empty_combined_body",
+      "value": "作成したピンの星をタップすると、ここで簡単に見つけられます。"
+    },
+    {
+      "name": "pm_profile_empty_groups_title",
+      "value": "ボードで共同編集"
+    },
+    {
+      "name": "pm_profile_empty_groups_body",
+      "value": "共同編集者をボードに追加して、ピンやお気に入りを保存し、アイデアをまとめましょう。"
+    },
+    {
+      "name": "pm_profile_empty_collages_title",
+      "value": "コラージュを作成"
+    },
+    {
+      "name": "pm_profile_empty_collages_body",
+      "value": "ピンを切り抜いて組み合わせ、新しい作品を公開して、ほかのユーザーにアイデアを届けましょう。"
+    },
+    {
+      "name": "pm_profile_empty_created_title",
+      "value": "作成したピン"
+    },
+    {
+      "name": "pm_profile_empty_created_body",
+      "value": "作成したピンはここに表示されます。"
+    },
+    {
+      "name": "pm_profile_empty_boards_title",
+      "value": "ボードはまだありません"
+    },
+    {
+      "name": "pm_profile_empty_boards_body",
+      "value": "条件に一致するボードはここに表示されます。"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_title",
+      "value": "作成中のコラージュはありません！"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_body",
+      "value": "ひらめきをくれる画像を切り抜いて組み合わせ、コラージュを作りましょう。"
+    },
+    {
+      "name": "pm_settings_view_profile",
+      "value": "プロフィールを見る"
+    },
+    {
+      "name": "pm_star_add",
+      "value": "お気に入りに追加"
+    },
+    {
+      "name": "pm_star_remove",
+      "value": "お気に入りから削除"
+    },
+    {
+      "name": "pm_star_added",
+      "value": "お気に入りに追加しました"
+    },
+    {
+      "name": "pm_star_removed",
+      "value": "お気に入りから削除しました"
+    },
+    {
+      "name": "pm_star_failed",
+      "value": "操作を送信できませんでした。メニューを開き直してお試しください。"
+    },
+    {
+      "name": "pm_star_unknown",
+      "value": "操作結果を確認できませんでした。更新して状態を確認してください。"
+    },
+    {
+      "name": "pm_star_filter",
+      "value": "お気に入り"
+    },
+    {
+      "name": "pm_star_filter_active",
+      "value": "お気に入り · 絞り込み中"
+    },
+    {
+      "name": "pm_board_view_title",
+      "value": "Board view"
+    },
+    {
+      "name": "pm_board_view_type",
+      "value": "Filter by type"
+    },
+    {
+      "name": "pm_board_view_favorites",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_board_view_density",
+      "value": "Set view to"
+    },
+    {
+      "name": "pm_board_view_wide",
+      "value": "Wide"
+    },
+    {
+      "name": "pm_board_view_default",
+      "value": "Default"
+    },
+    {
+      "name": "pm_board_view_compact",
+      "value": "Compact"
+    },
+    {
+      "name": "pm_board_view_apply",
+      "value": "Apply filters"
+    },
+    {
+      "name": "pm_pin_drafts_title",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_pin_drafts_expiry",
+      "value": "Drafts expire 30 days after you first save them. They will then be deleted."
+    },
+    {
+      "name": "pm_pin_drafts_empty",
+      "value": "下書きはありません"
+    },
+    {
+      "name": "pm_pin_drafts_days",
+      "value": "{0} days until deletion"
+    },
+    {
+      "name": "pm_pin_drafts_count",
+      "value": "{0} drafts"
+    },
+    {
+      "name": "pm_social_shopping_section",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_social_shopping_exclusions",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_social_shopping_detail",
+      "value": "People can use visual search to shop for products similar to those shown in your Pins."
+    },
+    {
+      "name": "pm_social_download_section",
+      "value": "Downloads"
+    },
+    {
+      "name": "pm_social_download_detail",
+      "value": "Allow people to download your video Pins (9:16 aspect ratio) and share them on other platforms. These videos include a watermark with your username."
+    },
+    {
+      "name": "pm_social_filter_other_detail",
+      "value": "Hide comments containing certain words or phrases on other people’s Pins."
+    },
+    {
+      "name": "pm_social_filter_my_detail",
+      "value": "Hide comments containing certain words or phrases on Pins you create."
+    },
+    {
+      "name": "pm_social_comments_title",
+      "value": "Comments"
+    },
+    {
+      "name": "pm_social_comments_entry_detail",
+      "value": "Manage comment permissions and filters"
+    },
+    {
+      "name": "pm_social_comments_detail",
+      "value": "Enable comments on your new and existing Pins by default."
+    },
+    {
+      "name": "pm_social_shopping",
+      "value": "類似商品の表示"
+    },
+    {
+      "name": "pm_social_idea_downloads",
+      "value": "Video Pin downloads"
+    },
+    {
+      "name": "pm_social_filter_phrases_placeholder",
+      "value": "フィルタリングする単語またはフレーズを入力"
+    },
+    {
+      "name": "pm_social_filter_phrases_hint",
+      "value": "単語またはフレーズをカンマで区切ってください"
+    },
+    {
+      "name": "pm_social_filter_phrases_done",
+      "value": "完了"
+    },
+    {
+      "name": "pm_social_filter_other_pins",
+      "value": "他のユーザーの Pin へのコメントをフィルタリング"
+    },
+    {
+      "name": "pm_social_filter_my_pins",
+      "value": "あなたの Pin へのコメントをフィルタリング"
+    },
+    {
+      "name": "pm_social_filter_invalid",
+      "value": "フィルター形式が無効です。単語またはフレーズをカンマで区切ってください。"
+    },
+    {
+      "name": "pm_social_comments",
+      "value": "あなたの Pin へのコメントを許可"
+    },
+    {
+      "name": "pm_pin_images_title",
+      "value": "Pin画像"
+    },
+    {
+      "name": "pm_publish_remove_product",
+      "value": "商品を削除"
+    },
+    {
+      "name": "pm_publish_add_product_help",
+      "value": "プラスボタンをタップして商品を追加"
+    },
+    {
+      "name": "pm_publish_affiliate_section",
+      "value": "プロモーション商品をタグ付け"
+    },
+    {
+      "name": "pm_publish_affiliate_label",
+      "value": "アフィリエイトリンクまたはプロモーション商品です"
+    },
+    {
+      "name": "pm_publish_affiliate_help",
+      "value": "この商品を含めることで報酬を受け取る可能性があるかどうかを開示してください。"
+    },
+    {
+      "name": "pm_board_cover_placeholder",
+      "value": "このボードの上部に表示するカバー画像を選択"
+    },
+    {
+      "name": "pm_publish_submit_failed",
+      "value": "公開が拒否されました。選択内容を確認して再試行してください。"
+    },
+    {
+      "name": "pm_publish_product_unconfirmed",
+      "value": "商品の作成結果を確認できません。閉じて更新し、再送信する前に確認してください。"
+    },
+    {
+      "name": "pm_publish_product_select_help",
+      "value": "タグ付けする商品を選択します。再度タップすると解除します。"
+    },
+    {
+      "name": "pm_publish_product_count",
+      "value": "商品 {0} 件"
+    },
+    {
+      "name": "pm_board_cover_verifying",
+      "value": "カバーの更新を確認中…"
+    },
+    {
+      "name": "pm_board_cover_unconfirmed",
+      "value": "カバーの更新を確認できません。最新の状態を確認してください。再送信は行いません。"
+    },
+    {
+      "name": "pm_board_cover_title",
+      "value": "ボードカバーを変更"
+    },
+    {
+      "name": "pm_board_cover_saving",
+      "value": "カバーを送信中…"
+    },
+    {
+      "name": "pm_board_cover_saved",
+      "value": "ボードカバーを更新しました"
+    },
+    {
+      "name": "pm_board_cover_pins",
+      "value": "このボードのピン"
+    },
+    {
+      "name": "pm_board_cover_more",
+      "value": "画像をさらに読み込む"
+    },
+    {
+      "name": "pm_board_cover_label",
+      "value": "カバー画像"
+    },
+    {
+      "name": "pm_board_cover_image_failed",
+      "value": "画像を読み込めませんでした。画像を選び直してください。"
+    },
+    {
+      "name": "pm_board_cover_empty",
+      "value": "このボードにはカバーに使える画像がありません"
+    },
+    {
+      "name": "pm_board_cover_drag",
+      "value": "ドラッグして位置を調整"
+    },
+    {
+      "name": "pm_board_cover_choose",
+      "value": "ボードカバーを選択"
+    },
+    {
+      "name": "pm_board_cover_check",
+      "value": "カバーの状態を確認"
+    },
+    {
+      "name": "pm_profile_protected_boards_title",
+      "value": "非公開リストのボード"
+    },
+    {
+      "name": "pm_profile_protected_boards_description",
+      "value": "プロフィールには公開されませんが、リンクを知っている人は誰でも閲覧できます。"
+    },
+    {
+      "name": "pm_publish_product_recommendations",
+      "value": "おすすめの商品"
+    },
+    {
+      "name": "pm_publish_product_search_help",
+      "value": "商品名を入力して検索してください。"
+    },
+    {
+      "name": "pm_publish_product_read_failed",
+      "value": "商品を読み込めません。再試行するか、商品リンクを確認してください。"
+    },
+    {
+      "name": "pm_publish_product_pending",
+      "value": "商品をプレビューできます。このピンへの追加にはまだ対応していません。"
+    },
+    {
+      "name": "pm_publish_product_lookup_help",
+      "value": "販売店の商品詳細ページのリンクを入力して、商品画像を確認してください。"
+    },
+    {
+      "name": "pm_publish_product_lookup",
+      "value": "商品を検索"
+    },
+    {
+      "name": "pm_publish_product_empty",
+      "value": "商品が見つかりません。"
+    },
+    {
+      "name": "pm_publish_topic_count",
+      "value": "{0} tags"
+    },
+    {
+      "name": "pm_publish_selected_topics",
+      "value": "Selected"
+    },
+    {
+      "name": "pm_publish_topic_search",
+      "value": "Search topics"
+    },
+    {
+      "name": "pm_publish_topic_help",
+      "value": "Tag related topics to reach people interested in Pins like yours. People will not see the topics you tag."
+    },
+    {
+      "name": "pm_publish_topic_empty",
+      "value": "No matching topics found"
+    },
+    {
+      "name": "pm_publish_similar_products",
+      "value": "Show similar products"
+    },
+    {
+      "name": "pm_publish_similar_help",
+      "value": "People can use visual search to shop for products similar to those shown in this Pin."
+    },
+    {
+      "name": "pm_publish_shopping_help",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_publish_shopping",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_publish_engagement",
+      "value": "Engagement settings"
+    },
+    {
+      "name": "pm_publish_alt_text",
+      "value": "Alt text"
+    },
+    {
+      "name": "pm_publish_alt_hint",
+      "value": "Describe the visual details of your Pin"
+    },
+    {
+      "name": "pm_publish_alt_help",
+      "value": "This helps people using screen readers understand your Pin."
+    },
+    {
+      "name": "pm_publish_allow_comments",
+      "value": "Allow comments"
+    },
+    {
+      "name": "pm_publish_ai_person_help",
+      "value": "This Pin includes an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_person",
+      "value": "Show an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_modified_help",
+      "value": "Content made entirely or partly with AI"
+    },
+    {
+      "name": "pm_publish_ai_modified",
+      "value": "Label as AI modified"
+    },
+    {
+      "name": "pm_publish_ai_disclosure",
+      "value": "AI disclosure"
+    },
+    {
+      "name": "pm_search_recommendation_updated",
+      "value": "おすすめが更新されました。もう一度選択してください。"
+    },
+    {
+      "name": "pm_search_recommendation_unavailable",
+      "value": "このおすすめを開けません。再読み込みしてください。"
+    },
+    {
+      "name": "pm_publish_use_link",
+      "value": "Use a link"
+    },
+    {
+      "name": "pm_publish_topics",
+      "value": "Tag topics"
+    },
+    {
+      "name": "pm_publish_title_limit",
+      "value": "Up to 100 characters"
+    },
+    {
+      "name": "pm_publish_title_hint",
+      "value": "Give your Pin a title"
+    },
+    {
+      "name": "pm_publish_title",
+      "value": "Title"
+    },
+    {
+      "name": "pm_publish_search_pins",
+      "value": "Search Pins"
+    },
+    {
+      "name": "pm_publish_recent_saves",
+      "value": "Recently saved"
+    },
+    {
+      "name": "pm_publish_products",
+      "value": "Tag products"
+    },
+    {
+      "name": "pm_publish_product_search",
+      "value": "Search by product name"
+    },
+    {
+      "name": "pm_publish_product_link",
+      "value": "Add a product link"
+    },
+    {
+      "name": "pm_publish_product_help",
+      "value": "Enter a product page link from a retailer’s website. A product Pin will be created and tagged in your Pin."
+    },
+    {
+      "name": "pm_publish_link_hint",
+      "value": "Add a link"
+    },
+    {
+      "name": "pm_publish_link",
+      "value": "Link"
+    },
+    {
+      "name": "pm_publish_description_hint",
+      "value": "Describe your Pin"
+    },
+    {
+      "name": "pm_publish_create_pin",
+      "value": "Create Pin"
+    },
+    {
+      "name": "pm_publish_choose_board",
+      "value": "Choose board"
+    },
+    {
+      "name": "pm_publish_advanced",
+      "value": "Advanced settings"
+    },
+    {
+      "name": "pm_profile_avatar_right",
+      "value": "アバターを右側に表示"
+    },
+    {
+      "name": "pm_pin_draft_delete_title",
+      "value": "下書きを削除しますか？"
+    },
+    {
+      "name": "pm_pin_draft_delete_message",
+      "value": "この下書きを削除してもよろしいですか？"
+    },
+    {
+      "name": "pm_publish_save_draft",
+      "value": "下書きを保存"
+    },
+    {
+      "name": "pm_publish_draft_exit_title",
+      "value": "保存して終了しますか？"
+    },
+    {
+      "name": "pm_publish_draft_exit_message",
+      "value": "変更は保存されていません。終了する前に下書きを保存してください。"
+    },
+    {
+      "name": "pm_publish_draft_saved",
+      "value": "下書きを保存しました。"
+    },
+    {
+      "name": "pm_publish_draft_unconfirmed",
+      "value": "保存結果を確認できません。編集内容は保持されています。再保存する前に下書き一覧を確認してください。"
+    },
+    {
+      "name": "pm_publish_draft_choose_board",
+      "value": "下書きを保存する前にボードを選択してください。"
+    },
+    {
+      "name": "pm_publish_draft_not_submitted",
+      "value": "下書きの準備または画像のアップロードに失敗しました。下書きは送信されていません。編集内容は保持されており、再保存できます。"
+    },
+    {
+      "name": "pm_publish_draft_box",
+      "value": "下書き"
+    },
+    {
+      "name": "pm_publish_source_files",
+      "value": "システムファイル"
+    },
+    {
+      "name": "pm_publish_source_website",
+      "value": "ウェブサイトのリンク"
+    }
   ]
 }

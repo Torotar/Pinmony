@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -29,7 +30,7 @@ export struct PinmonyBoardSectionPage {
         .accessibilityText(this.uiText("pm_section_name_0e25c295")).onChange((value: string) => { this.name = value; })
       if (this.busy) { LoadingProgress().width(24).height(24) }
       if (!this.ready && !this.busy && !this.error) { Text(this.uiText("pm_restoring_board_please_wait_9e819a8a")).fontColor($r('app.color.secondary_text')).fontSize(14) }
-      if (this.error) { Text(PinmonyI18n.render(this.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')).fontSize(14) }
+      if (this.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.error, this.uiLanguage) }) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
   @Builder

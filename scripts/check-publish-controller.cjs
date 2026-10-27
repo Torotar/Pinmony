@@ -5,7 +5,7 @@ const { PinmonyPublishController } = require('./publish-controller-harness.cjs')
   setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id)
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
-function harness() {
+function harness(native = false) {
   let auth = true, foreground = true, visible = false, document = 'synthetic-profile', prepared;
   let refreshes = 0, returns = 0, photos = 0, suppressed = 0, sections = 0, boardReturn = false, closeSheet;
   const reads = [], writes = [], messages = [], scripts = [], restoreModes = [];
@@ -19,6 +19,13 @@ function harness() {
     profileAddress: () => 'synthetic-profile', documentMatches: profile => document === profile,
     currentDocument: () => document, normalizeProfile: address => address,
     prepareContext: () => new Promise(resolve => { prepared = resolve; }), nativeEnabled: () => true,
+    nativeFlow: () => native,
+    nativeAction: async action => {
+      if(action === 'back') {
+        assert(suppressed > 0, 'child back must suppress root propagation before changing phase');
+        store.publishFlow.phase = 'select';
+      }
+    },
     publishScript: () => '', runScript: script => {
       scripts.push(script);
       if (script.includes('PinmonyPublishApi.read')) return new Promise((resolve, reject) => reads.push({ resolve, reject }));
@@ -41,6 +48,15 @@ function harness() {
   };
 }
 (async () => {
+  const uncertainBack=harness(true);uncertainBack.flow();uncertainBack.store.publishFlow.uncertain=true;
+  uncertainBack.controller.action('back','website');assert.equal(uncertainBack.store.publishFlow,undefined,'uncertain flow closes without another write');
+  for(const phase of ['topics','products','advanced','boards']) {
+    const childBack=harness(true);childBack.flow();childBack.store.publishFlow.kind='photo';childBack.store.publishFlow.phase=phase;
+    childBack.controller.action('back');assert.equal(childBack.store.publishFlow.phase,'select');assert.equal(childBack.suppressed(),1);assert.equal(childBack.returns(),0,'child return must retain publish flow');
+    childBack.controller.action('back',phase);assert.equal(childBack.store.publishFlow.phase,'select','a late back from the old destination cannot close the editor');
+    childBack.controller.action('close');assert.equal(childBack.store.publishFlow.draftExitRequested,true,'unsaved photo editor requests confirmation');
+    childBack.controller.action('cancelDraftExit');assert.equal(childBack.store.publishFlow,undefined,'cancel exits without saving');
+  }
   const cancelledPublish = harness();cancelledPublish.flow();cancelledPublish.controller.close();assert.deepEqual(cancelledPublish.restoreModes,[false],'cancelled publish preserves board');
   const completedPublish = harness();completedPublish.flow();completedPublish.store.publishFlow.completed = 1;completedPublish.controller.close();assert.deepEqual(completedPublish.restoreModes,[true],'completed publish revalidates board');
   const unknownPublish = harness();unknownPublish.flow();unknownPublish.store.publishFlow.uncertain = true;unknownPublish.controller.close();assert.deepEqual(unknownPublish.restoreModes,[true],'unknown write revalidates without replay');

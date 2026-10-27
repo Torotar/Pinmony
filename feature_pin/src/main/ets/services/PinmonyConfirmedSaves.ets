@@ -48,6 +48,7 @@ export class PinmonyConfirmedSaves {
       actionsRetained: detail.actionsRetained, commentsRetained: detail.commentsRetained, relatedRetained: detail.relatedRetained,
       carousel: detail.carousel, isVideo: detail.isVideo, video: detail.video, videoError: detail.videoError,
       mediaLoading: detail.mediaLoading, mediaError: detail.mediaError, mediaKind: detail.mediaKind,
+      shuffleId: detail.shuffleId, shuffle: detail.shuffle, shuffleLoading: false, shuffleError: detail.shuffleError,
       timingEvent: detail.timingEvent, timingDuration: detail.timingDuration,
       error: detail.error, retryable: detail.retryable, mediaUnsupported: detail.mediaUnsupported
     };

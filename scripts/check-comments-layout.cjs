@@ -8,9 +8,11 @@ catch (_) {
   if (!process.argv[2]) throw new Error('Pass the DevEco TypeScript module path as the first argument');
   ts = require(process.argv[2]);
 }
-const source = readSourceFileSync('entry/src/main/ets/components/PinmonyCommentsSheet.ets', 'utf8');
+const source = readSourceFileSync('feature_pin/src/main/ets/components/PinmonyCommentsSheet.ets', 'utf8');
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert.match(source, /if \(item\.canTranslate && this\.onTranslate\)/);
+assert(source.includes('message: PinmonyI18n.render(item.translationError, this.uiLanguage)'), 'official translation notice resolves resources in the current language');
+assert(source.includes('message: PinmonyI18n.render(item.repliesError, this.uiLanguage)'), 'official reply notice resolves resource markers');
 assert.match(source, /item\.translationVisible && item\.translatedText \? item\.translatedText : item\.text/,
   'translations change display without overwriting the editable original');
 assert.match(source, /\.enabled\(!item\.translationLoading && !this\.result\.loading && !this\.result\.busy && !this\.result\.uncertain\)/);

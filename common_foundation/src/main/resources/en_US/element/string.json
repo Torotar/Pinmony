@@ -608,7 +608,10 @@
       "name": "pm_secret_board_afc1422a",
       "value": "Secret board"
     },
-    { "name": "pm_public_board", "value": "Public board" },
+    {
+      "name": "pm_public_board",
+      "value": "Public board"
+    },
     {
       "name": "pm_featured_board_4b3cbe23",
       "value": "Featured board ·"
@@ -4333,248 +4336,1389 @@
       "name": "pm_one_year_ago_suffix",
       "value": " year ago"
     },
-    {"name":"pm_immersive_light","value":"Immersive lighting"},
-    {"name":"pm_light_off","value":"Off"},
-    {"name":"pm_light_gentle","value":"Gentle"},
-    {"name":"pm_light_immersive","value":"Immersive"},
-    {"name":"pm_light_exquisite","value":"Exquisite"},
-    {"name":"pm_inbox_search_username","value":"Search username"},
-    {"name":"pm_inbox_no_matching_username","value":"No matching usernames"},
-    {"name":"pm_photo_search","value":"Photo search"},
-    {"name":"pm_photo_search_loading","value":"Searching photo…"},
-    {"name":"pm_photo_search_empty","value":"No matching Pins found"},
-    {"name":"pm_photo_search_unconfirmed","value":"Photo search did not finish or its result was not confirmed. Close and choose a photo again."},
-    {"name":"pm_notifications_turn_off_all","value":"Turn off all"},
-    {"name":"pm_notifications_disable_push","value":"You will no longer receive push notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."},
-    {"name":"pm_notifications_disable_email","value":"You will no longer receive email notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."},
-    {"name":"pm_notifications_disable_news","value":"You will no longer receive in-app notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."},
-    {"name":"pm_social_title","value":"Social permissions"},
-    {"name":"pm_social_messages","value":"Messages"},
-    {"name":"pm_social_message_settings","value":"Message settings"},
-    {"name":"pm_social_blocked","value":"Blocked accounts"},
-    {"name":"pm_social_mentions","value":"@Mentions"},
-    {"name":"pm_social_friends","value":"Friends"},
-    {"name":"pm_social_followers","value":"Followers"},
-    {"name":"pm_social_following","value":"Following"},
-    {"name":"pm_social_others","value":"Everyone else"},
-    {"name":"pm_social_intro","value":"Choose how others can interact with you on Pinterest and find Pins you’ve interacted with in the past"},
-    {"name":"pm_social_message_settings_detail","value":"Choose who can send you a message and add you to group conversations"},
-    {"name":"pm_social_blocked_detail","value":"Manage people you've blocked"},
-    {"name":"pm_social_mentions_detail","value":"Choose who can mention you in a comment"},
-    {"name":"pm_social_message_intro","value":"Decide whether messages go to your inbox, requests, or are ignored"},
-    {"name":"pm_social_business_messages","value":"Allow others to message my business"},
-    {"name":"pm_social_business_detail","value":"A message button on your profile lets other people send you messages."},
-    {"name":"pm_social_unavailable","value":"Currently unavailable"},
-    {"name":"pm_social_direct","value":"Inbox"},
-    {"name":"pm_social_requests","value":"Requests"},
-    {"name":"pm_social_ignore","value":"Don't deliver"},
-    {"name":"pm_social_delivery","value":"Choose where your messages are delivered"},
-    {"name":"pm_social_friends_detail","value":"People you follow who also follow you."},
-    {"name":"pm_social_followers_detail","value":"People and brands that follow you. To message someone who follows you, you have to follow them."},
-    {"name":"pm_social_following_detail","value":"People and brands you follow. To message them, they must follow you."},
-    {"name":"pm_social_others_detail","value":"People on Pinterest you have not interacted or collaborated with."},
-    {"name":"pm_social_blocked_intro","value":"When you block someone, you can't see, follow or contact each other, or save each other's Pins."},
-    {"name":"pm_social_no_blocked","value":"You're not blocking anyone right now"},
-    {"name":"pm_social_no_matches","value":"No matching accounts"},
-    {"name":"pm_social_search","value":"Search"},
-    {"name":"pm_social_unblock","value":"Unblock"},
-    {"name":"pm_social_unblock_title","value":"Unblock {0}?"},
-    {"name":"pm_social_unblock_description","value":"Depending on your settings, you will be able to see, follow and contact this person, and save their Pins."},
-    {"name":"pm_social_mentions_anyone","value":"Anyone on Pinterest"},
-    {"name":"pm_social_mentions_following","value":"Only people you follow"},
-    {"name":"pm_social_mentions_off","value":"Turn off"},
-    {"name":"pm_social_others_short","value":"Others"},
-    {"name":"pm_settings_help_center","value":"Help center"},
-    {"name":"pm_settings_terms_of_service","value":"Terms of service"},
-    {"name":"pm_settings_privacy_policy","value":"Privacy policy"},
-    {"name":"pm_profile_search_your_pins","value":"Your Pins"},
-    {"name":"pm_profile_search_recent","value":"Recent searches"},
-    {"name":"pm_profile_search_empty","value":"No matching Pins"},
-    {"name":"pm_notify_category_published_comments","value":"Comments"},
-    {"name":"pm_notify_category_published_reactions","value":"Reactions"},
-    {"name":"pm_notify_category_published_saves","value":"Saves"},
-    {"name":"pm_notify_category_views_and_impressions","value":"Views and impressions"},
-    {"name":"pm_notify_category_published_collages","value":"Collages"},
-    {"name":"pm_notify_category_saved_pin_comments","value":"Comments"},
-    {"name":"pm_notify_category_saved_pin_mentions","value":"Mentions"},
-    {"name":"pm_notify_category_saved_pin_reminders","value":"Reminders"},
-    {"name":"pm_notify_category_saved_pin_tries","value":"Comments with photos"},
-    {"name":"pm_notify_category_group_board_updates","value":"Group board updates"},
-    {"name":"pm_notify_category_group_board_invites","value":"Group board invites"},
-    {"name":"pm_notify_category_messages","value":"Messages"},
-    {"name":"pm_notify_category_followers","value":"Followers"},
-    {"name":"pm_notify_category_homefeed_pins","value":"Inspired by your home feed"},
-    {"name":"pm_notify_category_pins_picked_for_you","value":"Based on your interests"},
-    {"name":"pm_notify_category_based_on_activity","value":"Based on your activity"},
-    {"name":"pm_notify_category_board_recommendations","value":"Boards you might like"},
-    {"name":"pm_notify_category_search_recommendations","value":"Searches you might like"},
-    {"name":"pm_notify_category_followee_pins","value":"Pins from people you follow"},
-    {"name":"pm_notify_category_shadow_followee_pins","value":"Pins from people you might like"},
-    {"name":"pm_notify_category_shopping_recommendations","value":"Shopping Pins"},
-    {"name":"pm_notify_category_pinterest_announcements","value":"Pinterest announcements"},
-    {"name":"pm_notify_category_surveys_and_quizzes","value":"Surveys and quizzes"},
-    {"name":"pm_notify_category_reports_and_violations_center","value":"Reports and violations center updates"},
-    {"name":"pm_notify_category_shuffles_activity","value":"Activity on Shuffles"},
-    {"name":"pm_notify_group_created","value":"Pins you created"},
-    {"name":"pm_notify_group_saved","value":"Pins you saved"},
-    {"name":"pm_notify_group_social","value":"Social activity"},
-    {"name":"pm_notify_group_recommendations","value":"Recommendations"},
-    {"name":"pm_notify_group_other","value":"Other notifications"},
-    {"name":"pm_notify_group_delivery","value":"How you get notifications"},
-    {"name":"pm_notify_title","value":"Manage Notifications"},
-    {"name":"pm_notify_how","value":"How do you want to be notified?"},
-    {"name":"pm_notify_push","value":"Push"},
-    {"name":"pm_notify_email","value":"Email"},
-    {"name":"pm_notify_news","value":"In-app"},
-    {"name":"pm_notify_on","value":"on"},
-    {"name":"pm_notify_off","value":"off"},
-    {"name":"pm_notify_comments_description","value":"Get notified when someone comments on a Pin you created"},
-    {"name":"pm_notify_search_description","value":"Get personalized search terms to help you discover more of what you love"},
-    {"name":"pm_notify_global_description","value":"Pinterest will still send you important updates about your account"},
-    {"name":"pm_autoplay_video_title","value":"Autoplay videos"},
-    {"name":"pm_autoplay_video_cellular","value":"Autoplay videos on mobile data"},
-    {"name":"pm_autoplay_video_wifi","value":"Autoplay videos on Wi-Fi"},
-    {"name":"pm_custom_gender_fallback","value":"Custom"},
-    {"name":"pm_board_load_section_details_failed","value":"Unable to load section details. Please retry."},
-    {"name":"pm_board_load_section_tools_failed","value":"Unable to load section tools. Please retry."},
-    {"name":"pm_board_load_recommendations_failed","value":"Unable to load recommendations. Please retry."},
-    {"name":"pm_board_load_board_details_failed","value":"Unable to load board details. Please retry."},
-    {"name":"pm_board_load_board_content_failed","value":"Unable to load board content. Please retry."},
-    {"name":"pm_notify_description_published_comments","value":"Get notified when someone comments on a Pin you created"},
-    {"name":"pm_notify_description_published_reactions","value":"Get notified when someone reacts to a Pin you created"},
-    {"name":"pm_notify_description_published_saves","value":"Get notified when someone saves a Pin you created"},
-    {"name":"pm_notify_description_views_and_impressions","value":"Get updates about views and impressions of your Pins"},
-    {"name":"pm_notify_description_published_collages","value":"Get notified about collages featuring your Pins"},
-    {"name":"pm_notify_description_saved_pin_comments","value":"Get notified about comments on Pins you saved"},
-    {"name":"pm_notify_description_saved_pin_mentions","value":"Get notified when you are mentioned on a Pin you saved"},
-    {"name":"pm_notify_description_saved_pin_reminders","value":"Get reminders about Pins you saved"},
-    {"name":"pm_notify_description_saved_pin_tries","value":"Get notified about comments with photos on Pins you saved"},
-    {"name":"pm_notify_description_group_board_updates","value":"Get updates about activity on your group boards"},
-    {"name":"pm_notify_description_group_board_invites","value":"Get notified when invitations to group boards are sent or received"},
-    {"name":"pm_notify_description_messages","value":"Get notified when someone sends you a message"},
-    {"name":"pm_notify_description_followers","value":"Get notified when someone follows you"},
-    {"name":"pm_notify_description_homefeed_pins","value":"Get popular Pins from your home feed that you may have missed"},
-    {"name":"pm_notify_description_pins_picked_for_you","value":"Get popular Pin recommendations based on your interests"},
-    {"name":"pm_notify_description_based_on_activity","value":"Get Pin recommendations based on your activity, interests and boards"},
-    {"name":"pm_notify_description_board_recommendations","value":"Get board recommendations"},
-    {"name":"pm_notify_description_search_recommendations","value":"Get personalized search terms to help you discover more of what you love"},
-    {"name":"pm_notify_description_followee_pins","value":"Get notified when people you follow publish new Pins"},
-    {"name":"pm_notify_description_shadow_followee_pins","value":"Get Pin notifications from people you might like"},
-    {"name":"pm_notify_description_shopping_recommendations","value":"Find out when Pins you saved drop in price"},
-    {"name":"pm_notify_description_pinterest_announcements","value":"Stay up to date with the latest news from Pinterest"},
-    {"name":"pm_notify_description_surveys_and_quizzes","value":"Take surveys to improve Pinterest and discover new quizzes"},
-    {"name":"pm_notify_description_reports_and_violations_center","value":"Get updates about reports and violations involving your content or content you reported"},
-    {"name":"pm_notify_description_shuffles_activity","value":"Get updates about activity on Shuffles"},
-    {"name":"pm_social_blocked_partial","value":"Showing accounts from the current response. The full blocked list has not been confirmed."},
+    {
+      "name": "pm_immersive_light",
+      "value": "Immersive lighting"
+    },
+    {
+      "name": "pm_light_off",
+      "value": "Off"
+    },
+    {
+      "name": "pm_light_gentle",
+      "value": "Gentle"
+    },
+    {
+      "name": "pm_light_immersive",
+      "value": "Immersive"
+    },
+    {
+      "name": "pm_light_exquisite",
+      "value": "Exquisite"
+    },
+    {
+      "name": "pm_inbox_search_username",
+      "value": "Search username"
+    },
+    {
+      "name": "pm_inbox_no_matching_username",
+      "value": "No matching usernames"
+    },
+    {
+      "name": "pm_photo_search",
+      "value": "Photo search"
+    },
+    {
+      "name": "pm_photo_search_loading",
+      "value": "Searching photo…"
+    },
+    {
+      "name": "pm_photo_search_empty",
+      "value": "No matching Pins found"
+    },
+    {
+      "name": "pm_photo_search_unconfirmed",
+      "value": "Photo search did not finish or its result was not confirmed. Close and choose a photo again."
+    },
+    {
+      "name": "pm_notifications_turn_off_all",
+      "value": "Turn off all"
+    },
+    {
+      "name": "pm_notifications_disable_push",
+      "value": "You will no longer receive push notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."
+    },
+    {
+      "name": "pm_notifications_disable_email",
+      "value": "You will no longer receive email notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."
+    },
+    {
+      "name": "pm_notifications_disable_news",
+      "value": "You will no longer receive in-app notifications from Pinterest about your personal account (except emails about important updates, account settings and privacy)."
+    },
+    {
+      "name": "pm_social_title",
+      "value": "Social permissions"
+    },
+    {
+      "name": "pm_social_messages",
+      "value": "Messages"
+    },
+    {
+      "name": "pm_social_message_settings",
+      "value": "Message settings"
+    },
+    {
+      "name": "pm_social_blocked",
+      "value": "Blocked accounts"
+    },
+    {
+      "name": "pm_social_mentions",
+      "value": "@Mentions"
+    },
+    {
+      "name": "pm_social_friends",
+      "value": "Friends"
+    },
+    {
+      "name": "pm_social_followers",
+      "value": "Followers"
+    },
+    {
+      "name": "pm_social_following",
+      "value": "Following"
+    },
+    {
+      "name": "pm_social_others",
+      "value": "Everyone else"
+    },
+    {
+      "name": "pm_social_intro",
+      "value": "Choose how others can interact with you on Pinterest and find Pins you’ve interacted with in the past"
+    },
+    {
+      "name": "pm_social_message_settings_detail",
+      "value": "Choose who can send you a message and add you to group conversations"
+    },
+    {
+      "name": "pm_social_blocked_detail",
+      "value": "Manage people you've blocked"
+    },
+    {
+      "name": "pm_social_mentions_detail",
+      "value": "Choose who can mention you in a comment"
+    },
+    {
+      "name": "pm_social_message_intro",
+      "value": "Decide whether messages go to your inbox, requests, or are ignored"
+    },
+    {
+      "name": "pm_social_business_messages",
+      "value": "Allow others to message my business"
+    },
+    {
+      "name": "pm_social_business_detail",
+      "value": "A message button on your profile lets other people send you messages."
+    },
+    {
+      "name": "pm_social_unavailable",
+      "value": "Currently unavailable"
+    },
+    {
+      "name": "pm_social_direct",
+      "value": "Inbox"
+    },
+    {
+      "name": "pm_social_requests",
+      "value": "Requests"
+    },
+    {
+      "name": "pm_social_ignore",
+      "value": "Don't deliver"
+    },
+    {
+      "name": "pm_social_delivery",
+      "value": "Choose where your messages are delivered"
+    },
+    {
+      "name": "pm_social_friends_detail",
+      "value": "People you follow who also follow you."
+    },
+    {
+      "name": "pm_social_followers_detail",
+      "value": "People and brands that follow you. To message someone who follows you, you have to follow them."
+    },
+    {
+      "name": "pm_social_following_detail",
+      "value": "People and brands you follow. To message them, they must follow you."
+    },
+    {
+      "name": "pm_social_others_detail",
+      "value": "People on Pinterest you have not interacted or collaborated with."
+    },
+    {
+      "name": "pm_social_blocked_intro",
+      "value": "When you block someone, you can't see, follow or contact each other, or save each other's Pins."
+    },
+    {
+      "name": "pm_social_no_blocked",
+      "value": "You're not blocking anyone right now"
+    },
+    {
+      "name": "pm_social_no_matches",
+      "value": "No matching accounts"
+    },
+    {
+      "name": "pm_social_search",
+      "value": "Search"
+    },
+    {
+      "name": "pm_social_unblock",
+      "value": "Unblock"
+    },
+    {
+      "name": "pm_social_unblock_title",
+      "value": "Unblock {0}?"
+    },
+    {
+      "name": "pm_social_unblock_description",
+      "value": "Depending on your settings, you will be able to see, follow and contact this person, and save their Pins."
+    },
+    {
+      "name": "pm_social_mentions_anyone",
+      "value": "Anyone on Pinterest"
+    },
+    {
+      "name": "pm_social_mentions_following",
+      "value": "Only people you follow"
+    },
+    {
+      "name": "pm_social_mentions_off",
+      "value": "Turn off"
+    },
+    {
+      "name": "pm_social_others_short",
+      "value": "Others"
+    },
+    {
+      "name": "pm_settings_help_center",
+      "value": "Help center"
+    },
+    {
+      "name": "pm_settings_terms_of_service",
+      "value": "Terms of service"
+    },
+    {
+      "name": "pm_settings_privacy_policy",
+      "value": "Privacy policy"
+    },
+    {
+      "name": "pm_profile_search_your_pins",
+      "value": "Your Pins"
+    },
+    {
+      "name": "pm_profile_search_recent",
+      "value": "Recent searches"
+    },
+    {
+      "name": "pm_profile_search_empty",
+      "value": "No matching Pins"
+    },
+    {
+      "name": "pm_notify_category_published_comments",
+      "value": "Comments"
+    },
+    {
+      "name": "pm_notify_category_published_reactions",
+      "value": "Reactions"
+    },
+    {
+      "name": "pm_notify_category_published_saves",
+      "value": "Saves"
+    },
+    {
+      "name": "pm_notify_category_views_and_impressions",
+      "value": "Views and impressions"
+    },
+    {
+      "name": "pm_notify_category_published_collages",
+      "value": "Collages"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_comments",
+      "value": "Comments"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_mentions",
+      "value": "Mentions"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_reminders",
+      "value": "Reminders"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_tries",
+      "value": "Comments with photos"
+    },
+    {
+      "name": "pm_notify_category_group_board_updates",
+      "value": "Group board updates"
+    },
+    {
+      "name": "pm_notify_category_group_board_invites",
+      "value": "Group board invites"
+    },
+    {
+      "name": "pm_notify_category_messages",
+      "value": "Messages"
+    },
+    {
+      "name": "pm_notify_category_followers",
+      "value": "Followers"
+    },
+    {
+      "name": "pm_notify_category_homefeed_pins",
+      "value": "Inspired by your home feed"
+    },
+    {
+      "name": "pm_notify_category_pins_picked_for_you",
+      "value": "Based on your interests"
+    },
+    {
+      "name": "pm_notify_category_based_on_activity",
+      "value": "Based on your activity"
+    },
+    {
+      "name": "pm_notify_category_board_recommendations",
+      "value": "Boards you might like"
+    },
+    {
+      "name": "pm_notify_category_search_recommendations",
+      "value": "Searches you might like"
+    },
+    {
+      "name": "pm_notify_category_followee_pins",
+      "value": "Pins from people you follow"
+    },
+    {
+      "name": "pm_notify_category_shadow_followee_pins",
+      "value": "Pins from people you might like"
+    },
+    {
+      "name": "pm_notify_category_shopping_recommendations",
+      "value": "Shopping Pins"
+    },
+    {
+      "name": "pm_notify_category_pinterest_announcements",
+      "value": "Pinterest announcements"
+    },
+    {
+      "name": "pm_notify_category_surveys_and_quizzes",
+      "value": "Surveys and quizzes"
+    },
+    {
+      "name": "pm_notify_category_reports_and_violations_center",
+      "value": "Reports and violations center updates"
+    },
+    {
+      "name": "pm_notify_category_shuffles_activity",
+      "value": "Activity on Shuffles"
+    },
+    {
+      "name": "pm_notify_group_created",
+      "value": "Pins you created"
+    },
+    {
+      "name": "pm_notify_group_saved",
+      "value": "Pins you saved"
+    },
+    {
+      "name": "pm_notify_group_social",
+      "value": "Social activity"
+    },
+    {
+      "name": "pm_notify_group_recommendations",
+      "value": "Recommendations"
+    },
+    {
+      "name": "pm_notify_group_other",
+      "value": "Other notifications"
+    },
+    {
+      "name": "pm_notify_group_delivery",
+      "value": "How you get notifications"
+    },
+    {
+      "name": "pm_notify_title",
+      "value": "Manage Notifications"
+    },
+    {
+      "name": "pm_notify_how",
+      "value": "How do you want to be notified?"
+    },
+    {
+      "name": "pm_notify_push",
+      "value": "Push"
+    },
+    {
+      "name": "pm_notify_email",
+      "value": "Email"
+    },
+    {
+      "name": "pm_notify_news",
+      "value": "In-app"
+    },
+    {
+      "name": "pm_notify_on",
+      "value": "on"
+    },
+    {
+      "name": "pm_notify_off",
+      "value": "off"
+    },
+    {
+      "name": "pm_notify_comments_description",
+      "value": "Get notified when someone comments on a Pin you created"
+    },
+    {
+      "name": "pm_notify_search_description",
+      "value": "Get personalized search terms to help you discover more of what you love"
+    },
+    {
+      "name": "pm_notify_global_description",
+      "value": "Pinterest will still send you important updates about your account"
+    },
+    {
+      "name": "pm_autoplay_video_title",
+      "value": "Autoplay videos"
+    },
+    {
+      "name": "pm_autoplay_video_cellular",
+      "value": "Autoplay videos on mobile data"
+    },
+    {
+      "name": "pm_autoplay_video_wifi",
+      "value": "Autoplay videos on Wi-Fi"
+    },
+    {
+      "name": "pm_custom_gender_fallback",
+      "value": "Custom"
+    },
+    {
+      "name": "pm_board_load_section_details_failed",
+      "value": "Unable to load section details. Please retry."
+    },
+    {
+      "name": "pm_board_load_section_tools_failed",
+      "value": "Unable to load section tools. Please retry."
+    },
+    {
+      "name": "pm_board_load_recommendations_failed",
+      "value": "Unable to load recommendations. Please retry."
+    },
+    {
+      "name": "pm_board_load_board_details_failed",
+      "value": "Unable to load board details. Please retry."
+    },
+    {
+      "name": "pm_board_load_board_content_failed",
+      "value": "Unable to load board content. Please retry."
+    },
+    {
+      "name": "pm_notify_description_published_comments",
+      "value": "Get notified when someone comments on a Pin you created"
+    },
+    {
+      "name": "pm_notify_description_published_reactions",
+      "value": "Get notified when someone reacts to a Pin you created"
+    },
+    {
+      "name": "pm_notify_description_published_saves",
+      "value": "Get notified when someone saves a Pin you created"
+    },
+    {
+      "name": "pm_notify_description_views_and_impressions",
+      "value": "Get updates about views and impressions of your Pins"
+    },
+    {
+      "name": "pm_notify_description_published_collages",
+      "value": "Get notified about collages featuring your Pins"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_comments",
+      "value": "Get notified about comments on Pins you saved"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_mentions",
+      "value": "Get notified when you are mentioned on a Pin you saved"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_reminders",
+      "value": "Get reminders about Pins you saved"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_tries",
+      "value": "Get notified about comments with photos on Pins you saved"
+    },
+    {
+      "name": "pm_notify_description_group_board_updates",
+      "value": "Get updates about activity on your group boards"
+    },
+    {
+      "name": "pm_notify_description_group_board_invites",
+      "value": "Get notified when invitations to group boards are sent or received"
+    },
+    {
+      "name": "pm_notify_description_messages",
+      "value": "Get notified when someone sends you a message"
+    },
+    {
+      "name": "pm_notify_description_followers",
+      "value": "Get notified when someone follows you"
+    },
+    {
+      "name": "pm_notify_description_homefeed_pins",
+      "value": "Get popular Pins from your home feed that you may have missed"
+    },
+    {
+      "name": "pm_notify_description_pins_picked_for_you",
+      "value": "Get popular Pin recommendations based on your interests"
+    },
+    {
+      "name": "pm_notify_description_based_on_activity",
+      "value": "Get Pin recommendations based on your activity, interests and boards"
+    },
+    {
+      "name": "pm_notify_description_board_recommendations",
+      "value": "Get board recommendations"
+    },
+    {
+      "name": "pm_notify_description_search_recommendations",
+      "value": "Get personalized search terms to help you discover more of what you love"
+    },
+    {
+      "name": "pm_notify_description_followee_pins",
+      "value": "Get notified when people you follow publish new Pins"
+    },
+    {
+      "name": "pm_notify_description_shadow_followee_pins",
+      "value": "Get Pin notifications from people you might like"
+    },
+    {
+      "name": "pm_notify_description_shopping_recommendations",
+      "value": "Find out when Pins you saved drop in price"
+    },
+    {
+      "name": "pm_notify_description_pinterest_announcements",
+      "value": "Stay up to date with the latest news from Pinterest"
+    },
+    {
+      "name": "pm_notify_description_surveys_and_quizzes",
+      "value": "Take surveys to improve Pinterest and discover new quizzes"
+    },
+    {
+      "name": "pm_notify_description_reports_and_violations_center",
+      "value": "Get updates about reports and violations involving your content or content you reported"
+    },
+    {
+      "name": "pm_notify_description_shuffles_activity",
+      "value": "Get updates about activity on Shuffles"
+    },
+    {
+      "name": "pm_social_blocked_partial",
+      "value": "Showing accounts from the current response. The full blocked list has not been confirmed."
+    },
     {
       "name": "pm_view_comment_replies",
       "value": "View {0} replies"
     },
-    {"name":"pm_photo_upload","value":"Upload photo"},
-    {"name":"pm_photo_history","value":"Photo search history"},
-    {"name":"pm_photo_history_select","value":"Select history photo"},
-    {"name":"pm_photo_history_confirm","value":"Confirm"},
-    {"name":"pm_photo_history_empty","value":"No uploads yet"},
-    {"name":"pm_photo_history_empty_hint","value":"Images you upload for search will appear here so you can use them again."},
-    {"name":"pm_photo_history_error","value":"Unable to load photos. Please retry."},
-    {"name":"pm_social_business_tab","value":"Business"},
-    {"name":"pm_photo_history_single_only","value":"Only one photo can be selected for search."},
-    { "name": "pm_press_back_again_to_exit", "value": "Press back again to exit" }
-,
-    {"value":"Make this board public","name":"pm_board_make_public"},
-    {"value":"Anyone can see this board. It appears on your profile and may appear in search and elsewhere on Pinterest.","name":"pm_board_public_description"},
-    {"value":"This board is public","name":"pm_board_public_title"},
-    {"value":"Anyone can see this board","name":"pm_board_public_visibility"},
-    {"value":"Only you and your collaborators can see this board. It does not appear on your public profile, in search results or elsewhere on Pinterest.","name":"pm_board_secret_description"},
-    {"value":"This board is secret","name":"pm_board_secret_title"},
-    {"value":"Only you and your collaborators can see this board","name":"pm_board_secret_visibility"},
-    {"name":"pm_video_connection_timeout","value":"Video connection timed out"},
-    {"name":"pm_video_proxy_timeout_hint","value":"Video connection timed out. Please check whether your proxy rules route pinimg.com to DIRECT, or switch proxy nodes (Global mode recommended)."},
-    {"name":"pm_profile_content_search","value":"Search your Pins"},
-    {"name":"pm_profile_board_sort","value":"Board options"},
-    {"name":"pm_profile_sort_name","value":"A to Z"},
-    {"name":"pm_profile_sort_recent","value":"Last saved"},
-    {"name":"pm_profile_sort_custom","value":"Custom order"},
-    {"name":"pm_profile_sort_load_error","value":"Unable to load sort order. Please try again."},
-    {"name":"pm_profile_sort_save_error","value":"Unable to confirm the sort order was saved. Reload to check."},
-    {"name":"pm_account_language","value":"Account language"},
-    {"name":"pm_language_simplified_chinese","value":"Chinese (Simplified)"},
-    {"name":"pm_language_traditional_chinese","value":"Chinese (Traditional)"},
-    {"name":"pm_language_english","value":"English"},
-    {"name":"pm_language_english_uk","value":"English (UK)"},
-    {"name":"pm_language_japanese","value":"Japanese"},
-    {"name":"pm_language_korean","value":"Korean"},
-    {"name":"pm_profile_organize_heading","value":"Organize profile"},
-    {"name":"pm_profile_auto_sort","value":"Auto-sort boards"},
-    {"name":"pm_profile_auto_sort_description","value":"Choose how Pinterest displays your boards"},
-    {"name":"pm_profile_layout_heading","value":"Layout"},
-    {"name":"pm_profile_edit_board_visibility","value":"Edit board visibility"},
-    {"name":"pm_profile_manage_visibility","value":"Manage visibility"},
-    {"name":"pm_profile_show_all_pins","value":"Show all Pins"},
-    {"name":"pm_profile_show_all_pins_description","value":"All Pins are visible to people viewing your profile"},
-    {"name":"pm_profile_visibility_load_error","value":"Unable to load visibility. Please try again."},
-    {"name":"pm_profile_visibility_save_error","value":"Save result not confirmed. Reload visibility before trying again."},
-    {"name":"pm_clear_logs","value":"Clear logs"},
-    {"name":"pm_clear_logs_confirm","value":"Clear logs stored in the app? Exported files are kept."},
-    {"name":"pm_logs_cleared","value":"Logs cleared"},
-    {"name":"pm_logs_clear_failed","value":"Unable to clear all logs. Please retry."},
-    {"name":"pm_profile_sort_heading","value":"Sort by"},
-    {"name":"pm_activity_yesterday","value":"Yesterday"},
-    {"name":"pm_activity_open_all","value":"Turn on all"},
-    {"name":"pm_activity_close_all","value":"Turn off all"},
-    {"name":"pm_activity_date_unknown","value":"Other activity"},
-    {"name":"pm_order_discard_title","value":"Discard unsaved order?"},
-    {"name":"pm_order_discard_message","value":"Your board order has not been saved. Going back will discard these changes."},
-    {"name":"pm_order_discard_action","value":"Discard changes"},
-    {"name":"pm_profile_legacy_layout","value":"Use legacy profile layout"},
-    {"name":"pm_profile_hub_pins","value":"Pins"},
-    {"name":"pm_profile_hub_boards","value":"Boards"},
-    {"name":"pm_profile_hub_collages","value":"Collages"},
-    {"name":"pm_profile_hub_favorites","value":"Favorites"},
-    {"name":"pm_profile_hub_created","value":"Created by you"},
-    {"name":"pm_profile_hub_groups","value":"Groups"},
-    {"name":"pm_profile_hub_secret","value":"Secret"},
-    {"name":"pm_profile_hub_saved","value":"Your saved Pins"},
-    {"name":"pm_profile_hub_suggestions","value":"Board suggestions"},
-    {"name":"pm_profile_hub_empty","value":"No Pins match these filters"},
-    {"name":"pm_profile_hub_favorite_empty","value":"Mark your Pins as favorites to find them here."},
-    {"name":"pm_profile_suggestion_confirm","value":"Create a board and move this suggested group of Pins into it?"},
-    {"name":"pm_profile_suggestion_unconfirmed","value":"The result is unconfirmed. Refresh to check your boards before creating again."},
-    {"name":"pm_profile_hub_result_count","value":"{0} Pins · {1} filters applied"},
-    {"name":"pm_profile_hub_in_progress","value":"In progress"},
-    {"name":"pm_profile_invite_collaborators","value":"Invite collaborators"},
-    {"name":"pm_profile_create_collage","value":"Create collage"},
-    {"name":"pm_profile_empty_favorites_title","value":"Favorite content"},
-    {"name":"pm_profile_empty_favorites_body","value":"Tap the star on a saved Pin you love to find it here. It is that simple!"},
-    {"name":"pm_profile_empty_combined_title","value":"Mark your Pins as favorites"},
-    {"name":"pm_profile_empty_combined_body","value":"Tap the star on a Pin you created to mark it as a favorite and easily find it here."},
-    {"name":"pm_profile_empty_groups_title","value":"Collaborate on boards"},
-    {"name":"pm_profile_empty_groups_body","value":"Add collaborators to a board to save Pins, mark favorites and organize your ideas together."},
-    {"name":"pm_profile_empty_collages_title","value":"Create a collage"},
-    {"name":"pm_profile_empty_collages_body","value":"Cut out and combine Pins to make something new, then publish your creation to inspire others."},
-    {"name":"pm_profile_empty_created_title","value":"Created by you"},
-    {"name":"pm_profile_empty_created_body","value":"Pins you create will appear here."},
-    {"name":"pm_profile_empty_boards_title","value":"No boards yet"},
-    {"name":"pm_profile_empty_boards_body","value":"Boards matching your filters will appear here."},
-    {"name":"pm_profile_empty_collage_drafts_title","value":"You have no collages in progress!"},
-    {"name":"pm_profile_empty_collage_drafts_body","value":"Cut out and combine any visuals that inspire you into a collage."}
-  ,
-    {"name":"pm_settings_view_profile","value":"View profile"},
-    {"name":"pm_star_add","value":"Add to favorites"},
-    {"name":"pm_star_remove","value":"Remove from favorites"},
-    {"name":"pm_star_added","value":"Added to favorites"},
-    {"name":"pm_star_removed","value":"Removed from favorites"},
-    {"name":"pm_star_failed","value":"Favorite action was not submitted. Reopen the menu to retry."},
-    {"name":"pm_star_unknown","value":"Favorite result could not be confirmed. Refresh to check before trying again."},
-    {"name":"pm_star_filter","value":"Favorites"},
-    {"name":"pm_star_filter_active","value":"Favorites · Filtered"},
-    {"name":"pm_board_view_title","value":"Board view"},
-    {"name":"pm_board_view_type","value":"Filter by type"},
-    {"name":"pm_board_view_favorites","value":"Favorites"},
-    {"name":"pm_board_view_density","value":"Set view to"},
-    {"name":"pm_board_view_wide","value":"Wide"},
-    {"name":"pm_board_view_default","value":"Default"},
-    {"name":"pm_board_view_compact","value":"Compact"},
-    {"name":"pm_board_view_apply","value":"Apply filters"}
+    {
+      "name": "pm_photo_upload",
+      "value": "Upload photo"
+    },
+    {
+      "name": "pm_photo_history",
+      "value": "Photo search history"
+    },
+    {
+      "name": "pm_photo_history_select",
+      "value": "Select history photo"
+    },
+    {
+      "name": "pm_photo_history_confirm",
+      "value": "Confirm"
+    },
+    {
+      "name": "pm_photo_history_empty",
+      "value": "No uploads yet"
+    },
+    {
+      "name": "pm_photo_history_empty_hint",
+      "value": "Images you upload for search will appear here so you can use them again."
+    },
+    {
+      "name": "pm_photo_history_error",
+      "value": "Unable to load photos. Please retry."
+    },
+    {
+      "name": "pm_social_business_tab",
+      "value": "Business"
+    },
+    {
+      "name": "pm_photo_history_single_only",
+      "value": "Only one photo can be selected for search."
+    },
+    {
+      "name": "pm_press_back_again_to_exit",
+      "value": "Press back again to exit"
+    },
+    {
+      "value": "Make this board public",
+      "name": "pm_board_make_public"
+    },
+    {
+      "value": "Anyone can see this board. It appears on your profile and may appear in search and elsewhere on Pinterest.",
+      "name": "pm_board_public_description"
+    },
+    {
+      "value": "This board is public",
+      "name": "pm_board_public_title"
+    },
+    {
+      "value": "Anyone can see this board",
+      "name": "pm_board_public_visibility"
+    },
+    {
+      "value": "Only you and your collaborators can see this board. It does not appear on your public profile, in search results or elsewhere on Pinterest.",
+      "name": "pm_board_secret_description"
+    },
+    {
+      "value": "This board is secret",
+      "name": "pm_board_secret_title"
+    },
+    {
+      "value": "Only you and your collaborators can see this board",
+      "name": "pm_board_secret_visibility"
+    },
+    {
+      "name": "pm_video_connection_timeout",
+      "value": "Video connection timed out"
+    },
+    {
+      "name": "pm_video_proxy_timeout_hint",
+      "value": "Video connection timed out. Please check whether your proxy rules route pinimg.com to DIRECT, or switch proxy nodes (Global mode recommended)."
+    },
+    {
+      "name": "pm_profile_content_search",
+      "value": "Search your Pins"
+    },
+    {
+      "name": "pm_profile_board_sort",
+      "value": "Board options"
+    },
+    {
+      "name": "pm_profile_sort_name",
+      "value": "A to Z"
+    },
+    {
+      "name": "pm_profile_sort_recent",
+      "value": "Last saved"
+    },
+    {
+      "name": "pm_profile_sort_custom",
+      "value": "Custom order"
+    },
+    {
+      "name": "pm_profile_sort_load_error",
+      "value": "Unable to load sort order. Please try again."
+    },
+    {
+      "name": "pm_profile_sort_save_error",
+      "value": "Unable to confirm the sort order was saved. Reload to check."
+    },
+    {
+      "name": "pm_account_language",
+      "value": "Account language"
+    },
+    {
+      "name": "pm_language_simplified_chinese",
+      "value": "Chinese (Simplified)"
+    },
+    {
+      "name": "pm_language_traditional_chinese",
+      "value": "Chinese (Traditional)"
+    },
+    {
+      "name": "pm_language_english",
+      "value": "English"
+    },
+    {
+      "name": "pm_language_english_uk",
+      "value": "English (UK)"
+    },
+    {
+      "name": "pm_language_japanese",
+      "value": "Japanese"
+    },
+    {
+      "name": "pm_language_korean",
+      "value": "Korean"
+    },
+    {
+      "name": "pm_profile_organize_heading",
+      "value": "Organize profile"
+    },
+    {
+      "name": "pm_profile_auto_sort",
+      "value": "Auto-sort boards"
+    },
+    {
+      "name": "pm_profile_auto_sort_description",
+      "value": "Choose how Pinterest displays your boards"
+    },
+    {
+      "name": "pm_profile_layout_heading",
+      "value": "Layout"
+    },
+    {
+      "name": "pm_profile_edit_board_visibility",
+      "value": "Edit board visibility"
+    },
+    {
+      "name": "pm_profile_manage_visibility",
+      "value": "Manage visibility"
+    },
+    {
+      "name": "pm_profile_show_all_pins",
+      "value": "Show all Pins"
+    },
+    {
+      "name": "pm_profile_show_all_pins_description",
+      "value": "All Pins are visible to people viewing your profile"
+    },
+    {
+      "name": "pm_profile_visibility_load_error",
+      "value": "Unable to load visibility. Please try again."
+    },
+    {
+      "name": "pm_profile_visibility_save_error",
+      "value": "Save result not confirmed. Reload visibility before trying again."
+    },
+    {
+      "name": "pm_clear_logs",
+      "value": "Clear logs"
+    },
+    {
+      "name": "pm_clear_logs_confirm",
+      "value": "Clear logs stored in the app? Exported files are kept."
+    },
+    {
+      "name": "pm_logs_cleared",
+      "value": "Logs cleared"
+    },
+    {
+      "name": "pm_logs_clear_failed",
+      "value": "Unable to clear all logs. Please retry."
+    },
+    {
+      "name": "pm_profile_sort_heading",
+      "value": "Sort by"
+    },
+    {
+      "name": "pm_activity_yesterday",
+      "value": "Yesterday"
+    },
+    {
+      "name": "pm_activity_open_all",
+      "value": "Turn on all"
+    },
+    {
+      "name": "pm_activity_close_all",
+      "value": "Turn off all"
+    },
+    {
+      "name": "pm_activity_date_unknown",
+      "value": "Other activity"
+    },
+    {
+      "name": "pm_order_discard_title",
+      "value": "Discard unsaved order?"
+    },
+    {
+      "name": "pm_order_discard_message",
+      "value": "Your board order has not been saved. Going back will discard these changes."
+    },
+    {
+      "name": "pm_order_discard_action",
+      "value": "Discard changes"
+    },
+    {
+      "name": "pm_profile_legacy_layout",
+      "value": "Use legacy profile layout"
+    },
+    {
+      "name": "pm_profile_hub_pins",
+      "value": "Pins"
+    },
+    {
+      "name": "pm_profile_hub_boards",
+      "value": "Boards"
+    },
+    {
+      "name": "pm_profile_hub_collages",
+      "value": "Collages"
+    },
+    {
+      "name": "pm_profile_hub_favorites",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_profile_hub_created",
+      "value": "Created by you"
+    },
+    {
+      "name": "pm_profile_hub_groups",
+      "value": "Groups"
+    },
+    {
+      "name": "pm_profile_hub_secret",
+      "value": "Secret"
+    },
+    {
+      "name": "pm_profile_hub_saved",
+      "value": "Your saved Pins"
+    },
+    {
+      "name": "pm_profile_hub_suggestions",
+      "value": "Board suggestions"
+    },
+    {
+      "name": "pm_profile_hub_empty",
+      "value": "No Pins match these filters"
+    },
+    {
+      "name": "pm_profile_hub_favorite_empty",
+      "value": "Mark your Pins as favorites to find them here."
+    },
+    {
+      "name": "pm_profile_suggestion_confirm",
+      "value": "Create a board and move this suggested group of Pins into it?"
+    },
+    {
+      "name": "pm_profile_suggestion_unconfirmed",
+      "value": "The result is unconfirmed. Refresh to check your boards before creating again."
+    },
+    {
+      "name": "pm_profile_hub_result_count",
+      "value": "{0} Pins · {1} filters applied"
+    },
+    {
+      "name": "pm_profile_hub_in_progress",
+      "value": "In progress"
+    },
+    {
+      "name": "pm_profile_invite_collaborators",
+      "value": "Invite collaborators"
+    },
+    {
+      "name": "pm_profile_create_collage",
+      "value": "Create collage"
+    },
+    {
+      "name": "pm_profile_empty_favorites_title",
+      "value": "Favorite content"
+    },
+    {
+      "name": "pm_profile_empty_favorites_body",
+      "value": "Tap the star on a saved Pin you love to find it here. It is that simple!"
+    },
+    {
+      "name": "pm_profile_empty_combined_title",
+      "value": "Mark your Pins as favorites"
+    },
+    {
+      "name": "pm_profile_empty_combined_body",
+      "value": "Tap the star on a Pin you created to mark it as a favorite and easily find it here."
+    },
+    {
+      "name": "pm_profile_empty_groups_title",
+      "value": "Collaborate on boards"
+    },
+    {
+      "name": "pm_profile_empty_groups_body",
+      "value": "Add collaborators to a board to save Pins, mark favorites and organize your ideas together."
+    },
+    {
+      "name": "pm_profile_empty_collages_title",
+      "value": "Create a collage"
+    },
+    {
+      "name": "pm_profile_empty_collages_body",
+      "value": "Cut out and combine Pins to make something new, then publish your creation to inspire others."
+    },
+    {
+      "name": "pm_profile_empty_created_title",
+      "value": "Created by you"
+    },
+    {
+      "name": "pm_profile_empty_created_body",
+      "value": "Pins you create will appear here."
+    },
+    {
+      "name": "pm_profile_empty_boards_title",
+      "value": "No boards yet"
+    },
+    {
+      "name": "pm_profile_empty_boards_body",
+      "value": "Boards matching your filters will appear here."
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_title",
+      "value": "You have no collages in progress!"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_body",
+      "value": "Cut out and combine any visuals that inspire you into a collage."
+    },
+    {
+      "name": "pm_settings_view_profile",
+      "value": "View profile"
+    },
+    {
+      "name": "pm_star_add",
+      "value": "Add to favorites"
+    },
+    {
+      "name": "pm_star_remove",
+      "value": "Remove from favorites"
+    },
+    {
+      "name": "pm_star_added",
+      "value": "Added to favorites"
+    },
+    {
+      "name": "pm_star_removed",
+      "value": "Removed from favorites"
+    },
+    {
+      "name": "pm_star_failed",
+      "value": "Favorite action was not submitted. Reopen the menu to retry."
+    },
+    {
+      "name": "pm_star_unknown",
+      "value": "Favorite result could not be confirmed. Refresh to check before trying again."
+    },
+    {
+      "name": "pm_star_filter",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_star_filter_active",
+      "value": "Favorites · Filtered"
+    },
+    {
+      "name": "pm_board_view_title",
+      "value": "Board view"
+    },
+    {
+      "name": "pm_board_view_type",
+      "value": "Filter by type"
+    },
+    {
+      "name": "pm_board_view_favorites",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_board_view_density",
+      "value": "Set view to"
+    },
+    {
+      "name": "pm_board_view_wide",
+      "value": "Wide"
+    },
+    {
+      "name": "pm_board_view_default",
+      "value": "Default"
+    },
+    {
+      "name": "pm_board_view_compact",
+      "value": "Compact"
+    },
+    {
+      "name": "pm_board_view_apply",
+      "value": "Apply filters"
+    },
+    {
+      "name": "pm_pin_drafts_title",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_pin_drafts_expiry",
+      "value": "Drafts expire 30 days after you first save them. They will then be deleted."
+    },
+    {
+      "name": "pm_pin_drafts_empty",
+      "value": "No drafts yet."
+    },
+    {
+      "name": "pm_pin_drafts_days",
+      "value": "{0} days until deletion"
+    },
+    {
+      "name": "pm_pin_drafts_count",
+      "value": "{0} drafts"
+    },
+    {
+      "name": "pm_social_shopping_section",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_social_shopping_exclusions",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_social_shopping_detail",
+      "value": "People can use visual search to shop for products similar to those shown in your Pins."
+    },
+    {
+      "name": "pm_social_download_section",
+      "value": "Downloads"
+    },
+    {
+      "name": "pm_social_download_detail",
+      "value": "Allow people to download your video Pins (9:16 aspect ratio) and share them on other platforms. These videos include a watermark with your username."
+    },
+    {
+      "name": "pm_social_filter_other_detail",
+      "value": "Hide comments containing certain words or phrases on other people’s Pins."
+    },
+    {
+      "name": "pm_social_filter_my_detail",
+      "value": "Hide comments containing certain words or phrases on Pins you create."
+    },
+    {
+      "name": "pm_social_comments_title",
+      "value": "Comments"
+    },
+    {
+      "name": "pm_social_comments_entry_detail",
+      "value": "Manage comment permissions and filters"
+    },
+    {
+      "name": "pm_social_comments_detail",
+      "value": "Enable comments on your new and existing Pins by default."
+    },
+    {
+      "name": "pm_social_shopping",
+      "value": "Show similar products"
+    },
+    {
+      "name": "pm_social_idea_downloads",
+      "value": "Video Pin downloads"
+    },
+    {
+      "name": "pm_social_filter_phrases_placeholder",
+      "value": "Enter words or phrases to filter"
+    },
+    {
+      "name": "pm_social_filter_phrases_hint",
+      "value": "Use commas to separate words or phrases"
+    },
+    {
+      "name": "pm_social_filter_phrases_done",
+      "value": "Done"
+    },
+    {
+      "name": "pm_social_filter_other_pins",
+      "value": "Filter comments on other people’s Pins"
+    },
+    {
+      "name": "pm_social_filter_my_pins",
+      "value": "Filter comments on your Pins"
+    },
+    {
+      "name": "pm_social_filter_invalid",
+      "value": "Invalid filter format. Separate words or phrases with commas."
+    },
+    {
+      "name": "pm_social_comments",
+      "value": "Allow comments on your Pins"
+    },
+    {
+      "name": "pm_pin_images_title",
+      "value": "Pin images"
+    },
+    {
+      "name": "pm_publish_remove_product",
+      "value": "Remove product"
+    },
+    {
+      "name": "pm_publish_add_product_help",
+      "value": "Tap the plus button to add products"
+    },
+    {
+      "name": "pm_publish_affiliate_section",
+      "value": "Tag promoted products"
+    },
+    {
+      "name": "pm_publish_affiliate_label",
+      "value": "This is an affiliate link or promoted product"
+    },
+    {
+      "name": "pm_publish_affiliate_help",
+      "value": "You must disclose whether you may receive compensation for including this product."
+    },
+    {
+      "name": "pm_board_cover_placeholder",
+      "value": "Choose a cover image to display at the top of this board"
+    },
+    {
+      "name": "pm_publish_submit_failed",
+      "value": "Publishing was rejected. Check your selections and try again."
+    },
+    {
+      "name": "pm_publish_product_unconfirmed",
+      "value": "Product creation was not confirmed. Close and refresh before trying again."
+    },
+    {
+      "name": "pm_publish_product_select_help",
+      "value": "Select products to tag. Tap again to remove."
+    },
+    {
+      "name": "pm_publish_product_count",
+      "value": "{0} products"
+    },
+    {
+      "name": "pm_board_cover_verifying",
+      "value": "Confirming cover update…"
+    },
+    {
+      "name": "pm_board_cover_unconfirmed",
+      "value": "The cover update is unconfirmed. Check its latest status. It will not be submitted again."
+    },
+    {
+      "name": "pm_board_cover_title",
+      "value": "Change board cover"
+    },
+    {
+      "name": "pm_board_cover_saving",
+      "value": "Submitting cover…"
+    },
+    {
+      "name": "pm_board_cover_saved",
+      "value": "Board cover updated"
+    },
+    {
+      "name": "pm_board_cover_pins",
+      "value": "Pins on this board"
+    },
+    {
+      "name": "pm_board_cover_more",
+      "value": "Load more images"
+    },
+    {
+      "name": "pm_board_cover_label",
+      "value": "Cover image"
+    },
+    {
+      "name": "pm_board_cover_image_failed",
+      "value": "Image failed to load. Select an image again."
+    },
+    {
+      "name": "pm_board_cover_empty",
+      "value": "This board has no available cover images"
+    },
+    {
+      "name": "pm_board_cover_drag",
+      "value": "Drag to reposition"
+    },
+    {
+      "name": "pm_board_cover_choose",
+      "value": "Choose a board cover"
+    },
+    {
+      "name": "pm_board_cover_check",
+      "value": "Check cover status"
+    },
+    {
+      "name": "pm_profile_protected_boards_title",
+      "value": "Unlisted boards"
+    },
+    {
+      "name": "pm_profile_protected_boards_description",
+      "value": "Unlisted boards do not appear publicly on your profile, but anyone with the link can view them."
+    },
+    {
+      "name": "pm_publish_product_recommendations",
+      "value": "Recommended products"
+    },
+    {
+      "name": "pm_publish_product_search_help",
+      "value": "Enter a product name to search."
+    },
+    {
+      "name": "pm_publish_product_read_failed",
+      "value": "Unable to load products. Retry or check the product link."
+    },
+    {
+      "name": "pm_publish_product_pending",
+      "value": "You can preview products here. Adding them to this Pin is not yet available."
+    },
+    {
+      "name": "pm_publish_product_lookup_help",
+      "value": "Enter a product detail page link from a retailer to view product images."
+    },
+    {
+      "name": "pm_publish_product_lookup",
+      "value": "Find product"
+    },
+    {
+      "name": "pm_publish_product_empty",
+      "value": "No products found."
+    },
+    {
+      "name": "pm_publish_topic_count",
+      "value": "{0} tags"
+    },
+    {
+      "name": "pm_publish_selected_topics",
+      "value": "Selected"
+    },
+    {
+      "name": "pm_publish_topic_search",
+      "value": "Search topics"
+    },
+    {
+      "name": "pm_publish_topic_help",
+      "value": "Tag related topics to reach people interested in Pins like yours. People will not see the topics you tag."
+    },
+    {
+      "name": "pm_publish_topic_empty",
+      "value": "No matching topics found"
+    },
+    {
+      "name": "pm_publish_similar_products",
+      "value": "Show similar products"
+    },
+    {
+      "name": "pm_publish_similar_help",
+      "value": "People can use visual search to shop for products similar to those shown in this Pin."
+    },
+    {
+      "name": "pm_publish_shopping_help",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_publish_shopping",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_publish_engagement",
+      "value": "Engagement settings"
+    },
+    {
+      "name": "pm_publish_alt_text",
+      "value": "Alt text"
+    },
+    {
+      "name": "pm_publish_alt_hint",
+      "value": "Describe the visual details of your Pin"
+    },
+    {
+      "name": "pm_publish_alt_help",
+      "value": "This helps people using screen readers understand your Pin."
+    },
+    {
+      "name": "pm_publish_allow_comments",
+      "value": "Allow comments"
+    },
+    {
+      "name": "pm_publish_ai_person_help",
+      "value": "This Pin includes an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_person",
+      "value": "Show an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_modified_help",
+      "value": "Content made entirely or partly with AI"
+    },
+    {
+      "name": "pm_publish_ai_modified",
+      "value": "Label as AI modified"
+    },
+    {
+      "name": "pm_publish_ai_disclosure",
+      "value": "AI disclosure"
+    },
+    {
+      "name": "pm_search_recommendation_updated",
+      "value": "Recommendations have changed. Please select again."
+    },
+    {
+      "name": "pm_search_recommendation_unavailable",
+      "value": "Unable to open this recommendation. Please reload."
+    },
+    {
+      "name": "pm_publish_use_link",
+      "value": "Use a link"
+    },
+    {
+      "name": "pm_publish_topics",
+      "value": "Tag topics"
+    },
+    {
+      "name": "pm_publish_title_limit",
+      "value": "Up to 100 characters"
+    },
+    {
+      "name": "pm_publish_title_hint",
+      "value": "Give your Pin a title"
+    },
+    {
+      "name": "pm_publish_title",
+      "value": "Title"
+    },
+    {
+      "name": "pm_publish_search_pins",
+      "value": "Search Pins"
+    },
+    {
+      "name": "pm_publish_recent_saves",
+      "value": "Recently saved"
+    },
+    {
+      "name": "pm_publish_products",
+      "value": "Tag products"
+    },
+    {
+      "name": "pm_publish_product_search",
+      "value": "Search by product name"
+    },
+    {
+      "name": "pm_publish_product_link",
+      "value": "Add a product link"
+    },
+    {
+      "name": "pm_publish_product_help",
+      "value": "Enter a product page link from a retailer’s website. A product Pin will be created and tagged in your Pin."
+    },
+    {
+      "name": "pm_publish_link_hint",
+      "value": "Add a link"
+    },
+    {
+      "name": "pm_publish_link",
+      "value": "Link"
+    },
+    {
+      "name": "pm_publish_description_hint",
+      "value": "Describe your Pin"
+    },
+    {
+      "name": "pm_publish_create_pin",
+      "value": "Create Pin"
+    },
+    {
+      "name": "pm_publish_choose_board",
+      "value": "Choose board"
+    },
+    {
+      "name": "pm_publish_advanced",
+      "value": "Advanced settings"
+    },
+    {
+      "name": "pm_profile_avatar_right",
+      "value": "Avatar on the right"
+    },
+    {
+      "name": "pm_pin_draft_delete_title",
+      "value": "Delete draft?"
+    },
+    {
+      "name": "pm_pin_draft_delete_message",
+      "value": "Are you sure you want to delete this draft?"
+    },
+    {
+      "name": "pm_publish_save_draft",
+      "value": "Save draft"
+    },
+    {
+      "name": "pm_publish_draft_exit_title",
+      "value": "Save before leaving?"
+    },
+    {
+      "name": "pm_publish_draft_exit_message",
+      "value": "Your changes have not been saved. Save them as a draft before leaving."
+    },
+    {
+      "name": "pm_publish_draft_saved",
+      "value": "Draft saved."
+    },
+    {
+      "name": "pm_publish_draft_unconfirmed",
+      "value": "Draft save result is unconfirmed. Your edits are retained. Reopen the draft list to check before saving again."
+    },
+    {
+      "name": "pm_publish_draft_choose_board",
+      "value": "Choose a board before saving the draft."
+    },
+    {
+      "name": "pm_publish_draft_not_submitted",
+      "value": "Draft preparation or image upload failed. No draft was submitted. Your edits are retained; you can try saving again."
+    },
+    {
+      "name": "pm_publish_draft_box",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_publish_source_files",
+      "value": "System files"
+    },
+    {
+      "name": "pm_publish_source_website",
+      "value": "Website link"
+    }
   ]
 }

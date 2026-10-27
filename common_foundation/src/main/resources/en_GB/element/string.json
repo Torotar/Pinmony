@@ -5076,59 +5076,649 @@
       "name": "pm_activity_date_unknown",
       "value": "Other activity"
     },
-    {"name":"pm_photo_history_empty_hint","value":"Images you upload for search will appear here so you can use them to search again."},
-    {"name":"pm_order_discard_title","value":"Discard unsaved order?"},
-    {"name":"pm_order_discard_message","value":"Your board order has not been saved. Going back will discard these changes."},
-    {"name":"pm_order_discard_action","value":"Discard changes"},
-    {"name":"pm_profile_legacy_layout","value":"Use legacy profile layout"},
-    {"name":"pm_profile_hub_pins","value":"Pins"},
-    {"name":"pm_profile_hub_boards","value":"Boards"},
-    {"name":"pm_profile_hub_collages","value":"Collages"},
-    {"name":"pm_profile_hub_favorites","value":"Favorites"},
-    {"name":"pm_profile_hub_created","value":"Created by you"},
-    {"name":"pm_profile_hub_groups","value":"Groups"},
-    {"name":"pm_profile_hub_secret","value":"Secret"},
-    {"name":"pm_profile_hub_saved","value":"Your saved Pins"},
-    {"name":"pm_profile_hub_suggestions","value":"Board suggestions"},
-    {"name":"pm_profile_hub_empty","value":"No Pins match these filters"},
-    {"name":"pm_profile_hub_favorite_empty","value":"Mark your Pins as favorites to find them here."},
-    {"name":"pm_profile_suggestion_confirm","value":"Create a board and move this suggested group of Pins into it?"},
-    {"name":"pm_profile_suggestion_unconfirmed","value":"The result is unconfirmed. Refresh to check your boards before creating again."},
-    {"name":"pm_profile_hub_result_count","value":"{0} Pins · {1} filters applied"},
-    {"name":"pm_profile_hub_in_progress","value":"In progress"},
-    {"name":"pm_profile_invite_collaborators","value":"Invite collaborators"},
-    {"name":"pm_profile_create_collage","value":"Create collage"},
-    {"name":"pm_profile_empty_favorites_title","value":"Favorite content"},
-    {"name":"pm_profile_empty_favorites_body","value":"Tap the star on a saved Pin you love to find it here. It is that simple!"},
-    {"name":"pm_profile_empty_combined_title","value":"Mark your Pins as favorites"},
-    {"name":"pm_profile_empty_combined_body","value":"Tap the star on a Pin you created to mark it as a favorite and easily find it here."},
-    {"name":"pm_profile_empty_groups_title","value":"Collaborate on boards"},
-    {"name":"pm_profile_empty_groups_body","value":"Add collaborators to a board to save Pins, mark favorites and organize your ideas together."},
-    {"name":"pm_profile_empty_collages_title","value":"Create a collage"},
-    {"name":"pm_profile_empty_collages_body","value":"Cut out and combine Pins to make something new, then publish your creation to inspire others."},
-    {"name":"pm_profile_empty_created_title","value":"Created by you"},
-    {"name":"pm_profile_empty_created_body","value":"Pins you create will appear here."},
-    {"name":"pm_profile_empty_boards_title","value":"No boards yet"},
-    {"name":"pm_profile_empty_boards_body","value":"Boards matching your filters will appear here."},
-    {"name":"pm_profile_empty_collage_drafts_title","value":"You have no collages in progress!"},
-    {"name":"pm_profile_empty_collage_drafts_body","value":"Cut out and combine any visuals that inspire you into a collage."}
-  ,
-    {"name":"pm_settings_view_profile","value":"View profile"},
-    {"name":"pm_star_add","value":"Add to favourites"},
-    {"name":"pm_star_remove","value":"Remove from favourites"},
-    {"name":"pm_star_added","value":"Added to favourites"},
-    {"name":"pm_star_removed","value":"Removed from favourites"},
-    {"name":"pm_star_failed","value":"Favourite action was not submitted. Reopen the menu to retry."},
-    {"name":"pm_star_unknown","value":"Favourite result could not be confirmed. Refresh to check before trying again."},
-    {"name":"pm_star_filter","value":"Favourites"},
-    {"name":"pm_star_filter_active","value":"Favourites · Filtered"},
-    {"name":"pm_board_view_title","value":"Board view"},
-    {"name":"pm_board_view_type","value":"Filter by type"},
-    {"name":"pm_board_view_favorites","value":"Favorites"},
-    {"name":"pm_board_view_density","value":"Set view to"},
-    {"name":"pm_board_view_wide","value":"Wide"},
-    {"name":"pm_board_view_default","value":"Default"},
-    {"name":"pm_board_view_compact","value":"Compact"},
-    {"name":"pm_board_view_apply","value":"Apply filters"}
+    {
+      "name": "pm_photo_history_empty_hint",
+      "value": "Images you upload for search will appear here so you can use them to search again."
+    },
+    {
+      "name": "pm_order_discard_title",
+      "value": "Discard unsaved order?"
+    },
+    {
+      "name": "pm_order_discard_message",
+      "value": "Your board order has not been saved. Going back will discard these changes."
+    },
+    {
+      "name": "pm_order_discard_action",
+      "value": "Discard changes"
+    },
+    {
+      "name": "pm_profile_legacy_layout",
+      "value": "Use legacy profile layout"
+    },
+    {
+      "name": "pm_profile_hub_pins",
+      "value": "Pins"
+    },
+    {
+      "name": "pm_profile_hub_boards",
+      "value": "Boards"
+    },
+    {
+      "name": "pm_profile_hub_collages",
+      "value": "Collages"
+    },
+    {
+      "name": "pm_profile_hub_favorites",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_profile_hub_created",
+      "value": "Created by you"
+    },
+    {
+      "name": "pm_profile_hub_groups",
+      "value": "Groups"
+    },
+    {
+      "name": "pm_profile_hub_secret",
+      "value": "Secret"
+    },
+    {
+      "name": "pm_profile_hub_saved",
+      "value": "Your saved Pins"
+    },
+    {
+      "name": "pm_profile_hub_suggestions",
+      "value": "Board suggestions"
+    },
+    {
+      "name": "pm_profile_hub_empty",
+      "value": "No Pins match these filters"
+    },
+    {
+      "name": "pm_profile_hub_favorite_empty",
+      "value": "Mark your Pins as favorites to find them here."
+    },
+    {
+      "name": "pm_profile_suggestion_confirm",
+      "value": "Create a board and move this suggested group of Pins into it?"
+    },
+    {
+      "name": "pm_profile_suggestion_unconfirmed",
+      "value": "The result is unconfirmed. Refresh to check your boards before creating again."
+    },
+    {
+      "name": "pm_profile_hub_result_count",
+      "value": "{0} Pins · {1} filters applied"
+    },
+    {
+      "name": "pm_profile_hub_in_progress",
+      "value": "In progress"
+    },
+    {
+      "name": "pm_profile_invite_collaborators",
+      "value": "Invite collaborators"
+    },
+    {
+      "name": "pm_profile_create_collage",
+      "value": "Create collage"
+    },
+    {
+      "name": "pm_profile_empty_favorites_title",
+      "value": "Favorite content"
+    },
+    {
+      "name": "pm_profile_empty_favorites_body",
+      "value": "Tap the star on a saved Pin you love to find it here. It is that simple!"
+    },
+    {
+      "name": "pm_profile_empty_combined_title",
+      "value": "Mark your Pins as favorites"
+    },
+    {
+      "name": "pm_profile_empty_combined_body",
+      "value": "Tap the star on a Pin you created to mark it as a favorite and easily find it here."
+    },
+    {
+      "name": "pm_profile_empty_groups_title",
+      "value": "Collaborate on boards"
+    },
+    {
+      "name": "pm_profile_empty_groups_body",
+      "value": "Add collaborators to a board to save Pins, mark favorites and organize your ideas together."
+    },
+    {
+      "name": "pm_profile_empty_collages_title",
+      "value": "Create a collage"
+    },
+    {
+      "name": "pm_profile_empty_collages_body",
+      "value": "Cut out and combine Pins to make something new, then publish your creation to inspire others."
+    },
+    {
+      "name": "pm_profile_empty_created_title",
+      "value": "Created by you"
+    },
+    {
+      "name": "pm_profile_empty_created_body",
+      "value": "Pins you create will appear here."
+    },
+    {
+      "name": "pm_profile_empty_boards_title",
+      "value": "No boards yet"
+    },
+    {
+      "name": "pm_profile_empty_boards_body",
+      "value": "Boards matching your filters will appear here."
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_title",
+      "value": "You have no collages in progress!"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_body",
+      "value": "Cut out and combine any visuals that inspire you into a collage."
+    },
+    {
+      "name": "pm_settings_view_profile",
+      "value": "View profile"
+    },
+    {
+      "name": "pm_star_add",
+      "value": "Add to favourites"
+    },
+    {
+      "name": "pm_star_remove",
+      "value": "Remove from favourites"
+    },
+    {
+      "name": "pm_star_added",
+      "value": "Added to favourites"
+    },
+    {
+      "name": "pm_star_removed",
+      "value": "Removed from favourites"
+    },
+    {
+      "name": "pm_star_failed",
+      "value": "Favourite action was not submitted. Reopen the menu to retry."
+    },
+    {
+      "name": "pm_star_unknown",
+      "value": "Favourite result could not be confirmed. Refresh to check before trying again."
+    },
+    {
+      "name": "pm_star_filter",
+      "value": "Favourites"
+    },
+    {
+      "name": "pm_star_filter_active",
+      "value": "Favourites · Filtered"
+    },
+    {
+      "name": "pm_board_view_title",
+      "value": "Board view"
+    },
+    {
+      "name": "pm_board_view_type",
+      "value": "Filter by type"
+    },
+    {
+      "name": "pm_board_view_favorites",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_board_view_density",
+      "value": "Set view to"
+    },
+    {
+      "name": "pm_board_view_wide",
+      "value": "Wide"
+    },
+    {
+      "name": "pm_board_view_default",
+      "value": "Default"
+    },
+    {
+      "name": "pm_board_view_compact",
+      "value": "Compact"
+    },
+    {
+      "name": "pm_board_view_apply",
+      "value": "Apply filters"
+    },
+    {
+      "name": "pm_pin_drafts_title",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_pin_drafts_expiry",
+      "value": "Drafts expire 30 days after you first save them. They will then be deleted."
+    },
+    {
+      "name": "pm_pin_drafts_empty",
+      "value": "No drafts yet."
+    },
+    {
+      "name": "pm_pin_drafts_days",
+      "value": "{0} days until deletion"
+    },
+    {
+      "name": "pm_pin_drafts_count",
+      "value": "{0} drafts"
+    },
+    {
+      "name": "pm_social_shopping_section",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_social_shopping_exclusions",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_social_shopping_detail",
+      "value": "People can use visual search to shop for products similar to those shown in your Pins."
+    },
+    {
+      "name": "pm_social_download_section",
+      "value": "Downloads"
+    },
+    {
+      "name": "pm_social_download_detail",
+      "value": "Allow people to download your video Pins (9:16 aspect ratio) and share them on other platforms. These videos include a watermark with your username."
+    },
+    {
+      "name": "pm_social_filter_other_detail",
+      "value": "Hide comments containing certain words or phrases on other people’s Pins."
+    },
+    {
+      "name": "pm_social_filter_my_detail",
+      "value": "Hide comments containing certain words or phrases on Pins you create."
+    },
+    {
+      "name": "pm_social_comments_title",
+      "value": "Comments"
+    },
+    {
+      "name": "pm_social_comments_entry_detail",
+      "value": "Manage comment permissions and filters"
+    },
+    {
+      "name": "pm_social_comments_detail",
+      "value": "Enable comments on your new and existing Pins by default."
+    },
+    {
+      "name": "pm_social_shopping",
+      "value": "Show similar products"
+    },
+    {
+      "name": "pm_social_idea_downloads",
+      "value": "Video Pin downloads"
+    },
+    {
+      "name": "pm_social_filter_phrases_placeholder",
+      "value": "Enter words or phrases to filter"
+    },
+    {
+      "name": "pm_social_filter_phrases_hint",
+      "value": "Use commas to separate words or phrases"
+    },
+    {
+      "name": "pm_social_filter_phrases_done",
+      "value": "Done"
+    },
+    {
+      "name": "pm_social_filter_other_pins",
+      "value": "Filter comments on other people’s Pins"
+    },
+    {
+      "name": "pm_social_filter_my_pins",
+      "value": "Filter comments on your Pins"
+    },
+    {
+      "name": "pm_social_filter_invalid",
+      "value": "Invalid filter format. Separate words or phrases with commas."
+    },
+    {
+      "name": "pm_social_comments",
+      "value": "Allow comments on your Pins"
+    },
+    {
+      "name": "pm_pin_images_title",
+      "value": "Pin images"
+    },
+    {
+      "name": "pm_publish_remove_product",
+      "value": "Remove product"
+    },
+    {
+      "name": "pm_publish_add_product_help",
+      "value": "Tap the plus button to add products"
+    },
+    {
+      "name": "pm_publish_affiliate_section",
+      "value": "Tag promoted products"
+    },
+    {
+      "name": "pm_publish_affiliate_label",
+      "value": "This is an affiliate link or promoted product"
+    },
+    {
+      "name": "pm_publish_affiliate_help",
+      "value": "You must disclose whether you may receive compensation for including this product."
+    },
+    {
+      "name": "pm_board_cover_placeholder",
+      "value": "Choose a cover image to display at the top of this board"
+    },
+    {
+      "name": "pm_publish_submit_failed",
+      "value": "Publishing was rejected. Check your selections and try again."
+    },
+    {
+      "name": "pm_publish_product_unconfirmed",
+      "value": "Product creation was not confirmed. Close and refresh before trying again."
+    },
+    {
+      "name": "pm_publish_product_select_help",
+      "value": "Select products to tag. Tap again to remove."
+    },
+    {
+      "name": "pm_publish_product_count",
+      "value": "{0} products"
+    },
+    {
+      "name": "pm_board_cover_verifying",
+      "value": "Confirming cover update…"
+    },
+    {
+      "name": "pm_board_cover_unconfirmed",
+      "value": "The cover update is unconfirmed. Check its latest status. It will not be submitted again."
+    },
+    {
+      "name": "pm_board_cover_title",
+      "value": "Change board cover"
+    },
+    {
+      "name": "pm_board_cover_saving",
+      "value": "Submitting cover…"
+    },
+    {
+      "name": "pm_board_cover_saved",
+      "value": "Board cover updated"
+    },
+    {
+      "name": "pm_board_cover_pins",
+      "value": "Pins on this board"
+    },
+    {
+      "name": "pm_board_cover_more",
+      "value": "Load more images"
+    },
+    {
+      "name": "pm_board_cover_label",
+      "value": "Cover image"
+    },
+    {
+      "name": "pm_board_cover_image_failed",
+      "value": "Image failed to load. Select an image again."
+    },
+    {
+      "name": "pm_board_cover_empty",
+      "value": "This board has no available cover images"
+    },
+    {
+      "name": "pm_board_cover_drag",
+      "value": "Drag to reposition"
+    },
+    {
+      "name": "pm_board_cover_choose",
+      "value": "Choose a board cover"
+    },
+    {
+      "name": "pm_board_cover_check",
+      "value": "Check cover status"
+    },
+    {
+      "name": "pm_profile_protected_boards_title",
+      "value": "Unlisted boards"
+    },
+    {
+      "name": "pm_profile_protected_boards_description",
+      "value": "Unlisted boards do not appear publicly on your profile, but anyone with the link can view them."
+    },
+    {
+      "name": "pm_publish_product_recommendations",
+      "value": "Recommended products"
+    },
+    {
+      "name": "pm_publish_product_search_help",
+      "value": "Enter a product name to search."
+    },
+    {
+      "name": "pm_publish_product_read_failed",
+      "value": "Unable to load products. Retry or check the product link."
+    },
+    {
+      "name": "pm_publish_product_pending",
+      "value": "You can preview products here. Adding them to this Pin is not yet available."
+    },
+    {
+      "name": "pm_publish_product_lookup_help",
+      "value": "Enter a product detail page link from a retailer to view product images."
+    },
+    {
+      "name": "pm_publish_product_lookup",
+      "value": "Find product"
+    },
+    {
+      "name": "pm_publish_product_empty",
+      "value": "No products found."
+    },
+    {
+      "name": "pm_publish_topic_count",
+      "value": "{0} tags"
+    },
+    {
+      "name": "pm_publish_selected_topics",
+      "value": "Selected"
+    },
+    {
+      "name": "pm_publish_topic_search",
+      "value": "Search topics"
+    },
+    {
+      "name": "pm_publish_topic_help",
+      "value": "Tag related topics to reach people interested in Pins like yours. People will not see the topics you tag."
+    },
+    {
+      "name": "pm_publish_topic_empty",
+      "value": "No matching topics found"
+    },
+    {
+      "name": "pm_publish_similar_products",
+      "value": "Show similar products"
+    },
+    {
+      "name": "pm_publish_similar_help",
+      "value": "People can use visual search to shop for products similar to those shown in this Pin."
+    },
+    {
+      "name": "pm_publish_shopping_help",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_publish_shopping",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_publish_engagement",
+      "value": "Engagement settings"
+    },
+    {
+      "name": "pm_publish_alt_text",
+      "value": "Alt text"
+    },
+    {
+      "name": "pm_publish_alt_hint",
+      "value": "Describe the visual details of your Pin"
+    },
+    {
+      "name": "pm_publish_alt_help",
+      "value": "This helps people using screen readers understand your Pin."
+    },
+    {
+      "name": "pm_publish_allow_comments",
+      "value": "Allow comments"
+    },
+    {
+      "name": "pm_publish_ai_person_help",
+      "value": "This Pin includes an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_person",
+      "value": "Show an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_modified_help",
+      "value": "Content made entirely or partly with AI"
+    },
+    {
+      "name": "pm_publish_ai_modified",
+      "value": "Label as AI modified"
+    },
+    {
+      "name": "pm_publish_ai_disclosure",
+      "value": "AI disclosure"
+    },
+    {
+      "name": "pm_search_recommendation_updated",
+      "value": "Recommendations have changed. Please select again."
+    },
+    {
+      "name": "pm_search_recommendation_unavailable",
+      "value": "Unable to open this recommendation. Please reload."
+    },
+    {
+      "name": "pm_publish_use_link",
+      "value": "Use a link"
+    },
+    {
+      "name": "pm_publish_topics",
+      "value": "Tag topics"
+    },
+    {
+      "name": "pm_publish_title_limit",
+      "value": "Up to 100 characters"
+    },
+    {
+      "name": "pm_publish_title_hint",
+      "value": "Give your Pin a title"
+    },
+    {
+      "name": "pm_publish_title",
+      "value": "Title"
+    },
+    {
+      "name": "pm_publish_search_pins",
+      "value": "Search Pins"
+    },
+    {
+      "name": "pm_publish_recent_saves",
+      "value": "Recently saved"
+    },
+    {
+      "name": "pm_publish_products",
+      "value": "Tag products"
+    },
+    {
+      "name": "pm_publish_product_search",
+      "value": "Search by product name"
+    },
+    {
+      "name": "pm_publish_product_link",
+      "value": "Add a product link"
+    },
+    {
+      "name": "pm_publish_product_help",
+      "value": "Enter a product page link from a retailer’s website. A product Pin will be created and tagged in your Pin."
+    },
+    {
+      "name": "pm_publish_link_hint",
+      "value": "Add a link"
+    },
+    {
+      "name": "pm_publish_link",
+      "value": "Link"
+    },
+    {
+      "name": "pm_publish_description_hint",
+      "value": "Describe your Pin"
+    },
+    {
+      "name": "pm_publish_create_pin",
+      "value": "Create Pin"
+    },
+    {
+      "name": "pm_publish_choose_board",
+      "value": "Choose board"
+    },
+    {
+      "name": "pm_publish_advanced",
+      "value": "Advanced settings"
+    },
+    {
+      "name": "pm_profile_avatar_right",
+      "value": "Avatar on the right"
+    },
+    {
+      "name": "pm_pin_draft_delete_title",
+      "value": "Delete draft?"
+    },
+    {
+      "name": "pm_pin_draft_delete_message",
+      "value": "Are you sure you want to delete this draft?"
+    },
+    {
+      "name": "pm_publish_save_draft",
+      "value": "Save draft"
+    },
+    {
+      "name": "pm_publish_draft_exit_title",
+      "value": "Save before leaving?"
+    },
+    {
+      "name": "pm_publish_draft_exit_message",
+      "value": "Your changes have not been saved. Save them as a draft before leaving."
+    },
+    {
+      "name": "pm_publish_draft_saved",
+      "value": "Draft saved."
+    },
+    {
+      "name": "pm_publish_draft_unconfirmed",
+      "value": "Draft save result is unconfirmed. Your edits are retained. Reopen the draft list to check before saving again."
+    },
+    {
+      "name": "pm_publish_draft_choose_board",
+      "value": "Choose a board before saving the draft."
+    },
+    {
+      "name": "pm_publish_draft_not_submitted",
+      "value": "Draft preparation or image upload failed. No draft was submitted. Your edits are retained; you can try saving again."
+    },
+    {
+      "name": "pm_publish_draft_box",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_publish_source_files",
+      "value": "System files"
+    },
+    {
+      "name": "pm_publish_source_website",
+      "value": "Website link"
+    }
   ]
 }

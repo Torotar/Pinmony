@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPublishOption } from '../models/PinmonyProfile';
 
@@ -92,11 +93,7 @@ export struct PinmonyPublishSheet {
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))
       } else if (this.options.length === 0) {
-        Text(this.uiText("pm_publishing_not_ready_please_retry_8ec4cc6d"))
-          .fontSize(14)
-          .fontColor($r('app.color.secondary_text'))
-        Button(this.uiText("pm_reload_df7392cc"))
-          .onClick(() => { if (this.onRetry) this.onRetry(); })
+        PinmonyActionNotice({ message: this.uiText("pm_publishing_not_ready_please_retry_8ec4cc6d"), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { if (this.onRetry) this.onRetry(); } })
       }
     }
     .padding({ left: 20, right: 20, top: 12, bottom: 32 })

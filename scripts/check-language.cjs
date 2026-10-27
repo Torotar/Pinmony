@@ -86,7 +86,7 @@ for (const file of ['feature_pin/src/main/ets/components/PinmonyMoreSheet.ets','
 }
 
 // Screenshot regression: execute the actual snapshot producers, not hand-written labels.
-const nativeLoader = createArktsLoader(ts, { common_foundation: { PinmonyI18n: f.api }, common_network: {} });
+const nativeLoader = createArktsLoader(ts, { common_foundation: { PinmonyI18n: f.api }, common_network: {}, '@kit.ArkTS':{}, '@kit.ImageKit':{} });
 const ProfileReader = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyProfileNativeReads.ets').PinmonyProfileNativeReads;
 const profile = Object.create(ProfileReader.prototype);
 Object.assign(profile, { owned: () => true, store: {}, section: 'saved', page: 'https://www.pinterest.com/test/', origin: 'https://www.pinterest.com',

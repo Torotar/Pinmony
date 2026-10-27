@@ -608,7 +608,10 @@
       "name": "pm_secret_board_afc1422a",
       "value": "私密图板"
     },
-    { "name": "pm_public_board", "value": "公开图板" },
+    {
+      "name": "pm_public_board",
+      "value": "公开图板"
+    },
     {
       "name": "pm_featured_board_4b3cbe23",
       "value": "特色图板"
@@ -4333,248 +4336,1389 @@
       "name": "pm_one_year_ago_suffix",
       "value": " 年前"
     },
-    {"name":"pm_immersive_light","value":"沉浸光感"},
-    {"name":"pm_light_off","value":"关闭"},
-    {"name":"pm_light_gentle","value":"柔和"},
-    {"name":"pm_light_immersive","value":"沉浸"},
-    {"name":"pm_light_exquisite","value":"精致"},
-    {"name":"pm_inbox_search_username","value":"通过名字或用户名搜索"},
-    {"name":"pm_inbox_no_matching_username","value":"没有匹配的用户名"},
-    {"name":"pm_photo_search","value":"照片搜索"},
-    {"name":"pm_photo_search_loading","value":"正在搜索照片…"},
-    {"name":"pm_photo_search_empty","value":"未找到匹配的 Pin 图"},
-    {"name":"pm_photo_search_unconfirmed","value":"照片搜索未完成或结果未确认，请关闭后重新选择照片。"},
-    {"name":"pm_notifications_turn_off_all","value":"全部关闭"},
-    {"name":"pm_notifications_disable_push","value":"你将不会再收到来自 Pinterest 关于你的个人帐户的推送通知（关于重要更新、帐户设置和隐私的邮件除外）"},
-    {"name":"pm_notifications_disable_email","value":"你将不会再收到来自 Pinterest 关于你的个人帐户的电子邮件通知（关于重要更新、帐户设置和隐私的邮件除外）"},
-    {"name":"pm_notifications_disable_news","value":"你将不会再收到来自 Pinterest 关于你的个人帐户的应用内通知（关于重要更新、帐户设置和隐私的邮件除外）"},
-    {"name":"pm_social_title","value":"社交权限"},
-    {"name":"pm_social_messages","value":"消息"},
-    {"name":"pm_social_message_settings","value":"消息设置"},
-    {"name":"pm_social_blocked","value":"已屏蔽的帐户"},
-    {"name":"pm_social_mentions","value":"@提及内容"},
-    {"name":"pm_social_friends","value":"朋友"},
-    {"name":"pm_social_followers","value":"粉丝"},
-    {"name":"pm_social_following","value":"关注中"},
-    {"name":"pm_social_others","value":"其他所有人"},
-    {"name":"pm_social_intro","value":"选择其他人如何与你在 Pinterest 上互动，以及基于我们最新功能的其他权限"},
-    {"name":"pm_social_message_settings_detail","value":"选择谁可以向你发送消息以及将你添加到群聊"},
-    {"name":"pm_social_blocked_detail","value":"管理已屏蔽的用户"},
-    {"name":"pm_social_mentions_detail","value":"选择可以 @提到你的用户"},
-    {"name":"pm_social_message_intro","value":"你决定是否将消息发送至你的收件箱、请求，或者不接收任何消息"},
-    {"name":"pm_social_business_messages","value":"允许其他人向我的企业发送消息"},
-    {"name":"pm_social_business_detail","value":"你的个人资料中将显示消息按钮，以便其他用户向你发送消息。"},
-    {"name":"pm_social_unavailable","value":"暂不可用"},
-    {"name":"pm_social_direct","value":"收件箱"},
-    {"name":"pm_social_requests","value":"消息请求"},
-    {"name":"pm_social_ignore","value":"忽略"},
-    {"name":"pm_social_delivery","value":"选择消息投放位置"},
-    {"name":"pm_social_friends_detail","value":"你和用户互相关注"},
-    {"name":"pm_social_followers_detail","value":"关注你的用户和品牌。要向关注你的用户发送消息，你必须关注他们。"},
-    {"name":"pm_social_following_detail","value":"你关注的用户和品牌。要向你关注的用户发送消息，他们必须关注你。"},
-    {"name":"pm_social_others_detail","value":"Pinterest 上你尚未与之交流或合作的用户。"},
-    {"name":"pm_social_blocked_intro","value":"你们将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。当你屏蔽某人时，对方不会收到通知。"},
-    {"name":"pm_social_no_blocked","value":"你目前没有屏蔽任何人"},
-    {"name":"pm_social_no_matches","value":"没有匹配的帐户"},
-    {"name":"pm_social_search","value":"搜索"},
-    {"name":"pm_social_unblock","value":"取消屏蔽"},
-    {"name":"pm_social_unblock_title","value":"取消屏蔽 {0}？"},
-    {"name":"pm_social_unblock_description","value":"根据您的设置，您将可以看到、关注和联系对方，并收藏对方的 Pin 图。了解更多"},
-    {"name":"pm_social_mentions_anyone","value":"Pinterest 上的任何人"},
-    {"name":"pm_social_mentions_following","value":"仅限你关注的人"},
-    {"name":"pm_social_mentions_off","value":"没有人可以 @提及你"},
-    {"name":"pm_social_others_short","value":"其他人"},
-    {"name":"pm_settings_help_center","value":"帮助中心"},
-    {"name":"pm_settings_terms_of_service","value":"服务条款"},
-    {"name":"pm_settings_privacy_policy","value":"隐私政策"},
-    {"name":"pm_profile_search_your_pins","value":"你的 Pin 图"},
-    {"name":"pm_profile_search_recent","value":"最近搜索"},
-    {"name":"pm_profile_search_empty","value":"没有匹配的 Pin 图"},
-    {"name":"pm_notify_category_published_comments","value":"评论"},
-    {"name":"pm_notify_category_published_reactions","value":"回应"},
-    {"name":"pm_notify_category_published_saves","value":"收藏"},
-    {"name":"pm_notify_category_views_and_impressions","value":"查看和浏览"},
-    {"name":"pm_notify_category_published_collages","value":"拼贴"},
-    {"name":"pm_notify_category_saved_pin_comments","value":"评论"},
-    {"name":"pm_notify_category_saved_pin_mentions","value":"提及"},
-    {"name":"pm_notify_category_saved_pin_reminders","value":"提醒"},
-    {"name":"pm_notify_category_saved_pin_tries","value":"带照片的评论"},
-    {"name":"pm_notify_category_group_board_updates","value":"群组图板更新"},
-    {"name":"pm_notify_category_group_board_invites","value":"群组图板邀请"},
-    {"name":"pm_notify_category_messages","value":"消息"},
-    {"name":"pm_notify_category_followers","value":"粉丝"},
-    {"name":"pm_notify_category_homefeed_pins","value":"灵感来自你的首页动态"},
-    {"name":"pm_notify_category_pins_picked_for_you","value":"根据你的兴趣做的推荐"},
-    {"name":"pm_notify_category_based_on_activity","value":"基于你的动态"},
-    {"name":"pm_notify_category_board_recommendations","value":"你可能喜欢的图板"},
-    {"name":"pm_notify_category_search_recommendations","value":"你可能喜欢的搜索内容"},
-    {"name":"pm_notify_category_followee_pins","value":"你关注的用户的 Pin 图"},
-    {"name":"pm_notify_category_shadow_followee_pins","value":"你可能喜欢的用户的 Pin 图"},
-    {"name":"pm_notify_category_shopping_recommendations","value":"购物 Pin 图"},
-    {"name":"pm_notify_category_pinterest_announcements","value":"Pinterest 公告"},
-    {"name":"pm_notify_category_surveys_and_quizzes","value":"问卷调查和测验"},
-    {"name":"pm_notify_category_reports_and_violations_center","value":"违规内容举报中心资讯"},
-    {"name":"pm_notify_category_shuffles_activity","value":"Shuffles 动态"},
-    {"name":"pm_notify_group_created","value":"你创建的 Pin 图"},
-    {"name":"pm_notify_group_saved","value":"你收藏的 Pin 图"},
-    {"name":"pm_notify_group_social","value":"社交活动"},
-    {"name":"pm_notify_group_recommendations","value":"推荐"},
-    {"name":"pm_notify_group_other","value":"其他通知"},
-    {"name":"pm_notify_group_delivery","value":"如何接收通知"},
-    {"name":"pm_notify_title","value":"管理通知"},
-    {"name":"pm_notify_how","value":"你想要如何收到通知？"},
-    {"name":"pm_notify_push","value":"推送"},
-    {"name":"pm_notify_email","value":"电子邮件"},
-    {"name":"pm_notify_news","value":"应用程序内"},
-    {"name":"pm_notify_on","value":"已开启"},
-    {"name":"pm_notify_off","value":"已关闭"},
-    {"name":"pm_notify_comments_description","value":"有人评论了你创建的 Pin 图时接收通知"},
-    {"name":"pm_notify_search_description","value":"获取个性化搜索词，帮助你发现更多你喜爱的内容"},
-    {"name":"pm_notify_global_description","value":"Pinterest 会持续向你发送关于你帐户的重要更新"},
-    {"name":"pm_autoplay_video_title","value":"自动播放视频"},
-    {"name":"pm_autoplay_video_cellular","value":"使用移动数据时自动播放视频"},
-    {"name":"pm_autoplay_video_wifi","value":"使用 WiFi 时自动播放视频"},
-    {"name":"pm_custom_gender_fallback","value":"自定义"},
-    {"name":"pm_board_load_section_details_failed","value":"区块资料读取失败，请重试"},
-    {"name":"pm_board_load_section_tools_failed","value":"区块工具读取失败，请重试"},
-    {"name":"pm_board_load_recommendations_failed","value":"推荐内容读取失败，请重试"},
-    {"name":"pm_board_load_board_details_failed","value":"图板资料读取失败，请重试"},
-    {"name":"pm_board_load_board_content_failed","value":"图板内容读取失败，请重试"},
-    {"name":"pm_notify_description_published_comments","value":"有人评论了你创建的 Pin 图时接收通知"},
-    {"name":"pm_notify_description_published_reactions","value":"有人回应了你创建的 Pin 图时接收通知"},
-    {"name":"pm_notify_description_published_saves","value":"有人收藏了你创建的 Pin 图时接收通知"},
-    {"name":"pm_notify_description_views_and_impressions","value":"你创建的 Pin 图被大量浏览时接收通知"},
-    {"name":"pm_notify_description_published_collages","value":"当有人使用你制作的模板创建了拼贴时接收通知"},
-    {"name":"pm_notify_description_saved_pin_comments","value":"当有人对你的评论点赞、回复或做出回应时接收通知"},
-    {"name":"pm_notify_description_saved_pin_mentions","value":"有人在评论中提及你时接收通知"},
-    {"name":"pm_notify_description_saved_pin_reminders","value":"获取通知以重新探索你收藏的 Pin 图"},
-    {"name":"pm_notify_description_saved_pin_tries","value":"有人尝试了你收藏的 Pin 图时接收通知"},
-    {"name":"pm_notify_description_group_board_updates","value":"获取关于群组图板动态的通知"},
-    {"name":"pm_notify_description_group_board_invites","value":"发送或收到加入群组图板的邀请时获取通知"},
-    {"name":"pm_notify_description_messages","value":"有人向你发送消息时接收通知"},
-    {"name":"pm_notify_description_followers","value":"有人关注你时接收通知"},
-    {"name":"pm_notify_description_homefeed_pins","value":"获取你可能错过的首页动态中的热门 Pin 图"},
-    {"name":"pm_notify_description_pins_picked_for_you","value":"获取你感兴趣的热门 Pin 图推荐"},
-    {"name":"pm_notify_description_based_on_activity","value":"根据你的动态、兴趣和图板获取 Pin 图推荐"},
-    {"name":"pm_notify_description_board_recommendations","value":"获取图板推荐"},
-    {"name":"pm_notify_description_search_recommendations","value":"获取个性化搜索词，帮助你发现更多你喜爱的内容"},
-    {"name":"pm_notify_description_followee_pins","value":"当你关注的用户发布新 Pin 图时获取通知"},
-    {"name":"pm_notify_description_shadow_followee_pins","value":"接收你可能喜欢的用户的 Pin 图通知"},
-    {"name":"pm_notify_description_shopping_recommendations","value":"了解你收藏的 Pin 图何时降价"},
-    {"name":"pm_notify_description_pinterest_announcements","value":"及时获取 Pinterest 的最新消息"},
-    {"name":"pm_notify_description_surveys_and_quizzes","value":"参与调查以改善 Pinterest 体验，并发现新的测验以增加互动"},
-    {"name":"pm_notify_description_reports_and_violations_center","value":"获取有关你的内容和已举报内容的举报和违规行为的更新"},
-    {"name":"pm_notify_description_shuffles_activity","value":"获取关于 Shuffles 动态的更新"},
-    {"name":"pm_social_blocked_partial","value":"已显示当前返回的账户，尚未确认完整屏蔽列表。"},
+    {
+      "name": "pm_immersive_light",
+      "value": "沉浸光感"
+    },
+    {
+      "name": "pm_light_off",
+      "value": "关闭"
+    },
+    {
+      "name": "pm_light_gentle",
+      "value": "柔和"
+    },
+    {
+      "name": "pm_light_immersive",
+      "value": "沉浸"
+    },
+    {
+      "name": "pm_light_exquisite",
+      "value": "精致"
+    },
+    {
+      "name": "pm_inbox_search_username",
+      "value": "通过名字或用户名搜索"
+    },
+    {
+      "name": "pm_inbox_no_matching_username",
+      "value": "没有匹配的用户名"
+    },
+    {
+      "name": "pm_photo_search",
+      "value": "照片搜索"
+    },
+    {
+      "name": "pm_photo_search_loading",
+      "value": "正在搜索照片…"
+    },
+    {
+      "name": "pm_photo_search_empty",
+      "value": "未找到匹配的 Pin 图"
+    },
+    {
+      "name": "pm_photo_search_unconfirmed",
+      "value": "照片搜索未完成或结果未确认，请关闭后重新选择照片。"
+    },
+    {
+      "name": "pm_notifications_turn_off_all",
+      "value": "全部关闭"
+    },
+    {
+      "name": "pm_notifications_disable_push",
+      "value": "你将不会再收到来自 Pinterest 关于你的个人帐户的推送通知（关于重要更新、帐户设置和隐私的邮件除外）"
+    },
+    {
+      "name": "pm_notifications_disable_email",
+      "value": "你将不会再收到来自 Pinterest 关于你的个人帐户的电子邮件通知（关于重要更新、帐户设置和隐私的邮件除外）"
+    },
+    {
+      "name": "pm_notifications_disable_news",
+      "value": "你将不会再收到来自 Pinterest 关于你的个人帐户的应用内通知（关于重要更新、帐户设置和隐私的邮件除外）"
+    },
+    {
+      "name": "pm_social_title",
+      "value": "社交权限"
+    },
+    {
+      "name": "pm_social_messages",
+      "value": "消息"
+    },
+    {
+      "name": "pm_social_message_settings",
+      "value": "消息设置"
+    },
+    {
+      "name": "pm_social_blocked",
+      "value": "已屏蔽的帐户"
+    },
+    {
+      "name": "pm_social_mentions",
+      "value": "@提及内容"
+    },
+    {
+      "name": "pm_social_friends",
+      "value": "朋友"
+    },
+    {
+      "name": "pm_social_followers",
+      "value": "粉丝"
+    },
+    {
+      "name": "pm_social_following",
+      "value": "关注中"
+    },
+    {
+      "name": "pm_social_others",
+      "value": "其他所有人"
+    },
+    {
+      "name": "pm_social_intro",
+      "value": "选择其他人如何与你在 Pinterest 上互动，以及基于我们最新功能的其他权限"
+    },
+    {
+      "name": "pm_social_message_settings_detail",
+      "value": "选择谁可以向你发送消息以及将你添加到群聊"
+    },
+    {
+      "name": "pm_social_blocked_detail",
+      "value": "管理已屏蔽的用户"
+    },
+    {
+      "name": "pm_social_mentions_detail",
+      "value": "选择可以 @提到你的用户"
+    },
+    {
+      "name": "pm_social_message_intro",
+      "value": "你决定是否将消息发送至你的收件箱、请求，或者不接收任何消息"
+    },
+    {
+      "name": "pm_social_business_messages",
+      "value": "允许其他人向我的企业发送消息"
+    },
+    {
+      "name": "pm_social_business_detail",
+      "value": "你的个人资料中将显示消息按钮，以便其他用户向你发送消息。"
+    },
+    {
+      "name": "pm_social_unavailable",
+      "value": "暂不可用"
+    },
+    {
+      "name": "pm_social_direct",
+      "value": "收件箱"
+    },
+    {
+      "name": "pm_social_requests",
+      "value": "消息请求"
+    },
+    {
+      "name": "pm_social_ignore",
+      "value": "忽略"
+    },
+    {
+      "name": "pm_social_delivery",
+      "value": "选择消息投放位置"
+    },
+    {
+      "name": "pm_social_friends_detail",
+      "value": "你和用户互相关注"
+    },
+    {
+      "name": "pm_social_followers_detail",
+      "value": "关注你的用户和品牌。要向关注你的用户发送消息，你必须关注他们。"
+    },
+    {
+      "name": "pm_social_following_detail",
+      "value": "你关注的用户和品牌。要向你关注的用户发送消息，他们必须关注你。"
+    },
+    {
+      "name": "pm_social_others_detail",
+      "value": "Pinterest 上你尚未与之交流或合作的用户。"
+    },
+    {
+      "name": "pm_social_blocked_intro",
+      "value": "你们将无法查看、关注、联系对方，也无法收藏对方的 Pin 图。当你屏蔽某人时，对方不会收到通知。"
+    },
+    {
+      "name": "pm_social_no_blocked",
+      "value": "你目前没有屏蔽任何人"
+    },
+    {
+      "name": "pm_social_no_matches",
+      "value": "没有匹配的帐户"
+    },
+    {
+      "name": "pm_social_search",
+      "value": "搜索"
+    },
+    {
+      "name": "pm_social_unblock",
+      "value": "取消屏蔽"
+    },
+    {
+      "name": "pm_social_unblock_title",
+      "value": "取消屏蔽 {0}？"
+    },
+    {
+      "name": "pm_social_unblock_description",
+      "value": "根据您的设置，您将可以看到、关注和联系对方，并收藏对方的 Pin 图。了解更多"
+    },
+    {
+      "name": "pm_social_mentions_anyone",
+      "value": "Pinterest 上的任何人"
+    },
+    {
+      "name": "pm_social_mentions_following",
+      "value": "仅限你关注的人"
+    },
+    {
+      "name": "pm_social_mentions_off",
+      "value": "没有人可以 @提及你"
+    },
+    {
+      "name": "pm_social_others_short",
+      "value": "其他人"
+    },
+    {
+      "name": "pm_settings_help_center",
+      "value": "帮助中心"
+    },
+    {
+      "name": "pm_settings_terms_of_service",
+      "value": "服务条款"
+    },
+    {
+      "name": "pm_settings_privacy_policy",
+      "value": "隐私政策"
+    },
+    {
+      "name": "pm_profile_search_your_pins",
+      "value": "你的 Pin 图"
+    },
+    {
+      "name": "pm_profile_search_recent",
+      "value": "最近搜索"
+    },
+    {
+      "name": "pm_profile_search_empty",
+      "value": "没有匹配的 Pin 图"
+    },
+    {
+      "name": "pm_notify_category_published_comments",
+      "value": "评论"
+    },
+    {
+      "name": "pm_notify_category_published_reactions",
+      "value": "回应"
+    },
+    {
+      "name": "pm_notify_category_published_saves",
+      "value": "收藏"
+    },
+    {
+      "name": "pm_notify_category_views_and_impressions",
+      "value": "查看和浏览"
+    },
+    {
+      "name": "pm_notify_category_published_collages",
+      "value": "拼贴"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_comments",
+      "value": "评论"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_mentions",
+      "value": "提及"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_reminders",
+      "value": "提醒"
+    },
+    {
+      "name": "pm_notify_category_saved_pin_tries",
+      "value": "带照片的评论"
+    },
+    {
+      "name": "pm_notify_category_group_board_updates",
+      "value": "群组图板更新"
+    },
+    {
+      "name": "pm_notify_category_group_board_invites",
+      "value": "群组图板邀请"
+    },
+    {
+      "name": "pm_notify_category_messages",
+      "value": "消息"
+    },
+    {
+      "name": "pm_notify_category_followers",
+      "value": "粉丝"
+    },
+    {
+      "name": "pm_notify_category_homefeed_pins",
+      "value": "灵感来自你的首页动态"
+    },
+    {
+      "name": "pm_notify_category_pins_picked_for_you",
+      "value": "根据你的兴趣做的推荐"
+    },
+    {
+      "name": "pm_notify_category_based_on_activity",
+      "value": "基于你的动态"
+    },
+    {
+      "name": "pm_notify_category_board_recommendations",
+      "value": "你可能喜欢的图板"
+    },
+    {
+      "name": "pm_notify_category_search_recommendations",
+      "value": "你可能喜欢的搜索内容"
+    },
+    {
+      "name": "pm_notify_category_followee_pins",
+      "value": "你关注的用户的 Pin 图"
+    },
+    {
+      "name": "pm_notify_category_shadow_followee_pins",
+      "value": "你可能喜欢的用户的 Pin 图"
+    },
+    {
+      "name": "pm_notify_category_shopping_recommendations",
+      "value": "购物 Pin 图"
+    },
+    {
+      "name": "pm_notify_category_pinterest_announcements",
+      "value": "Pinterest 公告"
+    },
+    {
+      "name": "pm_notify_category_surveys_and_quizzes",
+      "value": "问卷调查和测验"
+    },
+    {
+      "name": "pm_notify_category_reports_and_violations_center",
+      "value": "违规内容举报中心资讯"
+    },
+    {
+      "name": "pm_notify_category_shuffles_activity",
+      "value": "Shuffles 动态"
+    },
+    {
+      "name": "pm_notify_group_created",
+      "value": "你创建的 Pin 图"
+    },
+    {
+      "name": "pm_notify_group_saved",
+      "value": "你收藏的 Pin 图"
+    },
+    {
+      "name": "pm_notify_group_social",
+      "value": "社交活动"
+    },
+    {
+      "name": "pm_notify_group_recommendations",
+      "value": "推荐"
+    },
+    {
+      "name": "pm_notify_group_other",
+      "value": "其他通知"
+    },
+    {
+      "name": "pm_notify_group_delivery",
+      "value": "如何接收通知"
+    },
+    {
+      "name": "pm_notify_title",
+      "value": "管理通知"
+    },
+    {
+      "name": "pm_notify_how",
+      "value": "你想要如何收到通知？"
+    },
+    {
+      "name": "pm_notify_push",
+      "value": "推送"
+    },
+    {
+      "name": "pm_notify_email",
+      "value": "电子邮件"
+    },
+    {
+      "name": "pm_notify_news",
+      "value": "应用程序内"
+    },
+    {
+      "name": "pm_notify_on",
+      "value": "已开启"
+    },
+    {
+      "name": "pm_notify_off",
+      "value": "已关闭"
+    },
+    {
+      "name": "pm_notify_comments_description",
+      "value": "有人评论了你创建的 Pin 图时接收通知"
+    },
+    {
+      "name": "pm_notify_search_description",
+      "value": "获取个性化搜索词，帮助你发现更多你喜爱的内容"
+    },
+    {
+      "name": "pm_notify_global_description",
+      "value": "Pinterest 会持续向你发送关于你帐户的重要更新"
+    },
+    {
+      "name": "pm_autoplay_video_title",
+      "value": "自动播放视频"
+    },
+    {
+      "name": "pm_autoplay_video_cellular",
+      "value": "使用移动数据时自动播放视频"
+    },
+    {
+      "name": "pm_autoplay_video_wifi",
+      "value": "使用 WiFi 时自动播放视频"
+    },
+    {
+      "name": "pm_custom_gender_fallback",
+      "value": "自定义"
+    },
+    {
+      "name": "pm_board_load_section_details_failed",
+      "value": "区块资料读取失败，请重试"
+    },
+    {
+      "name": "pm_board_load_section_tools_failed",
+      "value": "区块工具读取失败，请重试"
+    },
+    {
+      "name": "pm_board_load_recommendations_failed",
+      "value": "推荐内容读取失败，请重试"
+    },
+    {
+      "name": "pm_board_load_board_details_failed",
+      "value": "图板资料读取失败，请重试"
+    },
+    {
+      "name": "pm_board_load_board_content_failed",
+      "value": "图板内容读取失败，请重试"
+    },
+    {
+      "name": "pm_notify_description_published_comments",
+      "value": "有人评论了你创建的 Pin 图时接收通知"
+    },
+    {
+      "name": "pm_notify_description_published_reactions",
+      "value": "有人回应了你创建的 Pin 图时接收通知"
+    },
+    {
+      "name": "pm_notify_description_published_saves",
+      "value": "有人收藏了你创建的 Pin 图时接收通知"
+    },
+    {
+      "name": "pm_notify_description_views_and_impressions",
+      "value": "你创建的 Pin 图被大量浏览时接收通知"
+    },
+    {
+      "name": "pm_notify_description_published_collages",
+      "value": "当有人使用你制作的模板创建了拼贴时接收通知"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_comments",
+      "value": "当有人对你的评论点赞、回复或做出回应时接收通知"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_mentions",
+      "value": "有人在评论中提及你时接收通知"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_reminders",
+      "value": "获取通知以重新探索你收藏的 Pin 图"
+    },
+    {
+      "name": "pm_notify_description_saved_pin_tries",
+      "value": "有人尝试了你收藏的 Pin 图时接收通知"
+    },
+    {
+      "name": "pm_notify_description_group_board_updates",
+      "value": "获取关于群组图板动态的通知"
+    },
+    {
+      "name": "pm_notify_description_group_board_invites",
+      "value": "发送或收到加入群组图板的邀请时获取通知"
+    },
+    {
+      "name": "pm_notify_description_messages",
+      "value": "有人向你发送消息时接收通知"
+    },
+    {
+      "name": "pm_notify_description_followers",
+      "value": "有人关注你时接收通知"
+    },
+    {
+      "name": "pm_notify_description_homefeed_pins",
+      "value": "获取你可能错过的首页动态中的热门 Pin 图"
+    },
+    {
+      "name": "pm_notify_description_pins_picked_for_you",
+      "value": "获取你感兴趣的热门 Pin 图推荐"
+    },
+    {
+      "name": "pm_notify_description_based_on_activity",
+      "value": "根据你的动态、兴趣和图板获取 Pin 图推荐"
+    },
+    {
+      "name": "pm_notify_description_board_recommendations",
+      "value": "获取图板推荐"
+    },
+    {
+      "name": "pm_notify_description_search_recommendations",
+      "value": "获取个性化搜索词，帮助你发现更多你喜爱的内容"
+    },
+    {
+      "name": "pm_notify_description_followee_pins",
+      "value": "当你关注的用户发布新 Pin 图时获取通知"
+    },
+    {
+      "name": "pm_notify_description_shadow_followee_pins",
+      "value": "接收你可能喜欢的用户的 Pin 图通知"
+    },
+    {
+      "name": "pm_notify_description_shopping_recommendations",
+      "value": "了解你收藏的 Pin 图何时降价"
+    },
+    {
+      "name": "pm_notify_description_pinterest_announcements",
+      "value": "及时获取 Pinterest 的最新消息"
+    },
+    {
+      "name": "pm_notify_description_surveys_and_quizzes",
+      "value": "参与调查以改善 Pinterest 体验，并发现新的测验以增加互动"
+    },
+    {
+      "name": "pm_notify_description_reports_and_violations_center",
+      "value": "获取有关你的内容和已举报内容的举报和违规行为的更新"
+    },
+    {
+      "name": "pm_notify_description_shuffles_activity",
+      "value": "获取关于 Shuffles 动态的更新"
+    },
+    {
+      "name": "pm_social_blocked_partial",
+      "value": "已显示当前返回的账户，尚未确认完整屏蔽列表。"
+    },
     {
       "name": "pm_view_comment_replies",
       "value": "查看 {0} 条回复"
     },
-    {"name":"pm_photo_upload","value":"上传照片"},
-    {"name":"pm_photo_history","value":"照片搜索历史"},
-    {"name":"pm_photo_history_select","value":"选择历史照片"},
-    {"name":"pm_photo_history_confirm","value":"确认"},
-    {"name":"pm_photo_history_empty","value":"还没有上传"},
-    {"name":"pm_photo_history_empty_hint","value":"当你上传图片进行搜索时，它会出现在这里，方便你再次使用它进行搜索。"},
-    {"name":"pm_photo_history_error","value":"无法加载照片，请重试"},
-    {"name":"pm_social_business_tab","value":"企业"},
-    {"name":"pm_photo_history_single_only","value":"只能选择一张照片进行搜索，请先取消已选照片"},
-    { "name": "pm_press_back_again_to_exit", "value": "再按一次返回退出应用" }
-,
-    {"value":"将此图板设为公开","name":"pm_board_make_public"},
-    {"value":"任何人都可以看到此图板。它会出现在你的个人资料中，可能在 Pinterest 上的搜索和其他地方显示。","name":"pm_board_public_description"},
-    {"value":"此图板为公开","name":"pm_board_public_title"},
-    {"value":"任何人都能够看到此图板","name":"pm_board_public_visibility"},
-    {"value":"仅合作用户可查看该图板。该图板不会展示在你的个人主页、搜索结果以及 Pinterest 的其他位置。","name":"pm_board_secret_description"},
-    {"value":"此图板为私密","name":"pm_board_secret_title"},
-    {"value":"仅合作用户可查看该图板","name":"pm_board_secret_visibility"},
-    {"name":"pm_video_connection_timeout","value":"视频连接超时"},
-    {"name":"pm_video_proxy_timeout_hint","value":"视频连接超时，请检查代理规则是否将 pinimg.com 指向 DIRECT，或切换代理节点（建议使用全局模式）"},
-    {"name":"pm_profile_content_search","value":"搜索你的 Pin 图"},
-    {"name":"pm_profile_board_sort","value":"Board options"},
-    {"name":"pm_profile_sort_name","value":"A 到 Z"},
-    {"name":"pm_profile_sort_recent","value":"最新收藏"},
-    {"name":"pm_profile_sort_custom","value":"自定义顺序"},
-    {"name":"pm_profile_sort_load_error","value":"无法读取排序，请重试"},
-    {"name":"pm_profile_sort_save_error","value":"未能确认排序已保存，请重新读取"},
-    {"name":"pm_account_language","value":"账户语言"},
-    {"name":"pm_language_simplified_chinese","value":"简体中文"},
-    {"name":"pm_language_traditional_chinese","value":"繁体中文"},
-    {"name":"pm_language_english","value":"英语"},
-    {"name":"pm_language_english_uk","value":"英语（英国）"},
-    {"name":"pm_language_japanese","value":"日语"},
-    {"name":"pm_language_korean","value":"韩语"},
-    {"name":"pm_profile_organize_heading","value":"整理用户资料"},
-    {"name":"pm_profile_auto_sort","value":"图板自动排序"},
-    {"name":"pm_profile_auto_sort_description","value":"选择你希望 Pinterest 如何显示你的图板"},
-    {"name":"pm_profile_layout_heading","value":"布局"},
-    {"name":"pm_profile_edit_board_visibility","value":"编辑图板可见性"},
-    {"name":"pm_profile_manage_visibility","value":"管理可见性"},
-    {"name":"pm_profile_show_all_pins","value":"显示所有 Pin 图"},
-    {"name":"pm_profile_show_all_pins_description","value":"所有 Pin 图对正在查看你个人资料的人公开可见"},
-    {"name":"pm_profile_visibility_load_error","value":"无法读取当前可见性，请重试"},
-    {"name":"pm_profile_visibility_save_error","value":"未能确认保存结果，请先重新读取可见性"},
-    {"name":"pm_clear_logs","value":"Clear logs"},
-    {"name":"pm_clear_logs_confirm","value":"Clear logs stored in the app? Exported files are kept."},
-    {"name":"pm_logs_cleared","value":"Logs cleared"},
-    {"name":"pm_logs_clear_failed","value":"Unable to clear all logs. Please retry."},
-    {"name":"pm_profile_sort_heading","value":"Sort by"},
-    {"name":"pm_activity_yesterday","value":"昨天"},
-    {"name":"pm_activity_open_all","value":"打开全部"},
-    {"name":"pm_activity_close_all","value":"关闭全部"},
-    {"name":"pm_activity_date_unknown","value":"其他动态"},
-    {"name":"pm_order_discard_title","value":"放弃未保存的排序？"},
-    {"name":"pm_order_discard_message","value":"你调整的图板顺序尚未保存，返回将放弃这些更改。"},
-    {"name":"pm_order_discard_action","value":"放弃更改"},
-    {"name":"pm_profile_legacy_layout","value":"使用旧版个人资料排版"},
-    {"name":"pm_profile_hub_pins","value":"Pin 图"},
-    {"name":"pm_profile_hub_boards","value":"图板"},
-    {"name":"pm_profile_hub_collages","value":"拼贴"},
-    {"name":"pm_profile_hub_favorites","value":"收藏夹"},
-    {"name":"pm_profile_hub_created","value":"由你创建"},
-    {"name":"pm_profile_hub_groups","value":"群组"},
-    {"name":"pm_profile_hub_secret","value":"私密"},
-    {"name":"pm_profile_hub_saved","value":"你收藏的 Pin 图"},
-    {"name":"pm_profile_hub_suggestions","value":"图板建议"},
-    {"name":"pm_profile_hub_empty","value":"没有符合筛选条件的 Pin 图"},
-    {"name":"pm_profile_hub_favorite_empty","value":"将你的 Pin 图标记为收藏，即可在这里找到它们。"},
-    {"name":"pm_profile_suggestion_confirm","value":"创建图板并将这组建议中的 Pin 图移入其中？"},
-    {"name":"pm_profile_suggestion_unconfirmed","value":"操作结果尚未确认，请刷新检查图板；不要重复创建。"},
-    {"name":"pm_profile_hub_result_count","value":"{0} 个 Pin 图结果 · 应用了 {1} 个筛选器"},
-    {"name":"pm_profile_hub_in_progress","value":"进行中"},
-    {"name":"pm_profile_invite_collaborators","value":"邀请合作用户"},
-    {"name":"pm_profile_create_collage","value":"创建拼贴"},
-    {"name":"pm_profile_empty_favorites_title","value":"收藏内容"},
-    {"name":"pm_profile_empty_favorites_body","value":"如果你特别喜欢某个 Pin 图，可以在你收藏的 Pin 图上点击星标，这样它们就会显示在这里。很简单！"},
-    {"name":"pm_profile_empty_combined_title","value":"将你的 Pin 图标记为收藏"},
-    {"name":"pm_profile_empty_combined_body","value":"在你创建的任何 Pin 图上点击星标，即可将它们标记为收藏。这样就能轻松在这里找到它们。"},
-    {"name":"pm_profile_empty_groups_title","value":"在图板上协作"},
-    {"name":"pm_profile_empty_groups_body","value":"将合作用户添加到图板，这样你就可以收藏 Pin 图、标记收藏夹并将你的点子整理在一起。"},
-    {"name":"pm_profile_empty_collages_title","value":"创建拼贴"},
-    {"name":"pm_profile_empty_collages_body","value":"截图并粘贴 Pin 图来制作全新内容，然后发布你创建的内容来启发其他用户。"},
-    {"name":"pm_profile_empty_created_title","value":"由你创建"},
-    {"name":"pm_profile_empty_created_body","value":"你创建的 Pin 图会显示在这里。"},
-    {"name":"pm_profile_empty_boards_title","value":"暂无图板"},
-    {"name":"pm_profile_empty_boards_body","value":"符合当前筛选条件的图板会显示在这里。"},
-    {"name":"pm_profile_empty_collage_drafts_title","value":"你没有任何正在进行中的拼贴！"},
-    {"name":"pm_profile_empty_collage_drafts_body","value":"剪裁并组合任何启发你的视觉内容，制作成拼贴"}
-  ,
-    {"name":"pm_settings_view_profile","value":"查看个人资料"},
-    {"name":"pm_star_add","value":"添加星标"},
-    {"name":"pm_star_remove","value":"取消星标"},
-    {"name":"pm_star_added","value":"已添加星标"},
-    {"name":"pm_star_removed","value":"已取消星标"},
-    {"name":"pm_star_failed","value":"星标操作未提交，请重新打开菜单重试"},
-    {"name":"pm_star_unknown","value":"星标结果未确认，请刷新核实后再操作"},
-    {"name":"pm_star_filter","value":"星标"},
-    {"name":"pm_star_filter_active","value":"星标 · 已筛选"},
-    {"name":"pm_board_view_title","value":"图板视图"},
-    {"name":"pm_board_view_type","value":"按类型筛选"},
-    {"name":"pm_board_view_favorites","value":"收藏夹"},
-    {"name":"pm_board_view_density","value":"将视图设置为"},
-    {"name":"pm_board_view_wide","value":"宽"},
-    {"name":"pm_board_view_default","value":"默认"},
-    {"name":"pm_board_view_compact","value":"精简"},
-    {"name":"pm_board_view_apply","value":"应用筛选器"}
+    {
+      "name": "pm_photo_upload",
+      "value": "上传照片"
+    },
+    {
+      "name": "pm_photo_history",
+      "value": "照片搜索历史"
+    },
+    {
+      "name": "pm_photo_history_select",
+      "value": "选择历史照片"
+    },
+    {
+      "name": "pm_photo_history_confirm",
+      "value": "确认"
+    },
+    {
+      "name": "pm_photo_history_empty",
+      "value": "还没有上传"
+    },
+    {
+      "name": "pm_photo_history_empty_hint",
+      "value": "当你上传图片进行搜索时，它会出现在这里，方便你再次使用它进行搜索。"
+    },
+    {
+      "name": "pm_photo_history_error",
+      "value": "无法加载照片，请重试"
+    },
+    {
+      "name": "pm_social_business_tab",
+      "value": "企业"
+    },
+    {
+      "name": "pm_photo_history_single_only",
+      "value": "只能选择一张照片进行搜索，请先取消已选照片"
+    },
+    {
+      "name": "pm_press_back_again_to_exit",
+      "value": "再按一次返回退出应用"
+    },
+    {
+      "value": "将此图板设为公开",
+      "name": "pm_board_make_public"
+    },
+    {
+      "value": "任何人都可以看到此图板。它会出现在你的个人资料中，可能在 Pinterest 上的搜索和其他地方显示。",
+      "name": "pm_board_public_description"
+    },
+    {
+      "value": "此图板为公开",
+      "name": "pm_board_public_title"
+    },
+    {
+      "value": "任何人都能够看到此图板",
+      "name": "pm_board_public_visibility"
+    },
+    {
+      "value": "仅合作用户可查看该图板。该图板不会展示在你的个人主页、搜索结果以及 Pinterest 的其他位置。",
+      "name": "pm_board_secret_description"
+    },
+    {
+      "value": "此图板为私密",
+      "name": "pm_board_secret_title"
+    },
+    {
+      "value": "仅合作用户可查看该图板",
+      "name": "pm_board_secret_visibility"
+    },
+    {
+      "name": "pm_video_connection_timeout",
+      "value": "视频连接超时"
+    },
+    {
+      "name": "pm_video_proxy_timeout_hint",
+      "value": "视频连接超时，请检查代理规则是否将 pinimg.com 指向 DIRECT，或切换代理节点（建议使用全局模式）"
+    },
+    {
+      "name": "pm_profile_content_search",
+      "value": "搜索你的 Pin 图"
+    },
+    {
+      "name": "pm_profile_board_sort",
+      "value": "Board options"
+    },
+    {
+      "name": "pm_profile_sort_name",
+      "value": "A 到 Z"
+    },
+    {
+      "name": "pm_profile_sort_recent",
+      "value": "最新收藏"
+    },
+    {
+      "name": "pm_profile_sort_custom",
+      "value": "自定义顺序"
+    },
+    {
+      "name": "pm_profile_sort_load_error",
+      "value": "无法读取排序，请重试"
+    },
+    {
+      "name": "pm_profile_sort_save_error",
+      "value": "未能确认排序已保存，请重新读取"
+    },
+    {
+      "name": "pm_account_language",
+      "value": "账户语言"
+    },
+    {
+      "name": "pm_language_simplified_chinese",
+      "value": "简体中文"
+    },
+    {
+      "name": "pm_language_traditional_chinese",
+      "value": "繁体中文"
+    },
+    {
+      "name": "pm_language_english",
+      "value": "英语"
+    },
+    {
+      "name": "pm_language_english_uk",
+      "value": "英语（英国）"
+    },
+    {
+      "name": "pm_language_japanese",
+      "value": "日语"
+    },
+    {
+      "name": "pm_language_korean",
+      "value": "韩语"
+    },
+    {
+      "name": "pm_profile_organize_heading",
+      "value": "整理用户资料"
+    },
+    {
+      "name": "pm_profile_auto_sort",
+      "value": "图板自动排序"
+    },
+    {
+      "name": "pm_profile_auto_sort_description",
+      "value": "选择你希望 Pinterest 如何显示你的图板"
+    },
+    {
+      "name": "pm_profile_layout_heading",
+      "value": "布局"
+    },
+    {
+      "name": "pm_profile_edit_board_visibility",
+      "value": "编辑图板可见性"
+    },
+    {
+      "name": "pm_profile_manage_visibility",
+      "value": "管理可见性"
+    },
+    {
+      "name": "pm_profile_show_all_pins",
+      "value": "显示所有 Pin 图"
+    },
+    {
+      "name": "pm_profile_show_all_pins_description",
+      "value": "所有 Pin 图对正在查看你个人资料的人公开可见"
+    },
+    {
+      "name": "pm_profile_visibility_load_error",
+      "value": "无法读取当前可见性，请重试"
+    },
+    {
+      "name": "pm_profile_visibility_save_error",
+      "value": "未能确认保存结果，请先重新读取可见性"
+    },
+    {
+      "name": "pm_clear_logs",
+      "value": "Clear logs"
+    },
+    {
+      "name": "pm_clear_logs_confirm",
+      "value": "Clear logs stored in the app? Exported files are kept."
+    },
+    {
+      "name": "pm_logs_cleared",
+      "value": "Logs cleared"
+    },
+    {
+      "name": "pm_logs_clear_failed",
+      "value": "Unable to clear all logs. Please retry."
+    },
+    {
+      "name": "pm_profile_sort_heading",
+      "value": "Sort by"
+    },
+    {
+      "name": "pm_activity_yesterday",
+      "value": "昨天"
+    },
+    {
+      "name": "pm_activity_open_all",
+      "value": "打开全部"
+    },
+    {
+      "name": "pm_activity_close_all",
+      "value": "关闭全部"
+    },
+    {
+      "name": "pm_activity_date_unknown",
+      "value": "其他动态"
+    },
+    {
+      "name": "pm_order_discard_title",
+      "value": "放弃未保存的排序？"
+    },
+    {
+      "name": "pm_order_discard_message",
+      "value": "你调整的图板顺序尚未保存，返回将放弃这些更改。"
+    },
+    {
+      "name": "pm_order_discard_action",
+      "value": "放弃更改"
+    },
+    {
+      "name": "pm_profile_legacy_layout",
+      "value": "使用旧版个人资料排版"
+    },
+    {
+      "name": "pm_profile_hub_pins",
+      "value": "Pin 图"
+    },
+    {
+      "name": "pm_profile_hub_boards",
+      "value": "图板"
+    },
+    {
+      "name": "pm_profile_hub_collages",
+      "value": "拼贴"
+    },
+    {
+      "name": "pm_profile_hub_favorites",
+      "value": "收藏夹"
+    },
+    {
+      "name": "pm_profile_hub_created",
+      "value": "由你创建"
+    },
+    {
+      "name": "pm_profile_hub_groups",
+      "value": "群组"
+    },
+    {
+      "name": "pm_profile_hub_secret",
+      "value": "私密"
+    },
+    {
+      "name": "pm_profile_hub_saved",
+      "value": "你收藏的 Pin 图"
+    },
+    {
+      "name": "pm_profile_hub_suggestions",
+      "value": "图板建议"
+    },
+    {
+      "name": "pm_profile_hub_empty",
+      "value": "没有符合筛选条件的 Pin 图"
+    },
+    {
+      "name": "pm_profile_hub_favorite_empty",
+      "value": "将你的 Pin 图标记为收藏，即可在这里找到它们。"
+    },
+    {
+      "name": "pm_profile_suggestion_confirm",
+      "value": "创建图板并将这组建议中的 Pin 图移入其中？"
+    },
+    {
+      "name": "pm_profile_suggestion_unconfirmed",
+      "value": "操作结果尚未确认，请刷新检查图板；不要重复创建。"
+    },
+    {
+      "name": "pm_profile_hub_result_count",
+      "value": "{0} 个 Pin 图结果 · 应用了 {1} 个筛选器"
+    },
+    {
+      "name": "pm_profile_hub_in_progress",
+      "value": "进行中"
+    },
+    {
+      "name": "pm_profile_invite_collaborators",
+      "value": "邀请合作用户"
+    },
+    {
+      "name": "pm_profile_create_collage",
+      "value": "创建拼贴"
+    },
+    {
+      "name": "pm_profile_empty_favorites_title",
+      "value": "收藏内容"
+    },
+    {
+      "name": "pm_profile_empty_favorites_body",
+      "value": "如果你特别喜欢某个 Pin 图，可以在你收藏的 Pin 图上点击星标，这样它们就会显示在这里。很简单！"
+    },
+    {
+      "name": "pm_profile_empty_combined_title",
+      "value": "将你的 Pin 图标记为收藏"
+    },
+    {
+      "name": "pm_profile_empty_combined_body",
+      "value": "在你创建的任何 Pin 图上点击星标，即可将它们标记为收藏。这样就能轻松在这里找到它们。"
+    },
+    {
+      "name": "pm_profile_empty_groups_title",
+      "value": "在图板上协作"
+    },
+    {
+      "name": "pm_profile_empty_groups_body",
+      "value": "将合作用户添加到图板，这样你就可以收藏 Pin 图、标记收藏夹并将你的点子整理在一起。"
+    },
+    {
+      "name": "pm_profile_empty_collages_title",
+      "value": "创建拼贴"
+    },
+    {
+      "name": "pm_profile_empty_collages_body",
+      "value": "截图并粘贴 Pin 图来制作全新内容，然后发布你创建的内容来启发其他用户。"
+    },
+    {
+      "name": "pm_profile_empty_created_title",
+      "value": "由你创建"
+    },
+    {
+      "name": "pm_profile_empty_created_body",
+      "value": "你创建的 Pin 图会显示在这里。"
+    },
+    {
+      "name": "pm_profile_empty_boards_title",
+      "value": "暂无图板"
+    },
+    {
+      "name": "pm_profile_empty_boards_body",
+      "value": "符合当前筛选条件的图板会显示在这里。"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_title",
+      "value": "你没有任何正在进行中的拼贴！"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_body",
+      "value": "剪裁并组合任何启发你的视觉内容，制作成拼贴"
+    },
+    {
+      "name": "pm_settings_view_profile",
+      "value": "查看个人资料"
+    },
+    {
+      "name": "pm_star_add",
+      "value": "添加星标"
+    },
+    {
+      "name": "pm_star_remove",
+      "value": "取消星标"
+    },
+    {
+      "name": "pm_star_added",
+      "value": "已添加星标"
+    },
+    {
+      "name": "pm_star_removed",
+      "value": "已取消星标"
+    },
+    {
+      "name": "pm_star_failed",
+      "value": "星标操作未提交，请重新打开菜单重试"
+    },
+    {
+      "name": "pm_star_unknown",
+      "value": "星标结果未确认，请刷新核实后再操作"
+    },
+    {
+      "name": "pm_star_filter",
+      "value": "星标"
+    },
+    {
+      "name": "pm_star_filter_active",
+      "value": "星标 · 已筛选"
+    },
+    {
+      "name": "pm_board_view_title",
+      "value": "图板视图"
+    },
+    {
+      "name": "pm_board_view_type",
+      "value": "按类型筛选"
+    },
+    {
+      "name": "pm_board_view_favorites",
+      "value": "收藏夹"
+    },
+    {
+      "name": "pm_board_view_density",
+      "value": "将视图设置为"
+    },
+    {
+      "name": "pm_board_view_wide",
+      "value": "宽"
+    },
+    {
+      "name": "pm_board_view_default",
+      "value": "默认"
+    },
+    {
+      "name": "pm_board_view_compact",
+      "value": "精简"
+    },
+    {
+      "name": "pm_board_view_apply",
+      "value": "应用筛选器"
+    },
+    {
+      "name": "pm_pin_drafts_title",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_pin_drafts_expiry",
+      "value": "Drafts expire 30 days after you first save them. They will then be deleted."
+    },
+    {
+      "name": "pm_pin_drafts_empty",
+      "value": "No drafts yet."
+    },
+    {
+      "name": "pm_pin_drafts_days",
+      "value": "{0} days until deletion"
+    },
+    {
+      "name": "pm_pin_drafts_count",
+      "value": "{0} drafts"
+    },
+    {
+      "name": "pm_social_shopping_section",
+      "value": "购物推荐"
+    },
+    {
+      "name": "pm_social_shopping_exclusions",
+      "value": "购物推荐不适用于包含标记的产品或付费合作伙伴关系标签的 Pin 图。"
+    },
+    {
+      "name": "pm_social_shopping_detail",
+      "value": "用户可以通过视觉搜索来购买与你 Pin 图中显示的产品相似的产品。"
+    },
+    {
+      "name": "pm_social_download_section",
+      "value": "下载"
+    },
+    {
+      "name": "pm_social_download_detail",
+      "value": "允许用户下载你的视频 Pin 图（比例 9:16）并将这些视频 Pin 图分享到其他平台。这些视频带有水印，水印文本为你的用户名。"
+    },
+    {
+      "name": "pm_social_filter_other_detail",
+      "value": "隐藏有关他人 Pin 图中包含某些字词或短语的评论。"
+    },
+    {
+      "name": "pm_social_filter_my_detail",
+      "value": "对于所有人在你创建的 Pin 图上作出的评论，隐藏含有某些字词或短语的评论。"
+    },
+    {
+      "name": "pm_social_comments_title",
+      "value": "评论"
+    },
+    {
+      "name": "pm_social_comments_entry_detail",
+      "value": "管理评论权限和评论筛选"
+    },
+    {
+      "name": "pm_social_comments_detail",
+      "value": "默认情况下，将为你的新 Pin 图和现有 Pin 图开启评论。"
+    },
+    {
+      "name": "pm_social_shopping",
+      "value": "显示类似产品"
+    },
+    {
+      "name": "pm_social_idea_downloads",
+      "value": "视频 Pin 图下载"
+    },
+    {
+      "name": "pm_social_filter_phrases_placeholder",
+      "value": "输入要过滤的词语或短语"
+    },
+    {
+      "name": "pm_social_filter_phrases_hint",
+      "value": "使用逗号分隔词或短语"
+    },
+    {
+      "name": "pm_social_filter_phrases_done",
+      "value": "完成"
+    },
+    {
+      "name": "pm_social_filter_other_pins",
+      "value": "筛选有关其他人的 Pin 图的评论"
+    },
+    {
+      "name": "pm_social_filter_my_pins",
+      "value": "筛选有关我的 Pin 图的评论"
+    },
+    {
+      "name": "pm_social_filter_invalid",
+      "value": "筛选词格式无效，请使用逗号分隔词语或短语"
+    },
+    {
+      "name": "pm_social_comments",
+      "value": "允许评论你的 Pin 图"
+    },
+    {
+      "name": "pm_pin_images_title",
+      "value": "Pin 图"
+    },
+    {
+      "name": "pm_publish_remove_product",
+      "value": "移除产品"
+    },
+    {
+      "name": "pm_publish_add_product_help",
+      "value": "点按加号按钮以添加产品"
+    },
+    {
+      "name": "pm_publish_affiliate_section",
+      "value": "Tag promoted products"
+    },
+    {
+      "name": "pm_publish_affiliate_label",
+      "value": "This is an affiliate link or promoted product"
+    },
+    {
+      "name": "pm_publish_affiliate_help",
+      "value": "You must disclose whether you may receive compensation for including this product."
+    },
+    {
+      "name": "pm_board_cover_placeholder",
+      "value": "选择要展示在此图板顶部的标题图片"
+    },
+    {
+      "name": "pm_publish_submit_failed",
+      "value": "Publishing was rejected. Check your selections and try again."
+    },
+    {
+      "name": "pm_publish_product_unconfirmed",
+      "value": "Product creation was not confirmed. Close and refresh before trying again."
+    },
+    {
+      "name": "pm_publish_product_select_help",
+      "value": "Select products to tag. Tap again to remove."
+    },
+    {
+      "name": "pm_publish_product_count",
+      "value": "{0} products"
+    },
+    {
+      "name": "pm_board_cover_verifying",
+      "value": "正在确认封面更新…"
+    },
+    {
+      "name": "pm_board_cover_unconfirmed",
+      "value": "封面结果尚未确认，请查询最新状态。不会重复提交。"
+    },
+    {
+      "name": "pm_board_cover_title",
+      "value": "更改图板封面"
+    },
+    {
+      "name": "pm_board_cover_saving",
+      "value": "正在提交封面…"
+    },
+    {
+      "name": "pm_board_cover_saved",
+      "value": "图板封面已更新"
+    },
+    {
+      "name": "pm_board_cover_pins",
+      "value": "此图板中的 Pin 图"
+    },
+    {
+      "name": "pm_board_cover_more",
+      "value": "加载更多图片"
+    },
+    {
+      "name": "pm_board_cover_label",
+      "value": "标题图片"
+    },
+    {
+      "name": "pm_board_cover_image_failed",
+      "value": "图片加载失败，请重新选择图片"
+    },
+    {
+      "name": "pm_board_cover_empty",
+      "value": "此图板暂无可用的封面图片"
+    },
+    {
+      "name": "pm_board_cover_drag",
+      "value": "拖动以重新定位"
+    },
+    {
+      "name": "pm_board_cover_choose",
+      "value": "选择图板封面"
+    },
+    {
+      "name": "pm_board_cover_check",
+      "value": "查询封面状态"
+    },
+    {
+      "name": "pm_profile_protected_boards_title",
+      "value": "非公开图板"
+    },
+    {
+      "name": "pm_profile_protected_boards_description",
+      "value": "非公开图板不会在你的个人资料页面上公开显示，但任何获得网址的用户都可以查看它们。"
+    },
+    {
+      "name": "pm_publish_product_recommendations",
+      "value": "推荐产品"
+    },
+    {
+      "name": "pm_publish_product_search_help",
+      "value": "输入产品名称以搜索产品。"
+    },
+    {
+      "name": "pm_publish_product_read_failed",
+      "value": "无法读取产品，请重试或检查商品链接。"
+    },
+    {
+      "name": "pm_publish_product_pending",
+      "value": "当前可预览产品，暂不支持添加到此 Pin 图。"
+    },
+    {
+      "name": "pm_publish_product_lookup_help",
+      "value": "输入零售商网站的商品详情页链接，以查看产品图片。"
+    },
+    {
+      "name": "pm_publish_product_lookup",
+      "value": "识别商品链接"
+    },
+    {
+      "name": "pm_publish_product_empty",
+      "value": "没有找到产品。"
+    },
+    {
+      "name": "pm_publish_topic_count",
+      "value": "{0} 个标签"
+    },
+    {
+      "name": "pm_publish_selected_topics",
+      "value": "已选择"
+    },
+    {
+      "name": "pm_publish_topic_search",
+      "value": "搜索主题"
+    },
+    {
+      "name": "pm_publish_topic_help",
+      "value": "标记相关主题，触达对相关 Pin 图感兴趣的用户。用户不会看到你标记的主题。"
+    },
+    {
+      "name": "pm_publish_topic_empty",
+      "value": "没有找到相关主题"
+    },
+    {
+      "name": "pm_publish_similar_products",
+      "value": "显示类似产品"
+    },
+    {
+      "name": "pm_publish_similar_help",
+      "value": "用户可以通过视觉搜索来购买与此 Pin 图中显示的产品相似的产品。"
+    },
+    {
+      "name": "pm_publish_shopping_help",
+      "value": "购物推荐不适用于包含标记的产品或付费合作伙伴标签的 Pin 图。"
+    },
+    {
+      "name": "pm_publish_shopping",
+      "value": "购物推荐"
+    },
+    {
+      "name": "pm_publish_engagement",
+      "value": "参与度设置"
+    },
+    {
+      "name": "pm_publish_alt_text",
+      "value": "替代文本"
+    },
+    {
+      "name": "pm_publish_alt_hint",
+      "value": "描述你 Pin 图的视觉详细信息"
+    },
+    {
+      "name": "pm_publish_alt_help",
+      "value": "这将帮助使用屏幕阅读器的用户理解你的 Pin 图内容。"
+    },
+    {
+      "name": "pm_publish_allow_comments",
+      "value": "允许评论"
+    },
+    {
+      "name": "pm_publish_ai_person_help",
+      "value": "此 Pin 图包含 AI 生成的用户"
+    },
+    {
+      "name": "pm_publish_ai_person",
+      "value": "展示 AI 生成的用户"
+    },
+    {
+      "name": "pm_publish_ai_modified_help",
+      "value": "完全或部分使用 AI 制作的内容"
+    },
+    {
+      "name": "pm_publish_ai_modified",
+      "value": "标记为由 AI 修改"
+    },
+    {
+      "name": "pm_publish_ai_disclosure",
+      "value": "AI 披露"
+    },
+    {
+      "name": "pm_search_recommendation_updated",
+      "value": "推荐内容已更新，请重新选择"
+    },
+    {
+      "name": "pm_search_recommendation_unavailable",
+      "value": "无法打开这条推荐，请重新读取"
+    },
+    {
+      "name": "pm_publish_use_link",
+      "value": "使用链接"
+    },
+    {
+      "name": "pm_publish_topics",
+      "value": "标记主题"
+    },
+    {
+      "name": "pm_publish_title_limit",
+      "value": "最多 100 个字符"
+    },
+    {
+      "name": "pm_publish_title_hint",
+      "value": "简要描述你的 Pin 图"
+    },
+    {
+      "name": "pm_publish_title",
+      "value": "标题"
+    },
+    {
+      "name": "pm_publish_search_pins",
+      "value": "搜索 Pin 图"
+    },
+    {
+      "name": "pm_publish_recent_saves",
+      "value": "最近的收藏"
+    },
+    {
+      "name": "pm_publish_products",
+      "value": "标记产品"
+    },
+    {
+      "name": "pm_publish_product_search",
+      "value": "按照产品名称搜索"
+    },
+    {
+      "name": "pm_publish_product_link",
+      "value": "添加产品链接"
+    },
+    {
+      "name": "pm_publish_product_help",
+      "value": "输入零售商网站上产品页面的链接。产品 Pin 图将自动创建并在 Pin 图中标记。"
+    },
+    {
+      "name": "pm_publish_link_hint",
+      "value": "在此处添加链接"
+    },
+    {
+      "name": "pm_publish_link",
+      "value": "链接"
+    },
+    {
+      "name": "pm_publish_description_hint",
+      "value": "描述你的 Pin 图"
+    },
+    {
+      "name": "pm_publish_create_pin",
+      "value": "创建 Pin 图"
+    },
+    {
+      "name": "pm_publish_choose_board",
+      "value": "选择图板"
+    },
+    {
+      "name": "pm_publish_advanced",
+      "value": "高级设置"
+    },
+    {
+      "name": "pm_profile_avatar_right",
+      "value": "头像右置"
+    },
+    {
+      "name": "pm_pin_draft_delete_title",
+      "value": "Delete draft?"
+    },
+    {
+      "name": "pm_pin_draft_delete_message",
+      "value": "Are you sure you want to delete this draft?"
+    },
+    {
+      "name": "pm_publish_save_draft",
+      "value": "Save draft"
+    },
+    {
+      "name": "pm_publish_draft_exit_title",
+      "value": "Save before leaving?"
+    },
+    {
+      "name": "pm_publish_draft_exit_message",
+      "value": "Your changes have not been saved. Save them as a draft before leaving."
+    },
+    {
+      "name": "pm_publish_draft_saved",
+      "value": "Draft saved."
+    },
+    {
+      "name": "pm_publish_draft_unconfirmed",
+      "value": "Draft save result is unconfirmed. Your edits are retained. Reopen the draft list to check before saving again."
+    },
+    {
+      "name": "pm_publish_draft_choose_board",
+      "value": "Choose a board before saving the draft."
+    },
+    {
+      "name": "pm_publish_draft_not_submitted",
+      "value": "Draft preparation or image upload failed. No draft was submitted. Your edits are retained; you can try saving again."
+    },
+    {
+      "name": "pm_publish_draft_box",
+      "value": "草稿箱"
+    },
+    {
+      "name": "pm_publish_source_files",
+      "value": "系统文件"
+    },
+    {
+      "name": "pm_publish_source_website",
+      "value": "网站链接"
+    }
   ]
 }

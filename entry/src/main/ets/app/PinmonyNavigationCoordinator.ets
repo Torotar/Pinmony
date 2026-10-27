@@ -518,7 +518,7 @@ onBackPress(): boolean {
     if (this.profileStore.publishFlow) {
         const flow: PinmonyPublishFlow = this.profileStore.publishFlow;
         if (!flow.busy && !this.profileStore.publishPicking)
-            this.ports.publishFlowAction(flow.uncertain || flow.kind === 'board' || ['website', 'photo', 'select'].includes(flow.phase) ? 'close' : 'back');
+            this.ports.publishFlowAction('back',flow.phase);
         return true;
     }
     if (this.pinStore.imageLayer && !this.ports.activeSheetKind()) {

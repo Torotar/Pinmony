@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -18,6 +19,7 @@ export struct PinmonyOrganizePage {
   @Prop pinsLoading: boolean = false;
   @Prop pinsError: string = '';
   @Prop pinsHasMore: boolean = false;
+  @Prop suggestionTitle: string = '';
   @Prop publishing: boolean = false;
   @Prop standaloneBoard: boolean = false;
   @State private name: string = '';
@@ -60,7 +62,7 @@ export struct PinmonyOrganizePage {
         }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
       },
       content: {
-        title: { mainTitle: this.state.phase === 'select' ? (this.publishing ? this.uiText("pm_select_pins_46854e37") : this.uiText("pm_organize_into_boards_ce266233")) :
+        title: { mainTitle: this.state.phase === 'select' ? (this.suggestionTitle ? this.suggestionTitle : this.publishing ? this.uiText("pm_select_pins_46854e37") : this.uiText("pm_organize_into_boards_ce266233")) :
           this.state.phase === 'create' ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416") },
         backIcon: {
           label: this.uiText("pm_back_572cf45b"),
@@ -70,8 +72,8 @@ export struct PinmonyOrganizePage {
         menu: { value: this.state.phase === 'select' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark'))
             .fontColor([$r('app.color.primary_text')]),
-          label: this.publishing ? (this.state.selectedIds.length ? this.uiText("pm_done_c0b3fbff") : this.uiText("pm_skip_fc50a99c")) : this.uiText("pm_next_acfc4e74"),
-          isEnabled: (this.publishing || this.state.selectedIds.length > 0) && !this.pinsLoading && !this.state.busy && !this.state.uncertain,
+          label: this.suggestionTitle ? this.uiText('pm_create_cde2cd07') : this.publishing ? (this.state.selectedIds.length ? this.uiText("pm_done_c0b3fbff") : this.uiText("pm_skip_fc50a99c")) : this.uiText("pm_next_acfc4e74"),
+          isEnabled: (this.publishing || this.state.selectedIds.length > 0) && !this.pinsLoading && !(this.suggestionTitle && this.pinsError) && !this.state.busy && !this.state.uncertain,
           action: () => {
             if ((this.publishing || this.state.selectedIds.length > 0) && !this.pinsLoading && !this.state.busy && !this.state.uncertain) this.act('next');
           }
@@ -121,7 +123,7 @@ export struct PinmonyOrganizePage {
       }
     }
     .borderRadius(12).clip(true)
-    .border({ width: this.selected(pin) ? 2 : 0, color: $r('app.color.primary_text') })
+    .border({ width: !this.suggestionTitle && this.selected(pin) ? 2 : 0, color: $r('app.color.primary_text') })
     .layoutWeight(1)
     .onClick(() => { if (!this.state.busy && !this.state.loading && !this.state.uncertain) this.act('toggle', pin.id); })
     .accessibilityText(pin.title || this.uiText("pm_select_pins_09909cdf"))
@@ -136,6 +138,9 @@ export struct PinmonyOrganizePage {
         .backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
         .enabled(!this.state.busy && !this.state.loading && !this.state.uncertain)
         .onClick(() => this.act('all'))
+      if (this.suggestionTitle && !this.pinsLoading && !this.pinsError && this.pins.length === 0) {
+        Text(this.uiText('pm_no_pins_in_this_category_yet_3202c6eb')).fontColor($r('app.color.secondary_text'))
+      }
       ForEach(this.rows(), (start: number) => {
         Row({ space: 12 }) {
           this.thumb(this.pins[start])
@@ -145,17 +150,16 @@ export struct PinmonyOrganizePage {
           else { Blank().layoutWeight(1) }
         }.width('100%').alignItems(VerticalAlign.Top)
       }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
-      if (this.pinsLoading && this.pins.length > 0) { LoadingProgress().width(28).height(28) }
+      if (this.pinsLoading) { LoadingProgress().width(28).height(28) }
       else if (this.pinsError) {
-        Text(PinmonyI18n.render(this.pinsError, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-        Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.act('retryPins'))
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.pinsError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.act('retryPins'), actionEnabled: !this.state.uncertain })
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
   @Builder
   private boardRow(board: PinmonyOrganizeBoard) {
-    PinmonyBoardPickerRow({title:board.title,imageUrl:board.imageUrl,secret:board.secret,
+    PinmonyBoardPickerRow({title:board.title,imageUrl:board.imageUrl,secret:board.secret,hasSections:board.hasSections === true,
       actionEnabled:board.enabled && !this.state.busy && !this.state.loading && !this.state.uncertain,
       onSelect:() => this.act('move',board.id)})
   }
@@ -168,7 +172,7 @@ export struct PinmonyOrganizePage {
       ForEach(this.state.boards, (board: PinmonyOrganizeBoard) => { this.boardRow(board) },
         (board: PinmonyOrganizeBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
       if (!this.state.loading && this.state.error && !this.state.uncertain) {
-        Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.state.busy).onClick(() => this.act('retryBoards'))
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error, this.uiLanguage), actionText: this.uiText("pm_reload_boards_c3e7cfa5"), onAction: () => this.act('retryBoards'), actionEnabled: !this.state.busy })
       } else if (!this.state.loading && !this.state.boards.length && !this.state.error) {
         Text(this.uiText("pm_no_boards_yet_43790af9")).fontColor($r('app.color.secondary_text'))
       }
@@ -182,7 +186,9 @@ export struct PinmonyOrganizePage {
         .onChange((value: string) => { this.name = value; })
       Row({ space: 14 }) {
         Text(this.uiText("pm_make_secret_228cf25e")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-        Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.state.busy)
+        Checkbox().select(this.secret).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(!this.state.busy)
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
       Button(this.uiText("pm_create_board_513babc9")).width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
@@ -194,7 +200,7 @@ export struct PinmonyOrganizePage {
   @Builder
   private organizeContent() {
     Column() {
-      if (this.state.selectedIds.length && this.state.phase !== 'create') {
+      if (!this.suggestionTitle && this.state.selectedIds.length && this.state.phase !== 'create') {
         Scroll() {
           Row({ space: 8 }) {
             ForEach(this.pins.filter((pin: PinmonyCreatedPin): boolean => this.selected(pin)), (pin: PinmonyCreatedPin) => {
@@ -207,8 +213,8 @@ export struct PinmonyOrganizePage {
       if (this.state.phase === 'boards') {
         Divider().color($r('app.color.secondary_text')).opacity(0.15).margin({ left: 16, right: 16 })
       }
-      if (this.state.error || this.state.feedback) {
-        Text(PinmonyI18n.render(this.state.error || this.state.feedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).padding(12)
+      if ((this.state.error || this.state.feedback) && !(this.state.phase === 'boards' && this.state.error && !this.state.uncertain)) {
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error || this.state.feedback, this.uiLanguage) })
       }
       Scroll(this.contentScroller) {
         Column() {

@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyNotificationCopy } from '../models/PinmonyNotificationCopy';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -51,12 +52,16 @@ export struct PinmonyNotificationsPage {
       Scroll(this.scroller) {
         Column({ space: 16 }) {
           if (this.store.error) {
-            Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("pm_retry_b8784c8d")).enabled(!this.store.busy && !this.store.loading).onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.store.busy && !this.store.loading })
           }
           ForEach(this.store.notifications, (group: NotificationGroup) => {
             Text(PinmonyNotificationCopy.group(group, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
-            ForEach(group.categories, (category: NotificationCategory) => {
+            Column() {
+            ForEach(group.categories, (category: NotificationCategory, categoryIndex: number) => {
+              if (categoryIndex > 0) {
+                Row() { Divider().strokeWidth(0.5).color($r('app.color.secondary_text')).opacity(0.25) }
+                  .width('100%').padding({left:16,right:16})
+              }
               Column({ space: 8 }) {
                 Row() {
                   Text(PinmonyNotificationCopy.category(category, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -70,7 +75,9 @@ export struct PinmonyNotificationsPage {
                   ForEach(category.channels, (channel: NotificationChannel) => {
                     Row() {
                       Text(PinmonyNotificationCopy.channel(channel, this.uiLanguage)).fontColor($r('app.color.primary_text')).layoutWeight(1)
-                      Toggle({ type: ToggleType.Switch, isOn: channel.value })
+                      Checkbox().select(channel.value).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
                         .enabled(channel.editable === true && !this.confirmationOpen && !this.store.busy && !this.store.loading && !this.store.writeUncertain)
                         .accessibilityText(PinmonyNotificationCopy.category(category, this.uiLanguage) + ' ' + PinmonyNotificationCopy.channel(channel, this.uiLanguage))
                         .onChange((value: boolean) => {
@@ -81,8 +88,9 @@ export struct PinmonyNotificationsPage {
                 } else {
                   Text(PinmonyNotificationCopy.summary(category, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
                 }
-              }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 8, bottom: 8 })
+              }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
             }, (category: NotificationCategory): string => group.key + ':' + category.key + ':' + this.uiLanguage)
+            }.width('100%').backgroundColor($r('app.color.display_settings_card')).borderRadius(20).clip(true)
           }, (group: NotificationGroup): string => group.key + ':' + this.uiLanguage)
           if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text(this.uiText("pm_no_notification_settings_available_b02ac445")).fontColor($r('app.color.secondary_text')) }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, bottom: 28 })

@@ -51,3 +51,5 @@ export { PinmonyShareSheet } from './src/main/ets/components/PinmonyShareSheet';
 export { PinmonyMoreSheet } from './src/main/ets/components/PinmonyMoreSheet';
 
 export { readProductPresentation, ProductPresentation } from './src/main/ets/services/PinmonyProductPresentation';
+export { PinmonyShuffleEffect, PinmonyShuffleItem, PinmonyShuffleSnapshot } from './src/main/ets/models/PinmonyShuffle';
+export { readShufflePresentation } from './src/main/ets/services/PinmonyShufflePresentation';

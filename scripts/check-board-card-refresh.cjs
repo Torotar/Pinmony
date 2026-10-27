@@ -7,5 +7,5 @@ const before=h.pinCardKey(pin);assert.equal(h.pinCardKey({...pin}),before,'uncha
 pin.cancelled=true;assert.notEqual(h.pinCardKey(pin),before,'confirmed cancellation immediately refreshes visible card');
 assert.notEqual(h.pinCardKey({...pin,title:'updated'}),h.pinCardKey(pin),'refreshed text is rendered for same Pin id');
 h.uiLanguage='en';assert.notEqual(h.pinCardKey(pin),before);
-assert(src.includes('.pullToRefresh(!this.phase() && this.snapshot.ready && !this.snapshot.flow?.busy)'),'refresh remains enabled while the current refresh is running');
+assert(src.includes(".pullToRefresh((!this.phase() || this.phase() === 'section') && this.snapshot.ready && !this.snapshot.flow?.busy)"),'refresh remains enabled while the current refresh is running');
 console.log('Board cards: changed cancellation/content updates nodes; unchanged cards retained; refresh gesture stays enabled');

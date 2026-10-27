@@ -1,4 +1,5 @@
 import { PinmonyI18n } from 'common_foundation';
+import { readShufflePresentation, PinmonyShuffleSnapshot } from 'feature_pin';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyVideo, PinmonyVideoSource, PinmonyCarousel, PinmonyCarouselItem,
   PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin, PIN_VIDEO_API_ENABLED, PIN_CAROUSEL_API_ENABLED, PIN_VISUAL_SEARCH_API_ENABLED } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -10,6 +11,9 @@ interface Videos { video_list?: VideoList; videoList?: VideoList; }
 interface Slot { videos?: Videos; id?: string; slot_id?: string; slotId?: string; title?: string; images?: Record<string,Art>; images_1200x?: Art; images_736x?: Art; images_474x?: Art; images_564x?: Art; images_orig?: Art; images_236x?: Art; }
 interface Carousel { carousel_slots?: Slot[]; carouselSlots?: Slot[]; }
 interface NativePin { id?: string; entityId?: string; type?: string; is_video?: boolean; videos?: Videos; carousel_data?: Carousel; carouselData?: Carousel; images?: Record<string,Art>; grid_title?: string; title?: string; }
+interface ShuffleReadFields { fields: string[]; }
+interface ShuffleReadOptions { url: string; fetchPolicy: string; data: ShuffleReadFields; }
+interface ShuffleReadEnvelope { options: ShuffleReadOptions; context: Record<string,string>; }
 interface Resource { status: string; code?: number; error?: Object; endpoint_name?: string; data: NativePin; bookmark?: string; }
 interface PinResponse { resource_response: Resource; }
 interface GraphPin { data?: NativePin; }
@@ -55,6 +59,10 @@ export class PinmonyDetailNativeAuxiliary {
   }
   pause(): void {
     this.revision++; this.cancelVisual(); this.cancel('native_detail_aux_');
+    if (this.store.detail?.shuffleLoading && this.store.detail.pinUrl === this.pin) {
+      const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
+      next.shuffleLoading = false; next.shuffleError = PinmonyI18n.message('pm_media_loading_paused_please_retry_67a4be3d'); this.store.detail = next;
+    }
     if (this.mediaLoading && this.store.detail?.pinUrl === this.pin) { this.mediaLoading = false; this.mediaError = PinmonyI18n.message("pm_media_loading_paused_please_retry_67a4be3d"); this.applyMedia(); }
     this.pin = ''; this.account = ''; this.store.detailMediaRetryBusy = false;
   }
@@ -72,9 +80,50 @@ export class PinmonyDetailNativeAuxiliary {
       this.mediaVersion = 0; this.original = this.image(r.data.images?.orig?.url || r.data.images?.['736x']?.url || r.data.images?.['474x']?.url || ''); this.mediaError = '';
       this.mediaKind = r.data.carousel_data?.carousel_slots?.length ? 'carousel' : r.data.is_video === true || !!r.data.videos ? 'video' : '';
       this.resolve(r.data,false,false);
+      if (this.store.detail?.shuffleId) this.readShuffle(r.data);
     } catch (_) {}
   }
   apply(): void { if (this.ready()) this.applyMedia(); }
+  retryShuffle(): void {
+    const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
+    if (!this.ready() || !detail?.shuffleId || detail.shuffleLoading) return;
+    const original: Art = {url:this.original,width:detail.shuffle?.canvasWidth || detail.imageWidth,height:detail.shuffle?.canvasHeight || detail.imageHeight};
+    const images: Record<string,Art> = {};
+    images['orig'] = original;
+    const raw: NativePin = {images:images};
+    this.readShuffle(raw);
+  }
+  private async readShuffle(raw: NativePin): Promise<void> {
+    const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
+    const shuffleId: string = detail?.shuffleId || '';
+    if (!detail || !/^\d{1,40}$/.test(shuffleId)) return;
+    const revision: number = this.revision, pin: string = this.pin;
+    const live = (): boolean => this.ready() && revision === this.revision && this.pin === pin && this.store.detail?.pinUrl === pin && this.store.detail.shuffleId === shuffleId;
+    const update = (loading: boolean, error: string, shuffle?: PinmonyShuffleSnapshot): void => {
+      if (!live() || !this.store.detail) return;
+      const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
+      next.shuffleLoading = loading; next.shuffleError = error;
+      if (shuffle) next.shuffle = shuffle;
+      this.store.detail = next;
+    };
+    update(true, '');
+    const session: PinmonyBusinessSessionContext = this.ports.session(), path: string = pin.slice(session.origin.length);
+    const options: ShuffleReadOptions = {url:'/v3/shuffles/' + shuffleId + '/',fetchPolicy:'store-or-network',data:{fields:['shuffle.{id,items,effect_data}','shuffleitem.{id,pin,shuffle_item_image(),settings,item_type,text,offset,scale,rotation,effect_data,mask,bitmap_mask,shuffle_asset,shuffle_item_image,images[236x,736x,736x(heic),750x,750x(heic)]}','shuffleasset.{id,cutout_images[originals],source_images[236x]}']}};
+    const envelope: ShuffleReadEnvelope = {options,context:{}};
+    const job: PinmonyNetworkJob = {id:'native_detail_aux_shuffle_' + (++this.sequence).toString(),epoch:session.generation,page:pin,method:'GET',body:'',
+      headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':'www/pin/[id].js','X-Pinterest-Source-Url':path},
+      url:session.origin + '/resource/ApiResource/get/?source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope)) + '&_=' + Date.now().toString()};
+    this.requests.add(job.id);
+    try {
+      const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessShuffleRead(job,(): PinmonyBusinessSessionContext => this.ports.session(),pin,shuffleId,live);
+      if (!live()) return;
+      const original: Art | undefined = raw.images?.orig || raw.images?.originals || raw.images?.['736x'];
+      const shuffle: PinmonyShuffleSnapshot | undefined = !reply.error && reply.status === 200 ? readShufflePresentation(reply.body,shuffleId,original?.width || detail.imageWidth,original?.height || detail.imageHeight) : undefined;
+      if (!shuffle) throw new Error('shuffle-read');
+      update(false,'',shuffle);
+    } catch (_) { update(false,PinmonyI18n.message('pm_unable_to_load_content_please_retry_95306b92')); }
+    finally {this.requests.delete(job.id);}
+  }
   private applyMedia(): void {
     const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
     if (!detail || detail.pinUrl !== this.pin) return;
@@ -99,9 +148,11 @@ export class PinmonyDetailNativeAuxiliary {
     this.mediaKind = detail.isVideo ? 'video' : detail.mediaKind === 'carousel' ? 'carousel' : '';
     this.mediaVersion = detail.video?.readRevision || 0; this.mediaLoading = false;
     this.mediaError = detail.isVideo ? detail.videoError || '' : detail.mediaError || '';
+    if (detail.shuffleId && !detail.shuffle) this.retryShuffle();
     return this.ready();
   }
   async openLayer(layer: string): Promise<void> {
+    if (layer === 'zoom' && this.store.detail?.shuffleId) return;
     if (!this.ready() || !['search','zoom'].includes(layer) || layer === 'search' && (!PIN_VISUAL_SEARCH_API_ENABLED || this.mediaKind === 'video')) return;
     this.cancelVisual(); this.bookmark = ''; this.crop = '';
     this.store.imageLayer = layer; this.store.visualResult = {pin:this.pin,loading:false,error:'',ended:false,items:[]};

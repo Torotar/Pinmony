@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyCarousel, PinmonyCarouselItem } from '../models/PinmonyDetail';
 import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
@@ -61,11 +62,10 @@ export struct PinmonyCarouselView {
               Stack() {
                 if (this.failed.includes(item.id)) {
                   Column({ space: 12 }) {
-                    Text(this.uiText("pm_image_failed_to_load_572993f5")).fontColor($r('app.color.primary_text'))
-                    Button(this.uiText("pm_retry_b8784c8d")).onClick(() => {
+                    PinmonyActionNotice({ active: this.active, message: this.uiText("pm_image_failed_to_load_572993f5"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
                       this.failed = this.failed.filter((id: string): boolean => id !== item.id);
                       this.revision++;
-                    })
+                    } })
                   }
                 } else {
                   Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
@@ -107,11 +107,10 @@ export struct PinmonyCarouselView {
                 } }).width('100%').height('100%')
             } else if (this.failed.includes(item.id)) {
               Column({ space: 12 }) {
-                Text(this.uiText("pm_image_failed_to_load_572993f5")).fontColor($r('app.color.primary_text'))
-                Button(this.uiText("pm_retry_b8784c8d")).onClick(() => {
+                PinmonyActionNotice({ active: this.active, message: this.uiText("pm_image_failed_to_load_572993f5"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
                   this.failed = this.failed.filter((id: string): boolean => id !== item.id);
                   this.revision++;
-                })
+                } })
               }
             } else {
               Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).borderRadius(18).clip(true)

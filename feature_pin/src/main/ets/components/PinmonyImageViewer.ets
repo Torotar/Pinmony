@@ -33,7 +33,8 @@ export struct PinmonyImageViewer {
     this.setFrame(this.origin.width > 0 && this.origin.height > 0 ? this.origin : this.containRect());
   }
   private imageDecoded(status: number, original: boolean, width: number = 0, height: number = 0): void {
-    if (!this.mounted || status !== 1) return;
+    // Hidden transition images may be data-ready before their first rendered frame.
+    if (!this.mounted || (status !== 0 && status !== 1)) return;
     if (!this.transitionStarted && width > 0 && height > 0) { this.naturalWidth = width; this.naturalHeight = height; }
     if (original) {
       this.originalDecoded = true;

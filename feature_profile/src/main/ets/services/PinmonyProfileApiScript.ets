@@ -137,7 +137,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
         target = safeUrl(item.url);
         var covers = (item.images && item.images['236x'] || []).map(function (img) { return image(img.url); }).filter(Boolean);
         if (!covers.length && image(item.image_cover_hd_url || item.image_cover_url)) covers.push(item.image_cover_hd_url || item.image_cover_url);
-        card = { secret: item.privacy === 'secret', title: clean(item.name, 300), covers: covers.slice(0, 3),
+        card = { secret: item.privacy === 'secret', protectedBoard: item.privacy === 'protected', title: clean(item.name, 300), covers: covers.slice(0, 3),
           collaboratorAvatars: item.is_collaborative === true ? [item.owner].concat(item.collaborating_users || []).filter(function (u, i, all) { return u && all.findIndex(function (v) { return v && String(v.id) === String(u.id); }) === i; }).slice(0, 6).map(function (u) { return image(u.image_small_url || u.image_medium_url); }).filter(Boolean) : [],
           pinCount: (typeof item.pin_count === 'number' && isFinite(item.pin_count) && item.pin_count >= 0 ? item.pin_count + ' 张 Pin 图' : '') +
             (Number.isInteger(item.section_count) && item.section_count > 0 ?

@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -88,7 +89,7 @@ export struct PinmonyCommentsSheet {
             .fontSize(15).fontColor($r('app.color.primary_text'))
         }
         if (item.translationError) {
-          Text(item.translationError).fontSize(12).fontColor($r('app.color.secondary_text'))
+          PinmonyActionNotice({ message: PinmonyI18n.render(item.translationError, this.uiLanguage) })
         }
         if (item.imageUrl) {
           Image(item.imageUrl).width(82).height(110).objectFit(ImageFit.Contain).borderRadius(10)
@@ -143,7 +144,7 @@ export struct PinmonyCommentsSheet {
     Column({ space: 12 }) {
       Divider().color($r('app.color.secondary_text')).opacity(0.2)
       if (this.result.actionError) {
-        Text(PinmonyI18n.render(this.result.actionError, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.result.actionError, this.uiLanguage) })
       }
       if (this.result.items.length === 0 && this.result.loading) {
         LoadingProgress().width(32).height(32)
@@ -175,8 +176,7 @@ export struct PinmonyCommentsSheet {
                       this.commentRow(reply, true)
                     }, (reply: PinmonyComment) => this.commentKey(reply))
                     if (item.repliesError) {
-                      Text(item.repliesError).fontSize(12).fontColor($r('app.color.secondary_text'))
-                      Button(this.uiText("pm_reload_replies_e32b3f23")).onClick(() => { if (this.onReplies) this.onReplies(item.id); })
+                      PinmonyActionNotice({ message: PinmonyI18n.render(item.repliesError, this.uiLanguage), actionText: this.uiText("pm_reload_replies_e32b3f23"), onAction: () => { if (this.onReplies) this.onReplies(item.id); } })
                     } else if (!item.repliesLoading && !(item.replies || []).length) {
                       Text(this.uiText("pm_no_replies_yet_1ff6ef41")).fontSize(12).fontColor($r('app.color.secondary_text'))
                     }
@@ -188,11 +188,10 @@ export struct PinmonyCommentsSheet {
           ListItem() {
             Column({ space: 12 }) {
               if (this.result.error) {
-                Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-                Button(this.uiText("pm_retry_b8784c8d")).onClick(() => {
+                PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
                   if (this.result.items.length && this.onMore) this.onMore();
                   else if (this.onRetry) this.onRetry();
-                })
+                } })
               } else if (this.result.loading) {
                 LoadingProgress().width(28).height(28)
               } else if (this.result.items.length === 0) {

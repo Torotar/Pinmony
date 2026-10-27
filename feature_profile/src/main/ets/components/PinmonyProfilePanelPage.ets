@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -121,12 +122,12 @@ export struct PinmonyProfilePanelPage {
             }.width('100%').height(48).justifyContent(FlexAlign.Center)
           }
           Column({ space: 20 }) {
-          if (!this.snapshot.loading && this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+          if (!this.snapshot.loading && this.snapshot.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
           else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
             PinmonyUserAvatar({ image: this.snapshot.avatarPreview || this.snapshot.avatar, name: this.firstNameDraft + ' ' + this.lastNameDraft, avatarSize: 120 })
             Button(this.snapshot.avatarBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.avatarAction === 'refresh' ? this.uiText("pm_refresh_profile_picture_96fa37f1") : this.snapshot.avatarAction === 'check' ? this.uiText("pm_check_status_7c5569c3") : this.uiText("pm_change_6b01fce4")).type(ButtonType.Normal).borderRadius(16).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
               .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
-            if (this.snapshot.avatarError) { Text(PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')) }
+            if (this.snapshot.avatarError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage) }) }
             this.field('名字', this.firstNameDraft)
             this.field('姓氏', this.lastNameDraft)
             Column({ space: 8 }) {
@@ -180,12 +181,12 @@ export struct PinmonyProfilePanelPage {
             }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage)
             }
           }
-          if (this.snapshot.mode === 'followers' && this.snapshot.hasMore) {
+          if (this.snapshot.mode === 'followers' && this.snapshot.hasMore && !this.snapshot.moreError) {
             Button(this.snapshot.moreLoading ? this.uiText("pm_loading_4927a53b") : this.snapshot.moreError ? this.uiText("pm_retry_loading_followers_db11cdc1") : this.uiText("pm_load_more_followers_76e47179")).type(ButtonType.Normal).borderRadius(16)
               .enabled(!this.snapshot.moreLoading && !this.followingBusy && !this.saving)
               .onClick(() => { if(this.onLoadMore)this.onLoadMore(); })
           }
-          if (this.snapshot.moreError) { Text(PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+          if (this.snapshot.moreError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_followers_db11cdc1"), actionEnabled: this.snapshot.mode === 'followers' && this.snapshot.hasMore && !this.snapshot.moreLoading && !this.followingBusy && !this.saving, onAction: () => { this.onLoadMore?.(); } }) }
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
         }.width('100%').padding({ left: 24, right: 24, top: this.snapshot.mode === 'following' ? 0 : 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').height('100%').align(Alignment.Top).clip(true)

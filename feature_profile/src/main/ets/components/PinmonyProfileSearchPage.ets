@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -87,8 +88,7 @@ export struct PinmonyProfileSearchPage {
             }
             if (this.snapshot.loading) { LoadingProgress().width(28).height(28) }
             if (this.snapshot.error) {
-              Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-              Button(this.text('pm_retry_b8784c8d')).onClick(() => this.onRetry())
+              PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => this.onRetry() })
             } else if (!this.snapshot.editing && !this.snapshot.loading && !this.snapshot.pins.length) {
               Text(this.text('pm_profile_search_empty')).fontColor($r('app.color.secondary_text'))
             } else if (!this.snapshot.editing && !this.snapshot.ended && !this.snapshot.loading) {

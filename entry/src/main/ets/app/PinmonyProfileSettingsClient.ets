@@ -39,6 +39,10 @@ interface Envelope {
     options: Object;
     context: Record<string, string>;
 }
+interface JsonRequest {
+    source_url: string;
+    data: Envelope;
+}
 export class ProfileSettingsRejected extends Error {
 }
 let sequence: number = 0;
@@ -55,8 +59,10 @@ export class PinmonyProfileSettingsClient {
     async request(page: string, name: string, verb: string, options: Object, source: string, current: () => boolean, postRead: boolean = false): Promise<ProfileSettingsResponse> {
         if (!current())
             throw new Error('stale');
-        const s: PinmonyBusinessSessionContext = this.ports.session(), graph: boolean = name === 'graphql', get: boolean = verb === 'get' && !postRead, envelope: Envelope = { options: options, context: {} }, form: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
-        const job: PinmonyNetworkJob = { id: 'native_profile_settings_' + (++sequence).toString(), epoch: s.generation, page: page, url: s.origin + (graph ? '/_/graphql/' : '/resource/' + name + '/' + verb + '/' + (get ? '?' + form : '')), method: get ? 'GET' : 'POST', body: get ? '' : graph ? JSON.stringify(options) : form, headers: { 'Accept': 'application/json', 'Content-Type': graph ? 'application/json' : 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Pws-Handler': 'www/index.js', 'X-Pinterest-Source-Url': source } };
+        const s: PinmonyBusinessSessionContext = this.ports.session(), graph: boolean = name === 'graphql', get: boolean = verb === 'get' && !postRead, envelope: Envelope = { options: options, context: {} }, form: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope)), json: boolean = !!(options as Record<string,Object>)['send_as_json'];
+        const handler: string = source === '/settings/permissions/' ? 'www/settings/permissions.js' : 'www/index.js';
+        const jsonBody: JsonRequest = { source_url: source, data: envelope };
+        const job: PinmonyNetworkJob = { id: 'native_profile_settings_' + (++sequence).toString(), epoch: s.generation, page: page, url: s.origin + (graph ? '/_/graphql/' : '/resource/' + name + '/' + verb + '/' + (get ? '?' + form : '')), method: get ? 'GET' : 'POST', body: get ? '' : graph ? JSON.stringify(options) : json ? JSON.stringify(jsonBody) : form, headers: { 'Accept': 'application/json', 'Content-Type': graph || json ? 'application/json' : 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Pws-Handler': handler, 'X-Pinterest-Source-Url': source } };
         if (s.appVersion)
             job.headers['X-App-Version'] = s.appVersion;
         const cancelled: Promise<PinmonyNetworkReply | undefined> = new Promise<PinmonyNetworkReply | undefined>((resolve): void => { this.waits.set(job.id, (): void => resolve(undefined)); });

@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -43,6 +44,7 @@ export struct PinmonyBoardCollaboratorsPage {
   @Builder private permissionOption(value: number, title: string, description: string) {
     Row({ space: 12 }) {
       Radio({ value: value.toString(), group: 'board-permissions' }).checked(this.selectedPermission === value)
+        .radioStyle({ checkedBackgroundColor: $r('app.color.accent'), indicatorColor: Color.White })
         .enabled(this.snapshot.owner === true && !this.snapshot.busy && !this.snapshot.uncertain)
         .onChange((checked: boolean) => { if (checked) this.selectedPermission = value; })
       Column({ space: 8 }) {
@@ -78,8 +80,7 @@ export struct PinmonyBoardCollaboratorsPage {
             Column({ space: 16 }) {
               if (this.snapshot.loading || this.snapshot.busy) { LoadingProgress().width(28).height(28) }
               if (this.snapshot.error) {
-                Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-                if (!this.snapshot.uncertain && !this.snapshot.busy) { Button(this.uiText("pm_retry_b8784c8d")).type(ButtonType.Normal).borderRadius(16).onClick(() => this.onAction('retry', '')) }
+                PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onAction('retry', ''), actionEnabled: !this.snapshot.uncertain && !this.snapshot.busy })
               } else if (!this.snapshot.loading) {
                 if (this.snapshot.phase === 'members') {
                   Text(this.uiText("pm_collaborators_can_82551ec5")).fontSize(13).fontColor($r('app.color.secondary_text'))
@@ -101,7 +102,8 @@ export struct PinmonyBoardCollaboratorsPage {
                   this.permissionOption(0, this.uiText("pm_do_almost_everything_15d2faac"), this.uiText("pm_add_move_or_delete_pins_and_sections_comment_and_react_fd71094d"))
                   this.permissionOption(1, this.uiText("pm_save_and_comment_90e113d5"), this.uiText("pm_save_and_organize_pins_comment_and_react_contact_the_board_owner_8f42b5cd"))
                   Row({ space: 10 }) {
-                    Checkbox({ name: 'allow-invites', group: 'collaborator' }).select(this.allowInvites)
+                    Checkbox({ name: 'allow-invites', group: 'collaborator' }).select(this.allowInvites).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).mark({ strokeColor: Color.White })
                       .enabled(!this.snapshot.busy && !this.snapshot.uncertain && this.snapshot.owner === true)
                       .onChange((value: boolean) => { this.allowInvites = value; })
                     Text(this.uiText("pm_invite_others_7610922d")).fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))

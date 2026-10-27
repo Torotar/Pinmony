@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
@@ -106,9 +107,7 @@ export struct PinmonyDetailHero {
           .hitTestBehavior(HitTestMode.None).accessibilityText(this.uiText("pm_loading_image_8fbf0f33"))
       } else if (!this.blocked && (this.imageState === 'timeout' || this.imageState === 'failed')) {
         Column({ space: 8 }) {
-          Text(this.imageState === 'failed' ? this.uiText("pm_image_failed_to_load_572993f5") : this.uiText("pm_image_loading_timed_out_b829c7d3"))
-            .fontSize(14).fontColor($r('app.color.secondary_text'))
-          Button(this.uiText("pm_reload_image_0ad285f1")).onClick(() => this.retryImage())
+          PinmonyActionNotice({ message: this.imageState === 'failed' ? this.uiText("pm_image_failed_to_load_572993f5") : this.uiText("pm_image_loading_timed_out_b829c7d3"), actionText: this.uiText("pm_reload_image_0ad285f1"), onAction: () => this.retryImage() })
         }.padding(12).borderRadius(12).backgroundColor($r('app.color.page_background'))
       }
     }.width('100%').height(this.heightVp).borderRadius(18).clip(true)

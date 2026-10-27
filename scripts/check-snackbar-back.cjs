@@ -145,7 +145,7 @@ let inboxUndo = 0;
 native.inboxStore.inboxFlow = { newsId: 'news', newsHidden: true };
 native.inboxFlowAction = action => { assert.equal(action, 'undoNews'); inboxUndo++; };
 native.showInboxUndoSnack('news');
-assert.equal(shown.at(-1).style.duration, 8000);
+assert.equal(shown.at(-1).style.duration, 4000);
 shown.at(-1).operation.onCloseButtonClick();
 assert.equal(inboxUndo, 0);
 native.showInboxUndoSnack('news');

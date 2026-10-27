@@ -695,8 +695,10 @@ export class PinmonySearchController {
     }
     if (search.discoveryApi && (kind === 'idea' || kind === 'ideaSection')) {
       let targetUrl: string = '';
+      let matched: boolean = false;
       for (const section of search.ideaSections) {
         if (kind === 'ideaSection' && section.actionId === id) {
+          matched = true;
           targetUrl = section.targetUrl || '';
           // Older retained snapshots may lack the section URL while their API cards still carry it.
           if (!targetUrl) {
@@ -709,6 +711,7 @@ export class PinmonySearchController {
         if (kind === 'idea') {
           for (const item of section.items) {
             if (item.id === id && item.enabled) {
+              matched = true;
               targetUrl = item.targetUrl || '';
               break;
             }
@@ -717,8 +720,14 @@ export class PinmonySearchController {
         }
       }
       // Use only the API URL attached to a card in the current page snapshot.
+      if (!matched) {
+        PinmonyRuntimeLog.info('SearchTopicTrace: rejected reason=content-updated kind=' + kind);
+        this.ports.showMessage(PinmonyI18n.message('pm_search_recommendation_updated'));
+        return;
+      }
       if (!/^https:\/\/(?:[^/]+\.)?pinterest\.com\/search\/pins\//i.test(targetUrl)) {
-        this.ports.showMessage(PinmonyI18n.message("pm_topic_link_expired_please_reload_0e9eac32"));
+        PinmonyRuntimeLog.info('SearchTopicTrace: rejected reason=invalid-target kind=' + kind);
+        this.ports.showMessage(PinmonyI18n.message('pm_search_recommendation_unavailable'));
         return;
       }
       this.searchStore.retainedSearch = search;

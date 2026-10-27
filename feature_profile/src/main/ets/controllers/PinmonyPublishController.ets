@@ -192,8 +192,9 @@ export class PinmonyPublishController {
     this.ports.syncMotion();
     try {
       if(this.ports.nativeFlow?.() && this.ports.nativeOpen){
-        const opened: boolean = await this.ports.nativeOpen();
-        if(opened && this.isCurrent(token,page) && option.kind === 'photo')await this.ports.pickPhotos(token,page);
+        // Photo publishing opens the draft picker first. The system album is
+        // opened only after the user taps the album action on that page.
+        await this.ports.nativeOpen();
         return;
       }
       const result: string = await this.ports.runScript(this.ports.publishScript() +
@@ -267,6 +268,9 @@ export class PinmonyPublishController {
   close(force: boolean = false): void {
     const flow: PinmonyPublishFlow | undefined = this.store.publishFlow;
     if (!flow && !this.store.publishPicking || !force && (flow?.busy || this.store.publishPicking)) return;
+    if (!force && flow?.kind === 'photo' && flow.phase === 'select' && !flow.draftSaved && !flow.uncertain && this.ports.nativeFlow?.()) {
+      flow.draftExitRequested = true; this.commit(flow); return;
+    }
     const refreshBoard: boolean = !!flow && (flow.completed > 0 || !!flow.boardCreated || flow.uncertain || flow.busy);
     PinmonyRuntimeLog.info('PublishTrace: close force=' + force.toString());
     if(this.ports.nativeFlow?.())this.ports.nativeClose?.();
@@ -283,9 +287,19 @@ export class PinmonyPublishController {
   action(action: string, value: string = '', secret: boolean = false): void {
     const flow: PinmonyPublishFlow | undefined = this.store.publishFlow;
     if (!flow || this.store.publishPicking || !this.ports.foreground() || !this.isCurrent(flow.token, flow.page)) return;
+    if (action === 'cancelDraftExit') { this.close(true); return; }
+      if(['back','topics','products','advanced','next'].includes(action))PinmonyRuntimeLog.info('PublishTrace: action=' + action + ' phase=' + flow.phase + ' busy=' + (!!flow.busy).toString() + ' loading=' + (!!flow.loading).toString());
+      if(action === 'back') {
+        if(value && value !== flow.phase)return;
+        if(flow.busy)return;
+        if(flow.uncertain || flow.kind === 'board' || ['website','photo','select'].includes(flow.phase) && !(flow.fromDraftBox && ['website','select'].includes(flow.phase))){this.close();return;}
+      }
     if (action === 'close' || action === 'next' && flow.selectedIds.length === 0) { this.close(); return; }
     if (action === 'pickPhoto') { this.ports.pickPhotos(flow.token, flow.page); return; }
-    if (flow.busy || flow.loading || flow.uncertain) return;
+    if (flow.busy || flow.loading && !(action === 'back' && flow.phase === 'sections') || flow.uncertain) return;
+    // A child destination handles this back event. The root may receive the same
+    // system gesture after the synchronous phase update; do not close its parent.
+    if (action === 'back') this.ports.suppressChildBack();
     if(this.ports.nativeFlow?.() && this.ports.nativeAction){this.ports.nativeAction(action,value,secret);return;}
     const token: number = flow.token, page: string = flow.page;
     const write: boolean = ['move', 'create'].includes(action);

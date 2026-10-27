@@ -1,6 +1,6 @@
 import { vibrator } from '@kit.SensorServiceKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
-import { PinmonyBoardPlaceholder } from 'common_ui';
+import { PinmonyBoardPlaceholder, PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoard } from '../models/PinmonyProfile';
 
@@ -116,7 +116,7 @@ export struct PinmonyBoardOrderPage {
       Scroll(this.scroller) {
         Column({ space: 4 }) {
           if (this.busy) { LoadingProgress().width(32).height(32) }
-          if (this.error) { Text(this.text(this.error)).fontColor($r('app.color.secondary_text')) }
+          if (this.error) { PinmonyActionNotice({ message: this.text(this.error) }) }
           ForEach(this.ordered, (board: PinmonyBoard, index: number) => {
             Row({ space: 14 }) {
               if (board.covers.length) {

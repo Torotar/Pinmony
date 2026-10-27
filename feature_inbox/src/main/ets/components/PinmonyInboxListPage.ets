@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
@@ -133,10 +134,9 @@ export struct PinmonyInboxListPage {
           Column({ space: 8 }) {
             if (this.loading()) { LoadingProgress().width(28).height(28) }
             if (this.error()) {
-              Text(PinmonyI18n.render(this.error(), this.uiLanguage)).fontColor($r('app.color.secondary_text')).padding(20)
-              Button(this.text('pm_retry_b8784c8d')).onClick(() => {
+              PinmonyActionNotice({ message: PinmonyI18n.render(this.error(), this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {
                 if (this.section === 'contacts') this.onContactsRetry(); else this.onRetry();
-              })
+              } })
             }
             ForEach(this.rows(false), (item: PinmonyInboxItem) => { this.row(item) },
               (item: PinmonyInboxItem): string => (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread) + ':' + this.uiLanguage)
@@ -181,10 +181,9 @@ export struct PinmonyInboxListPage {
           Column({ space: 8 }) {
             if (this.loading()) { LoadingProgress().width(28).height(28) }
             if (this.error()) {
-              Text(PinmonyI18n.render(this.error(), this.uiLanguage)).fontColor($r('app.color.secondary_text')).padding(20)
-              Button(this.text('pm_retry_b8784c8d')).onClick(() => {
+              PinmonyActionNotice({ message: PinmonyI18n.render(this.error(), this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {
                 if (this.section === 'contacts') this.onContactsRetry(); else this.onRetry();
-              })
+              } })
             }
             ForEach(this.rows(), (item: PinmonyInboxItem) => { this.row(item) },
               (item: PinmonyInboxItem): string => (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread) + ':' + this.uiLanguage)

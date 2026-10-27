@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
@@ -7,6 +8,19 @@ import { PinmonyUserAvatar } from 'common_ui';
 
 @Component
 export struct PinmonyInboxPage {
+  @StorageLink('pinmonyRootScrollTop2') @Watch('onRootScrollTop') private rootScrollTop: number = 0;
+  private onRootScrollTop(): void {
+    try {
+      const scroller: Scroller = this.scroller;
+      const offset: number = scroller.offset()?.yOffset || 0;
+      if (offset <= 1) {
+        if (!(this.refreshing || this.loading) && this.onRefresh) this.onRefresh();
+      } else {
+        scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true });
+      }
+    } catch (_) {}
+  }
+
   @StorageLink('pinmonyLanguage') @Watch('syncSegmentItems') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('onSnapshotChanged') snapshot: PinmonyInboxSnapshot = {} as PinmonyInboxSnapshot;
@@ -332,12 +346,7 @@ export struct PinmonyInboxPage {
               .fontSize(15)
               .fontColor($r('app.color.secondary_text'))
           } else {
-            Text(PinmonyI18n.render(this.error, this.uiLanguage))
-              .fontSize(15)
-              .fontColor($r('app.color.primary_text'))
-              .textAlign(TextAlign.Center)
-            Button(this.uiText("pm_retry_b8784c8d"))
-              .onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
           }
         }
         .width('100%')
@@ -347,8 +356,7 @@ export struct PinmonyInboxPage {
       } else {
         if (this.error) {
           Row({ space: 12 }) {
-            Text(PinmonyI18n.render(this.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).layoutWeight(1)
-            Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
           }.padding({ left: 20, right: 20, bottom: 12 }).width('100%')
         }
         Scroll(this.scroller) {
@@ -427,8 +435,7 @@ export struct PinmonyInboxPage {
                 }.padding({ left: 20, top: 12, bottom: 12 })
               } else if (this.snapshot.contactsError) {
                 Column({ space: 8 }) {
-                  Text(PinmonyI18n.render(this.snapshot.contactsError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-                  Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onContactsRetry) this.onContactsRetry(); })
+                  PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.snapshot.contactsError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onContactsRetry) this.onContactsRetry(); } })
                 }.alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 12 })
               } else if (this.snapshot.contacts.length > 0) {
                 ForEach(this.snapshot.contacts, (item: PinmonyInboxItem) => {

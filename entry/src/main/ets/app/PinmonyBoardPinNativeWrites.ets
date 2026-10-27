@@ -120,6 +120,7 @@ export class PinmonyBoardPinNativeWrites {
         !ids.every((id: string): boolean => /^\d{1,30}$/.test(id) && identity.loadedIds.includes(id)))return;
       selected = ids.slice(); options = {url:'/v3/pins/bulk/',data:{pin_ids:selected}}; url = '/resource/ApiResource/delete/';
       source = identity.page.slice(session.origin.length); handler = 'www/[username]/[slug]/_tools/organize.js';
+      if(source.split('/').filter((part: string): boolean => !!part)[1] === '_products_you_tagged')source += '_tools/organize/?organization_feed=False';
     }else if(action === 'move') {
       const target = original.targets.find((t): boolean => t.id === (sectionTarget && sectionTarget[1] !== identity.boardId ? sectionTarget[1] : value) && t.enabled && t.id !== identity.boardId);
       selected = identity.selectedIds.slice();

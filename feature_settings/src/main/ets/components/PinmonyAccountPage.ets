@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -92,6 +93,7 @@ export struct PinmonyAccountPage {
     Row() {
       Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(20).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Radio({ value: value, group: 'account-gender' }).checked(this.store.data?.gender === value)
+        .radioStyle({ checkedBackgroundColor: $r('app.color.accent'), indicatorColor: Color.White })
         .enabled(!this.store.busy && !this.store.loading && !this.store.error).accessibilityText(label)
         .onChange((checked: boolean) => { if (checked && this.store.data?.gender !== value) this.save('gender', value); })
     }.width('100%').constraintSize({ minHeight: 48 })
@@ -106,8 +108,7 @@ export struct PinmonyAccountPage {
             Text(this.uiText("pm_saving_6bdb4435")).fontColor($r('app.color.secondary_text'))
           }
           if (this.store.error) {
-            Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("pm_reload_df7392cc")).enabled(!this.store.loading && !this.store.busy).onClick(() => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); })
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); }, actionEnabled: !this.store.loading && !this.store.busy })
           }
           if (this.store.data?.ready && !this.store.loading) {
             if (this.store.screen === 'account') {
@@ -150,7 +151,7 @@ export struct PinmonyAccountPage {
                 Button({ type: ButtonType.Normal }) {
                   Row({ space: 12 }) {
                     Text(PinmonyI18n.render(c.name, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
-                    if (c.key === this.store.data?.country) { SymbolGlyph($r('sys.symbol.checkmark')).fontSize(20).fontColor([$r('app.color.primary_text')]) }
+                    if (c.key === this.store.data?.country) { SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(24).fontColor([$r('app.color.accent')]) }
                   }.width('100%').padding({ top: 14, bottom: 14 })
                 }.width('100%').constraintSize({ minHeight: 48 })
                   .fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent).enabled(!this.store.busy && !this.store.error)

@@ -130,6 +130,15 @@ async function main() {
   assert.equal((await undoTransport(deleteJob)).error,'');assert.equal((await undoTransport(deleteJob,[])).error,'rejected');
   const sectionRoute='/sample/board/section/_tools/more-ideas/?ideas_referrer=24';const sectionForm=new URLSearchParams(deleteJob.body);sectionForm.set('source_url',sectionRoute);const sectionDelete={...deleteJob,body:sectionForm.toString(),headers:{...deleteJob.headers,'X-Pinterest-Pws-Handler':'www/[username]/[slug]/[section_slug]/_tools/more-ideas.js'}};
   assert.equal((await undoTransport(sectionDelete,['77'],sectionRoute)).error,'');assert.equal((await undoTransport(sectionDelete,['7'],sectionRoute)).error,'rejected');
+  const protectedDelete=fixture();protectedDelete.setIdentity({...protectedDelete.identity(),page:origin+'/sample/_products_you_tagged/'});protectedDelete.state().phase='select';protectedDelete.state().pins=[pin(1),pin(2),pin(3)];
+  pending=protectedDelete.writer.submit('deleteSelected',JSON.stringify(['1','2']));const protectedJob=protectedDelete.requests[0].job;
+  assert.equal(new URLSearchParams(protectedJob.body).get('source_url'),'/sample/_products_you_tagged/_tools/organize/?organization_feed=False','protected delete uses captured organize context');
+  assert.equal((await transport(protectedJob)).error,'','captured protected-board bulk delete reaches native transport');
+  const invalidSource=new URLSearchParams(protectedJob.body);invalidSource.set('source_url','/sample/_products_you_tagged/');assert.equal((await transport({...protectedJob,body:invalidSource.toString()})).error,'rejected');
+  const otherReserved={...protectedJob,page:origin+'/sample/_other/'};assert.equal((await transport(otherReserved)).error,'rejected');
+  assert.equal((await transport({...save.requests[0].job,page:protectedJob.page})).error,'rejected','protected exception cannot enable other writes');
+  const malformedDelete=new URLSearchParams(protectedJob.body),bad=JSON.parse(malformedDelete.get('data'));bad.options.data.pin_ids=['99'];malformedDelete.set('data',JSON.stringify(bad));assert.equal((await transport({...protectedJob,body:malformedDelete.toString()})).error,'rejected');
+  protectedDelete.requests[0].resolve(resource(null,'v3_delete_pins'));await pending;assert.equal(protectedDelete.commits[0].action,'deleteSelected');assert.equal(JSON.stringify(protectedDelete.state().pins.map(p=>p.id)),JSON.stringify(['3']));
   const before = sent;
   function mutate(job, change) {const q = new URLSearchParams(job.body), e = JSON.parse(q.get('data')); change(e); q.set('data', JSON.stringify(e)); return {...job, body: q.toString()}}
   const crossTransport=(job,targets=['200','section:200:300'])=>net.requestBusinessBoardPinWrite(job,()=>session,'100','42',['1','2','3'],targets,[],()=>owner);

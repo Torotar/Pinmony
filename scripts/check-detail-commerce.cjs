@@ -13,6 +13,17 @@ const root = 'feature_pin/src/main/ets/';
 const { mapPrefetchedDetail, PinmonyDetailPrefetch } = load(root + 'services/PinmonyDetailPrefetch.ets');
 const { PinmonyDetailCache } = load(root + 'services/PinmonyDetailCache.ets');
 const { readProductPresentation } = load(root + 'services/PinmonyProductPresentation.ets');
+const shuffleUrl = 'https://www.pinterest.com/pin/101/';
+const shuffleBody = shuffle => JSON.stringify({ resource_response: { status: 'success', data: {
+  id: '101', type: 'pin', images: { '736x': { url: 'https://i.pinimg.com/736x/fixture.jpg', width: 736, height: 1000 } }, shuffle
+} } });
+const shuffleDetail = mapPrefetchedDetail(shuffleBody({ id: '202', user: { id: 'private-fixture' } }), shuffleUrl, true);
+assert.equal(shuffleDetail.shuffleId, '202', 'Pin metadata identifies collage independently of entry route');
+assert.equal(mapPrefetchedDetail(shuffleBody(null), shuffleUrl, true).shuffleId, undefined, 'ordinary Pin keeps zoom');
+assert.equal(mapPrefetchedDetail(shuffleBody({ id: 'invalid' }), shuffleUrl, true).shuffleId, undefined);
+const shuffleCache = new PinmonyDetailCache();
+shuffleCache.put('101', shuffleDetail, 0);
+assert.equal(shuffleCache.get('101').detail.shuffleId, '202', 'retained detail preserves collage identity');
 const galleryBody = images => JSON.stringify({ data: { v3GetPinQueryv2: { data: {
   entityId: '101', richMetadata: { products: [{ image_736x: images.map(canonicalImage => ({ canonicalImage })) }] }
 } } } });

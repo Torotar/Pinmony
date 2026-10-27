@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-const src=fs.readFileSync('feature_board/src/main/ets/components/PinmonyDraggablePublishButton.ets','utf8');
+const src=fs.readFileSync('common_ui/src/main/ets/components/PinmonyDraggablePublishButton.ets','utf8');
 const methods=src.slice(src.indexOf('  private left()'),src.indexOf('  build()'));
 const saves=[];
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Date,Curve:{EaseOut:1},PinmonyRuntimeLog:{info(){}},PinmonyPublishAnchor:{save:(...a)=>saves.push(a)}});
@@ -30,3 +30,18 @@ disk='{"right":false,"fraction":5}';const corrupt=freshRuntime();corrupt.anchor.
 h.areaWidth=400;h.areaHeight=700;h.actionEnabled=true;h.resize();h.start();h.move({offsetX:172-h.x,offsetY:320-h.y});h.settle();assert.equal(h.x,172,'release in center does not snap');h.resize();assert.equal(h.x,172,'center survives layout restore');
 assert(src.includes('GestureGroup(GestureMode.Sequence')&&src.includes('LongPressGesture')&&src.includes('onCancel'));
 console.log('Publish drag: default position, bounds, free placement, resize, disabled state and click suppression passed');
+
+// Execute the actual menu binding expression: invalid double-dollar references previously compiled but crashed here.
+const binding=src.split('\n').find(line=>line.includes('.bindMenu(')).trim();
+let menuArguments;const menu={bindMenu:(...args)=>{menuArguments=args;}};
+const render=vm.runInNewContext(ts.transpileModule('function render(){menu'+binding+';} render;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{menu,$r:key=>key,PinmonyRuntimeLog:{info(){}},Color:{Transparent:0},BlurStyle:{COMPONENT_ULTRA_THICK:1}});
+const menuState={menuOpen:true,menuItems:[{value:'Photo',action:()=>{}}]};render.call(menuState);assert.equal(menuArguments[0],true);assert.equal(menuArguments[1].length,1);menuArguments[2].onAppear();menuArguments[2].onDisappear();assert.equal(menuState.menuOpen,false);menuState.menuOpen=true;render.call(menuState);assert.equal(menuArguments[0],true);
+console.log('Publish menu: render expression has no runtime ReferenceError, dismiss resets state and reopen works');
+
+const page=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyPublishPage.ets','utf8');
+const sourceStart=page.indexOf('  private photoSources()'),sourceEnd=page.indexOf('  @Builder',sourceStart);
+const Source=vm.runInNewContext(ts.transpileModule('class Source {'+page.slice(sourceStart,sourceEnd)+'} Source;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{});
+const selected=[],sourceHost=new Source();sourceHost.uiText=key=>key;sourceHost.act=action=>selected.push(action);const items=sourceHost.photoSources();assert.equal(items.length,2);items[0].action();items[1].action();assert.deepEqual(selected,['pickPhoto','websiteFromPhoto']);
+let click;const clickStart=src.indexOf('.onClick(() => {'),clickEnd=src.indexOf('.bindMenu(',clickStart);
+const install=vm.runInNewContext(ts.transpileModule('function install(){button'+src.slice(clickStart,clickEnd)+';} install;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{button:{onClick:handler=>{click=handler;}},Date,PinmonyRuntimeLog:{info(){}}});
+const clickable={actionEnabled:true,dragging:false,suppressClickUntil:0,menuEnabled:true,menuOpen:false,menuItems:items};install.call(clickable);click();assert.equal(clickable.menuOpen,true);console.log('Photo sources: click requests menu and both native menu actions dispatch to the original photo/website flows');

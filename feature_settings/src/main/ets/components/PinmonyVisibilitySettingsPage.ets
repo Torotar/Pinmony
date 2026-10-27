@@ -1,8 +1,10 @@
+import { PinmonyActionNotice } from 'common_ui';
+import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
@@ -40,7 +42,7 @@ export struct PinmonyVisibilitySettingsPage {
         this.dismissErrorSnack();
         this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
       }
-    }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
+    }, { duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
   private title(): string { return this.uiText("pm_profile_visibility_6fedc091"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
@@ -78,7 +80,9 @@ export struct PinmonyVisibilitySettingsPage {
   private visibilityContent() {
     Row() {
       Text(this.uiText("pm_private_profile_b16cc2bf")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: this.store.data?.privateProfile || false }).enabled(this.available() && this.store.data?.canChangePrivacy)
+      Checkbox().select(this.store.data?.privateProfile || false).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(this.available() && this.store.data?.canChangePrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.privateProfile) { this.store.pendingPrivate = value; this.store.confirmOpen = true; } })
         .accessibilityText(this.uiText("pm_private_profile_b16cc2bf"))
     }.width('100%')
@@ -86,7 +90,9 @@ export struct PinmonyVisibilitySettingsPage {
       .fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 24 })
     Row() {
       Text(this.uiText("pm_search_privacy_d041067d")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: this.store.data?.searchPrivacy || false }).enabled(this.available() && this.store.data?.canEditSearchPrivacy)
+      Checkbox().select(this.store.data?.searchPrivacy || false).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(this.available() && this.store.data?.canEditSearchPrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.searchPrivacy) this.request('searchPrivacy', value.toString()); })
         .accessibilityText(this.uiText("pm_search_privacy_d041067d"))
     }.width('100%')
@@ -106,8 +112,7 @@ export struct PinmonyVisibilitySettingsPage {
           Text(this.store.pendingPrivate ? this.uiText("pm_your_profile_will_not_appear_in_pinterest_search_results_20307e8e") : this.uiText("pm_your_profile_will_appear_in_pinterest_search_results_ca924e80")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
         }
         if (this.store.error) {
-          Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-          Button(this.uiText("pm_reload_df7392cc")).enabled(!this.store.busy).onClick(() => { this.store.confirmOpen = false; this.request('read'); })
+          PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { this.store.confirmOpen = false; this.request('read'); }, actionEnabled: !this.store.busy })
         }
         Button(this.store.busy ? this.uiText("pm_saving_6bdb4435") : this.store.pendingPrivate ? this.uiText("pm_make_private_c25c078d") : this.uiText("pm_make_public_7a73baf0"))
           .width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))

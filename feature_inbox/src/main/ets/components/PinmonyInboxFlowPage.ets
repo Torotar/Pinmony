@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -207,7 +208,7 @@ export struct PinmonyInboxFlowPage {
       Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontSize(17).fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
       if (this.snapshot.screen === 'compose') {
-        Checkbox().select(this.snapshot.selectedIds.includes(user.id)).width(24).height(24).margin(0)
+        Checkbox().select(this.snapshot.selectedIds.includes(user.id)).width(24).height(24).margin(0).shape(CheckBoxShape.CIRCLE)
           .selectedColor($r('app.color.accent'))
           .onChange((selected: boolean) => {
             if (this.snapshot.selectedIds.includes(user.id) !== selected) this.act('select', user.id);
@@ -513,14 +514,14 @@ export struct PinmonyInboxFlowPage {
       if (this.snapshot.unsubscribedPin) {
         Text(this.uiText("pm_you_will_no_longer_receive_notifications_about_this_pin_75459ce5")).fontSize(14).fontColor($r('app.color.secondary_text'))
       }
-      if (this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')) }
+      if (this.snapshot.error) { PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
     }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 24 })
   }
 
   build() {
     if (this.snapshot.screen === 'updatesMenu' && this.snapshot.newsUndoing) {
       Column().width(1).height(1).hitTestBehavior(HitTestMode.Transparent)
-      if (this.snapshot.error) { Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+      if (this.snapshot.error) { PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
     } else if (this.snapshot.screen === 'updatesMenu') {
       Column().width(1).height(1)
         .hitTestBehavior(HitTestMode.Transparent)
@@ -568,10 +569,10 @@ export struct PinmonyInboxFlowPage {
       }
       if (this.snapshot.error) {
         Column({ space: 8 }) {
-          Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-          if (!(this.snapshot.screen === 'settings' && this.snapshot.writeUncertain)) {
-            Button(this.snapshot.writeUncertain ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d")).onClick(() => this.act('retry'))
-          }
+          PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage),
+            actionText: this.snapshot.writeUncertain ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
+            actionEnabled: !(this.snapshot.screen === 'settings' && this.snapshot.writeUncertain),
+            onAction: () => this.act('retry') })
         }.padding(16)
       }
       if (this.snapshot.loading && this.snapshot.screen !== 'chat') { LoadingProgress().width(28).height(28) }
@@ -640,8 +641,7 @@ export struct PinmonyInboxFlowPage {
           }
         }.padding({ left: 16, right: 16, top: 8, bottom: 24 })
         if (this.snapshot.sendError) {
-          Text(PinmonyI18n.render(this.snapshot.sendError, this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text')).padding(12)
-          Button(this.uiText("pm_reload_conversation_585a78c6")).onClick(() => this.act('retry'))
+          PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.sendError, this.uiLanguage), actionText: this.uiText("pm_reload_conversation_585a78c6"), onAction: () => this.act('retry') })
         }
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))

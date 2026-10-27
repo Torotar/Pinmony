@@ -34,7 +34,7 @@ let coverWidth=0;
 const Capture=vm.runInNewContext(ts.transpileModule('class Capture {'+capture+'} Capture;',{compilerOptions:{target:99}}).outputText,
  {pickCoverImageUrl:(images,width)=>{coverWidth=width;return images['564x']?.url||'';}});
 const owner=new Capture();let measuredId='';Object.assign(owner,{authStatus:'authenticated',businessSuspended:false,getUIContext:()=>({px2vp:n=>n/2,getComponentUtils:()=>({getRectangleById:id=>{measuredId=id;return {windowOffset:{x:40,y:180},size:{width:320,height:400}};}})})});
-for(const prefix of ['pinmony-board-photo-','pinmony-search-photo-']){
+for(const prefix of ['pinmony-board-photo-','pinmony-search-photo-','pinmony-profile-photo-']){
  owner.capturePinEntryPhoto('pin','image',prefix+'1',800,1000);
  assert.equal(measuredId,prefix+'1');assert.equal(owner.homeEntryCardId,measuredId);assert.equal(owner.homeEntryPhoto.y,90);assert.equal(owner.homeEntryPhoto.imageHeight,1000);
 }
@@ -47,6 +47,15 @@ owner.businessSuspended=true;owner.capturePinEntryPhoto('pin','image','old',800,
 console.log('Board/search entry capture: exact source ownership, dimensions, window conversion and suspended guard passed');
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
 assert(page.includes('this.entryPhoto && (!this.entryMotionComplete || this.entryClosing)'), 'finished entry overlay must leave the hit-test tree');
+assert.match(page,/Image\(this\.detail\.imageUrl\)[\s\S]{0,180}\.blur\(28\)[\s\S]{0,100}HitTestMode\.None/,'photo detail places a non-interactive blurred cover under the clear image');
+assert(page.includes('@Prop disableImageZoom: boolean = false;'),'detail exposes source-specific zoom suppression');
+assert.match(page,/onImageTap: \(url: string\) => \{ if \(!this\.disableImageZoom && !this\.detail\.shuffleId\)/,'collage detail suppresses carousel zoom without changing normal Pin behavior');
+assert.match(page,/onTap: \(\) => \{ if \(!this\.disableImageZoom && !this\.detail\.shuffleId\)/,'collage detail suppresses hero zoom without changing normal Pin behavior');
+const profilePage=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
+assert(profilePage.includes(".id('pinmony-profile-photo-' + pin.id)"),'profile collage pins expose stable entry-photo geometry');
+const profileOpen=indexSource.slice(indexSource.indexOf('private async performProfileAction'),indexSource.indexOf('private async ',indexSource.indexOf('private async performProfileAction')+1));
+assert(profileOpen.includes("profile.hubMode === 'collages'") && profileOpen.includes("'pinmony-profile-photo-' + target.id"),'published collage Pin opens through the existing photo detail transition');
+assert(indexSource.includes("false, profile.hubMode === 'collages' && target?.collageDraft !== true"),'published collage detail carries a scoped no-zoom interaction mode');
 const remount=fixture();remount.closing=true;remount.decoded=true;remount.begin();assert.equal(remount.frame.y,80,'closing remount starts at current detail photo');
 timers.shift()();assert.equal(remount.frame.y,100,'closing remount returns to original card');
 const searchSource=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');
@@ -80,3 +89,20 @@ assert(page.includes('pin.pinUrl || pin.id'),'recommendation nodes survive image
 assert(page.includes("'pinmony-related-photo-' + this.detail.pinUrl + '-' + pin.pinUrl"), 'source geometry uses parent and target routes independent of cached IDs and opening tokens');
 assert(indexSource.includes("'pinmony-related-photo-' + parent + '-' + target"), 'geometry lookup matches the retained image node');
 console.log('Related entry capture, stable card identity and header anchor compensation passed');
+
+const completion=source.match(/\.onComplete\(\(event\) => \{ ([^\n]+) \}\)/);
+assert(completion);
+const complete=vm.runInNewContext('(function(event){'+completion[1]+'})');
+for(const status of [0,1]){
+ const hidden=fixture(); complete.call(hidden,{loadingStatus:status});
+ assert.equal(hidden.started,true,'data-ready image unblocks hidden entry');
+ timers.shift()(); complete.call(hidden,{loadingStatus:1});
+ assert.equal(timers.length,0,'render callback cannot restart entry');
+}
+const disposed=fixture();disposed.aboutToDisappear();complete.call(disposed,{loadingStatus:0});
+assert.equal(disposed.started,false,'late data callback cannot open disposed detail');
+console.log('Hidden detail image readiness and disposal passed');
+
+assert(!indexSource.includes("this.profileSettingsVisible || this.homeEntryPhoto && this.homeEntryCardId.startsWith('pinmony-home-photo-')"),'detail entry must not add a second status inset to retained home tabs');
+assert.match(indexSource,/\.padding\(\{ top: this.profileSettingsVisible \?\s*this.getUIContext\(\).px2vp\(this.statusBarHeightPx\) : 0 \}\)/,'settings inset remains independent of detail entry');
+console.log('Retained home geometry: detail entry and return do not change root tabs inset passed');

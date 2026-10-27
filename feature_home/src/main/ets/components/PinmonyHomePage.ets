@@ -1,3 +1,5 @@
+import { PinmonyActionNotice } from 'common_ui';
+import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideoCard } from 'common_ui';
 import { connection } from '@kit.NetworkKit';
@@ -7,6 +9,21 @@ import { PinmonyHomeSkeleton } from './PinmonyHomeSkeleton';
 
 @Component
 export struct PinmonyHomePage {
+  @StorageLink('pinmonyRootScrollTop0') @Watch('onRootScrollTop') private rootScrollTop: number = 0;
+  private onRootScrollTop(): void {
+    try {
+      const scroller: Scroller = this.feedScroller;
+      const offset: number = scroller.offset()?.yOffset || 0;
+      if (offset <= 1) {
+        if (!(this.refreshing || this.loading) && this.onRefresh) this.onRefresh();
+      } else {
+        scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true });
+      }
+    } catch (_) {}
+  }
+
+  @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private homeTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx); }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
@@ -464,27 +481,20 @@ export struct PinmonyHomePage {
             if (!this.error) {
               LoadingProgress().width(18).height(18).color($r('app.color.accent'))
             }
-            Text(this.feedStatusText())
+            if (!this.error) { Text(this.feedStatusText())
               .fontSize(13)
               .fontColor($r('app.color.secondary_text'))
               .maxLines(2)
-              .layoutWeight(1)
+              .layoutWeight(1) }
             if (this.error) {
-              Button(this.uiText("pm_retry_b8784c8d")).fontSize(13)
-                .onClick(() => { if (this.onRetry) this.onRetry(); })
+              PinmonyActionNotice({ active: this.interactionReady, message: this.feedStatusText(), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
             }
           }
           .width('100%')
         }
         if (this.offlinePreview) {
           Row({ space: 8 }) {
-            Text(this.uiText("pm_offline_showing_recent_cache_5bff694a"))
-              .fontSize(13)
-              .fontColor($r('app.color.secondary_text'))
-              .maxLines(2)
-              .layoutWeight(1)
-            Button(this.uiText("pm_retry_b8784c8d")).fontSize(13)
-              .onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ active: this.interactionReady, message: this.uiText("pm_offline_showing_recent_cache_5bff694a"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
           }
           .width('100%')
           .accessibilityText(this.uiText("pm_offline_showing_recent_cache_you_can_retry_236c20a9"))
@@ -563,9 +573,7 @@ export struct PinmonyHomePage {
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
           if (!this.offlinePreview) {
-            Button(this.uiText("pm_retry_b8784c8d"))
-              .fontSize(13).margin({ top: 8 })
-              .onClick(() => this.retryImage(pin.imageUrl))
+            PinmonyActionNotice({ active: this.interactionReady, message: this.uiText("pm_retry_b8784c8d"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.retryImage(pin.imageUrl) })
           }
         }
         .width('100%')
@@ -692,6 +700,7 @@ export struct PinmonyHomePage {
         }
         .width('100%')
         .height(this.homeChromeCollapsed ? 0 : 68)
+        .margin({ top: this.homeChromeCollapsed ? 0 : this.homeTopInset() + 48 })
         .opacity(this.homeChromeCollapsed ? 0 : 1)
         .hitTestBehavior(this.homeChromeCollapsed ? HitTestMode.None : HitTestMode.Default)
         .accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')
@@ -701,23 +710,20 @@ export struct PinmonyHomePage {
       if (!this.canShowFeed()) {
         if (!this.offlinePreview && (this.loading || this.synchronizing) && !this.error) {
           PinmonyHomeSkeleton({ showCategories: this.categories.length === 0 })
+            .padding({ top: this.homeTopInset() + 48 })
             .width('100%')
             .layoutWeight(1)
         } else {
           Column({ space: 12 }) {
-            Text(this.emptyFeedMessage())
-              .width('100%')
-              .textAlign(TextAlign.Center)
-              .fontSize(16)
-              .fontColor($r('app.color.primary_text'))
-            Button(this.offlinePreview ? this.uiText("pm_connect_and_retry_a25c5d3e") : this.uiText("pm_reload_df7392cc"))
-              .onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ active: this.interactionReady, message: this.emptyFeedMessage(),
+              actionText: this.offlinePreview ? this.uiText("pm_connect_and_retry_a25c5d3e") : this.uiText("pm_reload_df7392cc"),
+              onAction: () => { if (this.onRetry) this.onRetry(); } })
           }
           .width('100%')
           .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
-          .padding({ left: 24, right: 24, bottom: 100 })
+          .padding({ left: 24, right: 24, top: this.homeTopInset() + 48, bottom: 100 })
         }
       } else {
         Stack({ alignContent: Alignment.Top }) {
@@ -735,8 +741,7 @@ export struct PinmonyHomePage {
                     if (this.home.loadingMore) {
                       LoadingProgress().width(24).height(24)
                     } else if (this.home.sourceError) {
-                      Button(this.uiText("pm_retry_loading_8924c788"))
-                        .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+                      PinmonyActionNotice({ active: this.interactionReady, message: this.uiText("pm_retry_loading_8924c788"), actionText: this.uiText("pm_retry_loading_8924c788"), onAction: () => { if (this.onLoadMore) this.onLoadMore(); } })
                     } else if (this.home.endReached) {
                       Text(this.uiText("pm_no_more_pins_dda147ad"))
                         .fontSize(12)
@@ -759,7 +764,10 @@ export struct PinmonyHomePage {
             .rowsGap(12)
             .width('100%')
             .height('100%')
-            .padding({ left: 12, right: 12, top: 8 })
+            .padding({ left: 12, right: 12, top: this.home.board ? 16 : this.homeTopInset() + 64 })
+            .clipContent(ContentClipMode.BOUNDARY)
+            .cachedCount(12, true)
+            .clip(false)
             .scrollBar(BarState.Off)
             .onAppear(() => this.restoreScrollPosition())
             .onDidScroll((offset: number, state: ScrollState) => {
@@ -793,19 +801,24 @@ export struct PinmonyHomePage {
           }
           .width('100%')
           .height('100%')
+          .clip(false)
           .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
           this.feedStatus()
         }
         .width('100%')
         .layoutWeight(1)
+        .clip(false)
       }
     }
     .width('100%')
     .height('100%')
+    .clip(false)
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .backgroundColor($r('app.color.page_background'))
   }
 
-  build() {
+  @Builder
+  private categoryButtons() {
     Column() {
       if (this.categories.length > 0) {
         Scroll() {
@@ -835,9 +848,36 @@ export struct PinmonyHomePage {
         .scrollBar(BarState.Off)
         .align(Alignment.Start)
       }
+    }.width('100%').padding({ top: this.homeTopInset() })
+    .hitTestBehavior(HitTestMode.Transparent)
+  }
+
+  @Builder
+  private homeNavigation() {
+    HdsNavigation() { this.feedContent() }
+      .width('100%').height('100%')
+      .titleMode(HdsNavigationTitleMode.MINI)
+      .hideBackButton(true)
+      .titleBar({
+        avoidLayoutSafeArea: false,
+        enableComponentSafeArea: false,
+        style: {
+          scrollEffectOpts: { enableScrollEffect: false },
+          originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 } },
+          scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 } }
+        },
+        content: { title: { mainTitle: '' } }
+      })
+      .bindToScrollable([this.feedScroller])
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+      .clip(false)
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopStart }) {
       Stack({ alignContent: Alignment.TopStart }) {
         ForEach([this.categoryPageKey()], (page: string) => {
-          Column() { this.feedContent() }
+          Column() { this.homeNavigation() }
             .width('100%').height('100%')
             .backgroundColor($r('app.color.page_background'))
             .hitTestBehavior(page === this.categoryPageKey() ? HitTestMode.Default : HitTestMode.None)
@@ -847,7 +887,7 @@ export struct PinmonyHomePage {
               TransitionEffect.translate({ x: -this.categoryDirection * this.contentWidth })))
         }, (page: string) => page)
       }
-        .width('100%').layoutWeight(1).clip(true)
+        .width('100%').height('100%').clip(false)
         .onAreaChange((_previous: Area, current: Area) => {
           const width: number = Number(current.width);
           if (Number.isFinite(width) && width > 0) this.contentWidth = width;
@@ -860,6 +900,22 @@ export struct PinmonyHomePage {
             .onActionStart(() => { this.suppressSwipeClick = true; })
             .onActionEnd((event: GestureEvent) => this.swipeCategory(event.offsetX, event.offsetY))
         )
+      if (this.categories.length > 0) {
+        Column()
+          .width('100%').height(this.homeTopInset() + 42)
+          .linearGradient({ direction: GradientDirection.Bottom, colors: [
+            [$r('app.color.search_top_mask_start'), 0],
+            [$r('app.color.search_top_mask_mid'), 0.95],
+            [$r('app.color.search_top_mask_end'), 1]
+          ] })
+          .linearGradientBlur(15, {
+            fractionStops: [[0, 0], [0.8, 0.2], [1, 0.4], [1, 1]], direction: GradientDirection.Top
+          })
+          .clip(true)
+          .hitTestBehavior(HitTestMode.None)
+          .accessibilityLevel('no')
+      }
+      this.categoryButtons()
     }
     .width('100%').height('100%')
   }

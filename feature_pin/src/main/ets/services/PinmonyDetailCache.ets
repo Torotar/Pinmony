@@ -80,6 +80,7 @@ export class PinmonyDetailCache {
       carousel: detail.carousel,
       isVideo: detail.isVideo,
       mediaKind: detail.mediaKind,
+      shuffleId: detail.shuffleId, shuffle: detail.shuffle, shuffleLoading: false, shuffleError: detail.shuffleError,
       // No request runs while displaying a retained parent. Offer a fresh read instead of a spinner.
       mediaLoading: false,
       mediaError: detail.mediaError,

@@ -1,9 +1,12 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { ImageFlightRect } from '../services/PinmonyImageTransition';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyImageViewer } from './PinmonyImageViewer';
+import { PinmonyShuffleCanvas } from './PinmonyShuffleCanvas';
+import { PinmonyShuffleItem } from '../models/PinmonyShuffle';
 import { splitDescriptionTags, PinmonyDescriptionPart } from '../services/PinmonyDescriptionTags';
 import { PinmonyVisualSearchView } from './PinmonyVisualSearchView';
 import { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from '../models/PinmonyVisualSearch';
@@ -32,6 +35,14 @@ export struct PinmonyDetailPage {
   @Prop traceId: number = 0;
   @Prop entryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
   @Prop entryClosing: boolean = false;
+  @Prop disableImageZoom: boolean = false;
+  @Prop shuffleSelectedImage: string = '';
+  @Prop shuffleBackdrop: string = '';
+  @Prop shuffleItems: PinmonyShuffleItem[] = [];
+  @Prop shuffleIndex: number = 0;
+  @Prop shufflePreviews: PinmonyDetailSnapshot[] = [];
+  onShufflePin?: (id: string) => void;
+  onShuffleRetry?: () => void;
   onEntryClosed?: () => void;
   @State private entryOpacity: number = 1;
   @State private entryScale: number = 1;
@@ -61,6 +72,10 @@ export struct PinmonyDetailPage {
   @State private searchImageReady: boolean = false;
   @State private searchOrigin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
   private onImageLayerChanged(): void {
+    if (this.imageLayer === 'zoom' && (this.disableImageZoom || !!this.detail.shuffleId)) {
+      this.onImageLayer?.('');
+      return;
+    }
     this.viewerControls = true;
     if (this.imageLayer === 'search') {
       if (!this.searchMounted) {
@@ -79,9 +94,25 @@ export struct PinmonyDetailPage {
       this.viewerOrigin = this.measureViewerOrigin();
       this.viewerClosing = false; this.viewerMounted = true;
     } else if (this.viewerMounted) {
-      this.viewerOrigin = this.measureViewerOrigin();
+      this.viewerOrigin = this.prepareViewerReturn();
       this.viewerClosing = true;
     }
+  }
+  private prepareViewerReturn(): ImageFlightRect {
+    const origin: ImageFlightRect = this.measureViewerOrigin();
+    if (origin.width <= 0 || origin.height <= 0 || origin.y + origin.height <= 56 || origin.y >= this.viewportHeight) return origin;
+    try {
+      const position = this.detailScroller.offset();
+      if (!position) return origin;
+      const offset: number = Math.max(0, position.yOffset);
+      if (offset <= 0) return origin;
+      // Reset under the opaque viewer; target the post-scroll photo bounds even
+      // before the next layout pass updates component measurements.
+      this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
+      this.lastReportedScrollOffset = 0;
+      this.onScrollPosition?.(this.detail.pinUrl, 0);
+      return { x: origin.x, y: origin.y + offset, width: origin.width, height: origin.height };
+    } catch (_) { return origin; }
   }
   private measureViewerOrigin(): ImageFlightRect {
     try {
@@ -607,7 +638,7 @@ export struct PinmonyDetailPage {
                 if (failed) { if (this.onImageError) this.onImageError(this.detail.pinUrl); }
                 else this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
               },
-              onImageTap: (url: string) => { this.zoomImageUrl = url; if (this.onImageLayer) this.onImageLayer('zoom'); } })
+              onImageTap: (url: string) => { if (!this.disableImageZoom && !this.detail.shuffleId) { this.zoomImageUrl = url; if (this.onImageLayer) this.onImageLayer('zoom'); } } })
           } else if (((this.detail.mediaLoading || this.mediaReadBusy) && !this.detail.video) || (this.detail.mediaKind === 'carousel' && !this.detail.carousel)) {
             Stack({ alignContent: Alignment.Center }) {
               if (this.detail.imageUrl) this.heroImage()
@@ -616,8 +647,7 @@ export struct PinmonyDetailPage {
                   .accessibilityText(this.uiText("pm_loading_media_01cf18eb"))
               } else {
                 Column({ space: 12 }) {
-                  Text(PinmonyI18n.render(this.detail.mediaError, this.uiLanguage) || this.uiText("pm_carousel_unavailable_093874a4")).fontColor($r('app.color.primary_text'))
-                  Button(this.uiText("pm_reload_media_57dfcd7b")).onClick(() => { if (this.onVideoRetry) this.onVideoRetry(); })
+                  PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.mediaError ?? '', this.uiLanguage) || this.uiText("pm_carousel_unavailable_093874a4"), actionText: this.uiText("pm_reload_media_57dfcd7b"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
                 }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
               }
             }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
@@ -649,8 +679,7 @@ export struct PinmonyDetailPage {
                 })
                 .onError(() => { if (this.onImageError) this.onImageError(this.detail.pinUrl); })
               Column({ space: 12 }) {
-                Text(PinmonyI18n.render(this.detail.videoError, this.uiLanguage) || this.uiText("pm_no_playable_video_url_available_a548116d")).fontColor($r('app.color.primary_text'))
-                Button(this.uiText("pm_reload_video_1472e7f1")).onClick(() => { if (this.onVideoRetry) this.onVideoRetry(); })
+                PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.videoError ?? '', this.uiLanguage) || this.uiText("pm_no_playable_video_url_available_a548116d"), actionText: this.uiText("pm_reload_video_1472e7f1"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
               }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
             }.width('100%').borderRadius(18).clip(true)
           } else {
@@ -692,9 +721,24 @@ export struct PinmonyDetailPage {
   @Builder
   private detailInformation() {
     Column({ space: 18 }) {
+          if (this.detail.shuffleError) {
+            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.shuffleError,this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.onShuffleRetry?.(), actionEnabled: this.videoActive && !this.detail.shuffleLoading })
+          }
+          if (this.detail.shuffle) {
+            Scroll() {
+              Row({space:12}) {
+                ForEach(this.detail.shuffle.items, (item: PinmonyShuffleItem) => {
+                  if (item.tappable && !item.hidden && item.alpha > 0 && item.imageUrl) {
+                    Image(item.imageUrl).width(80).height(100).objectFit(ImageFit.Contain).borderRadius(12)
+                      .accessibilityText(this.uiText('pm_open_original_pin_42977656'))
+                      .onClick(() => {if (this.videoActive && this.readsReady) this.onShufflePin?.(item.id);})
+                  }
+                }, (item: PinmonyShuffleItem): string => item.id + ':' + this.uiLanguage)
+              }
+            }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+          }
           if (this.contentError) {
-            Text(PinmonyI18n.render(this.contentError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-            if (this.contentRetryable) Button(this.uiText("pm_retry_loading_details_94912123")).onClick(() => { if (this.onContentRetry) this.onContentRetry(); })
+            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_details_94912123"), onAction: () => { if (this.onContentRetry) this.onContentRetry(); }, actionEnabled: this.contentRetryable })
           } else if (this.detail.kind !== 'cached' && !this.actionsReady && !this.readsReady && !this.deferredActions) {
             Text(this.detail.kind === 'cached' ? this.uiText("pm_syncing_pin_status_e1429d05") : this.uiText("pm_verifying_pin_content_cbcfd002"))
               .fontSize(14).fontColor($r('app.color.secondary_text'))
@@ -887,15 +931,11 @@ export struct PinmonyDetailPage {
   private detailFooter() {
     Column({ space: 12 }) {
           if (this.detail.kind === 'cached' && !this.detail.relatedLoading && this.detail.relatedError) {
-            Text(PinmonyI18n.render(this.detail.relatedError, this.uiLanguage))
-              .fontSize(14).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("pm_load_recommendations_08df83f8")).enabled(this.deferredActions || this.readsReady || this.actionsReady)
-              .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.relatedError, this.uiLanguage), actionText: this.uiText("pm_load_recommendations_08df83f8"), actionEnabled: this.deferredActions || this.readsReady || this.actionsReady, onAction: () => { this.onLoadMore?.(); } })
           }
           if (this.detail.kind !== 'cached' && this.detail.dataSource === 'api' && (this.actionsReady || this.readsReady)) {
             if (!this.detail.relatedLoading && this.detail.relatedError) {
-              Text(PinmonyI18n.render(this.detail.relatedError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-              Button(this.uiText("pm_retry_recommendations_83cd903e")).onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+              PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.relatedError, this.uiLanguage), actionText: this.uiText("pm_retry_recommendations_83cd903e"), onAction: () => { if (this.onLoadMore) this.onLoadMore(); } })
             } else if (this.detail.relatedEnded && this.detail.related.length === 0) {
               Text(this.uiText("pm_no_recommendations_yet_841e1d2f")).fontSize(14).fontColor($r('app.color.secondary_text'))
             }
@@ -908,6 +948,14 @@ export struct PinmonyDetailPage {
   private heroImage() {
     // Image lifecycle belongs to a component with a stable complete source key.
     Stack() {
+    if (this.detail.shuffle) {
+      PinmonyShuffleCanvas({shuffle:this.detail.shuffle,coverUrl:this.detail.imageUrl,canvasWidthVp:this.detailMediaWidth(),canvasHeightVp:this.heroHeight(),
+        interactionReady:this.videoActive && this.readsReady && !this.contentError,pinLabel:this.uiText('pm_open_original_pin_42977656'),onPin:this.onShufflePin})
+    } else {
+    if (this.detail.imageUrl) {
+      Image(this.detail.imageUrl).width('100%').height(this.heroHeight()).objectFit(ImageFit.Cover)
+        .blur(28).opacity(0.72).hitTestBehavior(HitTestMode.None)
+    }
     ForEach(this.heroImageSources(this.detail.imageUrl, this.detail.pinUrl), (source: DetailHeroSource) => {
       PinmonyDetailHero({ source: source, openId: this.traceId, heightVp: this.heroHeight(), label: this.detail.title,
         phase: this.detail.kind, blocked: !!this.contentError, renderIdentity: this.renderIdentity,
@@ -923,8 +971,12 @@ export struct PinmonyDetailPage {
         this.lastImageNotification = '';
           if (this.onImageError) this.onImageError(pin);
         }, onRetry: () => this.retryHeroImage(source.key),
-        onTap: () => { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } })
+        onTap: () => { if (!this.disableImageZoom && !this.detail.shuffleId) { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } } })
     }, (source: DetailHeroSource): string => source.key)
+    }
+    if (this.detail.shuffleLoading) {
+      LoadingProgress().width(28).height(28).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+    }
     }.width('100%').height(this.heroHeight()).borderRadius(18).clip(true)
       .id('pinmony-photo-source-' + this.traceId.toString())
       .opacity(this.viewerMounted && this.viewerImageReady || this.searchMounted && this.searchImageReady ? 0 : 1)
@@ -941,8 +993,109 @@ export struct PinmonyDetailPage {
       this.heroRenderRevision.toString();
   }
 
+  private shufflePreview(item: PinmonyShuffleItem | undefined): PinmonyDetailSnapshot | undefined {
+    return item?.pinId ? this.shufflePreviews.find((entry: PinmonyDetailSnapshot): boolean =>
+      entry.pinUrl.split('/pin/')[1]?.split('/')[0] === item.pinId) : undefined;
+  }
+
+  @Builder
+  private shufflePreviewCard(item: PinmonyShuffleItem) {
+    Column({space:12}) {
+      Row({space:12}) {
+        Image(item.imageUrl || '').width(64).height(88).objectFit(ImageFit.Cover).borderRadius(10)
+        Column({space:6}) {
+          Text(this.shufflePreview(item)?.title || '').fontSize(16).fontWeight(FontWeight.Medium).maxLines(2)
+            .fontColor($r('app.color.primary_text')).textOverflow({overflow:TextOverflow.Ellipsis})
+          Text(this.shufflePreview(item)?.creator || '').fontSize(13).maxLines(1).fontColor($r('app.color.secondary_text'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      }.width('100%').height(88)
+      Row({space:12}) {
+        Text(this.uiText('pm_save_60a53514')).fontSize(16).fontColor(Color.White).textAlign(TextAlign.Center)
+          .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.detail_save_accent'))
+        if (this.shufflePreview(item)?.sourceUrl) {
+          Text(this.uiText('pm_visit_website_04913c22')).fontSize(16).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center)
+            .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.shuffle_visit_background'))
+        } else {
+          Blank().layoutWeight(1).height(44)
+        }
+      }.width('100%').height(44)
+    }.width('100%').height(188).padding(16).borderRadius(18).backgroundColor($r('app.color.surface_muted'))
+      .hitTestBehavior(HitTestMode.None).accessibilityLevel('no-hide-descendants')
+  }
+
+  @Builder
+  private shuffleSelectedCard() {
+    Column({space:12}) {
+      Row({space:12}) {
+        Image(this.detail.imageUrl || this.shuffleItems[this.shuffleIndex]?.imageUrl || '').width(64).height(88).objectFit(ImageFit.Cover).borderRadius(10)
+        Column({space:6}) {
+          Text(this.detail.title || this.shufflePreview(this.shuffleItems[this.shuffleIndex])?.title || '').fontSize(16).fontWeight(FontWeight.Medium).maxLines(2)
+            .fontColor($r('app.color.primary_text')).textOverflow({overflow:TextOverflow.Ellipsis})
+          Text(this.detail.creator || this.shufflePreview(this.shuffleItems[this.shuffleIndex])?.creator || '').fontSize(13).maxLines(1).fontColor($r('app.color.secondary_text'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      }.width('100%').height(88)
+      if (this.contentError) {
+        PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError,this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.onContentRetry?.(), actionEnabled: this.contentRetryable })
+      }
+      Row({space:12}) {
+        if (this.action('save')) {
+          Button(PinmonyI18n.render(this.action('save')!.label,this.uiLanguage),{type:ButtonType.Normal})
+            .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.detail_save_accent')).fontColor(Color.White)
+            .enabled(!this.saveBusy && this.acceptsActionIntent(this.action('save')!))
+            .onClick(() => {
+              const action: PinmonyDetailAction | undefined = this.action('save');
+              if (action && !this.saveBusy && this.acceptsActionIntent(action)) this.onAction?.(action.id,action.kind);
+            })
+        } else {
+          Button(this.uiText('pm_save_60a53514'),{type:ButtonType.Normal}).height(44).layoutWeight(1).borderRadius(16)
+            .backgroundColor($r('app.color.detail_save_accent')).fontColor(Color.White).enabled(false)
+        }
+        if ((this.detail.sourceUrl && this.action('source')) ||
+            (this.detail.kind === 'opening' && this.shufflePreview(this.shuffleItems[this.shuffleIndex])?.sourceUrl)) {
+          Button(this.uiText('pm_visit_website_04913c22'),{type:ButtonType.Normal})
+            .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.shuffle_visit_background')).fontColor($r('app.color.primary_text'))
+            .enabled(!!this.action('source') && this.acceptsActionIntent(this.action('source')!))
+            .onClick(() => {
+              const action: PinmonyDetailAction | undefined = this.action('source');
+              if (action && this.acceptsActionIntent(action)) this.onAction?.(action.id,action.kind);
+            })
+        } else {
+          Blank().layoutWeight(1).height(44)
+        }
+      }.width('100%').height(44)
+    }.width('100%').constraintSize({minHeight:188}).padding(16).borderRadius(18).backgroundColor($r('app.color.surface_muted'))
+  }
+
   @Builder
   private detailContent() {
+    if (this.shuffleSelectedImage) {
+      Stack() {
+        Image(this.shuffleBackdrop || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Cover)
+          .blur(80).opacity(0.5).hitTestBehavior(HitTestMode.None)
+        Swiper() {
+          ForEach(this.shuffleItems, (item: PinmonyShuffleItem) => {
+            Column({space:16}) {
+              Image(item.cutoutUrl || item.imageUrl || '').width('100%').layoutWeight(1).objectFit(ImageFit.Contain)
+                .onClick(() => {
+                  if (this.videoActive && item.id === this.shuffleItems[this.shuffleIndex]?.id) this.onBack?.();
+                }, 8)
+              if (item.id === this.shuffleItems[this.shuffleIndex]?.id) {
+                Scroll() { this.shuffleSelectedCard() }.width('100%').height(188)
+              } else {
+                this.shufflePreviewCard(item)
+              }
+            }.width('100%').height('100%').padding({top:16,bottom:16})
+          }, (item: PinmonyShuffleItem): string => item.id + ':' + this.uiLanguage)
+        }.width('100%').height('100%').index(this.shuffleIndex).loop(false).indicator(false)
+          .prevMargin(20).nextMargin(20).itemSpace(12)
+          .disableSwipe(!this.videoActive || !this.readsReady)
+          .onChange((index: number) => {
+            if (index !== this.shuffleIndex && this.videoActive && this.readsReady && this.shuffleItems[index]) {
+              this.onShufflePin?.(this.shuffleItems[index].id);
+            }
+          })
+      }.width('100%').height('100%').clip(true)
+    } else {
     Column() {
       Scroll(this.detailScroller) {
         Column({ space: 18 }) {
@@ -1011,6 +1164,7 @@ export struct PinmonyDetailPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
+    }
   }
 
   @Builder
@@ -1018,22 +1172,17 @@ export struct PinmonyDetailPage {
     if (!this.imageLayer && this.detail.isVideo && this.detail.video &&
         !this.mediaReadBusy && !this.detail.mediaLoading && (this.detail.videoError || this.videoFailure)) {
       Row({ space: 8 }) {
-        Text(PinmonyI18n.render(this.detail.videoError || this.videoFailure, this.uiLanguage)).fontSize(13)
-          .fontColor($r('app.color.secondary_text')).maxLines(3).layoutWeight(1)
-        Button(this.uiText("pm_retry_b8784c8d")).fontSize(13).height(44).enabled(this.videoActive && (this.actionsReady || !!this.detail.videoError))
-          .onClick(() => {
+        PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.videoError || this.videoFailure, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
             if (this.detail.videoError) { if (this.onVideoRetry) this.onVideoRetry(); }
             else {
               this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0 });
               this.videoRetryRevision = (this.videoRetryRevision + 1) % 1000000;
             }
-          })
-        Button(this.uiText("pm_reload_url_84763306")).fontSize(13).height(44).enabled(this.videoActive && !!this.onVideoRetry)
-          .accessibilityText(this.uiText("pm_reload_video_url_f620176f"))
-          .onClick(() => {
+          }, actionEnabled: this.videoActive && (this.actionsReady || !!this.detail.videoError) })
+        PinmonyActionNotice({ active: this.videoActive, message: this.uiText("pm_reload_url_84763306"), actionText: this.uiText("pm_reload_url_84763306"), onAction: () => {
             PinmonyRuntimeLog.info('VideoTrace: openId=' + this.traceId.toString() + ' event=refresh-requested');
             if (this.onVideoRetry) this.onVideoRetry();
-          })
+          }, actionEnabled: this.videoActive && !!this.onVideoRetry })
       }.width('100%').padding(10)
         .backgroundColor($r('app.color.input_surface')).borderRadius(12)
     }
@@ -1046,7 +1195,7 @@ export struct PinmonyDetailPage {
         Column() { this.detailContent() }.width('100%').height('100%')
           .hitTestBehavior(this.searchMounted ? HitTestMode.None : HitTestMode.Default)
       if (this.searchMounted) {
-        PinmonyVisualSearchView({ pin: this.detail.pinUrl, imageUrl: this.detail.originalImageUrl || this.detail.imageUrl,
+        PinmonyVisualSearchView({ pin: this.detail.pinUrl, imageUrl: this.detail.imageUrl || this.detail.originalImageUrl,
           imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight, result: this.visualResult,
           animatePhoto: true, originX: this.searchOrigin.x, originY: this.searchOrigin.y,
           originWidth: this.searchOrigin.width, originHeight: this.searchOrigin.height, closing: this.searchClosing,

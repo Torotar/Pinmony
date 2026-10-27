@@ -145,14 +145,15 @@ export class PinmonySearchDiscoveryNativeReads {
         }
         const url: string = this.target(node.action?.url);
         if (node.story_type !== 'slp_search_recommendation' || !title || !url.startsWith(this.origin + '/search/pins/')) return;
+        const topicId: string = 'discovery-topic:' + url;
         const items: PinmonySearchIdea[] = [];
         node.objects.slice(0, 4).forEach((pin: DiscoveryObject, n: number): void => {
           const cover: string = this.image(pin?.imageMediumUrl); if (!cover) return;
-          items.push({ id: sectionId + '-' + n.toString(), title: title, imageUrl: cover, targetUrl: url, enabled: true });
+          items.push({ id: topicId + ':' + cover, title: title, imageUrl: cover, targetUrl: url, enabled: true });
         });
         if (!items.length) return;
-        const section: PinmonySearchIdeaSection = { id: sectionId, title: title, eyebrow: this.text(node.subtitle), actionId: sectionId, targetUrl: url, items: items };
-        const existing: number = sections.findIndex((value: PinmonySearchIdeaSection): boolean => value.id === sectionId || value.targetUrl === url);
+        const section: PinmonySearchIdeaSection = { id: topicId, title: title, eyebrow: this.text(node.subtitle), actionId: topicId, targetUrl: url, items: items };
+        const existing: number = sections.findIndex((value: PinmonySearchIdeaSection): boolean => value.targetUrl === url);
         if (existing >= 0) sections[existing] = section; else if (sections.length < 80) sections.push(section);
       });
       const cursor: string = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 4096 ? connection.pageInfo.endCursor : '';

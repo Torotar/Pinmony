@@ -5076,59 +5076,649 @@
       "name": "pm_activity_date_unknown",
       "value": "기타 활동"
     },
-    {"name":"pm_photo_history_empty_hint","value":"검색을 위해 업로드한 이미지는 여기에 표시되며 다시 검색하는 데 사용할 수 있습니다."},
-    {"name":"pm_order_discard_title","value":"저장하지 않은 순서를 버릴까요?"},
-    {"name":"pm_order_discard_message","value":"변경한 보드 순서가 저장되지 않았습니다. 돌아가면 변경 사항이 사라집니다."},
-    {"name":"pm_order_discard_action","value":"변경 사항 버리기"},
-    {"name":"pm_profile_legacy_layout","value":"이전 프로필 레이아웃 사용"},
-    {"name":"pm_profile_hub_pins","value":"핀"},
-    {"name":"pm_profile_hub_boards","value":"보드"},
-    {"name":"pm_profile_hub_collages","value":"콜라주"},
-    {"name":"pm_profile_hub_favorites","value":"즐겨찾기"},
-    {"name":"pm_profile_hub_created","value":"내가 만든 핀"},
-    {"name":"pm_profile_hub_groups","value":"그룹"},
-    {"name":"pm_profile_hub_secret","value":"비밀"},
-    {"name":"pm_profile_hub_saved","value":"저장한 핀"},
-    {"name":"pm_profile_hub_suggestions","value":"추천 보드"},
-    {"name":"pm_profile_hub_empty","value":"필터와 일치하는 핀이 없습니다"},
-    {"name":"pm_profile_hub_favorite_empty","value":"핀을 즐겨찾기에 추가하면 여기에 표시됩니다."},
-    {"name":"pm_profile_suggestion_confirm","value":"보드를 만들고 이 그룹의 핀을 이동할까요?"},
-    {"name":"pm_profile_suggestion_unconfirmed","value":"결과가 확인되지 않았습니다. 다시 만들기 전에 새로고침하여 보드를 확인하세요."},
-    {"name":"pm_profile_hub_result_count","value":"핀 {0}개 · 필터 {1}개 적용"},
-    {"name":"pm_profile_hub_in_progress","value":"진행 중"},
-    {"name":"pm_profile_invite_collaborators","value":"공동 작업자 초대"},
-    {"name":"pm_profile_create_collage","value":"콜라주 만들기"},
-    {"name":"pm_profile_empty_favorites_title","value":"즐겨찾는 콘텐츠"},
-    {"name":"pm_profile_empty_favorites_body","value":"저장한 핀의 별을 누르면 여기에 표시됩니다."},
-    {"name":"pm_profile_empty_combined_title","value":"내 핀을 즐겨찾기에 추가"},
-    {"name":"pm_profile_empty_combined_body","value":"내가 만든 핀의 별을 누르면 여기에서 쉽게 찾을 수 있습니다."},
-    {"name":"pm_profile_empty_groups_title","value":"보드에서 공동 작업"},
-    {"name":"pm_profile_empty_groups_body","value":"보드에 공동 작업자를 추가하여 핀과 즐겨찾기를 저장하고 아이디어를 함께 정리하세요."},
-    {"name":"pm_profile_empty_collages_title","value":"콜라주 만들기"},
-    {"name":"pm_profile_empty_collages_body","value":"핀을 잘라 조합하여 새로운 콘텐츠를 만들고 게시해 다른 사람들에게 영감을 주세요."},
-    {"name":"pm_profile_empty_created_title","value":"내가 만든 핀"},
-    {"name":"pm_profile_empty_created_body","value":"내가 만든 핀이 여기에 표시됩니다."},
-    {"name":"pm_profile_empty_boards_title","value":"아직 보드가 없습니다"},
-    {"name":"pm_profile_empty_boards_body","value":"필터와 일치하는 보드가 여기에 표시됩니다."},
-    {"name":"pm_profile_empty_collage_drafts_title","value":"진행 중인 콜라주가 없습니다!"},
-    {"name":"pm_profile_empty_collage_drafts_body","value":"영감을 주는 이미지를 잘라 조합하여 콜라주를 만드세요."}
-  ,
-    {"name":"pm_settings_view_profile","value":"프로필 보기"},
-    {"name":"pm_star_add","value":"즐겨찾기에 추가"},
-    {"name":"pm_star_remove","value":"즐겨찾기에서 삭제"},
-    {"name":"pm_star_added","value":"즐겨찾기에 추가했습니다"},
-    {"name":"pm_star_removed","value":"즐겨찾기에서 삭제했습니다"},
-    {"name":"pm_star_failed","value":"작업이 전송되지 않았습니다. 메뉴를 다시 열어 시도하세요."},
-    {"name":"pm_star_unknown","value":"작업 결과를 확인하지 못했습니다. 새로고침하여 상태를 확인하세요."},
-    {"name":"pm_star_filter","value":"즐겨찾기"},
-    {"name":"pm_star_filter_active","value":"즐겨찾기 · 필터 적용됨"},
-    {"name":"pm_board_view_title","value":"Board view"},
-    {"name":"pm_board_view_type","value":"Filter by type"},
-    {"name":"pm_board_view_favorites","value":"Favorites"},
-    {"name":"pm_board_view_density","value":"Set view to"},
-    {"name":"pm_board_view_wide","value":"Wide"},
-    {"name":"pm_board_view_default","value":"Default"},
-    {"name":"pm_board_view_compact","value":"Compact"},
-    {"name":"pm_board_view_apply","value":"Apply filters"}
+    {
+      "name": "pm_photo_history_empty_hint",
+      "value": "검색을 위해 업로드한 이미지는 여기에 표시되며 다시 검색하는 데 사용할 수 있습니다."
+    },
+    {
+      "name": "pm_order_discard_title",
+      "value": "저장하지 않은 순서를 버릴까요?"
+    },
+    {
+      "name": "pm_order_discard_message",
+      "value": "변경한 보드 순서가 저장되지 않았습니다. 돌아가면 변경 사항이 사라집니다."
+    },
+    {
+      "name": "pm_order_discard_action",
+      "value": "변경 사항 버리기"
+    },
+    {
+      "name": "pm_profile_legacy_layout",
+      "value": "이전 프로필 레이아웃 사용"
+    },
+    {
+      "name": "pm_profile_hub_pins",
+      "value": "핀"
+    },
+    {
+      "name": "pm_profile_hub_boards",
+      "value": "보드"
+    },
+    {
+      "name": "pm_profile_hub_collages",
+      "value": "콜라주"
+    },
+    {
+      "name": "pm_profile_hub_favorites",
+      "value": "즐겨찾기"
+    },
+    {
+      "name": "pm_profile_hub_created",
+      "value": "내가 만든 핀"
+    },
+    {
+      "name": "pm_profile_hub_groups",
+      "value": "그룹"
+    },
+    {
+      "name": "pm_profile_hub_secret",
+      "value": "비밀"
+    },
+    {
+      "name": "pm_profile_hub_saved",
+      "value": "저장한 핀"
+    },
+    {
+      "name": "pm_profile_hub_suggestions",
+      "value": "추천 보드"
+    },
+    {
+      "name": "pm_profile_hub_empty",
+      "value": "필터와 일치하는 핀이 없습니다"
+    },
+    {
+      "name": "pm_profile_hub_favorite_empty",
+      "value": "핀을 즐겨찾기에 추가하면 여기에 표시됩니다."
+    },
+    {
+      "name": "pm_profile_suggestion_confirm",
+      "value": "보드를 만들고 이 그룹의 핀을 이동할까요?"
+    },
+    {
+      "name": "pm_profile_suggestion_unconfirmed",
+      "value": "결과가 확인되지 않았습니다. 다시 만들기 전에 새로고침하여 보드를 확인하세요."
+    },
+    {
+      "name": "pm_profile_hub_result_count",
+      "value": "핀 {0}개 · 필터 {1}개 적용"
+    },
+    {
+      "name": "pm_profile_hub_in_progress",
+      "value": "진행 중"
+    },
+    {
+      "name": "pm_profile_invite_collaborators",
+      "value": "공동 작업자 초대"
+    },
+    {
+      "name": "pm_profile_create_collage",
+      "value": "콜라주 만들기"
+    },
+    {
+      "name": "pm_profile_empty_favorites_title",
+      "value": "즐겨찾는 콘텐츠"
+    },
+    {
+      "name": "pm_profile_empty_favorites_body",
+      "value": "저장한 핀의 별을 누르면 여기에 표시됩니다."
+    },
+    {
+      "name": "pm_profile_empty_combined_title",
+      "value": "내 핀을 즐겨찾기에 추가"
+    },
+    {
+      "name": "pm_profile_empty_combined_body",
+      "value": "내가 만든 핀의 별을 누르면 여기에서 쉽게 찾을 수 있습니다."
+    },
+    {
+      "name": "pm_profile_empty_groups_title",
+      "value": "보드에서 공동 작업"
+    },
+    {
+      "name": "pm_profile_empty_groups_body",
+      "value": "보드에 공동 작업자를 추가하여 핀과 즐겨찾기를 저장하고 아이디어를 함께 정리하세요."
+    },
+    {
+      "name": "pm_profile_empty_collages_title",
+      "value": "콜라주 만들기"
+    },
+    {
+      "name": "pm_profile_empty_collages_body",
+      "value": "핀을 잘라 조합하여 새로운 콘텐츠를 만들고 게시해 다른 사람들에게 영감을 주세요."
+    },
+    {
+      "name": "pm_profile_empty_created_title",
+      "value": "내가 만든 핀"
+    },
+    {
+      "name": "pm_profile_empty_created_body",
+      "value": "내가 만든 핀이 여기에 표시됩니다."
+    },
+    {
+      "name": "pm_profile_empty_boards_title",
+      "value": "아직 보드가 없습니다"
+    },
+    {
+      "name": "pm_profile_empty_boards_body",
+      "value": "필터와 일치하는 보드가 여기에 표시됩니다."
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_title",
+      "value": "진행 중인 콜라주가 없습니다!"
+    },
+    {
+      "name": "pm_profile_empty_collage_drafts_body",
+      "value": "영감을 주는 이미지를 잘라 조합하여 콜라주를 만드세요."
+    },
+    {
+      "name": "pm_settings_view_profile",
+      "value": "프로필 보기"
+    },
+    {
+      "name": "pm_star_add",
+      "value": "즐겨찾기에 추가"
+    },
+    {
+      "name": "pm_star_remove",
+      "value": "즐겨찾기에서 삭제"
+    },
+    {
+      "name": "pm_star_added",
+      "value": "즐겨찾기에 추가했습니다"
+    },
+    {
+      "name": "pm_star_removed",
+      "value": "즐겨찾기에서 삭제했습니다"
+    },
+    {
+      "name": "pm_star_failed",
+      "value": "작업이 전송되지 않았습니다. 메뉴를 다시 열어 시도하세요."
+    },
+    {
+      "name": "pm_star_unknown",
+      "value": "작업 결과를 확인하지 못했습니다. 새로고침하여 상태를 확인하세요."
+    },
+    {
+      "name": "pm_star_filter",
+      "value": "즐겨찾기"
+    },
+    {
+      "name": "pm_star_filter_active",
+      "value": "즐겨찾기 · 필터 적용됨"
+    },
+    {
+      "name": "pm_board_view_title",
+      "value": "Board view"
+    },
+    {
+      "name": "pm_board_view_type",
+      "value": "Filter by type"
+    },
+    {
+      "name": "pm_board_view_favorites",
+      "value": "Favorites"
+    },
+    {
+      "name": "pm_board_view_density",
+      "value": "Set view to"
+    },
+    {
+      "name": "pm_board_view_wide",
+      "value": "Wide"
+    },
+    {
+      "name": "pm_board_view_default",
+      "value": "Default"
+    },
+    {
+      "name": "pm_board_view_compact",
+      "value": "Compact"
+    },
+    {
+      "name": "pm_board_view_apply",
+      "value": "Apply filters"
+    },
+    {
+      "name": "pm_pin_drafts_title",
+      "value": "Drafts"
+    },
+    {
+      "name": "pm_pin_drafts_expiry",
+      "value": "Drafts expire 30 days after you first save them. They will then be deleted."
+    },
+    {
+      "name": "pm_pin_drafts_empty",
+      "value": "임시보드가 없습니다"
+    },
+    {
+      "name": "pm_pin_drafts_days",
+      "value": "{0} days until deletion"
+    },
+    {
+      "name": "pm_pin_drafts_count",
+      "value": "{0} drafts"
+    },
+    {
+      "name": "pm_social_shopping_section",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_social_shopping_exclusions",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_social_shopping_detail",
+      "value": "People can use visual search to shop for products similar to those shown in your Pins."
+    },
+    {
+      "name": "pm_social_download_section",
+      "value": "Downloads"
+    },
+    {
+      "name": "pm_social_download_detail",
+      "value": "Allow people to download your video Pins (9:16 aspect ratio) and share them on other platforms. These videos include a watermark with your username."
+    },
+    {
+      "name": "pm_social_filter_other_detail",
+      "value": "Hide comments containing certain words or phrases on other people’s Pins."
+    },
+    {
+      "name": "pm_social_filter_my_detail",
+      "value": "Hide comments containing certain words or phrases on Pins you create."
+    },
+    {
+      "name": "pm_social_comments_title",
+      "value": "Comments"
+    },
+    {
+      "name": "pm_social_comments_entry_detail",
+      "value": "Manage comment permissions and filters"
+    },
+    {
+      "name": "pm_social_comments_detail",
+      "value": "Enable comments on your new and existing Pins by default."
+    },
+    {
+      "name": "pm_social_shopping",
+      "value": "비슷한 제품 표시"
+    },
+    {
+      "name": "pm_social_idea_downloads",
+      "value": "Video Pin downloads"
+    },
+    {
+      "name": "pm_social_filter_phrases_placeholder",
+      "value": "필터링할 단어나 문구 입력"
+    },
+    {
+      "name": "pm_social_filter_phrases_hint",
+      "value": "단어나 문구는 쉼표로 구분하세요"
+    },
+    {
+      "name": "pm_social_filter_phrases_done",
+      "value": "완료"
+    },
+    {
+      "name": "pm_social_filter_other_pins",
+      "value": "다른 사람의 Pin 댓글 필터링"
+    },
+    {
+      "name": "pm_social_filter_my_pins",
+      "value": "내 Pin 댓글 필터링"
+    },
+    {
+      "name": "pm_social_filter_invalid",
+      "value": "필터 형식이 잘못되었습니다. 단어나 문구를 쉼표로 구분하세요."
+    },
+    {
+      "name": "pm_social_comments",
+      "value": "내 Pin에 댓글 허용"
+    },
+    {
+      "name": "pm_pin_images_title",
+      "value": "Pin 이미지"
+    },
+    {
+      "name": "pm_publish_remove_product",
+      "value": "제품 삭제"
+    },
+    {
+      "name": "pm_publish_add_product_help",
+      "value": "더하기 버튼을 눌러 제품 추가"
+    },
+    {
+      "name": "pm_publish_affiliate_section",
+      "value": "홍보 제품 태그"
+    },
+    {
+      "name": "pm_publish_affiliate_label",
+      "value": "제휴 링크 또는 홍보 제품입니다"
+    },
+    {
+      "name": "pm_publish_affiliate_help",
+      "value": "이 제품을 포함하여 보상을 받을 수 있는지 공개해야 합니다."
+    },
+    {
+      "name": "pm_board_cover_placeholder",
+      "value": "이 보드 상단에 표시할 커버 이미지를 선택하세요"
+    },
+    {
+      "name": "pm_publish_submit_failed",
+      "value": "게시가 거부되었습니다. 선택한 내용을 확인하고 다시 시도하세요."
+    },
+    {
+      "name": "pm_publish_product_unconfirmed",
+      "value": "제품 생성 결과를 확인하지 못했습니다. 다시 시도하기 전에 닫고 새로고침하여 확인하세요."
+    },
+    {
+      "name": "pm_publish_product_select_help",
+      "value": "태그할 제품을 선택하세요. 다시 누르면 선택이 해제됩니다."
+    },
+    {
+      "name": "pm_publish_product_count",
+      "value": "제품 {0}개"
+    },
+    {
+      "name": "pm_board_cover_verifying",
+      "value": "커버 업데이트 확인 중…"
+    },
+    {
+      "name": "pm_board_cover_unconfirmed",
+      "value": "커버 업데이트 결과를 확인하지 못했습니다. 최신 상태를 확인해 주세요. 다시 제출하지 않습니다."
+    },
+    {
+      "name": "pm_board_cover_title",
+      "value": "보드 커버 변경"
+    },
+    {
+      "name": "pm_board_cover_saving",
+      "value": "커버 제출 중…"
+    },
+    {
+      "name": "pm_board_cover_saved",
+      "value": "보드 커버가 업데이트되었습니다"
+    },
+    {
+      "name": "pm_board_cover_pins",
+      "value": "이 보드의 핀"
+    },
+    {
+      "name": "pm_board_cover_more",
+      "value": "이미지 더 불러오기"
+    },
+    {
+      "name": "pm_board_cover_label",
+      "value": "커버 이미지"
+    },
+    {
+      "name": "pm_board_cover_image_failed",
+      "value": "이미지를 불러오지 못했습니다. 이미지를 다시 선택해 주세요."
+    },
+    {
+      "name": "pm_board_cover_empty",
+      "value": "이 보드에는 커버로 사용할 수 있는 이미지가 없습니다"
+    },
+    {
+      "name": "pm_board_cover_drag",
+      "value": "드래그하여 위치 조정"
+    },
+    {
+      "name": "pm_board_cover_choose",
+      "value": "보드 커버 선택"
+    },
+    {
+      "name": "pm_board_cover_check",
+      "value": "커버 상태 확인"
+    },
+    {
+      "name": "pm_profile_protected_boards_title",
+      "value": "목록에 없는 보드"
+    },
+    {
+      "name": "pm_profile_protected_boards_description",
+      "value": "프로필에 공개적으로 표시되지 않지만 링크가 있는 사람은 누구나 볼 수 있습니다."
+    },
+    {
+      "name": "pm_publish_product_recommendations",
+      "value": "추천 제품"
+    },
+    {
+      "name": "pm_publish_product_search_help",
+      "value": "검색할 제품 이름을 입력하세요."
+    },
+    {
+      "name": "pm_publish_product_read_failed",
+      "value": "제품을 불러올 수 없습니다. 다시 시도하거나 제품 링크를 확인하세요."
+    },
+    {
+      "name": "pm_publish_product_pending",
+      "value": "제품을 미리 볼 수 있습니다. 이 핀에 추가하는 기능은 아직 지원되지 않습니다."
+    },
+    {
+      "name": "pm_publish_product_lookup_help",
+      "value": "제품 이미지를 보려면 판매점의 제품 상세 페이지 링크를 입력하세요."
+    },
+    {
+      "name": "pm_publish_product_lookup",
+      "value": "제품 찾기"
+    },
+    {
+      "name": "pm_publish_product_empty",
+      "value": "제품을 찾을 수 없습니다."
+    },
+    {
+      "name": "pm_publish_topic_count",
+      "value": "{0} tags"
+    },
+    {
+      "name": "pm_publish_selected_topics",
+      "value": "Selected"
+    },
+    {
+      "name": "pm_publish_topic_search",
+      "value": "Search topics"
+    },
+    {
+      "name": "pm_publish_topic_help",
+      "value": "Tag related topics to reach people interested in Pins like yours. People will not see the topics you tag."
+    },
+    {
+      "name": "pm_publish_topic_empty",
+      "value": "No matching topics found"
+    },
+    {
+      "name": "pm_publish_similar_products",
+      "value": "Show similar products"
+    },
+    {
+      "name": "pm_publish_similar_help",
+      "value": "People can use visual search to shop for products similar to those shown in this Pin."
+    },
+    {
+      "name": "pm_publish_shopping_help",
+      "value": "Shopping recommendations do not apply to Pins with tagged products or paid partnership labels."
+    },
+    {
+      "name": "pm_publish_shopping",
+      "value": "Shopping recommendations"
+    },
+    {
+      "name": "pm_publish_engagement",
+      "value": "Engagement settings"
+    },
+    {
+      "name": "pm_publish_alt_text",
+      "value": "Alt text"
+    },
+    {
+      "name": "pm_publish_alt_hint",
+      "value": "Describe the visual details of your Pin"
+    },
+    {
+      "name": "pm_publish_alt_help",
+      "value": "This helps people using screen readers understand your Pin."
+    },
+    {
+      "name": "pm_publish_allow_comments",
+      "value": "Allow comments"
+    },
+    {
+      "name": "pm_publish_ai_person_help",
+      "value": "This Pin includes an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_person",
+      "value": "Show an AI generated person"
+    },
+    {
+      "name": "pm_publish_ai_modified_help",
+      "value": "Content made entirely or partly with AI"
+    },
+    {
+      "name": "pm_publish_ai_modified",
+      "value": "Label as AI modified"
+    },
+    {
+      "name": "pm_publish_ai_disclosure",
+      "value": "AI disclosure"
+    },
+    {
+      "name": "pm_search_recommendation_updated",
+      "value": "추천 콘텐츠가 업데이트되었습니다. 다시 선택해 주세요."
+    },
+    {
+      "name": "pm_search_recommendation_unavailable",
+      "value": "이 추천 콘텐츠를 열 수 없습니다. 새로고침해 주세요."
+    },
+    {
+      "name": "pm_publish_use_link",
+      "value": "Use a link"
+    },
+    {
+      "name": "pm_publish_topics",
+      "value": "Tag topics"
+    },
+    {
+      "name": "pm_publish_title_limit",
+      "value": "Up to 100 characters"
+    },
+    {
+      "name": "pm_publish_title_hint",
+      "value": "Give your Pin a title"
+    },
+    {
+      "name": "pm_publish_title",
+      "value": "Title"
+    },
+    {
+      "name": "pm_publish_search_pins",
+      "value": "Search Pins"
+    },
+    {
+      "name": "pm_publish_recent_saves",
+      "value": "Recently saved"
+    },
+    {
+      "name": "pm_publish_products",
+      "value": "Tag products"
+    },
+    {
+      "name": "pm_publish_product_search",
+      "value": "Search by product name"
+    },
+    {
+      "name": "pm_publish_product_link",
+      "value": "Add a product link"
+    },
+    {
+      "name": "pm_publish_product_help",
+      "value": "Enter a product page link from a retailer’s website. A product Pin will be created and tagged in your Pin."
+    },
+    {
+      "name": "pm_publish_link_hint",
+      "value": "Add a link"
+    },
+    {
+      "name": "pm_publish_link",
+      "value": "Link"
+    },
+    {
+      "name": "pm_publish_description_hint",
+      "value": "Describe your Pin"
+    },
+    {
+      "name": "pm_publish_create_pin",
+      "value": "Create Pin"
+    },
+    {
+      "name": "pm_publish_choose_board",
+      "value": "Choose board"
+    },
+    {
+      "name": "pm_publish_advanced",
+      "value": "Advanced settings"
+    },
+    {
+      "name": "pm_profile_avatar_right",
+      "value": "프로필 사진을 오른쪽에 표시"
+    },
+    {
+      "name": "pm_pin_draft_delete_title",
+      "value": "임시보드를 삭제할까요?"
+    },
+    {
+      "name": "pm_pin_draft_delete_message",
+      "value": "이 임시보드를 삭제하시겠어요?"
+    },
+    {
+      "name": "pm_publish_save_draft",
+      "value": "임시 저장"
+    },
+    {
+      "name": "pm_publish_draft_exit_title",
+      "value": "저장하고 나갈까요?"
+    },
+    {
+      "name": "pm_publish_draft_exit_message",
+      "value": "변경 사항이 저장되지 않았습니다. 나가기 전에 임시 저장하세요."
+    },
+    {
+      "name": "pm_publish_draft_saved",
+      "value": "임시 저장했습니다."
+    },
+    {
+      "name": "pm_publish_draft_unconfirmed",
+      "value": "저장 결과를 확인하지 못했습니다. 편집 내용은 유지됩니다. 다시 저장하기 전에 목록을 확인하세요."
+    },
+    {
+      "name": "pm_publish_draft_choose_board",
+      "value": "임시 저장하기 전에 보드를 선택하세요."
+    },
+    {
+      "name": "pm_publish_draft_not_submitted",
+      "value": "임시 저장 준비 또는 이미지 업로드에 실패했습니다. 초안은 전송되지 않았으며 편집 내용은 유지됩니다. 다시 저장할 수 있습니다."
+    },
+    {
+      "name": "pm_publish_draft_box",
+      "value": "임시 보관함"
+    },
+    {
+      "name": "pm_publish_source_files",
+      "value": "시스템 파일"
+    },
+    {
+      "name": "pm_publish_source_website",
+      "value": "웹사이트 링크"
+    }
   ]
 }

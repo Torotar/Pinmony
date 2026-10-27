@@ -1,15 +1,18 @@
+import { PinmonyActionNotice } from 'common_ui';
+import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyProfileLayoutPreference } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardTarget, PinmonyBoardSection, PinmonyBoardCreator } from '../models/PinmonyBoardDetail';
 import { boardSectionPreviewImages } from '../services/PinmonyBoardPresentation';
 import { PinmonyDraggablePublishButton } from './PinmonyDraggablePublishButton';
+import { PinmonyBoardCoverContent } from './PinmonyBoardCoverContent';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay, PinmonyBoardPickerRow, PinmonyBoardPickerFooter } from 'common_ui';
 import { HdsTabs, HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode,
-  HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+  HdsNavigationTitleBarOptions, SnackBarIconType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 
 interface BoardTitleMenuItem {
   content: BoardTitleMenuContent;
@@ -35,10 +38,9 @@ interface BoardEditValues {
 export struct PinmonyBoardPage {
   @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
   @State private viewOpen: boolean = false;
-  @State private density: number = 1;
-  @State private draftDensity: number = 1;
-  @State private draftFavorites: boolean = false;
+  @StorageLink('pinmonyBoardDensity') private density: number = 1;
   private viewPage: string = '';
+  private viewScope: string = '';
   @State private publishAreaWidth: number = 0;
   @State private publishAreaHeight: number = 0;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -61,6 +63,7 @@ export struct PinmonyBoardPage {
   @State private recommend: boolean = false;
   @State private invites: boolean = false;
   @State private requests: boolean = false;
+  @State private coverPreviewReady: boolean = false;
   private editingSession: string = '';
   private selectionSession: string = '';
   private pendingSectionEditKey: string = '';
@@ -99,6 +102,7 @@ export struct PinmonyBoardPage {
   private readonly boardPathStack: NavPathStack = new NavPathStack();
   private parentScroller: Scroller = new Scroller();
   private flowScroller: Scroller = new Scroller();
+  private coverScroller: Scroller = new Scroller();
   private readonly sectionScrollers: Map<string, Scroller> = new Map<string, Scroller>();
   private scrollOwner: string = '';
   private visibleScrollScope: string = '';
@@ -106,7 +110,7 @@ export struct PinmonyBoardPage {
   private scrollRestoreToken: number = 0;
   private restoringScroll: boolean = false;
 
-  private scrollScope(): string {return this.snapshot.pageKey + ':' + (this.snapshot.nativeAccountGeneration ?? this.snapshot.session).toString() + ':' + (this.phase() === 'section' ? 'section:' + (this.snapshot.flow?.sectionId || '') : this.phase() || 'parent');}
+  private scrollScope(): string {return this.snapshot.pageKey + ':' + (this.snapshot.nativeAccountGeneration ?? this.snapshot.session).toString() + ':' + (this.snapshot.flow?.cover ? 'cover' : this.phase() === 'section' ? 'section:' + (this.snapshot.flow?.sectionId || '') : this.phase() || 'parent');}
   private restoreContentScroll(): void {
     const scope: string = this.scrollScope();
     if(scope === this.visibleScrollScope && !this.restoringScroll)return;
@@ -123,7 +127,8 @@ export struct PinmonyBoardPage {
 
   private contentScroll(): Scroller {
     const owner: string = this.snapshot.pageKey + ':' + (this.snapshot.nativeAccountGeneration ?? this.snapshot.session).toString();
-    if(owner !== this.scrollOwner){this.scrollOwner = owner;this.parentScroller = new Scroller();this.flowScroller = new Scroller();this.sectionScrollers.clear();this.scrollOffsets.clear();}
+    if(owner !== this.scrollOwner){this.scrollOwner = owner;this.parentScroller = new Scroller();this.flowScroller = new Scroller();this.coverScroller = new Scroller();this.sectionScrollers.clear();this.scrollOffsets.clear();}
+    if(this.snapshot.flow?.cover)return this.coverScroller;
     if(!this.phase())return this.parentScroller;
     if(this.phase() !== 'section' || !this.snapshot.flow?.sectionId)return this.flowScroller;
     const id: string = this.snapshot.flow.sectionId;
@@ -256,6 +261,7 @@ export struct PinmonyBoardPage {
   }
   private back(): void {
     if (this.snapshot.flow?.busy) return;
+    if(this.snapshot.flow?.cover){this.act('coverBack');return;}
     if (this.mergeOpen) { this.menuOpen = false; return; }
     if (this.creatingTarget && !this.snapshot.flow?.uncertain) { this.creatingTarget = false; return; }
     if (this.creatingBoardTarget && !this.snapshot.flow?.uncertain) { this.creatingBoardTarget = false; this.boardCreateSubmitted = false; return; }
@@ -315,7 +321,9 @@ export struct PinmonyBoardPage {
               .fontSize(15).fontColor($r('app.color.secondary_text'))
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
           ForEach([this.snapshot.privacy || ''], (privacy: string) => {
-          Toggle({ type: ToggleType.Switch, isOn: false })
+          Checkbox().select(false).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
             .enabled(this.snapshot.nativeReadsReady === true && !this.snapshot.flow?.loading && !this.snapshot.flow?.busy &&
               !this.snapshot.flow?.uncertain && !this.snapshot.flow?.error && !this.snapshot.flow?.phase)
             .onChange((value: boolean) => {
@@ -327,7 +335,7 @@ export struct PinmonyBoardPage {
         }.width('100%').alignItems(VerticalAlign.Center)
       }
       if(this.snapshot.flow?.loading || this.snapshot.flow?.busy) { LoadingProgress().width(24).height(24) }
-      if(this.snapshot.flow?.error) { Text(PinmonyI18n.render(this.snapshot.flow.error,this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+      if(this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error,this.uiLanguage) }) }
     }.width('100%').padding({ left:24,right:24,top:20,bottom:28 }).alignItems(HorizontalAlign.Start)
   }
 
@@ -346,21 +354,21 @@ export struct PinmonyBoardPage {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled && !this.snapshot.flow?.cover, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: {  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: this.isDiscoveryBoard() ? {
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: this.snapshot.flow?.cover ? $r('app.color.page_background') : $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: {  backgroundStyle: { backgroundColor: this.snapshot.flow?.cover ? $r('app.color.page_background') : Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: this.isDiscoveryBoard() ? {
           backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
           menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }
         } : { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text') } } }
       },
       content: {
-        title: { mainTitle: this.creatingBoardTarget ? this.uiText("pm_create_board_513babc9") : this.creatingTarget ? this.uiText("pm_add_section_779008ec") : this.selectingPins() ? this.uiText("pm_select_pins_46854e37") : this.phase() === 'targets' ? this.uiText(this.snapshot.flow?.targetBoardId || this.snapshot.flow?.sectionId ? 'pm_select_section_c87be634' : 'pm_save_to_board_0233a416') :
+        title: { mainTitle: this.snapshot.flow?.cover ? this.uiText('pm_board_cover_title') : this.creatingBoardTarget ? this.uiText("pm_create_board_513babc9") : this.creatingTarget ? this.uiText("pm_add_section_779008ec") : this.selectingPins() ? this.uiText("pm_select_pins_46854e37") : this.phase() === 'targets' ? this.uiText(this.snapshot.flow?.targetBoardId || this.snapshot.flow?.sectionId ? 'pm_select_section_c87be634' : 'pm_save_to_board_0233a416') :
           this.phase() === 'sectionEdit' ? this.uiText("pm_edit_section_60525d3b") : this.phase() === 'section' ? '' : this.phase() === 'ideas' ? this.uiText("pm_more_ideas_8f569818") : this.phase() === 'edit' ? this.uiText("pm_edit_board_2fd3c40f") : this.isDiscoveryBoard() ? (this.headerScrolled && this.snapshot.title !== '图板' ? PinmonyI18n.render(this.snapshot.title, this.uiLanguage) : '') : PinmonyI18n.render(this.snapshot.title || '', this.uiLanguage) },
-        backIcon: this.selectingPins() || this.phase() === 'edit' || this.phase() === 'sectionEdit' ? {
+        backIcon: this.snapshot.flow?.cover ? {isEnabled:!this.snapshot.flow.busy,action:() => this.back()} : this.selectingPins() || this.phase() === 'edit' || this.phase() === 'sectionEdit' ? {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           label: this.phase() === 'edit' ? this.uiText("pm_close_editor_64280f04") : this.uiText("pm_close_organizer_a3fa0809"), isEnabled: !this.snapshot.flow?.busy, action: () => this.back()
         } : { isEnabled: !this.snapshot.flow?.busy, action: () => this.back() },
-        menu: { value: this.phase() === 'sectionEdit' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.uiText("pm_done_c0b3fbff"),isEnabled:!!this.sectionEditName.trim() && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain,action:() => this.act('sectionRename',this.sectionEditName.trim())}}] : this.creatingBoardTarget || this.creatingTarget ? [] : this.phase() === 'sectionSelect' ? [{ content: {
+        menu: { value: this.snapshot.flow?.cover ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.uiText('pm_done_c0b3fbff'),isEnabled:this.coverPreviewReady && !!this.snapshot.flow.cover.selected && !this.snapshot.flow.busy && !this.snapshot.flow.uncertain && !this.snapshot.flow.cover.loading,action:() => this.act('coverSave')}}] : this.phase() === 'sectionEdit' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.uiText("pm_done_c0b3fbff"),isEnabled:!!this.sectionEditName.trim() && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain,action:() => this.act('sectionRename',this.sectionEditName.trim())}}] : this.creatingBoardTarget || this.creatingTarget ? [] : this.phase() === 'sectionSelect' ? [{ content: {
           label: this.selectedIds.length ? this.uiText("pm_done_c0b3fbff") : this.uiText("pm_skip_fc50a99c"), isEnabled: !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && !this.snapshot.loadingMore,
           action: () => { if(!this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && this.onAction)this.onAction(JSON.stringify({action:'sectionCreate',value:this.selectedIds})); }
         } }] : this.selectingPins() ? [{ content: {
@@ -455,7 +463,7 @@ export struct PinmonyBoardPage {
           SymbolGlyph(this.snapshot.flow?.saved.includes(pin.id) ? $r('sys.symbol.checkmark') : $r('sys.symbol.plus'))
             .fontSize(24).fontColor([this.snapshot.flow?.saved.includes(pin.id) ? Color.White : Color.Black])
         }.width(36).height(36).margin(8)
-          .backgroundColor(this.snapshot.flow?.saved.includes(pin.id) ? Color.Black : Color.White)
+          .backgroundColor(this.snapshot.flow?.saved.includes(pin.id) ? $r('app.color.accent') : Color.White)
           .enabled(!this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain)
           .onClick(() => this.act(this.snapshot.flow?.sectionId ? 'saveParentIdea' : 'save', pin.id))
           .accessibilityText(this.snapshot.flow?.saved.includes(pin.id) ? this.uiText("pm_unsave_dca60869") : this.uiText("pm_save_to_48bf7c69") + this.snapshot.title)
@@ -469,12 +477,12 @@ export struct PinmonyBoardPage {
         if (this.selectingPins()) this.toggle(pin.id);
         else if ((!this.phase() || this.phase() === 'section') && this.onPin) this.onPin(pin.id);
       })
-      if (!this.phase() || this.phase() === 'ideas' || this.phase() === 'section') {
+      if ((!this.phase() || this.phase() === 'ideas' || this.phase() === 'section') && !(this.modernBoardActions() && this.density === 2)) {
         Row() {
           Column({ space: 2 }) {
             if (pin.title) { Text(PinmonyI18n.render(pin.title, this.uiLanguage)).fontSize(13).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-          if ((!this.phase() || this.phase() === 'section') && typeof pin.favorite === 'boolean') {
+          if (this.profileBoard && (!this.phase() || this.phase() === 'section') && typeof pin.favorite === 'boolean') {
             Button({ type: ButtonType.Circle }) {
               if (this.favoritePending === pin.id) {
                 LoadingProgress().width(22).height(22)
@@ -557,22 +565,25 @@ export struct PinmonyBoardPage {
       }, (target: PinmonyBoardTarget) => JSON.stringify(target) + ':' + this.uiLanguage)
       }
     } else if (this.phase() === 'edit') {
-      this.editContent()
+      if(this.snapshot.flow?.cover) {
+        PinmonyBoardCoverContent({cover:this.snapshot.flow.cover,locked:this.snapshot.flow.busy,
+          onAction:(action: string,value: string): void => {this.act(action,value);},onReady:(ready: boolean): void => {this.coverPreviewReady = ready;}})
+      } else { this.editContent() }
     } else if (this.phase() === 'archived') {
       Text(this.uiText("pm_board_archived_03322af8")).fontSize(20).fontColor($r('app.color.primary_text'))
       Button(this.uiText("pm_close_3fd47edc")).onClick(() => this.act('close'))
     }
-    if (!this.organizeLoading() && (this.snapshot.flow?.loading || this.snapshot.flow?.busy)) { LoadingProgress().width(32).height(32) }
+    if (!this.snapshot.flow?.cover && !this.organizeLoading() && (this.snapshot.flow?.loading || this.snapshot.flow?.busy)) { LoadingProgress().width(32).height(32) }
     if (this.snapshot.flow?.error) {
-      Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-      if (!this.snapshot.flow.uncertain) { Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.act('retry')) }
+      PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.act('retry'), actionEnabled: !this.snapshot.flow.uncertain })
     }
   }
 
   @Builder
   private setting(label: string, description: string, value: boolean, changed: (value: boolean) => void) {
     Row({ space: 10 }) {
-      Checkbox().select(value).width(24).height(24).margin(0).selectedColor($r('app.color.accent'))
+      Checkbox().select(value).width(24).height(24).margin(0).selectedColor($r('app.color.accent')).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).mark({ strokeColor: Color.White })
         .enabled(!this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain)
         .onChange(changed).accessibilityText(label)
       Column({ space: 4 }) {
@@ -644,7 +655,7 @@ export struct PinmonyBoardPage {
         Text(this.uiText("pm_permanently_delete_this_section_and_all_its_pins_this_cannot_be__f7229feb")).fontSize(15).fontColor($r('app.color.secondary_text'))
       }.width('100%').alignItems(HorizontalAlign.Start).margin({top:16})
       if(this.snapshot.flow?.busy) { LoadingProgress().width(28).height(28) }
-      if(this.snapshot.flow?.error) { Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+      if(this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage) }) }
     }.width('100%').padding(20).alignItems(HorizontalAlign.Start)
   }
 
@@ -662,6 +673,33 @@ export struct PinmonyBoardPage {
   private editContent() {
     Column({ space: 20 }) {
       if (this.snapshot.editable) {
+      Column({space:10}) {
+        this.editLabel(this.uiText('pm_board_cover_label'))
+        Button({type:ButtonType.Normal}) {
+          Stack({alignContent:Alignment.BottomEnd}) {
+            if(this.snapshot.flow?.coverImage && this.snapshot.flow.coverPreview) {
+              Stack({alignContent:Alignment.TopStart}) {
+                Image(this.snapshot.flow.coverPreview.imageUrl)
+                  .width(this.snapshot.flow.coverPreview.width).height(this.snapshot.flow.coverPreview.height)
+                  .position({x:this.snapshot.flow.coverPreview.left,y:this.snapshot.flow.coverPreview.top}).objectFit(ImageFit.Fill)
+              }.width('100%').height('100%').clip(true)
+            } else if(this.snapshot.flow?.coverImage) {
+              Image(this.snapshot.flow.coverImage).width('100%').height('100%').objectFit(ImageFit.Cover)
+            } else {
+              Column({space:12}) {
+                Image($r('app.media.comment_photo')).width(28).height(28).fillColor($r('app.color.primary_text'))
+                Text(this.uiText('pm_board_cover_placeholder')).fontSize(17).fontColor($r('app.color.primary_text'))
+                  .textAlign(TextAlign.Center).padding({left:24,right:24})
+              }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+            }
+            Stack({alignContent:Alignment.Center}) {
+              Image($r('app.media.lucide_pencil')).width(22).height(22).fillColor($r('app.color.primary_text'))
+            }.width(40).height(40).borderRadius(12).backgroundColor($r('app.color.input_surface')).margin(10)
+          }.width('100%').height('100%')
+        }.width('100%').aspectRatio(5/3).borderRadius(20).clip(true).padding(0).backgroundColor($r('app.color.surface_muted'))
+          .enabled(this.snapshot.nativeReadsReady === true && !this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain)
+          .onClick((): void => {this.coverPreviewReady = false;this.act('coverOpen');}).accessibilityText(this.uiText('pm_board_cover_choose'))
+      }.width('100%')
       Column({ space: 10 }) {
         this.editLabel(this.uiText("pm_name_d44e9b3d"))
         TextInput({ text: this.editName }).maxLength(100).height(48).borderRadius(16)
@@ -800,8 +838,7 @@ export struct PinmonyBoardPage {
       if (this.snapshot.flow?.phase === 'mergeTargets') {
         if (this.snapshot.flow.loading || this.snapshot.flow.busy) { LoadingProgress().width(28).height(28) }
         if (this.snapshot.flow.error) {
-          Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-          Button(this.uiText('pm_retry_b8784c8d')).enabled(!this.snapshot.flow.loading).onClick(() => this.act('mergeTargetsRetry'))
+          PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.act('mergeTargetsRetry'), actionEnabled: !this.snapshot.flow.loading })
         }
         Scroll() {
           Column() {
@@ -827,32 +864,47 @@ export struct PinmonyBoardPage {
     Button({type:ButtonType.Normal}) {
       Row() {
         Text(this.uiText(key)).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
-        if(selected){SymbolGlyph($r('sys.symbol.checkmark')).fontSize(22).fontColor([$r('app.color.primary_text')])}
+        Checkbox().select(selected).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({strokeColor:Color.White}).width(24).height(24).margin(0)
+          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }.width('100%')
-    }.width('100%').height(52).backgroundColor(Color.Transparent).enabled(enabled).accessibilityChecked(selected).onClick(action)
+    }.width('100%').height(48).backgroundColor(Color.Transparent).stateEffect(false).hoverEffect(HoverEffect.None).enabled(enabled).accessibilityChecked(selected).onClick(action)
   }
 
   @Builder
   private boardViewSheet() {
-    Column({space:8}) {
+    Column({space:0}) {
       Text(this.uiText('pm_board_view_type')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-      this.viewOption('pm_all_pins_9a2e0270',!this.draftFavorites,()=>{this.draftFavorites=false;})
-      this.viewOption('pm_board_view_favorites',this.draftFavorites,()=>{this.draftFavorites=true;},this.snapshot.canFilterFavorites===true)
-      Text(this.uiText('pm_board_view_density')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%').margin({top:16})
-      this.viewOption('pm_board_view_wide',this.draftDensity===0,()=>{this.draftDensity=0;})
-      this.viewOption('pm_board_view_default',this.draftDensity===1,()=>{this.draftDensity=1;})
-      this.viewOption('pm_board_view_compact',this.draftDensity===2,()=>{this.draftDensity=2;})
-      Row({space:8}) {
-        Button(this.uiText('pm_close_3fd47edc')).layoutWeight(1).onClick(()=>{this.viewOpen=false;})
-        Button(this.uiText('pm_board_view_apply')).layoutWeight(1)
-          .enabled(this.viewPage===this.snapshot.pageKey && this.boardActionEnabled(1) && (this.draftDensity!==this.density || this.draftFavorites!==(this.snapshot.favoriteOnly===true)))
-          .onClick(()=>{
-            if(this.viewPage!==this.snapshot.pageKey || !this.boardActionEnabled(1))return;
-            this.density=this.draftDensity;this.viewOpen=false;
-            if(this.snapshot.canFilterFavorites && this.draftFavorites!==(this.snapshot.favoriteOnly===true))this.act('favorites');
-          })
-      }.width('100%').margin({top:16})
+      this.viewOption('pm_all_pins_9a2e0270',this.snapshot.favoriteOnly!==true,()=>{this.selectBoardViewFavorites(false);},this.boardViewFilterReady())
+      this.viewOption('pm_board_view_favorites',this.snapshot.favoriteOnly===true,()=>{this.selectBoardViewFavorites(true);},this.boardViewFilterReady() && this.snapshot.canFilterFavorites===true)
+      Text(this.uiText('pm_board_view_density')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%').margin({top:12})
+      ForEach([this.density], (_density: number) => {
+      this.viewOption('pm_board_view_wide',this.density===0,()=>{this.selectBoardDensity(0);})
+      this.viewOption('pm_board_view_default',this.density===1,()=>{this.selectBoardDensity(1);})
+      this.viewOption('pm_board_view_compact',this.density===2,()=>{this.selectBoardDensity(2);})
+      }, (density: number): string => density.toString())
     }.width('100%').padding({left:24,right:24,top:12,bottom:24})
+  }
+
+  private selectBoardDensity(value: number): void {
+    if (!this.boardViewLive() || this.density === value) return;
+    PinmonyProfileLayoutPreference.saveBoardDensity(value);
+  }
+
+  private boardViewLive(): boolean {
+    return this.viewOpen && !!this.viewPage && this.viewPage === this.snapshot.pageKey &&
+      this.viewScope === this.scrollScope() && this.modernBoardActions();
+  }
+  private boardViewFilterReady(): boolean {
+    return this.boardViewLive() && this.boardActionEnabled(1) && !this.snapshot.loadingMore;
+  }
+  private selectBoardViewFavorites(value: boolean): void {
+    if (!this.boardViewFilterReady() || !this.snapshot.canFilterFavorites || value === (this.snapshot.favoriteOnly === true)) return;
+    this.act('favorites');
+  }
+  private closeBoardView(): void {
+    this.viewPage = '';this.viewScope = '';this.viewOpen = false;
   }
 
   private modernBoardActions(): boolean {
@@ -883,7 +935,7 @@ export struct PinmonyBoardPage {
   private boardActionTabs() {
     HdsTabs({ barPosition: BarPosition.End }) {
       TabContent() { Column() }
-        .tabBar(this.boardActionTab('pm_organize_ff093473', $r('app.media.lucide_brush_cleaning'), 0))
+        .tabBar(this.boardActionTab('pm_organize_ff093473', $r('app.media.board_organize_outline'), 0))
       TabContent() { Column() }
         .tabBar(this.boardActionTab('pm_publish_b61f333b', $r('sys.symbol.plus'), 1))
       TabContent() { Column() }
@@ -947,8 +999,7 @@ export struct PinmonyBoardPage {
         JSON.stringify(this.selectionPins().slice(start, start + this.selectionColumns())) + ':' + this.uiLanguage)
       if (this.snapshot.loadingMore) { LoadingProgress().width(28).height(28) }
       if (this.snapshot.error) {
-        Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-        Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
@@ -976,7 +1027,7 @@ export struct PinmonyBoardPage {
               .enabled(!!this.boardTargetName.trim() && !this.snapshot.flow?.busy && !this.snapshot.flow?.loading && !this.snapshot.flow?.uncertain)
               .onClick(() => this.submitBoardTarget())
             if (this.snapshot.flow?.busy) { LoadingProgress().width(32).height(32) }
-            if (this.snapshot.flow?.error) { Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+            if (this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage) }) }
           } else if (this.creatingTarget) {
             TextInput({ placeholder: this.uiText("pm_name_d44e9b3d"), text: this.targetName }).maxLength(100).height(80)
               .border({ width: 1, color: $r('app.color.secondary_text') }).borderRadius(16)
@@ -988,9 +1039,9 @@ export struct PinmonyBoardPage {
               .enabled(!!this.targetName.trim() && !this.snapshot.flow?.busy && !this.snapshot.flow?.loading && !this.snapshot.flow?.uncertain)
               .onClick(() => this.act('sectionCreateSelected', this.targetName.trim()))
             if (this.snapshot.flow?.busy) { LoadingProgress().width(32).height(32) }
-            if (this.snapshot.flow?.error) { Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+            if (this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage) }) }
           } else if (this.selectingPins()) {
-            if(this.snapshot.flow?.error) { Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')) }
+            if(this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage) }) }
             this.organizeSelection()
           }
           else { this.flowContent() }
@@ -1030,14 +1081,13 @@ export struct PinmonyBoardPage {
         this.organizeContent()
       } else {
       Stack({ alignContent: Alignment.Bottom }) {
-      Refresh({ refreshing: this.snapshot.refreshing === true }) {
+      Refresh({ refreshing: this.snapshot.refreshing === true || this.phase() === 'section' && this.snapshot.flow?.loading === true }) {
       Scroll(this.contentScroll()) {
         Column({ space: 16 }) {
           if (this.snapshot.flow?.phase === 'archive') {
             if (this.snapshot.flow.busy) { LoadingProgress().width(28).height(28) }
             if (this.snapshot.flow.error) {
-              Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-              if (!this.snapshot.flow.uncertain) { Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.confirmArchive()) }
+              PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.confirmArchive(), actionEnabled: !this.snapshot.flow.uncertain })
               Button(this.uiText("pm_cancel_2cd0f3be")).enabled(!this.snapshot.flow.busy).onClick(() => { this.archiveOpen = false; this.act('close'); })
             }
           }
@@ -1111,20 +1161,20 @@ export struct PinmonyBoardPage {
                 PinmonyUserAvatar({ image: creator.avatar, name: creator.name, avatarSize: 30 }).margin({ left: index > 0 ? -12 : 0 })
               }, (creator: PinmonyBoardCreator) => creator.id)
               Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
-              Text(this.uiText("pm_from_df6e36f7")).fontSize(15).fontColor($r('app.color.primary_text'))
+              Text(this.uiText("pm_from_df6e36f7")).fontSize(15).lineHeight(22).fontColor($r('app.color.primary_text'))
               ForEach(this.snapshot.featuredCreators || [], (creator: PinmonyBoardCreator, index: number) => {
                 Row({ space: 4 }) {
-                if (index > 0) { Text(index === (this.snapshot.featuredCreators?.length || 0) - 1 ? this.uiText("pm_and_3d711428") : '、').fontSize(15).fontColor($r('app.color.primary_text')) }
-                Text(PinmonyI18n.render(creator.name, this.uiLanguage)).fontSize(15).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+                if (index > 0) { Text(index === (this.snapshot.featuredCreators?.length || 0) - 1 ? this.uiText("pm_and_3d711428") : '、').fontSize(15).lineHeight(22).fontColor($r('app.color.primary_text')) }
+                Text(PinmonyI18n.render(creator.name, this.uiLanguage)).fontSize(15).lineHeight(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
                   .onClick(() => { if (creator.url && this.onUser) this.onUser(creator.url); })
                 if (creator.verified) {
                   SymbolGlyph($r('sys.symbol.checkmark')).fontSize(10).fontColor([Color.White])
                     .padding(3).backgroundColor($r('app.color.accent')).borderRadius(8).accessibilityText(this.uiText("pm_verified_9a64637b"))
                 }
-                }.margin({ right: 4, bottom: 4 })
+                }.alignItems(VerticalAlign.Center).margin({ right: 4 })
               }, (creator: PinmonyBoardCreator) => (creator.id) + ':' + this.uiLanguage)
               }.layoutWeight(1)
-            }.width('100%')
+            }.width('100%').alignItems(VerticalAlign.Center)
           }
           if (!this.phase() && !this.snapshot.featuredCreators?.length && this.snapshot.ownerName && !this.joinedAvatar) {
             Row({ space: 8 }) {
@@ -1191,11 +1241,12 @@ export struct PinmonyBoardPage {
                 Blank().layoutWeight(1)
                 Button({type:ButtonType.Circle}) {
                   Image($r('app.media.profile_sliders')).width(22).height(22).fillColor($r('app.color.primary_text'))
-                }.width(48).height(48).backgroundColor($r('app.color.input_surface'))
+                }.width(40).height(40).backgroundColor($r('app.color.input_surface'))
                   .enabled(this.boardActionEnabled(1)).accessibilityText(this.uiText('pm_board_view_title'))
-                  .onClick(() => {this.viewPage=this.snapshot.pageKey;this.draftDensity=this.density;this.draftFavorites=this.snapshot.favoriteOnly===true;this.viewOpen=true;})
+                  .onClick(() => {this.viewPage=this.snapshot.pageKey;this.viewScope=this.scrollScope();this.viewOpen=true;})
                   .bindSheet($$this.viewOpen,this.boardViewSheet(),{height:SheetSize.FIT_CONTENT,showClose:true,dragBar:true,
-                    title:{title:this.uiText('pm_board_view_title')},backgroundColor:$r('app.color.page_background')})
+                    title:{title:this.uiText('pm_board_view_title')},backgroundColor:$r('app.color.page_background'),
+                    onDisappear: () => { this.closeBoardView(); }})
               }
             }.width('100%')
             if (!this.modernBoardActions()) {
@@ -1206,14 +1257,6 @@ export struct PinmonyBoardPage {
               this.actionTile(this.uiText("pm_more_ideas_8f569818"), $r('sys.symbol.square_grid_2x2'), 'ideas')
             }.width('100%')
             }
-          }
-          if (!this.phase() && this.snapshot.canFilterFavorites) {
-            Button(this.uiText(this.snapshot.favoriteOnly ? 'pm_star_filter_active' : 'pm_star_filter'), {type:ButtonType.Normal})
-              .height(40).borderRadius(20).padding({left:16,right:16})
-              .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
-              .enabled(!this.snapshot.loading && !this.snapshot.loadingMore && !this.snapshot.refreshing)
-              .accessibilityText(this.uiText(this.snapshot.favoriteOnly ? 'pm_star_filter_active' : 'pm_star_filter'))
-              .onClick(() => this.act('favorites'))
           }
           if (!this.phase() && this.snapshot.sections?.length) {
             if (this.isDiscoveryBoard()) {
@@ -1251,8 +1294,7 @@ export struct PinmonyBoardPage {
             }
           }
           if (!this.phase() && this.snapshot.sectionsError) {
-            Text(PinmonyI18n.render(this.snapshot.sectionsError, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("pm_retry_loading_sections_0d100b07")).onClick(() => this.act('sectionsRetry'))
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.sectionsError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_sections_0d100b07"), onAction: () => this.act('sectionsRetry') })
           }
           if (this.phase() === 'section') {
             Text(PinmonyI18n.render(this.snapshot.title, this.uiLanguage)).fontSize(22).fontColor($r('app.color.accent')).width('100%').textAlign(TextAlign.Center).onClick(() => this.act('close'))
@@ -1266,7 +1308,7 @@ export struct PinmonyBoardPage {
               }.width('100%').justifyContent(FlexAlign.Center).direction(Direction.Ltr)
             }
             if (this.snapshot.flow?.loading) { LoadingProgress().width(28).height(28) }
-            if (this.snapshot.flow?.error) { Text(PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')); Button(this.uiText("pm_retry_b8784c8d")).onClick(() => this.act('retry')) }
+            if (this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage) }); PinmonyActionNotice({ message: this.uiText("pm_retry_b8784c8d"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.act('retry') }) }
             if (!this.snapshot.flow?.loading && !this.snapshot.flow?.error && !this.snapshot.flow?.pins.length) {
               Text(this.uiText("pm_there_are_no_pins_in_this_section_yet_694eda70")).fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Center).margin({top:60,bottom:60})
             }
@@ -1279,11 +1321,11 @@ export struct PinmonyBoardPage {
               Text(this.uiText("pm_loading_board_3d66e034")).fontColor($r('app.color.secondary_text'))
             }
           } else if (!this.snapshot.ready && this.snapshot.error) {
-            Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text')).margin({ top: 48 })
-            Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
           } else if (this.snapshot.ready && this.snapshot.pins.length === 0 && this.phase() !== 'ideas' && this.phase() !== 'section') {
             Text(this.uiText("pm_no_saved_pins_yet_24c645e0")).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top: 64 })
           } else {
+            ForEach([this.contentColumnsTemplate() + ':' + this.density.toString()], (layout: string) => {
             WaterFlow() {
               ForEach((this.phase() === 'ideas' || this.phase() === 'section') ? this.snapshot.flow?.pins || [] : this.snapshot.pins, (pin: PinmonyBoardPin) => {
                 FlowItem() {
@@ -1296,6 +1338,7 @@ export struct PinmonyBoardPage {
             .columnsTemplate(this.contentColumnsTemplate())
             .columnsGap(12)
             .rowsGap(12)
+            }, (layout: string): string => layout)
           }
           if (this.phase() === 'ideas') {
             this.flowContent()
@@ -1306,8 +1349,7 @@ export struct PinmonyBoardPage {
           if (this.snapshot.loadingMore && !this.isDiscoveryBoard()) {
             LoadingProgress().width(28).height(28)
           } else if (this.snapshot.ready && this.snapshot.error) {
-            Text(PinmonyI18n.render(this.snapshot.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-            Button(this.uiText("pm_retry_b8784c8d")).onClick(() => { if (this.onRetry) this.onRetry(); })
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
           }
         }
         .width('100%')
@@ -1326,13 +1368,16 @@ export struct PinmonyBoardPage {
       })
       .align(Alignment.TopStart)
       .onReachEnd(() => {
-        if (this.phase() === 'section') this.act('sectionMore');
+        if (this.snapshot.flow?.cover) {
+          if(this.snapshot.flow.cover.hasMore && !this.snapshot.flow.cover.loading && !this.snapshot.flow.cover.error && !this.snapshot.flow.busy && !this.snapshot.flow.uncertain)this.act('coverMore');
+        }
+        else if (this.phase() === 'section') this.act('sectionMore');
         else if (this.phase() === 'targets') this.act('targetsMore');
         else if ((!this.phase() || this.selectingPins()) && this.snapshot.hasMore && this.onLoadMore) this.onLoadMore();
       })
       }
       .width('100%').height('100%')
-      .pullToRefresh(!this.phase() && this.snapshot.ready && !this.snapshot.flow?.busy)
+      .pullToRefresh((!this.phase() || this.phase() === 'section') && this.snapshot.ready && !this.snapshot.flow?.busy)
       .onRefreshing(() => {
         PinmonyRuntimeLog.info('BoardRefreshTrace: stage=gesture');
         if (this.onRefresh) this.onRefresh();

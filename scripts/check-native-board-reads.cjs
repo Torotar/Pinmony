@@ -137,3 +137,16 @@ async function favoriteFilter(){
  console.log('Board favorites: server filter, independent cursors, empty terminal page, confirmed removal and return to all passed');
 }
 favoriteFilter().catch(e=>{console.error(e);process.exitCode=1;});
+
+async function protectedBoardRoute(){
+ const {PinmonyRouteParser:Routes}=load('entry/src/main/ets/app/PinmonyRouteParser.ets');
+ const f=fixture(),session=f.session(),network=new Network();let sent=0;
+ network.request=async(job,current)=>{if(!acceptsNetworkJob(job,current()))return {error:'rejected'};sent++;return {error:''};};
+ for(const slug of ['_products_you_tagged','_saved','_created','_arbitrary']){
+  const target=origin+'/sample/'+slug+'/';assert.equal(Routes.boardUrlFromAddress(target),slug==='_products_you_tagged'?target:'');
+  const envelope={options:{field_set_key:'profile_grid_item',is_mobile_fork:true,username:'sample',slug},context:{}};
+  const job={id:'native_board_protected_test',epoch:session.generation,page:target,url:origin+'/resource/BoardResource/get/?source_url='+encodeURIComponent('/sample/'+slug+'/')+'&data='+encodeURIComponent(JSON.stringify(envelope)),method:'GET',body:'',headers:{'X-Pinterest-Pws-Handler':'www/index.js'}};
+  const before=sent;await network.requestBusinessBoardRead(job,()=>session,'','','',false,()=>true);assert.equal(sent-before,slug==='_products_you_tagged'?1:0);
+ }
+}
+protectedBoardRoute().then(()=>console.log('Protected tagged-products route: exact read exception and reserved-route rejection passed')).catch(e=>{console.error(e);process.exitCode=1;});

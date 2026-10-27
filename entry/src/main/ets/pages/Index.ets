@@ -1,3 +1,4 @@
+import { HdsSnackBar } from '@kit.UIDesignKit';
 import { PinmonyUpdateNotice } from 'feature_settings';
 import { display } from '@kit.ArkUI';
 import { PinmonyBoardOrderPage } from 'feature_profile';
@@ -50,7 +51,7 @@ import { PinmonyMoreSheet, PinmonyShareSheet, PinmonySharePanelsController, Pinm
   PIN_VISUAL_SEARCH_API_SCRIPT, PinmonyPinStore, PinmonyDetailTrace, PinmonyDetailController,
   PinmonyDetailPorts, PinmonyDetailReadCache, PinmonyDetailReadCachePorts, PinmonyDetailImageStage,
   PinmonyDetailImageStagePorts, PinmonyDetailDocumentBinding, PinmonyDetailDocumentBindingPorts,
-  PinmonyPostResult, ShareSheetOption, PinmonyDetailPage, PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin,
+  PinmonyPostResult, ShareSheetOption, PinmonyDetailPage, PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin, PinmonyShuffleItem,
   PIN_DETAIL_API_ENABLED, PIN_POST_API_ENABLED, PIN_POST_EXTENSIONS_ENABLED, PinmonyEditPinSheet,
   PinmonySaveSheet, PinmonyCommentsSheet, PinmonyDetailEntryPhoto } from 'feature_pin';
 
@@ -110,7 +111,7 @@ import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
 
 import { image } from '@kit.ImageKit';
-import { HdsTabs, HdsTabsController, HdsAnimationMode, hdsMaterial, HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
+import { HdsTabs, HdsTabsController, HdsAnimationMode, hdsMaterial, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
 
 import { PinmonyNavigationHistory } from '../app/PinmonyNavigationHistory';
 
@@ -2800,9 +2801,9 @@ struct Index {
   private publishPageVisible(): boolean {
     const flow = this.profileStore.publishFlow;
     if (!flow) return false;
-    // Keep the originating page mounted while the system picker supplies photos.
-    return flow.kind !== 'photo' || !this.profileStore.publishPicking &&
-      (flow.phase !== 'photo' || flow.pins.length > 0 || !!flow.error);
+    // The photo phase is the draft inbox, including its empty/loading states.
+    // It must remain mounted when the system album temporarily covers it.
+    return true;
   }
 
   private nativeRootTabsVisible(): boolean {
@@ -3233,6 +3234,23 @@ struct Index {
         index === 1 ? this.searchStore.search?.pageKey || origin + '/search/' :
           index === 2 ? this.inboxStore.inbox?.pageUrl || origin + '/inbox/' :
             this.authenticatedProfileUrl);
+  }
+
+  private rootTabLastClick: number = -1;
+  private rootTabLastClickAt: number = 0;
+
+  private handleRootTabClick(index: number): void {
+    const now: number = Date.now();
+    const doubleClick: boolean = this.rootTabLastClick === index && now - this.rootTabLastClickAt <= 320 && this.activeTab === index;
+    this.rootTabLastClick = doubleClick ? -1 : index;
+    this.rootTabLastClickAt = doubleClick ? 0 : now;
+    if (doubleClick && this.nativeRootTabsVisible()) {
+      const key: string = 'pinmonyRootScrollTop' + index.toString();
+      AppStorage.setOrCreate<number>(key, (AppStorage.get<number>(key) || 0) + 1);
+      this.bottomBarCoordinator.resetForSession();
+      return;
+    }
+    this.selectNativeRootTab(index);
   }
 
   private selectNativeRootTab(index: number): void {
@@ -3805,6 +3823,14 @@ struct Index {
     return this.homeController.openHomePin(id);
   }
   @State private homeEntryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
+  private shuffleParentDetail: PinmonyDetailSnapshot | undefined = undefined;
+  @State private shuffleSiblingItems: PinmonyShuffleItem[] = [];
+  @State private shuffleSelectedIndex: number = 0;
+  @State private shufflePreviews: PinmonyDetailSnapshot[] = [];
+  @State private shuffleSelectedPin: string = '';
+  @State private shuffleSelectedImage: string = '';
+  @State private shuffleSelectedBackdrop: string = '';
+  @State private collageDetailPinUrl: string = '';
   @State private relatedEntryParent: PinmonyDetailSnapshot | undefined = undefined;
   private relatedEntryParentOffset: number = 0;
   private relatedEntryParentTrace: number = 0;
@@ -4740,7 +4766,7 @@ struct Index {
 
   private async changeProfileTab(section: string): Promise<void> { if(this.usesNativeProfileReads()){await this.profileNativeReads.select(section); return;} await this.profileActionsController.changeTab(section); }
 
-  private async organizeProfile(action: string, value: string = '', secret: boolean = false): Promise<void> { if(this.usesNativeProfileReads() && await this.profileNativeReads.unorganizedAction(action))return; await this.profileActionsController.organize(action, value, secret); }
+  private async organizeProfile(action: string, value: string = '', secret: boolean = false): Promise<void> { if(this.usesNativeProfileReads() && await this.profileNativeReads.unorganizedAction(action, value))return; await this.profileActionsController.organize(action, value, secret); }
 
   private settingsProfileDepth: number = -1;
   @State private settingsProfileReturning: boolean = false;
@@ -4854,13 +4880,16 @@ struct Index {
 
   private returnToNativeProfile(target: string): boolean {
     if(!PIN_NATIVE_PROFILE_READS_ENABLED || !this.profileUrlFromAddress(target))return false;
+    const profilePage: string = this.profileUrlFromAddress(target);
+    const retained: PinmonyProfileSnapshot | undefined = this.profileStore.profile?.profileUrl === profilePage ? this.profileStore.profile : undefined;
+    const section: string = retained?.hubMode ? 'hub:' + retained.hubMode + ':' + (retained.hubFavorite ? '1' : '0') + ':' + (retained.hubCreated ? '1' : '0') : target.includes('/_created/') ? 'created' : 'saved';
     this.returnCoordinator.cancel();this.pageHistory.cancelBack();this.pageBackToken++;
     this.clearDetail();this.boardNativeReads.pause();this.boardStore.boardDetail = undefined;this.boardStore.pendingBoardUrl = '';this.boardStore.pendingBoardSource = '';
     this.boardStore.boardReturnPage = '';this.boardStore.boardReturnUrl = '';this.boardStore.presentationOnly = false;
     this.nativeRootOnly = this.profileStore.origins.length === 0;this.nativeBackTarget = target;this.navigationAddress = target;this.detailReturnedToRoot = false;
     if(!this.profileStore.origins.length){this.activeTab = 3;this.tabsController.changeIndex(3);}
     this.pageHistory.visit(target,'load');this.profileStore.profileUrl = this.profileUrlFromAddress(target);
-    this.profileNativeReads.select(target.includes('/_created/') ? 'created' : 'saved');
+    this.profileNativeReads.select(section);
     this.syncFloatingTabsMotion();return true;
   }
 
@@ -4927,12 +4956,15 @@ struct Index {
       .find((pin: PinmonyCreatedPin): boolean => pin.id === id);
     const pinUrl: string = this.extractPinUrl(target?.targetUrl || '');
     if (!pinUrl || !this.pinIdentity(pinUrl)) return false;
+    if (profile.hubMode === 'collages' && target && !target.collageDraft) {
+      this.capturePinEntryPhoto(pinUrl, target.imageUrl, 'pinmony-profile-photo-' + target.id, target.imageWidth, target.imageHeight);
+    }
     if (target) this.pinStore.rememberDetailOrigin(this.pinIdentity(target.targetUrl || ''), this.pinStore.detailReturnUrl);
     this.clearRootTabGuard('profile-pin-open');
     this.profileStore.profileFlowLeftPage = false;
     this.profileStore.profileWebFlow = false;
     try {
-      this.beginDetailOpening(pinUrl, this.pinStore.detailReturnUrl);
+      this.beginDetailOpening(pinUrl, this.pinStore.detailReturnUrl, false, profile.hubMode === 'collages' && target?.collageDraft !== true);
       if(!PIN_NATIVE_PROFILE_READS_ENABLED)this.loadSessionDocument(pinUrl);
       return true;
     } catch (error) {
@@ -5111,7 +5143,7 @@ struct Index {
     try {
       const uris: string[] = await pickPublishPhotoUris();
       if (!this.isCurrentPublish(token, page)) return;
-      if (!uris.length) { this.profileStore.publishPicking = false; this.closePublishFlow(); return; }
+      if (!uris.length) { this.profileStore.publishPicking = false; return; }
       for (const uri of uris) {
         if (!this.isCurrentPublish(token, page)) return;
         const photo: PinmonyPublishPhoto = await readPublishPhoto(uri);
@@ -5127,7 +5159,7 @@ struct Index {
     } catch (error) {
       if (this.isCurrentPublish(token, page)) {
         this.profileStore.publishPicking = false;
-        this.closePublishFlow();
+        if (this.profileStore.publishFlow?.phase !== 'photo') this.closePublishFlow();
         this.showMessage((error as Error).message || this.uiText("pm_image_selection_incomplete_please_retry_f48e5cbe"));
       }
     } finally { if (token === this.profileStore.publishFlowToken) this.profileStore.publishPicking = false; }
@@ -5169,6 +5201,7 @@ struct Index {
   }
 
   private clearDetail(preserveRead: boolean = false, localOnly: boolean = false): void {
+    if (!preserveRead) { this.detailOpeningCoordinator.pauseShufflePreviews(); this.shufflePreviews = []; }
     this.postPanelsController.pause();
     this.detailController.pause();
     this.detailReadController.pause();
@@ -5251,7 +5284,12 @@ struct Index {
     return true;
   }
 
-  private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false): void {
+  private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false, collageItem: boolean = false): void {
+    if (!returning && !collageItem) {
+      this.detailOpeningCoordinator.pauseShufflePreviews();this.shufflePreviews = [];
+      this.shuffleSelectedPin = '';this.shuffleSelectedImage = '';this.shuffleSelectedBackdrop = '';
+      this.shuffleParentDetail = undefined;this.shuffleSiblingItems = [];
+    }
     if (this.homeEntryPhoto?.pinUrl !== pinUrl) {
       this.homeEntryPhoto = undefined; this.homeEntryClosing = false; this.homeEntryBackCommitted = false;
     }
@@ -5260,6 +5298,7 @@ struct Index {
     this.detailClickedAt = 0;
     this.closeImageLayer();
     if (!this.pinIdentity(pinUrl)) return;
+    this.collageDetailPinUrl = collageItem ? pinUrl : '';
     this.clearRootTabGuard('detail-open');
     if (this.pinStore.detailOpeningPin === pinUrl) return;
     this.supersedeRootPreparationForDetail();
@@ -5389,6 +5428,7 @@ struct Index {
       commentLoading: detail.commentLoading, commentError: detail.commentError, commentsAvailable: detail.commentsAvailable,
       commentEmpty: detail.commentEmpty, imageStageReady: detail.imageStageReady, imageLoaded: detail.imageLoaded, interactionsSettled: detail.interactionsSettled,
       mediaLoading: detail.mediaLoading, mediaError: detail.mediaError, mediaKind: detail.mediaKind,
+      shuffleId: detail.shuffleId, shuffle: detail.shuffle, shuffleLoading: detail.shuffleLoading, shuffleError: detail.shuffleError,
       carousel: detail.carousel, isVideo: detail.isVideo, video: detail.video, videoError: detail.videoError
     };
   }
@@ -5414,6 +5454,36 @@ struct Index {
 
   private async searchImage(crop: PinmonyImageCrop, append: boolean, first: boolean): Promise<void> {
     await this.detailOperationsController.searchImage(crop, append, first);
+  }
+
+  private openShufflePin(id: string): void {
+    const current: PinmonyDetailSnapshot | undefined = this.pinStore.detail;
+    const sibling: boolean = !!current && this.shuffleSelectedPin === current.pinUrl;
+    const parent: PinmonyDetailSnapshot | undefined = sibling ? this.shuffleParentDetail : current;
+    if (!parent?.shuffle || parent.shuffle.id !== parent.shuffleId || this.authStatus !== 'authenticated' ||
+        this.businessSuspended || !this.pinStore.videoForeground || !this.pinStore.detailNativeReadsReady ||
+        !this.detailNativeReads.owned() || this.pinStore.detailPreparing || this.activeSheetKind || this.currentPinUrl() !== current?.pinUrl) return;
+    const item: PinmonyShuffleItem | undefined = parent.shuffle.items.find((entry: PinmonyShuffleItem): boolean => entry.id === id);
+    if (!item || !item.tappable || item.hidden || item.alpha <= 0 || !item.pinId || !/^\d{1,30}$/.test(item.pinId) || !item.imageUrl) return;
+    const target: string = this.nativeBusinessSessionContext().origin + '/pin/' + item.pinId + '/';
+    if (target === parent.pinUrl || this.pinStore.detailOpeningPin === target) return;
+    const siblings: PinmonyShuffleItem[] = parent.shuffle.items.filter((entry: PinmonyShuffleItem): boolean =>
+      entry.tappable && !entry.hidden && entry.alpha > 0 && !!entry.pinId && /^\d{1,30}$/.test(entry.pinId) && !!entry.imageUrl);
+    if (!sibling) this.pinStore.detailCache.put(this.pinIdentity(parent.pinUrl),parent,this.pinStore.detailScrollOffset);
+    this.beginDetailOpening(target,parent.pinUrl,false,true);
+    this.shuffleParentDetail = parent;
+    this.shuffleSiblingItems = siblings;
+    this.shuffleSelectedIndex = siblings.findIndex((entry: PinmonyShuffleItem): boolean => entry.id === id);
+    this.shuffleSelectedPin = target; this.shuffleSelectedImage = item.cutoutUrl || item.imageUrl; this.shuffleSelectedBackdrop = parent.imageUrl;
+    this.pinStore.detailScrollOffset = 0;
+    const origin: string = this.nativeBusinessSessionContext().origin;
+    const neighbors: PinmonyShuffleItem[] = siblings.slice(Math.max(0,this.shuffleSelectedIndex - 2),this.shuffleSelectedIndex + 3);
+    this.detailOpeningCoordinator.prefetchShufflePins(neighbors.filter((entry: PinmonyShuffleItem): boolean => entry.id !== id)
+      .map((entry: PinmonyShuffleItem): string => origin + '/pin/' + entry.pinId + '/'), parent.pinUrl,
+      (): boolean => this.shuffleParentDetail === parent && !!this.shuffleSelectedImage && this.authStatus === 'authenticated' && !this.businessSuspended,
+      (preview: PinmonyDetailSnapshot): void => {
+        this.shufflePreviews = this.shufflePreviews.filter((entry: PinmonyDetailSnapshot): boolean => entry.pinUrl !== preview.pinUrl).concat([preview]).slice(-24);
+      });
   }
 
   private async openImageRelated(id: string): Promise<void> {
@@ -5722,18 +5792,18 @@ struct Index {
     const key: string = this.pinStore.shareSession.toString() + ':' + this.pinStore.sharePin + ':feedback:' + this.pinStore.shareFeedback;
     if (this.pinStore.shareFeedbackSnackKey === key) return;
     this.pinStore.shareFeedbackSnackKey = key;
-    const snack: HdsSnackBar = this.preparePostSnack(5000);
+    const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
     snack.show({ icon: $r('sys.symbol.info_circle'), iconType: SnackBarIconType.NORMAL }, { title: PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage) }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
       closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
-    }, { duration: 5000, pressBackCallback: () => this.handlePostSnackBack(token) });
+    }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
 
   private showUndoSnack(message: string, pin: string, undo: () => void): void {
     PinmonyRuntimeLog.info('PinmonyReturn: undo snackbar shown');
-    const snack: HdsSnackBar = this.preparePostSnack(8000);
+    const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
     snack.show({ icon: PinmonyI18n.isText(message, 'pm_undo_incomplete_please_retry_e69779de') ||
       PinmonyI18n.isText(message, 'pm_undo_failed_please_retry_ea519ad9') ?
@@ -5748,12 +5818,12 @@ struct Index {
         PinmonyRuntimeLog.info('PinmonyReturn: snackbar close clicked');
         this.handlePostSnackClose(token);
       }
-    }, { duration: 8000, pressBackCallback: () => this.handlePostSnackBack(token) });
+    }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
 
   private showInboxUndoSnack(newsId: string): void {
     PinmonyRuntimeLog.info('PinmonyInbox: update hidden, undo snackbar shown');
-    const snack: HdsSnackBar = this.preparePostSnack(8000);
+    const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
     snack.show({ icon: $r('sys.symbol.trash'), iconType: SnackBarIconType.NORMAL }, { title: this.uiText("pm_update_deleted_509d0754") }, {
       operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: this.uiText("pm_undo_926a50b9"),
@@ -5767,7 +5837,7 @@ struct Index {
         this.inboxFlowAction('undoNews');
       },
       onCloseButtonClick: () => this.handlePostSnackClose(token)
-    }, { duration: 8000, pressBackCallback: () => this.handlePostSnackBack(token) });
+    }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
 
   private showInboxRestoredSnack(): void {
@@ -5781,13 +5851,13 @@ struct Index {
   }
 
   private showInboxUnsubscribedSnack(): void {
-    const snack: HdsSnackBar = this.preparePostSnack(8000);
+    const snack: HdsSnackBar = this.preparePostSnack(4000);
     const token: number = this.postSnackToken;
     snack.show({ icon: $r('sys.symbol.bell_slash'), iconType: SnackBarIconType.NORMAL }, { title: this.uiText("pm_you_will_no_longer_receive_notifications_about_this_pin_75459ce5") }, {
       operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
       closeButtonAccessibilityText: this.uiText("pm_dismiss_notice_d301bc12"),
       onCloseButtonClick: () => this.handlePostSnackClose(token)
-    }, { duration: 8000, pressBackCallback: () => this.handlePostSnackBack(token) });
+    }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
 
   private async undoSavedPin(): Promise<void> {
@@ -5898,6 +5968,11 @@ struct Index {
   // props and image nodes, not to the root ForEach key.
   private detailRootIdentity(): string {
     const detail: PinmonyDetailSnapshot | undefined = this.pinStore.detail;
+    // Sibling Pin reads update props on one retained carousel destination.
+    if (this.shuffleParentDetail && this.shuffleSelectedImage &&
+        this.collageDetailPinUrl === (detail?.pinUrl || this.pinStore.detailOpeningPin)) {
+      return 'shuffle:' + this.pinIdentity(this.shuffleParentDetail.pinUrl);
+    }
     return this.pinIdentity(detail?.pinUrl || this.pinStore.detailOpeningPin);
   }
 
@@ -6579,7 +6654,7 @@ struct Index {
             .scrollable(false)
             .barOverlap(true)
             .barHeight(56)
-            .padding({ top: this.profileSettingsVisible || this.homeEntryPhoto && this.homeEntryCardId.startsWith('pinmony-home-photo-') && (this.pinStore.detail || this.pinStore.detailOpeningPin) ?
+            .padding({ top: this.profileSettingsVisible ?
               this.getUIContext().px2vp(this.statusBarHeightPx) : 0 })
             .barBackgroundColor(this.immersiveLightMode !== 'off' ? Color.Transparent : $r('app.color.surface_muted'))
             .barFloatingStyle({
@@ -6589,7 +6664,7 @@ struct Index {
             .animationDuration(0)
             .onTabBarClick((index: number) => {
               this.logPageLifecycle('root-tab-click', 'targetTab=' + index.toString());
-              this.selectNativeRootTab(index);
+              this.handleRootTabClick(index);
             })
             .onContentWillChange((_currentIndex: number, comingIndex: number): boolean =>
               comingIndex === this.activeTab)
@@ -6804,6 +6879,14 @@ struct Index {
                   onTagSearch: (query: string, pin: string) => this.openDetailTagSearch(query, pin),
                   onRelatedTopic: (moduleId: string, topicId: string, pin: string) => this.openDetailRelatedTopic(moduleId, topicId, pin),
                   detail: this.detailPresentation(_identity),
+                  disableImageZoom: this.collageDetailPinUrl === this.pinStore.detail?.pinUrl,
+                  shuffleSelectedImage: this.shuffleSelectedPin === this.pinStore.detail?.pinUrl ? this.shuffleSelectedImage : '',
+                  shuffleBackdrop: this.shuffleSelectedBackdrop,
+                  shuffleItems: this.shuffleSiblingItems,
+                  shuffleIndex: this.shuffleSelectedIndex,
+                  shufflePreviews: this.shufflePreviews,
+                  onShufflePin: (id: string) => this.openShufflePin(id),
+                  onShuffleRetry: () => this.detailNativeAuxiliary.retryShuffle(),
                   renderIdentity: _identity === this.detailRootIdentity() ? this.detailRenderIdentity() : _identity,
                   traceId: _identity === this.detailRootIdentity() ? this.pinStore.detailOpeningToken : this.relatedEntryParentTrace,
                   entryPhoto: _identity === this.detailRootIdentity() && this.homeEntryPhoto?.pinUrl === this.pinStore.detail?.pinUrl ? this.homeEntryPhoto : undefined,
@@ -6842,6 +6925,7 @@ struct Index {
                         mediaLoading: current.mediaLoading,
                         mediaError: current.mediaError,
                         mediaKind: current.mediaKind,
+                        shuffleId: current.shuffleId, shuffle: current.shuffle, shuffleLoading: current.shuffleLoading, shuffleError: current.shuffleError,
                         dataSource: current.dataSource,
                         commentPreview: current.commentPreview,
                         commentLoading: current.commentLoading,
@@ -7010,7 +7094,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.boardOrderVisible || this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
+    .padding({ top: (this.authStatus === 'authenticated' && this.activeTab === 0) || this.boardOrderVisible || this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
       this.profileStore.searchVisible || !!this.inboxStore.listSection || (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
       this.inboxStore.invitationAllVisible || !!this.boardStore.collaborators || !!this.pinStore.detail || this.nativeSearchPageVisible() || this.nativeBoardVisible() ||
       (!this.pinStore.detail && !!this.profileStore.profile?.organize && !this.profileStore.profileWebFlow) ?

@@ -10,3 +10,5 @@ export { PinmonyPagePerformance } from './src/main/ets/services/PinmonyPagePerfo
 export { PinmonyPublishAnchor } from './src/main/ets/services/PinmonyPublishAnchor';
 
 export { isProductPin } from './src/main/ets/PinmonyProductPin';
+
+export { PinmonyProfileLayoutPreference } from './src/main/ets/services/PinmonyProfileLayoutPreference';

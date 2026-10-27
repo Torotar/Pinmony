@@ -6,8 +6,9 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 export const PIN_NATIVE_PROFILE_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
 interface ProfileImage { url?: string; width?: number; height?: number; }
 interface ProfileCover { source?: string; images?: Record<string,ProfileImage>; }
+interface ProfileBoardCoverPin { custom_cover?: boolean; image_url?: string; image_signature?: string; }
 interface ProfileUser { profile_cover?: ProfileCover; should_show_messaging?: boolean; profile_reach?: number; id: string; type: string; username: string; full_name?: string; image_large_url?: string; image_medium_url?: string; image_small_url?: string; follower_count?: number; following_count?: number; pin_count?: number; last_pin_save_time?: string; is_partner?: boolean; about?: string; website_url?: string; explicitly_followed_by_me?: boolean; blocked_by_me?: boolean; }
-interface ProfileRow { names?: string[]; thumbnails?: Record<string,ProfileImage>[]; favorited_by_me?: boolean; access?: string[]; privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
+interface ProfileRow { has_custom_cover?: boolean; cover_pin?: ProfileBoardCoverPin; cover_images?: Record<string,ProfileImage>; names?: string[]; thumbnails?: Record<string,ProfileImage>[]; favorited_by_me?: boolean; access?: string[]; privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
 interface ProfileTitle { text?: string; format?: string; }
 interface ProfileAction { url?: string; }
 interface ProfileResource { status: string; code?: number; error?: Object; data: ProfileUser | ProfileRow | ProfileRow[]; endpoint_name?: string; bookmark?: string; }
@@ -31,7 +32,12 @@ interface ProfileSortEnvelope { options: ProfileSortOptions; context: Record<str
 interface ProfileSortResponse { resource_response?: ProfileSortResource; client_context?: ProfileClient; }
 interface ProfileSortResource { status: string; code: number; endpoint_name: string; error?: Object; data: ProfileSortData | null; }
 interface ProfileInfo { cover: string; contact: boolean; monthlyViews?: number; name: string; handle: string; avatar: string; followers: number | null; following: number | null; userId: string; viewerId: string; isOwn: boolean; followingUser: boolean | null; blocked: boolean; business: boolean; about: string; website: string; pinCount: number | null; lastPinSaveTime: string; }
+class ProfileSuggestionSelection {
+  id: string = ''; title: string = ''; pins: PinmonyCreatedPin[] = []; selectedIds: string[] = [];
+  loading: boolean = false; error: string = ''; uncertain: boolean = false;
+}
 class ProfileFeed {
+  sort: string = '';
   ready: boolean = false; busy: boolean = false; cursor: string = ''; ended: boolean = false; error: string = ''; scroll: number = 0;
   boards: PinmonyBoard[] = []; pins: PinmonyCreatedPin[] = [];
 }
@@ -54,6 +60,7 @@ export class PinmonyProfileNativeReads {
   private hubFeed: ProfileFeed = new ProfileFeed();
   private readonly hubFeeds: Map<string,ProfileFeed> = new Map();
   private hubFeedKey(mode: string, favorite: boolean, created: boolean): string { return this.account + ':' + this.generation + ':' + this.page + ':' + mode + ':' + favorite + ':' + created; }
+  private suggestionSelection: ProfileSuggestionSelection | undefined = undefined;
   private suggestionWriting: boolean = false;
   private readonly attemptedSuggestions: Set<string> = new Set<string>();
   private suggestions: PinmonyBoard[] = []; private suggestionError: string = "";
@@ -84,11 +91,12 @@ export class PinmonyProfileNativeReads {
     }
     return true;
   }
-  pause(): void { this.suggestionWriting = false; if(this.store.profile?.profileUrl === this.page && this.store.profile.section === this.section)this.feed().scroll = this.store.profileScrollOffset; this.revision++; this.version++; if(this.requestId)this.ports.network().cancel(this.requestId); this.requestId = ''; this.busy = false; this.sortBusy = false; this.visibilityBusy = false; this.hubFeed.busy = false; this.saved.busy = false; this.created.busy = false; this.unorganized.busy = false; this.store.profileNativeReadsReady = false; this.store.profileActionsReady = false; this.store.profileSessionReady = false; this.store.profilePullRefreshing = false; this.bridgeEpoch = -1; this.bridgeSession = -1; this.adoptedVersion = -1; this.refreshNeeded = false; }
+  private pendingSortRead: boolean = false;
+  pause(): void { this.suggestionSelection = undefined; this.pendingSortRead = false; this.suggestionWriting = false; if(this.store.profile?.profileUrl === this.page && this.store.profile.section === this.section)this.feed().scroll = this.store.profileScrollOffset; this.revision++; this.version++; if(this.requestId)this.ports.network().cancel(this.requestId); this.requestId = ''; this.busy = false; this.sortBusy = false; this.visibilityBusy = false; this.hubFeed.busy = false; this.saved.busy = false; this.created.busy = false; this.unorganized.busy = false; this.store.profileNativeReadsReady = false; this.store.profileActionsReady = false; this.store.profileSessionReady = false; this.store.profilePullRefreshing = false; this.bridgeEpoch = -1; this.bridgeSession = -1; this.adoptedVersion = -1; this.refreshNeeded = false; }
   reset(): void { this.hubFeeds.clear(); this.suggestionWriting = false;  this.attemptedSuggestions.clear();this.suggestions = [];this.suggestionError = ''; this.hubMode = ''; this.hubFeed = new ProfileFeed(); this.hubFavorite = false; this.hubCreated = false; this.showAllPins = undefined; this.visibilityError = ''; this.boardSort = ''; this.sortError = ''; this.routes.clear(); this.pause(); if(this.account) {this.store.profileCache.clear(); if(this.store.profile?.profileUrl === this.page)this.store.profile = undefined;} this.account = ''; this.origin = ''; this.generation = -1; this.page = ''; this.section = 'saved'; this.info = undefined; this.identityVerified = false; this.infoError = ''; this.invalidation = 0; this.invalidationEpoch = -1; this.saved = new ProfileFeed(); this.created = new ProfileFeed(); this.unorganized = new ProfileFeed(); }
   async select(section: string): Promise<boolean> {
     if(this.suggestionWriting)return false;
-    if(section.startsWith('hub-create:')){await this.createSuggestion(section.slice(11));return true;}
+    if(section.startsWith('hub-create:')){await this.openSuggestion(section.slice(11));return true;}
     if(section.startsWith('hub:')) {
       const parts: string[] = section.split(':');
       if(!['pins','boards','collages','drafts','groups','secret'].includes(parts[1]) || !this.bind() || !this.info?.isOwn || !this.identityVerified)return false;
@@ -126,7 +134,7 @@ export class PinmonyProfileNativeReads {
     const previous: PinmonyProfileSnapshot | undefined = this.store.profile?.profileUrl === this.page && this.store.profile.section === this.section ? this.store.profile : undefined;
     const actions: PinmonyProfileAction[] = i?.isOwn ? [{id:'api-edit-profile',kind:'edit',label:PinmonyI18n.message("pm_edit_profile_3b0b2bb8"),enabled:true}] : i && typeof i.followingUser === 'boolean' && !i.blocked ? [{id:'api-follow-user',kind:'follow',label:i.followingUser ? PinmonyI18n.message("pm_following_7dfa5d8f") : PinmonyI18n.message("pm_follow_eb137dee"),enabled:true}] : [];
     if(i && !i.isOwn && i.contact && !i.blocked)actions.push({id:'api-contact-user',kind:'contact',label:PinmonyI18n.message("pm_contact_bfc96732"),enabled:true});
-    const snapshot: PinmonyProfileSnapshot = { suggestionWriting:this.suggestionWriting,suggestionUnavailableIds:Array.from(this.attemptedSuggestions),suggestions:this.suggestions.slice(),suggestionError:this.suggestionError,hubMode:this.hubMode,hubFavorite:this.hubFavorite,hubCreated:this.hubCreated,kind:'state',nativeVersion:this.version,session:this.store.profileSession,profileUrl:this.page,section:this.section,
+    const snapshot: PinmonyProfileSnapshot = { suggestionTitle:this.suggestionSelection?.title,suggestionWriting:this.suggestionWriting,suggestionUnavailableIds:Array.from(this.attemptedSuggestions),suggestions:this.suggestions.slice(),suggestionError:this.suggestionError,hubMode:this.hubMode,hubFavorite:this.hubFavorite,hubCreated:this.hubCreated,kind:'state',nativeVersion:this.version,session:this.store.profileSession,profileUrl:this.page,section:this.section,
       monthlyViews:i?.monthlyViews,displayName:i?.name || '',handle:i?.handle || '',avatarUrl:i?.avatar || '',coverUrl:i?.cover || '',business:i?.business,isOwn:i?.isOwn,about:i?.about || '',website:i?.website || '',
       followers:i?.followers !== undefined && i.followers !== null ? i.followers.toString() + PinmonyI18n.message("pm_followers_7c3af361") : '',following:i?.following !== undefined && i.following !== null ? i.following.toString() + PinmonyI18n.message("pm_following_52ff9a6f") : '',
       actions:actions,boards:f.boards.slice(),createdPins:f.pins.slice(),boardSort:i?.isOwn ? this.boardSort : '',boardSortBusy:this.sortBusy,boardSortPending:this.boardSortPending,boardSortError:this.sortError,
@@ -134,18 +142,39 @@ export class PinmonyProfileNativeReads {
       contentLoading:!f.ready && this.busy,contentLoadingMore:f.ready && f.busy,contentError:f.error,contentHasMore:!f.ended && !!f.cursor,
       unorganizedPins:(!this.hubMode || this.hubMode === 'boards') && this.section === 'saved' ? this.unorganized.pins.slice() : [],unorganizedLoading:this.section === 'saved' && this.unorganized.busy,
       unorganizedError:this.unorganized.error,unorganizedHasMore:!this.unorganized.ended && !!this.unorganized.cursor,unorganizedFeedback:previous?.unorganizedFeedback || '',organize:previous?.organize };
+    if(this.suggestionSelection) {
+      const selection: ProfileSuggestionSelection = this.suggestionSelection;
+      snapshot.unorganizedPins = selection.pins.slice(); snapshot.unorganizedLoading = selection.loading;
+      snapshot.unorganizedError = selection.error; snapshot.unorganizedHasMore = false;
+      snapshot.organize = {phase:'select',selectedIds:selection.selectedIds.slice(),boards:[],loading:selection.loading,busy:this.suggestionWriting,error:selection.uncertain ? selection.error : '',feedback:'',hasMore:false,uncertain:selection.uncertain};
+    } else if(previous?.suggestionTitle) snapshot.organize = undefined;
     this.store.profile = snapshot; this.store.profileUrl = this.page; this.store.profileNativeReadsReady = this.identityVerified && !!i && f.ready; this.store.profileLoading = !i && this.busy; this.store.profileError = this.infoError;
-    if(i && f.ready && !this.busy && !f.error)this.store.profileCache.put(snapshot,this.store.profileScrollOffset);
+    if(i && f.ready && !this.busy && !f.error && !this.suggestionSelection)this.store.profileCache.put(snapshot,this.store.profileScrollOffset);
+    if(this.pendingSortRead && !this.busy && !this.sortBusy && this.identityVerified && i?.isOwn && this.section === 'saved') {
+      this.pendingSortRead = false;
+      PinmonyRuntimeLog.info('ProfileSortTrace: phase=dequeued');
+      const queuedRevision: number = this.revision;
+      this.sortBoards('').then((): void => { if (queuedRevision === this.revision && this.owned()) this.loadBoardVisibility(); });
+    }
   }
-  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.busy || this.infoError || this.feed().error)return; if(!this.info || !this.feed().ready)await this.read(false,false); else if((!this.hubMode || this.hubMode === 'boards') && this.info?.isOwn && this.section === 'saved' && !this.unorganized.ready && !this.unorganized.error)await this.readUnorganized(false); }
+  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.suggestionSelection)return; if(this.busy || this.infoError || this.feed().error)return; if(!this.info || !this.feed().ready)await this.read(false,false); else if((!this.hubMode || this.hubMode === 'boards') && this.info?.isOwn && this.section === 'saved' && !this.unorganized.ready && !this.unorganized.error)await this.readUnorganized(false); }
   async sortBoards(value: string): Promise<void> {
-    if (!this.bind() || !this.identityVerified || !this.info?.isOwn || this.section !== 'saved' || this.busy || this.sortBusy) return;
+    if (!this.bind() || !this.identityVerified || !this.info?.isOwn || this.section !== 'saved') return;
+    if (this.busy || this.sortBusy) {
+      if (!value && !this.sortBusy) {
+        this.pendingSortRead = true;
+        PinmonyRuntimeLog.info('ProfileSortTrace: phase=queued reason=profile-busy');
+      }
+      return;
+    }
+    this.pendingSortRead = false;
     if (value && (!['alphabetical','last_pinned_to','custom'].includes(value) || !this.boardSort || !!this.sortError)) return;
     if (value && value === this.boardSort) return;
     const revision: number = this.revision, page: string = this.page, previous: string = this.boardSort || 'last_pinned_to';
     const live = (): boolean => revision === this.revision && this.owned() && this.page === page && this.info?.isOwn === true;
     this.busy = true; this.sortBusy = true; this.boardSortPending = value || this.boardSort || 'alphabetical'; this.sortError = ''; this.apply();
     let reload: boolean = false;
+    let failure: string = 'request-dispatch';
     try {
       const options: ProfileSortOptions = { url: value ? '/v3/users/me/metadata/' : '/v3/users/' + this.info.handle + '/metadata/', data: value ? {most_recent_board_sort_order:value,orbac_subject_id:''} : {} };
       const envelope: ProfileSortEnvelope = {options:options,context:{}}, source: string = page.slice(this.origin.length);
@@ -155,14 +184,43 @@ export class PinmonyProfileNativeReads {
       const reply = await this.ports.network().requestBusinessProfileSort(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.info.userId,this.info.viewerId,live);
       if (!live()) return;
       PinmonyRuntimeLog.info('ProfileSortTrace: phase=response write=' + (!!value).toString() + ' status=' + reply.status.toString() + ' transportError=' + (!!reply.error).toString());
-      if (reply.error || reply.status !== 200 || !reply.body || reply.body.length > 100000) throw new Error('sort-request');
-      const response: ProfileSortResponse = JSON.parse(reply.body) as ProfileSortResponse, r: ProfileSortResource | undefined = response.resource_response;
-      if (!r || r.status !== 'success' || r.code !== 0 || r.error || r.endpoint_name !== (value ? 'v3_user_metdata_set' : 'v3_user_metdata_get') || response.client_context?.user?.id && response.client_context.user.id !== this.info.viewerId) throw new Error('sort-response');
+      failure = 'transport';if (reply.error) throw new Error('sort-request');
+      failure = 'http-status';if (reply.status !== 200) throw new Error('sort-request');
+      failure = 'body-empty';if (!reply.body) throw new Error('sort-request');
+      failure = 'body-limit';if (reply.body.length > 100000) throw new Error('sort-request');
+      failure = 'json-parse';
+      const response: ProfileSortResponse = JSON.parse(reply.body) as ProfileSortResponse;
+      failure = 'response-shape';if (!response || typeof response !== 'object' || Array.isArray(response)) throw new Error('sort-response');
+      const r: ProfileSortResource | undefined = response.resource_response;
+      failure = 'resource-missing';if (!r || typeof r !== 'object' || Array.isArray(r)) throw new Error('sort-response');
+      PinmonyRuntimeLog.info('ProfileSortTrace: phase=validation write=' + (!!value).toString() +
+        ' statusOk=' + (r.status === 'success').toString() + ' codePresent=' + (r.code !== undefined).toString() +
+        ' codeZero=' + (r.code === 0).toString() + ' errorPresent=' + (!!r.error).toString() +
+        ' endpointPresent=' + (typeof r.endpoint_name === 'string' && r.endpoint_name.length > 0).toString() +
+        ' endpointMatch=' + (r.endpoint_name === (value ? 'v3_user_metdata_set' : 'v3_user_metdata_get')).toString() +
+        ' viewerPresent=' + (!!response.client_context?.user?.id).toString() +
+        ' viewerMatch=' + (!response.client_context?.user?.id || response.client_context.user.id === this.info.viewerId).toString() +
+        ' dataNull=' + (r.data === null).toString() + ' sortType=' + typeof r.data?.most_recent_board_sort_order);
+      failure = 'business-status';if (r.status !== 'success') throw new Error('sort-response');
+      failure = 'business-code';if (r.code !== 0) throw new Error('sort-response');
+      failure = 'business-error';if (r.error) throw new Error('sort-response');
+      failure = 'endpoint-mismatch';if (r.endpoint_name !== (value ? 'v3_user_metdata_set' : 'v3_user_metdata_get')) throw new Error('sort-response');
+      failure = 'viewer-mismatch';if (response.client_context?.user?.id && response.client_context.user.id !== this.info.viewerId) throw new Error('sort-response');
       const confirmed: string = value || r.data?.most_recent_board_sort_order || '';
-      if (!['alphabetical','last_pinned_to','custom'].includes(confirmed) || value && r.data !== null) throw new Error('sort-value');
-      reload = !this.boardSort || previous !== confirmed; this.boardSort = confirmed; this.store.profileCache.clear();
+      failure = 'sort-missing';if (!confirmed) throw new Error('sort-value');
+      failure = 'sort-unsupported';if (!['alphabetical','last_pinned_to','custom'].includes(confirmed)) throw new Error('sort-value');
+      failure = 'write-data-not-null';if (value && r.data !== null) throw new Error('sort-value');
+      PinmonyRuntimeLog.info('ProfileSortTrace: phase=validated write=' + (!!value).toString());
+      // Opening the options panel reads metadata without invalidating its visible feed.
+      reload = !!value && previous !== confirmed; this.boardSort = confirmed;
+      if(reload)this.store.profileCache.clear();
       if (reload) { this.hubFeeds.clear(); this.feed().ready = false;this.feed().cursor = '';this.feed().ended = false; this.saved.ready = false; this.saved.cursor = ''; this.saved.ended = false; this.saved.error = ''; }
-    } catch (_) { if (live()) this.sortError = value ? 'pm_profile_sort_save_error' : 'pm_profile_sort_load_error'; }
+    } catch (_) {
+      if (live()) {
+        PinmonyRuntimeLog.info('ProfileSortTrace: phase=rejected write=' + (!!value).toString() + ' reason=' + failure);
+        this.sortError = value ? 'pm_profile_sort_save_error' : 'pm_profile_sort_load_error';
+      }
+    }
     finally { if (revision === this.revision) { if (live() && reload) await this.read(false,false); if (revision === this.revision) { this.busy = false; this.sortBusy = false; this.boardSortPending = ''; this.requestId = ''; if (live()) this.apply(); this.ports.settled(); } } }
   }
   private uncertainMerges: Set<string> = new Set<string>();
@@ -273,7 +331,20 @@ export class PinmonyProfileNativeReads {
 
   async refresh(pull: boolean = false): Promise<void> { if(!this.bind())return; if(this.busy){this.refreshNeeded = true;this.store.profilePullRefreshing = this.store.profilePullRefreshing || pull;return;} this.hubFeeds.clear(); this.store.profileCache.clear(); this.version++; this.store.profilePullRefreshing = pull; this.store.profileActionsReady = false; this.store.profileSessionReady = false; await this.read(false,true); }
   async more(): Promise<void> { if(!this.bind() || !this.identityVerified || this.busy || this.feed().ended || !this.feed().cursor)return; await this.read(true,false); }
-  async unorganizedAction(action: string): Promise<boolean> { if(!['morePins','retryPins'].includes(action) || !this.bind() || !this.info?.isOwn)return false; if(this.busy)return true; await this.readUnorganized(action === 'morePins' && this.unorganized.ready && !!this.unorganized.cursor); return true; }
+  async unorganizedAction(action: string, value: string = ''): Promise<boolean> {
+    const selection: ProfileSuggestionSelection | undefined = this.suggestionSelection;
+    if(selection) {
+      if(!this.bind() || !this.info?.isOwn || this.suggestionSelection !== selection)return true;
+      if(this.suggestionWriting)return true;
+      if(action === 'close' || action === 'back') {this.revision++;if(this.requestId)this.ports.network().cancel(this.requestId);this.requestId = '';this.busy = false;this.suggestionSelection = undefined;this.apply();return true;}
+      if(selection.loading || selection.uncertain)return true;
+      if(action === 'retryPins') {await this.openSuggestion(selection.id);return true;}
+      if(action === 'toggle' && selection.pins.some((p: PinmonyCreatedPin): boolean => p.id === value))selection.selectedIds = selection.selectedIds.includes(value) ? selection.selectedIds.filter((id: string): boolean => id !== value) : selection.selectedIds.concat(value);
+      if(action === 'all')selection.selectedIds = selection.selectedIds.length === selection.pins.length ? [] : selection.pins.map((p: PinmonyCreatedPin): string => p.id);
+      if(action === 'next' && !selection.error && selection.selectedIds.length)await this.createSuggestion(selection.id);
+      this.apply();return true;
+    }
+ if(!['morePins','retryPins'].includes(action) || !this.bind() || !this.info?.isOwn)return false; if(this.busy)return true; await this.readUnorganized(action === 'morePins' && this.unorganized.ready && !!this.unorganized.cursor); return true; }
   installScript(): string {
     if(this.ports.visitor?.() || !this.owned() || !this.info || !this.identityVerified)return '';
     // pause/refresh advances the native version while retaining the visible snapshot.
@@ -339,12 +410,30 @@ export class PinmonyProfileNativeReads {
     if(!this.image(img?.url))return undefined;
     return {id:unorganized ? row.id : 'profile-api-native-' + row.id,targetUrl:this.origin + '/pin/' + row.id + '/',favorite:typeof row.favorited_by_me === 'boolean' ? row.favorited_by_me : undefined,title:this.clean(row.grid_title || (typeof row.title === 'string' ? row.title : '')),imageUrl:this.image(img?.url),imageWidth:img?.width || 0,imageHeight:img?.height || 0};
   }
+  private collageDraft(row: ProfileRow): PinmonyCreatedPin | undefined {
+    // The captured drawer response contains shuffle fields, without a Pin type or route.
+    if (!row || row.type !== undefined || typeof row.id !== 'string' || !/^\d{1,40}$/.test(row.id)) return undefined;
+    const img: ProfileImage | undefined = (row.images?.['736x'] || row.images?.['474x'] ||
+      row.images?.['236x'] || row.images?.['originals']) as ProfileImage | undefined;
+    const imageUrl: string = this.image(img?.url);
+    if (!imageUrl) return undefined;
+    return { id: 'profile-collage-draft-' + row.id, collageDraft: true, title: '', imageUrl: imageUrl,
+      imageWidth: img?.width || 0, imageHeight: img?.height || 0 };
+  }
   private board(row: ProfileRow): PinmonyBoard | undefined {
     if(!row || typeof row.id !== 'string' || row.id.length > 100)return undefined;
+    const coverAlternatives: string[] = [];
     let target: string = '', title: string = '', covers: string[] = [], count: number | null = null, updated: string = ''; const avatars: string[] = [];
     if(row.type === 'board') {
       if(!/^\d{1,40}$/.test(row.id))return undefined; target = this.target(row.url); title = this.clean(row.name); count = this.count(row.pin_count); updated = this.updated(row.board_order_modified_at);
       const imgs: ProfileImage[] = row.images?.['236x'] as ProfileImage[] || []; if(Array.isArray(imgs))covers = imgs.map((im: ProfileImage): string => this.image(im.url)).filter((v: string): boolean => !!v);
+      const generated: string = this.image(row.image_cover_url) || this.image(row.cover_images?.['200x150']?.url) || this.image(row.cover_images?.['236x']?.url);
+      if(generated && (row.has_custom_cover === true || row.cover_pin?.custom_cover === true || generated.includes('/custom_covers/'))) {
+        [generated,this.image(row.cover_images?.['200x150']?.url),this.image(row.cover_images?.['236x']?.url)].forEach((url: string): void => {if(url && !coverAlternatives.includes(url))coverAlternatives.push(url);});
+        const signature: string = typeof row.cover_pin?.image_signature === 'string' && /^[a-f0-9]{32}$/i.test(row.cover_pin.image_signature) ? row.cover_pin.image_signature : '';
+        const source: string = this.image(row.cover_pin?.image_url);
+        covers = [generated].concat(covers.filter((url: string): boolean => url !== generated && url !== source && (!signature || !url.includes('/'+signature+'.'))));
+      }
       if(!covers.length && this.image(row.image_cover_hd_url || row.image_cover_url))covers.push(this.image(row.image_cover_hd_url || row.image_cover_url));
       if(row.is_collaborative === true) {const seen: Set<string> = new Set<string>(); const users: ProfileUser[] = row.owner ? [row.owner] : []; users.concat(row.collaborating_users || []).slice(0,100).forEach((u: ProfileUser): void => {if(u && !seen.has(u.id) && avatars.length < 6) {seen.add(u.id); const avatar: string = this.image(u.image_small_url || u.image_medium_url); if(avatar)avatars.push(avatar);}});}
     } else if(row.type === 'story' && row.story_type === 'all_pins') {
@@ -358,7 +447,7 @@ export class PinmonyProfileNativeReads {
     const metadata: string = (count !== null ? count.toString() + PinmonyI18n.message("pm_pins_0a89904f") : '') +
       (sections !== null && Number.isInteger(sections) && sections > 0 ? (count !== null ? ' · ' : '') +
         (sections === 1 ? PinmonyI18n.message("pm_1_section_4d13c778") : sections.toString() + PinmonyI18n.message("pm_sections_68d526a8")) : '');
-    return {mergeable:row.type === 'board' && row.owner?.id === this.info?.viewerId && !!row.access?.includes('write') && !!row.access?.includes('delete'),sortable:row.type === 'board',secret:row.type === 'board' && row.privacy === 'secret',id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
+    return {mergeable:row.type === 'board' && row.owner?.id === this.info?.viewerId && !!row.access?.includes('write') && !!row.access?.includes('delete'),sortable:row.type === 'board',secret:row.type === 'board' && row.privacy === 'secret',protectedBoard:row.type === 'board' && row.privacy === 'protected',id:'profile-api-native-' + row.id,targetUrl:target,title:title,covers:covers.slice(0,3),coverAlternatives:coverAlternatives.length ? coverAlternatives : undefined,collaboratorAvatars:avatars,pinCount:metadata,updated:updated};
   }
   private async request(resource: string, options: ProfileOptions, source: string, revision: number): Promise<ProfileResponse> {
     const id: string = 'native_profile_' + (++this.sequence).toString(); this.requestId = id;
@@ -385,10 +474,12 @@ export class PinmonyProfileNativeReads {
         this.info = {cover:u.profile_cover?.source === 'image' ? this.image(u.profile_cover.images?.['1200x']?.url || u.profile_cover.images?.['750x']?.url || u.profile_cover.images?.['736x']?.url || u.profile_cover.images?.['originals']?.url) : '',contact:u.should_show_messaging === true,monthlyViews:this.count(u.profile_reach) ?? undefined,name:this.clean(u.full_name,160),handle:this.clean(u.username,100),avatar:this.image(u.image_large_url || u.image_medium_url || u.image_small_url),followers:this.count(u.follower_count),following:this.count(u.following_count),userId:u.id,viewerId:viewer,isOwn:viewer === u.id,followingUser:typeof u.explicitly_followed_by_me === 'boolean' ? u.explicitly_followed_by_me : null,blocked:u.blocked_by_me === true,business:u.is_partner === true,about:this.clean(u.about,2000),website:this.clean(u.website_url,2000),pinCount:this.count(u.pin_count),lastPinSaveTime:this.clean(u.last_pin_save_time,100)}; this.identityVerified = true; this.version++; readingUser = false; this.apply();
       }
       const info: ProfileInfo | undefined = this.info; if(!info || !this.identityVerified)throw new Error('profile-owner');
+      if(!append)f.sort = this.boardSort;
+      const sort: string = f.sort;
       // Sorted boards exclude the all-Pins story. A full refresh must fetch its
       // current presence and cover instead of retaining the previous snapshot.
       let refreshedStories: PinmonyBoard[] | undefined = undefined;
-      if (!this.hubMode && refresh && !append && section === 'saved' && info.isOwn && this.boardSort) {
+      if (!this.hubMode && refresh && !append && section === 'saved' && info.isOwn && sort) {
         const feed: ProfileResponse = await this.request('BoardsFeedResource',{field_set_key:'profile_grid_item',filter_stories:false,sort:'last_pinned_to',username:info.handle},path,revision);
         if (!live()) return;
         const rows: ProfileRow[] = feed.resource_response.data as ProfileRow[];
@@ -397,14 +488,14 @@ export class PinmonyProfileNativeReads {
         rows.forEach((row: ProfileRow): void => { if (row.type === 'story' && row.story_type === 'all_pins') { const story: PinmonyBoard | undefined = this.board(row); if (story) refreshedStories!.push(story); } });
       }
       if(this.hubMode) { await this.readHub(append,revision); if(this.hubMode === 'boards' && revision === this.revision && this.owned() && !append && (refresh || !this.unorganized.ready && !this.unorganized.error))await this.readUnorganized(false,true); return; }
-      const options: ProfileOptions = section === 'saved' ? {field_set_key:'profile_grid_item',filter_stories:false,sort:info.isOwn && this.boardSort ? this.boardSort : 'last_pinned_to',username:info.handle} : {field_set_key:'profile_created_grid_item',exclude_add_pin_rep:true,is_own_profile_pins:info.isOwn,user_id:info.userId,username:info.handle}; if(append)options.bookmarks = [previous];
-      if (section === 'saved' && info.isOwn && this.boardSort) {
+      const options: ProfileOptions = section === 'saved' ? {field_set_key:'profile_grid_item',filter_stories:false,sort:info.isOwn && sort ? sort : 'last_pinned_to',username:info.handle} : {field_set_key:'profile_created_grid_item',exclude_add_pin_rep:true,is_own_profile_pins:info.isOwn,user_id:info.userId,username:info.handle}; if(append)options.bookmarks = [previous];
+      if (section === 'saved' && info.isOwn && sort) {
         options.privacy_filter = 'all'; options.page_size = 25; options.group_by = 'mix_public_private';
         options.include_archived = false; options.filter_all_pins = true; options.add_fields = 'board.{meal_plan}';
       }
-      const body: ProfileResponse = await this.request(section === 'saved' ? (info.isOwn && this.boardSort ? 'BoardsResource' : 'BoardsFeedResource') : 'UserActivityPinsResource',options,path + (section === 'created' ? '_created/' : ''),revision); if(!live())return;
+      const body: ProfileResponse = await this.request(section === 'saved' ? (info.isOwn && sort ? 'BoardsResource' : 'BoardsFeedResource') : 'UserActivityPinsResource',options,path + (section === 'created' ? '_created/' : ''),revision); if(!live())return;
       const rows: ProfileRow[] = body.resource_response.data as ProfileRow[]; if(!Array.isArray(rows) || rows.length > 500)throw new Error('profile-feed');
-      const boards: PinmonyBoard[] = append ? f.boards.slice() : (refreshedStories !== undefined ? refreshedStories : section === 'saved' && info.isOwn && this.boardSort ? f.boards.filter((b: PinmonyBoard): boolean => b.targetUrl === this.page + 'pins/') : []), pins: PinmonyCreatedPin[] = append ? f.pins.slice() : []; let supported: number = 0;
+      const boards: PinmonyBoard[] = append ? f.boards.slice() : (refreshedStories !== undefined ? refreshedStories : section === 'saved' && info.isOwn && sort ? f.boards.filter((b: PinmonyBoard): boolean => b.targetUrl === this.page + 'pins/') : []), pins: PinmonyCreatedPin[] = append ? f.pins.slice() : []; let supported: number = 0;
       rows.forEach((r: ProfileRow): void => {if(section === 'saved') {const b: PinmonyBoard | undefined = this.board(r); if(b) {supported++; if(!boards.some((v: PinmonyBoard): boolean => v.id === b.id))boards.push(b);} else if(r?.type === 'story' && r.story_type === 'all_pins' && this.info?.pinCount === 0 && !r.objects?.length)supported++;} else {const p: PinmonyCreatedPin | undefined = this.pin(r); if(p) {supported++; if(!pins.some((v: PinmonyCreatedPin): boolean => v.id === p.id))pins.push(p);}}});
       if(rows.length && !supported)throw new Error('unsupported-feed'); const cursor: string = this.cursor(body);
       this.version++; f.boards = boards.slice(0,2000); f.pins = pins.slice(0,2000); f.cursor = cursor; f.ended = !cursor || cursor === '-end-' || cursor === previous || !rows.length; f.ready = true; if(boards.length >= 2000 || pins.length >= 2000)f.ended = true;
@@ -413,10 +504,45 @@ export class PinmonyProfileNativeReads {
     } catch (_) { if(live()) {if(readingUser)this.infoError = PinmonyI18n.message("pm_unable_to_load_profile_please_retry_6dbb335a"); else f.error = PinmonyI18n.message("pm_unable_to_load_content_please_retry_95306b92");} }
     finally { if(revision === this.revision){this.busy = false; f.busy = false; this.requestId = ''; if(live())this.apply(); this.ports.settled(); if(this.refreshNeeded && live()){this.refreshNeeded = false; this.refresh();}} }
   }
+  private async openSuggestion(id: string): Promise<void> {
+    if(!this.bind() || !this.identityVerified || !this.info?.isOwn || this.busy || this.hubMode !== 'pins' || this.hubFavorite || this.hubCreated || this.attemptedSuggestions.has(id))return;
+    const cluster: PinmonyBoard | undefined = this.suggestions.find((b: PinmonyBoard): boolean => b.id === id);
+    if(!cluster)return;
+    const selection: ProfileSuggestionSelection = new ProfileSuggestionSelection();selection.id = id;selection.title = cluster.title;selection.loading = true;
+    this.suggestionSelection = selection;this.busy = true;this.apply();
+    const revision: number = this.revision;
+    const live = (): boolean => revision === this.revision && this.owned() && this.suggestionSelection === selection;
+    try {
+      let cursor: string = '';const seen: Set<string> = new Set<string>();
+      for(let page: number = 0;page < 80;page++) {
+        const options: ProfileOptions = {url:'/v3/users/profile/pins/cluster/' + id + '/feed/',data:{fields:['pin.id','pin.images[170x,136x136,236x,474x,736x,orig]']}};
+        if(cursor)options.bookmarks = [cursor];
+        const body: ProfileResponse = await this.request('ApiResource',options,this.page.slice(this.origin.length),revision);
+        if(!live())return;
+        const rows: ProfileRow[] = body.resource_response.data as ProfileRow[];
+        if(body.resource_response.endpoint_name !== 'v3_get_user_profile_pins_cluster_feed' || !Array.isArray(rows) || rows.length > 500)throw new Error('cluster-feed');
+        for(const row of rows) {
+          if(row.type !== undefined && row.type !== 'pin')throw new Error('cluster-pin-type');
+          const pin: PinmonyCreatedPin | undefined = this.pin({id:row.id,type:'pin',images:row.images});
+          if(!pin)throw new Error('cluster-pin');pin.id = row.id;
+          if(!selection.pins.some((p: PinmonyCreatedPin): boolean => p.id === pin.id))selection.pins.push(pin);
+        }
+        if(selection.pins.length > 2000)throw new Error('cluster-limit');
+        const next: string = this.cursor(body);
+        if(!next || next === '-end-') {selection.selectedIds = selection.pins.map((p: PinmonyCreatedPin): string => p.id);return;}
+        if(!rows.length || seen.has(next))throw new Error('cluster-pagination');seen.add(next);cursor = next;
+      }
+      throw new Error('cluster-limit');
+    } catch (_) {if(live()){selection.pins = [];selection.selectedIds = [];selection.error = PinmonyI18n.message('pm_unable_to_load_content_please_retry_95306b92');}}
+    finally {if(live()){selection.loading = false;this.busy = false;this.requestId = '';this.apply();this.ports.settled();}}
+  }
   private async createSuggestion(id: string): Promise<void> {
     if(!this.bind() || !this.identityVerified || !this.info?.isOwn || this.busy || this.hubMode !== 'pins' || this.hubFavorite || this.hubCreated || this.attemptedSuggestions.has(id))return;
     const cluster: PinmonyBoard | undefined = this.suggestions.find((b: PinmonyBoard): boolean => b.id === id);
     if(!cluster)return;
+    const selection: ProfileSuggestionSelection | undefined = this.suggestionSelection;
+    if(!selection || selection.id !== id || selection.loading || selection.error || !selection.selectedIds.length)return;
+    const deselected: string[] = selection.pins.filter((p: PinmonyCreatedPin): boolean => !selection.selectedIds.includes(p.id)).map((p: PinmonyCreatedPin): string => p.id);
     const revision: number = this.revision; this.suggestionWriting = true; this.busy = true; this.hubFeed.busy = true; this.hubFeed.error = ''; this.attemptedSuggestions.add(id); this.apply();
     const live = (): boolean => this.owned() && revision === this.revision && this.info?.isOwn === true;
     try {
@@ -425,7 +551,7 @@ export class PinmonyProfileNativeReads {
       const send = async (resource: string, payload: string): Promise<ProfileResponse> => {
         const job: PinmonyNetworkJob = {id:'native_profile_suggestion_' + (++this.sequence),epoch:this.generation,page:this.page,url:this.origin + '/resource/' + resource + '/',method:'POST',body:'source_url=' + encodeURIComponent(this.page.slice(this.origin.length)) + '&data=' + encodeURIComponent(payload),headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':'www/index.js'}};
         this.requestId = job.id;
-        const reply = await this.ports.network().requestBusinessProfileSuggestion(job,(): PinmonyBusinessSessionContext => this.ports.session(),id,cluster.title,(): boolean => live());
+        const reply = await this.ports.network().requestBusinessProfileSuggestion(job,(): PinmonyBusinessSessionContext => this.ports.session(),id,cluster.title,(): boolean => live(),selection.pins.map((p: PinmonyCreatedPin): string => p.id));
         if(!live() || reply.error || reply.status !== 200)throw new Error('suggestion-request');
         const result: ProfileResponse = JSON.parse(reply.body) as ProfileResponse;
         if(result.resource_response?.status !== 'success' || result.resource_response.code !== 0 || result.resource_response.error)throw new Error('suggestion-response');
@@ -434,11 +560,11 @@ export class PinmonyProfileNativeReads {
       const created: ProfileResponse = await send('BoardResource/create',create);
       const board: ProfileRow = created.resource_response.data as ProfileRow;
       if(created.resource_response.endpoint_name !== 'v3_create_board' || board.type !== 'board' || !/^\d{1,40}$/.test(board.id) || board.name !== cluster.title || board.owner?.id !== this.info.userId || !board.access?.includes('write'))throw new Error('suggestion-board');
-      const moveEnvelope: ProfileSuggestionEnvelope = {options:{url:'/v3/pins/cluster/' + id + '/bulk/move/',data:{board_id:board.id,deselected_pin_ids:[]}},context:{}};
+      const moveEnvelope: ProfileSuggestionEnvelope = {options:{url:'/v3/pins/cluster/' + id + '/bulk/move/',data:{board_id:board.id,deselected_pin_ids:deselected}},context:{}};
       const moved: ProfileResponse = await send('ApiResource/update',JSON.stringify(moveEnvelope));
       if(moved.resource_response.endpoint_name !== 'v3_move_cluster_pins' || moved.resource_response.data !== null)throw new Error('suggestion-move');
-      if(live()) {this.hubFeeds.clear();this.suggestions = this.suggestions.filter((b: PinmonyBoard): boolean => b.id !== id);this.saved.ready = false;this.hubFeed.ready = false;}
-    } catch (_) {if(live())this.hubFeed.error = PinmonyI18n.message('pm_profile_suggestion_unconfirmed');}
+      if(live()) {this.suggestionSelection = undefined;this.hubFeeds.clear();this.suggestions = this.suggestions.filter((b: PinmonyBoard): boolean => b.id !== id);this.saved.ready = false;this.hubFeed.ready = false;}
+    } catch (_) {if(live()){selection.uncertain = true;selection.error = PinmonyI18n.message('pm_profile_suggestion_unconfirmed');this.hubFeed.error = selection.error;}}
     finally {if(revision === this.revision)this.suggestionWriting = false;if(live()){this.busy = false;this.hubFeed.busy = false;this.requestId = '';this.apply();if(!this.hubFeed.error)await this.read(false,false);}}
   }
   private async readHub(append: boolean, revision: number): Promise<void> {
@@ -449,8 +575,8 @@ export class PinmonyProfileNativeReads {
     let source: string = this.page.slice(this.origin.length);
     if(boardMode) {
       resource = 'BoardsResource';
-      options = mode === 'boards' ? {field_set_key:'profile_grid_item',filter_stories:false,sort:this.boardSort || 'last_pinned_to',username:info.handle,privacy_filter:'all',page_size:25,group_by:'mix_public_private',include_archived:false,filter_all_pins:true,add_fields:'board.{meal_plan}'} :
-        {boardOrder:this.boardSort || 'last_pinned_to',filterStories:false,isOwnProfile:true,isRetrievalHub:true,isViewerProfile:true,mixPublicSecret:true,sort:this.boardSort || 'last_pinned_to',field_set_key:'profile_grid_item',filter_types:mode === 'groups' ? 2 : 3,privacyFilter:'all',add_fields:'board.{meal_plan}',username:info.handle};
+      options = mode === 'boards' ? {field_set_key:'profile_grid_item',filter_stories:false,sort:f.sort || 'last_pinned_to',username:info.handle,privacy_filter:'all',page_size:25,group_by:'mix_public_private',include_archived:false,filter_all_pins:true,add_fields:'board.{meal_plan}'} :
+        {boardOrder:f.sort || 'last_pinned_to',filterStories:false,isOwnProfile:true,isRetrievalHub:true,isViewerProfile:true,mixPublicSecret:true,sort:f.sort || 'last_pinned_to',field_set_key:'profile_grid_item',filter_types:mode === 'groups' ? 2 : 3,privacyFilter:'all',add_fields:'board.{meal_plan}',username:info.handle};
     } else if(['collages','drafts'].includes(mode))options = {url:'/v3/users/me/shuffles/',data:{is_draft:mode === 'drafts',transform_to_pins:mode !== 'drafts',fields:mode === 'drafts' ? ['shuffle.id','shuffle.images','shuffle.updated_at'] : ['pin.access','pin.type','pin.id','pin.images','pin.description','pin.pinner','pin.shuffle()']}};
     if(mode === 'pins' && !this.hubFavorite && !this.hubCreated && !append) {
       this.suggestions = []; this.suggestionError = '';
@@ -477,7 +603,7 @@ export class PinmonyProfileNativeReads {
     const boards: PinmonyBoard[] = append ? f.boards.slice() : [], pins: PinmonyCreatedPin[] = append ? f.pins.slice() : [];
     for(const row of rows) {
       if(boardMode){const b: PinmonyBoard | undefined = this.board(row);if(!b)throw new Error('hub-board');if(!boards.some((v: PinmonyBoard): boolean => v.id === b.id))boards.push(b);}
-      else {const p: PinmonyCreatedPin | undefined = this.pin(row);if(this.hubFavorite && p)p.favorite = true;if(!p)throw new Error('hub-pin');if(!pins.some((v: PinmonyCreatedPin): boolean => v.id === p.id))pins.push(p);}
+      else {const p: PinmonyCreatedPin | undefined = mode === 'drafts' ? this.collageDraft(row) : this.pin(row);if(this.hubFavorite && p)p.favorite = true;if(!p)throw new Error(mode === 'drafts' ? 'hub-draft' : 'hub-pin');if(!pins.some((v: PinmonyCreatedPin): boolean => v.id === p.id))pins.push(p);}
     }
     const cursor: string = this.cursor(body); f.boards = boards.slice(0,2000); f.pins = pins.slice(0,2000); f.cursor = cursor;
     f.ended = !cursor || cursor === '-end-' || cursor === previous || !rows.length || boards.length >= 2000 || pins.length >= 2000; f.ready = true; this.version++;

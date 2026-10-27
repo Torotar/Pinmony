@@ -1,7 +1,7 @@
 import { StartupTask, common } from '@kit.AbilityKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { ConfigurationConstant } from '@kit.AbilityKit';
-import { PinmonyI18n, PinmonyPublishAnchor } from 'common_foundation';
+import { PinmonyI18n, PinmonyPublishAnchor, PinmonyProfileLayoutPreference } from 'common_foundation';
 import { PinmonySessionHistory } from 'common_session';
 
 @Sendable
@@ -14,6 +14,7 @@ export default class PreferencesTask extends StartupTask {
       ' effective=' + (AppStorage.get<string>('pinmonyLanguage') || 'unknown'));
     PersistentStorage.persistProp('themePreference', 'system');
     PersistentStorage.persistProp('profileLegacyLayout', false);
+    PinmonyProfileLayoutPreference.initialize(context);
     PinmonyPublishAnchor.initialize(context);
     PersistentStorage.persistProp('immersiveLightEnabled', true);
     PersistentStorage.persistProp('immersiveLightMode', AppStorage.get<boolean>('immersiveLightEnabled') === false ? 'off' : 'immersive');

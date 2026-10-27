@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyBoardRecoveryPage } from './PinmonyBoardRecoveryPage';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -162,8 +163,7 @@ export struct PinmonySettingsPage {
         }
         if (this.store.error) {
           ListItem() {
-            Text(PinmonyI18n.render(this.store.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-              .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+            PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage) })
           }
         }
         if (!this.store.loading) { ForEach(this.options, (id: string) => {

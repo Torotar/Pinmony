@@ -11,7 +11,7 @@ const board=id=>({type:'board',id:String(id),name:'Board '+id,url:'/sample/board
 const body=(data,bookmark='-end-',extra={})=>JSON.stringify({resource_response:{status:'success',code:0,data,bookmark},...extra});
 const userBody=(extra={})=>body(user,'',{client_context:{user:{id:'42'}},...extra});
 const flush=()=>new Promise(r=>setImmediate(r));
-function checkedBody(payload,job){let result;try{result=JSON.parse(payload)}catch{return payload}let r=result.resource_response;if(!r||r.endpoint_name)return payload;let o;try{o=JSON.parse(new URL(job.url).searchParams.get('data')).options}catch{return payload}let endpoint='';if(job.url.includes('UserActivityPinsResource'))endpoint='v3_get_bizpro_feed';if(job.url.includes('BoardsResource'))endpoint=o.filter_types?'v3_get_user_filtered_board_feed':'v3_user_profile_boards_feed';if(o.url==='/v3/users/profile/pins/clusters/')endpoint='v3_get_user_profile_pin_clusters';if(o.url==='/v3/users/me/shuffles/')endpoint='v3_get_user_collage_drawer_homefeed_pins';if(o.url==='/v3/users/me/filtered/pins/')endpoint='v3_get_user_filtered_pins_handler';if(endpoint)r.endpoint_name=endpoint;return JSON.stringify(result);}
+function checkedBody(payload,job){let result;try{result=JSON.parse(payload)}catch{return payload}let r=result.resource_response;if(!r||r.endpoint_name)return payload;let o;try{o=JSON.parse(new URL(job.url).searchParams.get('data')).options}catch{return payload}let endpoint='';if(job.url.includes('UserActivityPinsResource'))endpoint='v3_get_bizpro_feed';if(job.url.includes('BoardsResource'))endpoint=o.filter_types?'v3_get_user_filtered_board_feed':'v3_user_profile_boards_feed';if(/^\/v3\/users\/profile\/pins\/cluster\/.+\/feed\/$/.test(o.url))endpoint='v3_get_user_profile_pins_cluster_feed';if(o.url==='/v3/users/profile/pins/clusters/')endpoint='v3_get_user_profile_pin_clusters';if(o.url==='/v3/users/me/shuffles/')endpoint='v3_get_user_collage_drawer_homefeed_pins';if(o.url==='/v3/users/me/filtered/pins/')endpoint='v3_get_user_filtered_pins_handler';if(endpoint)r.endpoint_name=endpoint;return JSON.stringify(result);}
 function fixture(){let session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'},target=page,active=true,selected=true,document=origin+'/',epoch=7;
 const store={profileSession:0,profileActionsReady:false,profileSessionReady:false,profileScrollOffset:0,profileCache:new Cache(),origins:[]},requests=[],cancelled=[],addresses=[];
 const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({requestBusinessProfileSuggestion:(job,session,cluster,name,owns)=>new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:checkedBody(payload,job),status,error})})),cancel:id=>cancelled.push(id),requestBusinessProfileSort:(job,s,id,viewer,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:checkedBody(payload,job),status,error})}));},requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:checkedBody(payload,job),status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
@@ -39,29 +39,49 @@ async function main(){
 
  const w=fixture();await first(w);let wi=w.requests.length;
  let wp=w.reader.select('hub:pins:0:0');w.requests[wi++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_test',type:'pincluster',names:['Suggested'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await flush();w.requests[wi++].resolve(body([pin(1)]));await wp;
- wp=w.reader.select('hub-create:cluster_test');const createJob=w.requests[wi].job;assert.equal(endpoint(createJob),'/resource/BoardResource/create/');
+ wp=w.reader.select('hub-create:cluster_test');const clusterJob=w.requests[wi].job;
+ assert.equal(clusterJob.method,'GET');assert.equal(w.store.profile.organize.loading,true);
+ w.requests[wi++].resolve(body([{id:'1',images:pin(1).images}],'cluster-page2'));await flush();assert.deepEqual(options(w.requests[wi].job).bookmarks,['cluster-page2']);
+ w.requests[wi++].resolve(body([{id:'2',images:pin(2).images}]));await wp;assert.equal(w.store.profile.organize.selectedIds.join(','),'1,2');
+ await w.reader.unorganizedAction('all');assert.equal(w.store.profile.organize.selectedIds.length,0);
+ await w.reader.unorganizedAction('next');assert.equal(w.requests.length,wi,'zero selection does not create');
+ await w.reader.unorganizedAction('all');await w.reader.unorganizedAction('toggle','2');
+ wp=w.reader.unorganizedAction('next');const createJob=w.requests[wi].job;assert.equal(endpoint(createJob),'/resource/BoardResource/create/');
  await w.reader.select('hub-create:cluster_test');assert.equal(w.requests.length,wi+1,'no duplicate creation');
  w.requests[wi++].resolve(body({...board(9),name:'Suggested',access:['write','delete']},'',{resource_response:{status:'success',code:0,endpoint_name:'v3_create_board',data:{...board(9),name:'Suggested',access:['write','delete']}}}));await flush();
  const moveJob=w.requests[wi].job;assert.equal(endpoint(moveJob),'/resource/ApiResource/update/');assert.equal(JSON.parse(new URLSearchParams(moveJob.body).get('data')).options.data.board_id,'9');
- w.requests[wi++].resolve('{}');await wp;assert(w.store.profile.contentError,'unknown move must not report success');
+ w.requests[wi++].resolve('{}');await wp;assert(w.store.profile.organize.uncertain,'unknown move must not report success');assert.equal(JSON.parse(new URLSearchParams(moveJob.body).get('data')).options.data.deselected_pin_ids.join(','),'2');
  await w.reader.select('hub-create:cluster_test');assert.equal(w.requests.length,wi,'no replay after partial write');
 
  const success=fixture();await first(success);let si=success.requests.length;
  let sp=success.reader.select('hub:pins:0:0');success.requests[si++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_ok',type:'pincluster',names:['Suggested'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await flush();success.requests[si++].resolve(body([pin(1)]));await sp;
- sp=success.reader.select('hub-create:cluster_ok');success.requests[si++].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_create_board',data:{...board(9),name:'Suggested',access:['write']}}}));await flush();
+ sp=success.reader.select('hub-create:cluster_ok');const abandoned=success.requests[si++];await success.reader.unorganizedAction('close');abandoned.resolve(body([pin(99)]));await sp;assert(!success.store.profile.organize,'late feed cannot reopen selection');sp=success.reader.select('hub-create:cluster_ok');success.requests[si++].resolve(body([pin(1),pin(2)]));await sp;await success.reader.unorganizedAction('close');assert(!success.store.profile.organize);sp=success.reader.select('hub-create:cluster_ok');success.requests[si++].resolve(body([pin(1),pin(2)]));await sp;sp=success.reader.unorganizedAction('next');success.requests[si++].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_create_board',data:{...board(9),name:'Suggested',access:['write']}}}));await flush();
  success.requests[si++].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_move_cluster_pins',data:null}}));await flush();
  assert.equal(options(success.requests[si].job).url,'/v3/users/profile/pins/clusters/');success.requests[si++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[]}));await flush();success.requests[si++].resolve(body([]));await sp;assert.equal(success.store.profile.contentError,'');assert.equal(success.store.profile.suggestions.length,0);assert(!success.store.profile.suggestionWriting);
  const bad=success.reader.select('hub:pins:1:0');success.requests[si++].resolve(body([pin(3)],'',{resource_response:{status:'success',code:0,endpoint_name:'wrong_endpoint',data:[pin(3)]}}));await bad;assert(success.store.profile.contentError);assert.equal(success.store.profile.createdPins.length,0);
  const net=new Network();let calls=0;net.request=async(job,current)=>{const ok=current().authenticated;if(ok)calls++;return {error:ok?'':'rejected'};};const session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'};
- for(const job of [allJob,secretJob,combinedJob,createdJob,draftJob])assert.equal((await net.requestBusinessProfileRead(job,()=>session,page,'42',()=>true,'42')).error,'');assert.equal(calls,5);
+ for(const job of [allJob,secretJob,combinedJob,createdJob,draftJob])assert.equal((await net.requestBusinessProfileRead(job,()=>session,page,'42',()=>true,'42')).error,'');assert.equal(calls,5);assert.equal((await net.requestBusinessProfileRead(clusterJob,()=>session,page,'42',()=>true,'42')).error,'');assert((await net.requestBusinessProfileRead(clusterJob,()=>session,page,'42',()=>true,'43',true)).error);
  const changed={...allJob,url:allJob.url.replace(encodeURIComponent('/v3/users/me/filtered/pins/'),encodeURIComponent('/v3/users/other/pins/'))};assert((await net.requestBusinessProfileRead(changed,()=>session,page,'42',()=>true,'42')).error);
  assert((await net.requestBusinessProfileRead(allJob,()=>session,page,'42',()=>true,'43',true)).error);
  assert((await net.requestBusinessProfileRead(secretJob,()=>session,page,'42',()=>false,'42')).error);
  const writeSession={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'};
  assert.equal((await net.requestBusinessProfileSuggestion(createJob,()=>writeSession,'cluster_test','Suggested',()=>true)).error,'');
- assert.equal((await net.requestBusinessProfileSuggestion(moveJob,()=>writeSession,'cluster_test','Suggested',()=>true)).error,'');
+ assert.equal((await net.requestBusinessProfileSuggestion(moveJob,()=>writeSession,'cluster_test','Suggested',()=>true,['1','2'])).error,'');
  assert((await net.requestBusinessProfileSuggestion(moveJob,()=>writeSession,'other_cluster','Suggested',()=>true)).error);
  assert((await net.requestBusinessProfileSuggestion(createJob,()=>writeSession,'cluster_test','Wrong name',()=>true)).error);
- console.log('Profile hub: all Pins, favorites, combined filters, private/group boards, collage, legacy restore, stale isolation and transport guards passed');
+ assert((await net.requestBusinessProfileSuggestion(moveJob,()=>writeSession,'cluster_test','Suggested',()=>true,['1'])).error);
+ const drafts=fixture();await first(drafts);let di=drafts.requests.length;
+ const draft={id:'501',images:{'736x':{url:avatar,width:736,height:920}},updated_at:'2026-10-26T12:00:00Z'};
+ let dp=drafts.reader.select('hub:drafts:0:0');drafts.requests[di++].resolve(body([draft,draft]));await dp;
+ assert.equal(drafts.store.profile.contentError,'');assert.equal(drafts.store.profile.createdPins.length,1);
+ const card=drafts.store.profile.createdPins[0];assert.equal(card.collageDraft,true);assert.equal(card.id,'profile-collage-draft-501');assert.equal(card.imageUrl,avatar);assert.equal(card.targetUrl,undefined,'shuffle ids never become Pin routes');
+ dp=drafts.reader.select('hub:collages:0:0');drafts.requests[di++].resolve(body([pin(501)]));await dp;
+ assert.equal(drafts.store.profile.createdPins[0].id,'profile-api-native-501');assert(!drafts.store.profile.createdPins[0].collageDraft);
+ await drafts.reader.select('hub:drafts:0:0');assert.equal(drafts.requests.length,di,'draft cache is independent from published collage cache');assert.equal(drafts.store.profile.createdPins[0].collageDraft,true);
+ for(const invalid of [{...draft,id:'../pin/501'}, {...draft,images:{'736x':{url:'https://example.com/draft.png'}}},pin(501)])assert.equal(drafts.reader.collageDraft(invalid),undefined);
+ dp=drafts.reader.refresh();drafts.requests[di++].resolve(userBody());await flush();drafts.requests[di++].resolve(body([{...draft,images:{}}]));await dp;assert(drafts.store.profile.contentError,'malformed drafts remain a failure, not empty success');
+ const profileUi=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
+ assert.equal((profileUi.match(/!pin.collageDraft && this.interactionReady && this.onPin/g)||[]).length,2,'both image and title decline unimplemented draft clicks');
+ console.log('Profile hub: nonempty shuffle drafts, independent cache, malformed data, no Pin route, published collages, legacy restore, stale isolation and transport guards passed');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

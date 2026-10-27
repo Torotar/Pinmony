@@ -9,6 +9,7 @@ import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyAuthStatus, PinmonyBusinessSessionContext } from 'common_session';
 import { allowsSpeculativeReads } from 'common_foundation';
 import { PinmonyDetailSnapshot } from 'feature_pin';
+import { PinmonyDetailPrefetch } from 'feature_pin';
 import { PIN_DETAIL_API_ENABLED } from 'feature_pin';
 import { PinmonyHomePin, PinmonyHomeSnapshot } from 'feature_home';
 interface PinmonyDetailReadData { options: PinmonyDetailReadOptions; }
@@ -40,6 +41,38 @@ export interface PinmonyDetailOpeningCoordinatorPorts {
   pinStore: () => PinmonyPinStore;
 }
 export class PinmonyDetailOpeningCoordinator {
+  private shufflePreviewScope: string = '';
+  private readonly shufflePrefetch: PinmonyDetailPrefetch = new PinmonyDetailPrefetch('detail_prefetch_shuffle_');
+  pauseShufflePreviews(): void { this.shufflePrefetch.clear(); }
+  prefetchShufflePins(urls: string[], scope: string, visible: () => boolean,
+    ready: (detail: PinmonyDetailSnapshot) => void): void {
+    const captured: PinmonyBusinessSessionContext = this.ports.nativeBusinessSessionContext();
+    const nextScope: string = scope + captured.origin + captured.accountId + captured.generation.toString();
+    if (nextScope !== this.shufflePreviewScope) { this.shufflePrefetch.clear(); this.shufflePreviewScope = nextScope; }
+    const current = (): boolean => {
+      const now: PinmonyBusinessSessionContext = this.ports.nativeBusinessSessionContext();
+      return captured.authenticated && now.authenticated && now.generation === captured.generation &&
+        now.accountId === captured.accountId && this.pinStore.videoForeground && visible();
+    };
+    this.shufflePrefetch.onReady = (detail: PinmonyDetailSnapshot): void => { if (current()) ready(detail); };
+    urls.forEach((url: string) => {
+      const cached: PinmonyDetailSnapshot | undefined = this.shufflePrefetch.get(url);
+      if (cached && current()) ready(cached);
+    });
+    this.shufflePrefetch.offer(urls, scope + ':' + captured.generation.toString(),
+      async (url: string, id: string, ownerCurrent: () => boolean): Promise<string> => {
+        if (!ownerCurrent()) throw new Error('stale-shuffle-preview');
+        const pinId: string = (JSON.parse(decodeURIComponent(url.match(/[?&]data=([^&]+)/)![1])) as PinmonyDetailReadData).options.id;
+        const pin: string = captured.origin + '/pin/' + pinId + '/';
+        const job: PinmonyNetworkJob = {id:id,epoch:captured.generation,page:pin,url:url,method:'GET',body:'',
+          headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':'www/pin/[id].js'}};
+        const reply: PinmonyNetworkReply = await this.ports.detailReadNetwork().requestBusinessPinRead(job,
+          (): PinmonyBusinessSessionContext => this.ports.nativeBusinessSessionContext(), pin, ownerCurrent,
+          (): PinmonyNetworkContext => this.ports.nativeNetworkContext());
+        if (!ownerCurrent() || reply.error || reply.status !== 200) throw new Error('shuffle-preview-unavailable');
+        return reply.body;
+      }, current, (id: string) => this.ports.detailReadNetwork().cancel(id));
+  }
   private readonly homeStore: PinmonyHomeStore;
   private readonly pinStore: PinmonyPinStore;
   private readonly ports: PinmonyDetailOpeningCoordinatorPorts;

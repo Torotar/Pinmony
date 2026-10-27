@@ -1,8 +1,9 @@
+import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier, ComponentContent } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, HdsSnackBar, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyAiTopic, PinmonyRecentActivity } from '../models/PinmonyAccountSettings';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -58,7 +59,7 @@ export struct PinmonyRecommendationSettingsPage {
         this.dismissErrorSnack();
         this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
       }
-    }, { duration: 0, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
+    }, { duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
   private title(): string { return this.uiText("pm_refine_your_recommendations_92ce2929"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
@@ -159,8 +160,8 @@ export struct PinmonyRecommendationSettingsPage {
               if (!pin.recommendationClosed) {
                 SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([Color.White])
               }
-            }.width(26).height(26).borderRadius(8)
-              .backgroundColor(pin.recommendationClosed || pin.closeUncertain ? Color.White : $r('app.color.recommendation_selection'))
+            }.width(26).height(26).borderRadius(13)
+              .backgroundColor(pin.recommendationClosed || pin.closeUncertain ? Color.White : $r('app.color.accent'))
           }.width(44).height(44).backgroundColor(Color.Transparent).margin(4)
             .enabled(this.available() && !pin.closeUncertain)
             .onClick(() => { if (this.available() && !pin.closeUncertain) this.request(pin.recommendationClosed ? 'activityOpen' : 'activityClose', pin.id); })
@@ -173,7 +174,9 @@ export struct PinmonyRecommendationSettingsPage {
   private aiTopic(topic: PinmonyAiTopic) {
     Row() {
       Text(topic.text).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: topic.enabled }).enabled(this.available())
+      Checkbox().select(topic.enabled).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(this.available())
         .onChange((enabled: boolean) => { if (this.available() && topic.enabled !== enabled) this.request('aiTopic', JSON.stringify({ key: topic.key, enabled })); })
         .accessibilityText(topic.text)
     }.width('100%').constraintSize({ minHeight: 52 })
@@ -192,7 +195,9 @@ export struct PinmonyRecommendationSettingsPage {
           Text(this.uiText("pm_show_ai_content_409fe4d8")).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           Text(this.uiText("pm_turn_off_to_see_less_ai_content_in_product_feeds_b51424cd")).fontSize(14).fontColor($r('app.color.secondary_text'))
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        Toggle({ type: ToggleType.Switch, isOn: this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled) || false })
+        Checkbox().select(this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled) || false).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
           .enabled(this.available() && !!this.store.data?.topics.length)
           .onChange((enabled: boolean) => { if (this.available() && enabled !== this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled)) this.request('aiAll', enabled.toString()); })
           .accessibilityText(this.uiText("pm_show_ai_content_409fe4d8"))

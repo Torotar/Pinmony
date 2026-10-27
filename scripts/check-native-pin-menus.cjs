@@ -131,24 +131,15 @@ function legacySuppression(){
   assert.equal(window.PinmonyPostApi.homeMenuOpen(1,pin,origin+'/'),false);assert.equal(window.PinmonyPostApi.detailMoreOpen(1,pin),false);assert.equal(window.PinmonyPostApi.moreAction(1,pin,'detail-see-more',()=>{}),false);assert.equal(window.PinmonyPostApi.feedbackUndo(pin,1),false);assert.equal(fetches,0);
 }
 
-async function favoriteContract(){
- for(const initial of [false,true]) {
-  const f=fixture();await open(f,{...raw,favorited_by_me:initial});
-  assert(f.store.moreOptions.some(o=>o.id==='detail-favorite'&&o.enabled));
-  const pending=f.menu.action('detail-favorite');const n=f.jobs.length;
-  await f.menu.action('detail-favorite');assert.equal(f.jobs.length,n);
-  assert(f.jobs.at(-1).job.url.endsWith('/ApiResource/'+(initial?'delete':'create')+'/'));
-  assert.deepEqual(JSON.parse(JSON.stringify(options(f.jobs.at(-1).job))),{url:'/v3/pins/11/favorite/'});
-  f.jobs.at(-1).resolve(body({id:'11'},initial?'v3_unfavorite_pin':'v3_favorite_pin'));await pending;
-  assert(f.messages.length);
- }
- const f=fixture();await open(f,{...raw,favorited_by_me:false});let p=f.menu.action('detail-favorite');
- f.jobs.at(-1).resolve(body({id:'99'},'v3_favorite_pin'));await p;
- await open(f,{...raw,favorited_by_me:false});assert(!f.store.moreOptions.find(o=>o.id==='detail-favorite').enabled);
- const n=f.jobs.length;await f.menu.action('detail-favorite');assert.equal(f.jobs.length,n,'uncertain write is never replayed');
- console.log('Favorite writes: strict transport, add/remove, duplicate lock and mismatched identity lock passed');
+async function favoriteMenuAbsence(){
+ const f=fixture();await open(f,{...raw,favorited_by_me:false});
+ assert(!f.store.moreOptions.some(o=>o.id==='detail-favorite'));
+ const before=f.jobs.length;
+ await f.menu.action('detail-favorite');await f.menu.action('home-favorite');
+ assert.equal(f.jobs.length,before,'removed favorite menu actions never write');
+ console.log('Favorite menus: absent detail option and ignored stale actions passed');
 }
-favoriteContract().catch(e=>{console.error(e);process.exitCode=1;});
+favoriteMenuAbsence().catch(e=>{console.error(e);process.exitCode=1;});
 
 async function directFavoriteContract(){
  const f=fixture();const pending=f.menu.toggleFavorite(pin);assert.equal(f.jobs.length,1);

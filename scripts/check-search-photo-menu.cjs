@@ -17,6 +17,7 @@ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+source.slice(sta
  await host.photoMenu();host.active=false;await host.selectPhotoMenu(0);assert.equal(uploads,1);
  await host.photoMenu();assert.equal(calls,3);
  host.active=true;await host.photoMenu();await host.dismissPhotoMenu();assert.equal(uploads,1);assert.equal(histories,1);
- assert(source.includes("componentId: 'pinmony-photo-search-menu'"));
- console.log('Anchored photo Menu: lazy creation, HDS button target, upload/history, dismissal and inactive guards passed');
+ assert(source.includes(".id('pinmony-photo-search-menu')"));
+ assert(!source.includes("componentId: 'pinmony-photo-search-menu'"));
+ console.log('Anchored photo Menu: lazy creation, standalone button target, upload/history, dismissal and inactive guards passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

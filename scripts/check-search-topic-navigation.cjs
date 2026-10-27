@@ -1,6 +1,21 @@
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const runtime = require('./search-controller-harness.cjs').createSearchRuntime(ts);
+const fs=require('node:fs'),vm=require('node:vm');
+const pageSource=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');
+const keyStart=pageSource.indexOf('  private discoveryRowKey(');
+const keyMethod=pageSource.slice(keyStart,pageSource.indexOf('\n  @State',keyStart));
+const KeyHost=vm.runInNewContext(ts.transpileModule('class KeyHost {'+keyMethod+'} KeyHost;',
+  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const keyHost=new KeyHost();keyHost.discoveryColumns=()=>1;keyHost.uiLanguage='zh_CN';
+keyHost.snapshot={ideaSections:[{id:'first',actionId:'first',targetUrl:'a',items:[]}]};
+const oldKey=keyHost.discoveryRowKey(0);
+keyHost.snapshot={ideaSections:[{id:'second',actionId:'second',targetUrl:'b',items:[]}]};
+assert.notEqual(keyHost.discoveryRowKey(0),oldKey,'Replacing a row must rebuild old click closures');
+const sameKey=keyHost.discoveryRowKey(0);keyHost.snapshot.loading=true;
+assert.equal(keyHost.discoveryRowKey(0),sameKey,'Loading alone preserves recommendation nodes');
+keyHost.snapshot.ideaSections[0].items=[{id:'photo',targetUrl:'b',imageUrl:'image'}];
+assert.notEqual(keyHost.discoveryRowKey(0),sameKey,'Updated previews rebuild their closures');
 async function main() {
   const h = runtime.harness(), host = h.controller, page = 'https://www.pinterest.com/search/';
   h.setPage(page);
@@ -23,6 +38,15 @@ async function main() {
   await host.performSearchAction('updated', 'ideaSection');
   assert.equal(h.events.length, count);
   h.setActive(true);
+  const current = topic('current', 'current');
+  h.store.search = {pageKey:page,discoveryApi:true,ideaSections:[current]};
+  let before = h.events.filter(e=>e[0]==='search').length;
+  await host.performSearchAction('removed', 'ideaSection');
+  assert.equal(h.events.filter(e=>e[0]==='search').length,before,'Removed section cannot navigate');
+  assert(h.events.some(e=>JSON.stringify(e).includes('pm_search_recommendation_updated') || JSON.stringify(e).includes('推荐内容已更新')));
+  current.targetUrl='https://untrusted.example/search/pins/?q=x';
+  await host.performSearchAction('current','ideaSection');
+  assert.equal(h.events.filter(e=>e[0]==='search').length,before,'Invalid current URL remains blocked');
   const retained = topic('retained', 'cached'); delete retained.targetUrl;
   h.store.search = { pageKey: page, discoveryApi: true, ideaSections: [retained] };
   await host.performSearchAction('retained', 'ideaSection');

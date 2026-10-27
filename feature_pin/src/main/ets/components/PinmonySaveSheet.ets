@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySaveBoard, PinmonySaveResult } from '../models/PinmonyComments';
 import { PinmonyBoardPlaceholder, PinmonyBoardPickerRow, PinmonyBoardPickerFooter } from 'common_ui';
@@ -46,17 +47,15 @@ export struct PinmonySaveSheet {
   build() {
     if (this.result.error && !this.result.items.length && !this.result.shortlist.length && !this.creating) {
       Column({ space: 16 }) {
-        Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-        Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.result.busy && !this.result.loading)
-          .onClick(() => { if (this.onRetry) this.onRetry(); })
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_reload_boards_c3e7cfa5"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.result.busy && !this.result.loading })
       }.width('100%').padding(20).backgroundColor($r('app.color.page_background'))
     } else {
     Column({ space: 12 }) {
       if (this.result.error) {
-        Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText('pm_reload_boards_c3e7cfa5'), actionEnabled: !this.result.busy, onAction: () => this.onRetry?.() })
       }
       if (this.result.feedback) {
-        Text(PinmonyI18n.render(this.result.feedback, this.uiLanguage)).fontColor($r('app.color.primary_text'))
+        PinmonyActionNotice({ message: PinmonyI18n.render(this.result.feedback, this.uiLanguage) })
       }
       if (this.result.busy || this.result.loading) {
         LoadingProgress().width(28).height(28)
@@ -69,7 +68,9 @@ export struct PinmonySaveSheet {
         Divider().color($r('app.color.secondary_text')).opacity(0.15)
         Row() {
           Text(this.uiText("pm_keep_board_secret_2264c319")).fontColor($r('app.color.primary_text')).layoutWeight(1)
-          Toggle({ type: ToggleType.Switch, isOn: this.secret }).enabled(!this.result.busy)
+          Checkbox().select(this.secret).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(!this.result.busy)
             .onChange((value: boolean) => this.secret = value)
         }.width('100%')
         Row({ space: 12 }) {
@@ -150,9 +151,6 @@ export struct PinmonySaveSheet {
         if (this.result.savedId) {
           Button(this.uiText("pm_undo_save_8245d6cd") + this.result.savedBoard).enabled(!this.result.busy)
             .onClick(() => { if (this.onRemove) this.onRemove(); })
-        }
-        if (this.result.error) {
-          Button(this.uiText("pm_reload_boards_c3e7cfa5")).enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
         }
       }
     }.width('100%').height('100%').padding({left:16,right:16,top:16,bottom:0}).backgroundColor($r('app.color.page_background'))

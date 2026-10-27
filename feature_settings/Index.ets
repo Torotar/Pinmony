@@ -8,7 +8,7 @@ export { PIN_LOGOUT_API_ENABLED, logoutRequestBody, logoutResponseSucceeded } fr
 export { PinmonySettingsController, PinmonySettingsPorts } from './src/main/ets/controllers/PinmonySettingsController';
 
 export { NotificationChannel, NotificationChoice, notificationWritable, notificationGlobal } from './src/main/ets/models/PinmonyNotifications';
-export { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from './src/main/ets/models/PinmonySocialPermissions';
+export { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialCommentFilterResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from './src/main/ets/models/PinmonySocialPermissions';
 
 export { PinmonyUpdateNotice } from './src/main/ets/services/PinmonyUpdateNotice';
 export { PinmonyBoardRecoveryPage } from './src/main/ets/components/PinmonyBoardRecoveryPage';

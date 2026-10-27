@@ -36,7 +36,7 @@ export class PinmonyRouteParser {
     const match: RegExpMatchArray | null = address.match(
       /^(https:\/\/(?:[^/]+\.)?pinterest\.com)\/([^/?#]+)\/([^/?#]+)\/?(?:[?#]|$)/i);
     if (!match || /^_|^(pin|users|search|ideas|today|settings|edit|messages|inbox|login|signup|business|explore)$/i.test(match[2]) ||
-        /^_|^(followers|following)$/i.test(match[3])) return '';
+        (/^_|^(followers|following)$/i.test(match[3]) && match[3] !== '_products_you_tagged')) return '';
     return match[1] + '/' + match[2] + '/' + match[3] + '/';
   }
 

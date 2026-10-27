@@ -1,3 +1,4 @@
+import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyEditPinResult } from '../models/PinmonyEditPin';
 import { PinmonySaveSheet } from './PinmonySaveSheet';
@@ -49,8 +50,7 @@ export struct PinmonyEditPinSheet {
             Column({ space: 20 }) {
               if (this.result.loading || this.result.busy) { LoadingProgress().width(28).height(28) }
               if (this.result.error) {
-                Text(PinmonyI18n.render(this.result.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
-                Button(this.uiText("pm_reload_df7392cc")).enabled(!this.result.busy).onClick(() => { if (this.onRetry) this.onRetry(); })
+                PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.result.busy })
               }
               if (!this.result.loading && !this.result.error) {
           Image(this.result.imageUrl).width(110).height(110).objectFit(ImageFit.Cover)
@@ -92,7 +92,9 @@ export struct PinmonyEditPinSheet {
           }.width('100%').padding(0).backgroundColor(Color.Transparent)
             .enabled(!this.result.busy && this.result.phase === 'edit').onClick(() => this.act('editPhase', ',"boards"'))
           Row({ space: 12 }) {
-            Toggle({ type: ToggleType.Switch, isOn: this.result.ai }).enabled(!this.result.busy && this.result.phase === 'edit')
+            Checkbox().select(this.result.ai).shape(CheckBoxShape.CIRCLE)
+          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(!this.result.busy && this.result.phase === 'edit')
               .onChange((value: boolean) => { if (value !== this.result.ai) this.act('editAi', ',' + value.toString()); })
             Column({ space: 8 }) {
               Text(this.uiText("pm_label_as_ai_modified_ebf5fa46")).fontSize(17).fontWeight(FontWeight.Bold)

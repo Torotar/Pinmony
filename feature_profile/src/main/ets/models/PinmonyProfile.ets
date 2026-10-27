@@ -9,16 +9,19 @@ export interface PinmonyBoard {
   sortable?: boolean;
   mergeable?: boolean;
   secret?: boolean;
+  protectedBoard?: boolean;
   id: string;
   targetUrl?: string;
   title: string;
   covers: string[];
+  coverAlternatives?: string[];
   collaboratorAvatars?: string[];
   pinCount: string;
   updated: string;
 }
 
 export interface PinmonyCreatedPin {
+  collageDraft?: boolean;
   id: string;
   targetUrl?: string;
   favorite?: boolean;
@@ -29,6 +32,7 @@ export interface PinmonyCreatedPin {
 }
 
 export interface PinmonyOrganizeBoard {
+  hasSections?: boolean;
   id: string;
   title: string;
   imageUrl: string;
@@ -49,6 +53,7 @@ export interface PinmonyOrganizeSnapshot {
 }
 
 export interface PinmonyProfileSnapshot {
+  suggestionTitle?: string;
   suggestionWriting?: boolean;
   suggestionUnavailableIds?: string[];
   suggestions?: PinmonyBoard[];

@@ -105,7 +105,7 @@ export struct PinmonyDetailEntryMotion {
       Image(this.photo.imageUrl).width(this.frame.width).height(this.frame.height).objectFit(ImageFit.Cover)
         .borderRadius(18).clip(true).position({ x: this.frame.x, y: this.frame.y })
         .opacity(this.showing ? 1 : 0).accessibilityLevel('no')
-        .onComplete((event) => { if (event?.loadingStatus === 1) { this.decoded = true; this.begin(); } })
+        .onComplete((event) => { if (event?.loadingStatus === 0 || event?.loadingStatus === 1) { this.decoded = true; this.begin(); } })
         .onError(() => { if (this.closing) this.onClosed?.(); else this.onOpened?.(); })
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       .onAreaChange(() => { this.measured = true; this.begin(); })

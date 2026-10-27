@@ -29,7 +29,7 @@ export class PinmonySettingsStore {
     if (this.screen === 'boardRecovery' && this.boardRecoveryFromProfile) return false;
     if (this.screen === 'root') return false;
     this.token++;
-    this.screen = ['socialFriends','socialFollowers','socialFollowing','socialOthers'].includes(this.screen) ? 'socialMessages' : ['socialMessages','socialBlocked','socialMentions'].includes(this.screen) ? 'social' : ['birthdate', 'gender', 'country'].includes(this.screen) ? 'personal' : this.screen === 'personal' ? 'account' : this.screen === 'boardRecovery' ? 'display' : this.screen === 'theme' ? this.themeReturn : 'root';
+    this.screen = ['socialFriends','socialFollowers','socialFollowing','socialOthers'].includes(this.screen) ? 'socialMessages' : ['socialComments','socialMessages','socialBlocked','socialMentions'].includes(this.screen) ? 'social' : ['birthdate', 'gender', 'country'].includes(this.screen) ? 'personal' : this.screen === 'personal' ? 'account' : this.screen === 'boardRecovery' ? 'display' : this.screen === 'theme' ? this.themeReturn : 'root';
     this.loading = false;
     if (this.screen === 'root' || !this.writeUncertain) this.error = '';
     return true;

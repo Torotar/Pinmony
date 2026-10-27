@@ -20,6 +20,23 @@ function endpoint(job){return new URL(job.url).pathname;}
 async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
 async function main(){
 
+const coverFixture=fixture();
+const customCover='https://i.pinimg.com/custom_covers/200x150/synthetic-cover.jpg',alternateCover='https://i.pinimg.com/custom_covers/236x/synthetic-cover.jpg';
+const sourceSignature='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const sourceCover='https://i.pinimg.com/236x/aa/aa/aa/'+sourceSignature+'.jpg';
+const remainingCover='https://i.pinimg.com/236x/remaining.jpg';
+await first(coverFixture,[{...board(1),has_custom_cover:true,cover_images:{'236x':{url:alternateCover,width:236,height:null},'200x150':{url:customCover,width:200,height:150}},image_cover_url:customCover,image_cover_hd_url:sourceCover,
+  cover_pin:{custom_cover:true,image_url:sourceCover,image_signature:sourceSignature},images:{'236x':[{url:sourceCover},{url:remainingCover},{url:avatar}]}},board(2)]);
+assert.equal(JSON.stringify(coverFixture.store.profile.boards[0].covers),JSON.stringify([customCover,remainingCover,avatar]),'custom cover occupies the large left tile and other Pins remain on the right without duplicating the cover source');
+assert.equal(JSON.stringify(coverFixture.store.profile.boards[1].covers),JSON.stringify([avatar]),'ordinary board retains its automatic preview');
+assert.equal(JSON.stringify(coverFixture.store.profile.boards[0].coverAlternatives),JSON.stringify([customCover,alternateCover]),'standard generated cover before nullable-height 236x tier');
+const imageSource=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyBoardCoverImage.ets','utf8');
+const logic=imageSource.slice(0,imageSource.indexOf('  build()')).replace('@Component','').replace('export struct','export class').replace(/@Prop @Watch\('resetImages'\) /g,'').replace(/@State /g,'')+'}';
+const logicExports={};vm.runInNewContext(ts.transpileModule(logic,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:logicExports});
+const imageView=new logicExports.PinmonyBoardCoverImage();imageView.urls=[customCover,alternateCover];assert.equal(imageView.visibleUrls()[0],customCover);imageView.failImage(customCover);assert.equal(imageView.visibleUrls()[0],alternateCover);imageView.failImage(customCover);assert.equal(imageView.failedUrls.length,1);imageView.failImage(alternateCover);assert.equal(imageView.visibleUrls().length,0);imageView.resetImages();assert.equal(imageView.visibleUrls()[0],customCover);imageView.urls=[avatar];imageView.failImage(customCover);assert.equal(imageView.visibleUrls()[0],avatar,'late errors cannot poison a replaced board image');
+assert.match(imageSource,/onError\(.*failImage/);
+console.log('Board cover card: custom cover is the large left tile, other Pins retained, cover source excluded');
+
 const mergeBoards=[{...board(1),access:['write','delete']},{...board(2),access:['write','delete']}];
 let mergeJob, resolveMerge, mergeCalls=0;
 const mergeFixture=fixture((job,session,source,viewer,owner,member,live,targets)=>{
