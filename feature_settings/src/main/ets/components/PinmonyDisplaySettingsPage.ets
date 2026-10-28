@@ -236,7 +236,7 @@ export struct PinmonyDisplaySettingsPage {
       Text(this.uiText('pm_profile_legacy_layout')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Checkbox().select(this.legacyProfile).shape(CheckBoxShape.CIRCLE)
           .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).onChange((value: boolean) => { this.legacyProfile = value; })
+          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).onChange((value: boolean) => { PinmonyProfileLayoutPreference.saveLegacyLayout(value); })
         .accessibilityText(this.uiText('pm_profile_legacy_layout'))
     }.width('100%').constraintSize({ minHeight: 64 }).padding({left:16,right:16,top:8,bottom:8})
     if (!this.legacyProfile) {

@@ -320,6 +320,7 @@ export struct PinmonySearchPage {
   onLoadMore?: () => void;
   onRetry?: () => void;
   onBack?: () => void;
+  onRootBack?: () => void;
   onClearProductFilter?: (kind: string) => void;
   onFollowUser?: (id: string) => void;
   onFollowBoard?: (id: string) => void;
@@ -1654,6 +1655,7 @@ export struct PinmonySearchPage {
     if (this.snapshot.quiz && this.snapshot.quiz.mode !== 'entry' && this.onQuizAction) {
       this.onQuizAction('back', '');
     } else if (this.committedQuery() && this.onBack) this.onBack();
+    else if (this.onRootBack) this.onRootBack();
     else if (this.onBack) this.onBack();
   }
 

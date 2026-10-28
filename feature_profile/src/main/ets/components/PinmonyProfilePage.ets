@@ -126,6 +126,10 @@ export struct PinmonyProfilePage {
     if (!this.modern() || !this.hubPane) return 0;
     return this.hubHeaderInset() + this.hubCollapseHeight();
   }
+  private profileBodyTopInset(): number {
+    if (!this.onBack && !this.modern()) return this.getUIContext().px2vp(this.statusBarHeightPx) + 56;
+    return this.hubContentInset();
+  }
   private updateHubChrome(offset: number, state: ScrollState, position: number): void {
     if (!this.modern() || !this.interactionReady || this.refreshing || this.loading || this.sortVisible) return;
     if (position <= 1) {
@@ -859,7 +863,7 @@ export struct PinmonyProfilePage {
         .accessibilityLevel('no')
       Column() { this.hubHeader() }.width('100%').height(80)
         .position({x:0,y:this.getUIContext().px2vp(this.statusBarHeightPx)})
-      } else { this.profileBody() }
+      } else if (!this.modern()) { this.legacyProfileNavigation() } else { this.profileBody() }
       }
         .width('100%').height('100%')
         .bindSheet($$this.sortVisible, this.boardSortSheet(), {
@@ -889,14 +893,23 @@ export struct PinmonyProfilePage {
   }
 
   @Builder
-  private rootTitleBar() {
-    // Keep the existing 56vp root toolbar slot; Index owns its system safe area.
-    HdsNavigation() { Column().height(0) }
-      .width('100%').height(56)
+  private legacyProfileNavigation() {
+    HdsNavigation() { this.profileBody() }
+      .width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
-      .titleBar({ avoidLayoutSafeArea: false, enableComponentSafeArea: false,
+      .titleBar(this.rootTitleBarOptions())
+      .bindToScrollable([this.scroller])
+      .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
+        { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+      .clip(false)
+  }
+
+  private rootTitleBarOptions(): HdsNavigationTitleBarOptions {
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
         style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
-          scrollEffectOpts: { enableScrollEffect: false },
+          scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'),
+            scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
           systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
           originalStyle: {
             backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
@@ -908,7 +921,7 @@ export struct PinmonyProfilePage {
         },
         content: { title: { mainTitle: '' }, stackBuilder: this.rootCompactTitleBuilder,
           menu: { value: [{ content: { icon: $r('sys.symbol.gearshape'), label: this.uiText("pm_settings_df3d58c7"), action: () => this.openSettings() }, badge: this.updateUnread ? { value: '', accessibilityText: this.uiText('pm_new_version_available_596dd46c') } : undefined }] } }
-      })
+      };
   }
   @Builder
   private boardSortOption(value: string, label: string) {
@@ -1253,10 +1266,6 @@ export struct PinmonyProfilePage {
 
     Stack({alignContent:Alignment.TopStart}) {
     Column() {
-      if (!this.onBack && !this.modern()) {
-      this.rootTitleBar()
-
-      }
       if(this.modern() && !this.hubPane) { this.hubPager() } else {
       Refresh({ refreshing: this.refreshing, builder: this.profileRefreshIndicator }) {
       Scroll(this.scroller) {
@@ -1294,7 +1303,7 @@ export struct PinmonyProfilePage {
           .padding({ left: 16, right: 16, bottom: 116 })
         }
         .width('100%')
-        .padding({top:this.hubContentInset()})
+        .padding({top:this.profileBodyTopInset()})
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const width: number = Number(newArea.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;

@@ -7,14 +7,31 @@ export class PinmonyProfileLayoutPreference {
   static initialize(context: common.Context): void {
     try {
       PinmonyProfileLayoutPreference.storage = preferences.getPreferencesSync(context, {name:'pinmony_profile_layout'});
+      const legacy: preferences.ValueType = PinmonyProfileLayoutPreference.storage.getSync('legacyLayout', AppStorage.get<boolean>('profileLegacyLayout') === true);
+      AppStorage.setOrCreate('profileLegacyLayout', legacy === true);
       const value: preferences.ValueType = PinmonyProfileLayoutPreference.storage.getSync('avatarRight', false);
       AppStorage.setOrCreate('profileAvatarRight', value === true);
       const density: preferences.ValueType = PinmonyProfileLayoutPreference.storage.getSync('pinDensity', 1);
       AppStorage.setOrCreate('pinmonyProfilePinDensity', typeof density === 'number' && Number.isInteger(density) && density >= 0 && density <= 2 ? density : 1);
       const boardDensity: preferences.ValueType = PinmonyProfileLayoutPreference.storage.getSync('boardDensity', 1);
       AppStorage.setOrCreate('pinmonyBoardDensity', typeof boardDensity === 'number' && Number.isInteger(boardDensity) && boardDensity >= 0 && boardDensity <= 2 ? boardDensity : 1);
-      PinmonyRuntimeLog.info('ProfileLayoutTrace: event=restored avatarRight=' + (value === true).toString());
+      PinmonyRuntimeLog.info('ProfileLayoutTrace: event=restored avatarRight=' + (value === true).toString() + ' legacy=' + (legacy === true).toString());
     } catch (_) { PinmonyRuntimeLog.warn('ProfileLayoutTrace: event=restore-failed'); }
+  }
+  static saveLegacyLayout(value: boolean): boolean {
+    const previous: boolean = AppStorage.get<boolean>('profileLegacyLayout') === true;
+    try {
+      if (!PinmonyProfileLayoutPreference.storage) throw new Error('storage');
+      PinmonyProfileLayoutPreference.storage.putSync('legacyLayout', value);
+      PinmonyProfileLayoutPreference.storage.flushSync();
+      AppStorage.setOrCreate('profileLegacyLayout', value);
+      PinmonyRuntimeLog.info('ProfileLayoutTrace: event=saved legacy=' + value.toString());
+      return true;
+    } catch (_) {
+      try { PinmonyProfileLayoutPreference.storage?.putSync('legacyLayout', previous); } catch (_) {}
+      PinmonyRuntimeLog.warn('ProfileLayoutTrace: event=legacy-save-failed');
+      return false;
+    }
   }
   static savePinDensity(value: number): boolean {
     if (!Number.isInteger(value) || value < 0 || value > 2) return false;

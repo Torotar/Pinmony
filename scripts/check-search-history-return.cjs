@@ -26,6 +26,14 @@ host.inputEditing = true;
 host.closeInputPanel = () => { host.inputEditing = false; page = 'root'; };
 host.handleSearchBack();
 assert.equal(page, 'root');
+let rootBacks=0, childBacks=0;
+host.onRootBack=()=>{rootBacks++;};host.onBack=()=>{childBacks++;};
+host.handleSearchBack();assert.equal(rootBacks,1,'HDS search root forwards system back to the app exit policy');assert.equal(childBacks,0);
+host.inputEditing=true;host.handleSearchBack();assert.equal(rootBacks,1,'closing root history does not also arm exit');
+host.committedQuery=()=> 'query';host.handleSearchBack();assert.equal(childBacks,1,'search results retain child back behavior');assert.equal(rootBacks,1);
+host.committedQuery=()=>'';host.snapshot.quiz={mode:'results'};host.onQuizAction=()=>{childBacks++;};host.handleSearchBack();assert.equal(childBacks,2,'quiz child consumes back before exit');assert.equal(rootBacks,1);
+const rootView=fs.readFileSync('entry/src/main/ets/components/PinmonySearchRootContent.ets','utf8');assert(rootView.includes('onRootBack: () => { view.rootBack(); }'));
+const rootIndex=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');assert(rootIndex.includes('rootBack: (): boolean => this.onBackPress()'),'root back uses the full overlay-aware app policy');
 const navigation = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets', 'utf8');
 const branch = navigation.slice(navigation.indexOf('else if (this.searchStore.searchInputFocused'),
   navigation.indexOf('else if (this.pinStore.detailWebFlow)'));

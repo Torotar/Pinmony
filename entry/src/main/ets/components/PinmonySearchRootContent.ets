@@ -36,6 +36,7 @@ export interface PinmonySearchRootView {
   pullRefreshRoot: (kind: string) => Promise<void>;
   returnFromSearchQuiz: () => boolean;
   backFromSearch: () => void;
+  rootBack: () => boolean;
   performSearchQuizAction: (kind: string, id: string) => Promise<void>;
   openSearchFilters: () => Promise<void>;
   shouldKeepSearchPageMounted: () => boolean;
@@ -102,6 +103,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               onBack: () => {
                 if (!view.returnFromSearchQuiz()) view.backFromSearch();
               },
+              onRootBack: () => { view.rootBack(); },
               onQuizAction: (kind: string, id: string) => view.performSearchQuizAction(kind, id),
               onFilters: () => view.openSearchFilters(),
               onInputFocusChange: (focused: boolean, stopEditing: () => void) => {

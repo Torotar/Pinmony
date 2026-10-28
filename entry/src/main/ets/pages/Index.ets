@@ -6481,6 +6481,7 @@ struct Index {
       pullRefreshRoot: (kind: string): Promise<void> => this.pullRefreshRoot(kind),
       returnFromSearchQuiz: (): boolean => this.returnFromSearchQuiz(),
       backFromSearch: (): void => this.backFromSearch(),
+      rootBack: (): boolean => this.onBackPress(),
       performSearchQuizAction: (kind: string, id: string): Promise<void> => this.performSearchQuizAction(kind, id),
       openSearchFilters: (): Promise<void> => this.openSearchFilters(),
       shouldKeepSearchPageMounted: (): boolean => this.shouldKeepSearchPageMounted(),
@@ -7127,7 +7128,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: (this.authStatus === 'authenticated' && (this.activeTab === 0 || this.activeTab === 2 || (this.activeTab === 3 && !this.profileLegacyLayout && this.profileStore.profile?.isOwn === true))) || this.boardOrderVisible || this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
+    .padding({ top: (this.authStatus === 'authenticated' && (this.activeTab === 0 || this.activeTab === 2 || (this.activeTab === 3 && !!this.profileStore.profile))) || this.boardOrderVisible || this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
       this.profileStore.searchVisible || !!this.inboxStore.listSection || (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
       this.inboxStore.invitationAllVisible || !!this.boardStore.collaborators || !!this.pinStore.detail || this.nativeSearchPageVisible() || this.nativeBoardVisible() ||
       (!this.pinStore.detail && !!this.profileStore.profile?.organize && !this.profileStore.profileWebFlow) ?

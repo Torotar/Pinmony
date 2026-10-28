@@ -5,7 +5,7 @@ const ts = require(process.argv[2] || 'typescript');
 const pages = [
   ['feature_home', 'PinmonyHomePage', ['homeTitleBarOptions']],
   ['feature_search', 'PinmonySearchPage', ['searchTitleBarOptions']],
-  ['feature_profile', 'PinmonyProfilePage', ['hubTitleBarOptions', 'profileTitleOptions']]
+  ['feature_profile', 'PinmonyProfilePage', ['hubTitleBarOptions', 'profileTitleOptions', 'rootTitleBarOptions']]
 ];
 function extract(code, name) {
   const start = code.indexOf('private ' + name + '(');
@@ -31,13 +31,20 @@ for (const [module, page, methods] of pages) {
     const host = new Host();
     Object.assign(host, { immersiveLightMode: mode, inputEditing: false, visibleCategories: () => ['pins'], uiText: name => name });
     for (const method of methods) {
-      const style = host[method]().style;
+      const options = host[method]();
+      const style = options.style;
       assert.equal(style.blurStrategy, mode === 'off' ? 0 : 1, `${page}.${method}: strategy ${mode}`);
       assert.equal(style.thermoCtrl, mode !== 'off');
       assert.equal(style.scrollEffectOpts.enableScrollEffect, mode !== 'off');
       if (method === 'profileTitleOptions') {
         assert.equal(style.originalStyle.backgroundStyle.blurRadius, mode === 'off' ? 0 : 18);
         assert.equal(style.scrollEffectStyle.backgroundStyle.blurRadius, mode === 'off' ? 0 : 18);
+      }
+      if (method === 'rootTitleBarOptions') {
+        assert.equal(options.avoidLayoutSafeArea, true);
+        assert.equal(options.enableComponentSafeArea, false, 'legacy content must scroll behind the HDS title region');
+        assert.equal(style.scrollEffectOpts.scrollEffectType, 3);
+        assert.equal(options.content.menu.value.length, 1, 'legacy settings action stays in the title bar');
       }
     }
   }
@@ -47,4 +54,18 @@ for (const [module, page, methods] of pages) {
     for (const method of methods) assert(extract(generated, method).includes("this.immersiveLightMode !== 'off'"));
   }
 }
+const profileSource = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets', 'utf8');
+const legacyNavigation = extract(profileSource, 'legacyProfileNavigation');
+assert(legacyNavigation.includes('HdsNavigation() { this.profileBody() }'));
+assert(legacyNavigation.includes('.bindToScrollable([this.scroller])'));
+assert(!legacyNavigation.includes('.height(56)'), 'the legacy title bar is no longer an isolated fixed-height navigation');
+assert(!profileSource.includes('this.rootTitleBar()'), 'the scrolling body cannot contain a duplicate legacy toolbar');
+assert(profileSource.includes('.padding({top:this.profileBodyTopInset()})'), 'only scrollable content receives the initial title inset');
+const InsetHost = vm.runInNewContext(ts.transpileModule('class InsetHost {' + extract(profileSource, 'profileBodyTopInset') + '} InsetHost;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const inset = new InsetHost();Object.assign(inset,{statusBarHeightPx:84,getUIContext:()=>({px2vp:n=>n/3.5}),modern:()=>false,hubContentInset:()=>216});
+assert.equal(inset.profileBodyTopInset(),80,'legacy first frame preserves the status and title inset');
+inset.onBack=()=>{};assert.equal(inset.profileBodyTopInset(),216,'secondary profile keeps its existing inset path');
+inset.onBack=undefined;inset.modern=()=>true;assert.equal(inset.profileBodyTopInset(),216,'modern profile geometry stays unchanged');
+const indexSource = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+assert(indexSource.includes('this.activeTab === 3 && !!this.profileStore.profile'), 'Index yields the legacy root safe area to HDS too');
 console.log('Root title blur: home/search/profile configuration gates, profile radius and optional compiled-output checks passed');
