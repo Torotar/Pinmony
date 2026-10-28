@@ -1,6 +1,7 @@
-import { PinmonyActionNotice } from 'common_ui';
+import { PinmonyActionNotice, PinmonyImmersiveLight } from 'common_ui';
+import { BlurStrategy, HdsNavigation, HdsNavigationTitleBarOptions, HdsNavigationTitleMode, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
-import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
+import { CapsuleSegmentButtonV2, ColorMetrics, SegmentButtonV2Items } from '@kit.ArkUI';
 import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
 import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/PinmonyBoardInvitation';
 import { PinmonyBoardInvitationList } from './PinmonyBoardInvitationList';
@@ -8,6 +9,11 @@ import { PinmonyUserAvatar } from 'common_ui';
 
 @Component
 export struct PinmonyInboxPage {
+  @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private inboxTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
+  @State private inboxRefreshState: RefreshStatus = RefreshStatus.Inactive;
   @StorageLink('pinmonyRootScrollTop2') @Watch('onRootScrollTop') private rootScrollTop: number = 0;
   private onRootScrollTop(): void {
     try {
@@ -314,12 +320,15 @@ export struct PinmonyInboxPage {
     .alignItems(HorizontalAlign.Center)
   }
 
-  build() {
+  @Builder
+  private inboxSegments() {
     Column() {
       if (this.snapshot.updateLabel && this.snapshot.inboxLabel) {
         Row() {
           CapsuleSegmentButtonV2({
             items: this.segmentItems,
+            buttonBackgroundColor: ColorMetrics.resourceColor($r('app.color.surface_muted')),
+            buttonBackgroundBlurStyle: BlurStyle.NONE,
             enableStateAnimation: true,
             selectedIndex: this.snapshot.section === 'messages' ? 1 : 0,
             onItemClicked: (index: number) => {
@@ -329,17 +338,33 @@ export struct PinmonyInboxPage {
           .width(280)
         }
         .width('100%')
-        .height(72)
+        .height(56)
         .justifyContent(FlexAlign.Center)
-        .padding({ top: 12, bottom: 12 })
+        .padding({ top: 4, bottom: 4 })
       }
+    }.width('100%').height(56)
+  }
 
-      Refresh({ refreshing: this.refreshing }) {
+  @Builder
+  private inboxRefreshIndicator() {
+    Column() {
+      LoadingProgress().width(24).height(24).color($r('app.color.accent'))
+      .visibility(this.refreshing || this.inboxRefreshState === RefreshStatus.Drag ||
+        this.inboxRefreshState === RefreshStatus.OverDrag ? Visibility.Visible : Visibility.Hidden)
+    }.width('100%').height(64).justifyContent(FlexAlign.Center)
+      .offset({ y: this.inboxTopInset() })
+      .hitTestBehavior(HitTestMode.None)
+  }
+
+  @Builder
+  private inboxContent() {
+    Column() {
+      Refresh({ refreshing: this.refreshing, builder: this.inboxRefreshIndicator }) {
       Column() {
       if (this.loading || (this.error && !this.retainedContent)) {
         Column({ space: 16 }) {
           if (this.loading) {
-            LoadingProgress()
+            LoadingProgress().color($r('app.color.accent'))
               .width(28)
               .height(28)
             Text(this.uiText("pm_loading_inbox_b0cbe6ba"))
@@ -352,7 +377,7 @@ export struct PinmonyInboxPage {
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
-        .padding({ left: 24, right: 24, bottom: 110 })
+        .padding({ left: 24, right: 24, top: this.inboxTopInset(), bottom: 110 })
       } else {
         if (this.error) {
           Row({ space: 12 }) {
@@ -416,7 +441,7 @@ export struct PinmonyInboxPage {
 
             if (this.snapshot.section === 'updates' && this.snapshot.dataSource === 'api') {
               if (this.snapshot.moreLoading) {
-                LoadingProgress().width(28).height(28).alignSelf(ItemAlign.Center)
+                LoadingProgress().color($r('app.color.accent')).width(28).height(28).alignSelf(ItemAlign.Center)
               } else if (this.snapshot.hasMore || this.snapshot.moreError) {
                 Button(this.snapshot.moreError || this.uiText("pm_load_more_af90a08f")).alignSelf(ItemAlign.Center)
                   .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
@@ -430,7 +455,7 @@ export struct PinmonyInboxPage {
                 this.uiText("pm_contacts_3303b569"), 'contacts')
               if (this.snapshot.contactsLoading) {
                 Row({ space: 12 }) {
-                  LoadingProgress().width(24).height(24)
+                  LoadingProgress().color($r('app.color.accent')).width(24).height(24)
                   Text(this.uiText("pm_loading_contacts_54858f2d")).fontSize(14).fontColor($r('app.color.secondary_text'))
                 }.padding({ left: 20, top: 12, bottom: 12 })
               } else if (this.snapshot.contactsError) {
@@ -451,7 +476,7 @@ export struct PinmonyInboxPage {
           .alignItems(HorizontalAlign.Start)
           .justifyContent(FlexAlign.Start)
           .constraintSize({ maxWidth: 720 })
-          .padding({ bottom: 120 })
+          .padding({ top: this.inboxTopInset(), bottom: 120 })
           .onAreaChange((_oldArea: Area, newArea: Area) => {
             this.contentHeight = Number(newArea.height);
             this.reportScrollAvailability();
@@ -462,6 +487,7 @@ export struct PinmonyInboxPage {
         .align(Alignment.TopStart)
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+        .clip(false)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           this.viewportHeight = Number(newArea.height);
           this.reportScrollAvailability();
@@ -482,12 +508,43 @@ export struct PinmonyInboxPage {
       .width('100%').layoutWeight(1)
       .pullToRefresh(!this.refreshing && !this.loading)
       .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
+      .onStateChange((state: RefreshStatus) => { this.inboxRefreshState = state; })
     }
     .width('100%')
     .height('100%')
+    .clip(false)
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .backgroundColor($r('app.color.page_background'))
     .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
       .onActionEnd((event: GestureEvent) => this.swipeSection(event.offsetX, event.offsetY)))
+  }
+
+  private inboxTitleBarOptions(): HdsNavigationTitleBarOptions {
+    return {
+      avoidLayoutSafeArea: true,
+      enableComponentSafeArea: false,
+      style: {
+        blurStrategy: this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+        thermoCtrl: this.immersiveLightMode !== 'off',
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightMode !== 'off',
+          scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
+      },
+      content: { stackBuilder: (): void => { this.inboxSegments(); } }
+    };
+  }
+
+  build() {
+    HdsNavigation() { this.inboxContent() }
+      .width('100%').height('100%')
+      .titleMode(HdsNavigationTitleMode.MINI)
+      .hideBackButton(true)
+      .titleBar(this.inboxTitleBarOptions())
+      .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
+        { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
+      .bindToScrollable([this.scroller])
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+      .clip(false)
   }
 }
 

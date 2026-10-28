@@ -1,5 +1,6 @@
 {
   "color": [
+    { "name": "shuffle_card_glass", "value": "#B3ECEFF1" },
     {
       "name": "shuffle_visit_background",
       "value": "#D0D5DA"
@@ -14,7 +15,7 @@
     },
     {
       "name": "display_settings_control",
-      "value": "#D5D9DF"
+      "value": "#F1F3F4"
     },
     {
       "name": "immersive_title_scrolled",
@@ -59,6 +60,10 @@
     {
       "name": "input_surface",
       "value": "#F1F3F4"
+    },
+    {
+      "name": "search_header_control_surface",
+      "value": "#FFFFFF"
     },
     {
       "name": "accent",

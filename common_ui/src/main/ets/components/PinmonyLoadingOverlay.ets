@@ -8,7 +8,7 @@ export struct PinmonyLoadingOverlay {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       Column({ space: 12 }) {
-        LoadingProgress().width(48).height(48).color($r('app.color.detail_on_accent'))
+        LoadingProgress().width(48).height(48).color($r('app.color.accent'))
           .accessibilityLevel('no')
         Text(this.message).fontSize(15).fontColor($r('app.color.detail_on_accent'))
           .textAlign(TextAlign.Center)

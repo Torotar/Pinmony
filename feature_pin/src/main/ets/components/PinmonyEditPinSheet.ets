@@ -48,7 +48,7 @@ export struct PinmonyEditPinSheet {
           List() {
             ListItem() {
             Column({ space: 20 }) {
-              if (this.result.loading || this.result.busy) { LoadingProgress().width(28).height(28) }
+              if (this.result.loading || this.result.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
               if (this.result.error) {
                 PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.result.busy })
               }

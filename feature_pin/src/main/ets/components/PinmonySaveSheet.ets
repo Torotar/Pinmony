@@ -58,7 +58,7 @@ export struct PinmonySaveSheet {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.feedback, this.uiLanguage) })
       }
       if (this.result.busy || this.result.loading) {
-        LoadingProgress().width(28).height(28)
+        LoadingProgress().color($r('app.color.accent')).width(28).height(28)
       }
       if (this.creating) {
         Text(this.uiText("pm_board_name_dd9a7122")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')

@@ -46,7 +46,7 @@ export struct PinmonyPublishBoardPage {
           .onChange((value: boolean) => { this.secret = value; })
       }.width('100%')
       if (this.state.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error, this.uiLanguage) }) }
-      if (this.state.loading || this.state.busy) { LoadingProgress().width(28).height(28) }
+      if (this.state.loading || this.state.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
 
@@ -99,7 +99,7 @@ export struct PinmonyPublishBoardPage {
     HdsNavDestination() {
       Scroll(this.sectionsScroller) {
         Column({space:8}) {
-          if (this.state.loading) { LoadingProgress().width(28).height(28) }
+          if (this.state.loading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
           else if (this.state.error) {
             PinmonyActionNotice({message:PinmonyI18n.render(this.state.error,this.uiLanguage),actionText:this.uiText('pm_retry_b8784c8d'),onAction:() => this.onAction('retrySections','',false)})
           } else {
@@ -111,7 +111,7 @@ export struct PinmonyPublishBoardPage {
         }.width('100%').padding({left:20,right:20,top:12,bottom:28})
       }.width('100%').height('100%').align(Alignment.TopStart)
     }.width('100%').height('100%').titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.sectionsScroller])
-      .titleBar({avoidLayoutSafeArea:true,enableComponentSafeArea:true,style:{scrollEffectOpts:{enableScrollEffect:false},originalStyle:{backgroundStyle:{backgroundColor:$r('app.color.page_background'),maskExtraHeight:0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}}},content:{title:{mainTitle:this.uiText('pm_select_section_c87be634')},backIcon:{action:() => this.onAction('back','',false)}}})
+      .titleBar({avoidLayoutSafeArea:true,enableComponentSafeArea:true,style:{blurStrategy:this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,thermoCtrl:this.immersiveLightEnabled,systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode),scrollEffectOpts:{enableScrollEffect:this.immersiveLightEnabled,scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR},scrollEffectStyle:{backgroundStyle:{backgroundColor:$r('app.color.immersive_title_scrolled'),maskExtraHeight:0,blurRadius:this.immersiveLightEnabled ? 18 : 0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}},originalStyle:{backgroundStyle:{backgroundColor:Color.Transparent,maskExtraHeight:0,blurRadius:this.immersiveLightEnabled ? 18 : 0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}}},content:{title:{mainTitle:this.uiText('pm_select_section_c87be634')},backIcon:{action:() => this.onAction('back','',false)}}})
       .onBackPressed(() => {this.onAction('back','',false);return true;})
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }

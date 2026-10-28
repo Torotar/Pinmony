@@ -651,6 +651,7 @@ export class PinmonyPublishNativeFlow {
         try {
             const product: PinmonyCreatedPin = await this.story.createProduct(pin,f.page,this.viewer,(): boolean => this.current(revision));
             if(!this.current(revision))return;
+            f.productCreated = true;
             f.selectedProducts = selected.some((p: PinmonyCreatedPin): boolean => p.id === product.id) ? selected : selected.concat([product]);
             f.productResults = (f.productResults || []).map((p: PinmonyCreatedPin): PinmonyCreatedPin => p.id === value ? product : p);
             if(f.phase === 'productImages')f.phase = 'productConfirm';

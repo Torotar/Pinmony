@@ -78,7 +78,7 @@ export struct PinmonyPublishPage {
       content: { title: { mainTitle: this.state.phase === 'empty' ? this.uiText("pm_choose_image_9ad12a1a") : this.state.kind === 'photo' ? draftTitle : this.uiText("pm_website_fb8d739d") },
         backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: !this.state.busy, action: () => this.act(this.state.phase === 'empty' || this.state.fromDraftBox ? 'back' : 'close') },
         menu: { value: this.state.phase === 'photo' ? [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.info_circle')).fontSize(28).fontColor([$r('app.color.primary_text')]),
+          icon: new SymbolGlyphModifier($r('sys.symbol.info_circle')).fontSize(22).fontColor([$r('app.color.primary_text')]),
           label: this.uiText('pm_pin_drafts_expiry'), isEnabled: true,
           action: () => { this.showDraftExpiryTip = !this.showDraftExpiryTip; }
         } }] : this.state.phase === 'website' ? [{ content: {
@@ -175,7 +175,7 @@ export struct PinmonyPublishPage {
     } else {
       Stack({alignContent:Alignment.Center}) {
         HdsNavigation(this.stack) { Column().width('100%').height('100%') }.width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
-        if (this.state.kind === 'photo' && (this.state.loading || this.state.draftLoading)) { LoadingProgress().width(28).height(28).hitTestBehavior(HitTestMode.None) }
+        if (this.state.kind === 'photo' && (this.state.loading || this.state.draftLoading)) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None) }
         else if (this.state.loading || this.state.busy) { PinmonyLoadingOverlay({message:this.uiText('pm_loading_photos_35b3ef9b')}) }
       }.width('100%').height('100%')
     }

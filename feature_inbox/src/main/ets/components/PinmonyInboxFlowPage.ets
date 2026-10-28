@@ -575,7 +575,7 @@ export struct PinmonyInboxFlowPage {
             onAction: () => this.act('retry') })
         }.padding(16)
       }
-      if (this.snapshot.loading && this.snapshot.screen !== 'chat') { LoadingProgress().width(28).height(28) }
+      if (this.snapshot.loading && this.snapshot.screen !== 'chat') { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
 
       Scroll(this.scroller) {
         Column() {
@@ -654,7 +654,7 @@ export struct PinmonyInboxFlowPage {
         onWillDismiss: (action: DismissSheetAction) => { action.dismiss(); this.showMessageMenu = false; this.selectedMessage = undefined; this.blockTarget = undefined; }
       })
     if (this.snapshot.loading && this.snapshot.screen === 'chat') {
-      LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+      LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
     }
     }.width('100%').height('100%')
     }.width('100%').height('100%')

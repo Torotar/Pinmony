@@ -28,7 +28,7 @@ export struct PinmonyBoardSectionPage {
       TextInput({ placeholder: this.uiText("pm_section_name_e63b3281"), text: this.name }).maxLength(100)
         .enabled(!this.busy && !this.submitted)
         .accessibilityText(this.uiText("pm_section_name_0e25c295")).onChange((value: string) => { this.name = value; })
-      if (this.busy) { LoadingProgress().width(24).height(24) }
+      if (this.busy) { LoadingProgress().color($r('app.color.accent')).width(24).height(24) }
       if (!this.ready && !this.busy && !this.error) { Text(this.uiText("pm_restoring_board_please_wait_9e819a8a")).fontColor($r('app.color.secondary_text')).fontSize(14) }
       if (this.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.error, this.uiLanguage) }) }
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })

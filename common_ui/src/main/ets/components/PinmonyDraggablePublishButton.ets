@@ -75,8 +75,7 @@ export struct PinmonyDraggablePublishButton {
   build() {
     Button('+', {type:ButtonType.Normal}).width(56).height(56).fontSize(32)
       .backgroundColor(Color.Transparent)
-      .backgroundEffect({radius:20,saturation:1,brightness:1,color:this.menuEnabled ? $r('app.color.publish_source_button_glass') : $r('app.color.publish_button_glass')})
-      .border({width:this.menuEnabled ? 1 : 0,color:$r('app.color.publish_source_button_outline')})
+      .backgroundEffect({radius:20,saturation:1,brightness:1,color:$r('app.color.publish_button_glass')})
       .borderRadius(16).clip(true).fontColor($r('app.color.primary_text'))
       .position({ x: this.x, y: this.y })
       .enabled(this.actionEnabled)

@@ -5,7 +5,7 @@ const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailP
 const height = carousel.slice(carousel.indexOf('  private mediaHeight():'), carousel.indexOf('  build()'));
 const origin = page.slice(page.indexOf('  private measureViewerOrigin():'), page.indexOf('  @Prop visualResult'));
 const context = { exports: {} };
-vm.runInNewContext(ts.transpileModule('export class Layout {' + height + origin + '}', {
+vm.runInNewContext(ts.transpileModule('export class Layout { displayedDetail() { return this.detail; }' + height + origin + '}', {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
 }).outputText, context);
 const x = new context.exports.Layout();
@@ -26,6 +26,6 @@ assert.equal(measured[0], 'pinmony-photo-source-7-1');
 assert.equal(rect.x, -30); assert.equal(rect.y, 100); assert.equal(rect.width, 328);
 assert(carousel.includes(".opacity(this.imageHidden && item.imageUrl === this.hiddenImageUrl ? 0 : 1)"));
 assert(page.includes('hiddenImageUrl: this.zoomImageUrl'));
-assert(!page.includes('.translate({ x: this.detail.carousel?.freeScroll'));
-assert(page.includes('.margin({ left: this.detail.carousel?.freeScroll && !this.wideDetail() ? -18 : 0,'));
+assert(!page.includes('.translate({ x: this.displayedDetail().carousel?.freeScroll'));
+assert(page.includes('.margin({ left: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0,'));
 console.log('Product gallery: card-based height, selected-card return rect, scroll offset and decoded visibility handoff passed');

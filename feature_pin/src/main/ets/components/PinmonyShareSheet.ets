@@ -77,7 +77,7 @@ export struct PinmonyShareSheet {
     Column() {
       if (this.pinStore.shareLoading) {
         Row({ space: 12 }) {
-          LoadingProgress()
+          LoadingProgress().color($r('app.color.accent'))
             .width(24)
             .height(24)
           Text(this.uiText("pm_loading_share_options_1790123c"))

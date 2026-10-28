@@ -66,7 +66,7 @@ export struct PinmonyHomeMenuSheet {
       Divider().color($r('app.color.input_surface'))
       }
       if (this.menu.loading) {
-        LoadingProgress().width(28).height(28)
+        LoadingProgress().color($r('app.color.accent')).width(28).height(28)
       } else if (this.menu.error) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.menu.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !/取消收藏|收藏校验/.test(PinmonyI18n.render(this.menu.error, 'zh')) })
       } else {
@@ -95,7 +95,7 @@ export struct PinmonyHomeMenuSheet {
         }, (option: PinmonyHomeMenuOption) => (option.id + ':' + option.enabled.toString()) + ':' + this.uiLanguage)
         }.width('100%')
       }
-      if (this.menu.busy) { LoadingProgress().width(24).height(24) }
+      if (this.menu.busy) { LoadingProgress().color($r('app.color.accent')).width(24).height(24) }
       if (this.menu.feedback) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.menu.feedback, this.uiLanguage) })
       }

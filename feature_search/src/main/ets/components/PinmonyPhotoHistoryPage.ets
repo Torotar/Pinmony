@@ -110,7 +110,7 @@ export struct PinmonyPhotoHistoryView {
             if (width > 0 && Math.abs(width - this.widthValue) > 1) { this.widthValue = width; this.syncSections(); }
           })
         }
-        if (this.busy || this.confirming) { LoadingProgress().width(30).height(30) }
+        if (this.busy || this.confirming) { LoadingProgress().color($r('app.color.accent')).width(30).height(30) }
         if (this.failed) {
           PinmonyActionNotice({ message: this.text('pm_photo_history_error'), actionText: this.text('pm_retry_b8784c8d'), onAction: () => this.load() })
         } else if (!this.busy && !this.items.length) {

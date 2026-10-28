@@ -271,12 +271,12 @@ export class PinmonyPublishController {
     if (!force && flow?.kind === 'photo' && flow.phase === 'select' && !flow.draftSaved && !flow.uncertain && this.ports.nativeFlow?.()) {
       flow.draftExitRequested = true; this.commit(flow); return;
     }
-    const refreshBoard: boolean = !!flow && (flow.completed > 0 || !!flow.boardCreated || flow.uncertain || flow.busy);
+    const refreshBoard: boolean = !!flow && (flow.completed > 0 || !!flow.boardCreated || !!flow.productCreated || flow.uncertain || flow.busy);
     PinmonyRuntimeLog.info('PublishTrace: close force=' + force.toString());
     if(this.ports.nativeFlow?.())this.ports.nativeClose?.();
     this.pauseFlow(); this.store.publishFlowToken++; this.store.publishFlow = undefined; this.store.publishPicking = false;
     this.ports.suppressChildBack(); this.ports.syncMotion();
-    if (flow && (flow.completed > 0 || flow.boardCreated || flow.uncertain || flow.busy)) {
+    if (flow && (flow.completed > 0 || flow.boardCreated || flow.productCreated || flow.uncertain || flow.busy)) {
       this.store.profileCache.clear();
       if (!force && !this.ports.hasBoardReturn()) this.ports.refreshProfile();
     }

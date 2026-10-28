@@ -6,7 +6,7 @@ function load(file, names, globals = {}) {
     const match = source.match(new RegExp('  (?:private )?' + name + '\\([\\s\\S]*?\\r?\\n  \\}'));
     assert(match, name); return match[0];
   });
-  return vm.runInNewContext(ts.transpileModule('class Host {' + methods.join('\n') + '} Host;', {
+  return vm.runInNewContext(ts.transpileModule('class Host { displayedDetail() { return this.detail; }' + methods.join('\n') + '} Host;', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
   }).outputText, { PinmonyRuntimeLog: { info() {}, warn() {} }, ...globals });
 }

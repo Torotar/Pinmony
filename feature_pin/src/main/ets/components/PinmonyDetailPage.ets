@@ -6,6 +6,7 @@ import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyImageViewer } from './PinmonyImageViewer';
 import { PinmonyShuffleCanvas } from './PinmonyShuffleCanvas';
+import { PinmonyShuffleHitMasks } from '../services/PinmonyShuffleHitMasks';
 import { PinmonyShuffleItem } from '../models/PinmonyShuffle';
 import { splitDescriptionTags, PinmonyDescriptionPart } from '../services/PinmonyDescriptionTags';
 import { PinmonyVisualSearchView } from './PinmonyVisualSearchView';
@@ -27,21 +28,64 @@ import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNav
 @Component
 export struct PinmonyDetailPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
+  private immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
-  @Prop @Watch('onPinChanged') detail: PinmonyDetailSnapshot = {} as PinmonyDetailSnapshot;
+  @Prop @Watch('onPinChanged') currentDetail: PinmonyDetailSnapshot = {} as PinmonyDetailSnapshot;
+  @Prop shuffleParentDetail: PinmonyDetailSnapshot | undefined = undefined;
+  private fallbackDetail(): PinmonyDetailSnapshot {
+    return { kind: 'loading', session: 0, pinUrl: '', imageUrl: '', imageWidth: 0, imageHeight: 0,
+      title: '', description: '', creator: '', creatorAvatar: '', sourceLabel: '', actions: [], related: [] };
+  }
+  private displayedDetail(): PinmonyDetailSnapshot {
+    const current: PinmonyDetailSnapshot | undefined = this.currentDetail;
+    if (this.shuffleParentDetail && !this.shuffleFullDetail &&
+      (!current || current.pinUrl !== this.shuffleParentDetail.pinUrl || !current.shuffle)) return this.shuffleParentDetail;
+    return current || this.shuffleParentDetail || this.fallbackDetail();
+  }
   @Prop @Watch('onRenderIdentityChanged') renderIdentity: string = '';
   @Prop traceId: number = 0;
   @Prop entryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
   @Prop entryClosing: boolean = false;
   @Prop disableImageZoom: boolean = false;
-  @Prop shuffleSelectedImage: string = '';
+  @Prop @Watch('onShuffleSelectionChanged') shuffleSelectedImage: string = '';
   @Prop shuffleBackdrop: string = '';
   @Prop shuffleItems: PinmonyShuffleItem[] = [];
   @Prop shuffleIndex: number = 0;
+  @Prop @Watch('onPinChanged') shuffleFullDetail: boolean = false;
+  @Prop @Watch('onShuffleSelectionChanged') shuffleReturnItem: string = '';
+  @State private shuffleReadyImages: string[] = [];
+  @State private shuffleReadyBackdrop: string = '';
+  @State private shuffleViewerPresented: boolean = false;
+  private onShuffleSelectionChanged(): void {
+    if (!this.shuffleSelectedImage) {
+      this.shuffleViewerPresented = false;
+      setTimeout(() => this.revealShuffleReturn(),0);
+    }
+  }
+  private shuffleViewerVisible(): boolean {
+    return !!this.shuffleSelectedImage && !this.shuffleFullDetail && this.shuffleViewerPresented;
+  }
+  private closeShuffleViewer(itemId: string): void {
+    if (!this.videoActive || !this.shuffleViewerVisible() ||
+      itemId !== this.shuffleItems[this.shuffleIndex]?.id) return;
+    // Retained hidden image nodes must never invoke the detail page's back action.
+    this.shuffleViewerPresented = false;
+    this.onBack?.();
+  }
+  private shuffleImageReady(key: string): void {
+    if (!this.shuffleReadyImages.includes(key)) this.shuffleReadyImages = this.shuffleReadyImages.concat(key).slice(-64);
+    const item: PinmonyShuffleItem | undefined = this.shuffleItems[this.shuffleIndex];
+    if (this.shuffleSelectedImage && item && this.shuffleReadyBackdrop === (this.shuffleBackdrop || this.displayedDetail().imageUrl) &&
+        this.shuffleReadyImages.includes('photo:' + this.shuffleSelectedImage) &&
+        this.shuffleReadyImages.includes('card:' + (item.imageUrl || ''))) this.shuffleViewerPresented = true;
+  }
+  private readonly shuffleStripScroller: Scroller = new Scroller();
+  private readonly shuffleHitMasks: PinmonyShuffleHitMasks = new PinmonyShuffleHitMasks();
+  private shuffleRevealedKey: string = '';
   @Prop shufflePreviews: PinmonyDetailSnapshot[] = [];
   onShufflePin?: (id: string) => void;
+  onShuffleDetail?: (pin: string) => void;
   onShuffleRetry?: () => void;
   onEntryClosed?: () => void;
   @State private entryOpacity: number = 1;
@@ -72,7 +116,7 @@ export struct PinmonyDetailPage {
   @State private searchImageReady: boolean = false;
   @State private searchOrigin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
   private onImageLayerChanged(): void {
-    if (this.imageLayer === 'zoom' && (this.disableImageZoom || !!this.detail.shuffleId)) {
+    if (this.imageLayer === 'zoom' && (this.disableImageZoom || !!this.displayedDetail().shuffleId)) {
       this.onImageLayer?.('');
       return;
     }
@@ -110,15 +154,15 @@ export struct PinmonyDetailPage {
       // before the next layout pass updates component measurements.
       this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
       this.lastReportedScrollOffset = 0;
-      this.onScrollPosition?.(this.detail.pinUrl, 0);
+      this.onScrollPosition?.(this.displayedDetail().pinUrl, 0);
       return { x: origin.x, y: origin.y + offset, width: origin.width, height: origin.height };
     } catch (_) { return origin; }
   }
   private measureViewerOrigin(): ImageFlightRect {
     try {
       const ui = this.getUIContext();
-      const selectedIndex: number = this.detail.carousel?.freeScroll ?
-        this.detail.carousel.items.findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.zoomImageUrl) : -1;
+      const selectedIndex: number = this.displayedDetail().carousel?.freeScroll ?
+        (this.displayedDetail().carousel?.items || []).findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.zoomImageUrl) : -1;
       const source = ui.getComponentUtils().getRectangleById('pinmony-photo-source-' + this.traceId.toString() +
         (selectedIndex >= 0 ? '-' + selectedIndex.toString() : ''));
       const root = ui.getComponentUtils().getRectangleById('pinmony-photo-root-' + this.traceId.toString());
@@ -184,10 +228,10 @@ export struct PinmonyDetailPage {
   onScrollPosition?: (pinUrl: string, offset: number) => void;
 
   private onPinChanged(): void {
-    if (this.activePin !== this.detail.pinUrl) {
+    if (this.activePin !== this.displayedDetail().pinUrl) {
       this.viewerMounted = false; this.viewerClosing = false;
       this.searchMounted = false; this.searchImageReady = false; this.searchClosing = false;
-      this.activePin = this.detail.pinUrl;
+      this.activePin = this.displayedDetail().pinUrl;
       this.decodedHeroSource = undefined;
       this.expanded = false;
       this.zoomImageUrl = '';
@@ -203,7 +247,7 @@ export struct PinmonyDetailPage {
   }
 
   private notifyImageLoaded(pinUrl: string, imageUrl: string): void {
-    if (pinUrl === this.detail.pinUrl && imageUrl === this.detail.imageUrl) {
+    if (pinUrl === this.displayedDetail().pinUrl && imageUrl === this.displayedDetail().imageUrl) {
       const key: string = this.heroRenderKey(imageUrl, pinUrl);
       if (this.decodedHeroSource?.key !== key) this.decodedHeroSource = {
         key: key, url: imageUrl, pinUrl: pinUrl, revision: this.heroRenderRevision
@@ -219,7 +263,7 @@ export struct PinmonyDetailPage {
   aboutToAppear(): void {
     this.heroVisible = true;
     if (this.entryPhoto) this.entryOpacity = 0;
-    this.activePin = this.detail.pinUrl;
+    this.activePin = this.displayedDetail().pinUrl;
     this.updateDetailLayout();
     this.auditRecommendationGate('appear');
     this.auditRecommendationLayout();
@@ -234,12 +278,13 @@ export struct PinmonyDetailPage {
     this.searchLabelTimer = setTimeout(() => { this.searchLabelVisible = false; }, 2500);
   }
   aboutToDisappear(): void {
+    this.shuffleHitMasks.clear();
     this.heroVisible = false;
     clearTimeout(this.searchLabelTimer);
   }
 
   private retryHeroImage(key: string): void {
-    if (!this.heroVisible || !this.detail.imageUrl || key !== this.heroRenderKey(this.detail.imageUrl, this.detail.pinUrl)) return;
+    if (!this.heroVisible || !this.displayedDetail().imageUrl || key !== this.heroRenderKey(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl)) return;
     this.heroRenderRevision = (this.heroRenderRevision + 1) % 2147483647;
     this.lastImageNotification = '';
     if (this.onContentRetry) this.onContentRetry();
@@ -249,19 +294,19 @@ export struct PinmonyDetailPage {
     const share: PinmonyDetailAction | undefined = this.action('share');
     if (this.imageLayer === 'search') {
       return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-        style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
-          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+        style: { blurStrategy: this.immersiveLightEnabled() ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled(), scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled(), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled() ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled() ? 18 : 0 } } },
         content: { title: { mainTitle: this.uiText("pm_image_search_74a83573") }, menu: { value: [] }, backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: true,
           action: () => { if (this.onImageLayer) this.onImageLayer(''); } } } };
     }
     return {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+      style: { blurStrategy: this.immersiveLightEnabled() ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled(),
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled(), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled() ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled() ? 18 : 0 } }
       },
       content: {
         title: { mainTitle: '' },
@@ -278,16 +323,52 @@ export struct PinmonyDetailPage {
     };
   }
 
+  private shuffleThumbnailWidth(item: PinmonyShuffleItem): number {
+    return Math.max(20,Math.min(180,100 * item.imageWidth / Math.max(1,item.imageHeight)));
+  }
+
+  private shuffleReturnOffset(): number {
+    let offset: number = 0;
+    for (const item of this.displayedDetail().shuffle?.items || []) {
+      if (!item.tappable || item.hidden || item.alpha <= 0 || !item.imageUrl) continue;
+      if (item.id === this.shuffleReturnItem) return offset;
+      offset += this.shuffleThumbnailWidth(item) + 12;
+    }
+    return -1;
+  }
+
+  private revealShuffleReturn(): void {
+    const key: string = this.displayedDetail().pinUrl + ':' + this.shuffleReturnItem;
+    if (!this.shuffleReturnItem || this.shuffleRevealedKey === key || this.shuffleSelectedImage) return;
+    const offset: number = this.shuffleReturnOffset();
+    if (offset < 0) return;
+    try {
+      const ui = this.getUIContext();
+      const strip = ui.getComponentUtils().getRectangleById('pinmony-shuffle-strip-' + this.traceId.toString());
+      const root = ui.getComponentUtils().getRectangleById('pinmony-photo-root-' + this.traceId.toString());
+      if (strip.size.width <= 0 || root.size.height <= 0) return;
+      this.shuffleStripScroller.scrollTo({xOffset:offset,yOffset:0,animation:false});
+      const overflow: number = ui.px2vp(strip.windowOffset.y + strip.size.height - root.windowOffset.y - root.size.height) + 16;
+      if (overflow > 0) {
+        const position = this.detailScroller.offset();
+        this.detailScroller.scrollTo({xOffset:0,yOffset:(position?.yOffset || 0) + overflow,animation:false});
+      }
+      this.shuffleRevealedKey = key;
+    } catch (_) {}
+  }
+
   private restoreScrollPosition(): void {
     const offset: number = Math.max(0, this.initialScrollOffset);
     this.restoredPaginationAllowed = offset <= 0;
     this.restoringScroll = true;
-    const pin: string = this.detail.pinUrl;
+    const pin: string = this.displayedDetail().pinUrl;
     setTimeout(() => {
-      if (this.detail.pinUrl !== pin) return;
+      if (this.displayedDetail().pinUrl !== pin) return;
       try {
         this.detailScroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
         this.lastReportedScrollOffset = offset;
+        this.shuffleRevealedKey = '';
+        this.revealShuffleReturn();
       } catch (error) {
         PinmonyRuntimeLog.warn('Pinmony: detail scroll restoration unavailable');
       }
@@ -303,27 +384,28 @@ export struct PinmonyDetailPage {
       const offset: number = Math.max(0, position.yOffset);
       if (!force && Math.abs(offset - this.lastReportedScrollOffset) < 8) return;
       this.lastReportedScrollOffset = offset;
-      if (this.onScrollPosition) this.onScrollPosition(this.detail.pinUrl, offset);
+      if (this.onScrollPosition) this.onScrollPosition(this.displayedDetail().pinUrl, offset);
     } catch (error) {
       PinmonyRuntimeLog.warn('Pinmony: detail scroll position unavailable');
     }
   }
 
   private action(kind: string): PinmonyDetailAction | undefined {
-    const item: PinmonyDetailAction | undefined = this.detail.actions.find((value: PinmonyDetailAction): boolean => value.kind === kind);
+    const snapshot: PinmonyDetailSnapshot = this.shuffleSelectedImage && !this.shuffleFullDetail ? this.currentDetail : this.displayedDetail();
+    const item: PinmonyDetailAction | undefined = snapshot.actions.find((value: PinmonyDetailAction): boolean => value.kind === kind);
     if(!item && kind === 'share' && this.shareActionsReady)return {id:'native-share',kind:'share',label:this.uiText("pm_share_7e564575"),countText:'',enabled:true,selected:false};
     return item;
   }
 
   private leftActions(): PinmonyDetailAction[] {
-    const available: PinmonyDetailAction[] = this.detail.actions.filter((item: PinmonyDetailAction): boolean =>
+    const available: PinmonyDetailAction[] = this.displayedDetail().actions.filter((item: PinmonyDetailAction): boolean =>
       item.kind === 'like' || item.kind === 'comment' || item.kind === 'more');
-    if (this.detail.dataSource !== 'api') return available;
+    if (this.displayedDetail().dataSource !== 'api') return available;
     const kinds: string[] = ['like', 'comment'];
     const result: PinmonyDetailAction[] = kinds.map((kind: string): PinmonyDetailAction => {
       const real: PinmonyDetailAction | undefined = available.find((item: PinmonyDetailAction): boolean => item.kind === kind);
-      if (real && (this.readsReady || this.detail.imageStageReady && (this.actionsReady || this.postActionsReady && kind === 'like' || this.commentActionsReady && kind === 'comment') ||
-          this.detail.kind === 'cached' || this.detail.actionsRetained)) return real;
+      if (real && (this.readsReady || this.displayedDetail().imageStageReady && (this.actionsReady || this.postActionsReady && kind === 'like' || this.commentActionsReady && kind === 'comment') ||
+          this.displayedDetail().kind === 'cached' || this.displayedDetail().actionsRetained)) return real;
       return { id: 'pending-' + kind, kind: kind, label: kind === 'like' ? this.uiText("pm_like_aced5d7f") : this.uiText("pm_comments_6849b825"),
         countText: '', enabled: false, selected: false };
     });
@@ -352,16 +434,16 @@ export struct PinmonyDetailPage {
   }
 
   private isMainImageReady(): boolean {
-    return this.detail.dataSource !== 'api' || this.detail.imageStageReady === true;
+    return this.displayedDetail().dataSource !== 'api' || this.displayedDetail().imageStageReady === true;
   }
 
   private isCommentsReady(): boolean {
-    return this.readsReady || this.detail.dataSource !== 'api' || this.detail.interactionsSettled === true;
+    return this.readsReady || this.displayedDetail().dataSource !== 'api' || this.displayedDetail().interactionsSettled === true;
   }
 
   private isRecommendReady(): boolean {
-    return this.detail.kind === 'cached' || this.detail.relatedRetained === true ||
-      this.detail.related.length > 0 || this.detail.relatedEnded === true || !!this.detail.relatedError;
+    return this.displayedDetail().kind === 'cached' || this.displayedDetail().relatedRetained === true ||
+      this.displayedDetail().related.length > 0 || this.displayedDetail().relatedEnded === true || !!this.displayedDetail().relatedError;
   }
 
   private recommendCardHeight(cardWidth: number, pin: PinmonyRelatedPin): number {
@@ -382,13 +464,13 @@ export struct PinmonyDetailPage {
     const columns: number = this.recommendColumnCount();
     const width: number = this.recommendCardWidth();
     const key: string = reason + ':' + (ready ? '1' : '0') + ':' + columns.toString() + ':' + width.toFixed(2) +
-      ':' + (this.detail.imageStageReady === true ? '1' : '0') + ':' + (this.detail.interactionsSettled === true ? '1' : '0');
+      ':' + (this.displayedDetail().imageStageReady === true ? '1' : '0') + ':' + (this.displayedDetail().interactionsSettled === true ? '1' : '0');
     if (key === this.lastRecommendAuditKey) return;
     this.lastRecommendAuditKey = key;
     PinmonyRuntimeLog.info('RecommendAudit: gate reason=' + reason + ' main=' +
       (this.isMainImageReady() ? 'ready' : 'pending') + ' interactions=' +
       (this.isCommentsReady() ? 'ready' : 'pending') + ' ready=' + (ready ? 'ready' : 'blocked') +
-      ' presentation=' + (this.detail.kind === 'cached' || this.detail.relatedRetained ? 'cached' : 'current') +
+      ' presentation=' + (this.displayedDetail().kind === 'cached' || this.displayedDetail().relatedRetained ? 'cached' : 'current') +
       ' columns=' + columns.toString() + ' cardWidthVp=' + width.toFixed(2));
   }
 
@@ -415,7 +497,7 @@ export struct PinmonyDetailPage {
       this.measureTextOverflow();
     } catch (_) {
       // A transient unavailable UI context must not interrupt image/state setup.
-      this.textOverflowing = !!this.detail.title || !!this.detail.description;
+      this.textOverflowing = !!this.displayedDetail().title || !!this.displayedDetail().description;
       if (!this.textMeasureWarned) PinmonyRuntimeLog.warn('DetailTrace: text measurement unavailable');
       this.textMeasureWarned = true;
     }
@@ -424,13 +506,13 @@ export struct PinmonyDetailPage {
   private measureTextOverflow(): void {
     const utils = this.getUIContext().getMeasureUtils();
     const width: string = this.detailPaneWidth().toString() + 'vp';
-    const title = utils.measureTextSize({ textContent: this.detail.title, fontSize: '26fp',
+    const title = utils.measureTextSize({ textContent: this.displayedDetail().title, fontSize: '26fp',
       fontWeight: FontWeight.Bold, constraintWidth: width });
-    const shortTitle = utils.measureTextSize({ textContent: this.detail.title, fontSize: '26fp',
+    const shortTitle = utils.measureTextSize({ textContent: this.displayedDetail().title, fontSize: '26fp',
       fontWeight: FontWeight.Bold, constraintWidth: width, maxLines: 2 });
-    const description = utils.measureTextSize({ textContent: this.detail.description, fontSize: '16fp',
+    const description = utils.measureTextSize({ textContent: this.displayedDetail().description, fontSize: '16fp',
       lineHeight: '24vp', constraintWidth: width });
-    const shortDescription = utils.measureTextSize({ textContent: this.detail.description, fontSize: '16fp',
+    const shortDescription = utils.measureTextSize({ textContent: this.displayedDetail().description, fontSize: '16fp',
       lineHeight: '24vp', constraintWidth: width, maxLines: 2 });
     this.textOverflowing = Number(title.height) > Number(shortTitle.height) + 1 ||
       Number(description.height) > Number(shortDescription.height) + 1;
@@ -438,9 +520,9 @@ export struct PinmonyDetailPage {
 
   private heroHeight(): number {
     const width: number = this.detailPaneWidth();
-    if (this.detail.imageWidth <= 0 || this.detail.imageHeight <= 0) return width * 1.15;
-    const height: number = width * this.detail.imageHeight / this.detail.imageWidth;
-    return this.detail.isVideo || this.detail.mediaKind === 'carousel' || !!this.detail.carousel ? Math.min(1200, height) : height;
+    if (this.displayedDetail().imageWidth <= 0 || this.displayedDetail().imageHeight <= 0) return width * 1.15;
+    const height: number = width * this.displayedDetail().imageHeight / this.displayedDetail().imageWidth;
+    return this.displayedDetail().isVideo || this.displayedDetail().mediaKind === 'carousel' || !!this.displayedDetail().carousel ? Math.min(1200, height) : height;
   }
 
   private acceptsActionIntent(item: PinmonyDetailAction): boolean {
@@ -455,10 +537,10 @@ export struct PinmonyDetailPage {
   private creatorFontSize(): number {
     try {
       const utils = this.getUIContext().getMeasureUtils();
-      const width: string = Math.max(1, this.detailPaneWidth() - (this.detail.creator ? 42 : 0)).toString() + 'vp';
-      const full = utils.measureTextSize({ textContent: this.detail.creator, fontSize: '18fp',
+      const width: string = Math.max(1, this.detailPaneWidth() - (this.displayedDetail().creator ? 42 : 0)).toString() + 'vp';
+      const full = utils.measureTextSize({ textContent: this.displayedDetail().creator, fontSize: '18fp',
         fontWeight: FontWeight.Medium, constraintWidth: width });
-      const single = utils.measureTextSize({ textContent: this.detail.creator, fontSize: '18fp',
+      const single = utils.measureTextSize({ textContent: this.displayedDetail().creator, fontSize: '18fp',
         fontWeight: FontWeight.Medium, constraintWidth: width, maxLines: 1 });
       return Number(full.height) > Number(single.height) + 1 ? 16 : 18;
     } catch (_) { return 18; }
@@ -510,20 +592,20 @@ export struct PinmonyDetailPage {
           heightVp: this.recommendCardHeight(this.recommendCardWidth(), pin),
           targetPx: this.recommendCardWidth() * this.recommendDensity(), borderRadiusVp: RECOMMEND_CARD_RADIUS_VP,
           onLoaded: () => {
-            if (this.onRelatedImageLoaded && this.detail.related.some((item: PinmonyRelatedPin): boolean =>
-              item.id === pin.id && item.imageUrl === pin.imageUrl)) this.onRelatedImageLoaded(this.detail.pinUrl);
+            if (this.onRelatedImageLoaded && this.displayedDetail().related.some((item: PinmonyRelatedPin): boolean =>
+              item.id === pin.id && item.imageUrl === pin.imageUrl)) this.onRelatedImageLoaded(this.displayedDetail().pinUrl);
           }, onError: (code: number) => {
             PinmonyRuntimeLog.warn('RecommendImageError: code=' + code.toString());
           }, onTrace: (event: string, revision: number, tier: string, elapsedMs: number) => {
             PinmonyRuntimeLog.info('RecommendImageTrace: openId=' + this.traceId.toString() +
-              ' index=' + this.detail.related.findIndex((item: PinmonyRelatedPin): boolean => item.id === pin.id) +
+              ' index=' + this.displayedDetail().related.findIndex((item: PinmonyRelatedPin): boolean => item.id === pin.id) +
               ' event=' + event + ' revision=' + revision.toString() + ' tier=' + tier +
               ' elapsedMs=' + elapsedMs.toString());
           }, onAudit: (tier: string, targetPx: number, sourceHeightPx: number) =>
             this.auditRecommendationImage(tier, targetPx, sourceHeightPx) })
           .width('100%')
           .height(this.recommendCardHeight(this.recommendCardWidth(), pin))
-          .id('pinmony-related-photo-' + this.detail.pinUrl + '-' + pin.pinUrl)
+          .id('pinmony-related-photo-' + this.displayedDetail().pinUrl + '-' + pin.pinUrl)
         if (pin.title.length > 0) {
           Text(PinmonyI18n.render(pin.title, this.uiLanguage))
             .fontSize(15)
@@ -542,16 +624,16 @@ export struct PinmonyDetailPage {
     .width('100%')
     .backgroundColor(Color.Transparent)
     // Session preparation gates the action, not the colors of cached photographs.
-    .stateEffect(((this.readsReady || this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions))
+    .stateEffect(((this.readsReady || this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().relatedRetained) || this.deferredActions))
     .onClick(() => {
-      if (((this.readsReady || this.actionsReady && this.detail.kind !== 'cached' && !this.detail.relatedRetained) || this.deferredActions) && this.onRelated)
+      if (((this.readsReady || this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().relatedRetained) || this.deferredActions) && this.onRelated)
         this.onRelated(pin.pinUrl);
     })
     .accessibilityText(pin.title.length > 0 ? pin.title : this.uiText("pm_open_related_pin_e1e5dfc7"))
   }
 
   private relatedColumn(index: number, columnCount: number): PinmonyRelatedPin[] {
-    return this.detail.related.filter((_pin: PinmonyRelatedPin, pinIndex: number): boolean =>
+    return this.displayedDetail().related.filter((_pin: PinmonyRelatedPin, pinIndex: number): boolean =>
       pinIndex % columnCount === index);
   }
 
@@ -590,7 +672,7 @@ export struct PinmonyDetailPage {
         }.width('100%').padding(0).backgroundColor(Color.Transparent).borderRadius(16)
           .enabled(this.videoActive && !this.contentError)
           .onClick(() => {
-            if (this.videoActive && !this.contentError && this.onRelatedTopic) this.onRelatedTopic(module.id, topic.id, this.detail.pinUrl);
+            if (this.videoActive && !this.contentError && this.onRelatedTopic) this.onRelatedTopic(module.id, topic.id, this.displayedDetail().pinUrl);
           }).accessibilityText(topic.title)
       }, (topic: PinmonyRelatedTopic) => topic.id + ':' + topic.imageUrl + ':' + topic.targetUrl)
     }.width('100%').alignItems(HorizontalAlign.Start)
@@ -617,14 +699,14 @@ export struct PinmonyDetailPage {
     return Math.max(1, this.wideDetail() ? (this.contentWidth - 56) / 2 : this.contentWidth - 36);
   }
   private detailMediaWidth(): number {
-    return this.detail.carousel?.freeScroll && !this.wideDetail() ? this.contentWidth : this.detailPaneWidth();
+    return this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? this.contentWidth : this.detailPaneWidth();
   }
 
   @Builder
   private detailMedia() {
     Column() {
-          if (this.detail.carousel) {
-            PinmonyCarouselView({ carousel: this.detail.carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
+          if (this.displayedDetail().carousel) {
+            PinmonyCarouselView({ carousel: this.displayedDetail().carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
               productOffset: this.productGalleryOffset,
               onProductOffset: (offset: number) => { this.productGalleryOffset = offset; },
               sourceId: 'pinmony-photo-source-' + this.traceId.toString(),
@@ -632,68 +714,68 @@ export struct PinmonyDetailPage {
               hiddenImageUrl: this.zoomImageUrl,
               active: this.videoActive && !this.imageLayer,
               sessionReady: this.actionsReady || this.readsReady,
-              mediaOwner: this.detail.pinUrl + '|' + this.traceId.toString(), openId: this.traceId,
-              autoplayWifi: this.detail.autoplayWifi === true, autoplayCellular: this.detail.autoplayCellular === true,
+              mediaOwner: this.displayedDetail().pinUrl + '|' + this.traceId.toString(), openId: this.traceId,
+              autoplayWifi: this.displayedDetail().autoplayWifi === true, autoplayCellular: this.displayedDetail().autoplayCellular === true,
               onFirstImageSettled: (failed: boolean) => {
-                if (failed) { if (this.onImageError) this.onImageError(this.detail.pinUrl); }
-                else this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
+                if (failed) { if (this.onImageError) this.onImageError(this.displayedDetail().pinUrl); }
+                else this.notifyImageLoaded(this.displayedDetail().pinUrl, this.displayedDetail().imageUrl);
               },
-              onImageTap: (url: string) => { if (!this.disableImageZoom && !this.detail.shuffleId) { this.zoomImageUrl = url; if (this.onImageLayer) this.onImageLayer('zoom'); } } })
-          } else if (((this.detail.mediaLoading || this.mediaReadBusy) && !this.detail.video) || (this.detail.mediaKind === 'carousel' && !this.detail.carousel)) {
+              onImageTap: (url: string) => { if (!this.disableImageZoom && !this.displayedDetail().shuffleId) { this.zoomImageUrl = url; if (this.onImageLayer) this.onImageLayer('zoom'); } } })
+          } else if (((this.displayedDetail().mediaLoading || this.mediaReadBusy) && !this.displayedDetail().video) || (this.displayedDetail().mediaKind === 'carousel' && !this.displayedDetail().carousel)) {
             Stack({ alignContent: Alignment.Center }) {
-              if (this.detail.imageUrl) this.heroImage()
-              if (this.detail.mediaLoading || this.mediaReadBusy) {
+              if (this.displayedDetail().imageUrl) this.heroImage()
+              if (this.displayedDetail().mediaLoading || this.mediaReadBusy) {
                 LoadingProgress().width(28).height(28).color($r('app.color.accent'))
                   .accessibilityText(this.uiText("pm_loading_media_01cf18eb"))
               } else {
                 Column({ space: 12 }) {
-                  PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.mediaError ?? '', this.uiLanguage) || this.uiText("pm_carousel_unavailable_093874a4"), actionText: this.uiText("pm_reload_media_57dfcd7b"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
+                  PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().mediaError ?? '', this.uiLanguage) || this.uiText("pm_carousel_unavailable_093874a4"), actionText: this.uiText("pm_reload_media_57dfcd7b"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
                 }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
               }
             }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
-            if (this.detail.mediaKind === 'carousel') {
+            if (this.displayedDetail().mediaKind === 'carousel') {
               // Reserve the indicator row before the validated slots are ready.
               Row().width('100%').height(28)
             }
-          } else if (this.detail.video && this.detail.isVideo) {
-            PinmonyVideoPlayer({ video: this.detail.video, poster: this.detail.imageUrl, active: this.videoActive, openId: this.traceId,
-              autoplayWifi: this.detail.autoplayWifi === true, autoplayCellular: this.detail.autoplayCellular === true,
-              mediaOwner: this.detail.pinUrl + '|' + this.traceId.toString(),
+          } else if (this.displayedDetail().video && this.displayedDetail().isVideo) {
+            PinmonyVideoPlayer({ video: this.displayedDetail().video, poster: this.displayedDetail().imageUrl, active: this.videoActive, openId: this.traceId,
+              autoplayWifi: this.displayedDetail().autoplayWifi === true, autoplayCellular: this.displayedDetail().autoplayCellular === true,
+              mediaOwner: this.displayedDetail().pinUrl + '|' + this.traceId.toString(),
               sessionReady: this.actionsReady || this.readsReady,
-              readingAddress: this.detail.mediaLoading === true || this.mediaReadBusy,
+              readingAddress: this.displayedDetail().mediaLoading === true || this.mediaReadBusy,
               retryRevision: this.videoRetryRevision,
               onFailureChanged: (pinId: string, message: string) => {
-                if (this.detail.video?.pinId === pinId) this.videoFailure = message;
+                if (this.displayedDetail().video?.pinId === pinId) this.videoFailure = message;
               },
               onPosterSettled: (failed: boolean) => {
-                if (failed) { if (this.onImageError) this.onImageError(this.detail.pinUrl); }
-                else this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
+                if (failed) { if (this.onImageError) this.onImageError(this.displayedDetail().pinUrl); }
+                else this.notifyImageLoaded(this.displayedDetail().pinUrl, this.displayedDetail().imageUrl);
               } })
-          } else if (this.detail.isVideo) {
+          } else if (this.displayedDetail().isVideo) {
             Stack({ alignContent: Alignment.Center }) {
-              Image(this.detail.imageUrl).width('100%')
+              Image(this.displayedDetail().imageUrl).width('100%')
                 .height(this.heroHeight())
                 .objectFit(ImageFit.Contain)
                 .onComplete((event) => {
-                  if (event?.loadingStatus === 1) this.notifyImageLoaded(this.detail.pinUrl, this.detail.imageUrl);
+                  if (event?.loadingStatus === 1) this.notifyImageLoaded(this.displayedDetail().pinUrl, this.displayedDetail().imageUrl);
                 })
-                .onError(() => { if (this.onImageError) this.onImageError(this.detail.pinUrl); })
+                .onError(() => { if (this.onImageError) this.onImageError(this.displayedDetail().pinUrl); })
               Column({ space: 12 }) {
-                PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.videoError ?? '', this.uiLanguage) || this.uiText("pm_no_playable_video_url_available_a548116d"), actionText: this.uiText("pm_reload_video_1472e7f1"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
+                PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().videoError ?? '', this.uiLanguage) || this.uiText("pm_no_playable_video_url_available_a548116d"), actionText: this.uiText("pm_reload_video_1472e7f1"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
               }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
             }.width('100%').borderRadius(18).clip(true)
           } else {
            Stack({ alignContent: Alignment.BottomEnd }) {
-          if (this.detail.imageUrl) {
+          if (this.displayedDetail().imageUrl) {
             this.heroImage()
           }
 
-            if (this.detail.aiLabel) {
+            if (this.displayedDetail().aiLabel) {
               Row() {
-                Text(this.detail.aiLabel).fontSize(14).fontColor(Color.White)
+                Text(this.displayedDetail().aiLabel).fontSize(14).fontColor(Color.White)
                   .padding({ left: 14, right: 14, top: 12, bottom: 12 })
                   .backgroundColor('#B34B4F52').borderRadius(16)
-                  .accessibilityText(this.detail.aiLabel)
+                  .accessibilityText(this.displayedDetail().aiLabel)
               }.width('100%').justifyContent(FlexAlign.Start).padding(8)
                 .hitTestBehavior(HitTestMode.None)
             }
@@ -714,36 +796,39 @@ export struct PinmonyDetailPage {
 
     }.width(this.detailMediaWidth()).id('pinmony-entry-target-' + this.traceId.toString())
       .opacity(this.entryPhotoHidden ? 0 : 1)
-      .margin({ left: this.detail.carousel?.freeScroll && !this.wideDetail() ? -18 : 0,
-        right: this.detail.carousel?.freeScroll && !this.wideDetail() ? -18 : 0 })
+      .margin({ left: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0,
+        right: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0 })
   }
 
   @Builder
   private detailInformation() {
     Column({ space: 18 }) {
-          if (this.detail.shuffleError) {
-            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.shuffleError,this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.onShuffleRetry?.(), actionEnabled: this.videoActive && !this.detail.shuffleLoading })
+          if (this.displayedDetail().shuffleError) {
+            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().shuffleError || '',this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.onShuffleRetry?.(), actionEnabled: this.videoActive && !this.displayedDetail().shuffleLoading })
           }
-          if (this.detail.shuffle) {
-            Scroll() {
+          if (this.displayedDetail().shuffle) {
+            Scroll(this.shuffleStripScroller) {
               Row({space:12}) {
-                ForEach(this.detail.shuffle.items, (item: PinmonyShuffleItem) => {
+                ForEach(this.displayedDetail().shuffle?.items || [], (item: PinmonyShuffleItem) => {
                   if (item.tappable && !item.hidden && item.alpha > 0 && item.imageUrl) {
-                    Image(item.imageUrl).width(80).height(100).objectFit(ImageFit.Contain).borderRadius(12)
+                    Image(item.imageUrl).width(this.shuffleThumbnailWidth(item))
+                      .height(100).objectFit(ImageFit.Cover).borderRadius(12)
                       .accessibilityText(this.uiText('pm_open_original_pin_42977656'))
                       .onClick(() => {if (this.videoActive && this.readsReady) this.onShufflePin?.(item.id);})
                   }
                 }, (item: PinmonyShuffleItem): string => item.id + ':' + this.uiLanguage)
               }
-            }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+            }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.TopStart)
+              .id('pinmony-shuffle-strip-' + this.traceId.toString())
+              .onAreaChange(() => this.revealShuffleReturn())
           }
           if (this.contentError) {
             PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_details_94912123"), onAction: () => { if (this.onContentRetry) this.onContentRetry(); }, actionEnabled: this.contentRetryable })
-          } else if (this.detail.kind !== 'cached' && !this.actionsReady && !this.readsReady && !this.deferredActions) {
-            Text(this.detail.kind === 'cached' ? this.uiText("pm_syncing_pin_status_e1429d05") : this.uiText("pm_verifying_pin_content_cbcfd002"))
+          } else if (this.displayedDetail().kind !== 'cached' && !this.actionsReady && !this.readsReady && !this.deferredActions) {
+            Text(this.displayedDetail().kind === 'cached' ? this.uiText("pm_syncing_pin_status_e1429d05") : this.uiText("pm_verifying_pin_content_cbcfd002"))
               .fontSize(14).fontColor($r('app.color.secondary_text'))
-          } else if (this.detail.kind !== 'cached' && (this.detail.actionsRetained || this.detail.commentsRetained || this.detail.relatedRetained) &&
-              (this.detail.commentLoading || this.detail.relatedLoading)) {
+          } else if (this.displayedDetail().kind !== 'cached' && (this.displayedDetail().actionsRetained || this.displayedDetail().commentsRetained || this.displayedDetail().relatedRetained) &&
+              (this.displayedDetail().commentLoading || this.displayedDetail().relatedLoading)) {
             Text(this.uiText("pm_syncing_interactions_and_recommendations_d5a043fa")).fontSize(14).fontColor($r('app.color.secondary_text'))
           }
 
@@ -779,29 +864,29 @@ export struct PinmonyDetailPage {
           .alignItems(VerticalAlign.Center)
 
           Column({ space: 6 }) {
-            if (this.detail.creator.length > 0) {
+            if (this.displayedDetail().creator.length > 0) {
               Row({ space: 10 }) {
-                PinmonyUserAvatar({ image: this.detail.creatorAvatar, name: this.detail.creator, avatarSize: 32 })
-                Text(this.detail.creator)
+                PinmonyUserAvatar({ image: this.displayedDetail().creatorAvatar, name: this.displayedDetail().creator, avatarSize: 32 })
+                Text(this.displayedDetail().creator)
                   .fontSize(this.creatorFontSize())
                   .constraintSize({ maxWidth: '80%' })
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.primary_text'))
                   .maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
-                if (this.detail.creatorVerified) {
+                if (this.displayedDetail().creatorVerified) {
                   Image($r('app.media.pinmony_verified_badge')).width(16).height(16)
                     .accessibilityText(this.uiText('pm_verified_9a64637b'))
                 }
               }
               .width('100%')
               .onClick(() => {
-                PinmonyRuntimeLog.info('DetailCreatorTrace: click target=' + (this.detail.creatorUrl ? 'ready' : 'missing'));
-                if (this.detail.creatorUrl && this.onUser) this.onUser(this.detail.creatorUrl);
+                PinmonyRuntimeLog.info('DetailCreatorTrace: click target=' + (this.displayedDetail().creatorUrl ? 'ready' : 'missing'));
+                if (this.displayedDetail().creatorUrl && this.onUser) this.onUser(this.displayedDetail().creatorUrl || '');
               })
             }
-            if (this.detail.title.length > 0) {
-              Text(PinmonyI18n.render(this.detail.title, this.uiLanguage))
+            if (this.displayedDetail().title.length > 0) {
+              Text(PinmonyI18n.render(this.displayedDetail().title, this.uiLanguage))
                 .fontSize(26)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text'))
@@ -809,24 +894,24 @@ export struct PinmonyDetailPage {
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .width('100%')
             }
-            if (this.detail.sourceName && this.detail.sourceName !== this.detail.creator) {
-              Text(this.detail.sourceName).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
+            if (this.displayedDetail().sourceName && this.displayedDetail().sourceName !== this.displayedDetail().creator) {
+              Text(this.displayedDetail().sourceName).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
             }
-            if (this.detail.priceText) {
-              Text(this.detail.priceText).fontSize(18).fontWeight(FontWeight.Bold)
+            if (this.displayedDetail().priceText) {
+              Text(this.displayedDetail().priceText).fontSize(18).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text')).width('100%')
             }
-            if (this.detail.affiliateDisclosure) {
-              Text(this.detail.affiliateDisclosure).fontSize(13)
+            if (this.displayedDetail().affiliateDisclosure) {
+              Text(this.displayedDetail().affiliateDisclosure).fontSize(13)
                 .fontColor($r('app.color.secondary_text')).width('100%')
             }
-            if (this.detail.description.length > 0) {
+            if (this.displayedDetail().description.length > 0) {
               Text() {
-                ForEach(splitDescriptionTags(this.detail.description), (part: PinmonyDescriptionPart) => {
+                ForEach(splitDescriptionTags(this.displayedDetail().description), (part: PinmonyDescriptionPart) => {
                   Span(part.text)
                     .fontColor(part.query ? $r('app.color.link_text') : $r('app.color.primary_text'))
                     .onClick(() => {
-                      if (part.query && this.onTagSearch) this.onTagSearch(part.query, this.detail.pinUrl);
+                      if (part.query && this.onTagSearch) this.onTagSearch(part.query, this.displayedDetail().pinUrl);
                     })
                 })
               }
@@ -848,27 +933,27 @@ export struct PinmonyDetailPage {
                 .onClick(() => this.expanded = !this.expanded)
               }.width('100%')
             }
-            if (this.detail.richDescription && this.detail.richDescription !== this.detail.description) {
-              Text(this.detail.richDescription).fontSize(16).lineHeight(24)
+            if (this.displayedDetail().richDescription && this.displayedDetail().richDescription !== this.displayedDetail().description) {
+              Text(this.displayedDetail().richDescription).fontSize(16).lineHeight(24)
                 .fontColor($r('app.color.secondary_text')).width('100%')
             }
-          if ((this.readsReady || this.actionsReady && this.detail.imageStageReady !== false ||
-              this.detail.kind === 'cached' || this.detail.commentsRetained) && !this.detail.commentEmpty &&
-              !!this.detail.commentPreview?.trim()) {
+          if ((this.readsReady || this.actionsReady && this.displayedDetail().imageStageReady !== false ||
+              this.displayedDetail().kind === 'cached' || this.displayedDetail().commentsRetained) && !this.displayedDetail().commentEmpty &&
+              !!this.displayedDetail().commentPreview?.trim()) {
             Button({ type: ButtonType.Normal }) {
               Column({ space: 2 }) {
-                Text(this.detail.commentPreview || '').fontSize(13).lineHeight(18).maxLines(2)
+                Text(this.displayedDetail().commentPreview || '').fontSize(13).lineHeight(18).maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .fontColor($r('app.color.primary_text')).width('100%')
                 Text(this.uiText("pm_view_all_comments_11ef17e2")).fontSize(13).lineHeight(18).fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text')).width('100%')
               }.width('100%').alignItems(HorizontalAlign.Start)
             }.width('100%').padding(0).borderRadius(0).backgroundColor(Color.Transparent)
-              .enabled((this.readsReady || (this.actionsReady && this.detail.kind !== 'cached' && !this.detail.commentsRetained) || this.deferredActions))
+              .enabled((this.readsReady || (this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().commentsRetained) || this.deferredActions))
               .onClick(() => { if (this.onComments) this.onComments(); })
 
           }
-            if (this.detail.sourceLabel.length > 0 && this.action('source')) {
+            if (this.displayedDetail().sourceLabel.length > 0 && this.action('source')) {
               Button(this.uiText("pm_visit_website_04913c22"))
                 .width('100%')
                 .height(50)
@@ -883,7 +968,7 @@ export struct PinmonyDetailPage {
                     this.onAction(item.id, item.kind);
                   }
                 })
-                .accessibilityText(this.uiText("pm_visit_website_ac9d562e") + this.detail.sourceLabel)
+                .accessibilityText(this.uiText("pm_visit_website_ac9d562e") + this.displayedDetail().sourceLabel)
             }
           }
           .width('100%')
@@ -922,7 +1007,7 @@ export struct PinmonyDetailPage {
       const next: number = Math.max(0, offset + height - previous);
       this.detailScroller.scrollTo({ xOffset: 0, yOffset: next, animation: false });
       this.lastReportedScrollOffset = next;
-      this.onScrollPosition?.(this.detail.pinUrl, next);
+      this.onScrollPosition?.(this.displayedDetail().pinUrl, next);
       PinmonyRuntimeLog.info('DetailScrollTrace: related-anchor adjusted=true');
     } catch (_) { PinmonyRuntimeLog.warn('DetailScrollTrace: related-anchor unavailable'); }
   }
@@ -930,13 +1015,13 @@ export struct PinmonyDetailPage {
   @Builder
   private detailFooter() {
     Column({ space: 12 }) {
-          if (this.detail.kind === 'cached' && !this.detail.relatedLoading && this.detail.relatedError) {
-            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.relatedError, this.uiLanguage), actionText: this.uiText("pm_load_recommendations_08df83f8"), actionEnabled: this.deferredActions || this.readsReady || this.actionsReady, onAction: () => { this.onLoadMore?.(); } })
+          if (this.displayedDetail().kind === 'cached' && !this.displayedDetail().relatedLoading && this.displayedDetail().relatedError) {
+            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().relatedError || '', this.uiLanguage), actionText: this.uiText("pm_load_recommendations_08df83f8"), actionEnabled: this.deferredActions || this.readsReady || this.actionsReady, onAction: () => { this.onLoadMore?.(); } })
           }
-          if (this.detail.kind !== 'cached' && this.detail.dataSource === 'api' && (this.actionsReady || this.readsReady)) {
-            if (!this.detail.relatedLoading && this.detail.relatedError) {
-              PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.relatedError, this.uiLanguage), actionText: this.uiText("pm_retry_recommendations_83cd903e"), onAction: () => { if (this.onLoadMore) this.onLoadMore(); } })
-            } else if (this.detail.relatedEnded && this.detail.related.length === 0) {
+          if (this.displayedDetail().kind !== 'cached' && this.displayedDetail().dataSource === 'api' && (this.actionsReady || this.readsReady)) {
+            if (!this.displayedDetail().relatedLoading && this.displayedDetail().relatedError) {
+              PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().relatedError || '', this.uiLanguage), actionText: this.uiText("pm_retry_recommendations_83cd903e"), onAction: () => { if (this.onLoadMore) this.onLoadMore(); } })
+            } else if (this.displayedDetail().relatedEnded && this.displayedDetail().related.length === 0) {
               Text(this.uiText("pm_no_recommendations_yet_841e1d2f")).fontSize(14).fontColor($r('app.color.secondary_text'))
             }
           }
@@ -948,33 +1033,33 @@ export struct PinmonyDetailPage {
   private heroImage() {
     // Image lifecycle belongs to a component with a stable complete source key.
     Stack() {
-    if (this.detail.shuffle) {
-      PinmonyShuffleCanvas({shuffle:this.detail.shuffle,coverUrl:this.detail.imageUrl,canvasWidthVp:this.detailMediaWidth(),canvasHeightVp:this.heroHeight(),
+    if (this.displayedDetail().shuffle) {
+      PinmonyShuffleCanvas({shuffle:this.displayedDetail().shuffle,hitMasks:this.shuffleHitMasks,coverUrl:this.displayedDetail().imageUrl,canvasWidthVp:this.detailMediaWidth(),canvasHeightVp:this.heroHeight(),
         interactionReady:this.videoActive && this.readsReady && !this.contentError,pinLabel:this.uiText('pm_open_original_pin_42977656'),onPin:this.onShufflePin})
     } else {
-    if (this.detail.imageUrl) {
-      Image(this.detail.imageUrl).width('100%').height(this.heroHeight()).objectFit(ImageFit.Cover)
+    if (this.displayedDetail().imageUrl) {
+      Image(this.displayedDetail().imageUrl).width('100%').height(this.heroHeight()).objectFit(ImageFit.Cover)
         .blur(28).opacity(0.72).hitTestBehavior(HitTestMode.None)
     }
-    ForEach(this.heroImageSources(this.detail.imageUrl, this.detail.pinUrl), (source: DetailHeroSource) => {
-      PinmonyDetailHero({ source: source, openId: this.traceId, heightVp: this.heroHeight(), label: this.detail.title,
-        phase: this.detail.kind, blocked: !!this.contentError, renderIdentity: this.renderIdentity,
-        stageReady: this.detail.imageStageReady === true, confirmedLoaded: this.detail.imageLoaded === true,
-        previewAvailable: this.decodedHeroSource?.pinUrl === this.detail.pinUrl,
+    ForEach(this.heroImageSources(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl), (source: DetailHeroSource) => {
+      PinmonyDetailHero({ source: source, openId: this.traceId, heightVp: this.heroHeight(), label: this.displayedDetail().title,
+        phase: this.displayedDetail().kind, blocked: !!this.contentError, renderIdentity: this.renderIdentity,
+        stageReady: this.displayedDetail().imageStageReady === true, confirmedLoaded: this.displayedDetail().imageLoaded === true,
+        previewAvailable: this.decodedHeroSource?.pinUrl === this.displayedDetail().pinUrl,
         onLoaded: (pin: string, image: string) => {
-          if (!this.heroVisible || source.key !== this.heroRenderKey(this.detail.imageUrl, this.detail.pinUrl) ||
-              pin !== this.detail.pinUrl || image !== this.detail.imageUrl) return;
+          if (!this.heroVisible || source.key !== this.heroRenderKey(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl) ||
+              pin !== this.displayedDetail().pinUrl || image !== this.displayedDetail().imageUrl) return;
           this.notifyImageLoaded(pin, image);
         },
         onFailed: (pin: string) => {
-          if (!this.heroVisible || source.key !== this.heroRenderKey(this.detail.imageUrl, this.detail.pinUrl)) return;
+          if (!this.heroVisible || source.key !== this.heroRenderKey(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl)) return;
         this.lastImageNotification = '';
           if (this.onImageError) this.onImageError(pin);
         }, onRetry: () => this.retryHeroImage(source.key),
-        onTap: () => { if (!this.disableImageZoom && !this.detail.shuffleId) { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } } })
+        onTap: () => { if (!this.disableImageZoom && !this.displayedDetail().shuffleId) { this.zoomImageUrl = ''; if (this.onImageLayer) this.onImageLayer('zoom'); } } })
     }, (source: DetailHeroSource): string => source.key)
     }
-    if (this.detail.shuffleLoading) {
+    if (this.displayedDetail().shuffleLoading) {
       LoadingProgress().width(28).height(28).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
     }
     }.width('100%').height(this.heroHeight()).borderRadius(18).clip(true)
@@ -999,112 +1084,99 @@ export struct PinmonyDetailPage {
   }
 
   @Builder
-  private shufflePreviewCard(item: PinmonyShuffleItem) {
+  private shuffleSelectedCard(item: PinmonyShuffleItem) {
     Column({space:12}) {
       Row({space:12}) {
         Image(item.imageUrl || '').width(64).height(88).objectFit(ImageFit.Cover).borderRadius(10)
+          .onComplete(() => this.shuffleImageReady('card:' + (item.imageUrl || '')))
+          .onError(() => this.shuffleImageReady('card:' + (item.imageUrl || '')))
         Column({space:6}) {
-          Text(this.shufflePreview(item)?.title || '').fontSize(16).fontWeight(FontWeight.Medium).maxLines(2)
+          Text((item.id === this.shuffleItems[this.shuffleIndex]?.id ? this.currentDetail.title : '') || this.shufflePreview(item)?.title || '').fontSize(16).fontWeight(FontWeight.Medium).maxLines(2)
             .fontColor($r('app.color.primary_text')).textOverflow({overflow:TextOverflow.Ellipsis})
-          Text(this.shufflePreview(item)?.creator || '').fontSize(13).maxLines(1).fontColor($r('app.color.secondary_text'))
+          Text((item.id === this.shuffleItems[this.shuffleIndex]?.id ? this.currentDetail.creator : '') || this.shufflePreview(item)?.creator || '').fontSize(13).maxLines(1).fontColor($r('app.color.secondary_text'))
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.width('100%').height(88)
-      Row({space:12}) {
-        Text(this.uiText('pm_save_60a53514')).fontSize(16).fontColor(Color.White).textAlign(TextAlign.Center)
-          .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.detail_save_accent'))
-        if (this.shufflePreview(item)?.sourceUrl) {
-          Text(this.uiText('pm_visit_website_04913c22')).fontSize(16).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center)
-            .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.shuffle_visit_background'))
-        } else {
-          Blank().layoutWeight(1).height(44)
-        }
-      }.width('100%').height(44)
-    }.width('100%').height(188).padding(16).borderRadius(18).backgroundColor($r('app.color.surface_muted'))
-      .hitTestBehavior(HitTestMode.None).accessibilityLevel('no-hide-descendants')
-  }
-
-  @Builder
-  private shuffleSelectedCard() {
-    Column({space:12}) {
-      Row({space:12}) {
-        Image(this.detail.imageUrl || this.shuffleItems[this.shuffleIndex]?.imageUrl || '').width(64).height(88).objectFit(ImageFit.Cover).borderRadius(10)
-        Column({space:6}) {
-          Text(this.detail.title || this.shufflePreview(this.shuffleItems[this.shuffleIndex])?.title || '').fontSize(16).fontWeight(FontWeight.Medium).maxLines(2)
-            .fontColor($r('app.color.primary_text')).textOverflow({overflow:TextOverflow.Ellipsis})
-          Text(this.detail.creator || this.shufflePreview(this.shuffleItems[this.shuffleIndex])?.creator || '').fontSize(13).maxLines(1).fontColor($r('app.color.secondary_text'))
-        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      }.width('100%').height(88)
-      if (this.contentError) {
+        .accessibilityText(this.uiText('pm_open_original_pin_42977656'))
+        .onClick(() => {
+          if (this.videoActive && this.readsReady && item.id === this.shuffleItems[this.shuffleIndex]?.id) this.onShuffleDetail?.(this.currentDetail.pinUrl);
+        }, 8)
+      if (item.id === this.shuffleItems[this.shuffleIndex]?.id && this.contentError) {
         PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError,this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.onContentRetry?.(), actionEnabled: this.contentRetryable })
       }
       Row({space:12}) {
-        if (this.action('save')) {
-          Button(PinmonyI18n.render(this.action('save')!.label,this.uiLanguage),{type:ButtonType.Normal})
+          Button(item.id === this.shuffleItems[this.shuffleIndex]?.id && this.action('save') ? PinmonyI18n.render(this.action('save')!.label,this.uiLanguage) : this.uiText('pm_save_60a53514'),{type:ButtonType.Normal})
             .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.detail_save_accent')).fontColor(Color.White)
-            .enabled(!this.saveBusy && this.acceptsActionIntent(this.action('save')!))
+            .enabled(this.videoActive)
             .onClick(() => {
               const action: PinmonyDetailAction | undefined = this.action('save');
-              if (action && !this.saveBusy && this.acceptsActionIntent(action)) this.onAction?.(action.id,action.kind);
+              if (item.id === this.shuffleItems[this.shuffleIndex]?.id && action && !this.saveBusy && this.acceptsActionIntent(action)) this.onAction?.(action.id,action.kind);
             })
-        } else {
-          Button(this.uiText('pm_save_60a53514'),{type:ButtonType.Normal}).height(44).layoutWeight(1).borderRadius(16)
-            .backgroundColor($r('app.color.detail_save_accent')).fontColor(Color.White).enabled(false)
-        }
-        if ((this.detail.sourceUrl && this.action('source')) ||
-            (this.detail.kind === 'opening' && this.shufflePreview(this.shuffleItems[this.shuffleIndex])?.sourceUrl)) {
+        if ((item.id === this.shuffleItems[this.shuffleIndex]?.id && this.currentDetail.sourceUrl && this.action('source')) ||
+            this.shufflePreview(item)?.sourceUrl) {
           Button(this.uiText('pm_visit_website_04913c22'),{type:ButtonType.Normal})
             .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.shuffle_visit_background')).fontColor($r('app.color.primary_text'))
-            .enabled(!!this.action('source') && this.acceptsActionIntent(this.action('source')!))
+            .enabled(this.videoActive)
             .onClick(() => {
               const action: PinmonyDetailAction | undefined = this.action('source');
-              if (action && this.acceptsActionIntent(action)) this.onAction?.(action.id,action.kind);
+              if (item.id === this.shuffleItems[this.shuffleIndex]?.id && action && this.acceptsActionIntent(action)) this.onAction?.(action.id,action.kind);
             })
-        } else {
-          Blank().layoutWeight(1).height(44)
         }
       }.width('100%').height(44)
-    }.width('100%').constraintSize({minHeight:188}).padding(16).borderRadius(18).backgroundColor($r('app.color.surface_muted'))
+    }.width('100%').constraintSize({minHeight:188}).padding(16).borderRadius(18)
+      .backgroundEffect({radius:28,saturation:1,brightness:1,color:$r('app.color.shuffle_card_glass')})
   }
 
   @Builder
-  private detailContent() {
-    if (this.shuffleSelectedImage) {
+  private shuffleViewerContent() {
       Stack() {
-        Image(this.shuffleBackdrop || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Cover)
-          .blur(80).opacity(0.5).hitTestBehavior(HitTestMode.None)
         Swiper() {
           ForEach(this.shuffleItems, (item: PinmonyShuffleItem) => {
             Column({space:16}) {
               Image(item.cutoutUrl || item.imageUrl || '').width('100%').layoutWeight(1).objectFit(ImageFit.Contain)
+                .alt(item.imageUrl || '')
+                .onComplete(() => this.shuffleImageReady('photo:' + (item.cutoutUrl || item.imageUrl || '')))
+                .onError(() => this.shuffleImageReady('photo:' + (item.cutoutUrl || item.imageUrl || '')))
                 .onClick(() => {
-                  if (this.videoActive && item.id === this.shuffleItems[this.shuffleIndex]?.id) this.onBack?.();
+                  this.closeShuffleViewer(item.id);
                 }, 8)
-              if (item.id === this.shuffleItems[this.shuffleIndex]?.id) {
-                Scroll() { this.shuffleSelectedCard() }.width('100%').height(188)
-              } else {
-                this.shufflePreviewCard(item)
-              }
+              Scroll() { this.shuffleSelectedCard(item) }.width('100%').height(188)
             }.width('100%').height('100%').padding({top:16,bottom:16})
           }, (item: PinmonyShuffleItem): string => item.id + ':' + this.uiLanguage)
         }.width('100%').height('100%').index(this.shuffleIndex).loop(false).indicator(false)
           .prevMargin(20).nextMargin(20).itemSpace(12)
-          .disableSwipe(!this.videoActive || !this.readsReady)
+          .disableSwipe(!this.videoActive)
           .onChange((index: number) => {
-            if (index !== this.shuffleIndex && this.videoActive && this.readsReady && this.shuffleItems[index]) {
+            if (index !== this.shuffleIndex && this.videoActive && this.shuffleViewerVisible() && this.shuffleItems[index]) {
               this.onShufflePin?.(this.shuffleItems[index].id);
             }
           })
       }.width('100%').height('100%').clip(true)
-    } else {
+  }
+
+  @Builder
+  private detailContent() {
+    Stack() {
+      if (this.displayedDetail().shuffle || this.shuffleParentDetail) {
+        Image(this.shuffleBackdrop || this.displayedDetail().imageUrl).width('100%').height('100%').objectFit(ImageFit.Cover)
+          .blur(80).opacity(0.5).hitTestBehavior(HitTestMode.None)
+          .onComplete(() => {
+            this.shuffleReadyBackdrop = this.shuffleBackdrop || this.displayedDetail().imageUrl;
+            this.shuffleImageReady('backdrop');
+          })
+          .onError(() => {
+            this.shuffleReadyBackdrop = this.shuffleBackdrop || this.displayedDetail().imageUrl;
+            this.shuffleImageReady('backdrop');
+          })
+      }
     Column() {
       Scroll(this.detailScroller) {
         Column({ space: 18 }) {
           this.detailHeader()
-          if (this.detail.dataSource === 'api' && !this.isRecommendReady()) {
+          if (this.displayedDetail().dataSource === 'api' && !this.isRecommendReady()) {
             Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
             this.recommendationSkeleton()
-          } else if (this.detail.related.length > 0 && this.isRecommendReady()) {
+          } else if (this.displayedDetail().related.length > 0 && this.isRecommendReady()) {
             Text(this.uiText("pm_more_to_explore_f7cba896"))
               .fontSize(23)
               .fontWeight(FontWeight.Bold)
@@ -1146,7 +1218,7 @@ export struct PinmonyDetailPage {
       .onScrollStop(() => this.reportScrollPosition(true))
       .onReachEnd(() => {
         if (!this.restoredPaginationAllowed) return;
-        if (!this.readsReady && (this.detail.kind === 'cached' || this.detail.relatedRetained)) {
+        if (!this.readsReady && (this.displayedDetail().kind === 'cached' || this.displayedDetail().relatedRetained)) {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=cached-presentation');
           return;
         }
@@ -1154,31 +1226,43 @@ export struct PinmonyDetailPage {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=recommend-not-ready');
           return;
         }
-        if (!this.readsReady && !this.detail.interactionsSettled) {
+        if (!this.readsReady && !this.displayedDetail().interactionsSettled) {
           PinmonyRuntimeLog.info('RecommendAudit: pagination.blocked reason=interactions-pending');
           return;
         }
-        if ((this.actionsReady || this.readsReady) && !this.detail.relatedError && this.onLoadMore) this.onLoadMore();
+        if ((this.actionsReady || this.readsReady) && !this.displayedDetail().relatedError && this.onLoadMore) this.onLoadMore();
       })
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
-    }
+    .opacity(this.shuffleViewerVisible() ? 0 : 1)
+    .hitTestBehavior(this.shuffleSelectedImage && !this.shuffleFullDetail ? HitTestMode.None : HitTestMode.Default)
+    .accessibilityLevel(this.shuffleSelectedImage && !this.shuffleFullDetail ? 'no-hide-descendants' : 'auto')
+      if (this.shuffleSelectedImage && this.shuffleItems.length > 0) {
+        Column() { this.shuffleViewerContent() }.width('100%').height('100%')
+          .opacity(this.shuffleViewerVisible() ? 1 : 0)
+          .hitTestBehavior(this.shuffleViewerVisible() ? HitTestMode.Default : HitTestMode.None)
+          .accessibilityLevel(this.shuffleViewerVisible() ? 'auto' : 'no-hide-descendants')
+      }
+      if (this.shuffleSelectedImage && !this.shuffleFullDetail && !this.shuffleViewerVisible()) {
+        LoadingProgress().width(28).height(28).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+      }
+    }.width('100%').height('100%')
   }
 
   @Builder
   private videoRetryNotice() {
-    if (!this.imageLayer && this.detail.isVideo && this.detail.video &&
-        !this.mediaReadBusy && !this.detail.mediaLoading && (this.detail.videoError || this.videoFailure)) {
+    if (!this.imageLayer && this.displayedDetail().isVideo && this.displayedDetail().video &&
+        !this.mediaReadBusy && !this.displayedDetail().mediaLoading && (this.displayedDetail().videoError || this.videoFailure)) {
       Row({ space: 8 }) {
-        PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.detail.videoError || this.videoFailure, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
-            if (this.detail.videoError) { if (this.onVideoRetry) this.onVideoRetry(); }
+        PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().videoError || this.videoFailure, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
+            if (this.displayedDetail().videoError) { if (this.onVideoRetry) this.onVideoRetry(); }
             else {
               this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0 });
               this.videoRetryRevision = (this.videoRetryRevision + 1) % 1000000;
             }
-          }, actionEnabled: this.videoActive && (this.actionsReady || !!this.detail.videoError) })
+          }, actionEnabled: this.videoActive && (this.actionsReady || !!this.displayedDetail().videoError) })
         PinmonyActionNotice({ active: this.videoActive, message: this.uiText("pm_reload_url_84763306"), actionText: this.uiText("pm_reload_url_84763306"), onAction: () => {
             PinmonyRuntimeLog.info('VideoTrace: openId=' + this.traceId.toString() + ' event=refresh-requested');
             if (this.onVideoRetry) this.onVideoRetry();
@@ -1195,8 +1279,8 @@ export struct PinmonyDetailPage {
         Column() { this.detailContent() }.width('100%').height('100%')
           .hitTestBehavior(this.searchMounted ? HitTestMode.None : HitTestMode.Default)
       if (this.searchMounted) {
-        PinmonyVisualSearchView({ pin: this.detail.pinUrl, imageUrl: this.detail.imageUrl || this.detail.originalImageUrl,
-          imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight, result: this.visualResult,
+        PinmonyVisualSearchView({ pin: this.displayedDetail().pinUrl, imageUrl: this.displayedDetail().imageUrl || this.displayedDetail().originalImageUrl,
+          imageWidth: this.displayedDetail().imageWidth, imageHeight: this.displayedDetail().imageHeight, result: this.visualResult,
           animatePhoto: true, originX: this.searchOrigin.x, originY: this.searchOrigin.y,
           originWidth: this.searchOrigin.width, originHeight: this.searchOrigin.height, closing: this.searchClosing,
           onTransitionReady: () => { this.searchImageReady = true; },
@@ -1213,7 +1297,7 @@ export struct PinmonyDetailPage {
     .titleBar(this.titleBarOptions())
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideBackButton(false)
-    .hideTitleBar(false)
+    .hideTitleBar(this.shuffleViewerVisible())
     .onBackPressed(() => {
       PinmonyRuntimeLog.info('PinmonyReturn: detail destination back');
       if (this.searchMounted && this.searchClosing) return true;
@@ -1239,9 +1323,9 @@ export struct PinmonyDetailPage {
         PinmonyDetailEntryMotion({ photo: this.entryPhoto,
           targetId: 'pinmony-entry-target-' + this.traceId.toString(),
           rootId: 'pinmony-photo-root-' + this.traceId.toString(),
-          imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight,
+          imageWidth: this.displayedDetail().imageWidth, imageHeight: this.displayedDetail().imageHeight,
           restoredOffset: this.initialScrollOffset,
-          bottomInset: this.detail.carousel ? 28 : 0, closing: this.entryClosing,
+          bottomInset: this.displayedDetail().carousel ? 28 : 0, closing: this.entryClosing,
           onReveal: (closing: boolean, pageExit: boolean) => {
             this.entryPhotoHidden = !pageExit;
             this.getUIContext().animateTo({ duration: closing ? 200 : 240, curve: Curve.EaseOut }, () => {
@@ -1254,8 +1338,8 @@ export struct PinmonyDetailPage {
           .hitTestBehavior(HitTestMode.None)
       }
       if (this.viewerMounted) {
-        PinmonyImageViewer({ detail: this.detail, imageUrl: this.zoomImageUrl || this.detail.originalImageUrl || this.detail.imageUrl,
-          previewUrl: this.zoomImageUrl || this.detail.imageUrl,
+        PinmonyImageViewer({ detail: this.displayedDetail(), imageUrl: this.zoomImageUrl || this.displayedDetail().originalImageUrl || this.displayedDetail().imageUrl,
+          previewUrl: this.zoomImageUrl || this.displayedDetail().imageUrl,
           origin: this.viewerOrigin, closing: this.viewerClosing,
           onReady: () => { this.viewerImageReady = true; },
           onClosed: () => {

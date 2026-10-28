@@ -2,9 +2,9 @@
   "app": {
     "bundleName": "com.pinmony.app",
     "vendor": "example",
-    "versionCode": 2004000,
-    "versionName": "2.4.0",
-    "buildVersion": "8",
+    "versionCode": 2005000,
+    "versionName": "2.5.0",
+    "buildVersion": "9",
     "icon": "$media:pinmony_logo",
     "label": "$string:app_name"
   }

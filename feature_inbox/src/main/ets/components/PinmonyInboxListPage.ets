@@ -132,7 +132,7 @@ export struct PinmonyInboxListPage {
         }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 12 })
         Scroll(this.scroller) {
           Column({ space: 8 }) {
-            if (this.loading()) { LoadingProgress().width(28).height(28) }
+            if (this.loading()) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
             if (this.error()) {
               PinmonyActionNotice({ message: PinmonyI18n.render(this.error(), this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {
                 if (this.section === 'contacts') this.onContactsRetry(); else this.onRetry();
@@ -179,7 +179,7 @@ export struct PinmonyInboxListPage {
         }
         Scroll(this.searchScroller) {
           Column({ space: 8 }) {
-            if (this.loading()) { LoadingProgress().width(28).height(28) }
+            if (this.loading()) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
             if (this.error()) {
               PinmonyActionNotice({ message: PinmonyI18n.render(this.error(), this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {
                 if (this.section === 'contacts') this.onContactsRetry(); else this.onRetry();

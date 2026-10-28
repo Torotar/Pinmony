@@ -47,10 +47,10 @@ owner.businessSuspended=true;owner.capturePinEntryPhoto('pin','image','old',800,
 console.log('Board/search entry capture: exact source ownership, dimensions, window conversion and suspended guard passed');
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
 assert(page.includes('this.entryPhoto && (!this.entryMotionComplete || this.entryClosing)'), 'finished entry overlay must leave the hit-test tree');
-assert.match(page,/Image\(this\.detail\.imageUrl\)[\s\S]{0,180}\.blur\(28\)[\s\S]{0,100}HitTestMode\.None/,'photo detail places a non-interactive blurred cover under the clear image');
+assert.match(page,/Image\(this\.displayedDetail\(\)\.imageUrl\)[\s\S]{0,180}\.blur\(28\)[\s\S]{0,100}HitTestMode\.None/,'photo detail places a non-interactive blurred cover under the clear image');
 assert(page.includes('@Prop disableImageZoom: boolean = false;'),'detail exposes source-specific zoom suppression');
-assert.match(page,/onImageTap: \(url: string\) => \{ if \(!this\.disableImageZoom && !this\.detail\.shuffleId\)/,'collage detail suppresses carousel zoom without changing normal Pin behavior');
-assert.match(page,/onTap: \(\) => \{ if \(!this\.disableImageZoom && !this\.detail\.shuffleId\)/,'collage detail suppresses hero zoom without changing normal Pin behavior');
+assert.match(page,/onImageTap: \(url: string\) => \{ if \(!this\.disableImageZoom && !this\.displayedDetail\(\)\.shuffleId\)/,'collage detail suppresses carousel zoom without changing normal Pin behavior');
+assert.match(page,/onTap: \(\) => \{ if \(!this\.disableImageZoom && !this\.displayedDetail\(\)\.shuffleId\)/,'collage detail suppresses hero zoom without changing normal Pin behavior');
 const profilePage=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
 assert(profilePage.includes(".id('pinmony-profile-photo-' + pin.id)"),'profile collage pins expose stable entry-photo geometry');
 const profileOpen=indexSource.slice(indexSource.indexOf('private async performProfileAction'),indexSource.indexOf('private async ',indexSource.indexOf('private async performProfileAction')+1));
@@ -86,7 +86,7 @@ function findAnchor(n){if(ts.isMethodDeclaration(n)&&n.name.getText(pageFile)===
 const Anchor=vm.runInNewContext(ts.transpileModule('class Anchor {'+anchorMethod+'} Anchor;', {compilerOptions:{target:99}}).outputText,{PinmonyRuntimeLog:{info:()=>{},warn:()=>{}}});
 const anchor=new Anchor();let scroll=900;Object.assign(anchor,{measuredHeaderHeight:600,restoringScroll:false,detail:{pinUrl:'pin'},detailScroller:{offset:()=>({yOffset:scroll}),scrollTo:o=>scroll=o.yOffset},onScrollPosition:()=>{}});anchor.preserveRelatedAnchor(680);assert.equal(scroll,980,'header growth preserves related card screen position');anchor.preserveRelatedAnchor(580);assert.equal(scroll,880,'header shrink preserves related card screen position');scroll=100;anchor.preserveRelatedAnchor(630);assert.equal(scroll,100,'hero viewport must not be moved');
 assert(page.includes('pin.pinUrl || pin.id'),'recommendation nodes survive image metadata refresh');assert(indexSource.includes('pinmony-related-photo-'),'related route captures exact card');
-assert(page.includes("'pinmony-related-photo-' + this.detail.pinUrl + '-' + pin.pinUrl"), 'source geometry uses parent and target routes independent of cached IDs and opening tokens');
+assert(page.includes("'pinmony-related-photo-' + this.displayedDetail().pinUrl + '-' + pin.pinUrl"), 'source geometry uses parent and target routes independent of cached IDs and opening tokens');
 assert(indexSource.includes("'pinmony-related-photo-' + parent + '-' + target"), 'geometry lookup matches the retained image node');
 console.log('Related entry capture, stable card identity and header anchor compensation passed');
 

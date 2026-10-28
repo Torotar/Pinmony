@@ -150,7 +150,7 @@ export struct PinmonyOrganizePage {
           else { Blank().layoutWeight(1) }
         }.width('100%').alignItems(VerticalAlign.Top)
       }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
-      if (this.pinsLoading) { LoadingProgress().width(28).height(28) }
+      if (this.pinsLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
       else if (this.pinsError) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.pinsError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.act('retryPins'), actionEnabled: !this.state.uncertain })
       }

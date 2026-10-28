@@ -39,7 +39,7 @@ export struct PinmonySearchFilterSheet {
     Column() {
       if (this.searchStore.searchFilterLoading) {
         Row({ space: 12 }) {
-          LoadingProgress()
+          LoadingProgress().color($r('app.color.accent'))
             .width(24)
             .height(24)
           Text(this.uiText("pm_loading_filters_e07a2b70"))

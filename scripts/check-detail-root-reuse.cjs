@@ -13,7 +13,7 @@ assert(index.includes('ForEach(this.detailPresentationIdentities()'),
   'detail root ForEach must use stable Pin identity');
 assert(index.includes('? this.detailRenderIdentity() : _identity'),
   'volatile render identity must remain available to the detail component');
-assert(detail.includes('ForEach(this.heroImageSources(this.detail.imageUrl, this.detail.pinUrl)') && detail.includes('=> source.key'),
+assert(detail.includes('ForEach(this.heroImageSources(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl)') && detail.includes('=> source.key'),
   'hero image source identity controls structural node reuse');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
@@ -32,7 +32,7 @@ routes.pinStore.detail=parent;routes.homeEntryPhoto=undefined;
 assert.equal(routes.detailPresentationIdentities().join(','),'101','return removes only the child, preserving the original parent node');
 const method = name => detail.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0];
 const context = {};
-require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page {
+require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page { displayedDetail() { return this.detail; }
   ${method('onPinChanged')}
   ${method('heroRenderKey')}
   ${method('heroImageSources')}

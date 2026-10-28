@@ -115,7 +115,7 @@ export struct PinmonyBoardOrderPage {
     HdsNavDestination() {
       Scroll(this.scroller) {
         Column({ space: 4 }) {
-          if (this.busy) { LoadingProgress().width(32).height(32) }
+          if (this.busy) { LoadingProgress().color($r('app.color.accent')).width(32).height(32) }
           if (this.error) { PinmonyActionNotice({ message: this.text(this.error) }) }
           ForEach(this.ordered, (board: PinmonyBoard, index: number) => {
             Row({ space: 14 }) {

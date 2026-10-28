@@ -13,7 +13,7 @@ export struct PinmonyMoreSheet {
     Column() {
       if (this.pinStore.moreLoading) {
         Row({ space: 12 }) {
-          LoadingProgress()
+          LoadingProgress().color($r('app.color.accent'))
             .width(24)
             .height(24)
           Text(this.uiText("pm_loading_options_a22ab0b2"))

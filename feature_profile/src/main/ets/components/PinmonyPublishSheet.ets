@@ -88,7 +88,7 @@ export struct PinmonyPublishSheet {
           .onClick(() => { if (this.onSection) this.onSection(); })
       }
       if (this.loading) {
-        LoadingProgress().width(28).height(28)
+        LoadingProgress().color($r('app.color.accent')).width(28).height(28)
         Text(this.uiText("pm_preparing_to_publish_97f29dc9"))
           .fontSize(14)
           .fontColor($r('app.color.secondary_text'))

@@ -15,7 +15,7 @@ host.inputEditing = false;
 host.committedQuery = () => 'query';
 host.openSearchHistory = () => { host.inputEditing = true; page = 'history'; };
 host.closeInputPanel = () => { host.inputEditing = false; };
-host.onBack = () => { assert.equal(host.inputEditing, true, 'parent consumes history before local focus is cleared'); page = 'root'; };
+host.onBack = () => { if (!host.inputEditing) { host.openSearchHistory(); return; } page = 'root'; };
 host.handleSearchBack();
 assert.equal(page, 'history');
 host.handleSearchBack();

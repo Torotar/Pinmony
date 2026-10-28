@@ -12,7 +12,7 @@ function page() {
   return Object.assign(new sandbox.Page(), {
     rootExitBackAt: 0, showMessage() {},
     getUIContext: () => ({ getHostContext: () => ({ terminateSelf: () => Promise.resolve() }) }),
-    nativeChildBackUntil: 0, authStatus: 'authenticated', profileSettingsVisible: false,
+    nativeChildBackUntil: 0, authStatus: 'authenticated', profileSettingsVisible: false, authWebVisible: () => false,
     pinStore: { shareBackHandledUntil: 0 }, inboxStore: {}, profileStore: { origins: [] }, searchStore: {}, boardStore: {},
     activeSheetKind: '', pageHistory: { isPending: () => false },
     nativeRootTabsVisible: () => true,
@@ -25,8 +25,8 @@ for (const activeTab of [0, 1, 2, 3]) {
   assert.equal(root.onBackPress(), true, 'each root consumes the first back and prompts, even if data failed');
   assert(root.rootExitBackAt > 0);
 }
-const login = page(); login.authStatus = 'error'; login.nativeRootTabsVisible = () => false;
-assert.equal(login.onBackPress(), false, 'failed login screen can exit');
+const login = page(); login.authStatus = 'checking'; login.authWebVisible = () => true; login.nativeRootTabsVisible = () => false;
+assert.equal(login.onBackPress(), false, 'visible login screen delegates back');
 const sheet = page(); let closed = 0;
 sheet.activeSheetKind = 'comments'; sheet.dismissApiComments = () => { closed++; sheet.activeSheetKind = ''; };
 assert.equal(sheet.onBackPress(), true); assert.equal(closed, 1);

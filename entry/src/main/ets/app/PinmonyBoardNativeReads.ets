@@ -30,7 +30,7 @@ interface BoardVideo { duration?: number; }
 interface BoardVideos { video_list?: Record<string, BoardVideo>; }
 interface BoardPinData { favorited_by_me?: boolean; type: string; id: string; images?: Record<string, BoardImage>; image_large_url?: string;
   image_medium_url?: string; image_large_size_pixels?: BoardDimensions; image_medium_size_pixels?: BoardDimensions;
-  grid_title?: string; title?: string; pinner?: BoardUser; board?: BoardPinOwner; videos?: BoardVideos; tracking_params?: string; }
+  grid_title?: string; title?: string; description?: string; link?: string; pinner?: BoardUser; board?: BoardPinOwner; videos?: BoardVideos; tracking_params?: string; }
 interface BoardPinOwner { id: string; section_count?: number; }
 interface BoardCreatedSection { id: string; title: string; pin_count?: number | null; board: BoardPinOwner; }
 interface BoardToolData { type: string; tool: number; text: string; }
@@ -41,10 +41,10 @@ interface BoardContext { user?: BoardUser; }
 interface BoardRequestResource { options?: BoardReadOptions; }
 interface BoardReadOptions { currentFilter?: number; board_url?: string; layout?: string; url?: string; data?: BoardSectionFields; field_set_key?: string; is_mobile_fork?: boolean; username?: string; slug?: string; board_id?: string;
   add_vase?: boolean; filter_section_pins?: boolean; is_react?: boolean; prepend?: boolean; page_size?: number;
-  redux_normalize_feed?: boolean; gated?: boolean; is_own_profile_pins?: boolean; section_id?: string; bookmarks?: string[]; id?: string; type?: string; __track__referrer?: number; privacy_filter?: string; sort?: string; filter_stories?: boolean; group_by?: string; include_archived?: boolean; filter_all_pins?: boolean; status_filters?: string; include_inactive?: boolean; suggestion_type?: string; board?: string; }
+  redux_normalize_feed?: boolean; gated?: boolean; is_own_profile_pins?: boolean; section_id?: string; bookmarks?: string[]; id?: string; type?: string; __track__referrer?: number | string; privacy_filter?: string; sort?: string; filter_stories?: boolean; group_by?: string; include_archived?: boolean; filter_all_pins?: boolean; status_filters?: string; include_inactive?: boolean; suggestion_type?: string; board?: string; }
 interface BoardTargetData { type: string; id: string; name?: string; section_count?: number; image_cover_url?: string; archived_by_me_at?: string; archived_by_me?: boolean; access?: string[] | string; privacy?: string; }
 interface BoardInviteData { board: BoardPinOwner; invited_user: BoardUser; status: string; }
-interface BoardSourcePin { id: string; tracking_params?: string; }
+interface BoardSourcePin { id: string; tracking_params?: string; title?: string; description?: string; link?: string; }
 interface BoardAuxiliary { flowOwned: boolean; sourcePins: BoardSourcePin[]; selectedIds: string[]; targetBookmark: string; collaborators?: PinmonyBoardCollaborators; }
 interface BoardPreparedContext { session: number; page: string; version: number; }
 interface BoardPermissionValue { permission: number; invites: boolean; }
@@ -78,7 +78,7 @@ export class PinmonyBoardNativeReads {
   private reload: number = 0; private sectionsReload: number = 0; private refreshQueued: boolean = false;
   private readonly requests: Set<string> = new Set<string>();
   private preparing: boolean = false; private flowEpoch: number = 0; private collabEpoch: number = 0;
-  private targetCursor: string = ''; private selectedIds: string[] = []; private sources: BoardSourcePin[] = [];
+  private targetCursor: string = ''; private ideaCursor: string = ''; private selectedIds: string[] = []; private sources: BoardSourcePin[] = [];
   private readonly flowRequests: Set<string> = new Set<string>(); private readonly collabRequests: Set<string> = new Set<string>();
   private readonly sectionRequests: Set<string> = new Set<string>();
   private readonly contentWrites: PinmonyBoardContentNativeWrites;
@@ -336,7 +336,7 @@ export class PinmonyBoardNativeReads {
       return true;
     }
     const phase: string = this.store.boardDetail?.flow?.phase || '';
-    if(['ideas','select','targets','targetsMore','edit','archiveConfirm'].includes(a.action) || ['ideas','targets','edit'].includes(phase) && a.action === 'retry' || a.action === 'close') {
+    if(['ideas','ideasMore','select','targets','targetsMore','edit','archiveConfirm'].includes(a.action) || ['ideas','targets','edit'].includes(phase) && a.action === 'retry' || a.action === 'close') {
       await this.auxiliaryAction(a);return true;
     }
     if(a.action === 'saveParentIdea') {
@@ -513,6 +513,7 @@ export class PinmonyBoardNativeReads {
       const recover: boolean = old?.uncertain === true || old?.phase === 'archived';this.cancelFlow();this.cancelSection();this.flow = this.emptyFlow();this.sectionSource = undefined;this.targetCursor = '';this.selectedIds = [];this.sources = [];this.syncAuxiliary();if(recover)await this.refresh();return;
     }
     if(!this.verified || !this.ready || old?.uncertain)return;
+    if(a.action === 'ideasMore') {if(old?.phase === 'ideas' && !old.sectionId && !old.error)await this.readAuxiliary('ideas',true);return;}
     if(a.action === 'sectionTargetBack' && old?.phase === 'targets') {this.cancelFlow();old.targetBoardId = undefined;old.targetSections = undefined;old.loading = false;old.error = '';this.flow = old;this.syncAuxiliary();return;}
     if(a.action === 'sectionTargetOpen' && typeof a.value === 'string' && this.contributes()) {await this.readTargetSections(a.value);return;}
     if(old?.loading && (a.action === old.phase || a.action === 'retry'))return;
@@ -528,24 +529,39 @@ export class PinmonyBoardNativeReads {
     if(a.action === 'retry' && old?.phase === 'targets' && old.targetBoardId){await this.readTargetSections(old.targetBoardId);return;}
     if(a.action === 'retry' && old?.phase === 'ideas' && old.sectionId && this.sectionSource){this.cancelFlow();this.flow = this.sectionSource;this.flow.phase = 'section';this.sectionSource = undefined;await this.readSectionIdeas();return;}
     const phase: string = a.action === 'retry' ? old?.phase || '' : a.action;
-    if(['ideas','targets','edit'].includes(phase))await this.readAuxiliary(phase,a.action === 'retry' && phase === 'targets' && !!this.targetCursor);
+    if(['ideas','targets','edit'].includes(phase))await this.readAuxiliary(phase,a.action === 'retry' && (phase === 'targets' && !!this.targetCursor || phase === 'ideas' && !!this.ideaCursor));
   }
   private async readAuxiliary(phase: string, append: boolean): Promise<void> {
     if(!this.current() || !this.board || this.store.boardDetail?.flow?.busy || append && (this.flow?.loading || !this.flow?.hasMore && !this.flow?.error))return;
     const mergeTargets: boolean = phase === 'mergeTargets';
     if(mergeTargets)phase = 'targets';
     this.cancelFlow();const epoch: number = this.flowEpoch, revision: number = this.revision, board: BoardData = this.board;
-    if(!append){this.flow = this.emptyFlow();if(this.sectionSource && phase === 'targets'){this.flow.sectionId = this.sectionSource.sectionId;this.flow.sectionTitle = this.sectionSource.sectionTitle;this.flow.pins = this.sectionSource.pins.slice();}if(phase === 'ideas')this.sources = [];}
+    if(!append){this.flow = this.emptyFlow();if(this.sectionSource && phase === 'targets'){this.flow.sectionId = this.sectionSource.sectionId;this.flow.sectionTitle = this.sectionSource.sectionTitle;this.flow.pins = this.sectionSource.pins.slice();}if(phase === 'ideas'){this.sources = [];this.ideaCursor = '';}}
     const f: PinmonyBoardFlow | undefined = this.flow;if(!f)return;f.phase = mergeTargets ? 'mergeTargets' : phase;f.loading = true;f.error = '';this.syncAuxiliary();
     const live = (): boolean => this.current() && revision === this.revision && epoch === this.flowEpoch && this.flow === f;
     try {
       let name: string = 'BoardResource', o: BoardReadOptions = {board_id:board.id,field_set_key:'edit'};
-      if(phase === 'ideas'){name = 'BoardContentRecommendationResource';o = {id:board.id,type:'board',__track__referrer:23};}
+      if(phase === 'ideas'){name = 'BoardContentRecommendationResource';o = {id:board.id,type:'board',__track__referrer:this.page.slice(this.origin.length).split('/')[2] === '_products_you_tagged' ? '23' : 23};if(append)o.bookmarks = [this.ideaCursor];}
       else if(phase === 'targets'){name = 'BoardsResource';o = {privacy_filter:'all',sort:'custom',field_set_key:'profile_grid_item',filter_stories:true,username:board.owner.username,page_size:25,group_by:'mix_public_private',include_archived:true,filter_all_pins:false};if(append)o.bookmarks = [this.targetCursor];}
       const body: BoardResponse = await this.request(name,o,revision,-1,true,live);
       if(phase === 'ideas') {
         const rows: BoardPinData[] = body.resource_response.data as BoardPinData[];if(!Array.isArray(rows) || rows.length > 500)throw new Error('ideas');
-        const pins: PinmonyBoardPin[] = [], sources: BoardSourcePin[] = [];rows.forEach((p: BoardPinData): void => {if (isProductPin(p)) return;let pin: PinmonyBoardPin;try {pin = this.mapPin(p);}catch (_) {return;}if(!pins.some((old: PinmonyBoardPin): boolean => old.id === pin.id)){pins.push(pin);sources.push({id:pin.id,tracking_params:typeof p.tracking_params === 'string' && p.tracking_params.length <= 16384 ? p.tracking_params : undefined});}});if(rows.some((p: BoardPinData): boolean => p?.type === 'pin' && !isProductPin(p)) && !pins.length)throw new Error('unsupported-ideas');f.pins = pins;this.sources = sources;f.saved = this.pinWrites.savedIds();
+        const products: boolean = this.page.slice(this.origin.length).split('/')[2] === '_products_you_tagged';
+        if(products && body.resource_response.endpoint_name !== 'v3_get_board_ideas_feed')throw new Error('ideas-endpoint');
+        const pins: PinmonyBoardPin[] = append ? f.pins.slice() : [], sources: BoardSourcePin[] = append ? this.sources.slice() : [];
+        let mapped: number = 0;
+        rows.forEach((p: BoardPinData): void => {
+          if(!products && isProductPin(p))return;
+          let pin: PinmonyBoardPin;try {pin = this.mapPin(p);}catch (_) {return;}mapped++;
+          if(!pins.some((old: PinmonyBoardPin): boolean => old.id === pin.id)){
+            pins.push(pin);sources.push({id:pin.id,tracking_params:typeof p.tracking_params === 'string' && p.tracking_params.length <= 16384 ? p.tracking_params : undefined,
+              title:typeof p.title === 'string' ? p.title.slice(0,1000) : '',description:typeof p.description === 'string' ? p.description.slice(0,10000) : '',link:typeof p.link === 'string' ? p.link.slice(0,8192) : ''});
+          }
+        });
+        if(rows.some((p: BoardPinData): boolean => p?.type === 'pin' && (products || !isProductPin(p))) && !mapped)throw new Error('unsupported-ideas');
+        const next: string = this.next(body);
+        f.pins = pins.slice(0,500);this.sources = sources.slice(0,500);f.saved = this.pinWrites.savedIds();
+        f.hasMore = !!next && next !== '-end-' && next !== this.ideaCursor && !!rows.length && pins.length < 500;this.ideaCursor = next;
       } else if(phase === 'targets') {
         const rows: BoardTargetData[] = body.resource_response.data as BoardTargetData[];if(!Array.isArray(rows) || rows.length > 500)throw new Error('targets');
         const targets: PinmonyBoardTarget[] = append ? f.targets.slice() : [];

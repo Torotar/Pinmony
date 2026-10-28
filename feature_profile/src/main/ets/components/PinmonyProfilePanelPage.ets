@@ -194,7 +194,7 @@ export struct PinmonyProfilePanelPage {
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
           .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))
       if (this.snapshot.loading) {
-        LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
     }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])

@@ -57,11 +57,7 @@ export struct PinmonyNotificationsPage {
           ForEach(this.store.notifications, (group: NotificationGroup) => {
             Text(PinmonyNotificationCopy.group(group, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
             Column() {
-            ForEach(group.categories, (category: NotificationCategory, categoryIndex: number) => {
-              if (categoryIndex > 0) {
-                Row() { Divider().strokeWidth(0.5).color($r('app.color.secondary_text')).opacity(0.25) }
-                  .width('100%').padding({left:16,right:16})
-              }
+            ForEach(group.categories, (category: NotificationCategory) => {
               Column({ space: 8 }) {
                 Row() {
                   Text(PinmonyNotificationCopy.category(category, this.uiLanguage)).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -90,14 +86,14 @@ export struct PinmonyNotificationsPage {
                 }
               }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
             }, (category: NotificationCategory): string => group.key + ':' + category.key + ':' + this.uiLanguage)
-            }.width('100%').backgroundColor($r('app.color.display_settings_card')).borderRadius(20).clip(true)
+            }.width('100%')
           }, (group: NotificationGroup): string => group.key + ':' + this.uiLanguage)
           if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text(this.uiText("pm_no_notification_settings_available_b02ac445")).fontColor($r('app.color.secondary_text')) }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, bottom: 28 })
       }.width('100%').height('100%').align(Alignment.TopStart)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
     }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,

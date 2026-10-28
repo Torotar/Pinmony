@@ -78,7 +78,7 @@ export struct PinmonyBoardCollaboratorsPage {
         Column() {
           Scroll(this.scroller) {
             Column({ space: 16 }) {
-              if (this.snapshot.loading || this.snapshot.busy) { LoadingProgress().width(28).height(28) }
+              if (this.snapshot.loading || this.snapshot.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
               if (this.snapshot.error) {
                 PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onAction('retry', ''), actionEnabled: !this.snapshot.uncertain && !this.snapshot.busy })
               } else if (!this.snapshot.loading) {

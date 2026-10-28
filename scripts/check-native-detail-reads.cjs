@@ -316,7 +316,7 @@ async function main() {
   const post = { reset() {}, resourceRequest() { throw Error('duplicate preview'); } };
   vm.runInNewContext(extension, { window: { PinmonyPostApi: post, PinmonyPostExtensionsEnabled: true, PinmonyNativeDetailReadsEnabled: true } });
   assert.equal(post.previewRead(pinUrl(1)), null, 'Web preview delegates to native ownership');
-  const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
+  const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8').replaceAll('this.displayedDetail()', 'this.detail');
   const visibility = page.match(/if \(\((this\.readsReady \|\| this\.actionsReady && this\.detail\.imageStageReady[^]*?)\) \{/)[1];
   const shows = view => !!vm.runInNewContext('(function(){return ((' + visibility + ');}).call(view)', { view });
   const view = { readsReady: true, actionsReady: false, detail: { kind: 'state', imageStageReady: false, commentsAvailable: true, commentEmpty: false, commentPreview: 'preview' } };

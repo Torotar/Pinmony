@@ -47,5 +47,5 @@ for(const status of [0,1]) {
 console.log('Image search readiness: data-ready unblocks hidden flight without waiting for render passed');
 
 const detailPage=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
-assert.match(detailPage,/PinmonyVisualSearchView\(\{ pin: this.detail.pinUrl, imageUrl: this.detail.imageUrl \|\| this.detail.originalImageUrl/,'search entry must reuse the displayed image before requesting original size');
+assert.match(detailPage,/PinmonyVisualSearchView\(\{ pin: this\.displayedDetail\(\)\.pinUrl, imageUrl: this\.displayedDetail\(\)\.imageUrl \|\| this\.displayedDetail\(\)\.originalImageUrl/,'search entry must reuse the displayed image before requesting original size');
 console.log('Visual search entry reuses displayed detail image passed');

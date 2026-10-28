@@ -12,6 +12,9 @@ export interface PinmonyShuffleItem {
   cutoutUrl?: string;
   imageWidth: number;
   imageHeight: number;
+  hitWidth?: number;
+  hitHeight?: number;
+  hitMask?: string;
   offsetX: number;
   offsetY: number;
   scale: number;
@@ -23,6 +26,7 @@ export interface PinmonyShuffleItem {
 }
 
 export interface PinmonyShuffleSnapshot {
+  coordinateWidth?: number;
   canvasWidth: number;
   canvasHeight: number;
   id: string;

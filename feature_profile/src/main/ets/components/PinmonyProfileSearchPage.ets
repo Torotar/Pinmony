@@ -53,7 +53,7 @@ export struct PinmonyProfileSearchPage {
                     }.layoutWeight(1).constraintSize({ minHeight: 44 }).onClick(() => { if (!item.deleting) this.submit(item.query); })
                     if (!this.snapshot.query.trim()) {
                       Button({ type: ButtonType.Circle }) {
-                        if (item.deleting) { LoadingProgress().width(16).height(16) }
+                        if (item.deleting) { LoadingProgress().color($r('app.color.accent')).width(16).height(16) }
                         else { SymbolGlyph($r('sys.symbol.xmark')).fontSize(14).fontColor([$r('app.color.secondary_text')]) }
                       }.width(36).height(36).padding(0).backgroundColor(Color.Transparent)
                         .enabled(item.deletable === true && !item.deleting)
@@ -86,7 +86,7 @@ export struct PinmonyProfileSearchPage {
                 ForEach(this.snapshot.pins, (pin: PinmonyProfileSearchPin) => { GridCol() { this.pin(pin) } }, (pin: PinmonyProfileSearchPin) => pin.id)
               }.width('100%')
             }
-            if (this.snapshot.loading) { LoadingProgress().width(28).height(28) }
+            if (this.snapshot.loading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
             if (this.snapshot.error) {
               PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => this.onRetry() })
             } else if (!this.snapshot.editing && !this.snapshot.loading && !this.snapshot.pins.length) {

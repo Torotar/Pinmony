@@ -147,7 +147,7 @@ export struct PinmonyCommentsSheet {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.actionError, this.uiLanguage) })
       }
       if (this.result.items.length === 0 && this.result.loading) {
-        LoadingProgress().width(32).height(32)
+        LoadingProgress().color($r('app.color.accent')).width(32).height(32)
         Text(this.uiText("pm_loading_comments_dded3fba")).fontColor($r('app.color.secondary_text'))
         Blank().layoutWeight(1)
       } else {
@@ -170,7 +170,7 @@ export struct PinmonyCommentsSheet {
                 if (item.repliesOpen) {
                   Column({ space: 14 }) {
                     if (item.repliesLoading) {
-                      LoadingProgress().width(24).height(24)
+                      LoadingProgress().color($r('app.color.accent')).width(24).height(24)
                     }
                     ForEach(item.replies || [], (reply: PinmonyComment) => {
                       this.commentRow(reply, true)
@@ -193,7 +193,7 @@ export struct PinmonyCommentsSheet {
                   else if (this.onRetry) this.onRetry();
                 } })
               } else if (this.result.loading) {
-                LoadingProgress().width(28).height(28)
+                LoadingProgress().color($r('app.color.accent')).width(28).height(28)
               } else if (this.result.items.length === 0) {
                 Text(this.uiText("pm_write_a_comment_share_feedback_or_send_a_high_five_2ef32875")).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
                   .margin({ top: 140 })
@@ -258,7 +258,7 @@ export struct PinmonyCommentsSheet {
               .onClick(() => this.pickImage()).accessibilityText(this.uiText("pm_add_image_9f0d4e46"))
           }
           Button({ type: ButtonType.Normal }) {
-            if (this.result.busy) { LoadingProgress().width(20).height(20) }
+            if (this.result.busy) { LoadingProgress().color($r('app.color.accent')).width(20).height(20) }
             else { SymbolGlyph(this.editing ? $r('sys.symbol.checkmark') : $r('sys.symbol.arrow_up'))
               .fontSize(20).fontColor([$r('app.color.detail_on_accent')]) }
           }.width(32).height(32).borderRadius(16).backgroundColor($r('app.color.accent'))

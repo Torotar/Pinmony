@@ -101,6 +101,9 @@ function harness(native = false) {
   flow.reads[1].resolve(flow.reply({ phase: 'done', completed: 1 })); await flush();
   assert.equal(flow.store.publishFlow, undefined); assert.equal(flow.refreshes(), 1); assert.equal(flow.returns(), 1);
   assert.equal(flow.messages.length, 1); assert.equal(flow.store.cleared, true);
+  const productOnly = harness(); productOnly.flow(); productOnly.store.publishFlow.productCreated = true;
+  productOnly.controller.close(); assert.equal(productOnly.refreshes(),1,'product creation invalidates profile before the main Pin is published');
+  assert.equal(productOnly.restoreModes.at(-1),true,'returning to the board reloads created product content');
   const write = harness(); write.flow(); write.controller.action('create', 'synthetic'); write.controller.action('create', 'synthetic');
   assert.equal(write.writes.length, 1); write.controller.close(); assert(write.store.publishFlow);
   write.controller.pause(); write.controller.resume(); assert.equal(write.writes.length, 1, 'resume only reads, never writes');

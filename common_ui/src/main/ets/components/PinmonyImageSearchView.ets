@@ -175,7 +175,7 @@ export struct PinmonyImageSearchView {
           if (this.result.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onSearch) this.onSearch(this.crop, this.result.items.length > 0, false); }, actionEnabled: !this.uploadedPhoto })
           } else if (this.result.loading) {
-            LoadingProgress().width(36).height(36)
+            LoadingProgress().color($r('app.color.accent')).width(36).height(36)
             Text(this.uiText('pm_photo_search_loading')).fontColor($r('app.color.secondary_text'))
           } else if (this.result.items.length === 0) {
             Text(this.uiText("pm_no_related_images_8c34996f")).fontColor($r('app.color.secondary_text')).fontSize(14)

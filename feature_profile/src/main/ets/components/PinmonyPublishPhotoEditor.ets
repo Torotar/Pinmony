@@ -1,7 +1,7 @@
-import { PinmonyActionNotice } from 'common_ui';
+import { PinmonyImmersiveLight, PinmonyActionNotice } from 'common_ui';
 import { PinmonyLoadingOverlay } from 'common_ui';
 import { Chip, ChipSize, SymbolGlyphModifier } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyCreatedPin, PinmonyOrganizeBoard } from '../models/PinmonyProfile';
 import { PinmonyPublishFlow, PinmonyPublishTopic } from '../models/PinmonyPublishFlow';
@@ -25,6 +25,8 @@ export class PinmonyPublishPhotoViewState {
 
 @Component
 export struct PinmonyPublishPhotoEditor {
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @Prop @Watch('syncPhase') state: PinmonyPublishFlow;
   @State private title: string = '';
@@ -132,14 +134,14 @@ export struct PinmonyPublishPhotoEditor {
   }
   private titleBar(phase: string): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { scrollEffectOpts: { enableScrollEffect: false },
-        originalStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl:this.immersiveLightEnabled, systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius:this.immersiveLightEnabled ? 18 : 0 },
           contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } } },
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius:this.immersiveLightEnabled ? 18 : 0 },
           contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } } } },
       content: { title: { mainTitle: this.text(phase === 'advanced' ? 'pm_publish_advanced' : ['topics','products','productImages','productSearch','productConfirm'].includes(phase) ? phase === 'topics' ? 'pm_publish_topics' : 'pm_publish_products' : 'pm_publish_create_pin') },
         backIcon: { label: this.text('pm_back_572cf45b'), isEnabled: !this.state.busy, action: () => this.back(phase) },
-        menu: { value: phase === 'select' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.save')).fontSize(28).fontColor([$r('app.color.primary_text')]),label:this.text('pm_publish_save_draft'),isEnabled:!this.state.busy && !this.state.loading && !this.state.uncertain && !this.state.draftSaved,action:(): void => this.onAction('saveDraft','',false)}}] : phase === 'topics' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.text('pm_done_c0b3fbff'),isEnabled:this.topicsChanged(),action:(): void => {if(this.topicsChanged())this.onAction('doneTopics','',false);}}}] : phase === 'productImages' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.text('pm_done_c0b3fbff'),isEnabled:!!this.state.productImageId && !this.state.busy && !this.state.uncertain,action:(): void => this.onAction('confirmProductImage','',false)}}] : ['products','productSearch','productConfirm'].includes(phase) ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.text(phase === 'productConfirm' ? 'pm_done_c0b3fbff' : 'pm_next_acfc4e74'),isEnabled:!this.state.busy && (phase === 'productConfirm' || !!this.state.selectedProducts?.length),action:(): void => this.onAction('doneProducts','',false)}}] : [] } } };
+        menu: { value: phase === 'select' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.save')).fontSize(22).fontColor([$r('app.color.primary_text')]),label:this.text('pm_publish_save_draft'),isEnabled:!this.state.busy && !this.state.loading && !this.state.uncertain && !this.state.draftSaved,action:(): void => this.onAction('saveDraft','',false)}}] : phase === 'topics' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.text('pm_done_c0b3fbff'),isEnabled:this.topicsChanged(),action:(): void => {if(this.topicsChanged())this.onAction('doneTopics','',false);}}}] : phase === 'productImages' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.text('pm_done_c0b3fbff'),isEnabled:!!this.state.productImageId && !this.state.busy && !this.state.uncertain,action:(): void => this.onAction('confirmProductImage','',false)}}] : ['products','productSearch','productConfirm'].includes(phase) ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.text(phase === 'productConfirm' ? 'pm_done_c0b3fbff' : 'pm_next_acfc4e74'),isEnabled:!this.state.busy && (phase === 'productConfirm' || !!this.state.selectedProducts?.length),action:(): void => this.onAction('doneProducts','',false)}}] : [] } } };
   }
   private rowLabel(action: string): string {
     return action === 'next' ? 'pm_publish_choose_board' : action === 'topics' ? 'pm_publish_topics' :
@@ -295,7 +297,7 @@ export struct PinmonyPublishPhotoEditor {
   private productResults(link: boolean) {
     Scroll(link ? this.productLinkScroller : this.productScroller) {
       Column({space:16}) {
-        if(this.state.productLoading) { LoadingProgress().width(28).height(28) }
+        if(this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
         else if(this.state.productError) {
           PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage), actionText: this.text('pm_retry_b8784c8d'), onAction: () => this.onAction(this.state.productMode === 'link' ? 'findProduct' : 'searchProducts',this.state.productQuery || '',false) })
         } else if(this.state.productMode && !(this.state.productResults || []).length) {
@@ -374,7 +376,7 @@ export struct PinmonyPublishPhotoEditor {
           Button(this.text('pm_publish_product_lookup')).width('100%').height(48).borderRadius(16)
             .enabled(/^https?:\/\/[^\s/@?#]+(?:[/?#][^\s]*)?$/.test(this.productLink.trim()) && !this.state.productLoading)
             .onClick(() => this.onAction('findProduct',this.productLink,false))
-          if(this.state.productLoading) { LoadingProgress().width(28).height(28) }
+          if(this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
           if(this.state.productError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage) }) }
           if(this.state.productMode === 'link' && !this.state.productLoading && !(this.state.productResults || []).length) { Text(this.text('pm_publish_product_empty')).fontColor($r('app.color.secondary_text')) }
         }.width('100%').height('100%').padding(16)
@@ -406,7 +408,7 @@ export struct PinmonyPublishPhotoEditor {
           ForEach(this.state.productSuggestions || [], (term: string) => {
             Row({space:20}) { SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(22).fontColor([$r('app.color.primary_text')]); Text(term).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1) }.width('100%').padding({top:16,bottom:16}).onClick(() => { if(this.productTimer >= 0)clearTimeout(this.productTimer); this.query = term; this.viewState.productQuery = term; this.onAction('searchProducts',term,false); })
           }, (term: string) => term)
-          if (this.state.productLoading) { LoadingProgress().width(28).height(28) }
+          if (this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
           if (this.state.productError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage) }) }
         }.width('100%')
       } else { this.productResults(false) }
@@ -454,7 +456,7 @@ export struct PinmonyPublishPhotoEditor {
         Scroll(this.topicScroller) { this.topicsPage() }.width('100%').height('100%').align(Alignment.TopStart)
         .initialOffset({yOffset:this.viewState.topicOffset}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .onDidScroll((): void => { this.viewState.topicOffset = Math.max(0,this.topicScroller.currentOffset().yOffset); })
-        if (this.state.topicLoading) { LoadingProgress().width(28).height(28).hitTestBehavior(HitTestMode.None) }
+        if (this.state.topicLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None) }
         }.width('100%').height('100%') }
       else if(phase === 'advanced') { Scroll(this.advancedScroller) { this.advancedPage() }.width('100%').height('100%').align(Alignment.TopStart)
         .initialOffset({yOffset:this.viewState.advancedOffset}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})

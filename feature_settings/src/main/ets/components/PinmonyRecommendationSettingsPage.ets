@@ -96,7 +96,7 @@ export struct PinmonyRecommendationSettingsPage {
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.store.screen === 'recommend' ? [{ content: {
           componentId: 'pinmony-recommendation-info',
-          icon: new SymbolGlyphModifier($r('sys.symbol.exclamationmark_circle'))
+          icon: new SymbolGlyphModifier($r('sys.symbol.exclamationmark_circle')).fontSize(22)
             .fontColor([$r('app.color.primary_text')]),
           label: this.uiText("pm_about_recommendations_03c3b26e"), action: () => { this.showRecommendationInfo(); }
         } }] : [] } } };
@@ -235,7 +235,7 @@ export struct PinmonyRecommendationSettingsPage {
       }.width('100%').height('100%').align(Alignment.TopStart)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
     }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)

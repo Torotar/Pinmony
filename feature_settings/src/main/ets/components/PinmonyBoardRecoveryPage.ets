@@ -60,7 +60,7 @@ export struct PinmonyBoardRecoveryPage {
           if(this.store.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error,this.language), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {this.selected = '';this.onRequest?.('boardRecoveryRead','');}, actionEnabled: !this.store.busy && !this.store.loading })
           }
-          if(this.store.loading || this.store.busy) { LoadingProgress().width(32).height(32) }
+          if(this.store.loading || this.store.busy) { LoadingProgress().color($r('app.color.accent')).width(32).height(32) }
           if(this.store.boardRecoveryReady) {
             if (this.store.recoverableBoards.length > 0) {
               Text(this.text('pm_board_recovery_total').replace('{count}',this.store.recoverableBoards.length.toString()))

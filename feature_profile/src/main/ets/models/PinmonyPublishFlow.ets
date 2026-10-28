@@ -35,6 +35,7 @@ export interface PinmonyPublishFlow extends PinmonyOrganizeSnapshot {
   accountCommentsEnabled?: boolean;
   accountShoppingRecommendationsEnabled?: boolean;
   boardCreated?: boolean;
+  productCreated?: boolean;
   photoTitle?: string;
   photoDescription?: string;
   photoLink?: string;

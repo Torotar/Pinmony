@@ -47,7 +47,7 @@ export struct PinmonyBoardCoverContent {
           .onComplete((): void => {if(this.previewId === pin.id){this.loaded = true;this.previewFailed = false;this.onReady(!this.dragging);}})
           .onError((): void => {if(this.previewId === pin.id){this.loaded = false;this.previewFailed = true;this.onReady(false);}})
       },(pin: PinmonyBoardPin): string => pin.id+':'+this.previewRevision)
-      if(this.selected() && !this.loaded && !this.previewFailed) { LoadingProgress().width(32).height(32).align(Alignment.Center) }
+      if(this.selected() && !this.loaded && !this.previewFailed) { LoadingProgress().color($r('app.color.accent')).width(32).height(32).align(Alignment.Center) }
     }.width('100%').height(this.frameSide).clip(true).borderRadius(20).backgroundColor($r('app.color.surface_muted'))
       .onAreaChange((_old: Area, area: Area): void => {const side: number = Number(area.width);if(side > 0)this.frameSide = side;})
       .gesture(PanGesture({fingers:1,direction:PanDirection.All})
@@ -66,7 +66,7 @@ export struct PinmonyBoardCoverContent {
       }
       if(this.cover.status === 'saving' || this.cover.status === 'verifying') {
         Row({space:8}) {
-          LoadingProgress().width(24).height(24)
+          LoadingProgress().color($r('app.color.accent')).width(24).height(24)
           Text(this.copy(this.cover.status === 'saving' ? 'pm_board_cover_saving' : 'pm_board_cover_verifying')).fontColor($r('app.color.secondary_text'))
         }
       }
@@ -93,7 +93,7 @@ export struct PinmonyBoardCoverContent {
         },(pin: PinmonyBoardPin): string => pin.id+':'+(this.cover.selected?.pinId === pin.id)+':'+this.uiLanguage)
       }.width('100%')
       }
-      if(this.cover.loading) { LoadingProgress().width(28).height(28) }
+      if(this.cover.loading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
       if(this.cover.hasMore && !this.cover.loading && !this.cover.error && !this.locked && this.cover.status !== 'uncertain') {
         Row().width('100%').height(1)
           .onVisibleAreaChange([0,1],(visible: boolean,ratio: number): void => {if(visible && ratio > 0)this.onAction('coverMore','');})

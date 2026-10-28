@@ -47,7 +47,7 @@ export struct PinmonyBoardInvitationList {
           .fontColor($r('app.color.primary_text')).layoutWeight(1)
         if (!this.all) { Button(this.uiText("pm_view_all_b92c0ea9")).backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text')).onClick(() => this.onAll()) }
       }.width('100%')
-      if (this.snapshot.loading) { LoadingProgress().width(24).height(24) }
+      if (this.snapshot.loading) { LoadingProgress().color($r('app.color.accent')).width(24).height(24) }
       if (this.snapshot.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
       ForEach(this.all ? this.snapshot.items : this.snapshot.items.slice(0, 1), (item: PinmonyBoardInvitation) => {
         Row({ space: 12 }) {

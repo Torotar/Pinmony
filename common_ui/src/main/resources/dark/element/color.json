@@ -1,5 +1,6 @@
 {
   "color": [
+    { "name": "shuffle_card_glass", "value": "#B3303238" },
     {
       "name": "shuffle_visit_background",
       "value": "#50545E"
@@ -59,6 +60,10 @@
     {
       "name": "input_surface",
       "value": "#27292F"
+    },
+    {
+      "name": "search_header_control_surface",
+      "value": "#383C44"
     },
     {
       "name": "accent",

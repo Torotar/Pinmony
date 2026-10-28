@@ -84,13 +84,15 @@ export struct PinmonySocialPermissionsPage {
   @Builder
   private phraseFilterInput(mine: boolean) {
     Column({ space: 8 }) {
-      TextArea({ text: this.phraseDraftValue(mine), placeholder: this.uiText('pm_social_filter_phrases_placeholder') })
-        .width('100%').height(96).maxLength(2000).fontSize(16).fontColor($r('app.color.primary_text'))
-        .backgroundColor($r('app.color.input_surface')).border({ width: 1, color: $r('app.color.secondary_text'), radius: 12 })
-        .onChange((value: string): void => { this.updatePhraseDraft(mine, value); })
+      Row({ space: 8 }) {
+        TextArea({ text: this.phraseDraftValue(mine), placeholder: this.uiText('pm_social_filter_phrases_placeholder') })
+          .layoutWeight(1).height(96).maxLength(2000).fontSize(16).fontColor($r('app.color.primary_text'))
+          .backgroundColor($r('app.color.input_surface')).border({ width: 1, color: $r('app.color.secondary_text'), radius: 12 })
+          .onChange((value: string): void => { this.updatePhraseDraft(mine, value); })
+        Button(this.uiText('pm_social_filter_phrases_done'), { type: ButtonType.Normal })
+          .height(96).borderRadius(16).enabled(this.available()).onClick((): void => { this.savePhraseFilter(mine); })
+      }.width('100%')
       Text(this.uiText('pm_social_filter_phrases_hint')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-      Button(this.uiText('pm_social_filter_phrases_done')).enabled(this.available()).onClick((): void => { this.savePhraseFilter(mine); })
-        .alignSelf(ItemAlign.End)
     }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 16, right: 16, bottom: 12 })
   }
   @Builder
@@ -167,7 +169,7 @@ export struct PinmonySocialPermissionsPage {
     });
   }
   @Builder
-  private link(title: string, detail: string, target: string) {
+  private link(title: string, detail: string, target: string, requiresReady: boolean = false) {
     Button() {
       Column({ space: 6 }) {
         Row() { Text(this.uiText(title)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -175,7 +177,7 @@ export struct PinmonySocialPermissionsPage {
         }.width('100%')
         if (detail) { Text(PinmonyI18n.render(detail, this.uiLanguage)).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%') }
       }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:12,bottom:12 })
-    }.width('100%').backgroundColor(Color.Transparent).padding(0).enabled(!this.store.busy && !this.store.loading && !this.confirming).onClick(() => this.open(target))
+    }.width('100%').backgroundColor(Color.Transparent).padding(0).enabled(!this.store.busy && !this.store.loading && !this.confirming && (!requiresReady || this.store.social.ready)).onClick(() => this.open(target))
   }
   @Builder
   private selection(label: string, value: number, selected: number, messageOption: boolean = false) {
@@ -237,11 +239,15 @@ export struct PinmonySocialPermissionsPage {
             Text(this.uiText('pm_social_shopping')).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).width('100%')
             Text(this.uiText('pm_social_shopping_detail')).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          if (this.store.social.ready && this.store.social.shoppingRecommendationsEnabled !== undefined) {
           Toggle({ type: ToggleType.Switch, isOn: this.store.social.shoppingRecommendationsEnabled === true })
           .selectedColor($r('app.color.accent')).switchPointColor(Color.White)
             .enabled(this.available() && this.store.social.ready && !this.store.social.protected && this.store.social.shoppingRecommendationsEnabled !== undefined)
             .accessibilityText(this.uiText('pm_social_shopping'))
             .onChange((checked: boolean): void => { if (this.available() && this.onRequest) this.onRequest('socialShopping', String(checked)); })
+          } else {
+            Blank().width(48).height(48)
+          }
         }.width('100%').alignItems(VerticalAlign.Top)
         Text(this.uiText('pm_social_shopping_exclusions')).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
       }.width('100%').alignItems(HorizontalAlign.Start)
@@ -252,11 +258,15 @@ export struct PinmonySocialPermissionsPage {
             Text(this.uiText('pm_social_idea_downloads')).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).width('100%')
             Text(this.uiText('pm_social_download_detail')).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
           }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          if (this.store.social.ready && this.store.social.ideaPinDownloadsEnabled !== undefined) {
           Toggle({ type: ToggleType.Switch, isOn: this.store.social.ideaPinDownloadsEnabled === true })
           .selectedColor($r('app.color.accent')).switchPointColor(Color.White)
             .enabled(this.available() && this.store.social.ready && !this.store.social.protected && this.store.social.ideaPinDownloadsEnabled !== undefined)
             .accessibilityText(this.uiText('pm_social_idea_downloads'))
             .onChange((checked: boolean): void => { if (this.available() && this.onRequest) this.onRequest('socialIdeaDownloads', String(checked)); })
+          } else {
+            Blank().width(48).height(48)
+          }
         }.width('100%').alignItems(VerticalAlign.Top)
       }.width('100%').alignItems(HorizontalAlign.Start)
     }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 12, bottom: 12 })
@@ -265,13 +275,11 @@ export struct PinmonySocialPermissionsPage {
   private body() {
     if (this.store.screen === 'social') {
       Text(this.uiText('pm_social_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
-      if (this.store.social.ready) {
-        this.link('pm_social_comments_title',this.uiText('pm_social_comments_entry_detail'),'socialComments')
-      }
       this.link('pm_social_message_settings',this.uiText('pm_social_message_settings_detail'),'socialMessages')
       this.link('pm_social_blocked',this.uiText('pm_social_blocked_detail'),'socialBlocked')
       this.link('pm_social_mentions',this.uiText('pm_social_mentions_detail'),'socialMentions')
-      if (this.store.social.ready) { this.shoppingAndDownloads() }
+      this.link('pm_social_comments_title',this.uiText('pm_social_comments_entry_detail'),'socialComments',true)
+      this.shoppingAndDownloads()
     } else if (this.store.screen === 'socialComments') {
       if (this.store.social.ready) {
         this.socialToggle('socialComments', this.store.social.commentsEnabled)
@@ -317,6 +325,8 @@ export struct PinmonySocialPermissionsPage {
   private destination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
+        ForEach([this.store.screen], (_screen: string) => {
+        Column() {
         if (this.store.screen === 'socialMessages' && (this.store.social.personal || this.store.social.business)) {
           this.messageTabs()
         } else {
@@ -326,7 +336,12 @@ export struct PinmonySocialPermissionsPage {
           }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:16,bottom:28 })
         }.width('100%').height('100%').align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         }
-        if (this.store.loading || this.store.busy) { LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None) }
+        }.width('100%').height('100%')
+          .transition(this.store.screen === 'social' ? TransitionEffect.IDENTITY : TransitionEffect.asymmetric(
+            TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
+            TransitionEffect.IDENTITY))
+        }, (screen: string): string => screen)
+        if (this.store.loading || this.store.busy) { LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None) }
       }.width('100%').height('100%')
     }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
       style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },

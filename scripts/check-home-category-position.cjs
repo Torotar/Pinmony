@@ -1,6 +1,7 @@
 const { rawLocalMessages } = require('./local-message-test-fixture.cjs');
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]);
 const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
+const indexSource=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function method(name){const a=source.indexOf('  private '+name+'(');assert(a>=0);const b=source.indexOf('\n  private ',a+1);return source.slice(a,b).replace(/@Builder\s*$/,'');}
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('updateHomeChrome')+method('emptyFeedMessage')+method('canShowFeed')+method('onOfflinePreviewChanged')+method('updateCategories')+method('applyCategories')+method('categoryPageKey')+method('selectTab')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Curve:{EaseInOut:'ease',EaseOut:'out'},ScrollState:{Idle:0,Scroll:1},animateTo:(_options,change)=>change()});
 const h=new Host(),calls=[];Object.assign(h,{categories:[],getUIContext:()=>({animateTo:(_options,change)=>change()}),uiText:rawLocalMessages.text,home:{tabs:['all','art','icons'].map((id,index)=>({id,label:id,selected:index===1,enabled:index!==2}))},categoryViewportWidth:0,categoryWidths:new Map(),alignedCategory:'',pendingTabId:'',interactionReady:true,onTab:id=>calls.push(id)});
@@ -11,7 +12,7 @@ h.pendingTabId='all';h.updateCategories();assert.equal(h.categories.findIndex(ta
 h.interactionReady=false;h.selectTab(h.categories[1]);assert.equal(calls.length,1);
 h.pendingTabId='';h.updateCategories();assert.equal(h.categories.findIndex(tab=>tab.selected),1,'failure restores confirmed selection');
 h.home.tabs=[];h.updateCategories();assert.equal(h.categories.length,0);
-assert(source.includes('.height(this.homeChromeCollapsed ? 0 : 68)'));
+assert(source.includes('.opacity(this.homeChromeCollapsed ? 0 : 1)'));
 assert(source.includes(".accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')"));
 Object.assign(h,{offlinePreview:true,interactionReady:false,offlineCategoryId:'',pendingTabId:'',home:{kind:'state',pins:[{id:'1'}],tabs:['all','art','icons'].map((id,index)=>({id,label:id,selected:index===1,enabled:true}))}});
 h.updateCategories();const priorCalls=calls.length;h.selectTab(h.categories[2]);assert.equal(calls.length,priorCalls,'offline category selection makes no request');assert.equal(h.categories[2].selected,true);assert.equal(h.canShowFeed(),false,'do not show another category cache');assert.match(h.emptyFeedMessage(),/当前离线/);
@@ -34,7 +35,21 @@ h.selectTab(h.categories[0]);assert.equal(h.categoryDirection,-1,'earlier catego
 const animationCount=animations.length;h.pendingTabId='all';h.updateCategories();h.selectTab(h.categories[0]);assert.equal(animations.length,animationCount,'same-category snapshots and repeated selection never restart transition');
 h.pendingTabId='art';h.updateCategories();assert.equal(h.categoryPageKey(),'art');assert.equal(h.categoryDirection,1,'external pending selection uses the same transition');
 h.pendingTabId='';h.updateCategories();assert.equal(h.categoryPageKey(),'all');assert.equal(h.categoryDirection,-1,'failed selection restores confirmed category in reverse');
-assert(source.indexOf('ForEach(this.categories') < source.indexOf('ForEach([this.categoryPageKey()]'), 'category bar stays outside the keyed content transition');
-assert(source.includes('Column() { this.feedContent() }'), 'only feed content belongs to the moving page');
+const homeNavigation=source.slice(source.indexOf('  private homeNavigation()'),source.indexOf('  build() {',source.indexOf('  private homeNavigation()')));
+const titleOptionsStart=source.indexOf('  private homeTitleBarOptions()');
+const titleOptionsMethod=source.slice(titleOptionsStart,source.indexOf('\n  build()',titleOptionsStart));
+const TitleHost=vm.runInNewContext(ts.transpileModule('class TitleHost {'+titleOptionsMethod+'} TitleHost;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:3},PinmonyImmersiveLight:{effect:mode=>mode}});
+for(const mode of ['immersive','gentle','exquisite','off']){const titleHost=new TitleHost();titleHost.immersiveLightMode=mode;const style=titleHost.homeTitleBarOptions().style;assert.equal(style.blurStrategy,mode==='off'?0:1);assert.equal(style.thermoCtrl,mode!=='off');assert.equal(style.scrollEffectOpts.enableScrollEffect,mode!=='off','runtime title options must not depend on an accessor omitted by the ArkUI struct compiler');}
+assert(homeNavigation.includes('HdsNavigation() { this.feedContent() }'),'the HDS navigation owns the scrolling feed');
+assert(homeNavigation.includes('stackBuilder: (): void => { this.categoryButtons(); }'),'all home categories are mounted in HDS stackBuilder');
+assert(homeNavigation.includes('systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)'),'the HDS title bar owns its default material effect');
+const homeTitleBarOptions=source.slice(source.indexOf('  private homeTitleBarOptions()'),source.indexOf('\n  build()',source.indexOf('  private homeTitleBarOptions()')));
+assert(homeTitleBarOptions.includes('avoidLayoutSafeArea: true')&&homeTitleBarOptions.includes('enableComponentSafeArea: false'),'title controls avoid the system area without introducing a second component safe area into the manually inset feed');
+assert(!homeNavigation.includes('maskExtraHeight')&&!homeNavigation.includes('blurRadius')&&!source.includes('linearGradientBlur('),'the home page does not tune or draw a separate blur layer');
+assert(source.includes('top: this.homeTopInset() + (this.home.board ? 132 : 64) })'),'home feed does not add bottom scroll padding');
+const rootTabs=indexSource.slice(indexSource.indexOf('  private buildRootTabs()'),indexSource.indexOf('  build()',indexSource.indexOf('  private buildRootTabs()')));
+assert(rootTabs.includes('.barOverlap(true)'),'root tab bar keeps its original floating overlap layout');
+assert(rootTabs.includes('barBottomMargin: 28'),'root tab floating margin stays unchanged');
+assert(source.includes('ForEach([this.categoryPageKey()]')&&source.includes('this.homeNavigation()'),'title bar and feed move together with the selected category page');
 assert(source.includes('TransitionEffect.asymmetric('));assert(source.includes('this.contentWidth }'));
 console.log('Home category motion: both directions, rapid selection, pending and failure rollback, stable same-category updates passed');

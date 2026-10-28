@@ -1,26 +1,35 @@
-const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const ts = require(process.argv[2] || 'typescript');
-const source = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets', 'utf8');
-function method(name) {
-  const start = source.indexOf('  private ' + name + '(');
-  assert(start >= 0);
-  return source.slice(start, source.indexOf('\n  private ', start + 1));
-}
-const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
-  method('updateHubChrome') + method('setHubChromeCollapsed') + '} Host;',
-  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,
-  {ScrollState:{Scroll:1},Curve:{EaseOut:1}});
-const h = new Host();
-Object.assign(h,{modern:()=>true,interactionReady:true,refreshing:false,loading:false,sortVisible:false,
-  hubChromeScrollDistance:0,hubChromeCollapsed:false,getUIContext:()=>({animateTo:(options,fn)=>{assert.equal(options.duration,180);fn();}})});
-h.updateHubChrome(12,1,100); assert.equal(h.hubChromeCollapsed,false);
-h.updateHubChrome(9,1,109); assert.equal(h.hubChromeCollapsed,true);
-h.updateHubChrome(-12,1,97); assert.equal(h.hubChromeCollapsed,true);
-h.updateHubChrome(-9,1,88); assert.equal(h.hubChromeCollapsed,false);
-h.updateHubChrome(30,2,118); assert.equal(h.hubChromeCollapsed,false,'inertia does not toggle chrome');
-h.updateHubChrome(30,1,148); assert.equal(h.hubChromeCollapsed,true);
-h.updateHubChrome(0,2,0); assert.equal(h.hubChromeCollapsed,false,'top always expands');
-h.refreshing=true;h.updateHubChrome(30,1,100);assert.equal(h.hubChromeCollapsed,false);
-h.refreshing=false;h.updateHubChrome(12,1,100);h.updateHubChrome(-12,1,88);
-assert.equal(h.hubChromeCollapsed,false,'direction changes reset accumulation');
-console.log('Profile chrome: 20vp directional threshold, 180ms animation, top expansion, inertia and refresh guards passed');
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ts=require(process.argv[2]||'typescript');
+const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
+function method(name){const start=source.indexOf('  private '+name+'(');assert(start>=0);return source.slice(start,source.indexOf('\n  private ',start+1));}
+const methods=['hubHeaderInset','hubChromeHeight','hubCollapseHeight','hubHeaderBackgroundOpacity','hubChromeVisibleHeight','hubContentInset','updateHubChrome','registerHubScroller','setHubChromeCollapsed'];
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.map(method).join('')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{ScrollState:{Scroll:1},Curve:{EaseOut:1}});
+let animations=0;
+const h=new Host();Object.assign(h,{modern:()=>true,hubPane:true,interactionReady:true,refreshing:false,loading:false,sortVisible:false,hubTab:'boards',hubChromeOffset:0,hubChromeOffsetVp:0,hubChromeScrollDistance:0,statusBarHeightPx:24,getUIContext:()=>({px2vp:n=>n,animateTo:(opts,fn)=>{assert.equal(opts.duration,260);assert.equal(opts.curve,1);animations++;fn();}})});
+h.updateHubChrome(6,1,100);assert.equal(h.hubChromeOffset,0);
+h.updateHubChrome(4,1,104);assert.equal(h.hubChromeOffset,112,'10vp triggers full eased collapse');
+const count=animations;h.updateHubChrome(20,1,124);assert.equal(animations,count,'same target does not restart animation');
+h.updateHubChrome(-6,1,118);assert.equal(h.hubChromeOffset,112);
+h.updateHubChrome(-4,1,114);assert.equal(h.hubChromeOffset,0,'reverse 10vp triggers full eased expansion');
+h.updateHubChrome(30,2,144);assert.equal(h.hubChromeOffset,0,'inertia cannot toggle chrome');
+h.updateHubChrome(6,1,150);h.updateHubChrome(-6,1,144);assert.equal(h.hubChromeOffset,0,'direction reversal resets accumulation');
+h.hubChromeScrollDistance=0;h.updateHubChrome(NaN,1,144);assert.equal(h.hubChromeScrollDistance,0);
+h.updateHubChrome(10,1,154);h.updateHubChrome(0,0,0);assert.equal(h.hubChromeOffset,0,'top always expands');
+for(const guard of ['refreshing','loading','sortVisible']){h[guard]=true;h.updateHubChrome(20,1,100);assert.equal(h.hubChromeOffset,0);h[guard]=false;}
+h.interactionReady=false;h.updateHubChrome(20,1,100);assert.equal(h.hubChromeOffset,0);h.interactionReady=true;
+const start=source.indexOf('.onDidScroll('),end=source.indexOf('.onReachEnd(',start);assert(start>=0&&end>start);
+const callback=source.slice(start+'.onDidScroll('.length,end).trim().replace(/\)\s*$/,'');
+const Pane=vm.runInNewContext(ts.transpileModule('class Pane { didScroll = '+callback+'; } Pane;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+let position=100,forwarded=0;const scroller={offset:()=>({yOffset:position})};
+h.hubPaneScrollers=[{},{},{}];h.registerHubScroller('boards',scroller);assert.equal(h.hubPaneScrollers[1],scroller);
+const registered=h.hubPaneScrollers;h.registerHubScroller('boards',scroller);assert.equal(h.hubPaneScrollers,registered);
+const pane=new Pane();Object.assign(pane,{hubPane:true,restoringScroll:false,interactionReady:true,scroller,onHubScroll:(offset,state,current)=>h.updateHubChrome(offset,state,current),updateCompactHeader(){},reportScroll(){},onContentScroll(){forwarded++;}});
+pane.didScroll(0,10,1);assert.equal(h.hubChromeOffset,112);
+position=90;pane.didScroll(0,-10,1);assert.equal(h.hubChromeOffset,0);
+pane.restoringScroll=true;pane.didScroll(0,20,1);assert.equal(h.hubChromeOffset,0);assert.equal(forwarded,3);
+assert.equal(h.hubContentInset(),216);h.hubChromeOffsetVp=56;assert.equal(h.hubChromeVisibleHeight(),56);assert.equal(h.hubContentInset(),216,'animation does not shift the reading position');
+h.hubChromeOffsetVp=112;assert.equal(h.hubChromeVisibleHeight(),0);assert.equal(h.hubContentInset(),216);
+h.hubChromeOffset=0;assert.equal(h.hubHeaderBackgroundOpacity(),1);h.hubChromeOffset=56;assert.equal(h.hubHeaderBackgroundOpacity(),0.5);h.hubChromeOffset=112;assert.equal(h.hubHeaderBackgroundOpacity(),0);
+h.hubTab='collages';assert.equal(h.hubCollapseHeight(),52);h.statusBarHeightPx=40;assert.equal(h.hubCollapseHeight(),52);
+h.hubPane=false;assert.equal(h.hubContentInset(),0);h.hubPane=true;h.modern=()=>false;assert.equal(h.hubContentInset(),0);
+console.log('Profile chrome: search-style 260ms EaseOut, halved 10vp threshold, reversal, inertia guards, fixed reading inset and actual scroll callback passed');

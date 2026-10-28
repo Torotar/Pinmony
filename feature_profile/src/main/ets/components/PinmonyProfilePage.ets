@@ -27,6 +27,10 @@ export struct PinmonyProfilePage {
   }
 
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
+  onHubScrollerReady?: (scroller: Scroller) => void;
+  @State private hubPaneScrollers: Scroller[] = [new Scroller(), new Scroller(), new Scroller()];
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
@@ -36,9 +40,9 @@ export struct PinmonyProfilePage {
   @Prop hubPane: boolean = false;
   @Prop denseHubPins: boolean = false;
   @State private hubSearchPosition: number = 0;
-  @State private hubChromeCollapsed: boolean = false;
-  @Prop hubChromeHidden: boolean = false;
+  @State private hubChromeOffset: number = 0;
   private hubChromeScrollDistance: number = 0;
+  @Prop hubChromeOffsetVp: number = 0;
   onHubScroll?: (offset: number, state: ScrollState, position: number) => void;
   @State private hubSnapshots: PinmonyProfileSnapshot[] = [];
   private readonly hubSwiper: SwiperController = new SwiperController();
@@ -108,6 +112,21 @@ export struct PinmonyProfilePage {
   @State private boardFilter: string = '';
   private hubRequested: boolean = false;
   private modern(): boolean { return !this.legacyProfile && this.profile.isOwn === true && !this.onBack; }
+  private hubHeaderInset(): number {
+    return this.getUIContext().px2vp(this.statusBarHeightPx) + 80;
+  }
+  private hubChromeHeight(): number { return this.hubTab === 'collages' ? 52 : 112; }
+  private hubCollapseHeight(): number { return this.hubChromeHeight(); }
+  private hubHeaderBackgroundOpacity(): number {
+    return 1 - Math.max(0, Math.min(1, this.hubChromeOffset / this.hubCollapseHeight()));
+  }
+  private hubChromeVisibleHeight(): number {
+    return Math.max(0, this.hubCollapseHeight() - this.hubChromeOffsetVp);
+  }
+  private hubContentInset(): number {
+    if (!this.modern() || !this.hubPane) return 0;
+    return this.hubHeaderInset() + this.hubCollapseHeight();
+  }
   private updateHubChrome(offset: number, state: ScrollState, position: number): void {
     if (!this.modern() || !this.interactionReady || this.refreshing || this.loading || this.sortVisible) return;
     if (position <= 1) {
@@ -118,15 +137,24 @@ export struct PinmonyProfilePage {
     if (state !== ScrollState.Scroll || !Number.isFinite(offset) || Math.abs(offset) < 0.1) return;
     if (this.hubChromeScrollDistance * offset < 0) this.hubChromeScrollDistance = 0;
     this.hubChromeScrollDistance += offset;
-    if (Math.abs(this.hubChromeScrollDistance) < 20) return;
+    if (Math.abs(this.hubChromeScrollDistance) < 10) return;
     const collapsed: boolean = this.hubChromeScrollDistance > 0;
     this.hubChromeScrollDistance = 0;
     this.setHubChromeCollapsed(collapsed);
   }
+  private registerHubScroller(tab: string, scroller: Scroller): void {
+    const index: number = ['pins','boards','collages'].indexOf(tab);
+    if (index < 0 || this.hubPaneScrollers[index] === scroller) return;
+    const scrollers: Scroller[] = this.hubPaneScrollers.slice();
+    scrollers[index] = scroller;
+    this.hubPaneScrollers = scrollers;
+  }
   private setHubChromeCollapsed(collapsed: boolean): void {
-    if (this.hubChromeCollapsed === collapsed) return;
-    this.getUIContext().animateTo({duration:180,curve:Curve.EaseOut}, () => {
-      this.hubChromeCollapsed = collapsed;
+    this.hubChromeScrollDistance = 0;
+    const target: number = collapsed ? this.hubCollapseHeight() : 0;
+    if (this.hubChromeOffset === target) return;
+    this.getUIContext().animateTo({ duration: 260, curve: Curve.EaseOut }, () => {
+      this.hubChromeOffset = target;
     });
   }
   private layoutChanged(): void {
@@ -157,12 +185,12 @@ export struct PinmonyProfilePage {
   @Builder
   private hubPager() {
     Column() {
-      this.hubHeader()
       Stack({alignContent:Alignment.TopStart}) {
       Swiper(this.hubSwiper) {
         ForEach(['pins','boards','collages'], (tab: string) => {
           PinmonyProfilePage({
-            hubPane:true,hubChromeHidden:this.hubChromeCollapsed,denseHubPins:this.densePins,profile:this.hubSnapshot(tab),interactionReady:this.interactionReady && this.hubTab === tab,
+            onHubScrollerReady: (scroller: Scroller) => this.registerHubScroller(tab, scroller),
+            hubPane:true,hubChromeOffsetVp:this.hubChromeOffset,denseHubPins:this.densePins,profile:this.hubSnapshot(tab),interactionReady:this.interactionReady && this.hubTab === tab,
             readsReady:this.readsReady && this.hubTab === tab,actionsReady:this.actionsReady && this.hubTab === tab,
             automaticLoadingEnabled:this.automaticLoadingEnabled && this.hubTab === tab,
             refreshing:this.refreshing && this.hubTab === tab,initialScrollOffset:0,
@@ -190,7 +218,7 @@ export struct PinmonyProfilePage {
         .disableSwipe(!this.interactionReady || this.profile.suggestionWriting || this.sortVisible)
         .onChange((index: number) => {
           const tab: string = ['pins','boards','collages'][index];
-          if(tab && this.hubTab !== tab){this.hubChromeScrollDistance = 0;this.setHubChromeCollapsed(false);this.sortVisible = false;this.hubTab = tab;this.requestHub();}
+          if(tab && this.hubTab !== tab){this.setHubChromeCollapsed(false);this.sortVisible = false;this.hubTab = tab;this.requestHub();}
         })
         .onContentDidScroll((selectedIndex: number,index: number,position: number,_mainAxisLength: number) => {
           if(index === selectedIndex)this.hubIndicatorPosition = Math.max(0,Math.min(2,index - position));
@@ -198,11 +226,6 @@ export struct PinmonyProfilePage {
         })
         .onAnimationEnd((index: number) => {this.hubIndicatorPosition = index;this.hubSearchPosition = index === 2 ? -1 : 0;})
         .width('100%').height('100%')
-        Column() { this.hubSearch() }.width('100%')
-          .height(this.hubChromeCollapsed ? 0 : 60).opacity(this.hubChromeCollapsed ? 0 : 1).clip(true)
-          .translate({x:this.hubSearchPosition * (this.contentWidth + 16)})
-          .hitTestBehavior(this.hubChromeCollapsed || this.hubTab === 'collages' ? HitTestMode.None : HitTestMode.Default)
-          .accessibilityLevel(this.hubChromeCollapsed || this.hubTab === 'collages' ? 'no-hide-descendants' : 'auto')
       }.width('100%').layoutWeight(1).clip(true)
         .onAreaChange((_old: Area,area: Area) => {const width: number = Number(area.width);if(width > 0)this.contentWidth = width;})
     }.width('100%').height('100%')
@@ -214,6 +237,7 @@ export struct PinmonyProfilePage {
     this.onTab('hub:' + mode + ':' + (this.favoriteFilter ? '1' : '0') + ':' + (this.createdFilter ? '1' : '0'));
   }
   aboutToAppear(): void {
+    if (this.hubPane && this.onHubScrollerReady) this.onHubScrollerReady(this.scroller);
     this.retainHubSnapshot();
     if (this.onBack) this.profilePaths.pushPath({ name: 'user-profile' }, false);
     if(this.profile.hubMode) {
@@ -692,7 +716,7 @@ export struct PinmonyProfilePage {
     }
     if (this.loading || this.profile.contentLoading) {
       Column({ space: 10 }) {
-        LoadingProgress().width(32).height(32)
+        LoadingProgress().color($r('app.color.accent')).width(32).height(32)
       }
       .width('100%')
       .height(220)
@@ -752,7 +776,7 @@ export struct PinmonyProfilePage {
       Button(this.uiText('pm_load_more_af90a08f')).onClick(() => {if(this.onLoadMore)this.onLoadMore();})
     }
     if (this.profile.contentLoadingMore) {
-      LoadingProgress().width(28).height(28)
+      LoadingProgress().color($r('app.color.accent')).width(28).height(28)
     }
   }
 
@@ -817,7 +841,27 @@ export struct PinmonyProfilePage {
       HdsNavigation(this.profilePaths) { Column().width('100%').height('100%') }
         .width('100%').height('100%').hideTitleBar(true).navDestination(this.profileDestination)
     } else {
-      Stack() { this.profileBody() }
+      Stack({alignContent:Alignment.TopStart}) {
+      if (this.modern() && !this.hubPane) {
+      HdsNavigation() { this.profileBody() }
+        .width('100%').height('100%')
+        .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
+        .titleBar(this.hubTitleBarOptions())
+        .bindToScrollable([this.hubPaneScrollers[Math.max(0, ['pins','boards','collages'].indexOf(this.hubTab))]])
+        .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
+          { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
+        .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+        .clip(false)
+      Column().width('100%').height(this.hubHeaderInset())
+        .backgroundColor($r('app.color.page_background'))
+        .opacity(this.hubHeaderBackgroundOpacity())
+        .position({x:0,y:0})
+        .hitTestBehavior(HitTestMode.None)
+        .accessibilityLevel('no')
+      Column() { this.hubHeader() }.width('100%').height(80)
+        .position({x:0,y:this.getUIContext().px2vp(this.statusBarHeightPx)})
+      } else { this.profileBody() }
+      }
         .width('100%').height('100%')
         .bindSheet($$this.sortVisible, this.boardSortSheet(), {
       height: SheetSize.FIT_CONTENT, showClose: true, backgroundColor: $r('app.color.page_background'),
@@ -873,7 +917,7 @@ export struct PinmonyProfilePage {
       Row({ space: 12 }) {
         Text(this.uiText(label)).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
         if (this.profile.boardSortBusy && this.profile.boardSortPending === value) {
-          LoadingProgress().width(20).height(20).color($r('app.color.detail_accent'))
+          LoadingProgress().width(20).height(20).color($r('app.color.accent'))
         } else if (!this.profile.boardSortBusy && this.profile.boardSort === value) {
           SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(24).fontColor([$r('app.color.detail_accent')])
         }
@@ -895,7 +939,7 @@ export struct PinmonyProfilePage {
         PinmonyActionNotice({ active: this.interactionReady, message: this.uiText(this.profile.boardSortError || 'pm_profile_sort_load_error'), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => { if (this.onBoardSort) this.onBoardSort(''); }, actionEnabled: !this.profile.boardSortBusy })
       }
       if (!this.profile.boardSort && !this.profile.boardSortError && !this.profile.boardSortBusy) {
-        LoadingProgress().width(24).height(24).color($r('app.color.detail_accent')).margin(16)
+        LoadingProgress().width(24).height(24).color($r('app.color.accent')).margin(16)
       }
       this.boardSortOption('alphabetical', 'pm_profile_sort_name')
       this.boardSortOption('custom', 'pm_profile_sort_custom')
@@ -924,7 +968,7 @@ export struct PinmonyProfilePage {
           Text(this.uiText('pm_profile_show_all_pins_description')).fontSize(14).fontColor($r('app.color.secondary_text'))
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.profile.visibilityBusy) {
-          LoadingProgress().width(40).height(24)
+          LoadingProgress().color($r('app.color.accent')).width(40).height(24)
         } else if (typeof this.profile.showAllPins === 'boolean') {
           Checkbox().select(this.profile.showAllPins === true).shape(CheckBoxShape.CIRCLE)
           .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
@@ -1160,15 +1204,15 @@ export struct PinmonyProfilePage {
               .onClick(() => {
                 if(this.interactionReady && !this.profile.suggestionWriting && this.hubTab !== tab){
                   this.hubSearchPosition = tab === 'collages' ? -1 : 0;
-                  this.hubChromeScrollDistance = 0;this.setHubChromeCollapsed(false);
+                  this.setHubChromeCollapsed(false);
                   this.hubIndicatorPosition = ['pins','boards','collages'].indexOf(tab);
                   this.hubTab = tab;this.requestHub();
                 }
               })
           }, (tab: string): string => tab + ':' + this.uiLanguage)
         }.width('100%').height(64)
-        Row().height(2).width(this.hubTabBarWidth / 3).backgroundColor($r('app.color.primary_text'))
-          .translate({x:(this.hubIndicatorPosition < 0 ? ['pins','boards','collages'].indexOf(this.hubTab) : this.hubIndicatorPosition) * this.hubTabBarWidth / 3,y:-12})
+        Row().height(2).width(24).backgroundColor($r('app.color.primary_text'))
+          .translate({x:(this.hubIndicatorPosition < 0 ? ['pins','boards','collages'].indexOf(this.hubTab) : this.hubIndicatorPosition) * this.hubTabBarWidth / 3 + (this.hubTabBarWidth / 3 - 24) / 2,y:-12})
           .hitTestBehavior(HitTestMode.None)
         }.layoutWeight(1).height(64)
           .onAreaChange((_old: Area,area: Area) => {this.hubTabBarWidth = Number(area.width);})
@@ -1177,23 +1221,45 @@ export struct PinmonyProfilePage {
 
     }.width('100%').padding({left:16,right:16,top:12,bottom:4})
   }
+  private hubTitleBarOptions(): HdsNavigationTitleBarOptions {
+    return {
+      avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: {
+        originalStyle: { backgroundStyle: { maskExtraHeight: 24 } },
+        scrollEffectStyle: { backgroundStyle: { maskExtraHeight: 24 } },
+        blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+        thermoCtrl: this.immersiveLightEnabled,
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled,
+          scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
+      },
+      content: { title: { mainTitle: '' } }
+    };
+  }
+  @Builder
+  private profileRefreshIndicator() {
+    Column() {
+      LoadingProgress().width(24).height(24).color($r('app.color.accent'))
+        .visibility(this.refreshing || this.profileRefreshState === RefreshStatus.Drag ||
+          this.profileRefreshState === RefreshStatus.OverDrag ? Visibility.Visible : Visibility.Hidden)
+    }.width('100%').height(64).justifyContent(FlexAlign.Center)
+      .offset({ y: this.hubContentInset() })
+      .hitTestBehavior(HitTestMode.None)
+  }
+
+  @State private profileRefreshState: RefreshStatus = RefreshStatus.Inactive;
+
   @Builder
   private profileBody() {
 
+    Stack({alignContent:Alignment.TopStart}) {
     Column() {
       if (!this.onBack && !this.modern()) {
       this.rootTitleBar()
 
       }
       if(this.modern() && !this.hubPane) { this.hubPager() } else {
-      if(this.modern() && this.hubPane) {
-        if(this.hubTab !== 'collages') { Row().width('100%').height(this.hubChromeHidden ? 0 : 60) }
-        Column() { this.hubFilters() }.width('100%').height(this.hubChromeHidden ? 0 : 52)
-          .opacity(this.hubChromeHidden ? 0 : 1).clip(true)
-          .hitTestBehavior(this.hubChromeHidden ? HitTestMode.None : HitTestMode.Default)
-          .accessibilityLevel(this.hubChromeHidden ? 'no-hide-descendants' : 'auto')
-      }
-      Refresh({ refreshing: this.refreshing }) {
+      Refresh({ refreshing: this.refreshing, builder: this.profileRefreshIndicator }) {
       Scroll(this.scroller) {
         Column() {
           if(this.modern()) { if(!this.hubPane)this.hubHeader() } else {
@@ -1229,6 +1295,7 @@ export struct PinmonyProfilePage {
           .padding({ left: 16, right: 16, bottom: 116 })
         }
         .width('100%')
+        .padding({top:this.hubContentInset()})
         .onAreaChange((_oldArea: Area, newArea: Area) => {
           const width: number = Number(newArea.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
@@ -1239,6 +1306,8 @@ export struct PinmonyProfilePage {
       .scrollBar(BarState.Off)
       .align(Alignment.TopStart)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+      .clipContent(ContentClipMode.BOUNDARY)
+      .clip(false)
 
       .onAppear(() => this.restoreScroll())
       .onDidScroll((_xOffset: number, offset: number, state: ScrollState) => {
@@ -1254,6 +1323,7 @@ export struct PinmonyProfilePage {
       .width('100%').layoutWeight(1)
       .pullToRefresh(this.interactionReady && !this.refreshing && !this.loading)
       .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
+      .onStateChange((state: RefreshStatus) => { this.profileRefreshState = state; })
       }
     }
     .width('100%')
@@ -1263,6 +1333,23 @@ export struct PinmonyProfilePage {
       radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyProfilePage.aboutVisible radius=four-corners-32vp'); },
       height: '75%', showClose: true, backgroundColor: $r('app.color.page_background') })
+      if(this.modern() && this.hubPane) {
+        Column({space:0}) {
+          Column({space:0}) {
+          if(this.hubTab !== 'collages') {
+            Column() { this.hubSearch() }.width('100%').height(60)
+          }
+          Column() { this.hubFilters() }.width('100%').height(52)
+          }.width('100%').height(this.hubCollapseHeight())
+            .backgroundColor($r('app.color.page_background'))
+        }.width('100%').height(this.hubChromeHeight())
+          .position({x:0,y:this.hubHeaderInset()})
+          .opacity(this.hubChromeVisibleHeight() / this.hubChromeHeight())
+          .clip(true)
+          .hitTestBehavior(this.hubChromeVisibleHeight() <= 0 ? HitTestMode.None : HitTestMode.Default)
+          .accessibilityLevel(this.hubChromeVisibleHeight() <= 0 ? 'no-hide-descendants' : 'auto')
+      }
+    }.width('100%').height('100%')
   }
 
   @Builder
@@ -1286,7 +1373,7 @@ export struct PinmonyProfilePage {
             }, (column: number) => column.toString())
           }.width('100%').alignItems(VerticalAlign.Top)
         }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
-        if (this.profile.unorganizedLoading) { LoadingProgress().width(28).height(28) }
+        if (this.profile.unorganizedLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
         else if (this.profile.unorganizedError) {
           PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.profile.unorganizedError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onOrganize) this.onOrganize('retryPins', '', false); } })
         }

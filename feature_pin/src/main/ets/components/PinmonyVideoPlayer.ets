@@ -167,7 +167,7 @@ export struct PinmonyVideoPlayer {
         }
         if (this.readingAddress || this.state.phase === 'loading' || this.state.buffering ||
             !this.state.rendered && (this.state.phase === 'prepared' || this.state.phase === 'playing')) {
-          LoadingProgress().width(42).height(42).color(Color.White)
+          LoadingProgress().width(42).height(42).color($r('app.color.accent'))
         } else if (this.state.phase !== 'playing') {
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.video_play')).width(32).height(32)

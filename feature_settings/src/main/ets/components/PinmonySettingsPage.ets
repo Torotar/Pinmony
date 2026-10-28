@@ -211,7 +211,7 @@ export struct PinmonySettingsPage {
       .contentEndOffset(this.getUIContext().px2vp(this.gestureBarHeightPx) + 12)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
     }
@@ -252,10 +252,11 @@ export struct PinmonySettingsPage {
     .backgroundColor($r('app.color.page_background'))
     .hitTestBehavior(this.store.screen === 'root' ? HitTestMode.Default : HitTestMode.None)
     .accessibilityLevel(this.store.screen === 'root' ? 'auto' : 'no-hide-descendants')
-    ForEach(this.store.screen === 'root' ? [] : [this.store.screen], (_screen: string) => {
+    ForEach(this.store.screen === 'root' ? [] : [this.store.screen.startsWith('social') ? 'social' : this.store.screen], (_screen: string) => {
       Column() { this.settingsSubpage() }.width('100%').height('100%')
         .backgroundColor($r('app.color.page_background'))
-        .transition(TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.translate({x:'100%'}).animation({duration:180,curve:Curve.EaseOut}),
           TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn})))
     }, (screen: string): string => screen)
     }.width('100%').height('100%')

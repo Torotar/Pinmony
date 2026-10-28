@@ -1389,7 +1389,7 @@ export class PinmonyNativeNetwork {
       const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
         job.id.startsWith('native_board_pin_write_') && job.epoch === captured.generation && job.page.startsWith(captured.origin + '/') &&
         /^\/[^/?#]+\/[^/?#]+\/$/.test(path) && !/^_|^(?:pin|users|search|ideas|today|settings|messages|inbox|login|logout|signup|business|explore)$/i.test(parts[0]) &&
-        (!/^_|^(?:pins|followers|following)$/i.test(parts[1]) || parts[1] === '_products_you_tagged' && job.url === captured.origin + '/resource/ApiResource/delete/' && o['url'] === '/v3/pins/bulk/') && /^\d{1,30}$/.test(boardId) && /^\d{1,30}$/.test(viewerId) && job.method === 'POST' &&
+        (!/^_|^(?:pins|followers|following)$/i.test(parts[1]) || parts[1] === '_products_you_tagged' && (job.url === captured.origin + '/resource/ApiResource/delete/' && o['url'] === '/v3/pins/bulk/' || job.url === captured.origin + '/resource/RepinResource/create/')) && /^\d{1,30}$/.test(boardId) && /^\d{1,30}$/.test(viewerId) && job.method === 'POST' &&
         job.headers['Accept'] === 'application/json' && job.headers['Content-Type'] === 'application/x-www-form-urlencoded' && job.headers['X-Requested-With'] === 'XMLHttpRequest' &&
         !!form && Object.keys(envelope).length === 2 && !!envelope.context && typeof envelope.context === 'object' && !Array.isArray(envelope.context) && Object.keys(envelope.context).length === 0 &&
         !!o && typeof o === 'object' && !Array.isArray(o);
@@ -1398,9 +1398,16 @@ export class PinmonyNativeNetwork {
       if(job.url === captured.origin + '/resource/PinResource/delete/') {
         permitted = basic && recommendation && keys.length === 2 && typeof o['id'] === 'string' && /^\d{1,30}$/.test(o['id'] as string) && savedCopies.includes(o['id'] as string) && typeof o['client_tracking_params'] === 'string' && (o['client_tracking_params'] as string).length <= 16384;
       }else if(job.url === captured.origin + '/resource/RepinResource/create/') {
+        const product: boolean = parts[1] === '_products_you_tagged';
+        const event: Record<string,Object> | undefined = o['eventContext'] as Record<string,Object> | undefined;
         permitted = basic && recommendation &&
+          (product ? !recommendationPath && keys.length === 12 && keys.every((key: string): boolean => ['pin_id','board_id','clientTrackingParams','description','title','link','image_base64','image_url','media_upload_id','is_buyable_pin','is_removable','eventContext'].includes(key)) &&
+            typeof o['title'] === 'string' && (o['title'] as string).length <= 1000 && typeof o['description'] === 'string' && (o['description'] as string).length <= 10000 && typeof o['link'] === 'string' && (o['link'] as string).length <= 8192 &&
+            typeof o['clientTrackingParams'] === 'string' && (o['clientTrackingParams'] as string).length <= 16384 && o['image_base64'] === '' && o['image_url'] === '' && o['media_upload_id'] === '' && o['is_buyable_pin'] === false && o['is_removable'] === false &&
+            !!event && !Array.isArray(event) && Object.keys(event).length === 3 && event['viewType'] === 5 && event['viewParameter'] === 3173 && event['element'] === 10599 &&
+            typeof o['pin_id'] === 'string' && /^\d{1,30}$/.test(o['pin_id'] as string) && recommendedIds.includes(o['pin_id'] as string) && o['board_id'] === boardId :
           (keys.length === 3 || keys.length === 4 && keys.includes('clientTrackingParams')) && typeof o['pin_id'] === 'string' && /^\d{1,30}$/.test(o['pin_id'] as string) &&
-          recommendedIds.includes(o['pin_id'] as string) && o['board_id'] === boardId && o['user_id'] === viewerId && (o['clientTrackingParams'] === undefined || typeof o['clientTrackingParams'] === 'string' && (o['clientTrackingParams'] as string).length <= 16384);
+          recommendedIds.includes(o['pin_id'] as string) && o['board_id'] === boardId && o['user_id'] === viewerId && (o['clientTrackingParams'] === undefined || typeof o['clientTrackingParams'] === 'string' && (o['clientTrackingParams'] as string).length <= 16384));
       }else if(job.url === captured.origin + '/resource/BoardResource/create/') {
         permitted = basic && source === '/board/create/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/board/create.js' && keys.length === 2 &&
           typeof o['name'] === 'string' && !!(o['name'] as string).trim() && o['name'] === (o['name'] as string).trim() && (o['name'] as string).length <= 100 &&
@@ -1514,12 +1521,12 @@ export class PinmonyNativeNetwork {
       const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
         job.id.startsWith('native_board_aux_') && job.epoch === captured.generation && job.page.startsWith(captured.origin + '/') &&
         /^\/[^/?#]+\/[^/?#]+\/$/.test(path) && !/^_|^(?:pin|users|search|ideas|today|settings|messages|inbox|login|logout|signup|business|explore)$/i.test(parts[0]) &&
-        !/^_|^(?:pins|followers|following)$/i.test(parts[1]) && /^\d{1,30}$/.test(boardId) && /^\d{1,30}$/.test(viewerId) && /^[A-Za-z0-9_]+$/.test(username) &&
+        (!/^_|^(?:pins|followers|following)$/i.test(parts[1]) || parts[1] === '_products_you_tagged' && job.url.startsWith(captured.origin + '/resource/BoardContentRecommendationResource/get/?')) && /^\d{1,30}$/.test(boardId) && /^\d{1,30}$/.test(viewerId) && /^[A-Za-z0-9_]+$/.test(username) &&
         job.method === 'GET' && job.body === '' && !!source && Object.keys(payload).length === 2 && !Array.isArray(o) && !Array.isArray(payload.context) && Object.keys(payload.context).length === 0 &&
         (cursor === undefined || Array.isArray(cursor) && cursor.length === 1 && typeof cursor[0] === 'string' && cursor[0].length > 0 && cursor[0].length <= 4096);
       const sourcePath: string = source ? decodeURIComponent(source[1]) : '';
       if(job.url.startsWith(captured.origin + '/resource/BoardContentRecommendationResource/get/?')) {
-        permitted = basic && sourcePath === path + '_tools/more-ideas/?ideas_referrer=23' && handler === 'www/[username]/[slug]/_tools/more-ideas.js' && keys.length === 3 && o['id'] === boardId && o['type'] === 'board' && o['__track__referrer'] === 23;
+        permitted = basic && sourcePath === path + '_tools/more-ideas/?ideas_referrer=23' && handler === 'www/[username]/[slug]/_tools/more-ideas.js' && (keys.length === 3 || keys.length === 4 && keys.includes('bookmarks')) && o['id'] === boardId && o['type'] === 'board' && o['__track__referrer'] === (parts[1] === '_products_you_tagged' ? '23' : 23);
       } else if(job.url.startsWith(captured.origin + '/resource/BoardsResource/get/?')) {
         permitted = basic && sourcePath === '/board/' + boardId + '/organize/repin/' && handler === 'www/board/[id]/organize.js' &&
           (keys.length === 9 || keys.length === 10 && keys.includes('bookmarks')) && keys.every((k: string): boolean => ['privacy_filter','sort','field_set_key','filter_stories','username','page_size','group_by','include_archived','filter_all_pins','bookmarks'].includes(k)) &&

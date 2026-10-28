@@ -4,7 +4,7 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
-export interface PinmonyBoardRecommendationSource { id: string; tracking_params?: string; }
+export interface PinmonyBoardRecommendationSource { id: string; tracking_params?: string; title?: string; description?: string; link?: string; }
 export interface PinmonyBoardPinWriteIdentity {
   page: string; boardId: string; viewerId: string; intent: number; canContribute: boolean;
   recommendationPath?: string;
@@ -14,6 +14,9 @@ interface CreateTargetOptions { name: string; privacy: string; }
 interface CreateTargetInput { name: string; secret: boolean; }
 interface CreatedTarget { id: string; type: string; name: string; privacy: string; owner: CopyOwner; image_cover_url?: string; }
 interface SaveOptions { pin_id: string; board_id: string; user_id: string; clientTrackingParams?: string; }
+interface ProductSaveContext { viewType: number; viewParameter: number; element: number; }
+interface ProductSaveOptions { pin_id: string; board_id: string; clientTrackingParams: string; description: string; title: string; link: string;
+  image_base64: string; image_url: string; media_upload_id: string; is_buyable_pin: boolean; is_removable: boolean; eventContext: ProductSaveContext; }
 interface UnsaveOptions { id: string; client_tracking_params: string; }
 interface SavedRecommendation { id: string; tracking: string; }
 interface MoveData { board_id: string; pin_ids: string[]; section_id?: string; }
@@ -23,7 +26,7 @@ interface BulkDeleteOptions { url: string; data: BulkDeleteData; }
 interface SectionMoveData { pins: string[]; fields: string[]; }
 interface SectionMoveOptions { url: string; data: SectionMoveData; }
 interface SectionMoveResult { id: string; type: string; board: CopyOwner; }
-interface WriteEnvelope { options: SaveOptions | UnsaveOptions | MoveOptions | SectionMoveOptions | BulkDeleteOptions | CreateTargetOptions; context: Record<string, string>; }
+interface WriteEnvelope { options: SaveOptions | ProductSaveOptions | UnsaveOptions | MoveOptions | SectionMoveOptions | BulkDeleteOptions | CreateTargetOptions; context: Record<string, string>; }
 interface CopyOwner { id: string; }
 interface SavedCopy { id: string; board: CopyOwner; pinner: CopyOwner; is_repin: boolean; }
 interface WriteResource { status: string; code: number; endpoint_name: string; data: SavedCopy | CreatedTarget | SectionMoveResult | null; }
@@ -82,12 +85,15 @@ export class PinmonyBoardPinNativeWrites {
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if(this.job || !original || !identity || !identity.canContribute || !session.authenticated || !session.accountId ||
       original.busy || original.loading || original.uncertain || original.error)return;
-    let options: SaveOptions | UnsaveOptions | MoveOptions | SectionMoveOptions | BulkDeleteOptions | CreateTargetOptions;
+    let options: SaveOptions | ProductSaveOptions | UnsaveOptions | MoveOptions | SectionMoveOptions | BulkDeleteOptions | CreateTargetOptions;
+    const productBoard: boolean = identity.page.slice(session.origin.length).split('/')[2] === '_products_you_tagged';
     const sectionTarget: RegExpMatchArray | null = value.match(/^section:(\d{1,30}):(\d{1,30})$/);
     let createKey: string = '';
     let url: string, source: string, handler: string;
     let selected: string[] = [];
     if(action === 'save' && original.saved.includes(value))action = 'unsave';
+    // This capture confirms saving recommendations, but no per-card undo on the protected board.
+    if(productBoard && action === 'unsave')return;
     if(action === 'save' || action === 'unsave') {
       const key: string = this.key(value,identity,session);
       if(this.uncertainPins.has(key)){this.operationKey = key;this.unknown(this.clone(original));return;}
@@ -104,7 +110,13 @@ export class PinmonyBoardPinNativeWrites {
       if(original.phase !== 'ideas' || !pin || !original.pins.some((p): boolean => p.id === value) || original.saved.includes(value))return;
       const save: SaveOptions = {pin_id:value,board_id:identity.boardId,user_id:identity.viewerId};
       if(typeof pin.tracking_params === 'string' && pin.tracking_params.length <= 16384)save.clientTrackingParams = pin.tracking_params;
-      options = save;selected = [value];url = '/resource/RepinResource/create/';
+      if(productBoard) {
+        if(identity.recommendationPath || typeof pin.title !== 'string' || pin.title.length > 1000 || typeof pin.description !== 'string' || pin.description.length > 10000 ||
+          typeof pin.link !== 'string' || pin.link.length > 8192 || typeof pin.tracking_params !== 'string' || pin.tracking_params.length > 16384)return;
+        options = {pin_id:value,board_id:identity.boardId,clientTrackingParams:pin.tracking_params,title:pin.title,description:pin.description,link:pin.link,
+          image_base64:'',image_url:'',media_upload_id:'',is_buyable_pin:false,is_removable:false,eventContext:{viewType:5,viewParameter:3173,element:10599}};
+      }else options = save;
+      selected = [value];url = '/resource/RepinResource/create/';
       }
     }else if(action === 'createTarget') {
       let input: CreateTargetInput;try { input = JSON.parse(value) as CreateTargetInput; }catch (_) {return;}

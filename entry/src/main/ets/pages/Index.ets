@@ -165,6 +165,7 @@ interface PinmonyBoardOperationAction {
 @Component
 struct Index {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  @StorageLink('profileLegacyLayout') private profileLegacyLayout: boolean = false;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private nativeChildBackUntil: number = 0;
@@ -2872,6 +2873,7 @@ struct Index {
       return;
     }
     if (!this.currentSearchPageKey()) return;
+    if (!this.searchStore.searchInputFocused && this.searchController.restoreCategorySearchParent()) return;
     if (!this.searchStore.searchInputFocused && this.restoreTopicSearchParent()) return;
     if (/[?&]q=[^&#]+/.test(this.currentSearchPageKey()) && !this.searchStore.searchInputFocused &&
       this.searchStore.searchOpenHistory) {
@@ -3826,6 +3828,9 @@ struct Index {
   private shuffleParentDetail: PinmonyDetailSnapshot | undefined = undefined;
   @State private shuffleSiblingItems: PinmonyShuffleItem[] = [];
   @State private shuffleSelectedIndex: number = 0;
+  @State private shuffleFullDetail: boolean = false;
+  @State private shuffleReturnParent: string = '';
+  @State private shuffleReturnItem: string = '';
   @State private shufflePreviews: PinmonyDetailSnapshot[] = [];
   @State private shuffleSelectedPin: string = '';
   @State private shuffleSelectedImage: string = '';
@@ -3971,7 +3976,7 @@ struct Index {
         style: { badgeSize: index === 3 && this.updateUnread ? 6 : 0, fontSize: 0 } }) {
       SymbolGlyph(symbol)
         .fontSize(24)
-        .fontColor([this.activeTab === index ? $r('app.color.tab_text_primary') :
+        .fontColor([this.activeTab === index ? $r('app.color.accent') :
           $r('app.color.tab_text_secondary')])
       }
       Text(PinmonyI18n.text(labelKey, this.uiLanguage))
@@ -3981,7 +3986,7 @@ struct Index {
         .maxLines(1)
         .textAlign(TextAlign.Center)
         .fontWeight(this.activeTab === index ? FontWeight.Medium : FontWeight.Regular)
-        .fontColor(this.activeTab === index ? $r('app.color.tab_text_primary') :
+        .fontColor(this.activeTab === index ? $r('app.color.accent') :
           $r('app.color.tab_text_secondary'))
     }
     .width('100%')
@@ -4167,6 +4172,15 @@ struct Index {
     if (this.showNativeSheet || this.activeSheetKind) {
       this.onBackPress();
       return;
+    }
+    if (this.shuffleFullDetail && this.shuffleSelectedPin === this.pinStore.detail?.pinUrl) {
+      this.shuffleFullDetail = false;
+      this.pinStore.detailScrollOffset = 0;
+      return;
+    }
+    if (this.shuffleSelectedImage && this.shuffleSelectedPin === this.pinStore.detail?.pinUrl && this.shuffleParentDetail) {
+      this.shuffleReturnParent = this.shuffleParentDetail.pinUrl;
+      this.shuffleReturnItem = this.shuffleSiblingItems[this.shuffleSelectedIndex]?.id || '';
     }
     if (this.homeEntryPhoto && !this.homeEntryBackCommitted && this.homeEntryPhoto.pinUrl === this.pinStore.detail?.pinUrl && !this.pinStore.imageLayer) {
       if (this.homeEntryClosing) return;
@@ -5286,6 +5300,7 @@ struct Index {
 
   private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false, collageItem: boolean = false): void {
     if (!returning && !collageItem) {
+      this.shuffleFullDetail = false;
       this.detailOpeningCoordinator.pauseShufflePreviews();this.shufflePreviews = [];
       this.shuffleSelectedPin = '';this.shuffleSelectedImage = '';this.shuffleSelectedBackdrop = '';
       this.shuffleParentDetail = undefined;this.shuffleSiblingItems = [];
@@ -5461,8 +5476,9 @@ struct Index {
     const sibling: boolean = !!current && this.shuffleSelectedPin === current.pinUrl;
     const parent: PinmonyDetailSnapshot | undefined = sibling ? this.shuffleParentDetail : current;
     if (!parent?.shuffle || parent.shuffle.id !== parent.shuffleId || this.authStatus !== 'authenticated' ||
-        this.businessSuspended || !this.pinStore.videoForeground || !this.pinStore.detailNativeReadsReady ||
-        !this.detailNativeReads.owned() || this.pinStore.detailPreparing || this.activeSheetKind || this.currentPinUrl() !== current?.pinUrl) return;
+        this.businessSuspended || !this.pinStore.videoForeground || this.activeSheetKind ||
+        (!sibling && (!this.pinStore.detailNativeReadsReady || !this.detailNativeReads.owned() || this.pinStore.detailPreparing)) ||
+        (sibling ? (this.pinStore.detailPin || this.pinStore.detailOpeningPin) !== current?.pinUrl : this.currentPinUrl() !== current?.pinUrl)) return;
     const item: PinmonyShuffleItem | undefined = parent.shuffle.items.find((entry: PinmonyShuffleItem): boolean => entry.id === id);
     if (!item || !item.tappable || item.hidden || item.alpha <= 0 || !item.pinId || !/^\d{1,30}$/.test(item.pinId) || !item.imageUrl) return;
     const target: string = this.nativeBusinessSessionContext().origin + '/pin/' + item.pinId + '/';
@@ -5484,6 +5500,16 @@ struct Index {
       (preview: PinmonyDetailSnapshot): void => {
         this.shufflePreviews = this.shufflePreviews.filter((entry: PinmonyDetailSnapshot): boolean => entry.pinUrl !== preview.pinUrl).concat([preview]).slice(-24);
       });
+  }
+
+  private openShuffleDetail(pin: string): void {
+    if (!this.shuffleSelectedImage || pin !== this.shuffleSelectedPin || pin !== this.pinStore.detail?.pinUrl ||
+        this.currentPinUrl() !== pin || this.authStatus !== 'authenticated' || this.businessSuspended ||
+        !this.pinStore.videoForeground || !this.pinStore.detailNativeReadsReady || !this.detailNativeReads.owned() ||
+        this.pinStore.detailPreparing || this.activeSheetKind) return;
+    // The selected Pin is already loaded. Show its full native detail without another read.
+    this.shuffleFullDetail = true;
+    this.pinStore.detailScrollOffset = 0;
   }
 
   private async openImageRelated(id: string): Promise<void> {
@@ -5971,7 +5997,7 @@ struct Index {
     // Sibling Pin reads update props on one retained carousel destination.
     if (this.shuffleParentDetail && this.shuffleSelectedImage &&
         this.collageDetailPinUrl === (detail?.pinUrl || this.pinStore.detailOpeningPin)) {
-      return 'shuffle:' + this.pinIdentity(this.shuffleParentDetail.pinUrl);
+      return this.pinIdentity(this.shuffleParentDetail.pinUrl);
     }
     return this.pinIdentity(detail?.pinUrl || this.pinStore.detailOpeningPin);
   }
@@ -6247,6 +6273,9 @@ struct Index {
   onBackPress(): boolean {
     if (this.boardOrderVisible) { if (!this.boardOrderBusy) this.boardOrderBackRequest++; return true; }
     if (this.boardRecoveryVisible) { if (!this.settingsStore.busy) this.boardRecoveryVisible = false; return true; }
+    if (this.authStatus !== 'authenticated' && !this.offlinePreviewMode && !this.authWebVisible()) {
+      return this.handleRootExitBack();
+    }
     this.rootExitBackHandled = false;
     const handled: boolean = this.navigationCoordinator.onBackPress();
     if (!this.rootExitBackHandled) this.rootExitBackAt = 0;
@@ -6316,7 +6345,7 @@ struct Index {
           if (this.homeStore.customHomeMenu.error) {
             Text(PinmonyI18n.render(this.homeStore.customHomeMenu.error, this.uiLanguage)).fontColor($r('app.color.secondary_text'))
           } else {
-            LoadingProgress().width(28).height(28)
+            LoadingProgress().color($r('app.color.accent')).width(28).height(28)
             Text(this.uiText("pm_loading_21bd738e")).fontColor($r('app.color.secondary_text'))
           }
         }.width('100%').padding(24)
@@ -6428,7 +6457,9 @@ struct Index {
       syncFloatingTabsMotion: (): void => this.syncFloatingTabsMotion(),
       searchStore: this.searchStore,
       shouldKeepSearchRootMounted: (): boolean => this.shouldKeepSearchRootMounted(),
-      preparingDetailReturn: this.searchEntryReturnPreparing && !!this.pinStore.detail,
+      // Keep the original search destination throughout the flight and detail visit.
+      // Recreating it only on back loses WaterFlow's anchor and collapsed header state.
+      preparingDetailReturn: this.preservingSearchForPin() || this.searchEntryReturnPreparing && !!this.pinStore.detail,
       pinStore: this.pinStore,
       loadFailed: this.loadFailed,
       activeTab: this.activeTab,
@@ -6724,10 +6755,8 @@ struct Index {
               this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + id + '/', this.nativeBusinessSessionContext().origin + '/edit/activity/');
             }, onOpenExternalLink: (url: string): Promise<void> => this.systemActions.openLink(url), onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
               .width('100%').height('100%')
-              .transition(TransitionEffect.asymmetric(
-                this.settingsProfileReturning ? TransitionEffect.IDENTITY :
-                  TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
-                TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })))
+              .transition(this.settingsProfileReturning ? TransitionEffect.asymmetric(
+                TransitionEffect.IDENTITY, TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })) : NATIVE_PAGE_TRANSITION)
           }
 
           if (this.profileStore.origins.length > 0 && this.currentProfileUrl()) {
@@ -6878,14 +6907,18 @@ struct Index {
                 PinmonyDetailPage({ onUser: (url: string) => this.openUserProfile(url),
                   onTagSearch: (query: string, pin: string) => this.openDetailTagSearch(query, pin),
                   onRelatedTopic: (moduleId: string, topicId: string, pin: string) => this.openDetailRelatedTopic(moduleId, topicId, pin),
-                  detail: this.detailPresentation(_identity),
-                  disableImageZoom: this.collageDetailPinUrl === this.pinStore.detail?.pinUrl,
+                  shuffleParentDetail: _identity === this.detailRootIdentity() ? this.shuffleParentDetail : undefined,
+                  currentDetail: this.detailPresentation(_identity),
+                  disableImageZoom: !this.shuffleFullDetail && this.collageDetailPinUrl === this.pinStore.detail?.pinUrl,
                   shuffleSelectedImage: this.shuffleSelectedPin === this.pinStore.detail?.pinUrl ? this.shuffleSelectedImage : '',
                   shuffleBackdrop: this.shuffleSelectedBackdrop,
                   shuffleItems: this.shuffleSiblingItems,
                   shuffleIndex: this.shuffleSelectedIndex,
+                  shuffleFullDetail: this.shuffleFullDetail,
+                  shuffleReturnItem: this.shuffleReturnParent === this.pinStore.detail?.pinUrl ? this.shuffleReturnItem : '',
                   shufflePreviews: this.shufflePreviews,
                   onShufflePin: (id: string) => this.openShufflePin(id),
+                  onShuffleDetail: (pin: string) => this.openShuffleDetail(pin),
                   onShuffleRetry: () => this.detailNativeAuxiliary.retryShuffle(),
                   renderIdentity: _identity === this.detailRootIdentity() ? this.detailRenderIdentity() : _identity,
                   traceId: _identity === this.detailRootIdentity() ? this.pinStore.detailOpeningToken : this.relatedEntryParentTrace,
@@ -7094,7 +7127,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: (this.authStatus === 'authenticated' && this.activeTab === 0) || this.boardOrderVisible || this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
+    .padding({ top: (this.authStatus === 'authenticated' && (this.activeTab === 0 || this.activeTab === 2 || (this.activeTab === 3 && !this.profileLegacyLayout && this.profileStore.profile?.isOwn === true))) || this.boardOrderVisible || this.publishPageVisible() && !!this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' || (this.profileStore.origins.length > 0 && !!this.currentProfileUrl()) || !!this.profileStore.panel || this.profileSettingsVisible ||
       this.profileStore.searchVisible || !!this.inboxStore.listSection || (!!this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'updatesMenu') ||
       this.inboxStore.invitationAllVisible || !!this.boardStore.collaborators || !!this.pinStore.detail || this.nativeSearchPageVisible() || this.nativeBoardVisible() ||
       (!this.pinStore.detail && !!this.profileStore.profile?.organize && !this.profileStore.profileWebFlow) ?

@@ -361,11 +361,26 @@ export class PinmonySearchNativeReads {
     modules.slice(0,20).forEach((module: FilterModule): void => { const action: FilterAction | undefined = module?.action; if(action?.type !== 'contenttypefiltermoduleaction' || !Array.isArray(action.filters)) return;
       action.filters.slice(0,50).forEach((item: FilterItem): void => { const label: string = item?.display?.display_text?.trim() || ''; if(item?.type !== 'filteroption' || !label) return; const target: string = this.target(item.action?.type === 'onebarmoduleaction' ? item.action.feed_url : ''); const id: string = 'native-filter-' + feed.filters.length.toString(); const enabled: boolean = !!target && this.supported(target) && this.query(target) === this.query(feed.snapshot.pageKey) && !item.disabled && !item.is_disabled; feed.filters.push({id:id,label:this.filterLabel(target.slice(this.origin.length).match(/^\/search\/(pins|videos|boards|users|buyable_pins)\//)?.[1] || '', label.slice(0,70)),group:this.filterGroup(action.title?.slice(0,70) || ''),selected:item.is_selected === true,enabled:enabled}); if(enabled)feed.targets.set(id,target); }); });
   }
+  private recoveryFilterFeed(): ReadFeed | undefined {
+    if (!this.owned() || !this.query(this.page)) return undefined;
+    return Array.from(this.feeds.values()).reverse().find((candidate: ReadFeed): boolean =>
+      this.query(candidate.snapshot.pageKey) === this.query(this.page) && candidate.filters.length > 0);
+  }
+
   async filters(): Promise<void> {
     if (!this.bind()) return; const page: string = this.page; const feed: ReadFeed | undefined = this.feeds.get(page); const token: number = ++this.filterRevision; const panel: number = this.store.searchFilterToken; const revision: number = this.revision;
     const live = (): boolean => this.owned() && page === this.page && token === this.filterRevision && panel === this.store.searchFilterToken && revision === this.revision;
-    if (!feed) { this.store.searchFilterLoading = false; this.store.searchFilterError = PinmonyI18n.message("pm_wait_for_search_results_to_finish_loading_then_retry_5baf3b75"); return; }
     this.store.searchProductDomains = [];this.store.searchProductCurrency = '';this.store.searchProductPrices = false;this.store.searchProductError = '';
+    if (!feed) {
+      const previous: ReadFeed | undefined = this.recoveryFilterFeed();
+      this.store.searchFilterOptions = previous ? previous.filters.filter((option: PinmonySearchFilterOption): boolean =>
+        /^https:\/\/[^/]+\/search\/(pins|videos|boards|users|buyable_pins)\/\?q=[^&]+(?:&rs=[^&]*)?$/.test(previous.targets.get(option.id) || ''))
+        .map((option: PinmonySearchFilterOption): PinmonySearchFilterOption => ({id:option.id,label:option.label,group:option.group,enabled:option.enabled,
+          selected:(previous.targets.get(option.id) || '').split('?')[0] === page.split('?')[0]})) : [];
+      this.store.searchFilterLoading = false;
+      this.store.searchFilterError = this.store.searchFilterOptions.length ? '' : PinmonyI18n.message("pm_wait_for_search_results_to_finish_loading_then_retry_5baf3b75");
+      return;
+    }
     this.store.searchProductMin = this.param(page,'price_min');this.store.searchProductMax = this.param(page,'price_max');
     if(page.startsWith(this.origin + '/search/buyable_pins/')) {
       const chosen: string[] = this.param(page,'domains').split(',');
@@ -414,6 +429,8 @@ export class PinmonySearchNativeReads {
         this.store.searchProductError = '';return target;
       } catch (_) {this.store.searchProductError = PinmonyI18n.message("pm_enter_a_valid_whole_number_price_range_minimum_cannot_exceed_max_2a617055");return '';}
     }
-    return this.owned() && feed?.filters.some((item: PinmonySearchFilterOption): boolean => item.id === id && item.enabled && !item.selected) ? feed.targets.get(id) || '' : '';
+    const source: ReadFeed | undefined = feed || this.recoveryFilterFeed();
+    const options: PinmonySearchFilterOption[] = feed ? feed.filters : this.store.searchFilterOptions;
+    return this.owned() && options.some((item: PinmonySearchFilterOption): boolean => item.id === id && item.enabled && !item.selected) ? source?.targets.get(id) || '' : '';
   }
 }

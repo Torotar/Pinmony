@@ -1,7 +1,7 @@
 import { PinmonyActionNotice } from 'common_ui';
-import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
+import { BlurStrategy, HdsNavigation, HdsNavigationTitleBarOptions, HdsNavigationTitleMode, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
-import { PinmonyVideoCard } from 'common_ui';
+import { PinmonyImmersiveLight, PinmonyVideoCard } from 'common_ui';
 import { connection } from '@kit.NetworkKit';
 import { allowsSpeculativeReads, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
@@ -23,7 +23,10 @@ export struct PinmonyHomePage {
   }
 
   @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private homeTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx); }
+  @State private refreshGestureState: RefreshStatus = RefreshStatus.Inactive;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
@@ -145,6 +148,19 @@ export struct PinmonyHomePage {
   private pendingEnd: boolean = false;
   private viewportFillKey: string = '';
   private viewportHeight: number = 0;
+  private readonly layoutTraceSizes: Map<string, string> = new Map<string, string>();
+  private layoutTraceCount: number = 0;
+  private traceLayout(node: string, area: Area): void {
+    const top: number = Number(area.globalPosition.y);
+    const height: number = Number(area.height);
+    if (!Number.isFinite(top) || !Number.isFinite(height) || height <= 0) return;
+    const geometry: string = ' top=' + top.toFixed(1) + ' height=' + height.toFixed(1) +
+      ' bottom=' + (top + height).toFixed(1);
+    if (this.layoutTraceCount >= 24 || this.layoutTraceSizes.get(node) === geometry) return;
+    this.layoutTraceSizes.set(node, geometry);
+    ++this.layoutTraceCount;
+    PinmonyRuntimeLog.info('HomeLayoutTrace: node=' + node + geometry + ' componentSafeArea=false');
+  }
   private prefetchNotBefore: number = 0;
   private prefetchTimer: number = -1;
   private lastHomePinCount: number = 0;
@@ -639,7 +655,7 @@ export struct PinmonyHomePage {
         }
         Button({ type: ButtonType.Circle }) {
           if (this.menuLoadingId === pin.id) {
-            LoadingProgress().width(20).height(20)
+            LoadingProgress().color($r('app.color.accent')).width(20).height(20)
           } else {
             Image($r('app.media.lucide_ellipsis'))
               .width(20)
@@ -683,6 +699,18 @@ export struct PinmonyHomePage {
   }
 
   @Builder
+  private homeRefreshIndicator() {
+    Column() {
+      LoadingProgress().width(24).height(24)
+      .color($r('app.color.accent'))
+      .visibility(this.refreshing || this.refreshGestureState === RefreshStatus.Drag ||
+        this.refreshGestureState === RefreshStatus.OverDrag ? Visibility.Visible : Visibility.Hidden)
+    }.width('100%').height(64).justifyContent(FlexAlign.Center)
+      .offset({ y: this.homeTopInset() + 48 + (this.home.board ? 68 : 0) })
+      .hitTestBehavior(HitTestMode.None)
+  }
+
+  @Builder
   private feedContent() {
     Column() {
       if (this.feedActive) {
@@ -693,18 +721,6 @@ export struct PinmonyHomePage {
             Image(url).width(1).height(1).opacity(0).accessibilityLevel('no')
           }, (url: string) => url)
         }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-      }
-      if (this.home.board && this.canShowFeed()) {
-        Column() {
-          this.boardSummary(this.home.board)
-        }
-        .width('100%')
-        .height(this.homeChromeCollapsed ? 0 : 68)
-        .margin({ top: this.homeChromeCollapsed ? 0 : this.homeTopInset() + 48 })
-        .opacity(this.homeChromeCollapsed ? 0 : 1)
-        .hitTestBehavior(this.homeChromeCollapsed ? HitTestMode.None : HitTestMode.Default)
-        .accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')
-        .clip(true)
       }
 
       if (!this.canShowFeed()) {
@@ -727,7 +743,7 @@ export struct PinmonyHomePage {
         }
       } else {
         Stack({ alignContent: Alignment.Top }) {
-          Refresh({ refreshing: this.refreshing }) {
+          Refresh({ refreshing: this.refreshing, builder: this.homeRefreshIndicator }) {
             WaterFlow({ scroller: this.feedScroller }) {
               ForEach(this.home.pins, (pin: PinmonyHomePin) => {
                 FlowItem() {
@@ -739,7 +755,7 @@ export struct PinmonyHomePage {
                 Column({ space: 8 }) {
                   if (this.home.dataSource === 'api') {
                     if (this.home.loadingMore) {
-                      LoadingProgress().width(24).height(24)
+                      LoadingProgress().color($r('app.color.accent')).width(24).height(24)
                     } else if (this.home.sourceError) {
                       PinmonyActionNotice({ active: this.interactionReady, message: this.uiText("pm_retry_loading_8924c788"), actionText: this.uiText("pm_retry_loading_8924c788"), onAction: () => { if (this.onLoadMore) this.onLoadMore(); } })
                     } else if (this.home.endReached) {
@@ -764,7 +780,7 @@ export struct PinmonyHomePage {
             .rowsGap(12)
             .width('100%')
             .height('100%')
-            .padding({ left: 12, right: 12, top: this.home.board ? 16 : this.homeTopInset() + 64 })
+            .padding({ left: 12, right: 12, top: this.homeTopInset() + (this.home.board ? 132 : 64) })
             .clipContent(ContentClipMode.BOUNDARY)
             .cachedCount(12, true)
             .clip(false)
@@ -793,6 +809,7 @@ export struct PinmonyHomePage {
               this.loadNextPageAtEnd();
             })
             .onAreaChange((_oldArea: Area, newArea: Area) => {
+              this.traceLayout('waterflow', newArea);
               this.viewportHeight = Number(newArea.height);
               setTimeout(() => this.fillShortViewport(), 0);
               const width: number = Number(newArea.width);
@@ -803,6 +820,7 @@ export struct PinmonyHomePage {
           .height('100%')
           .clip(false)
           .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
+          .onStateChange((state: RefreshStatus) => { this.refreshGestureState = state; })
           this.feedStatus()
         }
         .width('100%')
@@ -815,10 +833,20 @@ export struct PinmonyHomePage {
     .clip(false)
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .backgroundColor($r('app.color.page_background'))
+    .onAreaChange((_oldArea: Area, area: Area) => this.traceLayout('feed', area))
   }
 
   @Builder
   private categoryButtons() {
+    Stack({alignContent:Alignment.TopStart}) {
+      if (this.home.board && this.canShowFeed()) {
+        Column().width('100%').height(this.homeTopInset() + 48)
+          .backgroundColor($r('app.color.page_background'))
+          .opacity(this.homeChromeCollapsed ? 0 : 1)
+          .position({x:0,y:-this.homeTopInset()})
+          .hitTestBehavior(HitTestMode.None)
+          .accessibilityLevel('no')
+      }
     Column() {
       if (this.categories.length > 0) {
         Scroll() {
@@ -848,29 +876,52 @@ export struct PinmonyHomePage {
         .scrollBar(BarState.Off)
         .align(Alignment.Start)
       }
-    }.width('100%').padding({ top: this.homeTopInset() })
+    }.width('100%').height(48)
     .hitTestBehavior(HitTestMode.Transparent)
+    }.width('100%').height(48).clip(false).hitTestBehavior(HitTestMode.Transparent)
   }
 
   @Builder
   private homeNavigation() {
+    Stack({alignContent:Alignment.TopStart}) {
     HdsNavigation() { this.feedContent() }
       .width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MINI)
       .hideBackButton(true)
-      .titleBar({
-        avoidLayoutSafeArea: false,
-        enableComponentSafeArea: false,
-        style: {
-          scrollEffectOpts: { enableScrollEffect: false },
-          originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 } },
-          scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 } }
-        },
-        content: { title: { mainTitle: '' } }
-      })
+      .titleBar(this.homeTitleBarOptions())
+      .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
+        { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
       .bindToScrollable([this.feedScroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .clip(false)
+      .onAreaChange((_oldArea: Area, area: Area) => this.traceLayout('navigation', area))
+      if (this.home.board && this.canShowFeed()) {
+        Column() {
+          Column() { this.boardSummary(this.home.board) }.width('100%').height(68)
+            .backgroundColor($r('app.color.page_background'))
+        }.width('100%').height(68)
+          .position({x:0,y:this.homeTopInset() + 48})
+          .opacity(this.homeChromeCollapsed ? 0 : 1)
+          .clip(true)
+          .hitTestBehavior(this.homeChromeCollapsed ? HitTestMode.None : HitTestMode.Default)
+          .accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')
+      }
+    }.width('100%').height('100%')
+  }
+
+  private homeTitleBarOptions(): HdsNavigationTitleBarOptions {
+    return {
+      avoidLayoutSafeArea: true,
+      enableComponentSafeArea: false,
+      style: {
+        blurStrategy: this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+        thermoCtrl: this.immersiveLightMode !== 'off',
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightMode !== 'off',
+          scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
+      },
+      content: { stackBuilder: (): void => { this.categoryButtons(); } }
+    };
   }
 
   build() {
@@ -900,24 +951,9 @@ export struct PinmonyHomePage {
             .onActionStart(() => { this.suppressSwipeClick = true; })
             .onActionEnd((event: GestureEvent) => this.swipeCategory(event.offsetX, event.offsetY))
         )
-      if (this.categories.length > 0) {
-        Column()
-          .width('100%').height(this.homeTopInset() + 42)
-          .linearGradient({ direction: GradientDirection.Bottom, colors: [
-            [$r('app.color.search_top_mask_start'), 0],
-            [$r('app.color.search_top_mask_mid'), 0.95],
-            [$r('app.color.search_top_mask_end'), 1]
-          ] })
-          .linearGradientBlur(15, {
-            fractionStops: [[0, 0], [0.8, 0.2], [1, 0.4], [1, 1]], direction: GradientDirection.Top
-          })
-          .clip(true)
-          .hitTestBehavior(HitTestMode.None)
-          .accessibilityLevel('no')
-      }
-      this.categoryButtons()
     }
     .width('100%').height('100%')
+    .onAreaChange((_oldArea: Area, area: Area) => this.traceLayout('root', area))
   }
 
 }

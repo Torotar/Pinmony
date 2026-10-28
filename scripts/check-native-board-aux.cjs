@@ -41,6 +41,46 @@ await action(g,'close');assert.equal(g.store.boardDetail.flow.phase,'','close do
 // Collaborator writes now have a separate native contract/lifecycle suite; auxiliary reads remain independent.
 p=g.reader.openCollaborators();g.requests[6].resolve(response(board));g.requests[7].resolve(response([]));g.requests[8].resolve(response([{id:'44',username:'suggested'}]));await p;await g.reader.collaboratorsAction('permissions','');assert.equal(g.store.collaborators.phase,'permissions');assert.equal(g.reader.collaboratorsPolling(),false);const permission=JSON.stringify({permission:0,invites:false});
 const mixed=fixture();await ready(mixed);p=action(mixed,'ideas');mixed.requests[2].resolve(response([pin(7),{type:'story'}, {...pin(8),images:undefined}]));await p;assert.equal(mixed.store.boardDetail.flow.pins.length,1,'recommendation modules do not fail otherwise valid Pins');
+// Captured protected-board ideas: real reader, product cards, paging and exact native gates.
+const products=fixture(),productPage=origin+'/sample/_products_you_tagged/';
+products.store.boardDetail.pageKey=productPage;
+const productBoard={...board,url:'/sample/_products_you_tagged/',privacy:'protected',access:['read','write','delete']};
+await ready(products,productBoard);
+const productPin=id=>({...pin(id),is_product_pin:true,title:'Product '+id,description:'Original product description',link:'https://retailer.test/product'});
+const ideasReply=(rows,bookmark='-end-',endpoint='v3_get_board_ideas_feed')=>JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:endpoint,data:rows,bookmark},client_context:{user:owner}});
+p=action(products,'ideas');let request=products.requests.at(-1);
+assert.equal(opts(request.job).__track__referrer,'23');
+request.resolve(ideasReply([productPin(7)],'ideas-next'));await p;
+assert.equal(products.store.boardDetail.flow.pins.length,1,'product cards are allowed only in the product board');
+assert(products.store.boardDetail.flow.hasMore);
+p=action(products,'ideasMore');request=products.requests.at(-1);const count=products.requests.length;
+await action(products,'ideasMore');assert.equal(products.requests.length,count,'one page at a time');
+assert.deepEqual(opts(request.job).bookmarks,['ideas-next']);request.resolve('invalid');await p;
+assert(products.store.boardDetail.flow.error);assert.equal(products.store.boardDetail.flow.pins.length,1);
+await action(products,'ideasMore');assert.equal(products.requests.length,count,'failed pages require explicit retry');
+p=action(products,'retry');request=products.requests.at(-1);assert.deepEqual(opts(request.job).bookmarks,['ideas-next']);
+request.resolve(ideasReply([productPin(7),productPin(8)],'ideas-next'));await p;
+assert.deepEqual(Array.from(products.store.boardDetail.flow.pins,p=>p.id),['7','8']);assert.equal(products.store.boardDetail.flow.hasMore,false,'repeated cursor stops paging');
+const productNet=new Network();productNet.request=async(job,current)=>({error:acceptsNetworkJob(job,current())?'':'rejected'});
+const readGate=job=>productNet.requestBusinessBoardAuxRead(job,()=>products.session(),'100','sample','42',()=>true);
+assert.equal((await readGate(request.job)).error,'','protected pagination reaches actual native transport');
+const editRead={...f.requests[6].job,page:productPage};assert.equal((await readGate(editRead)).error,'rejected','protected exception does not permit board management');
+const alteredRead=change=>{const url=new URL(request.job.url),data=JSON.parse(url.searchParams.get('data'));change(data.options);url.searchParams.set('data',JSON.stringify(data));return {...request.job,url:url.href}};
+for(const job of [alteredRead(o=>o.id='999'),alteredRead(o=>o.__track__referrer=23),alteredRead(o=>o.bookmarks=['a','b']),{...request.job,page:origin+'/sample/_other/'}])assert.equal((await readGate(job)).error,'rejected');
+p=action(products,'save','8');request=products.requests.at(-1);
+const savedOptions=JSON.parse(new URLSearchParams(request.job.body).get('data')).options;
+assert.equal(savedOptions.title,'Product 8');assert.equal(savedOptions.description,'Original product description');assert.equal(savedOptions.link,'https://retailer.test/product');
+assert.deepEqual(savedOptions.eventContext,{viewType:5,viewParameter:3173,element:10599});assert.equal(savedOptions.user_id,undefined);assert.equal(Object.keys(savedOptions).length,12);
+const writeGate=job=>productNet.requestBusinessBoardPinWrite(job,()=>products.session(),'100','42',[],[],['7','8'],()=>true);
+assert.equal((await writeGate(request.job)).error,'','captured product save reaches actual native transport');
+const alteredWrite=change=>{const form=new URLSearchParams(request.job.body),data=JSON.parse(form.get('data'));change(data.options);form.set('data',JSON.stringify(data));return {...request.job,body:form.toString()}};
+for(const job of [alteredWrite(o=>o.pin_id='99'),alteredWrite(o=>o.board_id='999'),alteredWrite(o=>o.user_id='42'),alteredWrite(o=>o.eventContext.element=0),{...request.job,page:origin+'/sample/_other/'}])assert.equal((await writeGate(job)).error,'rejected');
+request.resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_repin_handler',data:{...pin(88),board:{id:'100'},pinner:owner,is_repin:true}},client_context:{user:owner}}));await p;
+assert.deepEqual(Array.from(products.store.boardDetail.flow.saved),['8']);assert.equal(products.store.boardDetail.pins[0].id,'88');
+products.requests.at(-1).resolve(response({...productBoard,pin_count:4}));await flush();products.requests.at(-1).resolve(response([pin(88),pin(1),pin(2)]));await flush();
+const afterSave=products.requests.length;await action(products,'save','8');assert.equal(products.requests.length,afterSave,'no uncaptured protected-card undo write');
+await action(products,'close');p=action(products,'ideas');products.requests.at(-1).resolve(ideasReply([productPin(9)],'-end-','other'));await p;assert(products.store.boardDetail.flow.error,'wrong endpoint cannot populate protected ideas');
+await action(products,'close');p=action(products,'ideas');const lateProduct=products.requests.at(-1);await action(products,'close');lateProduct.resolve(ideasReply([productPin(9)]));await p;assert.notEqual(products.store.boardDetail.flow.phase,'ideas');
 // Native management rejects incomplete edit values without waiting for a Web document.
 const h=fixture();await ready(h);p=action(h,'edit');h.requests[2].resolve(response(board));await p;h.ports.prepareDocument=()=>{throw Error('native edit must not prepare a Web document')};const beforeEdit=h.requests.length;assert.equal(await action(h,'editSave',{name:'Edited'}),true);assert.equal(h.requests.length,beforeEdit,'incomplete edits never dispatch');await action(h,'close');
 // Execute the actual Index native dispatch: read-only paths never reach the old reader/poller,

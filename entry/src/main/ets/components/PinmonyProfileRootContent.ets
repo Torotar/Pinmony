@@ -107,7 +107,7 @@ function PinmonyBuildProfileStatus(view: PinmonyProfileRootView) {
     Column() {
       Column({ space: 18 }) {
         if (view.profileStore.profileLoading) {
-          LoadingProgress().width(36).height(36)
+          LoadingProgress().color($r('app.color.accent')).width(36).height(36)
           Text(PinmonyI18n.text(PinmonyI18n.message("pm_loading_profile_503bfab4")))
             .fontSize(15)
             .fontColor($r('app.color.secondary_text'))

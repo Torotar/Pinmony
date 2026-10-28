@@ -11,7 +11,7 @@ host.finishRootPull=()=>{};host.returnCoordinator={cancel(){}};host.rootTabAddre
 host.searchStore.searchInputFocused=true;host.searchStore.searchInputStopEditing=()=>calls.push('blur');
 host.pageHistory={cancelBack:()=>calls.push('cancel'),visit:()=>{},prepareBackTo:target=>calls.push(target),isPending:()=>true};
 host.searchStore.searchCache={put:()=>{}};host.clearSearch=()=>{host.searchStore.search=undefined;host.searchStore.search=undefined};host.searchPlaceholder=()=>({});host.controller={loadUrl:target=>calls.push(target)};
-host.searchController={invalidatePending(){}};host.restoreRetainedSearch=()=>false;
+host.searchController={invalidatePending(){},restoreCategorySearchParent:()=>false};host.restoreRetainedSearch=()=>false;
 host.backFromSearch();const expected=new URL(page).origin+'/search/';assert.equal(calls.at(-1),expected);
 assert.ok(calls.includes('cancel'));assert.equal(host.searchStore.search.query,'');assert.equal(host.activeTab,1);
 assert.equal(host.nativeBackTarget,expected);assert.equal(host.rootTabAddresses.get(1),expected);

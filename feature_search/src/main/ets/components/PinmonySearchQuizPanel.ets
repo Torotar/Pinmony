@@ -40,7 +40,7 @@ export struct PinmonySearchQuizPanel {
 
   @Builder
   private requestState() {
-    if (this.quiz.busy) { LoadingProgress().width(28).height(28).alignSelf(ItemAlign.Center) }
+    if (this.quiz.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).alignSelf(ItemAlign.Center) }
     if (this.quiz.error) {
       PinmonyActionNotice({ message: PinmonyI18n.render(this.quiz.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onAction('retry', '') })
     }
@@ -80,7 +80,7 @@ export struct PinmonySearchQuizPanel {
   private paginationFooter() {
     if (this.quiz.busy && this.quiz.cards.length > 0) {
       Row() {
-        LoadingProgress().width(28).height(28)
+        LoadingProgress().color($r('app.color.accent')).width(28).height(28)
       }.width('100%').height(48).justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Center)
     }
   }
@@ -111,7 +111,7 @@ export struct PinmonySearchQuizPanel {
             })
         }
         if (this.quiz.busy && this.quiz.cards.length === 0) {
-          LoadingProgress().width(32).height(32).hitTestBehavior(HitTestMode.None)
+          LoadingProgress().color($r('app.color.accent')).width(32).height(32).hitTestBehavior(HitTestMode.None)
         } else if (this.quiz.cards.length === 0) {
           if (this.quiz.error) { Column({ space: 8 }) { this.requestState() }.width('100%') }
           else { Text(this.uiText("pm_no_recommendations_yet_841e1d2f")).fontColor($r('app.color.secondary_text')) }
