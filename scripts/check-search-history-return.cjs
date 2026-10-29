@@ -3,6 +3,14 @@ const vm = require('vm');
 const assert = require('assert/strict');
 const ts = require(process.argv[2]);
 const source = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
+const destination = source.slice(source.indexOf('  private searchRootDestination('), source.indexOf('  private searchCategoriesTitleBar('));
+const discovery = destination.indexOf("this.searchMaterialContent('discovery')");
+const results = destination.indexOf("this.searchMaterialContent('results')");
+const history = destination.indexOf("this.searchMaterialContent('history')");
+assert(discovery >= 0 && discovery < history && results < history);
+assert(destination.slice(results, history).includes('.zIndex(this.historyExitToRoot ? 0 : 2)'), 'results must remain above history when returning to history, and below it on the way to root');
+assert(destination.slice(history).includes('.zIndex(1)'), 'history exits above the root destination');
+assert.match(destination.slice(history), /TransitionEffect\.translate\(\{ x: '100%' \}\)\.animation\(\{ duration: 150, curve: Curve\.EaseIn \}\)/);
 const start = source.indexOf('  private handleSearchBack(');
 const end = source.indexOf('\n  private ', start + 1);
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +

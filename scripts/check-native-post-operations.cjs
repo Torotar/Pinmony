@@ -80,11 +80,20 @@ async function sectionSaveChecks(){
   const args=write.args.map((v,i)=>i===3?['100']:v);assert.equal((await send(write,write.job,args)).error,'reject','transport requires section ownership');
   const q=new URLSearchParams(write.job.body),e=JSON.parse(q.get('data'));e.options.section='301';q.set('data',JSON.stringify(e));
   assert.equal((await send(write,{...write.job,body:q.toString()})).error,'reject');
-  for(const result of [{...savedCopy(),section:{id:'301'}},savedCopy()]){
+  for(const result of [{...savedCopy(),section:{id:'301'}}]){
     const bad=fixture();await openSave(bad);let work=bad.ops.saveAction('boardsSections',',"100"');bad.requests[3].resolve(resource(sections,'get_all_boards_sections'));await work;
     work=bad.ops.saveAction('boardsSave',',"100","300"');bad.requests[4].resolve(resource(result,'v3_repin_handler'));await work;
     assert(bad.store.saveResult.uncertain);assert(!bad.store.confirmedSaves.isSaved('11'));
     await bad.ops.saveAction('boardsBack');await bad.ops.saveAction('boardsSections',',"100"');await bad.ops.saveAction('boardsSave',',"100","300"');assert.equal(bad.requests.length,5,'unknown response cannot unlock via section navigation');
+  }
+  for(const verified of [true,false]) {
+    const check=fixture();await openSave(check);let work=check.ops.saveAction('boardsSections',',"100"');check.requests[3].resolve(resource(sections,'get_all_boards_sections'));await work;
+    work=check.ops.saveAction('boardsSave',',"100","300"');check.requests[4].resolve(resource(savedCopy(),'v3_repin_handler'));await flush();
+    const readCopy=check.requests[5];assert.match(readCopy.job.url,/PinResource\/get/);assert.equal(JSON.parse(new URLSearchParams(new URL(readCopy.job.url).search).get('data')).options.id,'77');
+    assert.equal((await net.requestBusinessPost(readCopy.job,check.session,...readCopy.args.slice(1,-1),()=>true)).error,'');
+    readCopy.resolve(resource({...savedCopy(),section:{id:verified?'300':'301'}}));await work;
+    assert.equal(check.store.confirmedSaves.isSaved('11'),verified);assert.equal(!!check.store.saveResult.uncertain,!verified);
+    assert.equal(check.requests.length,6,'verification reads the returned copy without replaying the write');
   }
   const foreign=fixture();await openSave(foreign);p=foreign.ops.saveAction('boardsSections',',"100"');foreign.requests[3].resolve(resource([{...sections[0],board:{id:'200'}}],'get_all_boards_sections'));await p;
   assert(foreign.store.saveResult.error);assert.equal(foreign.store.saveResult.targetSections.length,0);
@@ -108,6 +117,6 @@ const h=new Host(),calls=[];Object.assign(h,{pinStore:{detail:{pinUrl:pin},saveR
 await h.openApiBoards();h.saveApiAction('boardsSave',',"100"');h.dismissApiBoards();await h.openEditPin(pin);h.editPinAction('editAi',',true');h.dismissEditPin();await h.cancelDetailSave(pin);await h.undoSavedPin();assert.equal(calls.length,8);assert.equal(calls[0][1],pin);assert.equal(calls.at(-1)[0],'cancel');
 const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8'),start=ui.indexOf('  private acceptsActionIntent('),end=ui.indexOf('\n  private ',start+1);assert(start>=0);
 const View=vm.runInNewContext(ts.transpileModule('class View {'+ui.slice(start,end)+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{});const view=new View();view.postActionsReady=true;view.actionsReady=false;view.deferredActions=false;assert(view.acceptsActionIntent({kind:'save',enabled:false}));assert(view.acceptsActionIntent({kind:'like',enabled:false,selected:false}));assert(!view.acceptsActionIntent({kind:'like',enabled:false,selected:true}));assert(!view.acceptsActionIntent({kind:'comment',enabled:false}));assert(!view.acceptsActionIntent({kind:'share',enabled:false}));
-assert(index.includes('postActionsReady: this.postNativeOperations.ready()'));assert(index.includes('nativePause: (): void => this.postNativeOperations?.pause()'));assert(fs.readFileSync('entry/src/main/ets/app/PinmonyScriptRegistry.ets','utf8').includes('window.PinmonyNativePostOperationsEnabled'));
+assert(index.includes('postActionsReady: _identity === this.detailRootIdentity() && this.postNativeOperations.ready()'));assert(index.includes('nativePause: (): void => this.postNativeOperations?.pause()'));assert(fs.readFileSync('entry/src/main/ets/app/PinmonyScriptRegistry.ets','utf8').includes('window.PinmonyNativePostOperationsEnabled'));
 }
 const watchdog=setTimeout(()=>{console.error('native post test timed out');process.exit(1)},20000);main().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1});

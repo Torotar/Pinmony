@@ -1,5 +1,6 @@
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -207,7 +208,7 @@ export struct PinmonyInboxFlowPage {
       this.avatar(user)
       Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontSize(17).fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
-      if (this.snapshot.screen === 'compose') {
+      if (this.snapshot.screen === 'compose' && !this.snapshot.directContact) {
         Checkbox().select(this.snapshot.selectedIds.includes(user.id)).width(24).height(24).margin(0).shape(CheckBoxShape.CIRCLE)
           .selectedColor($r('app.color.accent'))
           .onChange((selected: boolean) => {
@@ -557,7 +558,7 @@ export struct PinmonyInboxFlowPage {
     HdsNavDestination() {
     Stack({ alignContent: Alignment.Center }) {
     Column() {
-      if (this.snapshot.screen === 'compose') {
+      if (this.snapshot.screen === 'compose' && !this.snapshot.directContact) {
         TextInput({ text: this.query, placeholder: this.uiText("pm_search_by_name_or_email_0c503b47") }).margin({ left: 16, right: 16, bottom: 8 })
           .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain)
           .onChange((value: string) => {
@@ -575,11 +576,13 @@ export struct PinmonyInboxFlowPage {
             onAction: () => this.act('retry') })
         }.padding(16)
       }
-      if (this.snapshot.loading && this.snapshot.screen !== 'chat') { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
+      if (this.snapshot.loading && this.snapshot.screen !== 'chat' && !this.snapshot.directContact) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
 
       Scroll(this.scroller) {
         Column() {
-          if (this.snapshot.screen === 'compose' || this.snapshot.screen === 'settings') {
+          if (this.snapshot.screen === 'compose' && this.snapshot.directContact) {
+            Column()
+          } else if (this.snapshot.screen === 'compose' || this.snapshot.screen === 'settings') {
             ForEach(this.snapshot.users, (user: InboxFlowUser) => { this.userRow(user) }, (user: InboxFlowUser) => user.id)
           } else {
             if (this.snapshot.users.length > 0) {
@@ -653,7 +656,7 @@ export struct PinmonyInboxFlowPage {
         backgroundColor: $r('app.color.page_background'),
         onWillDismiss: (action: DismissSheetAction) => { action.dismiss(); this.showMessageMenu = false; this.selectedMessage = undefined; this.blockTarget = undefined; }
       })
-    if (this.snapshot.loading && this.snapshot.screen === 'chat') {
+    if (this.snapshot.loading && this.snapshot.screen === 'chat' || this.snapshot.directContact && !this.snapshot.error) {
       LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
     }
     }.width('100%').height('100%')
@@ -664,12 +667,12 @@ export struct PinmonyInboxFlowPage {
           systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
           scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
         },
-        content: { title: { mainTitle: this.snapshot.screen === 'chat' ? '' :
+        content: { title: { mainTitle: this.snapshot.screen === 'chat' || this.snapshot.directContact ? '' :
           this.snapshot.screen === 'compose' ? this.uiText("pm_new_message_3fc957bf") : PinmonyI18n.render(this.snapshot.title, this.uiLanguage) || this.uiText("pm_message_settings_57326743") },
           stackBuilder: this.conversationTitleBuilder,
           backIcon: { isEnabled: true, action: () => this.act('back') },
           menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: this.uiText("pm_message_settings_57326743"), action: () => this.act('settings') } }] :
-            this.snapshot.screen === 'compose' ? [{ content: { type: TextStyleMode.NORMAL, label: this.uiText("pm_next_acfc4e74"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
+            this.snapshot.screen === 'compose' && !this.snapshot.directContact ? [{ content: { icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontSize(24).fontWeight(FontWeight.Medium).fontColor([$r('app.color.primary_text')]), label: this.uiText("pm_next_acfc4e74"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
       .backgroundColor($r('app.color.page_background'))
       .bindToScrollable([this.scroller])

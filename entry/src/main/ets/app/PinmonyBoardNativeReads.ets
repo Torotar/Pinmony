@@ -71,7 +71,7 @@ export class PinmonyBoardNativeReads {
   private pins: PinmonyBoardPin[] = []; private sections: PinmonyBoardSection[] = [];
   private favoriteOnly: boolean = false;
   private cursor: string = ''; private ended: boolean = false; private ready: boolean = false; private busy: boolean = false;
-  private attempted: boolean = false; private error: string = ''; private refreshing: boolean = false;
+  private attempted: boolean = false; private error: string = ''; private refreshing: boolean = false; private postOperationLoading: boolean = false;
   private sectionsError: string = ''; private sectionsBusy: boolean = false; private sectionsReady: boolean = false; private sectionsQueued: boolean = false;
   private sectionEpoch: number = 0; private sectionCursor: string = ''; private flow: PinmonyBoardFlow | undefined = undefined;
   private bridgeEpoch: number = -1; private bridgeSession: number = 0; private adoptedVersion: number = -1;
@@ -138,7 +138,7 @@ export class PinmonyBoardNativeReads {
       state: (): PinmonyBoardFlow | undefined => this.store.boardDetail?.flow,
       page: (): string => this.store.boardDetail?.pageKey || '',
       identity: (): PinmonyBoardPinWriteIdentity | undefined => this.current() && this.verified && this.ready && this.board && !this.collection() ?
-        {page:this.page,boardId:this.board.id,viewerId:this.viewer,intent:this.flowEpoch,canContribute:this.contributes(),recommendationPath:this.flow?.phase === 'ideas' && this.flow.sectionId ? this.sectionIdeaPath : undefined,loadedIds:this.pins.map((pin: PinmonyBoardPin): string => pin.id),selectedIds:this.selectedIds.slice(),sources:this.sources.slice()} : undefined,
+        {page:this.page,boardId:this.board.id,viewerId:this.viewer,intent:this.flowEpoch,canContribute:this.contributes(),recommendationPath:this.flow?.phase === 'ideas' && this.flow.sectionId ? this.sectionIdeaPath : undefined,loadedIds:(this.sectionSource?.pins || this.pins).map((pin: PinmonyBoardPin): string => pin.id),selectedIds:this.selectedIds.slice(),sources:this.sources.slice()} : undefined,
       session: (): PinmonyBusinessSessionContext => this.ports.session(),network: (): PinmonyNativeNetwork => this.ports.network(),
       changed: (flow: PinmonyBoardFlow): void => {const unknown: boolean = flow.uncertain && !this.store.boardDetail?.flow?.uncertain;this.flow = flow;if(this.store.boardDetail)this.store.boardDetail.flow = flow;this.syncAuxiliary();if(unknown && this.ports.invalidateProfile)this.ports.invalidateProfile();},
       confirmed: (action: string, ids: string[], copy: string): void => this.pinWriteConfirmed(action,ids,copy)
@@ -165,11 +165,11 @@ export class PinmonyBoardNativeReads {
     this.sectionWrites.pause();this.contentWrites.pause();this.managementWrites.pause();this.pinWrites.pause();this.collaboratorWrites.pause();
     this.preparing = false; this.revision++; this.version++; this.sectionEpoch++; this.flowEpoch++; this.collabEpoch++;
     this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear(); this.sectionRequests.clear(); this.flowRequests.clear(); this.collabRequests.clear();
-    this.busy = false; this.sectionsBusy = false; this.sectionsQueued = false; this.refreshing = false; if(!this.ready)this.attempted = false; if(this.flow?.phase === 'section')this.flow = undefined;
+    this.busy = false; this.sectionsBusy = false; this.sectionsQueued = false; this.refreshing = false; this.postOperationLoading = false; if(!this.ready)this.attempted = false; if(this.flow?.phase === 'section')this.flow = undefined;
     else if(this.flow?.loading){this.flow.loading = false;this.flow.error = PinmonyI18n.message("pm_loading_interrupted_please_retry_b469c1dd");}
     if(this.store.collaborators?.loading){this.store.collaborators.loading = false;this.store.collaborators.error = PinmonyI18n.message("pm_loading_interrupted_please_retry_b469c1dd");}
     this.refreshQueued = false;
-    if(this.store.boardDetail) {this.store.boardDetail.session = 0; this.store.boardDetail.loadingMore = false; this.store.boardDetail.refreshing = false; if(this.store.boardDetail.flow?.phase === 'section')this.store.boardDetail.flow = undefined;}
+    if(this.store.boardDetail) {this.store.boardDetail.session = 0; this.store.boardDetail.loadingMore = false; this.store.boardDetail.refreshing = false; this.store.boardDetail.postOperationLoading = false; if(this.store.boardDetail.flow?.phase === 'section')this.store.boardDetail.flow = undefined;}
   }
   reset(): void { this.favoriteOnly = false;this.pause();this.cancelledCards.clear();this.cancelledPositions.clear();this.refreshedCancelledIds.clear();this.cancelledDisplayCount = undefined; this.sectionSource = undefined;this.sectionComplete = false;this.page = ''; this.account = ''; this.generation = -1; this.board = undefined; this.viewer = ''; this.verified = false; this.pins = []; this.sections = []; this.ready = false; this.attempted = false; this.error = ''; this.sectionsReady = false; this.sectionsError = ''; this.cursor = ''; this.ended = false; this.targetCursor = ''; this.selectedIds = []; this.sources = []; this.flow = undefined; this.store.collaborators = undefined; }
   private bind(): boolean {
@@ -212,13 +212,13 @@ export class PinmonyBoardNativeReads {
       chatPeer:peer ? {id:peer.id,name:this.clean(peer.full_name || peer.username),avatar:this.image(peer.image_medium_url || peer.image_small_url),username:this.clean(peer.username)} : undefined,
       following:typeof b?.followed_by_me === 'boolean' ? b.followed_by_me : undefined,followBusy:this.followWrites.busy(b?.id || ''),
       canFollow:this.verified && this.ready && !own && !this.collection() && typeof b?.followed_by_me === 'boolean' && !this.followWrites.pending() && !this.followWrites.locked(b.id),
-      editable:this.verified && own && !this.collection(),collaborator:member,canContribute:this.verified && !this.collection() && (own || member && !!b?.access?.includes('write')),
+      editable:this.postOperationLoading && !this.verified ? existing?.editable === true : this.verified && own && !this.collection(),collaborator:member,canContribute:this.verified && !this.collection() && (own || member && !!b?.access?.includes('write')),
       featuredCreators:creators,featured:!!b?.featured_board_metadata,featuredCreator:tag !== undefined && /^\d+$/.test(tag.toString()) && Number.isInteger(Number(tag)) && Number(tag) >= 0,
       sponsored:b?.featured_board_metadata?.is_sponsored_content === true,ownerVerified:display?.verified_identity?.verified === true,
       sectionCount:Number.isInteger(b?.section_count) && (b?.section_count || 0) > 0 ? b?.section_count : 0,
       favoriteOnly:this.favoriteOnly,canFilterFavorites:this.verified && !this.collection(),
       sections:this.favoriteOnly ? [] : this.sections.slice(),sectionsError:this.sectionsError,subtitle:this.clean(b?.featured_board_metadata?.board_subtitle),description:this.clean(b?.description,2000),headerImage:this.image(b?.header?.large_image_url || b?.header?.small_image_url),
-      loading:!this.ready && this.busy,loadingMore:this.ready && this.busy && !this.refreshing,refreshing:this.refreshing,
+      loading:!this.ready && this.busy,loadingMore:this.ready && this.busy && !this.refreshing,refreshing:this.refreshing,postOperationLoading:this.postOperationLoading,
       ready:this.ready,error:this.error,hasMore:!this.ended && !!this.cursor,pins:this.pins.slice(),flow:this.flow || existing?.flow,revision:existing?.revision || 0};
     this.store.boardDetail = snapshot;
     if(this.ready)this.ports.committed();
@@ -229,7 +229,7 @@ export class PinmonyBoardNativeReads {
     if(this.flow?.phase === 'section' && this.flow.sectionId){
       if(this.flow.loading)return;
       PinmonyRuntimeLog.info('BoardRefreshTrace: stage=section-request');
-      await this.readSection(this.flow.sectionId,false);return;
+      await this.readSection(this.flow.sectionId,false,true);return;
     }
     if(this.busy){this.refreshQueued = true;PinmonyRuntimeLog.info('BoardRefreshTrace: stage=queued');return;}
     PinmonyRuntimeLog.info('BoardRefreshTrace: stage=request');
@@ -392,7 +392,7 @@ export class PinmonyBoardNativeReads {
       if(!this.sections.some((section: PinmonyBoardSection): boolean => section.id === data.id))this.sections.push({id:data.id,title:data.title,
         pinCount:this.count(data.pin_count === null ? undefined : data.pin_count),images:[],pins:[]});
       this.board.section_count = this.count(data.board.section_count) === undefined ? Math.max(this.sections.length,(this.board.section_count || 0) + 1) : data.board.section_count;
-      this.sectionsReady = false;this.sectionsError = '';this.syncAuxiliary();this.readSections(true);if(openCreated)this.readSection(data.id,false);
+      this.sectionsReady = false;this.sectionsError = '';this.syncAuxiliary();this.readSections(true);if(openCreated)this.readSection(data.id,false,false,true);
     }else {
       const pin: PinmonyBoardPin | undefined = (sectionFlow?.pins || this.pins).find((p: PinmonyBoardPin): boolean => p.id === value);
       if(pin){pin.cancelled = true;this.cancelledCards.set(value,pin);this.cancelledPositions.set(value,this.pins.indexOf(pin));}
@@ -426,11 +426,12 @@ export class PinmonyBoardNativeReads {
       this.syncAuxiliary();if(this.ports.exited)this.ports.exited(action);return;
     }
     this.syncAuxiliary();
-    if(action !== 'archive')this.read(false,true);
+    if(action !== 'archive')this.read(false,true,true);
   }
   private pinWriteConfirmed(action: string, ids: string[], copy: string): void {
     if(!this.current() || !this.board)return;
-    const sourceSection: string = (this.sectionSource || this.flow)?.sectionId || '';
+    const source: PinmonyBoardFlow | undefined = this.sectionSource || this.flow;
+    const sourceSection: string = source?.sectionId || '';
     if(action === 'createTarget'){if(this.ports.invalidateProfile)this.ports.invalidateProfile();this.syncAuxiliary();return;}
     if((action === 'move' || action === 'moveSection') && this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
     if(action === 'save') {
@@ -449,15 +450,15 @@ export class PinmonyBoardNativeReads {
       this.flow = this.emptyFlow();this.selectedIds = [];this.targetCursor = '';this.sources = [];
     }
     if(this.ports.invalidateProfile)this.ports.invalidateProfile();
-    this.syncAuxiliary();
+    if(!sourceSection || !['move','moveSection','deleteSelected'].includes(action))this.syncAuxiliary();
     if((action === 'save' || action === 'unsave') && this.flow?.phase === 'ideas' && this.flow.sectionId)return;
     // Cancel every older read before revalidating, so a late feed cannot restore moved Pins.
     this.pause();
-    if(sourceSection && (action === 'move' || action === 'moveSection' || action === 'deleteSelected')){
+    if(source && sourceSection && (action === 'move' || action === 'moveSection' || action === 'deleteSelected')){
       this.sectionSource = undefined;this.sectionsReady = false;this.sectionsError = '';
-      this.readSection(sourceSection,false);this.readSections(true);return;
+      this.revalidateSectionAfterWrite(source,ids);return;
     }
-    this.read(false,true);
+    this.read(false,true,true);
   }
   private auxiliarySnapshot(): BoardAuxiliary { return {flowOwned:!!this.flow,sourcePins:this.sources.slice(),selectedIds:this.selectedIds.slice(),targetBookmark:this.targetCursor,collaborators:this.store.collaborators}; }
   private cancelFlow(): void {this.flowEpoch++;this.flowRequests.forEach((id: string): void => this.ports.network().cancel(id));this.flowRequests.clear();}
@@ -497,18 +498,46 @@ export class PinmonyBoardNativeReads {
     if(!this.current() || !this.board)return;
     const source: PinmonyBoardFlow | undefined = this.sectionSource || this.flow, id: string = source?.sectionId || '', title: string = source?.sectionTitle || '';
     if(action === 'rename' && source && renamed){this.pause();source.sectionTitle = renamed;source.phase = 'section';source.busy = false;source.error = '';this.flow = source;this.sectionSource = undefined;const section: PinmonyBoardSection | undefined = this.sections.find((s: PinmonyBoardSection): boolean => s.id === id);if(section)section.title = renamed;this.ports.invalidateProfile?.();this.syncAuxiliary();this.readSections(true);this.ports.feedback?.(PinmonyI18n.message("pm_section_name_updated_373a284b"));return;}
+    const movedIds: string[] = this.selectedIds.slice();
+    if(action === 'move' && this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
     this.pause();this.sectionSource = undefined;this.selectedIds = [];this.flow = this.emptyFlow();
     if(this.ports.invalidateProfile)this.ports.invalidateProfile();
     if(action === 'delete'){this.sections = this.sections.filter((s: PinmonyBoardSection): boolean => s.id !== id);if(this.ports.feedback)this.ports.feedback(title + PinmonyI18n.message("pm_section_deleted_73959940"));}
     else if(this.ports.feedback)this.ports.feedback(PinmonyI18n.message("pm_selected_pins_moved_ddba8b7a"));
-    this.sectionsReady = false;this.syncAuxiliary();this.readSections(true);
-    if(action === 'move')this.readSection(id,false);else this.read(false,true);
+    this.sectionsReady = false;
+    if(action === 'move' && source && id)this.revalidateSectionAfterWrite(source,movedIds);else {this.syncAuxiliary();this.read(false,true,true);}
+  }
+  private async revalidateSectionAfterWrite(source: PinmonyBoardFlow, ids: string[]): Promise<void> {
+    const revision: number = this.revision, id: string = source.sectionId || '';
+    source.phase = 'section';source.busy = false;source.loading = false;source.error = '';
+    source.pins = source.pins.filter((pin: PinmonyBoardPin): boolean => !ids.includes(pin.id));
+    this.flow = source;
+    for(let attempt: number = 0;attempt < 4;attempt++) {
+      await this.readSection(id,false,true,true,true);
+      if(!this.current() || revision !== this.revision || this.flow?.phase !== 'section' || this.flow.sectionId !== id)return;
+      const current: PinmonyBoardFlow = this.flow;
+      const returned: number = current.pins.filter((pin: PinmonyBoardPin): boolean => ids.includes(pin.id)).length;
+      PinmonyRuntimeLog.info('BoardRefreshTrace: stage=section-after-write attempt=' + attempt.toString() + ' moved=' + ids.length.toString() + ' remaining=' + current.pins.length.toString() + ' returnedMoved=' + returned.toString() + ' error=' + (!!current.error).toString());
+      if(!returned || current.error)break;
+      current.pins = current.pins.filter((pin: PinmonyBoardPin): boolean => !ids.includes(pin.id));
+      if(attempt === 3)current.error = PinmonyI18n.message('pm_board_section_sync_pending');
+      this.version++;this.apply();this.ports.install(this.installScript());
+      if(attempt === 3)break;
+      const epoch: number = this.sectionEpoch;
+      await new Promise<void>((resolve: () => void): void => {setTimeout(resolve,1500);});
+      if(!this.current() || revision !== this.revision || this.sectionEpoch !== epoch || this.flow !== current)return;
+    }
+    await this.read(false,true,true);
   }
   private async auxiliaryAction(a: BoardReadAction): Promise<void> {
     if(!this.bind() || this.store.boardDetail?.flow?.busy)return;
     const old: PinmonyBoardFlow | undefined = this.store.boardDetail?.flow;
     if(this.ports.movePage?.() === this.page && a.action === 'select')a.action = 'close';
     if(a.action === 'close') {
+      if(this.sectionSource && !old?.uncertain) {
+        if(this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
+        await this.sectionAction({action:'sectionReturn'});return;
+      }
       if(this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
       const recover: boolean = old?.uncertain === true || old?.phase === 'archived';this.cancelFlow();this.cancelSection();this.flow = this.emptyFlow();this.sectionSource = undefined;this.targetCursor = '';this.selectedIds = [];this.sources = [];this.syncAuxiliary();if(recover)await this.refresh();return;
     }
@@ -752,8 +781,8 @@ export class PinmonyBoardNativeReads {
     rows.filter((p: BoardPinData): boolean => p?.type !== 'story').forEach((p: BoardPinData): void => {if(boardFeed && !this.collection() && p?.type === 'pin' && p.board && p.board.id !== this.board?.id)throw new Error('board-pin');try {const pin: PinmonyBoardPin = this.mapPin(p);if(!pins.some((v: PinmonyBoardPin): boolean => v.id === pin.id))pins.push(pin);}catch (_) {}});
     if(rows.some((p: BoardPinData): boolean => p?.type === 'pin') && !pins.length)throw new Error('unsupported-feed');return pins;
   }
-  private async read(append: boolean, refresh: boolean): Promise<void> {
-    const revision: number = this.revision, previous: string = append ? this.cursor : ''; this.busy = true; this.attempted = true; this.error = ''; this.refreshing = refresh; this.apply();
+  private async read(append: boolean, refresh: boolean, operation: boolean = false): Promise<void> {
+    const revision: number = this.revision, previous: string = append ? this.cursor : ''; this.busy = true; this.attempted = true; this.error = ''; this.refreshing = refresh; this.postOperationLoading = operation; this.apply();
     const live = (): boolean => this.current() && revision === this.revision;
     let stage: string = '图板资料';
     try {
@@ -794,7 +823,10 @@ export class PinmonyBoardNativeReads {
       this.pins = pins.slice(0,2000); this.cursor = next; this.ended = !next || next === '-end-' || next === previous || !mapped.length || pins.length >= 2000; this.ready = true; this.version++; if(!append)this.recoveryVersion = this.version;
       PinmonyRuntimeLog.info('BoardNativeTrace: committed append=' + append.toString() + ' count=' + this.pins.length.toString());
     } catch (_) {if(live()){this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_pins_please_retry_e4cd3927") : PinmonyI18n.message(stage === '区块资料' ? 'pm_board_load_section_details_failed' : stage === '区块工具' ? 'pm_board_load_section_tools_failed' : stage === '推荐内容' ? 'pm_board_load_recommendations_failed' : stage === '图板资料' ? 'pm_board_load_board_details_failed' : 'pm_board_load_board_content_failed');PinmonyRuntimeLog.info('BoardNativeTrace: failed stage=' + (stage === '图板资料' ? 'metadata' : 'feed'));}}
-    finally {if(live()){this.busy = false;this.refreshing = false;this.apply();this.ports.install(this.installScript());if(this.refreshQueued){this.refreshQueued = false;this.refresh();}else if(this.verified && !this.sectionsReady && !this.sectionsBusy && !this.sectionsError)this.readSections();}}
+    finally {
+      if(live() && refresh && !this.error && this.verified && !this.sectionsReady && !this.sectionsBusy && !this.sectionsError) await this.readSections();
+      if(live()){this.busy = false;this.refreshing = false;this.postOperationLoading = false;this.apply();this.ports.install(this.installScript());if(this.refreshQueued){this.refreshQueued = false;this.refresh();}else if(this.verified && !this.sectionsReady && !this.sectionsBusy && !this.sectionsError)this.readSections();}
+    }
   }
   private async readSections(force: boolean = false): Promise<void> {
     if(!this.current() || !this.verified || !this.board || this.sectionsBusy)return;
@@ -808,19 +840,22 @@ export class PinmonyBoardNativeReads {
     finally {if(this.current() && revision === this.revision){this.sectionsBusy = false;this.apply();this.ports.install(this.installScript());if(this.sectionsQueued){this.sectionsQueued = false;this.readSections(true);}}}
   }
   private cancelSection(): void {this.sectionEpoch++;this.sectionRequests.forEach((id: string): void => this.ports.network().cancel(id));this.sectionRequests.clear();}
-  private async readSection(id: string, append: boolean): Promise<void> {
+  private async readSection(id: string, append: boolean, refresh: boolean = false, operation: boolean = false, keepOperationLoading: boolean = false): Promise<void> {
     const section: PinmonyBoardSection | undefined = this.sections.find((s: PinmonyBoardSection): boolean => s.id === id); if(!section || append && (this.flow?.loading || !this.flow?.hasMore))return;
     if(!append)this.cancelSection();
     const epoch: number = this.sectionEpoch, revision: number = this.revision;
-    if(!append){this.flow = this.emptyFlow();this.sectionCursor = '';this.sectionEnumerationValid = true;}
+    if(!append){
+      const retained: PinmonyBoardPin[] = refresh && this.flow?.phase === 'section' && this.flow.sectionId === id ? this.flow.pins.slice() : [];
+      this.flow = this.emptyFlow();this.flow.pins = retained;this.sectionCursor = '';this.sectionEnumerationValid = true;
+    }
     const f: PinmonyBoardFlow | undefined = this.flow; if(!f)return; const previous: string = this.sectionCursor;
-    f.phase = 'section';f.sectionId = id;f.sectionTitle = section.title;f.loading = true;f.error = '';this.apply();
+    f.phase = 'section';f.sectionId = id;f.sectionTitle = section.title;f.loading = true;f.refreshing = refresh;f.error = '';this.postOperationLoading = operation;this.apply();
     try {const o: BoardReadOptions = {page_size:25,prepend:false,section_id:id}; if(append)o.bookmarks = [previous];const body: BoardResponse = await this.request('BoardSectionPinsResource',o,revision,epoch), pins: PinmonyBoardPin[] = this.mapPins(body,false), next: string = this.next(body);
       const raw: BoardPinData[] = body.resource_response.data as BoardPinData[];
       if(!Array.isArray(raw) || !raw.filter((p: BoardPinData): boolean => p?.type !== 'story').every((p: BoardPinData): boolean => p?.type === 'pin' && this.digits(p.id) && pins.some((pin: PinmonyBoardPin): boolean => pin.id === p.id)))this.sectionEnumerationValid = false;
       const merged: PinmonyBoardPin[] = append ? f.pins.slice() : [];pins.forEach((p: PinmonyBoardPin): void => {if(this.refreshedCancelledIds.has(p.id))return;if(!merged.some((v: PinmonyBoardPin): boolean => v.id === p.id))merged.push(p);}); if(merged.length > 500)this.sectionEnumerationValid = false;f.pins = merged.slice(0,500); f.hasMore = !!next && next !== '-end-' && next !== previous && !!pins.length && merged.length < 500; this.sectionCursor = next;this.version++;
     } catch (_) {if(this.current() && revision === this.revision && epoch === this.sectionEpoch)f.error = PinmonyI18n.message("pm_unable_to_load_section_content_please_retry_03225906");}
-    finally {if(this.current() && revision === this.revision && epoch === this.sectionEpoch){f.loading = false;this.apply();this.ports.install(this.installScript());}}
+    finally {if(this.current() && revision === this.revision && epoch === this.sectionEpoch){f.loading = false;f.refreshing = false;if(!keepOperationLoading)this.postOperationLoading = false;this.apply();this.ports.install(this.installScript());}}
   }
   installScript(): string { if(!this.current() || !this.verified || !this.board || !this.ready)return '';return 'window.PinmonyBoardApi && window.PinmonyBoardApi.installNative && window.PinmonyBoardApi.installNative(' + JSON.stringify(this.page) + ',' + JSON.stringify(this.board) + ',' + JSON.stringify(this.viewer) + ',' + JSON.stringify(this.store.boardDetail) + ',' + JSON.stringify(this.cursor) + ',' + JSON.stringify(this.auxiliarySnapshot()) + ');'; }
   updateBridge(value: string): void {

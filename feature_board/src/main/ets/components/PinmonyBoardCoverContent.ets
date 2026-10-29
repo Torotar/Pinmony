@@ -10,6 +10,7 @@ export struct PinmonyBoardCoverContent {
   @Prop locked: boolean = false;
   onAction: (action: string, value: string) => void = () => {};
   onReady: (ready: boolean) => void = () => {};
+  onPreviewLoading: (loading: boolean) => void = () => {};
   @State private frameSide: number = 300;
   @State private cropLeft: number = 0;
   @State private cropTop: number = 0;
@@ -27,6 +28,7 @@ export struct PinmonyBoardCoverContent {
   private syncCrop(): void {
     const pin: PinmonyBoardPin | undefined = this.selected();
     if(this.previewId !== (pin?.id || '')){this.previewId = pin?.id || '';this.loaded = false;this.previewFailed = false;this.onReady(false);}
+    this.onPreviewLoading(!!pin && !this.loaded && !this.previewFailed);
     if(!this.dragging){this.cropLeft = this.cover.selected?.cropX || 0;this.cropTop = this.cover.selected?.cropY || 0;}
   }
   private displayScale(): number { const pin: PinmonyBoardPin | undefined = this.selected();return pin ? this.frameSide/Math.min(pin.imageWidth,pin.imageHeight) : 1; }
@@ -44,10 +46,9 @@ export struct PinmonyBoardCoverContent {
           .width(pin.imageWidth*this.displayScale()).height(pin.imageHeight*this.displayScale())
           .objectFit(ImageFit.Fill).position({x:-this.cropLeft*this.displayScale(),y:-this.cropTop*this.displayScale()})
           .draggable(false)
-          .onComplete((): void => {if(this.previewId === pin.id){this.loaded = true;this.previewFailed = false;this.onReady(!this.dragging);}})
-          .onError((): void => {if(this.previewId === pin.id){this.loaded = false;this.previewFailed = true;this.onReady(false);}})
+          .onComplete((): void => {if(this.previewId === pin.id){this.loaded = true;this.previewFailed = false;this.onPreviewLoading(false);this.onReady(!this.dragging);}})
+          .onError((): void => {if(this.previewId === pin.id){this.loaded = false;this.previewFailed = true;this.onPreviewLoading(false);this.onReady(false);}})
       },(pin: PinmonyBoardPin): string => pin.id+':'+this.previewRevision)
-      if(this.selected() && !this.loaded && !this.previewFailed) { LoadingProgress().color($r('app.color.accent')).width(32).height(32).align(Alignment.Center) }
     }.width('100%').height(this.frameSide).clip(true).borderRadius(20).backgroundColor($r('app.color.surface_muted'))
       .onAreaChange((_old: Area, area: Area): void => {const side: number = Number(area.width);if(side > 0)this.frameSide = side;})
       .gesture(PanGesture({fingers:1,direction:PanDirection.All})
@@ -76,7 +77,7 @@ export struct PinmonyBoardCoverContent {
           actionEnabled: !this.locked && !this.cover.loading,
           onAction: (): void => {this.onAction(this.cover.status === 'uncertain' ? 'coverCheck' : 'coverRetry','');} })
       }
-      if(this.cover.pins.length > 0) {
+      if(!this.cover.adjusting && this.cover.pins.length > 0) {
       Text(this.copy('pm_board_cover_pins')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).width('100%')
       Flex({wrap:FlexWrap.Wrap,justifyContent:FlexAlign.Start,alignItems:ItemAlign.Start}) {
         ForEach(this.cover.pins,(pin: PinmonyBoardPin) => {
@@ -86,15 +87,14 @@ export struct PinmonyBoardCoverContent {
             .enabled(!this.locked && this.cover.status !== 'uncertain')
             .onClick((): void => {
               if(this.cover.selected?.pinId !== pin.id || this.previewFailed)this.onReady(false);
-              if(this.cover.selected?.pinId === pin.id && this.previewFailed){this.previewRevision++;this.previewFailed = false;this.loaded = false;}
+              if(this.cover.selected?.pinId === pin.id && this.previewFailed){this.previewRevision++;this.previewFailed = false;this.loaded = false;this.onPreviewLoading(true);}
               this.onAction('coverSelect',pin.id);
             })
             .accessibilityText(this.copy('pm_board_cover_choose')).accessibilitySelected(this.cover.selected?.pinId === pin.id)
         },(pin: PinmonyBoardPin): string => pin.id+':'+(this.cover.selected?.pinId === pin.id)+':'+this.uiLanguage)
       }.width('100%')
       }
-      if(this.cover.loading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
-      if(this.cover.hasMore && !this.cover.loading && !this.cover.error && !this.locked && this.cover.status !== 'uncertain') {
+      if(!this.cover.adjusting && this.cover.hasMore && !this.cover.loading && !this.cover.error && !this.locked && this.cover.status !== 'uncertain') {
         Row().width('100%').height(1)
           .onVisibleAreaChange([0,1],(visible: boolean,ratio: number): void => {if(visible && ratio > 0)this.onAction('coverMore','');})
       }

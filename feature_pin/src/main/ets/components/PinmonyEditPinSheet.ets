@@ -11,12 +11,22 @@ export struct PinmonyEditPinSheet {
   @State private draftTitle: string = '';
   @State private draftDescription: string = '';
   private draftPin: string = '';
+  private sheetVisible: boolean = false;
+  private deleteDialogOpen: boolean = false;
+  private deleteDialogEpoch: number = 0;
   onAction?: (method: string, args: string) => void;
   onRetry?: () => void;
   onClose?: () => void;
 
   aboutToAppear(): void {
+    this.sheetVisible = true;
     this.syncDraft();
+  }
+
+  aboutToDisappear(): void {
+    this.sheetVisible = false;
+    this.deleteDialogOpen = false;
+    this.deleteDialogEpoch++;
   }
 
   private syncDraft(): void {
@@ -31,6 +41,36 @@ export struct PinmonyEditPinSheet {
 
   private act(method: string, args: string): void {
     if (this.onAction) this.onAction(method, args);
+  }
+
+  private confirmDelete(): void {
+    if (!this.sheetVisible || this.deleteDialogOpen || this.result.phase !== 'edit' || this.result.loading ||
+      this.result.busy || this.result.error || this.result.uncertain || this.result.picker.busy) return;
+    const pin: string = this.result.pin;
+    const epoch: number = ++this.deleteDialogEpoch;
+    this.deleteDialogOpen = true;
+    this.act('editPhase', ',"confirm"');
+    this.getUIContext().showAlertDialog({
+      title: this.uiText('pm_delete_this_pin_bd01697d'),
+      message: this.uiText('pm_this_cannot_be_undone_55d5e34b'),
+      primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => this.cancelDelete(epoch, pin) },
+      secondaryButton: { value: this.uiText('pm_delete_2f9daa82'), action: () => {
+        if (!this.sheetVisible || !this.deleteDialogOpen || this.deleteDialogEpoch !== epoch ||
+          this.result.pin !== pin || this.result.phase !== 'confirm' || this.result.loading || this.result.busy ||
+          this.result.error || this.result.uncertain || this.result.picker.busy) return;
+        this.deleteDialogOpen = false;
+        this.act('editCommit', ',true');
+      } },
+      cancel: () => this.cancelDelete(epoch, pin)
+    });
+  }
+
+  private cancelDelete(epoch: number, pin: string): void {
+    if (!this.sheetVisible || !this.deleteDialogOpen || this.deleteDialogEpoch !== epoch) return;
+    this.deleteDialogOpen = false;
+    if (this.result.pin === pin && this.result.phase === 'confirm' && !this.result.busy) {
+      this.act('editPhase', ',"edit"');
+    }
   }
 
   onCreatingChange?: (creating: boolean) => void;
@@ -112,7 +152,7 @@ export struct PinmonyEditPinSheet {
                 .fontColor($r('app.color.secondary_text')).width('100%')
             }.width('100%')
           }.padding(0).backgroundColor(Color.Transparent).enabled(!this.result.busy && this.result.phase === 'edit')
-            .onClick(() => this.act('editPhase', ',"confirm"'))
+            .onClick(() => this.confirmDelete())
 
               }
             }.width('100%').padding({ right: 28 })
@@ -129,24 +169,6 @@ export struct PinmonyEditPinSheet {
             .onClick(() => this.act('editCommit', ',false,' + JSON.stringify(this.draftTitle) + ',' +
               JSON.stringify(this.draftDescription)))
         }.padding(20).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
-        if (this.result.phase === 'confirm' && !this.result.error) {
-          Rect().width('100%').height('100%').fill('#66000000')
-            .onClick(() => { if (!this.result.busy) this.act('editPhase', ',"edit"'); })
-        }
-          if (this.result.phase === 'confirm' && !this.result.error) {
-            Column({ space: 16 }) {
-              Text(this.uiText("pm_delete_this_pin_bd01697d")).fontSize(20).fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.primary_text')).width('100%')
-              Text(this.uiText("pm_this_cannot_be_undone_55d5e34b")).fontSize(15).fontColor($r('app.color.secondary_text')).width('100%')
-              Button(this.uiText("pm_delete_2f9daa82")).width('100%').backgroundColor($r('app.color.surface_muted'))
-                .fontColor($r('app.color.primary_text')).enabled(!this.result.busy)
-                .onClick(() => this.act('editCommit', ',true'))
-              Button(this.uiText("pm_cancel_2cd0f3be")).width('100%').backgroundColor($r('app.color.detail_accent'))
-                .fontColor($r('app.color.detail_on_accent')).enabled(!this.result.busy)
-                .onClick(() => this.act('editPhase', ',"edit"'))
-            }.padding(20).borderRadius(24).backgroundColor($r('app.color.input_surface'))
-          }
-
       }.width('100%').height('100%')
     }
   }

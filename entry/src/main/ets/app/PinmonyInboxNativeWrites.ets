@@ -35,7 +35,7 @@ export class PinmonyInboxNativeWrites {
   constructor(ports: PinmonyInboxNativeWritePorts) {this.ports = ports;}
   busy(): boolean {return !!this.job;}
   private clone(f: PinmonyInboxFlowSnapshot): PinmonyInboxFlowSnapshot {
-    return {nativeAccountGeneration:f.nativeAccountGeneration,kind:f.kind,pageUrl:f.pageUrl,session:f.session,contextEpoch:f.contextEpoch,nativeToken:f.nativeToken,nativeRead:f.nativeRead,
+    return {directContact:f.directContact,nativeAccountGeneration:f.nativeAccountGeneration,kind:f.kind,pageUrl:f.pageUrl,session:f.session,contextEpoch:f.contextEpoch,nativeToken:f.nativeToken,nativeRead:f.nativeRead,
       screen:f.screen,title:f.title,loading:f.loading,error:f.error,users:f.users.slice(),messages:f.messages.slice(),selectedIds:f.selectedIds.slice(),hasMore:f.hasMore,
       conversationId:f.conversationId,sending:f.sending,sentRevision:f.sentRevision,sendError:f.sendError,messageBusy:f.messageBusy,
       blocked:f.blocked,blockedUserId:f.blockedUserId,blockRevision:f.blockRevision,writeUncertain:f.writeUncertain,writeAction:f.writeAction,writeTarget:f.writeTarget};

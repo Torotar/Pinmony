@@ -552,6 +552,10 @@ export const PIN_BOARD_API_SCRIPT: string = `
       if(key !== page) { reset(); key = page; }
       if(nativeVersion === snapshot.nativeVersion) return true;
       if(flow.busy && !(nativeFlowOwned && (nativePinWrites() && ['ideas','targets'].includes(flow.phase) || nativeManagementWrites() && ['','edit','archive'].includes(flow.phase) || nativeContentWrites() && !flow.phase)) || flow.loading && !nativeFlowOwned || sectionCreating || cancelPinState && cancelPinState.busy || collaborators && (collaborators.busy && !nativeCollaboratorWrites() || collaborators.loading && !nativeAuxiliary())) return false;
+      if(nativeAuxiliary() && auxiliary && auxiliary.flowOwned === true) {
+        var selectedSource = snapshot.flow && snapshot.flow.sectionId ? snapshot.flow.pins : snapshot.pins;
+        if(!snapshot.flow || !['','ideas','targets','select','edit','archive','archived','section'].includes(snapshot.flow.phase) || !Array.isArray(selectedSource) || !Array.isArray(auxiliary.selectedIds) || auxiliary.selectedIds.length > 500 || !auxiliary.selectedIds.every(function(id){return digits(id) && selectedSource.some(function(pin){return pin.id === id;});}) || !Array.isArray(auxiliary.sourcePins) || auxiliary.sourcePins.length > 500) return false;
+      }
       // Adopting a newer native feed must not cancel or change the generation of an existing business flow.
       board = value; viewerId = viewer; pins = snapshot.pins.slice(); sections = (snapshot.sections || []).slice();
       ready = snapshot.ready; attempted = true; boardBusy = false; feedBusy = false; refreshing = false;
@@ -565,7 +569,6 @@ export const PIN_BOARD_API_SCRIPT: string = `
       if(nativeAuxiliary() && auxiliary) {
         nativeFlowOwned = auxiliary.flowOwned === true;
         if(nativeFlowOwned) {
-          if(!snapshot.flow || !['','ideas','targets','select','edit','archive','archived','section'].includes(snapshot.flow.phase) || !Array.isArray(auxiliary.selectedIds) || auxiliary.selectedIds.length > 500 || !auxiliary.selectedIds.every(function(id){return digits(id) && pins.some(function(pin){return pin.id === id;});}) || !Array.isArray(auxiliary.sourcePins) || auxiliary.sourcePins.length > 500) return false;
           flowEpoch++; flow = snapshot.flow; selectedIds = auxiliary.selectedIds.slice(); targetBookmark = auxiliary.targetBookmark || ''; sourcePins = {};
           auxiliary.sourcePins.forEach(function(pin){if(pin && digits(pin.id) && flow.pins.some(function(card){return card.id === pin.id;}))sourcePins[pin.id] = pin;});
         }

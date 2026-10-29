@@ -139,9 +139,9 @@ export struct PinmonyDisplaySettingsPage {
       Text(this.uiText("pm_language_9f6fee1a")).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
-        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }])
-        .selected(Math.max(0, ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko'].indexOf(this.languagePreference)))
-        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.uiText("pm_follow_system_217cfe7d"))
+        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }])
+        .selected(Math.max(0, ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru'].indexOf(this.languagePreference)))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.uiText("pm_follow_system_217cfe7d"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
         .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
@@ -149,8 +149,8 @@ export struct PinmonyDisplaySettingsPage {
         .optionFontColor($r('app.color.primary_text'))
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
-          if (index >= 0 && index < 7) {
-            const value: string = ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko'][index];
+          if (index >= 0 && index < 8) {
+            const value: string = ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru'][index];
             try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
             catch (_) {
               PinmonyRuntimeLog.warn('LanguagePreference: save failed');

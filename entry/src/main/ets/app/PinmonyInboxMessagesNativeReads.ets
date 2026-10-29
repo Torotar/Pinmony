@@ -134,7 +134,7 @@ export class PinmonyInboxMessagesNativeReads {
     this.store.inboxLoading = !this.listReady && this.listBusy; this.store.inboxError = this.listError; this.store.inboxWebFlow = false; this.store.pendingInboxSection = ''; this.store.restoringInboxSection = '';
     if(this.listReady && !this.listBusy && !this.listError)this.store.inboxCache.put(snapshot,this.store.inboxScrollOffset);
   }
-  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.flow){ if(this.ownsFlow() && this.flow.error && !this.flow.writeUncertain && !this.flow.sending && !this.flow.messageBusy)await this.action('retry',''); return; } await Promise.all([this.listReady || this.listBusy ? Promise.resolve() : this.readList(false),this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
+  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.flow){ if(this.ownsFlow() && !this.flow.directContact && this.flow.error && !this.flow.writeUncertain && !this.flow.sending && !this.flow.messageBusy)await this.action('retry',''); return; } await Promise.all([this.listReady || this.listBusy ? Promise.resolve() : this.readList(false),this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
   async refresh(): Promise<void> { if(this.bind() && !this.flow)await Promise.all([this.listBusy ? Promise.resolve() : this.readList(false),this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
   async refreshContacts(): Promise<void> { if(this.bind() && !this.contactsBusy && !this.flow)await this.readContacts(); }
   async poll(): Promise<void> { if(!this.bind())return; if(this.flow){if(this.ownsFlow() && this.flow.screen === 'chat' && !this.flowBusy && !this.flow.sending && !this.flow.messageBusy && !this.flow.sendError && !this.flow.error && !this.flow.writeUncertain)await this.readMessages(false,true);}else if(this.listReady && !this.listBusy)await this.readList(true); }
@@ -221,17 +221,17 @@ export class PinmonyInboxMessagesNativeReads {
     } catch (_) { if(live())this.contactsError = PinmonyI18n.message("pm_unable_to_load_contacts_please_retry_9942b99b"); }
     finally { if(revision === this.revision){this.contactsBusy = false; if(live())this.apply(); this.ports.settled();} }
   }
-  private newFlow(screen: string,conversation: string = ''): PinmonyInboxFlowSnapshot {
+  private newFlow(screen: string,conversation: string = '',deferPublish: boolean = false): PinmonyInboxFlowSnapshot {
     this.writes.pause();this.writePreparing = false;this.cancel('identity');this.flowRevision++; this.cancel('flow'); this.flowBusy = false; if(screen !== 'settings')this.cursor = ''; this.store.flowDismissed = false;
     const flow: PinmonyInboxFlowSnapshot = {kind:'nativeFlow',nativeToken:this.flowRevision,session:this.store.inboxSession,pageUrl:this.page,screen:screen,title:screen === 'compose' ? PinmonyI18n.message("pm_new_message_3fc957bf") : '',loading:true,error:'',users:[],messages:[],selectedIds:[],hasMore:false,conversationId:conversation};
-    this.flow = flow; this.publish(); return flow;
+    this.flow = flow; if(!deferPublish)this.publish(); return flow;
   }
   private publish(allowInactive: boolean = false): void {
     const session: PinmonyBusinessSessionContext = this.ports.session();
     const retained: boolean = allowInactive && session.authenticated && session.accountId === this.account && session.generation === this.generation && session.origin === this.origin && this.store.inboxFlow?.nativeToken === this.flow?.nativeToken;
     if(!this.flow || this.store.flowDismissed || !this.owned() && !retained)return;
     const flow: PinmonyInboxFlowSnapshot = this.flow;
-    this.store.inboxFlow = {nativeAccountGeneration:this.generation,kind:flow.kind,pageUrl:flow.pageUrl,session:this.store.inboxSession,contextEpoch:flow.contextEpoch,
+    this.store.inboxFlow = {directContact:flow.directContact,nativeAccountGeneration:this.generation,kind:flow.kind,pageUrl:flow.pageUrl,session:this.store.inboxSession,contextEpoch:flow.contextEpoch,
       writeUncertain:flow.writeUncertain,writeAction:flow.writeAction,writeTarget:flow.writeTarget,nativeToken:flow.nativeToken,nativeRead:flow.nativeRead,screen:flow.screen,title:flow.title,loading:flow.loading,error:flow.error,
       users:flow.users,messages:flow.messages,selectedIds:flow.selectedIds,hasMore:flow.hasMore,conversationId:flow.conversationId,
       sending:flow.sending,sentRevision:flow.sentRevision,sendError:flow.sendError,messageBusy:flow.messageBusy,
@@ -247,7 +247,7 @@ export class PinmonyInboxMessagesNativeReads {
       const contact: NativeContact | undefined = this.contacts.find((row: NativeContact): boolean => row.id === id); if(!contact)return true;
       const existing: RawConversation | undefined = this.conversations.find((c: RawConversation): boolean => c.users.length <= 2 && c.users.some((u: RawUser): boolean => u.id === contact.userId));
       if(existing) {this.newFlow('chat',existing.id); await this.readChat();}
-      else {const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose'); flow.users = [{id:contact.userId,name:contact.title,avatar:contact.imageUrl,profileUrl:contact.profileUrl,self:false}]; flow.selectedIds = [contact.userId]; flow.loading = false; this.publish();}
+      else {const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose','',true); flow.directContact = true;flow.users = [{id:contact.userId,name:contact.title,avatar:contact.imageUrl,profileUrl:contact.profileUrl,self:false}]; flow.selectedIds = [contact.userId]; flow.loading = false; this.publish(); await this.action('next','');}
       return true;
     }
     const c: RawConversation | undefined = this.conversations.find((row: RawConversation): boolean => id === 'conversation:' + row.id); if(!c)return true;
@@ -300,7 +300,7 @@ export class PinmonyInboxMessagesNativeReads {
     if(action === 'select' && flow.screen === 'compose' && !flow.loading){if(flow.users.some((u: InboxFlowUser): boolean => u.id === value && !u.self))flow.selectedIds = flow.selectedIds.includes(value) ? flow.selectedIds.filter((id: string): boolean => id !== value) : flow.selectedIds.concat([value]); this.publish(); return true;}
     if(action === 'search' && flow.screen === 'compose'){await this.readCompose(value.trim().slice(0,500)); return true;}
     if(action === 'more' && flow.screen === 'chat'){if(flow.hasMore && !this.flowBusy)await this.readMessages(true,false); return true;}
-    if(action === 'retry'){if(flow.screen === 'chat')await this.readChat(); else if(flow.screen === 'compose')await this.readCompose(this.query); return true;}
+    if(action === 'retry'){if(flow.screen === 'chat')await this.readChat(); else if(flow.screen === 'compose' && flow.directContact)await this.action('next',''); else if(flow.screen === 'compose')await this.readCompose(this.query); return true;}
     return true;
   }
   private matchConversation(ids: string[], rows: RawConversation[]): string {

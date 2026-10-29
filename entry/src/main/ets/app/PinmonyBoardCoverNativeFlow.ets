@@ -32,6 +32,7 @@ export class PinmonyBoardCoverNativeFlow {
   private revision: number = 0;
   private sequence: number = 0;
   private cursor: string = '';
+  private restore: CoverSavedPin | undefined = undefined;
   private readonly cursors: Set<string> = new Set<string>();
   private readonly jobs: Set<string> = new Set<string>();
   // Sent writes remain locked across close/reopen and navigation. Only matching
@@ -66,22 +67,23 @@ export class PinmonyBoardCoverNativeFlow {
     const account: string = session.origin + ':' + session.accountId + ':' + session.generation;
     if(this.pendingAccount !== account){this.pendingAccount = account;this.pending.clear();}
     const key: string = this.key(identity,session);
-    if(action === 'coverOpen') {
+    if(action === 'coverOpen' || action === 'coverAdjust') {
       if(f.uncertain || f.error)return;
-      this.cursor = '';this.cursors.clear();
+      this.cursor = '';this.cursors.clear();this.restore = undefined;
       const locked: PinmonyBoardCoverCrop | undefined = this.pending.get(key);
-      f.cover = {pins:[],loading:false,hasMore:false,status:locked ? 'uncertain' : '',error:locked ? PinmonyI18n.message('pm_board_cover_unconfirmed') : '',selected:locked};
+      f.cover = {adjusting:action === 'coverAdjust',pins:[],loading:true,hasMore:false,status:locked ? 'uncertain' : '',error:locked ? PinmonyI18n.message('pm_board_cover_unconfirmed') : '',selected:locked};
       f.uncertain = !!locked;this.publish(f);
-      await this.read(f,identity,session,false);return;
+      await this.load(f,identity,session,false);return;
     }
     const c: PinmonyBoardCoverState | undefined = f.cover;if(!c)return;
     if(action === 'coverCheck'){if(this.pending.has(key))await this.check(f,identity,session);return;}
     if(this.pending.has(key) || f.uncertain)return;
     if(action === 'coverMore' || action === 'coverRetry') {
-      if(action === 'coverMore' && !c.hasMore)return;
-      await this.read(f,identity,session,!!this.cursor);return;
+      if(action === 'coverMore' && (c.adjusting || !c.hasMore))return;
+      await this.load(f,identity,session,!!this.cursor);return;
     }
     if(action === 'coverSelect') {
+      if(c.adjusting)return;
       const pin: PinmonyBoardPin | undefined = c.pins.find((p: PinmonyBoardPin): boolean => p.id === encoded);
       if(pin){c.selected = boardCoverCrop(pin,(pin.imageWidth-Math.min(pin.imageWidth,pin.imageHeight))/2,(pin.imageHeight-Math.min(pin.imageWidth,pin.imageHeight))/2);c.error = '';this.publish(f);}return;
     }
@@ -124,13 +126,26 @@ export class PinmonyBoardCoverNativeFlow {
     if(!b || b.type !== 'board' || b.id !== identity.boardId || b.owner?.id !== identity.viewerId || !Array.isArray(b.access) || !b.access.includes('write'))throw new Error('cover-owner');
     return b;
   }
+  private async load(f: PinmonyBoardFlow, identity: PinmonyBoardCoverIdentity, session: PinmonyBusinessSessionContext, append: boolean): Promise<void> {
+    const state: PinmonyBoardCoverState | undefined = f.cover;if(!state)return;
+    const revision: number = this.revision;
+    state.loading = true;this.publish(f);
+    try {
+    await this.read(f,identity,session,append);
+    for(let page: number = 0;page < 32 && this.live(identity,session,revision,f) && f.cover === state && state.adjusting &&
+      !state.selected && state.hasMore && !state.error && state.status !== 'uncertain';page++)await this.read(f,identity,session,true);
+    if(this.live(identity,session,revision,f) && f.cover === state && state.adjusting && !state.selected && !state.error) {
+      state.error = PinmonyI18n.message('pm_board_cover_image_failed');
+    }
+    }finally{if(this.live(identity,session,revision,f) && f.cover === state){state.loading = false;this.publish(f);}}
+  }
   private async read(f: PinmonyBoardFlow, identity: PinmonyBoardCoverIdentity, session: PinmonyBusinessSessionContext, append: boolean): Promise<void> {
     const c: PinmonyBoardCoverState | undefined = f.cover;if(!c)return;
     const revision: number = this.revision, live = (): boolean => this.live(identity,session,revision,f);
-    c.loading = true;if(c.status !== 'uncertain')c.error = '';this.publish(f);
+    if(c.status !== 'uncertain')c.error = '';
     try {
       if(!append){const b: CoverBoardData = this.board(await this.request('BoardResource',{board_id:identity.boardId,field_set_key:'edit'},false,identity,session,live),identity);
-        if(!live())return;if(f.coverImage !== this.safeImage(b.image_cover_url))f.coverPreview = undefined;f.coverImage = b.has_custom_cover === true || b.cover_pin?.custom_cover === true || this.safeImage(b.image_cover_url).includes('/custom_covers/') ? this.safeImage(b.image_cover_url) : '';
+        if(!live())return;this.restore = c.adjusting && b.cover_pin?.custom_cover === true ? b.cover_pin : undefined;if(f.coverImage !== this.safeImage(b.image_cover_url))f.coverPreview = undefined;f.coverImage = b.has_custom_cover === true || b.cover_pin?.custom_cover === true || this.safeImage(b.image_cover_url).includes('/custom_covers/') ? this.safeImage(b.image_cover_url) : '';
         if(this.pending.has(this.key(identity,session)) && this.match(b,c.selected)){this.confirm(f,b,identity,session);return;}}
       const options: CoverReadOptions = {board_id:identity.boardId,field_set_key:'images_only_item',filter_section_pins:false,page_size:50};
       if(append)options.bookmarks = [this.cursor];
@@ -147,11 +162,18 @@ export class PinmonyBoardCoverNativeFlow {
           if(candidate && this.safeImage(candidate.url) && Number.isInteger(candidate.width) && Number.isInteger(candidate.height) && candidate.width > preview.width && candidate.width <= 20000 && candidate.height > 0 && candidate.height <= 20000 && Math.abs(candidate.height/candidate.width-image.height/image.width) <= 2/image.width)preview = candidate;});
         if(!pins.some((v: PinmonyBoardPin): boolean => v.id === p.id))pins.push({id:p.id,pinUrl:session.origin+'/pin/'+p.id+'/',imageUrl:image.url,previewImageUrl:preview.url,imageWidth:image.width,imageHeight:image.height,title:''});
       });
+      const saved: CoverSavedPin | undefined = this.restore;
+      const source: PinmonyBoardPin | undefined = pins.find((pin: PinmonyBoardPin): boolean => pin.id === saved?.pin_id);
+      if(c.adjusting && !c.selected && source && saved?.crop?.length === 2 && saved.size?.length === 2) {
+        const crop: PinmonyBoardCoverCrop = boardCoverCrop(source,saved.crop[0],saved.crop[1]);
+        if(Number.isFinite(saved.crop[0]) && Number.isFinite(saved.crop[1]) && crop.cropX === saved.crop[0] && crop.cropY === saved.crop[1] &&
+          crop.width === saved.size[0] && crop.height === saved.size[1] && typeof saved.scale === 'number' && Math.abs(crop.scale-saved.scale) < 0.000001)c.selected = crop;
+      }
       const next: string = body.resource_response.bookmark || body.resource?.options?.bookmarks?.[0] || '';
       c.hasMore = typeof next === 'string' && !!next && next !== '-end-' && next.length <= 4096 && !this.cursors.has(next) && rows.length > 0 && pins.length < 500;
       c.pins = pins.slice(0,500);if(c.hasMore){this.cursor = next;this.cursors.add(next);}else this.cursor = '';
     }catch(_){if(live())c.error = PinmonyI18n.message(c.status === 'uncertain' ? 'pm_board_cover_unconfirmed' : 'pm_unable_to_load_please_retry_b22c1af1');}
-    finally{if(live()){c.loading = false;this.publish(f);}}
+    finally{if(live())this.publish(f);}
   }
   private match(b: CoverBoardData, crop: PinmonyBoardCoverCrop | undefined): boolean {
     const p: CoverSavedPin | undefined = b.cover_pin;

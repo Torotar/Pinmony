@@ -52,7 +52,7 @@ export struct PinmonyDetailEntryMotion {
       const height: number = ui.px2vp(hero.size.height) - this.bottomInset;
       const viewport: number = ui.px2vp(root.size.height);
       const visible: number = Math.max(0, Math.min(top + height, viewport) - Math.max(top, 56));
-      return height > 0 && visible >= Math.min(height, viewport - 56) * 0.8;
+      return height > 0 && visible > 0;
     } catch (_) { return false; }
   }
   private begin(): void {
@@ -65,13 +65,13 @@ export struct PinmonyDetailEntryMotion {
       } else {
         this.started = true;
         PinmonyRuntimeLog.info('DetailMotionTrace: event=layout-unavailable');
-        this.onOpened?.();
+        if (this.closing) this.move(true); else this.onOpened?.();
       }
       return;
     }
     this.started = true;
     this.frame = this.closing ? target : this.source;
-    this.showing = this.closing ? this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible();
+    this.showing = this.closing ? !this.photo.returnPageOnly && this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible();
     // Commit the source frame before starting the destination animation.
     this.timer = setTimeout(() => { if (this.alive) this.move(this.closing); }, 32);
   }
@@ -82,10 +82,11 @@ export struct PinmonyDetailEntryMotion {
     this.move(true);
   }
   private move(closing: boolean): void {
-    const target: ImageFlightRect | undefined = this.target();
-    if (!target) { if (closing) this.onClosed?.(); else this.onOpened?.(); return; }
+    const measuredTarget: ImageFlightRect | undefined = this.target();
+    if (!measuredTarget && !closing) { this.onOpened?.(); return; }
+    const target: ImageFlightRect = measuredTarget || this.frame;
     const version: number = ++this.version;
-    const pageExit: boolean = !this.heroVisible() || !closing && this.restoredOffset > 0;
+    const pageExit: boolean = !measuredTarget || closing && this.photo.returnPageOnly === true || !this.heroVisible() || !closing && this.restoredOffset > 0;
     if (!this.showing) this.frame = target;
     this.showing = !pageExit;
     PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (closing ? 'close-start' : 'open-start'));
@@ -107,7 +108,7 @@ export struct PinmonyDetailEntryMotion {
         .opacity(this.showing ? 1 : 0).accessibilityLevel('no')
         .onComplete((event) => { if (event?.loadingStatus === 0 || event?.loadingStatus === 1) { this.decoded = true; this.begin(); } })
         .onError(() => { if (this.closing) this.onClosed?.(); else this.onOpened?.(); })
-    }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+    }.width('100%').height('100%').clip(true).hitTestBehavior(HitTestMode.None)
       .onAreaChange(() => { this.measured = true; this.begin(); })
   }
 }

@@ -31,6 +31,7 @@ export interface InboxFlowMessage {
   board?: InboxFlowBoard;
 }
 export interface PinmonyInboxFlowSnapshot {
+  directContact?: boolean;
   nativeAccountGeneration?: number;
   writeUncertain?: boolean;
   writeAction?: string;

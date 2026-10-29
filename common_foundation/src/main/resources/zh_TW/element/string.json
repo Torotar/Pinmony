@@ -1,5 +1,6 @@
 {
   "string": [
+    { "name": "pm_board_section_sync_pending", "value": "區塊內容尚未同步，請稍後重試" },
     {
       "name": "pm_detail_paid_link",
       "value": "付費連結"
@@ -5719,6 +5720,7 @@
     {
       "name": "pm_publish_source_website",
       "value": "網站連結"
-    }
+    },
+    {"name":"pm_board_cover_adjust","value":"調整封面位置"}
   ]
 }

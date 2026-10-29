@@ -265,6 +265,7 @@ export struct PinmonySearchPage {
   private activePage: string = '';
   private lastSnapshotQuery: string = '';
   @State private inputEditing: boolean = false;
+  @State private historyExitToRoot: boolean = false;
   @State private categoriesCollapsed: boolean = false;
   @State private searchHeaderScrolled: boolean = false;
 
@@ -1439,8 +1440,32 @@ export struct PinmonySearchPage {
   private searchRootDestination(_name?: string, _param?: Object) {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Top }) {
-        this.searchMaterialContent()
-        this.searchInteractiveHeader()
+        if (!this.inputEditing && !this.committedQuery()) {
+          Stack({ alignContent: Alignment.Top }) {
+            this.searchMaterialContent('discovery')
+            this.searchInteractiveHeader()
+          }.width('100%').height('100%')
+        }
+        if (!this.inputEditing && this.committedQuery()) {
+          Stack({ alignContent: Alignment.Top }) {
+            this.searchMaterialContent('results')
+            this.searchInteractiveHeader()
+          }.width('100%').height('100%')
+            .zIndex(this.historyExitToRoot ? 0 : 2)
+            .transition(TransitionEffect.asymmetric(
+              this.historyExitToRoot ? TransitionEffect.IDENTITY :
+                TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
+              TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })))
+        }
+        if (this.inputEditing) {
+          Stack({ alignContent: Alignment.Top }) {
+            this.searchMaterialContent('history')
+            this.searchInteractiveHeader()
+          }.width('100%').height('100%')
+            .zIndex(1)
+            .transition(TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
+              TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })))
+        }
       }.width('100%').height('100%')
     }
       .hideTitleBar(true)
@@ -1487,7 +1512,7 @@ export struct PinmonySearchPage {
   @State private searchRefreshState: RefreshStatus = RefreshStatus.Inactive;
 
   @Builder
-  private searchMaterialContent() {
+  private searchMaterialContent(mode: string) {
     HdsNavigation() {
       Column() {
         if (this.automaticLoadingEnabled && this.committedQuery()) {
@@ -1499,9 +1524,9 @@ export struct PinmonySearchPage {
         }
         Refresh({ refreshing: this.refreshing, builder: this.searchRefreshIndicator }) {
           Column() {
-            if (this.inputEditing) {
+            if (mode === 'history') {
               this.inputSuggestionsContent()
-            } else if (!this.committedQuery()) {
+            } else if (mode === 'discovery') {
               if (this.error && this.snapshot.heroes.length === 0 && this.snapshot.ideaSections.length === 0) {
                 this.searchStatus()
               } else {
@@ -1644,6 +1669,7 @@ export struct PinmonySearchPage {
 
   private handleSearchBack(): void {
     if (this.inputEditing) {
+      this.historyExitToRoot = true;
       if (this.committedQuery() && this.onBack) {
         // The parent must consume the history intent before focus is cleared.
         this.onBack();
@@ -1660,6 +1686,7 @@ export struct PinmonySearchPage {
   }
 
   private openSearchHistory(): void {
+    this.historyExitToRoot = false;
     this.inputController.stopEditing();
     this.query = '';
     this.inputEditing = true;
@@ -1690,6 +1717,7 @@ export struct PinmonySearchPage {
   }
 
   private onInputFocus(focused: boolean): void {
+    if (focused) this.historyExitToRoot = false;
     this.inputEditing = focused;
     if (focused && this.onQueryChange) this.onQueryChange(this.query, true);
     if (this.onInputFocusChange) {

@@ -64,7 +64,7 @@ assert(profileSource.includes('.padding({top:this.profileBodyTopInset()})'), 'on
 const InsetHost = vm.runInNewContext(ts.transpileModule('class InsetHost {' + extract(profileSource, 'profileBodyTopInset') + '} InsetHost;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
 const inset = new InsetHost();Object.assign(inset,{statusBarHeightPx:84,getUIContext:()=>({px2vp:n=>n/3.5}),modern:()=>false,hubContentInset:()=>216});
 assert.equal(inset.profileBodyTopInset(),80,'legacy first frame preserves the status and title inset');
-inset.onBack=()=>{};assert.equal(inset.profileBodyTopInset(),216,'secondary profile keeps its existing inset path');
+inset.onBack=()=>{};assert.equal(inset.profileBodyTopInset(),80,'secondary profile uses the same scrollable title inset as the legacy profile');
 inset.onBack=undefined;inset.modern=()=>true;assert.equal(inset.profileBodyTopInset(),216,'modern profile geometry stays unchanged');
 const indexSource = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert(indexSource.includes('this.activeTab === 3 && !!this.profileStore.profile'), 'Index yields the legacy root safe area to HDS too');

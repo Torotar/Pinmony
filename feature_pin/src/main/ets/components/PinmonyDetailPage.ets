@@ -181,6 +181,7 @@ export struct PinmonyDetailPage {
   onDownload?: () => void;
   onViewerSave?: () => void;
   onTagSearch?: (query: string, pin: string) => void;
+  onTextCopied?: () => void;
   @Prop contentError: string = '';
   @Prop contentRetryable: boolean = true;
   onContentRetry?: () => void;
@@ -887,6 +888,9 @@ export struct PinmonyDetailPage {
             }
             if (this.displayedDetail().title.length > 0) {
               Text(PinmonyI18n.render(this.displayedDetail().title, this.uiLanguage))
+                .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+                .copyOption(CopyOptions.LocalDevice)
+                .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
                 .fontSize(26)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text'))
@@ -915,6 +919,9 @@ export struct PinmonyDetailPage {
                     })
                 })
               }
+                .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+                .copyOption(CopyOptions.LocalDevice)
+                .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
                 .fontSize(16)
                 .lineHeight(24)
                 .fontColor($r('app.color.primary_text'))
@@ -935,6 +942,9 @@ export struct PinmonyDetailPage {
             }
             if (this.displayedDetail().richDescription && this.displayedDetail().richDescription !== this.displayedDetail().description) {
               Text(this.displayedDetail().richDescription).fontSize(16).lineHeight(24)
+                .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+                .copyOption(CopyOptions.LocalDevice)
+                .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
                 .fontColor($r('app.color.secondary_text')).width('100%')
             }
           if ((this.readsReady || this.actionsReady && this.displayedDetail().imageStageReady !== false ||

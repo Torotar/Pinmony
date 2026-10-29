@@ -57,6 +57,7 @@ export interface PinmonyBoardDetail {
   loading: boolean;
   loadingMore: boolean;
   refreshing?: boolean;
+  postOperationLoading?: boolean;
   ready: boolean;
   error: string;
   hasMore: boolean;
@@ -81,6 +82,7 @@ export interface PinmonyBoardFlow {
   phase: string;
   sectionId?: string;
   sectionTitle?: string;
+  refreshing?: boolean;
   loading: boolean;
   busy: boolean;
   uncertain: boolean;
@@ -114,6 +116,7 @@ export interface PinmonyBoardCoverCrop {
 }
 
 export interface PinmonyBoardCoverState {
+  adjusting?: boolean;
   pins: PinmonyBoardPin[];
   selected?: PinmonyBoardCoverCrop;
   loading: boolean;

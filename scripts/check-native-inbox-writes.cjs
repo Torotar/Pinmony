@@ -47,6 +47,18 @@ return {reader,store,req,cancelled,setActive:v=>active=v,setSession:s=>session=s
 async function start(f){const p=f.reader.demand();f.req[0].resolve([conversation()],'v3_get_conversations');f.req[1].resolve([{...peer,type:'user_share_suggestion'},{...peer3,type:'user_share_suggestion'}],'v3_user_contacts_suggestion');await p;}
 async function openChat(f,id='100',users=[me,peer],messages=[message()]){const p=f.reader.open('conversation:'+id);f.req.at(-1).resolve(conversation(id,users),'v3_get_conversation');await flush();f.req.at(-1).resolve(messages,'v3_get_conversation_messages');await p;}
 async function integration(){
+const flowSource=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxFlowPage.ets','utf8');
+const flowBody=flowSource.slice(flowSource.indexOf('private flowDestination()'));
+assert.match(flowBody,/if \(this\.snapshot\.screen === 'compose' && !this\.snapshot\.directContact\)\s*\{\s*TextInput/,'contact loading must not show the compose search field');
+// A contact without a conversation keeps a dedicated loading state through creation and unknown results.
+const directContact=readerFixture();await start(directContact);let directPending=directContact.reader.open('contact:3');
+assert.equal(directContact.store.inboxFlow.directContact,true);assert.equal(directContact.req.at(-1).job.method,'POST');
+directContact.req.at(-1).resolve({id:'bad'},endpoints.next);await directPending;
+assert.equal(directContact.store.inboxFlow.directContact,true);assert.equal(directContact.store.inboxFlow.writeUncertain,true);
+let directCount=directContact.req.length;await directContact.reader.demand();assert.equal(directContact.req.length,directCount,'unknown direct creation never replays');
+directPending=directContact.reader.action('retry','');assert.equal(directContact.req.at(-1).job.method,'GET');directContact.req.at(-1).resolve([conversation('300',[me,peer3])],'v3_get_conversations');await directPending;
+directContact.req.at(-1).resolve(conversation('300',[me,peer3]),'v3_get_conversation');await flush();directContact.req.at(-1).resolve([],'v3_get_conversation_messages');await flush();
+assert.equal(directContact.store.inboxFlow.screen,'chat');assert(!directContact.store.inboxFlow.directContact);directContact.reader.pause();
 const f=readerFixture();await start(f);await openChat(f);const {PinmonyInboxActionsController:Actions}=load('feature_inbox/src/main/ets/controllers/PinmonyInboxActionsController.ets');const controller=new Actions(f.store,{allowed:()=>true,enabled:()=>true,nativeAction:(a,v)=>f.reader.action(a,v),nativeOpen:id=>f.reader.open(id),nativeWrites:()=>true,prepare(){throw Error('Web prepare')},document(){throw Error('Web document')},epoch(){throw Error('Web epoch')},runScript(){throw Error('Web submit')},feedback(){}});
 let p=f.reader.poll(),old=f.req.at(-1);let writing=controller.action('send',' hello ');assert(f.store.inboxFlow.sending);assert.equal(f.store.inboxFlow.messages.length,1);const write=f.req.at(-1);assert.equal(write.job.method,'POST');await controller.action('send','hello');await controller.action('react','300|❤️');assert.equal(f.req.at(-1),write);write.resolve(message('400',me,'hello'),endpoints.send);await writing;assert.equal(f.store.inboxFlow.sentRevision,1);assert.equal(f.store.inboxFlow.messages.length,2);old.resolve([],'v3_get_conversation_messages');await p;assert.equal(f.store.inboxFlow.messages.length,2,'late quiet read cannot erase confirmed send');assert(f.cancelled.includes(old.job.id));
 let count=f.req.length;await controller.action('deleteMessage','300');assert.equal(f.req.length,count,'foreign message cannot be deleted');

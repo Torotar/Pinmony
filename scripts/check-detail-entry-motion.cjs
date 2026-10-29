@@ -77,6 +77,23 @@ scrolled.begin();assert.equal(scrolled.showing,false,'closing remount cannot fla
 timers.shift()();assert.equal(pageExit,true);assert.equal(scrolled.showing,false);
 const beforeClose=closed;animations.at(-1).onFinish();assert.equal(closed,beforeClose+1,'page exit commits back once');
 console.log('Scrolled detail: offscreen hero hidden and page exit completes navigation passed');
+for (const top of [-300, 760]) {
+ const partial=fixture();partial.closing=true;partial.decoded=true;
+ const ui=partial.getUIContext();
+ partial.getUIContext=()=>({...ui,getComponentUtils:()=>({getRectangleById:id=>id==='root'?{windowOffset:{x:0,y:30},size:{width:360,height:800}}:{windowOffset:{x:18,y:top+30},size:{width:324,height:433}}})});
+ let mode;partial.onReveal=(_closing,page)=>{mode=page;};
+ assert.equal(partial.heroVisible(),true,'partially visible detail hero keeps its photo flight');
+ partial.begin();timers.shift()();assert.equal(mode,false);animations.at(-1).onFinish();
+}
+const recycledHero=fixture();recycledHero.started=true;recycledHero.decoded=true;recycledHero.target=()=>undefined;
+let recycledPage=false;recycledHero.onReveal=(closing,page)=>{recycledPage=closing&&page;};
+recycledHero.closing=true;recycledHero.closeChanged();assert.equal(recycledPage,true,'missing detail hero still animates page exit');
+animations.at(-1).onFinish();
+const missingSource=fixture();missingSource.photo.returnPageOnly=true;missingSource.closing=true;missingSource.decoded=true;
+let fallbackExit=false;missingSource.onReveal=(closing,page)=>{fallbackExit=closing&&page;};
+missingSource.begin();assert.equal(missingSource.showing,false,'offscreen source cannot flash a stale photo');
+timers.shift()();assert.equal(fallbackExit,true,'offscreen source animates the page even with visible hero');
+animations.at(-1).onFinish();
 const reopened=fixture();reopened.restoredOffset=900;reopened.decoded=true;let pageOpen=false;reopened.onReveal=(closing,page)=>{pageOpen=!closing&&page;};
 reopened.begin();assert.equal(reopened.showing,false,'restored entry never paints flying hero');timers.shift()();assert.equal(pageOpen,true);assert.equal(reopened.showing,false);animations.at(-1).onFinish();
 console.log('Restored detail entry: page fade without flying to offscreen hero passed');
@@ -104,5 +121,6 @@ assert.equal(disposed.started,false,'late data callback cannot open disposed det
 console.log('Hidden detail image readiness and disposal passed');
 
 assert(!indexSource.includes("this.profileSettingsVisible || this.homeEntryPhoto && this.homeEntryCardId.startsWith('pinmony-home-photo-')"),'detail entry must not add a second status inset to retained home tabs');
-assert.match(indexSource,/\.padding\(\{ top: this.profileSettingsVisible \?\s*this.getUIContext\(\).px2vp\(this.statusBarHeightPx\) : 0 \}\)/,'settings inset remains independent of detail entry');
+const rootTabs = indexSource.slice(indexSource.indexOf('private buildRootTabs()'), indexSource.indexOf('private buildRootTabs()') + 5000);
+assert(!/\.padding\(\{ top:.*homeEntryPhoto/.test(rootTabs),'retained tabs must not shift when the return flight appears');
 console.log('Retained home geometry: detail entry and return do not change root tabs inset passed');

@@ -71,7 +71,7 @@ export struct PinmonyOrganizePage {
         },
         menu: { value: this.state.phase === 'select' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark'))
-            .fontColor([$r('app.color.primary_text')]),
+            .fontSize(24).fontWeight(FontWeight.Medium).fontColor([$r('app.color.primary_text')]),
           label: this.suggestionTitle ? this.uiText('pm_create_cde2cd07') : this.publishing ? (this.state.selectedIds.length ? this.uiText("pm_done_c0b3fbff") : this.uiText("pm_skip_fc50a99c")) : this.uiText("pm_next_acfc4e74"),
           isEnabled: (this.publishing || this.state.selectedIds.length > 0) && !this.pinsLoading && !(this.suggestionTitle && this.pinsError) && !this.state.busy && !this.state.uncertain,
           action: () => {

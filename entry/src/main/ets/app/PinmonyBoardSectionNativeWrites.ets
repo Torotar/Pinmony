@@ -71,7 +71,7 @@ export class PinmonyBoardSectionNativeWrites {
       const body: SectionWriteResponse = JSON.parse(reply.body) as SectionWriteResponse, r: SectionWriteResource = body.resource_response;
       if(r?.status !== 'success' || r.code !== 0 || r.endpoint_name !== (action === 'rename' ? 'v3_edit_section' : action === 'delete' ? 'v3_delete_board_section' : 'v3_board_bulk_move') || action !== 'rename' && r.data !== null || body.client_context?.user && body.client_context.user.id !== identity.viewer)throw new Error('business');
       if(action === 'rename'){const d: SectionResult = r.data as SectionResult;if(!d || d.id !== identity.section || d.type !== 'board_section' || d.title !== target || d.board?.id !== identity.board)throw new Error('section');}
-      this.uncertain.delete(key);flow.busy = false;this.job = '';this.ports.changed(flow);this.ports.confirmed(action,action === 'rename' ? target : undefined);
+      this.uncertain.delete(key);flow.busy = false;this.job = '';if(action !== 'move')this.ports.changed(flow);this.ports.confirmed(action,action === 'rename' ? target : undefined);
     }catch (_) {if(current()){flow.busy = false;flow.uncertain = true;flow.error = PinmonyI18n.message("pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27");this.ports.changed(flow);}}
     finally {if(revision === this.revision){this.job = '';this.cancelWait = undefined;}}
   }

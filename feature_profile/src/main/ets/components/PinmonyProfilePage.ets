@@ -127,7 +127,7 @@ export struct PinmonyProfilePage {
     return this.hubHeaderInset() + this.hubCollapseHeight();
   }
   private profileBodyTopInset(): number {
-    if (!this.onBack && !this.modern()) return this.getUIContext().px2vp(this.statusBarHeightPx) + 56;
+    if (!this.modern()) return this.getUIContext().px2vp(this.statusBarHeightPx) + 56;
     return this.hubContentInset();
   }
   private updateHubChrome(offset: number, state: ScrollState, position: number): void {
@@ -178,7 +178,12 @@ export struct PinmonyProfilePage {
       const oldTab: string = ['boards','groups','secret'].includes(p.hubMode || '') ? 'boards' : p.hubMode === 'drafts' ? 'collages' : p.hubMode || '';
       return oldTab === tab && p.profileUrl === this.profile.profileUrl && p.session === this.profile.session;
     });
-    if(saved)return saved;
+    if(saved) {
+      if(!saved.organize)return saved;
+      const retained: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(saved)) as PinmonyProfileSnapshot;
+      retained.organize = undefined;
+      return retained;
+    }
     const pending: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.profile)) as PinmonyProfileSnapshot;
     pending.hubMode = tab;pending.section = tab === 'boards' ? 'saved' : 'created';
     pending.boards = [];pending.createdPins = [];pending.unorganizedPins = [];pending.suggestions = [];
@@ -794,7 +799,7 @@ export struct PinmonyProfilePage {
   }
 
   private profileTitleOptions(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: {
@@ -832,15 +837,9 @@ export struct PinmonyProfilePage {
       .backgroundColor($r('app.color.page_background'))
   }
   build() {
-    if (this.profile.organize) {
-      PinmonyOrganizePage({ state: this.profile.organize,
-          suggestionTitle: this.profile.suggestionTitle || '', pins: this.profile.unorganizedPins || [],
-        pinsLoading: this.profile.unorganizedLoading === true, pinsError: this.profile.unorganizedError || '',
-        pinsHasMore: this.profile.unorganizedHasMore === true,
-        onAction: (action: string, value: string, secret: boolean) => {
-          if (this.onOrganize) this.onOrganize(action, value, secret);
-        } })
-    } else if (this.onBack) {
+    Stack() {
+    Column() {
+    if (this.onBack) {
       HdsNavigation(this.profilePaths) { Column().width('100%').height('100%') }
         .width('100%').height('100%').hideTitleBar(true).navDestination(this.profileDestination)
     } else {
@@ -878,6 +877,22 @@ export struct PinmonyProfilePage {
       }
     })
     }
+    }.width('100%').height('100%')
+      .hitTestBehavior(this.profile.organize ? HitTestMode.None : HitTestMode.Default)
+    if (this.profile.organize) {
+      PinmonyOrganizePage({ state: this.profile.organize,
+          suggestionTitle: this.profile.suggestionTitle || '', pins: this.profile.unorganizedPins || [],
+        pinsLoading: this.profile.unorganizedLoading === true, pinsError: this.profile.unorganizedError || '',
+        pinsHasMore: this.profile.unorganizedHasMore === true,
+        onAction: (action: string, value: string, secret: boolean) => {
+          if (this.onOrganize) this.onOrganize(action, value, secret);
+        } })
+        .width('100%').height('100%')
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.translate({x:'100%'}).animation({duration:180,curve:Curve.EaseOut}),
+          TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn})))
+    }
+    }.width('100%').height('100%')
   }
 
   @Builder

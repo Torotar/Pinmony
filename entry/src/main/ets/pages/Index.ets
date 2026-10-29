@@ -283,6 +283,7 @@ struct Index {
   @State private pinStore: PinmonyPinStore = new PinmonyPinStore();
   @State private boardStore: PinmonyBoardStore = new PinmonyBoardStore();
   @State private settingsStore: PinmonySettingsStore = new PinmonySettingsStore();
+  @State private chatSettingsUnderlay: PinmonyInboxFlowSnapshot | undefined = undefined;
   @State private boardRecoveryVisible: boolean = false;
   @State private profileStore: PinmonyProfileStore = new PinmonyProfileStore();
   @State private inboxStore: PinmonyInboxStore = new PinmonyInboxStore();
@@ -2648,7 +2649,7 @@ struct Index {
     }
   }
 
-  private clearInbox(): void { this.inboxReadController.clear(); }
+  private clearInbox(): void { this.chatSettingsUnderlay = undefined; this.inboxReadController.clear(); }
   private restoreInbox(address: string): boolean { return this.inboxReadController.restore(address); }
   private expectInbox(): void { this.inboxReadController.expect(); }
   private updateInbox(value: string): void { try {
@@ -3183,7 +3184,15 @@ struct Index {
     this.traceAction('inbox.action', id); await this.inboxActionsController.open(id);
   }
   private async inboxFlowAction(action: string, value: string = ''): Promise<void> {
+    const flow: PinmonyInboxFlowSnapshot | undefined = this.inboxStore.inboxFlow;
+    if (action === 'settings' && flow?.screen === 'chat' && !flow.loading) {
+      this.chatSettingsUnderlay = flow;
+      this.inboxStore.chatReturnConversation = flow.conversationId || '';
+    }
     await this.inboxActionsController.action(action, value);
+    if (action === 'back' && flow?.screen === 'settings' && this.inboxStore.inboxFlow?.screen !== 'settings') {
+      this.chatSettingsUnderlay = undefined;
+    }
     if (PIN_NATIVE_INBOX_UPDATES_ENABLED && action === 'back' && !this.inboxStore.inboxFlow) this.inboxUpdatesNativeReads.demand();
   }
 
@@ -3895,6 +3904,9 @@ struct Index {
       this.inboxStore.inboxFlow.messages.some((message): boolean => message.pinUrl === url);
   }
 
+  private chatBoardTransitionPage: string = '';
+  private chatProfileTransition: boolean = false;
+
   private openInboxBoard(messageId: string): void {
     const flow = this.inboxStore.inboxFlow;
     const nativeChat: boolean = this.inboxMessagesNativeReads.ownsFlow();
@@ -3909,6 +3921,7 @@ struct Index {
     const target: string = this.boardUrlFromAddress(card?.url || '');
     if (!card || !/^\d+$/.test(card.id) || !target || target !== card.url || this.rejectOfflineAction('chat board')) return;
     this.traceAction('inbox.board.open');
+    this.chatBoardTransitionPage = target;
     this.inboxStore.retainedChat = flow;
     this.inboxStore.chatReturnConversation = flow.conversationId || '';
     this.returnCoordinator.cancel(); this.pageHistory.cancelBack(); this.pageBackToken++;
@@ -4192,10 +4205,16 @@ struct Index {
       try {
         const ui = this.getUIContext();
         const rect = ui.getComponentUtils().getRectangleById(this.homeEntryCardId);
+        const x: number = ui.px2vp(rect.windowOffset.x), width: number = ui.px2vp(rect.size.width);
         const y: number = ui.px2vp(rect.windowOffset.y), height: number = ui.px2vp(rect.size.height);
-        if (rect.size.width > 0 && height > 0 && y >= 0 && y + height <= this.getUIContext().px2vp(display.getDefaultDisplaySync().height)) {
+        if (width > 0 && height > 0) {
+          const screen = display.getDefaultDisplaySync();
+          const visible: boolean = x < ui.px2vp(screen.width) && x + width > 0 &&
+            y < ui.px2vp(screen.height) && y + height > 0;
           this.homeEntryPhoto = { pinUrl: this.homeEntryPhoto.pinUrl, imageUrl: this.homeEntryPhoto.imageUrl,
-            x: ui.px2vp(rect.windowOffset.x), y: y, width: ui.px2vp(rect.size.width), height: height };
+            x: x, y: y, width: width, height: height,
+            imageWidth: this.homeEntryPhoto.imageWidth, imageHeight: this.homeEntryPhoto.imageHeight,
+            returnPageOnly: !visible };
           this.homeEntryClosing = true; return;
         }
       } catch (_) {}
@@ -4211,7 +4230,12 @@ struct Index {
         this.homeEntryClosing = true;
         return;
       }
-      this.homeEntryPhoto = undefined;
+      // A recycled or fully clipped source still needs a bounded page exit.
+      this.homeEntryPhoto = { pinUrl: this.homeEntryPhoto.pinUrl, imageUrl: this.homeEntryPhoto.imageUrl,
+        x: this.homeEntryPhoto.x, y: this.homeEntryPhoto.y,
+        width: this.homeEntryPhoto.width, height: this.homeEntryPhoto.height, returnPageOnly: true };
+      this.homeEntryClosing = true;
+      return;
     }
     this.lastRootBackAt = 0;
     if (this.backInProgress) return;
@@ -4474,6 +4498,8 @@ struct Index {
   }
 
   private closeBoardCollaborators(): void {
+    if (this.boardStore.collaborators && !this.boardStore.collaborators.busy && !this.boardStore.collaborators.uncertain &&
+        this.boardStore.collaborators.phase !== 'members') { this.boardCollaboratorsAction('members', ''); return; }
     if(PIN_NATIVE_BOARD_READS_ENABLED){if(this.boardStore.collaborators?.busy)return;this.boardCollaboratorsController.pause();this.boardNativeReads.collaboratorsAction('close','').catch((): void => {});return;}
     this.boardCollaboratorsController.close();
   }
@@ -4691,6 +4717,9 @@ struct Index {
     }
     if (this.boardStore.boardDetail?.flow?.phase) {
       const phase: string = this.boardStore.boardDetail.flow.phase;
+      if (this.boardStore.boardDetail.flow.sectionId && ['select','ideas','sectionEdit'].includes(phase) && !this.boardStore.boardDetail.flow.uncertain) {
+        this.boardOperation('flow', JSON.stringify({action:'sectionReturn'}));return;
+      }
       this.boardOperation('flow', JSON.stringify({ action: phase === 'targets' && !this.boardStore.boardDetail.flow.uncertain ? 'select' : 'close' }));
       return;
     }
@@ -4784,6 +4813,8 @@ struct Index {
 
   private settingsProfileDepth: number = -1;
   @State private settingsProfileReturning: boolean = false;
+  @State private settingsProfileName: string = '';
+  @State private settingsProfileAvatar: string = '';
   private openUserProfile(url: string, fromSettings: boolean = false): void {
     const rootOnly: boolean = this.nativeRootOnly;
     const previousAddress: string = this.navigationAddress;
@@ -4794,7 +4825,7 @@ struct Index {
       this.closeProfilePanel(); this.profileSettingsVisible = false; return;
     }
     if (this.profileStore.origins.length >= 12) return;
-    if(fromSettings){this.settingsProfileReturning = false;this.settingsProfileDepth = this.profileStore.origins.length;this.profileSettingsVisible = false;}
+    if(fromSettings){this.settingsProfileName = this.profileStore.profile?.displayName || '';this.settingsProfileAvatar = this.profileStore.profile?.avatarUrl || '';this.settingsProfileReturning = false;this.settingsProfileDepth = this.profileStore.origins.length;this.profileSettingsVisible = false;}
     const searchSource: string = this.activeTab === 1 && !this.pinStore.detail && !this.boardStore.boardDetail && !this.profileStore.origins.length ? this.currentSearchPageKey() : '';
     this.clearRootTabGuard('profile-open');
     let source: string;
@@ -4805,6 +4836,12 @@ struct Index {
         (boardSource && (boardSource === this.nativeBackTarget || boardSource === this.navigationAddress) ? boardSource : searchSource || this.nativeDisplayAddress())) : this.sessionDocumentUrl();
     }
     catch (_) { this.showMessage(PinmonyI18n.message("pm_page_not_ready_please_retry_e6aeff92")); return; }
+    if (!this.profileStore.origins.length) {
+      const flow = this.inboxStore.inboxFlow;
+      this.chatProfileTransition = !fromSettings && this.activeTab === 2 && flow?.screen === 'chat' &&
+        source === flow.pageUrl && !this.boardStore.boardDetail && !this.pinStore.detail && !this.pinStore.detailOpeningPin;
+      if (this.chatProfileTransition && flow) this.inboxStore.chatReturnConversation = flow.conversationId || '';
+    }
     if(PIN_NATIVE_PROFILE_READS_ENABLED){
       if(!this.profileStore.origins.length)this.profileBoardOrigins.clear();
       this.profileBoardOrigins.set(this.profileStore.origins.length,{board:this.boardStore.boardDetail,returnUrl:this.boardStore.boardReturnUrl,returnPage:this.boardStore.boardReturnPage,rootTab:this.boardStore.rootTab,cancelledPins:Array.from(this.cancelledBoardPins)});
@@ -4816,6 +4853,7 @@ struct Index {
     this.closeProfilePanel();
     this.clearDetail();
     this.clearProfile();
+    if(fromSettings)this.profileStore.profileCache.clear();
 
     this.nativeRootOnly = false;
     this.navigationAddress = page;
@@ -5827,6 +5865,17 @@ struct Index {
     }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
 
+  private showTextCopiedSnack(): void {
+    const snack: HdsSnackBar = this.preparePostSnack(4000);
+    const token: number = this.postSnackToken;
+    snack.show({ icon: $r('sys.symbol.checkmark_circle'), iconType: SnackBarIconType.NORMAL },
+      { title: this.uiText('pm_copied_8f6f8d97') }, {
+        operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
+        closeButtonAccessibilityText: this.uiText('pm_dismiss_notice_d301bc12'),
+        onCloseButtonClick: () => this.handlePostSnackClose(token)
+      }, { duration: 4000, pressBackCallback: () => this.handlePostSnackBack(token) });
+  }
+
   private showUndoSnack(message: string, pin: string, undo: () => void): void {
     PinmonyRuntimeLog.info('PinmonyReturn: undo snackbar shown');
     const snack: HdsSnackBar = this.preparePostSnack(4000);
@@ -6686,8 +6735,6 @@ struct Index {
             .scrollable(false)
             .barOverlap(true)
             .barHeight(56)
-            .padding({ top: this.profileSettingsVisible ?
-              this.getUIContext().px2vp(this.statusBarHeightPx) : 0 })
             .barBackgroundColor(this.immersiveLightMode !== 'off' ? Color.Transparent : $r('app.color.surface_muted'))
             .barFloatingStyle({
               barBottomMargin: 28,
@@ -6750,98 +6797,17 @@ struct Index {
               height:'75%', showClose:true, backgroundColor:$r('app.color.page_background'),
               onWillDismiss:(action:DismissSheetAction): void => { if (!this.settingsStore.busy) action.dismiss(); },
               onDisappear:(): void => this.closeBoardRecovery() })
-          if (this.profileSettingsVisible) {
-            PinmonySettingsPage({ store: this.settingsStore, profileName:this.profileStore.profile?.displayName || '',profileAvatar:this.profileStore.profile?.avatarUrl || '',onViewProfile:() => {const page: string = this.profileStore.profile?.profileUrl || '';if(page)this.openUserProfile(page,true);}, onPin: (id: string): void => {
+          if (this.profileSettingsVisible || this.settingsProfileDepth >= 0) {
+            PinmonySettingsPage({ store: this.settingsStore, profileName:this.settingsProfileDepth >= 0 ? this.settingsProfileName : this.profileStore.profile?.displayName || '',profileAvatar:this.settingsProfileDepth >= 0 ? this.settingsProfileAvatar : this.profileStore.profile?.avatarUrl || '',onViewProfile:() => {const page: string = this.profileStore.profile?.profileUrl || '';if(page)this.openUserProfile(page,true);}, onPin: (id: string): void => {
               if (this.authStatus !== 'authenticated' || this.businessSuspended || this.settingsStore.busy || this.settingsStore.loading || !this.settingsStore.data?.activities.some((pin): boolean => pin.id === id)) return;
               this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + id + '/', this.nativeBusinessSessionContext().origin + '/edit/activity/');
             }, onOpenExternalLink: (url: string): Promise<void> => this.systemActions.openLink(url), onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
               .width('100%').height('100%')
+              .hitTestBehavior(this.settingsProfileDepth >= 0 ? HitTestMode.None : HitTestMode.Default)
               .transition(this.settingsProfileReturning ? TransitionEffect.asymmetric(
                 TransitionEffect.IDENTITY, TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })) : NATIVE_PAGE_TRANSITION)
           }
 
-          if (this.profileStore.origins.length > 0 && this.currentProfileUrl()) {
-            Column() { this.buildProfileContent() }.width('100%').height('100%')
-              .transition(TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
-                this.settingsProfileDepth >= 0 || this.settingsProfileReturning ?
-                  TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn}) : TransitionEffect.IDENTITY))
-          }
-
-          if (this.profileStore.panel) {
-            PinmonyProfilePanelPage({ snapshot: this.profileStore.panel, followingBusy: this.profileStore.followingBusy, onFollow: (id: string) => this.followProfileUser(id), onAvatar: () => this.changeProfileAvatar(), saving: this.profileStore.saving, onSave: (input: string) => this.saveProfilePanel(input),
-              onBoard: (url: string) => this.openProfilePanelBoard(url), onUser: (url: string) => this.openUserProfile(url), onBack: () => this.closeProfilePanel(),
-              onSection: (section: string) => this.openProfilePanel('following', section),
-              onLoadMore: () => { this.profileNativeActions.moreFollowers(); } })
-              .width('100%').height('100%').transition(this.immediateFollowingReturn ? TransitionEffect.asymmetric(
-                TransitionEffect.IDENTITY, TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })) : NATIVE_PAGE_TRANSITION)
-          }
-          if (this.boardStore.collaborators) {
-            PinmonyBoardCollaboratorsPage({ snapshot: this.boardStore.collaborators,
-              onClose: () => this.closeBoardCollaborators(),
-              onAction: (action: string, value: string) => this.boardCollaboratorsAction(action, value) })
-          }
-          if (this.inboxStore.invitationAllVisible && this.inboxStore.boardInvitations) {
-              PinmonyBoardInvitationList({ snapshot: this.inboxStore.boardInvitations, all: true,
-                onBack: () => { this.inboxStore.invitationAllVisible = false; },
-                onPreview: (item: PinmonyBoardInvitation) => this.previewBoardInvitation(item) })
-                .width('100%').height('100%')
-          }
-          if (this.boardStore.boardDetail && this.nativeBoardVisible()) {
-            PinmonyBoardPage({ profileBoard: this.boardStore.rootTab === 3,
-              discoveryBoard: this.boardStore.discoveryBoardPage === this.boardStore.boardDetail.pageKey,
-              onUser: (url: string) => this.openUserProfile(url), snapshot: this.boardStore.boardDetail, onBack: () => this.backFromBoard(),
-              onPin: (id: string) => { this.traceAction('board.pin.open'); this.boardOperation('open', id); },
-              onMessage: () => this.openBoardChat(), onMore: (id: string) => this.openBoardPinMore(id),
-              onFavorite: async (id: string): Promise<void> => {
-                const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
-                const pin: PinmonyBoardPin | undefined = (board?.flow?.phase === 'section' ? board.flow.pins : board?.pins || []).find((item: PinmonyBoardPin): boolean => item.id === id);
-                if(!board || !pin || this.showNativeSheet || !board.nativeReadsReady)return;
-                this.homeStore.homeMenuPin = pin.pinUrl;this.homeStore.homeMenuPage = board.pageKey;
-                await this.pinMenuNative.toggleFavorite(pin.pinUrl);
-              }, onCollaborators: () => this.openBoardCollaborators(),
-              invitationName: this.inboxStore.boardInvitationPreview?.inviter || '', invitationAvatar: this.inboxStore.boardInvitationPreview?.inviterAvatar || '',
-              invitationVisible: this.inboxStore.invitationBannerVisible && this.inboxStore.boardInvitationPreview?.boardUrl === this.boardStore.boardDetail.pageKey,
-              invitationBusy: this.inboxStore.invitationBusy, joinedAvatar: this.inboxStore.joinedBoardAvatar,
-              onAcceptInvitation: () => this.acceptBoardInvitation(), onDismissInvitation: () => { this.inboxStore.invitationBannerVisible = false; },
-              onShare: () => this.shareCurrentBoard(), onPublish: () => this.openProfilePublish(),
-              onLoadMore: () => this.boardOperation('more'), onRetry: () => this.boardOperation('retry'),
-              onRefresh: () => this.boardOperation('refresh'),
-              onAction: (value: string) => this.boardOperation('flow', value) })
-              .width('100%').height('100%')
-              .visibility(this.boardStore.collaborators || this.publishPageVisible() && this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' ? Visibility.Hidden : Visibility.Visible)
-              .hitTestBehavior(this.boardStore.collaborators || this.profileStore.publishFlow || this.publishBoardReturn ? HitTestMode.None : HitTestMode.Default)
-              .onAppear(() => {
-                if (this.boardStore.boardDetail) this.pagePerformance.markSecondary('board', this.boardStore.boardDetail.pageKey, 'component-ready');
-                if(PIN_NATIVE_BOARD_READS_ENABLED)this.boardNativeReads.demand();
-              })
-              .transition(this.followingBoardReturn ? TransitionEffect.asymmetric(
-                TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseOut }),
-                TransitionEffect.IDENTITY) : BOARD_PAGE_TRANSITION)
-          }
-
-          if (this.boardSectionVisible) {
-            PinmonyBoardSectionPage({ ready: this.boardSectionReady(), onCreate: (name: string): Promise<string> => this.createBoardSection(name), onClose: () => {
-              this.closeBoardSection();
-            } })
-              .width('100%').height('100%')
-          }
-          if (this.activeTab === 3 && this.profileStore.searchVisible && this.profileStore.contentSearch &&
-              !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
-            PinmonyProfileSearchPage({ snapshot: this.profileStore.contentSearch,
-              onResume: () => this.profileSearchReads.resume(),
-              onPause: () => this.profileSearchReads.pause(),
-              onInput: (query: string) => this.profileSearchReads.input(query),
-              onSubmit: (query: string) => this.profileSearchReads.submit(query),
-              onDeleteHistory: (query: string) => this.profileSearchReads.deleteHistory(query),
-              onMore: () => this.profileSearchReads.more(), onRetry: () => this.profileSearchReads.retry(),
-              onBack: () => { this.nativeChildBackUntil = Date.now() + 300; this.profileSearchReads.close(); this.syncFloatingTabsMotion(); },
-              onPin: (id: string) => {
-                const pin: PinmonyProfileSearchPin | undefined = this.profileStore.contentSearch?.pins.find((p: PinmonyProfileSearchPin): boolean => p.id === id) ||
-                  this.profileStore.contentSearch?.suggestions.flatMap((s) => s.pins).find((p: PinmonyProfileSearchPin): boolean => p.id === id);
-                if (!pin || this.authStatus !== 'authenticated' || this.businessSuspended || this.activeSheetKind) return;
-                this.profileSearchReads.pause(); this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + pin.id + '/', this.currentProfileUrl());
-              } }).width('100%').height('100%')
-          }
           if (this.activeTab === 2 && this.inboxStore.listSection && this.inboxStore.inbox &&
               !this.pinStore.detail && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
             PinmonyInboxListPage({ snapshot: this.inboxStore.inbox,
@@ -6855,16 +6821,24 @@ struct Index {
               onRetry: () => this.retryInbox(), onContactsRetry: () => this.retryInboxContacts() })
               .width('100%').height('100%')
               .hitTestBehavior(this.inboxStore.inboxFlow ? HitTestMode.None : HitTestMode.Default)
+              .transition(NATIVE_PAGE_TRANSITION)
           }
-          if (!(PIN_NATIVE_PROFILE_READS_ENABLED && this.profileStore.origins.length > 0 && this.currentProfileUrl()) && !this.nativeBoardVisible() && this.inboxStore.inboxFlow && (this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() ||
+          if (this.inboxStore.inboxFlow &&
+              (!(PIN_NATIVE_PROFILE_READS_ENABLED && this.profileStore.origins.length > 0 && this.currentProfileUrl()) && !this.nativeBoardVisible() ||
+                this.activeTab === 2 && this.inboxStore.inboxFlow.screen === 'chat') && (this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() ||
               this.activeTab === 2 && !!this.inboxStore.retainedChat)) {
-            PinmonyInboxFlowPage({ onUser: (url: string) => this.openUserProfile(url), snapshot: this.inboxStore.inboxFlow,
+            PinmonyInboxFlowPage({ onUser: (url: string) => this.openUserProfile(url),
+              snapshot: this.inboxStore.inboxFlow.screen === 'settings' && this.chatSettingsUnderlay ?
+                this.chatSettingsUnderlay : this.inboxStore.inboxFlow,
               onCopyText: async (text: string): Promise<boolean> => {
                 try { await this.systemActions.copyText(text); this.showMessage(PinmonyI18n.message("pm_copied_8f6f8d97")); return true; }
                 catch (_) { this.showMessage(PinmonyI18n.message("pm_unable_to_copy_please_retry_86ee2899")); return false; }
               },
               onBoard: (messageId: string) => this.openInboxBoard(messageId),
-              active: !this.pinStore.detail && !this.pinStore.detailOpeningPin && this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl(),
+              active: !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() &&
+                this.profileStore.origins.length === 0 &&
+                !(this.inboxStore.inboxFlow.screen === 'settings' && this.chatSettingsUnderlay) &&
+                this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl(),
               restoreOffset: this.inboxStore.chatReturnConversation === this.inboxStore.inboxFlow.conversationId ? this.inboxStore.chatScrollOffset : -1,
               onOffset: (offset: number): void => { this.inboxStore.chatScrollOffset = offset; },
               onNewsHidden: (newsId: string) => this.showInboxUndoSnack(newsId),
@@ -6894,19 +6868,122 @@ struct Index {
               onAction: (action: string, value: string) => this.inboxFlowAction(action, value) })
               .width(this.inboxStore.inboxFlow.screen === 'updatesMenu' ? 1 : '100%')
               .height(this.inboxStore.inboxFlow.screen === 'updatesMenu' ? 1 : '100%')
-              .hitTestBehavior(this.inboxStore.inboxFlow.screen === 'updatesMenu' ? HitTestMode.Transparent : HitTestMode.Default)
+              .hitTestBehavior(this.inboxStore.inboxFlow.screen === 'updatesMenu' ? HitTestMode.Transparent :
+                this.nativeBoardVisible() || this.profileStore.origins.length > 0 ||
+                  this.inboxStore.inboxFlow.screen === 'settings' && this.chatSettingsUnderlay ? HitTestMode.None : HitTestMode.Default)
+              .transition(this.inboxStore.inboxFlow.screen === 'updatesMenu' ? TransitionEffect.IDENTITY : NATIVE_PAGE_TRANSITION)
               .onAppear(() => {
                 const flow: PinmonyInboxFlowSnapshot | undefined = this.inboxStore.inboxFlow;
                 if (flow?.screen === 'chat') this.pagePerformance.markSecondary('chat', flow.session + ':' + (flow.conversationId || ''), 'component-ready');
               })
           }
 
+          if (this.inboxStore.inboxFlow?.screen === 'settings' && this.chatSettingsUnderlay &&
+              this.activeTab === 2 && !this.nativeBoardVisible() && this.profileStore.origins.length === 0 &&
+              !this.pinStore.detail && !this.pinStore.detailOpeningPin &&
+              this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl()) {
+            PinmonyInboxFlowPage({ snapshot: this.inboxStore.inboxFlow,
+              onUser: (url: string) => this.openUserProfile(url),
+              onAction: (action: string, value: string) => this.inboxFlowAction(action, value),
+              onBlockChanged: (blocked: boolean, userName: string) => this.showInboxBlockSnack(blocked, userName) })
+              .width('100%').height('100%').transition(NATIVE_PAGE_TRANSITION)
+          }
+
+          if (this.profileStore.origins.length > 0 && this.currentProfileUrl()) {
+            Column() { this.buildProfileContent() }.width('100%').height('100%')
+              .transition(this.chatProfileTransition || this.settingsProfileDepth >= 0 ? NATIVE_PAGE_TRANSITION :
+                TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
+                  this.settingsProfileDepth >= 0 || this.settingsProfileReturning ?
+                    TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn}) : TransitionEffect.IDENTITY))
+          }
+
+          if (this.profileStore.panel) {
+            PinmonyProfilePanelPage({ snapshot: this.profileStore.panel, followingBusy: this.profileStore.followingBusy, onFollow: (id: string) => this.followProfileUser(id), onAvatar: () => this.changeProfileAvatar(), saving: this.profileStore.saving, onSave: (input: string) => this.saveProfilePanel(input),
+              onBoard: (url: string) => this.openProfilePanelBoard(url), onUser: (url: string) => this.openUserProfile(url), onBack: () => this.closeProfilePanel(),
+              onSection: (section: string) => this.openProfilePanel('following', section),
+              onLoadMore: () => { this.profileNativeActions.moreFollowers(); } })
+              .width('100%').height('100%').transition(this.immediateFollowingReturn ? TransitionEffect.asymmetric(
+                TransitionEffect.IDENTITY, TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })) : NATIVE_PAGE_TRANSITION)
+          }
+          if (this.inboxStore.invitationAllVisible && this.inboxStore.boardInvitations) {
+              PinmonyBoardInvitationList({ snapshot: this.inboxStore.boardInvitations, all: true,
+                onBack: () => { this.inboxStore.invitationAllVisible = false; },
+                onPreview: (item: PinmonyBoardInvitation) => this.previewBoardInvitation(item) })
+                .width('100%').height('100%').transition(NATIVE_PAGE_TRANSITION)
+          }
+          if (this.boardStore.boardDetail && this.nativeBoardVisible()) {
+            PinmonyBoardPage({ profileBoard: this.boardStore.rootTab === 3,
+              singlePinMove: this.singlePinMovePage === this.boardStore.boardDetail.pageKey,
+              discoveryBoard: this.boardStore.discoveryBoardPage === this.boardStore.boardDetail.pageKey,
+              onUser: (url: string) => this.openUserProfile(url), snapshot: this.boardStore.boardDetail, onBack: () => this.backFromBoard(),
+              onPin: (id: string) => { this.traceAction('board.pin.open'); this.boardOperation('open', id); },
+              onMessage: () => this.openBoardChat(), onMore: (id: string) => this.openBoardPinMore(id),
+              onFavorite: async (id: string): Promise<void> => {
+                const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
+                const pin: PinmonyBoardPin | undefined = (board?.flow?.phase === 'section' ? board.flow.pins : board?.pins || []).find((item: PinmonyBoardPin): boolean => item.id === id);
+                if(!board || !pin || this.showNativeSheet || !board.nativeReadsReady)return;
+                this.homeStore.homeMenuPin = pin.pinUrl;this.homeStore.homeMenuPage = board.pageKey;
+                await this.pinMenuNative.toggleFavorite(pin.pinUrl);
+              }, onCollaborators: () => this.openBoardCollaborators(),
+              invitationName: this.inboxStore.boardInvitationPreview?.inviter || '', invitationAvatar: this.inboxStore.boardInvitationPreview?.inviterAvatar || '',
+              invitationVisible: this.inboxStore.invitationBannerVisible && this.inboxStore.boardInvitationPreview?.boardUrl === this.boardStore.boardDetail.pageKey,
+              invitationBusy: this.inboxStore.invitationBusy, joinedAvatar: this.inboxStore.joinedBoardAvatar,
+              onAcceptInvitation: () => this.acceptBoardInvitation(), onDismissInvitation: () => { this.inboxStore.invitationBannerVisible = false; },
+              onShare: () => this.shareCurrentBoard(), onPublish: () => this.openProfilePublish(),
+              onLoadMore: () => this.boardOperation('more'), onRetry: () => this.boardOperation('retry'),
+              onRefresh: () => this.boardOperation('refresh'),
+              onAction: (value: string) => this.boardOperation('flow', value) })
+              .width('100%').height('100%')
+              .visibility(this.publishPageVisible() && this.profileStore.publishFlow && this.profileStore.publishFlow.phase !== 'create' ? Visibility.Hidden : Visibility.Visible)
+              .hitTestBehavior(this.boardStore.collaborators || this.profileStore.publishFlow || this.publishBoardReturn ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.boardStore.collaborators ? 'no-hide-descendants' : 'auto')
+              .onAppear(() => {
+                if (this.boardStore.boardDetail) this.pagePerformance.markSecondary('board', this.boardStore.boardDetail.pageKey, 'component-ready');
+                if(PIN_NATIVE_BOARD_READS_ENABLED)this.boardNativeReads.demand();
+              })
+              .transition(this.boardStore.rootTab === 2 && this.boardStore.boardDetail.pageKey === this.chatBoardTransitionPage ?
+                NATIVE_PAGE_TRANSITION : this.followingBoardReturn ? TransitionEffect.asymmetric(
+                TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseOut }),
+                TransitionEffect.IDENTITY) : BOARD_PAGE_TRANSITION)
+          }
+
+          if (this.boardStore.collaborators) {
+            PinmonyBoardCollaboratorsPage({ snapshot: this.boardStore.collaborators,
+              onClose: () => this.closeBoardCollaborators(),
+              onAction: (action: string, value: string) => this.boardCollaboratorsAction(action, value) })
+              .width('100%').height('100%').transition(NATIVE_PAGE_TRANSITION)
+          }
+
+          if (this.boardSectionVisible) {
+            PinmonyBoardSectionPage({ ready: this.boardSectionReady(), onCreate: (name: string): Promise<string> => this.createBoardSection(name), onClose: () => {
+              this.closeBoardSection();
+            } })
+              .width('100%').height('100%')
+          }
+          if (this.activeTab === 3 && this.profileStore.searchVisible && this.profileStore.contentSearch &&
+              !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
+            PinmonyProfileSearchPage({ snapshot: this.profileStore.contentSearch,
+              onResume: () => this.profileSearchReads.resume(),
+              onPause: () => this.profileSearchReads.pause(),
+              onInput: (query: string) => this.profileSearchReads.input(query),
+              onSubmit: (query: string) => this.profileSearchReads.submit(query),
+              onDeleteHistory: (query: string) => this.profileSearchReads.deleteHistory(query),
+              onMore: () => this.profileSearchReads.more(), onRetry: () => this.profileSearchReads.retry(),
+              onBack: () => { this.nativeChildBackUntil = Date.now() + 300; this.profileSearchReads.close(); this.syncFloatingTabsMotion(); },
+              onPin: (id: string) => {
+                const pin: PinmonyProfileSearchPin | undefined = this.profileStore.contentSearch?.pins.find((p: PinmonyProfileSearchPin): boolean => p.id === id) ||
+                  this.profileStore.contentSearch?.suggestions.flatMap((s) => s.pins).find((p: PinmonyProfileSearchPin): boolean => p.id === id);
+                if (!pin || this.authStatus !== 'authenticated' || this.businessSuspended || this.activeSheetKind) return;
+                this.profileSearchReads.pause(); this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + pin.id + '/', this.currentProfileUrl());
+              } }).width('100%').height('100%')
+          }
           if ((this.pinStore.detail || this.pinStore.detailOpeningPin) && !this.pinStore.detailWebFlow && !this.loadFailed) {
             Stack() {
               if (this.pinStore.detail && !this.pinStore.detailWebFlow && !this.loadFailed) {
                 ForEach(this.detailPresentationIdentities(), (_identity: string) => {
                 PinmonyDetailPage({ onUser: (url: string) => this.openUserProfile(url),
                   onTagSearch: (query: string, pin: string) => this.openDetailTagSearch(query, pin),
+                  onTextCopied: () => this.showTextCopiedSnack(),
                   onRelatedTopic: (moduleId: string, topicId: string, pin: string) => this.openDetailRelatedTopic(moduleId, topicId, pin),
                   shuffleParentDetail: _identity === this.detailRootIdentity() ? this.shuffleParentDetail : undefined,
                   currentDetail: this.detailPresentation(_identity),

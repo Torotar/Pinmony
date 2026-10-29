@@ -236,6 +236,19 @@ async function main() {
   work=nr.handle('flow',JSON.stringify({action:'move',value:'section:200:300'}));assert.equal(cr.length,13);
   cr[12].resolve(resource(null,'v3_move_pins'));await work;assert.equal(cs.boardDetail.pins.length,0);
   cr[13].resolve(resource({...board,pin_count:0}));await flush();cr[14].resolve(resource([]));await flush();
+  // A section can contain Pins absent from the parent feed. Creation validates that section's selection.
+  const sectionFlow={...cs.boardDetail.flow,phase:'select',sectionId:'500',sectionTitle:'Section',pins:[pin(88)],targets:[],busy:false,loading:false,uncertain:false,error:''};
+  nr.sectionSource={...sectionFlow,phase:'section'};nr.flow=sectionFlow;cs.boardDetail.flow=sectionFlow;nr.selectedIds=['88'];
+  work=nr.handle('flow',JSON.stringify({action:'targets',value:['88']}));cr[15].resolve(resource([]));await flush();
+  cr[16].resolve(resource([{id:'500',type:'board_section',title:'Section',board:{id:'100'}}],'get_all_boards_sections'));await work;
+  work=nr.handle('flow',JSON.stringify({action:'createTarget',value:input}));
+  assert.equal(cr.length,18,'section-only selected Pins must reach the existing create request');
+  cr[17].resolve(resource({id:'251',type:'board',name:'New board',privacy:'secret',owner:{id:'42'}},'v3_create_board'));await work;
+  assert.equal(cs.boardDetail.flow.targets[0].id,'251');assert.deepEqual(Array.from(nr.selectedIds),['88']);
+  await nr.handle('flow',JSON.stringify({action:'select'}));assert.equal(cs.boardDetail.flow.sectionId,'500');
+  const sectionBack=new Back();sectionBack.boardStore=cs;sectionBack.boardNativeReads=nr;sectionBack.boardOperation=(method,value)=>nr.handle(method,value);
+  sectionBack.backFromBoard();await flush();assert.equal(cs.boardDetail.flow.phase,'section');assert.equal(cs.boardDetail.flow.sectionId,'500');
+  await nr.handle('flow',JSON.stringify({action:'close'}));assert.equal(cs.boardDetail.flow.phase,'');
   // Real Web adapter adopts native busy and completed flows, with both legacy submit entrypoints disabled.
   const script = load('feature_board/src/main/ets/services/PinmonyBoardApiScript.ets').PIN_BOARD_API_SCRIPT;
   const location={hostname:'www.pinterest.com',origin,pathname:'/sample/board/',href:page};let fetches=0;const states=[];
@@ -243,7 +256,16 @@ async function main() {
     PinmonyNativeNetworkEnabled:true,PinmonyNetwork:{isReady:()=>true,documentEpoch:()=>7},PinmonyShareBridge:{boardState:raw=>states.push(JSON.parse(raw))},addEventListener(){},setInterval(){}};window.top=window;
   const ctx={window,location,URL,AbortController,console,setTimeout,clearTimeout,fetch(){fetches++;throw Error('duplicate Web POST')}};
   vm.runInNewContext(script,ctx);vm.runInNewContext(reader.installScript(),ctx);
-  let version=store.boardDetail.nativeVersion+1;const flow={...save.state(),phase:'ideas',busy:true};
+  let version=store.boardDetail.nativeVersion+1;
+  const sectionFlowForBridge={...save.state(),phase:'targets',sectionId:'456',pins:[{id:'88'}],busy:false};
+  const sectionSnapshot={...store.boardDetail,nativeVersion:version++,flow:sectionFlowForBridge};
+  const sectionAux={flowOwned:true,sourcePins:[],selectedIds:['88'],targetBookmark:''};
+  assert.equal(window.PinmonyBoardApi.installNative(page,board,'42',sectionSnapshot,'',{...sectionAux,selectedIds:['999']}),false);
+  assert.equal(window.PinmonyBoardApi.installNative(page,board,'42',sectionSnapshot,'',sectionAux),true,'section-only selection is adopted after a rejected snapshot with the same version');
+  assert.equal(states.at(-1).flow.sectionId,'456');
+  assert.equal(window.PinmonyBoardApi.installNative(page,board,'42',{...sectionSnapshot,nativeVersion:version++,flow:{...sectionFlowForBridge,phase:'section',pins:[]}},'',{...sectionAux,selectedIds:[]}),true);
+  assert.equal(states.at(-1).flow.phase,'section');assert.equal(states.at(-1).flow.pins.length,0,'confirmed move can replace the visible section');
+  const flow={...save.state(),phase:'ideas',busy:true};
   const adopt = f => window.PinmonyBoardApi.installNative(page,board,'42',{...store.boardDetail,nativeVersion:version++,flow:f},'',{flowOwned:true,sourcePins:[{id:'7'}],selectedIds:[],targetBookmark:''});
   assert(adopt(flow));assert.equal(window.PinmonyBoardApi.flow(states.at(-1).session,page,JSON.stringify({action:'save',value:'7'})),false);
   assert(adopt({...flow,busy:false}));assert.equal(states.at(-1).flow.busy,false);assert.equal(window.PinmonyBoardApi.flow(states.at(-1).session,page,JSON.stringify({action:'move',value:'200'})),false);assert.equal(fetches,0);

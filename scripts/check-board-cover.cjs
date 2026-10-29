@@ -41,7 +41,30 @@ async function main() {
   crop=geometry.boardCoverCrop({...pin,imageWidth:118,imageHeight:236},0,9);assert.equal(crop.scale,2);assert.equal(crop.width,118);
   const hd=fixture(),hdPin=sourcePin();hdPin.images['474x']={url:'https://i.pinimg.com/474x/synthetic.jpg',width:474,height:1030};hdPin.images.orig={url:'https://i.pinimg.com/originals/wrong.jpg',width:2000,height:2000};
   await open(hd,[hdPin]);const hdResult=hd.state().cover.pins[0];assert.equal(hdResult.previewImageUrl,hdPin.images['474x'].url);assert.equal(hdResult.imageUrl,image);assert.equal(hdResult.imageWidth,236);assert.equal(hdResult.imageHeight,513);
-  const positioned=geometry.boardCoverPreview(hdResult,0,100,236,236,236);assert.equal(positioned.imageUrl,hdPin.images['474x'].url);assert.equal(positioned.top,(-100*100/236)+'%');assert.equal(geometry.boardCoverPreview(hdResult,0,999,236,236),undefined);
+  const positioned=geometry.boardCoverPreview(hdResult,0,100,236,236,236);assert.equal(positioned.imageUrl,hdPin.images['474x'].url);assert(Math.abs(parseFloat(positioned.top)-100*((1-5/3)/2-100*(5/3)/236))<1e-8);assert.equal(geometry.boardCoverPreview(hdResult,0,999,236,236),undefined);
+  for(const source of [{imageWidth:236,imageHeight:513},{imageWidth:513,imageHeight:236},{imageWidth:236,imageHeight:236}])for(const aspect of [5/3,1,3/5]) {
+    const side=Math.min(source.imageWidth,source.imageHeight),x=(source.imageWidth-side)/2,y=(source.imageHeight-side)/2;
+    const rect=geometry.boardCoverPreview({...source,imageUrl:image},x,y,side,side,source.imageWidth,aspect);
+    const shownWidth=parseFloat(rect.width)/100*aspect,shownHeight=parseFloat(rect.height)/100;
+    assert(Math.abs(shownWidth/shownHeight-source.imageWidth/source.imageHeight)<1e-8,'displayed source retains its aspect ratio');
+    const centerX=parseFloat(rect.left)/100*aspect+(x+side/2)*shownWidth/source.imageWidth;
+    const centerY=parseFloat(rect.top)/100+(y+side/2)*shownHeight/source.imageHeight;
+    assert(Math.abs(centerX-aspect/2)<1e-8 && Math.abs(centerY-.5)<1e-8,'saved crop center remains at the frame center');
+  }
+  assert.equal(geometry.boardCoverPreview(hdResult,0,100,236,236,236,0),undefined);
+  const adjust=fixture(),existing={pinId:'11',cropX:0,cropY:100,width:236,height:236,scale:1};
+  let adjustment=adjust.flow.handle('coverAdjust');adjust.requests.at(-1).resolve(body(savedBoard(existing)));await flush();
+  adjust.requests.at(-1).resolve(body([sourcePin('12')],'v3_board_pins','more-adjust'));await flush();
+  assert.equal(adjust.state().cover.loading,true,'saved-cover lookup remains loading between feed pages');
+  assert.match(adjust.requests.at(-1).job.url,/BoardFeedResource/);assert.deepEqual(options(adjust.requests.at(-1).job).bookmarks,['more-adjust']);
+  adjust.requests.at(-1).resolve(body([sourcePin()],'v3_board_pins','-end-'));await adjustment;
+  assert.equal(adjust.state().cover.loading,false,'lookup finishes loading after the saved source is found');
+  assert(adjust.state().cover.adjusting);assert.equal(JSON.stringify(adjust.state().cover.selected),JSON.stringify(existing),'adjust opens the saved image at its confirmed position');
+  await adjust.flow.handle('coverSelect','12');assert.equal(adjust.state().cover.selected.pinId,'11','adjusting cannot replace the saved image');
+  assert.equal(adjust.requests.filter(r=>r.job.method==='POST').length,0,'opening adjustment never writes');
+  await adjust.flow.handle('coverBack');adjustment=adjust.flow.handle('coverOpen');adjust.requests.at(-1).resolve(body(savedBoard(existing)));await flush();adjust.requests.at(-1).resolve(body([sourcePin()],'v3_board_pins','-end-'));await adjustment;
+  assert(!adjust.state().cover.adjusting);assert(!adjust.state().cover.selected,'change-image entry opens the picker without restoring an image');
+  const missing=fixture();adjustment=missing.flow.handle('coverAdjust');missing.requests.at(-1).resolve(body(savedBoard(existing)));await flush();missing.requests.at(-1).resolve(body([sourcePin('12')],'v3_board_pins','-end-'));await adjustment;assert(missing.state().cover.error);assert(!missing.state().cover.selected,'missing saved source cannot silently select another Pin');
   const f=fixture();await open(f,[sourcePin(),sourcePin(),{id:'story',type:'story'},sourcePin('12',0,2)]);
   assert.equal(f.state().coverImage,'','automatic collage is not a user-selected cover');
   assert.equal(f.state().cover.pins.length,1);assert.equal(f.state().description,'Retained draft');
@@ -96,9 +119,12 @@ async function main() {
   assert.match(pageSource,/pm_board_cover_placeholder/);
   assert.match(pageSource,/if \(this.snapshot.flow\?\.cover\) \{[\s\S]*?this.act\('coverMore'\)/);
   const component=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardCoverContent.ets','utf8');
+  assert(!component.includes('if(this.cover.loading) { LoadingProgress()'),'cover data loading must not render inside scroll content');
+  assert(!component.includes('if(this.selected() && !this.loaded && !this.previewFailed) { LoadingProgress()'),'preview loading shares the page indicator');
+  assert.match(pageSource,/this.snapshot.flow.cover.adjusting \|\| this.snapshot.flow.cover.pins.length === 0/,'background pagination does not start another entry spinner');
   assert(!component.includes('pm_board_cover_more'),'no load-more button');
   assert(!component.includes('pm_board_cover_empty'),'empty candidate content remains hidden');
-  assert.match(component,/if\(this.cover.pins.length > 0\)/);
+  assert.match(component,/if\(!this.cover.adjusting && this.cover.pins.length > 0\)/);
   assert.match(component,/onVisibleAreaChange\(\[0,1\]/,'visible page boundary loads automatically');
   await integration();
   console.log('Board cover passed: geometry, filtering/pagination, independent save, readback confirmation, uncertainty/reopen lock, cancellation/account guards, exact network whitelist and nested UI back.');

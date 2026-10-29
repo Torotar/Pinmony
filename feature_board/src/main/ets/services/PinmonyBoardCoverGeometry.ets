@@ -1,12 +1,15 @@
 import { PinmonyBoardCoverCrop, PinmonyBoardPin, PinmonyBoardCoverPreview } from '../models/PinmonyBoardDetail';
 
 export function boardCoverPreview(pin: PinmonyBoardPin, x: number, y: number, width: number, height: number,
-  sourceWidth: number = 236): PinmonyBoardCoverPreview | undefined {
+  sourceWidth: number = 236, frameAspect: number = 5/3): PinmonyBoardCoverPreview | undefined {
   const sourceHeight: number = sourceWidth * pin.imageHeight / pin.imageWidth;
-  if(![x,y,width,height,sourceWidth,sourceHeight].every((v: number): boolean => Number.isFinite(v)) ||
-    x < 0 || y < 0 || width <= 0 || height <= 0 || sourceWidth <= 0 || x+width > sourceWidth+1 || y+height > sourceHeight+1)return undefined;
-  return {imageUrl:pin.previewImageUrl || pin.imageUrl,width:(100*sourceWidth/width)+'%',height:(100*sourceHeight/height)+'%',
-    left:(-100*x/width)+'%',top:(-100*y/height)+'%'};
+  if(![x,y,width,height,sourceWidth,sourceHeight,frameAspect].every((v: number): boolean => Number.isFinite(v)) ||
+    x < 0 || y < 0 || width <= 0 || height <= 0 || sourceWidth <= 0 || frameAspect <= 0 || x+width > sourceWidth+1 || y+height > sourceHeight+1)return undefined;
+  // Use one scale for both axes, then center the saved crop in the display frame.
+  // Percentages are relative to different frame dimensions, so they must account for its aspect ratio.
+  const scale: number = Math.max(frameAspect/width,1/height);
+  return {imageUrl:pin.previewImageUrl || pin.imageUrl,width:(100*sourceWidth*scale/frameAspect)+'%',height:(100*sourceHeight*scale)+'%',
+    left:(100*((frameAspect-width*scale)/2-x*scale)/frameAspect)+'%',top:(100*((1-height*scale)/2-y*scale))+'%'};
 }
 
 // BoardCoverImageCrop in the captured website bundle: a 236px square frame,

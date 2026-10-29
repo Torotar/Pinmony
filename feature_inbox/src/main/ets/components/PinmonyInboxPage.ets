@@ -210,10 +210,10 @@ export struct PinmonyInboxPage {
               .accessibilityLevel('no').hitTestBehavior(HitTestMode.None)
           }
         }.width(48).height(48)
-          .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
+          .onClick(() => { if (contact && item.enabled && this.onAction) this.onAction(item.id); else if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
       } else {
         PinmonyUserAvatar({ image: item.imageUrl, name: item.title, avatarSize: 48 })
-          .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
+          .onClick(() => { if (contact && item.enabled && this.onAction) this.onAction(item.id); else if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); else if (item.enabled && this.onAction) this.onAction(item.id); })
       }
       Column({ space: 4 }) {
         Text(PinmonyI18n.render(item.title, this.uiLanguage))

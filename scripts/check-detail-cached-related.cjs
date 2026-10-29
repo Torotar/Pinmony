@@ -28,6 +28,7 @@ async function main() {
       detail: { kind: 'cached', dataSource:'api', pinUrl: parent, actions:[], related: [card] } });
   }
   Object.assign(n, { authStatus: 'authenticated', businessSuspended: false,
+    detailOpeningCoordinator: { pauseShufflePreviews() {} },
     pinStore: { videoForeground: true, detailOpeningToken: 3,
       detailPrefetch: { cancelExcept() {} }, rememberDetailOrigin: (id, url) => origins.push([id, url]),
       detailOrigin: () => parent }, homeStore: {}, detailPrefetchTimer: -1,
@@ -82,7 +83,8 @@ async function main() {
   assert(fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8').includes('this.onRelated(pin.pinUrl)'),
     'retained card callbacks pass stable routes instead of cached IDs');
   const Back = vm.runInNewContext(ts.transpileModule('class Back {' + method('async backFromDetail') + '} Back;',
-    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info(){}},Date});
+    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info(){}},Date,
+      display:{getDefaultDisplaySync:()=>({width:360,height:800})}});
   const back = new Back();
   Object.assign(back,{activeSheetKind:'',showNativeSheet:false,pageHistory:{isPending:()=>false},
     pinStore:{shareBackHandledUntil:0,detail:{pinUrl:target},detailOrigin:()=>parent},
@@ -92,6 +94,19 @@ async function main() {
   await back.backFromDetail();
   assert.equal(back.homeEntryClosing,true,'related back starts its exit even while parent geometry is pending');
   assert.equal(back.homeEntryPhoto.pinUrl,target,'return does not discard the flight and instantly replace the page');
+  for (const [y, pageOnly] of [[-40,false],[700,false],[-300,true],[900,true]]) {
+    back.homeEntryClosing=false; back.relatedEntryParent=undefined; back.homeEntryCardId='pinmony-home-photo-card';
+    back.getUIContext=()=>({px2vp:n=>n,getComponentUtils:()=>({getRectangleById:()=>({windowOffset:{x:20,y},size:{width:150,height:200}})})});
+    await back.backFromDetail();
+    assert.equal(back.homeEntryClosing,true,'partial and offscreen cards both animate on return');
+    assert.equal(back.homeEntryPhoto.returnPageOnly,pageOnly,'only completely offscreen cards use page exit');
+    assert.equal(back.homeEntryPhoto.y,y,'preserve full card geometry without squeezing the image');
+  }
+  back.homeEntryClosing=false;
+  back.getUIContext=()=>{throw Error('source recycled');};
+  await back.backFromDetail();
+  assert.equal(back.homeEntryClosing,true);
+  assert.equal(back.homeEntryPhoto.returnPageOnly,true,'recycled sources use a page exit');
   console.log('Cached related navigation: immediate target card, stable route after cache replacement, target-only read/navigation, native parent history and session/background/offline guards passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

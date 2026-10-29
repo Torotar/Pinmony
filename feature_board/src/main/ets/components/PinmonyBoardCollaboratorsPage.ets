@@ -7,8 +7,56 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyBoardCollaborators, PinmonyBoardCollaborator } from '../models/PinmonyBoardCollaborators';
 
+interface CollaboratorSurfaceParams {
+  state: PinmonyBoardCollaborators;
+}
+
 @Component
 export struct PinmonyBoardCollaboratorsPage {
+  @Prop snapshot: PinmonyBoardCollaborators;
+  @State private retainedMembers: PinmonyBoardCollaborators | undefined = undefined;
+  onAction: (action: string, value: string) => void = () => {};
+  onClose: () => void = () => {};
+
+  private subpage(): boolean {
+    return !!this.retainedMembers && this.retainedMembers.token === this.snapshot.token &&
+      this.retainedMembers.page === this.snapshot.page &&
+      (this.snapshot.phase === 'invite' || this.snapshot.phase === 'permissions');
+  }
+
+  private dispatch(action: string, value: string): void {
+    if ((action === 'invite' || action === 'permissions') && this.snapshot.phase === 'members') {
+      this.retainedMembers = JSON.parse(JSON.stringify(this.snapshot)) as PinmonyBoardCollaborators;
+    }
+    this.onAction(action, value);
+  }
+
+  @Builder
+  private surface($$: CollaboratorSurfaceParams) {
+    PinmonyBoardCollaboratorsSurface({ snapshot: $$.state, onClose: this.onClose,
+      onAction: (action: string, value: string): void => this.dispatch(action, value) })
+      .width('100%').height('100%')
+  }
+
+  build() {
+    Stack() {
+      Column() { this.surface({ state: this.subpage() ? this.retainedMembers! : this.snapshot }) }
+        .width('100%').height('100%')
+        .hitTestBehavior(this.subpage() ? HitTestMode.None : HitTestMode.Default)
+        .accessibilityLevel(this.subpage() ? 'no-hide-descendants' : 'auto')
+      if (this.subpage()) {
+        Column() { this.surface({ state: this.snapshot }) }
+          .width('100%').height('100%')
+          .transition(TransitionEffect.asymmetric(
+            TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
+            TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })))
+      }
+    }.width('100%').height('100%')
+  }
+}
+
+@Component
+struct PinmonyBoardCollaboratorsSurface {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
@@ -21,7 +69,11 @@ export struct PinmonyBoardCollaboratorsPage {
   @State private selectedPermission: number = 0;
   private stack: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
-  aboutToAppear(): void { this.stack.pushPath({ name: 'collaborators' }, false); }
+  aboutToAppear(): void {
+    this.allowInvites = this.snapshot.invites;
+    this.selectedPermission = this.snapshot.permission;
+    this.stack.pushPath({ name: 'collaborators' }, false);
+  }
   private back(): void {
     if (this.snapshot.busy) return;
     if (this.snapshot.phase === 'members' || this.snapshot.uncertain) this.onClose();

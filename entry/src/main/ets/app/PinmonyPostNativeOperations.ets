@@ -51,6 +51,7 @@ export class PinmonyPostNativeOperations {
   private account: string = ''; private revision: number = 0; private sequence: number = 0;
   private pin: string = ''; private mode: string = ''; private viewer: string = ''; private raw: NativePin | undefined = undefined;
   private verifiedCopy: string = ''; private initialBoard: string = ''; private section: string = ''; private disclosures: number[] = []; private tracking: string = '';
+  private pendingSaveCopy: string = '';
   private busy: boolean = false; private sent: boolean = false; private token: number = 0;
   private readonly requests: Set<string> = new Set<string>(); private readonly waits: Map<string,() => void> = new Map<string,() => void>();
   private readonly saved: Map<string,SaveCopy> = new Map<string,SaveCopy>(); private readonly liked: Set<string> = new Set<string>();
@@ -127,7 +128,7 @@ export class PinmonyPostNativeOperations {
     this.requests.add(job.id);
     let reply: PinmonyNetworkReply | undefined;
     try {reply = await Promise.race([this.ports.network().requestBusinessPost(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.pin,this.viewer,this.allowed(),this.raw?.pinner?.id === this.viewer && !!this.viewer,this.raw?.is_repin === false,
-      this.saved.get(this.id())?.id || this.store.confirmedSaves.copyId(this.id()),!!this.verifiedCopy,(): boolean => this.valid(revision)),cancel]);}
+      this.pendingSaveCopy || this.saved.get(this.id())?.id || this.store.confirmedSaves.copyId(this.id()),!!this.verifiedCopy,(): boolean => this.valid(revision)),cancel]);}
     finally {this.requests.delete(job.id);this.waits.delete(job.id);}
     if(!this.valid(revision))throw new Error('stale');
     if(!reply || reply.error || reply.status < 200 || reply.status >= 300 || !reply.body || reply.body.length > 6000000)throw new Error('request');
@@ -208,7 +209,18 @@ export class PinmonyPostNativeOperations {
     const tracking: string | undefined = this.raw?.client_tracking_params || this.raw?.tracking_params;if(tracking){if(tracking.length > 16384)throw new Error('tracking');o.clientTrackingParams = tracking;}
     this.sent = true;const r: Resource = await this.request('RepinResource','create',o,revision) as Resource,p: NativePin = r.data as NativePin;
     if(r.code !== 0 || r.endpoint_name !== 'v3_repin_handler' || !p || !this.digits(p.id) || p.id === this.id() || p.pinner?.id !== this.viewer || p.is_repin !== true || !this.digits(p.board?.id) ||
-      (boardId === 'profile-quick-saves' ? p.board?.layout !== 'quick_saves' : p.board?.id !== boardId) || sectionId && p.section?.id !== sectionId)throw new Error('copy');
+      (boardId === 'profile-quick-saves' ? p.board?.layout !== 'quick_saves' : p.board?.id !== boardId))throw new Error('copy');
+    if(sectionId && p.section?.id !== sectionId) {
+      if(p.section?.id)throw new Error('section-mismatch');
+      PinmonyRuntimeLog.info('PinSaveTrace: section=missing action=verify-copy');
+      this.pendingSaveCopy = p.id;
+      try {
+        const check: Resource = await this.request('PinResource','get',{id:p.id,field_set_key:'auth_web_main_pin'},revision) as Resource;
+        const copy: NativePin = check.data as NativePin;
+        if(!copy || copy.id !== p.id || copy.pinner?.id !== this.viewer || copy.is_repin !== true || copy.board?.id !== boardId || copy.section?.id !== sectionId)throw new Error('section-unconfirmed');
+        PinmonyRuntimeLog.info('PinSaveTrace: section=verified');
+      } finally {this.pendingSaveCopy = '';}
+    }
     this.sent = false;this.saved.set(this.id(),{id:p.id,board:b.name,boardId:p.board!.id,viewer:this.viewer,scope:this.ports.originToken?.() || ''});this.store.confirmedSaves.confirm(this.id(),true,p.id,b.name);this.apply();
     this.store.saveResult.savedId = p.id;this.store.saveResult.savedBoard = b.name;this.store.saveResult.feedback = PinmonyI18n.message("pm_saved_to_b75786b2") + b.name;this.ports.committed('save',this.pin);
   }

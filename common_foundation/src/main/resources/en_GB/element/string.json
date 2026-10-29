@@ -1,5 +1,6 @@
 {
   "string": [
+    { "name": "pm_board_section_sync_pending", "value": "Section changes have not synced yet. Please try again later." },
     {
       "name": "pm_detail_paid_link",
       "value": "Paid link"
@@ -5719,6 +5720,7 @@
     {
       "name": "pm_publish_source_website",
       "value": "Website link"
-    }
+    },
+    {"name":"pm_board_cover_adjust","value":"Adjust cover position"}
   ]
 }

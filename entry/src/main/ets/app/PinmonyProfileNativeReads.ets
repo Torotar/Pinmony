@@ -498,6 +498,12 @@ export class PinmonyProfileNativeReads {
       const boards: PinmonyBoard[] = append ? f.boards.slice() : (refreshedStories !== undefined ? refreshedStories : section === 'saved' && info.isOwn && sort ? f.boards.filter((b: PinmonyBoard): boolean => b.targetUrl === this.page + 'pins/') : []), pins: PinmonyCreatedPin[] = append ? f.pins.slice() : []; let supported: number = 0;
       rows.forEach((r: ProfileRow): void => {if(section === 'saved') {const b: PinmonyBoard | undefined = this.board(r); if(b) {supported++; if(!boards.some((v: PinmonyBoard): boolean => v.id === b.id))boards.push(b);} else if(r?.type === 'story' && r.story_type === 'all_pins' && this.info?.pinCount === 0 && !r.objects?.length)supported++;} else {const p: PinmonyCreatedPin | undefined = this.pin(r); if(p) {supported++; if(!pins.some((v: PinmonyCreatedPin): boolean => v.id === p.id))pins.push(p);}}});
       if(rows.length && !supported)throw new Error('unsupported-feed'); const cursor: string = this.cursor(body);
+      if(section === 'saved' && sort === 'alphabetical') {
+        const stories: PinmonyBoard[] = boards.filter((b: PinmonyBoard): boolean => b.targetUrl === this.page + 'pins/');
+        const ordered: PinmonyBoard[] = boards.filter((b: PinmonyBoard): boolean => b.targetUrl !== this.page + 'pins/');
+        ordered.sort((a: PinmonyBoard,b: PinmonyBoard): number => a.title.toLocaleLowerCase().localeCompare(b.title.toLocaleLowerCase()));
+        boards.splice(0,boards.length);stories.concat(ordered).forEach((board: PinmonyBoard): void => {boards.push(board);});
+      }
       this.version++; f.boards = boards.slice(0,2000); f.pins = pins.slice(0,2000); f.cursor = cursor; f.ended = !cursor || cursor === '-end-' || cursor === previous || !rows.length; f.ready = true; if(boards.length >= 2000 || pins.length >= 2000)f.ended = true;
       PinmonyRuntimeLog.info('ProfileNativeTrace: committed section=' + section + ' append=' + append.toString() + ' count=' + (boards.length + pins.length).toString());
       if(info.isOwn && section === 'saved' && !append && (refresh || !this.unorganized.ready && !this.unorganized.error))await this.readUnorganized(false,true);
@@ -605,6 +611,7 @@ export class PinmonyProfileNativeReads {
       if(boardMode){const b: PinmonyBoard | undefined = this.board(row);if(!b)throw new Error('hub-board');if(!boards.some((v: PinmonyBoard): boolean => v.id === b.id))boards.push(b);}
       else {const p: PinmonyCreatedPin | undefined = mode === 'drafts' ? this.collageDraft(row) : this.pin(row);if(this.hubFavorite && p)p.favorite = true;if(!p)throw new Error(mode === 'drafts' ? 'hub-draft' : 'hub-pin');if(!pins.some((v: PinmonyCreatedPin): boolean => v.id === p.id))pins.push(p);}
     }
+    if(boardMode && f.sort === 'alphabetical')boards.sort((a: PinmonyBoard,b: PinmonyBoard): number => a.title.toLocaleLowerCase().localeCompare(b.title.toLocaleLowerCase()));
     const cursor: string = this.cursor(body); f.boards = boards.slice(0,2000); f.pins = pins.slice(0,2000); f.cursor = cursor;
     f.ended = !cursor || cursor === '-end-' || cursor === previous || !rows.length || boards.length >= 2000 || pins.length >= 2000; f.ready = true; this.version++;
   }

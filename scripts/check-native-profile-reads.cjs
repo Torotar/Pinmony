@@ -20,6 +20,12 @@ function endpoint(job){return new URL(job.url).pathname;}
 async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
 async function main(){
 
+const alphabetic=fixture();await first(alphabetic,[board(1)],'-end-');alphabetic.reader.boardSort='alphabetical';
+const orderedRead=alphabetic.reader.read(false,false);assert.equal(options(alphabetic.requests.at(-1).job).sort,'alphabetical');
+alphabetic.requests.at(-1).resolve(body([{...board(1),name:'Zebra'},{...board(2),name:'apple'}]));await orderedRead;
+assert.deepEqual(Array.from(alphabetic.store.profile.boards,b=>b.title),['apple','Zebra'],'loaded boards follow the chosen name order even when the response is unsorted');
+console.log('Alphabetical board order sorts the loaded response by title');
+
 const coverFixture=fixture();
 const customCover='https://i.pinimg.com/custom_covers/200x150/synthetic-cover.jpg',alternateCover='https://i.pinimg.com/custom_covers/236x/synthetic-cover.jpg';
 const sourceSignature='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
