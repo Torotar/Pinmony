@@ -12,6 +12,7 @@ export interface PinmonyAccountSettings {
   ready: boolean;
   email: string;
   confirmedEmail: boolean;
+  businessAccount?: boolean;
   birthdate: string;
   gender: string;
   customGender: string;

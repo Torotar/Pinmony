@@ -120,6 +120,9 @@ export struct PinmonyAccountPage {
               this.row(this.uiText("pm_email_1b2714b8"), this.store.data.email)
               this.row(this.uiText("pm_password_a621ab60"), this.uiText("pm_change_password_946e28f6"))
               this.row(this.uiText("pm_phone_number_8e87c0dd"), this.uiText("pm_add_number_9d820e33"))
+              if (this.store.data.businessAccount === false) {
+                this.row(this.uiText("pm_convert_to_a_business_account_4935be59"), '', '', this.uiText("pm_a_business_account_gives_you_tools_such_as_ads_and_analytics_to__50598c20"))
+              }
               Text(this.uiText("pm_deactivation_and_deletion_75be0aea")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
               this.row(this.uiText("pm_deactivate_your_account_06052a52"), '', '', this.uiText("pm_temporarily_hide_your_profile_pins_and_boards_a6d31140"))
               this.row(this.uiText("pm_delete_your_data_and_account_ff4cef48"), '', '', this.uiText("pm_permanently_delete_your_data_and_everything_associated_with_your_2cb85273"))

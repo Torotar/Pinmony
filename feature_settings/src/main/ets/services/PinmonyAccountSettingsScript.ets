@@ -18,6 +18,7 @@ export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
     var username = decodeURIComponent(new URL(active).pathname.split('/')[1]);
     if (d.username.toLowerCase() !== username.toLowerCase()) throw Error('identity');
     identity = String(d.id);
+    state.businessAccount = typeof d.is_partner === 'boolean' ? d.is_partner : undefined;
     state.email = text(d.email, 320); state.confirmedEmail = d.has_confirmed_email === true;
     state.birthdate = birthdate(d.birthdate);
     if (!state.birthdate && typeof d.birthday === 'number' && Number.isSafeInteger(d.birthday) && d.birthday > 0) {

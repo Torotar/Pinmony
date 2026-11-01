@@ -15,6 +15,7 @@ interface User {
     username: string;
     email?: string;
     has_confirmed_email?: boolean;
+    is_partner?: boolean;
     birthdate?: string;
     birthday?: number;
     gender?: string;
@@ -232,6 +233,7 @@ export class PinmonySettingsNativeFlow {
         const v: PinmonyAccountSettings = this.value!;
         v.email = (account.email || '').slice(0, 320);
         v.confirmedEmail = account.has_confirmed_email === true;
+        v.businessAccount = typeof account.is_partner === 'boolean' ? account.is_partner : undefined;
         v.birthdate = this.date(account.birthdate);
         if (!v.birthdate && Number.isSafeInteger(account.birthday) && account.birthday! > 0) {
             const d: Date = new Date(account.birthday! * 1000);

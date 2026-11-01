@@ -40,6 +40,14 @@ function harness() {
     failWrite() { failWrite = true; }, wrongAck() { wrongAck = true; }, delay(fn) { delayed = fn; } };
 }
 async function main() {
+  for (const value of [false, true, undefined, 'false']) {
+    const typed=harness(); typed.account.is_partner=value;
+    await typed.api.start(page,1,'read','');
+    assert.equal(typed.api.read().businessAccount,typeof value==='boolean'?value:undefined);
+  }
+  const ui=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','utf8');
+  assert.match(ui,/if \(this\.store\.data\.businessAccount === false\) \{\s*this\.row\(this\.uiText\("pm_convert_to_a_business_account/);
+
   const h = harness();
   await h.api.start(page, 1, 'read', '');
   assert.equal(h.api.read().birthdate, '2000-01-01');
