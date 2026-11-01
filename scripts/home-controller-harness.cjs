@@ -12,6 +12,7 @@ function createHomeRuntime(ts, globals = {}) {
   const Store = loader.loadFile('feature_home/src/main/ets/stores/PinmonyHomeStore.ets').PinmonyHomeStore;
   const cache = loader.loadFile('feature_home/src/main/ets/services/PinmonyHomeCache.ets');
   function bindIndex(native, nativeMode = false) {
+    native.nativeBusinessRoutesEnabled ??= nativeMode;
     native.homeStore ||= new Store();
     for (const [key, value] of Object.entries(new Store())) if (!(key in native.homeStore)) native.homeStore[key] = value;
     const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');

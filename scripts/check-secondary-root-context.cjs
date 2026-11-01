@@ -39,7 +39,7 @@ function harness(index) {
     profileUrlFromAddress: value => value === roots[3] || value.startsWith(roots[3] + '_created/') ? roots[3] : '',
     boardUrlFromAddress: value => value === board ? board : '', extractPinUrl: value => value === pin ? pin : '',
     pinIdentity: value => value === pin ? '123' : '', webJsonText: value => value,
-    traceAction() {}, clearRootTabGuard() {}, showMessage: value => requests.push(['notice', value]),
+    capturePinEntryPhoto() {}, traceAction() {}, clearRootTabGuard() {}, showMessage: value => requests.push(['notice', value]),
     returnFromSearchQuiz: () => false,
     beginDetailOpening: (url, parent) => requests.push(['detail', url, parent]),
     requestRootPage(i) { n.tabRequestToken++; n.pendingWebTab = i; requests.push(['prepare', i]); },

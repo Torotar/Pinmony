@@ -4,7 +4,7 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileStore, PinmonyPublishFlow, PinmonyPublishTopic, PinmonyPublishPhoto, PinmonyCreatedPin, PinmonyOrganizeBoard, PinmonyPublishDraft } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonySharePublishClient, PinmonySharePublishClientPorts, PinmonySharePublishOwner, PinmonyBusinessRejection } from './PinmonySharePublishClient';
+import { PIN_NATIVE_SHARE_PUBLISH_ENABLED, PinmonySharePublishClient, PinmonySharePublishClientPorts, PinmonySharePublishOwner, PinmonyBusinessRejection } from './PinmonySharePublishClient';
 interface PublishSectionPreview { image_medium_url?: string; images?: Record<string,Image>; }
 interface PublishSection { preview_pins?: PublishSectionPreview[]; id: string; type: string; title: string; board: Board; }
 interface PublishSectionsData { fields: string[]; orbac_subject_id: string; }
@@ -244,6 +244,7 @@ export class PinmonyPublishNativeFlow {
         this.viewer = u.id!;
     }
     async menu(current: () => boolean): Promise<boolean> {
+        if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) return false;
         this.pause();
         this.flow = undefined;
         this.bind();
@@ -269,6 +270,7 @@ export class PinmonyPublishNativeFlow {
         }
     }
     async open(): Promise<boolean> {
+        if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) return false;
         this.pause();
         this.bind();
         this.flow = this.store.publishFlow ? JSON.parse(JSON.stringify(this.store.publishFlow)) as PinmonyPublishFlow : undefined;
@@ -660,6 +662,7 @@ export class PinmonyPublishNativeFlow {
         }finally {if(this.current(revision)){f.busy = false;this.writeKey = '';this.commit();}}
     }
     async action(action: string, value: string, secret: boolean): Promise<void> {
+        if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) return;
         const f: PinmonyPublishFlow | undefined = this.flow, revision: number = this.revision;
         if (!f || !this.current(revision) || !this.viewer || f.loading && !(action === 'back' && f.phase === 'sections') || f.busy || f.uncertain)
             return;

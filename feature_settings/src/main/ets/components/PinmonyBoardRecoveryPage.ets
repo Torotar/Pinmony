@@ -1,3 +1,6 @@
+import { LengthMetrics } from '@kit.ArkUI';
+import { BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
+import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
@@ -7,6 +10,9 @@ import { PinmonySettingsStore, PinmonyRecoverableBoard } from '../stores/Pinmony
 
 @Component
 export struct PinmonyBoardRecoveryPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
+  private titleContentInset(): number { return this.panelMode ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('pinmonyLanguage') private language: string = 'zh';
   @ObjectLink store: PinmonySettingsStore;
   @Prop panelMode: boolean = false;
@@ -22,11 +28,13 @@ export struct PinmonyBoardRecoveryPage {
       this.store.recoverableBoards.some((b: PinmonyRecoverableBoard): boolean => b.id === this.selected && !b.restored);
   }
   private options(): HdsNavigationTitleBarOptions {
-    return {avoidLayoutSafeArea:true,enableComponentSafeArea:true,
-      style:{scrollEffectOpts:{enableScrollEffect:false},
-        originalStyle:{backgroundStyle:{backgroundColor:$r('app.color.page_background'),maskExtraHeight:0},
+    return {avoidLayoutSafeArea:true,enableComponentSafeArea:false,
+      style:{blurStrategy:this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+        thermoCtrl:this.immersiveLightMode !== 'off',systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode),
+        scrollEffectOpts:{enableScrollEffect:this.immersiveLightMode !== 'off',scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR},
+        originalStyle:{backgroundStyle:{backgroundColor:Color.Transparent,maskExtraHeight:0,blurRadius:this.immersiveLightMode !== 'off' ? 18 : 0},
           contentStyle:{backIconStyle:{iconColor:$r('app.color.primary_text')},titleStyle:{mainTitleColor:$r('app.color.primary_text')},menuStyle:{iconColor:$r('app.color.primary_text'),textColor:$r('app.color.primary_text')}}},
-        scrollEffectStyle:{backgroundStyle:{backgroundColor:$r('app.color.page_background'),maskExtraHeight:0},
+        scrollEffectStyle:{backgroundStyle:{backgroundColor:$r('app.color.immersive_title_scrolled'),maskExtraHeight:0,blurRadius:this.immersiveLightMode !== 'off' ? 18 : 0},
           contentStyle:{backIconStyle:{iconColor:$r('app.color.primary_text')},titleStyle:{mainTitleColor:$r('app.color.primary_text')},menuStyle:{iconColor:$r('app.color.primary_text'),textColor:$r('app.color.primary_text')}}}},
       content:{title:{mainTitle:this.text('pm_board_recovery_title')},backIcon:{isEnabled:!this.store.busy,action:() => this.onBack?.()},
         menu:{value:[{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),
@@ -60,7 +68,6 @@ export struct PinmonyBoardRecoveryPage {
           if(this.store.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error,this.language), actionText: this.text('pm_retry_b8784c8d'), onAction: () => {this.selected = '';this.onRequest?.('boardRecoveryRead','');}, actionEnabled: !this.store.busy && !this.store.loading })
           }
-          if(this.store.loading || this.store.busy) { LoadingProgress().color($r('app.color.accent')).width(32).height(32) }
           if(this.store.boardRecoveryReady) {
             if (this.store.recoverableBoards.length > 0) {
               Text(this.text('pm_board_recovery_total').replace('{count}',this.store.recoverableBoards.length.toString()))
@@ -74,26 +81,42 @@ export struct PinmonyBoardRecoveryPage {
               }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
             }
           }
-        }.width('100%').padding({left:20,right:20,top:16,bottom:32}).alignItems(HorizontalAlign.Start)
+        }.width('100%').padding({left:20,right:20,top:this.titleContentInset() + 16,bottom:32}).alignItems(HorizontalAlign.Start)
       }.width('100%').layoutWeight(1).align(Alignment.TopStart)
+        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
+  }
+  @Builder
+  private recoveryLoading() {
+    if (this.store.loading || this.store.busy) {
+      LoadingProgress().color($r('app.color.accent')).width(32).height(32)
+        .hitTestBehavior(HitTestMode.None)
+    }
   }
   @Builder
   private destination() {
     HdsNavDestination() {
-      this.recoveryContent()
+      Stack({ alignContent: Alignment.Center }) {
+        Column() {
+          this.recoveryContent()
+        }.width('100%').height('100%')
+        this.recoveryLoading()
+      }.width('100%').height('100%')
     }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false).bindToScrollable([this.scroller])
       .onBackPressed(() => {if(!this.store.busy)this.onBack?.();return true;})
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
   build() {
     if (this.panelMode) {
-      Column() {
-        Text(this.text('pm_board_recovery_title')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-          .width('100%').padding({left:24,right:64,top:16,bottom:16})
-        this.recoveryContent()
-        Button(this.text('pm_board_recovery_submit'), { type: ButtonType.Normal })
-          .width('90%').height(48).borderRadius(16).enabled(this.canRestore())
-          .onClick(() => {if(this.canRestore())this.onRequest?.('boardRecoveryRestore',this.selected);}).margin({top:8,bottom:20})
+      Stack({ alignContent: Alignment.Center }) {
+        Column() {
+          Text(this.text('pm_board_recovery_title')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+            .width('100%').padding({left:24,right:64,top:16,bottom:16})
+          this.recoveryContent()
+          Button(this.text('pm_board_recovery_submit'), { type: ButtonType.Normal })
+            .width('90%').height(48).borderRadius(16).enabled(this.canRestore())
+            .onClick(() => {if(this.canRestore())this.onRequest?.('boardRecoveryRestore',this.selected);}).margin({top:8,bottom:20})
+        }.width('100%').height('100%')
+        this.recoveryLoading()
       }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
     } else {
     HdsNavigation(this.paths) { Column().width('100%').height('100%') }

@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
@@ -7,8 +8,11 @@ import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
 
 @Component
 export struct PinmonyInboxListPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @State private listHeaderHeight: number = 0;
+  @State private searchHeaderHeight: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') @Watch('syncLabels') private uiLanguage: string = 'zh';
   @Prop snapshot: PinmonyInboxSnapshot;
   @Prop section: string = 'messages';
@@ -122,7 +126,8 @@ export struct PinmonyInboxListPage {
   @Builder
   private listDestination() {
     HdsNavDestination() {
-      Column() {
+      Stack({alignContent:Alignment.TopStart}) {
+        Column() {
         Row() {
           CapsuleSegmentButtonV2({ items: this.segments, enableStateAnimation: true,
             selectedIndex: this.section === 'contacts' ? 1 : 0,
@@ -130,6 +135,8 @@ export struct PinmonyInboxListPage {
               this.selectSection(index === 0 ? 'messages' : 'contacts');
             } }) .width(280)
         }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 12 })
+        }.width('100%').margin({top:this.titleContentInset()}).backgroundColor($r('app.color.page_background')).zIndex(1)
+          .onAreaChange((_old:Area,area:Area) => {this.listHeaderHeight = Number(area.height);})
         Scroll(this.scroller) {
           Column({ space: 8 }) {
             if (this.loading()) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
@@ -144,17 +151,18 @@ export struct PinmonyInboxListPage {
               Text(this.text(this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))
                 .fontColor($r('app.color.secondary_text')).padding(24)
             }
-          }.width('100%').constraintSize({ maxWidth: 720 }).padding({ bottom: 32 })
-        }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Auto)
+          }.width('100%').constraintSize({ maxWidth: 720 }).padding({ top:this.titleContentInset() + this.listHeaderHeight, bottom: 32 })
+        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto)
+          .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.listHeaderHeight)})
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
           .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
             .onActionEnd((event: GestureEvent) => this.swipeSection(event.offsetX, event.offsetY)))
       }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
     }.width('100%').height('100%')
-      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
         content: { title: { mainTitle: this.text('pm_inbox_63a5e7b7') },
           backIcon: { isEnabled: true, action: () => this.onBack() },
           menu: { value: [{ content: { icon: $r('app.media.inbox_search_outline'), label: this.text('pm_search_44ce7ae9'),
@@ -168,7 +176,8 @@ export struct PinmonyInboxListPage {
   @Builder
   private searchDestination() {
     HdsNavDestination() {
-      Column() {
+      Stack({alignContent:Alignment.TopStart}) {
+        Column() {
         if (this.searching) {
           Search({ value: this.query(), placeholder: this.text('pm_inbox_search_username') })
             .onChange((value: string) => {
@@ -177,6 +186,8 @@ export struct PinmonyInboxListPage {
               this.searchScroller.scrollTo({ xOffset: 0, yOffset: 0 });
             }).margin({ left: 20, right: 20, bottom: 12 })
         }
+        }.width('100%').margin({top:this.titleContentInset()}).backgroundColor($r('app.color.page_background')).zIndex(1)
+          .onAreaChange((_old:Area,area:Area) => {this.searchHeaderHeight = Number(area.height);})
         Scroll(this.searchScroller) {
           Column({ space: 8 }) {
             if (this.loading()) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
@@ -192,15 +203,16 @@ export struct PinmonyInboxListPage {
                 this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))
                 .fontColor($r('app.color.secondary_text')).padding(24)
             }
-          }.width('100%').constraintSize({ maxWidth: 720 }).padding({ bottom: 32 })
-        }.width('100%').layoutWeight(1).align(Alignment.Top).scrollBar(BarState.Auto)
+          }.width('100%').constraintSize({ maxWidth: 720 }).padding({ top:this.titleContentInset() + this.searchHeaderHeight, bottom: 32 })
+        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto)
+          .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.searchHeaderHeight)})
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
     }.width('100%').height('100%')
-      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
         content: { title: { mainTitle: this.text('pm_search_44ce7ae9') },
           backIcon: { isEnabled: true, action: () => this.closeSearch() },
           menu: { value: [] } } })

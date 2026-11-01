@@ -3,7 +3,9 @@ import { PinmonyInboxStore, PinmonyInboxSnapshot, PinmonyInboxItem } from 'featu
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
-export const PIN_NATIVE_INBOX_UPDATES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_INBOX_UPDATES_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_INBOX_UPDATES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_INBOX_UPDATES_ROLLOUT_ENABLED;
 interface NewsImage { url?: string; }
 interface NewsObject { subscribed_to_notifications?: boolean; id?: string; type?: string; images?: Record<string,NewsImage>; image_cover_url?: string; image_large_url?: string; }
 interface NewsText { t?: string; }

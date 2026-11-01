@@ -66,6 +66,13 @@ export function readShufflePresentation(body: string, expectedId: string, canvas
         bounds[1][0] > 0 && bounds[1][1] > 0 && raw.bitmap_mask?.is_hidden !== true;
       const cutout: string | undefined = masked ? raw.shuffle_asset?.cutout_images?.originals?.url : undefined;
       const cutoutUrl: string | undefined = typeof cutout === 'string' && cutout.length <= 4096 && /^https:\/\/i\.pinimg\.com\/[^\s#]+$/i.test(cutout) ? cutout : undefined;
+      // Captured mask_bounds is [[x, y], [width, height]], normalized to the
+      // original image, not a pair of opposite corners.
+      const boundsValid: boolean = !!cutoutUrl && !!bounds && bounds.length === 2 &&
+        bounds[0].length === 2 && bounds[1].length === 2 &&
+        bounds[0].every((part: number): boolean => Number.isFinite(part) && part >= 0) &&
+        bounds[1].every((part: number): boolean => Number.isFinite(part) && part > 0) &&
+        bounds[0][0] + bounds[1][0] <= 1.000001 && bounds[0][1] + bounds[1][1] <= 1.000001;
       const cutoutImage: ShuffleImage | undefined = raw.shuffle_asset?.cutout_images?.originals;
       const hitWidth: number = cutoutUrl ? finite(cutoutImage?.width,0) : source?.width || 0;
       const hitHeight: number = cutoutUrl ? finite(cutoutImage?.height,0) : source?.height || 0;
@@ -76,7 +83,9 @@ export function readShufflePresentation(body: string, expectedId: string, canvas
       const hitMask: string | undefined = cutoutUrl && embedded.length <= 262144 && /^iVBORw0KGgo[A-Za-z0-9+/=]+$/.test(embedded) ? embedded : undefined;
       const pinId: string | undefined = raw.item_type === 1 && raw.pin?.id && /^\d{1,30}$/.test(raw.pin.id) ? raw.pin.id : undefined;
       items.push({ id: raw.id, itemType: typeof raw.item_type === 'number' ? raw.item_type : 0, pinId,
-        pinUrl: pinId ? '/pin/' + pinId + '/' : undefined, imageUrl: source?.url, cutoutUrl, imageWidth: source?.width || 0,
+        pinUrl: pinId ? '/pin/' + pinId + '/' : undefined, imageUrl: source?.url, cutoutUrl,
+        cutoutBounds: boundsValid && bounds ? { x: bounds[0][0], y: bounds[0][1], width: bounds[1][0], height: bounds[1][1] } : undefined,
+        imageWidth: source?.width || 0,
         imageHeight: source?.height || 0, hitMask, hitWidth: hitWidth > 0 && hitWidth <= 50000 ? Math.max(1,Math.floor(hitWidth * layoutFactor)) : 0,
         hitHeight: hitHeight > 0 && hitHeight <= 50000 ? Math.max(1,Math.floor(hitHeight * layoutFactor)) : 0,
         offsetX, offsetY, rotation: finite(settings?.rotation?.z, finite(raw.rotation, 0)) * 180 / Math.PI,

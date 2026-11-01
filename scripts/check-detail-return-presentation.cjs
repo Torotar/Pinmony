@@ -90,7 +90,7 @@ async function main() {
   Object.assign(n, { pinStore: store, activeSheetKind: '', nativeBackTarget: '', pageBackToken: 0,
     searchStore: { searchReturnPageKey: home + 'search/' }, pinIdentity: identity,
     extractPinUrl: value => identity(value) ? pin(identity(value)) : '', searchUrlFromAddress: () => '',
-    profileUrlFromAddress: () => '', boardUrlFromAddress: () => '', isHomeRootAddress: value => value === home,
+    profileUrlFromAddress: () => '', inboxUrlFromAddress: () => '', boardUrlFromAddress: () => '', isHomeRootAddress: value => value === home,
     pageHistory: { isPending: () => pending, visit: (url, mode) => { events.push([url, mode]); pending = false; },
       cancelBack: () => { pending = false; } },
     detailJourney: { current: () => 0, mark() {} },
@@ -133,7 +133,7 @@ async function main() {
   const frame = detailPage.match(/\.onScrollFrameBegin\(\(offset: number, state: ScrollState\) => \{([\s\S]*?)\n      \}\)/)[1];
   const reach = detailPage.match(/\.onReachEnd\(\(\) => \{([\s\S]*?)\n      \}\)/)[1];
   const scrollView = { restoringScroll: false, restoredPaginationAllowed: false, readsReady: true, actionsReady: false,
-    detail: { relatedError: '' }, isRecommendReady: () => true, onLoadMore() { this.loads++; }, loads: 0 };
+    detail: { relatedError: '' }, displayedDetail() { return this.detail; }, isRecommendReady: () => true, onLoadMore() { this.loads++; }, loads: 0 };
   const scrollContext = { view: scrollView, ScrollState: { Scroll: 1, Fling: 2 }, PinmonyRuntimeLog: { info() {} } };
   function reachEnd() { vm.runInNewContext('(function(){' + reach + '}).call(view)', scrollContext); }
   function scroll(offset, state) { vm.runInNewContext(ts.transpileModule('(function(offset: number, state: ScrollState){' + frame + '}).call(view,' + offset + ',' + state + ')', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, scrollContext); }

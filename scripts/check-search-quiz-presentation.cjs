@@ -10,6 +10,7 @@ function method(name) {
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + method('syncQuizPresentation()') + page.slice(page.indexOf('  private contentColumns()'), page.indexOf('\n  }', page.indexOf('  private contentColumns()')) + 4) + '}',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText + '\nHost;');
 const host = new Host();
+host.syncResultRows = () => {};
 host.contentWidth = 360;
 let sections = [], updates = 0;
 host.flowSections = { length: () => sections.length, splice: (_start, _count, next) => { sections = next; updates++; } };
@@ -37,7 +38,8 @@ assert.equal(sections.length, 1, 'dismiss removes only the entry section');
 assert.equal(sections[0].itemsCount, 25, 'ordinary results survive dismissal');
 assert.match(page, /\.bindSheet\(\$\$this\.quizSheetOpen/);
 assert.match(page, /height: '85%', preferType: SheetType\.BOTTOM/);
-assert.match(page, /WaterFlow\(\{ scroller: this\.resultsScroller, sections: this\.flowSections \}\)[\s\S]*?FlowItem\(\) \{ this\.inspirationEntry\(\)/);
+assert.match(page, /WaterFlow\(\{ scroller: this\.resultsScroller, sections: this\.flowSections \}\)[\s\S]*?LazyForEach\(this\.resultRows/);
+assert(page.includes('else { this.inspirationEntry() }'), 'inspiration remains a full-width lazy row');
 const picker = panel.slice(panel.indexOf('private selectionContent()'), panel.indexOf('\n  build()'));
 assert(!picker.includes('quiz.topics'), 'candidate topics are absent from picker UI');
 assert(!panel.includes('更多创意'));

@@ -18,6 +18,12 @@ const writer=new Writer({state:()=>state,identity:()=>identity,session:()=>sessi
 return {writer,req,cancelled,commits,snapshots,state:()=>state,identity:()=>identity,session:()=>session,setIdentity:i=>identity=i,setState:f=>state=f,setSession:s=>session=s,submit:(value=values[action])=>writer.submit(action,value)};
 }
 async function main(){
+
+const denied=(change={})=>JSON.stringify({resource_response:{error:{status:'failure',http_status:409,code:4372,api_error_code:4372,...change}}});
+for(const action of ['send','next']){const f=fixture(action),before=f.state().sentRevision,p=f.submit();f.req[0].resolve(denied(),409);await p;assert.equal(f.state().recipientRestricted,true);assert.equal(f.state().writeUncertain,false);assert.equal(f.state().sentRevision,before);assert(!f.writer.busy());assert.equal(f.commits.length,0);assert((action==='send'?f.state().sendError:f.state().error).includes('由于收件人的消息设置'));await f.submit();assert.equal(f.req.length,1);}
+for(const [status,body] of [[200,denied()],[409,denied({code:4373})],[409,denied({api_error_code:undefined})],[409,denied({http_status:400})],[409,denied({status:'success'})],[409,JSON.stringify({...JSON.parse(denied()),client_context:{user:peer}})]]){const f=fixture(),p=f.submit();f.req[0].resolve(body,status);await p;assert.equal(f.state().writeUncertain,true);assert(!f.state().recipientRestricted);assert.equal(f.commits.length,0);}
+{const f=fixture(),p=f.submit();f.setSession({...f.session(),generation:2});f.req[0].resolve(denied(),409);await p;assert(!f.state().recipientRestricted);assert.equal(f.commits.length,0);}
+
 const jobs={};for(const action of Object.keys(endpoints)){const f=fixture(action),old=f.state(),p=f.submit();assert(f.writer.busy());assert.notEqual(f.state(),old);assert.equal(f.commits.length,0);await f.submit();assert.equal(f.req.length,1);jobs[action]=f.req[0].job;const q=new URLSearchParams(jobs[action].body),o=JSON.parse(q.get('data')).options;assert.equal(q.get('source_url'),'/inbox/');if(action==='send')assert.deepEqual(o,{conversation_id:'100',text:'hello',field_set_key:['default_with_reactions']});if(action==='next')assert.deepEqual(o,{user_ids:['2','3'],emails:[]});f.req[0].resolve(response(dataFor(action),endpoints[action]));await p;assert.equal(f.commits.length,1);assert(!f.state().sending&&!f.state().messageBusy&&!f.state().loading);assert(!f.state().writeUncertain);}
 for(const action of Object.keys(endpoints))for(const change of [f=>f.setState({...f.state(),sending:true}),f=>f.setState({...f.state(),messageBusy:true}),f=>f.setState({...f.state(),loading:true}),f=>f.setState({...f.state(),writeUncertain:true}),f=>f.setSession({...f.session(),authenticated:false}),f=>f.setIdentity({...f.identity(),viewerId:''})]){const f=fixture(action);change(f);await f.submit();assert.equal(f.req.length,0,action);}
 for(const text of ['',' ', 'x'.repeat(2001)]){const f=fixture();await f.submit(text);assert.equal(f.req.length,0);}
@@ -40,13 +46,21 @@ console.log('Native inbox writes passed: six exact POST contracts, ownership and
 }
 function readerFixture(){
 const Reader=load('entry/src/main/ets/app/PinmonyInboxMessagesNativeReads.ets',n=>n==='./PinmonyInboxNativeWrites'?writesModule:n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?log:{}).PinmonyInboxMessagesNativeReads;
-let active=true,session=fixture().session();const req=[],cancelled=[],store={inboxSession:0,inboxScrollOffset:20,inboxCache:{clear(){},get(){},put(){}}};const send=(job,...args)=>new Promise(resolve=>req.push({job,current:args.at(-1),resolve:(data,endpoint='',viewer=me)=>resolve({body:response(data,endpoint,viewer),status:200,error:''})}));
-const reader=new Reader({store:()=>store,username:()=> 'self',session:()=>session,page:()=>page,active:()=>active,network:()=>({cancel:id=>cancelled.push(id),requestBusinessInboxMessagesRead:send,requestBusinessInboxWrite:send}),settled(){}});
-return {reader,store,req,cancelled,setActive:v=>active=v,setSession:s=>session=s,session:()=>session};
+let active=true,session=fixture().session();const req=[],cancelled=[],feedback=[],store={inboxSession:0,inboxScrollOffset:20,inboxCache:{clear(){},get(){},put(){}}};const send=(job,...args)=>new Promise(resolve=>req.push({job,current:args.at(-1),resolveRaw:(body,status)=>resolve({body,status,error:''}),resolve:(data,endpoint='',viewer=me)=>resolve({body:response(data,endpoint,viewer),status:200,error:''})}));
+const reader=new Reader({feedback:message=>feedback.push(message),store:()=>store,username:()=> 'self',session:()=>session,page:()=>page,active:()=>active,network:()=>({cancel:id=>cancelled.push(id),requestBusinessInboxMessagesRead:send,requestBusinessInboxWrite:send}),settled(){}});
+return {reader,store,req,cancelled,feedback,setActive:v=>active=v,setSession:s=>session=s,session:()=>session};
 }
 async function start(f){const p=f.reader.demand();f.req[0].resolve([conversation()],'v3_get_conversations');f.req[1].resolve([{...peer,type:'user_share_suggestion'},{...peer3,type:'user_share_suggestion'}],'v3_user_contacts_suggestion');await p;}
 async function openChat(f,id='100',users=[me,peer],messages=[message()]){const p=f.reader.open('conversation:'+id);f.req.at(-1).resolve(conversation(id,users),'v3_get_conversation');await flush();f.req.at(-1).resolve(messages,'v3_get_conversation_messages');await p;}
 async function integration(){
+
+for(const action of ['next','send']){
+const restricted=readerFixture();await start(restricted);if(action==='send')await openChat(restricted);restricted.store.listSection='messages';let rejected=action==='next'?restricted.reader.open('contact:3'):restricted.reader.action('send','hello');restricted.req.at(-1).resolveRaw(JSON.stringify({resource_response:{error:{status:'failure',http_status:409,code:4372,api_error_code:4372}}}),409);await rejected;
+assert.equal(restricted.store.inboxFlow,undefined);assert.equal(restricted.store.retainedChat,undefined);assert.equal(restricted.store.flowDismissed,true);assert.equal(restricted.store.listSection,'');assert.equal(restricted.feedback.length,1);assert(restricted.feedback[0].includes('由于收件人的消息设置'));assert.equal(restricted.reader.writePreparing,false);
+const restrictedCount=restricted.req.length;await restricted.reader.demand();await restricted.reader.action('retry','');await restricted.reader.action('next','');assert.equal(restricted.req.length,restrictedCount);restricted.reader.pause();
+}
+
+
 const flowSource=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxFlowPage.ets','utf8');
 const flowBody=flowSource.slice(flowSource.indexOf('private flowDestination()'));
 assert.match(flowBody,/if \(this\.snapshot\.screen === 'compose' && !this\.snapshot\.directContact\)\s*\{\s*TextInput/,'contact loading must not show the compose search field');

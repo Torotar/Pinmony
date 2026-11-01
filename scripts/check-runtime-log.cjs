@@ -33,7 +33,24 @@ const { PinmonyRuntimeLog: log } = compile('common_foundation/src/main/ets/servi
     util: { TextEncoder: class { encodeInto(text) { return new Uint8Array(Buffer.from(text)); } },
       TextDecoder: { create() { const decoder = new TextDecoder(); return { decodeToString: (bytes, options) => decoder.decode(bytes, options) }; } } } });
 (async () => {
+  for(const stage of ['notice-show','notice-dismiss','comment-action operation=commentTranslate']) {
+    log.info('AsyncAction: stage='+stage);
+    assert(log.recentActionContext().startsWith('stage='+stage.split(' ')[0]+' ageMs='));
+  }
+  log.info('AsyncAction: stage=photo-menu-select');
+  assert.match(log.recentActionContext(), /stage=photo-menu-select ageMs=[0-9]+/);
+  log.actionAt = Date.now() - 6000;
+  assert.equal(log.recentActionContext(), 'stage=none ageMs=expired', 'stale actions cannot attribute unrelated exceptions');
   assert.match(log.savedStatus(), /尚未成功/); log.initialize('/internal'); await log.flush(); assert.match(log.savedStatus(), /已自动保存/);
+  const checkpoint = files.get('/internal/pinweb-runtime.log');
+  log.info('batched-without-checkpoint'); await log.flush(false);
+  assert(files.get(sessionPath).includes('batched-without-checkpoint'), 'automatic flush still persists complete session history');
+  assert.equal(files.get('/internal/pinweb-runtime.log'), checkpoint, 'automatic batches do not rewrite the history checkpoint');
+  await log.flush();
+  assert(files.get('/internal/pinweb-runtime.log').includes('batched-without-checkpoint'), 'explicit flush forces a checkpoint');
+  log.snapshotWrittenAt = Date.now() - 5001;
+  log.info('checkpoint-interval'); await log.flush(false);
+  assert(files.get('/internal/pinweb-runtime.log').includes('checkpoint-interval'), 'continuous records checkpoint after the interval');
   const before = opens;
   log.info('cookie=secret token=hidden https://example.test/?csrf=private account_id=1234567890123');
   assert.equal(opens, before, 'record performs no synchronous or immediate disk I/O'); await log.flush();

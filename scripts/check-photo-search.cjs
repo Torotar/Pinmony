@@ -11,6 +11,31 @@ const body = { success: true, status: 'success', code: 0, endpoint_name: 'v3_len
   { id: '123', type: 'pin', images: { '474x': { url: 'https://i.pinimg.com/test.jpg', width: 474, height: 600 } } }
 ] };
 const origin = 'https://www.pinterest.com';
+const searchPage = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
+const titleMethod = searchPage.slice(searchPage.indexOf('  private photoSearchTitleBarOptions()'), searchPage.indexOf('  private searchTitleBarOptions()'));
+const Title = vm.runInNewContext(ts.transpileModule('class Title {' + titleMethod + '} Title;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
+  { BlurStrategy: { ENABLE: 1, DISABLE: 0 }, ScrollEffectType: { IMMERSIVE_GRADIENT_BLUR: 1 }, Color: { Transparent: 'transparent' },
+    $r: key => key, PinmonyImmersiveLight: { effect: mode => mode } });
+let closed = 0;
+for (const mode of ['off', 'gentle', 'immersive', 'always']) {
+  const title = new Title(); Object.assign(title, { immersiveLightMode: mode, uiText: key => key, closePhotoSearch: reverse => { assert.equal(reverse, true); closed++; } });
+  const options = title.photoSearchTitleBarOptions();
+  assert.equal(options.style.systemMaterialEffect, mode);
+  assert.equal(options.style.blurStrategy, 0, 'photo search retains material without title blur');
+  assert.equal(options.style.thermoCtrl, false);
+  assert.equal(options.style.scrollEffectOpts.enableScrollEffect, false);
+  assert.equal(options.enableComponentSafeArea, true, 'preserve photo transition safe-area coordinates');
+  for (const state of ['originalStyle', 'scrollEffectStyle']) {
+    assert.equal(options.style[state].backgroundStyle.blurRadius, 0);
+    assert.equal(options.style[state].backgroundStyle.backgroundColor, 'transparent');
+    assert.equal(options.style[state].contentStyle.backIconStyle.iconColor, 'app.color.primary_text');
+    assert.equal(options.style[state].contentStyle.backIconStyle.backgroundColor, ['off','gentle'].includes(mode) ? 'transparent' : undefined);
+  }
+  options.content.backIcon.action();
+}
+assert.equal(closed, 4);
+assert(searchPage.includes('.titleBar(this.photoSearchTitleBarOptions())'));
+
 const indexSource = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const gate = indexSource.match(/searchResultsVisible: \(\): boolean => ([\s\S]*?),\s*floatingTabsMounted:/)[1];
 const hideSearchBar = vm.runInNewContext('(function () { return ' + gate + '; })');
@@ -49,16 +74,19 @@ const Flow = load('entry/src/main/ets/app/PinmonyPhotoSearchFlow.ets', 'PinmonyP
   assert.equal(uploaded, 0, 'Closing picker flow must prevent upload');
   const switched = flow.search(); session.generation++; selected('photo-uri'); await switched;
   assert.equal(uploaded, 0, 'Session changes must prevent upload');
+  const fullPhoto = new ArrayBuffer(24);
+  let reads = 0;
+  ports.read = async () => { reads++; return fullPhoto; };
   const valid = flow.search(); selected('photo-uri'); assert.equal((await valid).length, 1);
   const requests = [];
-  const fullPhoto = new ArrayBuffer(24);
   ports.read = async (uri, ...extra) => {
     assert.equal(uri, 'photo-uri'); assert.equal(extra.length, 0, 'Region search must read the complete original photo');
+    reads++;
     return fullPhoto;
   };
   ports.network = () => ({ cancel() {}, searchUploadedPhoto: (bytes, page, session, current, job, region) => {
     assert.equal(bytes, fullPhoto);
-    return new Promise(resolve => requests.push({ region, resolve }));
+    return new Promise(resolve => requests.push({ region, job, resolve }));
   } });
   const firstRegion = { x: .1, y: .1, w: .5, h: .5 };
   const newerRegion = { x: .3, y: .2, w: .4, h: .6 };
@@ -66,11 +94,35 @@ const Flow = load('entry/src/main/ets/app/PinmonyPhotoSearchFlow.ets', 'PinmonyP
   const second = flow.crop(newerRegion); await new Promise(resolve => setImmediate(resolve));
   assert.equal(JSON.stringify(requests[0].region), JSON.stringify(firstRegion));
   assert.equal(JSON.stringify(requests[1].region), JSON.stringify(newerRegion));
+  assert.notEqual(requests[0].job,requests[1].job,'rapid region updates use independent request IDs');
   requests[1].resolve(JSON.stringify(body)); assert.equal((await second).length, 1);
   requests[0].resolve(JSON.stringify({ ...body, data: [] }));
   assert.equal(await first, undefined, 'Old selection results must not overwrite the latest region');
+  assert.equal(reads, 1, 'region changes reuse the original prepared bytes');
   flow.open('not-returned'); assert.equal(opened, 0);
   flow.open('123'); assert.equal(opened, 1);
   session.generation++; flow.open('123'); assert.equal(opened, 1);
+  let finishRead, sharedReads=0, sharedUploads=0;
+  const sharedFlow=new Flow({...ports,pick:async()=> 'shared-photo',read:()=>{sharedReads++;return new Promise(resolve=>{finishRead=resolve;});},
+    network:()=>({cancel(){},searchUploadedPhoto:async()=>{sharedUploads++;return JSON.stringify(body);}})});
+  const originalRead=sharedFlow.search();await new Promise(resolve=>setImmediate(resolve));
+  const duringRead=sharedFlow.crop(firstRegion);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(sharedReads,1,'crop while preparing shares the in-flight image read');
+  finishRead(fullPhoto);assert.equal(await originalRead,undefined);assert.equal((await duringRead).length,1);
+  assert.equal(sharedUploads,1,'superseded initial flow does not upload');
+  sharedFlow.cancel();const freshRead=sharedFlow.search();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(sharedReads,2,'closing clears prepared image bytes');finishRead(fullPhoto);await freshRead;
+  let attempts=0;
+  const retryFlow=new Flow({...ports,pick:async()=> 'retry-photo',read:async()=>{if(++attempts===1)throw Error('read');return fullPhoto;},
+    network:()=>({cancel(){},searchUploadedPhoto:async()=>JSON.stringify(body)})});
+  await assert.rejects(retryFlow.search());assert.equal((await retryFlow.crop(firstRegion)).length,1);
+  assert.equal(attempts,2,'failed image preparation is not cached');
+  const isolatedReads=[];let isolatedUploads=0;
+  const isolatedFlow=new Flow({...ports,pick:async()=> 'same-uri',read:()=>new Promise(resolve=>isolatedReads.push(resolve)),
+    network:()=>({cancel(){},searchUploadedPhoto:async()=>{isolatedUploads++;return JSON.stringify(body);}})});
+  const oldImage=isolatedFlow.search();await new Promise(resolve=>setImmediate(resolve));isolatedFlow.cancel();
+  const newImage=isolatedFlow.search();await new Promise(resolve=>setImmediate(resolve));assert.equal(isolatedReads.length,2);
+  isolatedReads[0](fullPhoto);assert.equal(await oldImage,undefined);assert.equal(isolatedUploads,0);
+  isolatedReads[1](fullPhoto);await newImage;assert.equal(isolatedUploads,1,'old read cannot clear or populate the new image preparation');
   console.log('photo search response, cancellation, session and result checks passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

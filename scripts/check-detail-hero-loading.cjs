@@ -57,7 +57,7 @@ console.log('Isolated detail hero: node lifecycle, bounded timeout, actual retry
 
 function parentMethod(name){const start=parent.indexOf('  private '+name+'(');assert(start>=0);return parent.slice(start,parent.indexOf('\n  private ',start+1)).replace(/@Builder/g,'');}
 const Parent=vm.runInNewContext(ts.transpileModule('class Parent {'+['notifyImageLoaded','heroImageSources','heroRenderKey'].map(parentMethod).join('\n')+'} Parent;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
-const page=new Parent();page.heroRenderRevision=0;page.detail={pinUrl:'pin',imageUrl:'preview'};page.notifyImageLoaded('pin','preview');
+const page=new Parent();page.displayedDetail=()=>page.detail;page.heroRenderRevision=0;page.detail={pinUrl:'pin',imageUrl:'preview'};page.notifyImageLoaded('pin','preview');
 const initial=page.heroImageSources('preview','pin');assert.equal(initial.length,1);
 page.detail.imageUrl='full';const upgrading=page.heroImageSources('full','pin');assert.equal(upgrading.length,2);assert.equal(upgrading[0].key,initial[0].key,'decoded preview keeps the same mounted node');
 page.notifyImageLoaded('other','full');assert.equal(page.heroImageSources('full','pin').length,2,'stale success cannot discard preview');

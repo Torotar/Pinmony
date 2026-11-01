@@ -16,13 +16,15 @@ function fixture() {
   const view = new scope.exports.Sheet(), calls = [];
   let dialog;
   Object.assign(view, { sheetVisible: true, deleteDialogOpen: false, deleteDialogEpoch: 0,
-    result: { pin: 'pin-1', phase: 'edit', loading: false, busy: false, error: '', uncertain: false, picker: { busy: false } },
+    result: { pin: 'pin-1', phase: 'edit', editableContent: true, loading: false, busy: false, error: '', uncertain: false, picker: { busy: false } },
     uiText: key => key, getUIContext: () => ({ showAlertDialog: options => { dialog = options; } }),
     act(method, args) { calls.push([method, args]); if (method === 'editPhase') this.result.phase = JSON.parse(args.slice(1)); }
   });
   return { view, calls, dialog: () => dialog };
 }
 const cancel = fixture(); cancel.view.confirmDelete();
+assert.equal(cancel.dialog().title,'pm_delete_this_pin_bd01697d');
+assert.equal(cancel.dialog().secondaryButton.value,'pm_delete_2f9daa82');
 assert.deepEqual(cancel.calls, [['editPhase', ',"confirm"']]);
 cancel.dialog().primaryButton.action();
 assert.equal(cancel.view.result.phase, 'edit');
@@ -30,6 +32,11 @@ cancel.dialog().secondaryButton.action();
 assert.equal(cancel.calls.filter(c => c[0] === 'editCommit').length, 0);
 const confirmed = fixture(); confirmed.view.confirmDelete(); confirmed.dialog().secondaryButton.action(); confirmed.dialog().secondaryButton.action();
 assert.equal(confirmed.calls.filter(c => c[0] === 'editCommit').length, 1);
+const saved = fixture(); saved.view.result.editableContent = false; saved.view.confirmDelete();
+assert.equal(saved.dialog().title,'pm_remove_saved_pin_confirm');
+assert.equal(saved.dialog().secondaryButton.value,'pm_remove_saved_pin');
+saved.dialog().secondaryButton.action();assert.equal(saved.calls.filter(c => c[0] === 'editCommit').length,1,'removal wording keeps the existing confirmed operation');
+assert.match(source,/Text\(this\.uiText\(this\.result\.editableContent \? 'pm_delete_pin_e216e3fe' : 'pm_remove_saved_pin'\)\)/,'action label uses the verified original-versus-repin classification');
 const dismissed = fixture(); dismissed.view.confirmDelete(); dismissed.dialog().cancel(); assert.equal(dismissed.view.result.phase, 'edit');
 const stale = fixture(); stale.view.confirmDelete(); stale.view.aboutToDisappear(); stale.dialog().secondaryButton.action();
 assert.equal(stale.calls.filter(c => c[0] === 'editCommit').length, 0);

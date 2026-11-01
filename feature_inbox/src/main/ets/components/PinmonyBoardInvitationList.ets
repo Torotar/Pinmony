@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -7,8 +8,9 @@ import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/Pinmo
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 @Component
 export struct PinmonyBoardInvitationList {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop snapshot: PinmonyBoardInvitations;
@@ -20,18 +22,18 @@ export struct PinmonyBoardInvitationList {
   private scroller: Scroller = new Scroller();
   aboutToAppear(): void { if (this.all) this.stack.pushPath({ name: 'board-requests' }, false); }
   private titleOptions(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
+        scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         originalStyle: {
-          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
           }
         },
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
@@ -74,7 +76,10 @@ export struct PinmonyBoardInvitationList {
     if (this.all) {
       HdsNavigation(this.stack) {
         HdsNavDestination() {
-          Scroll(this.scroller) { this.content() }.width('100%').height('100%').align(Alignment.Top)
+          Scroll(this.scroller) {
+            Column() { this.content() }.width('100%').padding({top:this.titleContentInset()})
+          }.width('100%').height('100%').align(Alignment.Top)
+            .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
         }.titleBar(this.titleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
           .onBackPressed(() => { this.onBack(); return true; })
           .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])

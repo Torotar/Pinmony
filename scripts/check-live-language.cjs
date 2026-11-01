@@ -46,9 +46,10 @@ module.exports = function checkLiveLanguage(ts, i18n) {
   assert(profile.includes("boards[start].id + ':' + this.uiLanguage"));
   assert(profile.includes("(pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage"));
   if (i18n) {
-    const homeSource=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
+    const homeSource=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets','utf8');
     const methods=['emptyFeedMessage','feedStatusText'].map(name=>{
       const start=homeSource.indexOf('  private '+name+'(');
+      assert(start >= 0, 'Home feed copy method must exist in its actual component: '+name);
       return homeSource.slice(start,homeSource.indexOf('\n  }',start)+4);
     }).join('\n');
     const homeContext={PinmonyI18n:i18n};

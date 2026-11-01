@@ -4,7 +4,9 @@ import { PinmonyHomeMenuState } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
-export const PIN_NATIVE_PIN_MENUS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_POST_API_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_PIN_MENUS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED && PIN_POST_API_ENABLED;
 interface Image { url?: string; }
 interface User { id?: string; }
 interface Topic { name?: string; }
@@ -39,12 +41,13 @@ export class PinmonyPinMenuNative {
   private key(): string {const s: PinmonyBusinessSessionContext = this.ports.session();return s.authenticated && s.accountId ? s.accountId + ':' + s.generation.toString() + ':' + s.origin : '';}
   private id(pin: string = this.pin): string {return pin.match(/\/pin\/(\d{1,30})\/$/)?.[1] || '';}
   pause(): void {this.revision++;if(this.requestId)this.ports.network().cancel(this.requestId);this.requestId = '';this.busy = false;this.store.feedbackUndoBusy = false;}
-  private current(revision: number): boolean {return revision === this.revision && this.key() === this.account && this.ports.active() && this.route === this.ports.route() && this.ports.owns(this.pin) &&
+  private current(revision: number): boolean {return PIN_NATIVE_PIN_MENUS_ENABLED && revision === this.revision && this.key() === this.account && this.ports.active() && this.route === this.ports.route() && this.ports.owns(this.pin) &&
     (this.direct || (this.photo ? this.ports.sheet() === 'share' && this.store.shareSession === this.token : this.ports.sheet() === 'more' && this.store.moreSession === this.token));}
   private bind(pin: string,token: number,photo: boolean): number {
     this.pause();this.direct = false;const key: string = this.key();if(key !== this.account){this.submitted.clear();this.favoriteIntents.clear();this.undo = undefined;}this.account = key;this.pin = pin;this.token = token;this.photo = photo;this.route = this.ports.route();this.raw = undefined;this.viewer = '';return this.revision;
   }
   private async request(options: Options,revision: number,undo: boolean = false, favorite: string = ''): Promise<Resource> {
+    if(!PIN_NATIVE_PIN_MENUS_ENABLED)throw new PinMenuNotSent('disabled');
     const s: PinmonyBusinessSessionContext = this.ports.session(), get: boolean = !options.url;
     const envelope: Envelope = {options:options,context:{}}, path: string = '/pin/' + this.id() + '/';
     const id: string = 'native_pin_menu_' + (++this.sequence).toString();this.requestId = id;
@@ -74,8 +77,9 @@ export class PinmonyPinMenuNative {
   private enabled(action: string): boolean {return !this.submitted.has(this.pin + ':' + action);}
   private canOpenEdit(): boolean {return PIN_EDIT_API_ENABLED && /^\d{1,30}$/.test(this.viewer) && this.raw?.pinner?.id === this.viewer;}
   async photoRead(token: number,pin: string): Promise<PinmonyHomeMenuState> {
-    const revision: number = this.bind(pin,token,true);
     const state: PinmonyHomeMenuState = {session:token,pinUrl:pin,loading:false,busy:false,error:'',feedback:'',options:[],actions:[]};
+    if(!PIN_NATIVE_PIN_MENUS_ENABLED)return state;
+    const revision: number = this.bind(pin,token,true);
     try {await this.read(revision);if(!this.current(revision))return state;
       state.canCancelSave = this.raw?.is_repin === true && this.raw?.pinner?.id === this.viewer;
       state.actions = state.actions.concat([{id:'home-save',label:PinmonyI18n.message("pm_save_60a53514"),enabled:true},{id:'home-download',label:PinmonyI18n.message("pm_download_image_8894375c"),enabled:!!this.image()},
@@ -86,6 +90,7 @@ export class PinmonyPinMenuNative {
   }
   private option(id: string,label: string,enabled: boolean = true): MoreSheetOption {return {id:id,label:label,enabled:enabled,subtitle:'',icon:'',group:0};}
   async open(): Promise<void> {
+    if(!PIN_NATIVE_PIN_MENUS_ENABLED)return;
     const detail = this.store.detail;if(!this.ports.active() || !detail || !this.ports.owns(detail.pinUrl))return;
     const token: number = Math.max(1,this.store.moreSession + 1);this.store.moreSession = token;this.store.morePin = detail.pinUrl;this.store.moreApiMode = true;
     this.store.moreTitle = PinmonyI18n.message('pm_options_bb7486f4');this.store.moreOptions = [];this.store.moreLoading = true;this.store.moreError = '';this.store.ignoredMoreSession = 0;this.ports.show();
@@ -100,6 +105,7 @@ export class PinmonyPinMenuNative {
     finally {if(this.current(revision))this.store.moreLoading = false;}
   }
   async action(id: string): Promise<void> {
+    if(!PIN_NATIVE_PIN_MENUS_ENABLED)return;
     const revision: number = this.revision;
     if(id === 'home-favorite' || id === 'detail-favorite')return;
     if(!this.current(revision) || this.busy || !this.raw)return;
@@ -140,6 +146,7 @@ export class PinmonyPinMenuNative {
     finally {if(revision === this.revision)this.busy = false;}
   }
   async toggleFavorite(pin: string): Promise<void> {
+    if(!PIN_NATIVE_PIN_MENUS_ENABLED)return;
     if(this.busy || !this.ports.active() || !this.ports.owns(pin))return;
     const revision: number = this.bind(pin,0,true);this.direct = true;
     this.busy = true;
@@ -175,6 +182,7 @@ export class PinmonyPinMenuNative {
     } finally {if(revision === this.revision){this.busy = false;if(!this.photo)this.store.moreLoading = false;}}
   }
   async undoFeedback(): Promise<void> {
+    if(!PIN_NATIVE_PIN_MENUS_ENABLED)return;
     const state: Undo | undefined = this.undo;
     if(!state || state.pin !== this.store.feedbackUndoPin || state.session !== this.store.feedbackUndoSession || state.account !== this.key() || this.store.feedbackUndoBusy || !this.ports.owns(state.pin) || !this.ports.active())return;
     const lock: string = state.pin + ':undo';if(this.submitted.has(lock))return;

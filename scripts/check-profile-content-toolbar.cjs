@@ -18,11 +18,18 @@ const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,sel
 return {reader,store,requests,cancelled,addresses,getSession:()=>session,setSession:s=>session=s,setPage:p=>target=p,setActive:v=>active=v,setSelected:v=>selected=v,setDocument:d=>document=d,setEpoch:v=>epoch=v};}
 function options(job){return JSON.parse(new URL(job.url).searchParams.get('data')).options;}
 function endpoint(job){return new URL(job.url).pathname;}
-async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
+async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,3,'main and auxiliary feeds start independently');assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
 
 const sortBody = (value,write=false) => JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:write?'v3_user_metdata_set':'v3_user_metdata_get',data:write?null:{most_recent_board_sort_order:value}}});
 const dataOf = job => JSON.parse(new URLSearchParams(job.method==='POST'?job.body:new URL(job.url).search).get('data')).options;
 async function main(){
+ const mismatch=fixture();await first(mismatch,[{...board(1),name:'Zebra'},{...board(2),name:'apple'}]);
+ let repair=mismatch.reader.sortBoards('');mismatch.requests[3].resolve(sortBody('alphabetical'));await repair;
+ repair=mismatch.reader.sortBoards('alphabetical');assert.equal(mismatch.requests.length,5,'selected preference must still apply when the visible feed has another order');
+ mismatch.requests[4].resolve(sortBody('',true));await flush();assert.equal(dataOf(mismatch.requests[5].job).sort,'alphabetical');assert(!dataOf(mismatch.requests[5].job).bookmarks);
+ mismatch.requests[5].resolve(body([{...board(2),name:'apple'},{...board(1),name:'Zebra'}]));await repair;
+ assert.deepEqual(Array.from(mismatch.store.profile.boards,b=>b.title),['apple','Zebra']);
+ const repairedCount=mismatch.requests.length;await mismatch.reader.sortBoards('alphabetical');assert.equal(mismatch.requests.length,repairedCount,'matching preference and feed remains a no-op');
  const f=fixture();await first(f);
  let p=f.reader.sortBoards('');assert(f.store.profile.boardSortBusy);f.requests[3].resolve(sortBody('alphabetical'));await flush();
  assert.equal(f.requests.length,4,'first opening reads metadata only, without reloading the board feed');await p;assert.equal(f.store.profile.boardSort,'alphabetical');assert.equal(f.store.profile.boards[0].title,'Board 1');assert(f.store.profile.contentHasMore,'opening options preserves pagination');

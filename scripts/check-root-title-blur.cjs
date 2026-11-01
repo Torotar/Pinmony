@@ -3,6 +3,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const pages = [
+  ['feature_settings', 'PinmonySettingsPage', ['titleBarOptions']],
   ['feature_home', 'PinmonyHomePage', ['homeTitleBarOptions']],
   ['feature_search', 'PinmonySearchPage', ['searchTitleBarOptions']],
   ['feature_profile', 'PinmonyProfilePage', ['hubTitleBarOptions', 'profileTitleOptions', 'rootTitleBarOptions']]
@@ -33,6 +34,12 @@ for (const [module, page, methods] of pages) {
     for (const method of methods) {
       const options = host[method]();
       const style = options.style;
+      if (page === 'PinmonySettingsPage') {
+        assert.equal(options.enableComponentSafeArea, false, 'settings list must scroll behind the title bar');
+        assert(source.includes("Row().width('100%').height(this.getUIContext().px2vp(this.statusBarHeightPx) + 56)"),
+          'initial title inset stays inside the scrolling list');
+        assert(source.includes('.bindToScrollable([this.contentScroller])'));
+      }
       assert.equal(style.blurStrategy, mode === 'off' ? 0 : 1, `${page}.${method}: strategy ${mode}`);
       assert.equal(style.thermoCtrl, mode !== 'off');
       assert.equal(style.scrollEffectOpts.enableScrollEffect, mode !== 'off');

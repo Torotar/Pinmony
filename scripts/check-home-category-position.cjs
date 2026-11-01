@@ -40,7 +40,7 @@ const titleOptionsStart=source.indexOf('  private homeTitleBarOptions()');
 const titleOptionsMethod=source.slice(titleOptionsStart,source.indexOf('\n  build()',titleOptionsStart));
 const TitleHost=vm.runInNewContext(ts.transpileModule('class TitleHost {'+titleOptionsMethod+'} TitleHost;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:3},PinmonyImmersiveLight:{effect:mode=>mode}});
 for(const mode of ['immersive','gentle','exquisite','off']){const titleHost=new TitleHost();titleHost.immersiveLightMode=mode;const style=titleHost.homeTitleBarOptions().style;assert.equal(style.blurStrategy,mode==='off'?0:1);assert.equal(style.thermoCtrl,mode!=='off');assert.equal(style.scrollEffectOpts.enableScrollEffect,mode!=='off','runtime title options must not depend on an accessor omitted by the ArkUI struct compiler');}
-assert(homeNavigation.includes('HdsNavigation() { this.feedContent() }'),'the HDS navigation owns the scrolling feed');
+assert(homeNavigation.includes('HdsNavigation() { this.categoryFeed() }'),'the HDS navigation owns the animated content region');
 assert(homeNavigation.includes('stackBuilder: (): void => { this.categoryButtons(); }'),'all home categories are mounted in HDS stackBuilder');
 assert(homeNavigation.includes('systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)'),'the HDS title bar owns its default material effect');
 const homeTitleBarOptions=source.slice(source.indexOf('  private homeTitleBarOptions()'),source.indexOf('\n  build()',source.indexOf('  private homeTitleBarOptions()')));
@@ -50,6 +50,10 @@ assert(source.includes('top: this.homeTopInset() + (this.home.board ? 132 : 64) 
 const rootTabs=indexSource.slice(indexSource.indexOf('  private buildRootTabs()'),indexSource.indexOf('  build()',indexSource.indexOf('  private buildRootTabs()')));
 assert(rootTabs.includes('.barOverlap(true)'),'root tab bar keeps its original floating overlap layout');
 assert(rootTabs.includes('barBottomMargin: 28'),'root tab floating margin stays unchanged');
-assert(source.includes('ForEach([this.categoryPageKey()]')&&source.includes('this.homeNavigation()'),'title bar and feed move together with the selected category page');
-assert(source.includes('TransitionEffect.asymmetric('));assert(source.includes('this.contentWidth }'));
+const rootBuild=source.slice(source.indexOf('  build() {'));
+const categoryFeed=source.slice(source.indexOf('  private categoryFeed()'),source.indexOf('  private homeNavigation()'));
+assert(categoryFeed.includes('ForEach([this.categoryPageKey()]')&&categoryFeed.includes('this.feedContent()'),'only the content region receives the category transition');
+assert(categoryFeed.includes('.translate({ x: this.categoryDragOffset })')&&categoryFeed.includes('.onActionUpdate('),'content follows horizontal dragging');
+assert(!rootBuild.includes('categoryDragOffset')&&!rootBuild.includes('.priorityGesture('),'the title bar and options remain outside content motion and its gesture');
+assert(!source.includes(".geometryTransition('home-category-selection')"),'the option animation is reverted');
 console.log('Home category motion: both directions, rapid selection, pending and failure rollback, stable same-category updates passed');

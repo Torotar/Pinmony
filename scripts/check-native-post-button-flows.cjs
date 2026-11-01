@@ -22,18 +22,18 @@ async function picker(f){const start=f.requests.length,p=f.ops.openSave(pin);f.r
  f.requests[start+2].resolve(JSON.stringify({data:{}}));await p;
 }
 const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
-function method(name){const start=ui.search(new RegExp('  private '+name+'\\('));assert(start>=0);return ui.slice(start,ui.indexOf('\n  private ',start+1));}
-const View=vm.runInNewContext(ts.transpileModule('class View {'+['action','acceptsActionIntent','titleBarOptions','leftActions'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},Color:{Transparent:0},$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},TextStyleMode:{NORMAL:0}});
+function method(name){const start=ui.search(new RegExp('  private '+name+'\\('));assert(start>=0);if(name==='displayedDetail')return ui.slice(start,ui.indexOf('\n  }',start)+4);return ui.slice(start,ui.indexOf('\n  private ',start+1)).replace(/\s*@Builder\s*$/,'');}
+const View=vm.runInNewContext(ts.transpileModule('class View {'+['displayedDetail','action','acceptsActionIntent','titleBarOptions','leftActions','actionButtonEnabled','actionCountText'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},Color:{Transparent:0},$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},TextStyleMode:{NORMAL:0}});
 View.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
-function view(f){const v=new View();Object.assign(v,{detail:f.store.detail,imageLayer:'',shareActionsReady:true,postActionsReady:true,commentActionsReady:true,actionsReady:false,deferredActions:false,auxiliaryReady:true,likeBlocked:f.ops.likeBlocked(pin),saveBusy:false});return v;}
+function view(f){const v=new View();Object.defineProperty(v,'currentDetail',{get:()=>v.detail});Object.assign(v,{detail:f.store.detail,imageLayer:'',shareActionsReady:true,postActionsReady:true,commentActionsReady:true,actionsReady:false,deferredActions:false,auxiliaryReady:true,likeBlocked:f.ops.likeBlocked(pin),saveBusy:false});return v;}
 async function main(){
  // Actual UI menu -> actual Index native dispatch -> real DetailController; no Web control or document.
  const f=fixture(),v=view(f),index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
- const arrow=index.match(/nativePostAction: (async [^\r\n]+),\r?\n/);assert(arrow);
+ const arrow=index.match(/nativePostAction: (async [\s\S]*?),\s*postExtensionsEnabled:/);assert(arrow);
  const ownStart=index.indexOf('  private ownsPostPin(');assert(ownStart>=0);
  const ownMethod=index.slice(ownStart,index.indexOf('\n  private ',ownStart+1));
- const Host=vm.runInNewContext(ts.transpileModule('class Host {'+ownMethod+' make(){return ('+arrow[1]+');} } Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PIN_NATIVE_COMMENT_WRITES_ENABLED:true});
- const h=new Host(),shares=[],calls=[];Object.assign(h,{pinStore:f.store,pinIdentity:p=>p.match(/\/pin\/(\d+)\//)?.[1]||'',shareNativeFlow:{open:async(...a)=>shares.push(a)},postNativeOperations:f.ops});
+ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+ownMethod+' make(){return ('+arrow[1]+');} } Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_POST_OPERATIONS_ENABLED:true,PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PIN_NATIVE_COMMENT_WRITES_ENABLED:true});
+ const h=new Host(),shares=[],calls=[];Object.assign(h,{nativeBusinessRoutesEnabled:true,pinStore:f.store,pinIdentity:p=>p.match(/\/pin\/(\d+)\//)?.[1]||'',shareNativeFlow:{open:async(...a)=>shares.push(a)},postNativeOperations:f.ops});
  const dc=new Detail({store:f.store,isOffline:()=>false,isAuthenticated:()=>true,traceAction(){},nativePostAction:h.make(),runScript(){throw Error('Web script')},loadDetailUrl(){throw Error('Web navigation')}});
  v.onAction=(id,kind)=>calls.push(dc.performAction(id,kind));
  let menu=v.titleBarOptions().content.menu.value;assert.equal(menu.length,1);assert(menu[0].content.isEnabled);menu[0].content.action();await Promise.all(calls);
@@ -67,8 +67,37 @@ async function main(){
  p=s.ops.detailAction('save');s.requests[4].resolve(resource(raw));await flush();assert.match(s.requests[5].job.url,/PinResource\/get/);
  s.requests[5].resolve(resource({...saved,id:'77'}));await flush();assert.match(s.requests[6].job.url,/PinResource\/delete/);
  s.requests[6].resolve(resource(null,'v3_delete_pin_handler'));await p;assert(!view(s).action('save').selected);
- const liked=fixture();p=liked.ops.like(pin);liked.requests[0].resolve(resource(raw));await flush();liked.requests[1].resolve(resource({id:'11'}));await p;
+ const liked=fixture();liked.store.detail.actions=[{id:'native-like',kind:'like',label:'Like',countText:'128',enabled:true,selected:false}];p=liked.ops.like(pin);liked.requests[0].resolve(resource(raw));await flush();liked.requests[1].resolve(resource({id:'11'}));await p;
  rendered=view(liked);assert(rendered.leftActions().find(x=>x.kind==='like').selected);assert(!rendered.acceptsActionIntent(rendered.action('like')));assert.equal(liked.store.detail.title,'Original');
+ assert.equal(rendered.actionCountText(rendered.action('like')),'129','confirmed new like advances a known exact count after successful write');
+ assert(rendered.actionButtonEnabled(rendered.action('like')),'selected heart avoids system disabled opacity while repeat intent remains rejected');
+ liked.ops.apply();assert.equal(view(liked).action('like').countText,'129','repeated overlays cannot double-increment the count');
+
+ for (const test of [
+   {text:'273',extra:{},reply:{id:'11'},expected:'274'},
+   {text:'273',extra:{},reply:{id:'11',reaction_data:{reaction_counts:{'1':280}}},expected:'280'},
+   {text:'1.2万',extra:{reaction_data:{reaction_by_me:0,reaction_counts:{'1':12345}}},reply:{id:'11'},expected:'12346'},
+   {text:'1.2万',extra:{},reply:{id:'11'},expected:'1.2万'},
+   {text:'1,273',extra:{},reply:{id:'11'},expected:'1274'}
+ ]) {
+   const countCase=fixture();countCase.store.detail.actions=[{id:'like',kind:'like',label:'Like',countText:test.text,enabled:true,selected:false}];
+   const work=countCase.ops.like(pin);countCase.requests[0].resolve(resource({...raw,...test.extra}));await flush();
+   assert.equal(view(countCase).action('like').countText,test.text,'pending write does not change count');
+   countCase.requests[1].resolve(resource(test.reply));await work;
+   assert.equal(view(countCase).action('like').countText,test.expected);countCase.ops.apply();
+   assert.equal(view(countCase).action('like').countText,test.expected,'confirmed count overlay is idempotent');
+   countCase.ops.observe(pin,resource({...raw,reaction_by_me:1,reaction_counts:{'1':290}}));
+   assert.equal(view(countCase).action('like').countText,'290','later authoritative read supersedes the confirmed local count');
+ }
+ const hollowComment=fs.readFileSync('common_ui/src/main/resources/base/media/detail_comment_outline.svg','utf8');
+ assert(hollowComment.includes('fill-rule="evenodd"'));assert((hollowComment.match(/[Mm]/g)||[]).length>=2,'tinted comment outline retains a real inner cutout');
+ assert(ui.includes("app.media.detail_comment_outline"));
+ assert(ui.includes("SymbolGlyph(item.selected ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))"),'likes use official Huawei heart symbols');
+
+ const pendingLike={id:'pending-like',kind:'like',label:'Like',countText:'',enabled:false,selected:false};rendered.postActionsReady=false;
+ assert(!rendered.actionButtonEnabled(pendingLike),'unready unselected likes retain their disabled state');
+ assert(ui.includes(".fontColor([item.selected ? $r('app.color.accent') : $r('app.color.primary_text')])"),'selected heart uses the shared theme red');
+
  // Previously saved, current Pin itself is an owned repin; neither another person's Pin nor an original creation can be deleted.
  const old=fixture();p=old.ops.cancelSave(pin);old.requests[0].resolve(resource(saved));await flush();const deletion=old.requests[1];assert(deletion);
  assert.match(deletion.job.url,/PinResource\/delete/);assert.deepEqual(JSON.parse(new URLSearchParams(deletion.job.body).get('data')).options,{id:'11',client_tracking_params:'synthetic~0'});

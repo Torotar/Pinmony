@@ -32,6 +32,7 @@ class HdsSnackBar {
 const context = { $r:value=>value,SnackBarIconType:{NORMAL:0},HdsSnackBar, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 },
   Date: { now: () => now },
   PinmonyRuntimeLog: { info: line => logs.push(line), warn: line => logs.push(line) } };
+context.PinmonySnackBarLifecycle = require('./snackbar-lifecycle-harness.cjs').loadSnackBarLifecycle(ts, context.PinmonyRuntimeLog);
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native { ' + source.slice(start, end) +
   source.slice(source.indexOf('  private showInboxBlockSnack('),
     source.indexOf('\n  @Builder', source.indexOf('  private showInboxBlockSnack('))) +
@@ -132,7 +133,7 @@ failDismiss = true;
 assert.doesNotThrow(() => native.dismissPostSnack());
 failDismiss = false;
 assert.equal(native.postSnack, undefined);
-assert(logs.some(line => line.startsWith('PostSnack: dismiss-threw snackSeq=')));
+assert(logs.includes('SnackBarNative: operation=dismiss outcome=threw'));
 assert(!logs.some(line => /PostSnack:.*token=/.test(line)));
 const preparedSeqs = logs.filter(line => line.startsWith('PostSnack: prepared ')).map(line => /snackSeq=(\d+)/.exec(line)[1]);
 assert.equal(new Set(preparedSeqs).size, preparedSeqs.length);

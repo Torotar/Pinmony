@@ -45,6 +45,10 @@ async function main(){
  assert(indexSource.includes('this.detailNativeAuxiliary.resume(pinUrl, token)'), 'native back restores both reads and viewer context');
  const f=fixture();assert(f.aux.ready());await f.aux.openLayer('zoom');assert.equal(f.aux.downloadUrl(),raw.images.orig.url);assert.equal(f.requests.length,0);
  await f.aux.openLayer('search');let p=f.aux.search(crop,false,true);assert.equal(f.requests.length,1);
+ const cancelledBeforeDuplicate=f.cancelled.length;
+ await f.aux.search({...crop},false,false);
+ assert.equal(f.requests.length,1,'same pending crop does not restart the request');
+ assert.equal(f.cancelled.length,cancelledBeforeDuplicate,'duplicate crop must not cancel its pending response');
  let options=JSON.parse(new URL(f.requests[0].job.url).searchParams.get('data')).options;
  assert.deepEqual(options,{pin_id:'11',crop,crop_source:5,is_shopping:false,entry_source:'flashlight',entrypoint:'closeup_cta'});
  const loadingResult=f.store.visualResult;f.requests[0].resolve(visual([2,2,3]));await p;assert.notEqual(f.store.visualResult,loadingResult,'completed search publishes a new observable root object');assert.equal(f.store.visualResult.items.length,2);assert.equal(f.store.visualResult.loading,false);

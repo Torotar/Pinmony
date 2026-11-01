@@ -19,3 +19,15 @@ for(const home of [false,true]){
   close.call(h);close.call(h);assert.equal(h.activeSheetKind,'');assert.deepEqual(events,home?['home-close','snack']:['snack']);
 }
 console.log('Save Sheet: home/detail retain type until disappearance, cleanup precedes feedback, callback runs once');
+
+// Publishing the confirmed result can render the Sheet before its exit completes.
+// That intermediate frame must not create a second ActionNotice snackbar.
+const saveSheet=fs.readFileSync('feature_pin/src/main/ets/components/PinmonySaveSheet.ets','utf8');
+const feedbackGuard=saveSheet.match(/if \((this\.result\.feedback[^\n]*)\) \{\r?\n\s*PinmonyActionNotice\(\{ message: PinmonyI18n\.render\(this\.result\.feedback/);
+assert(feedbackGuard,'feedback notice guard');
+const showsFeedback=new Function('return !!('+feedbackGuard[1]+')');
+assert.equal(showsFeedback.call({result:{feedback:'confirmed',savedId:'copy'}}),false,'confirmed save must use only post-close snackbar');
+assert.equal(showsFeedback.call({result:{feedback:'other feedback',savedId:''}}),true,'non-save feedback remains available');
+assert.equal(showsFeedback.call({result:{feedback:'',savedId:''}}),false);
+assert(saveSheet.includes('if (this.result.error)'),'save errors remain visible');
+console.log('Save feedback: intermediate confirmed Sheet frame stays silent; post-close undo notice occurs once; other feedback and errors retained');

@@ -1,6 +1,37 @@
 {
   "string": [
-    { "name": "pm_board_section_sync_pending", "value": "Section changes have not synced yet. Please try again later." },
+    {
+      "name": "pm_recommend_boards_description",
+      "value": "Turn off personalization for a board to remove its home feed tabs and recommendations. This will not affect the board or its Pins."
+    },
+    {
+      "name": "pm_recommend_board_unavailable",
+      "value": "Personalization settings are currently unavailable"
+    },
+    {
+      "name": "pm_recommend_board_today",
+      "value": "Today"
+    },
+    {
+      "name": "pm_recommend_board_days",
+      "value": "{0} day(s) ago"
+    },
+    {
+      "name": "pm_recommend_board_weeks",
+      "value": "{0} week(s) ago"
+    },
+    {
+      "name": "pm_recommend_board_months",
+      "value": "{0} month(s) ago"
+    },
+    {
+      "name": "pm_recommend_board_years",
+      "value": "{0} year(s) ago"
+    },
+    {
+      "name": "pm_board_section_sync_pending",
+      "value": "Section changes have not synced yet. Please try again later."
+    },
     {
       "name": "pm_detail_paid_link",
       "value": "Paid link"
@@ -1014,6 +1045,14 @@
       "value": "No suggested contacts"
     },
     {
+      "name": "pm_profile_minutes_ago",
+      "value": " minutes ago"
+    },
+    {
+      "name": "pm_profile_hours_ago",
+      "value": " hours ago"
+    },
+    {
       "name": "pm_just_now_de6785d9",
       "value": "Just now"
     },
@@ -1188,6 +1227,14 @@
     {
       "name": "pm_content_made_entirely_or_partly_with_ai_3beb552d",
       "value": "Content made entirely or partly with AI"
+    },
+    {
+      "name": "pm_remove_saved_pin",
+      "value": "Remove this Pin"
+    },
+    {
+      "name": "pm_remove_saved_pin_confirm",
+      "value": "Remove this Pin from your board?"
     },
     {
       "name": "pm_delete_pin_e216e3fe",
@@ -5721,6 +5768,50 @@
       "name": "pm_publish_source_website",
       "value": "Website link"
     },
-    {"name":"pm_board_cover_adjust","value":"Adjust cover position"}
+    {
+      "name": "pm_board_cover_adjust",
+      "value": "Adjust cover position"
+    },
+    {
+      "name": "pm_language_portuguese_brazil",
+      "value": "Portuguese (Brazil)"
+    },
+    {
+      "name": "pm_message_recipient_settings_restricted",
+      "value": "Oops! This message can't be sent because of the recipient's message settings."
+    },
+    {
+      "name": "pm_profile_pins_end",
+      "value": "No more Pins"
+    },
+    {
+      "name": "pm_photo_history_manage",
+      "value": "Delete photo history"
+    },
+    {
+      "name": "pm_photo_history_delete_all",
+      "value": "Delete all"
+    },
+    {
+      "name": "pm_photo_history_delete_all_confirm",
+      "value": "Delete all photo search history? This submits the deletion to the server."
+    },
+    { "name": "pm_photo_history_pending_delete", "value": "Pending deletion" },
+    {
+      "name": "pm_photo_history_deleted",
+      "value": "Deleted successfully"
+    },
+    {
+      "name": "pm_photo_history_delete_unconfirmed",
+      "value": "Deletion could not be confirmed. Reopen history to check."
+    },
+    {
+      "name": "pm_photo_history_restore_unconfirmed",
+      "value": "Restoration could not be confirmed. Reopen history to check."
+    },
+    {
+      "name": "pm_photo_history_delete_all_incomplete",
+      "value": "Not all history could be loaded. Delete all was not performed."
+    }
   ]
 }

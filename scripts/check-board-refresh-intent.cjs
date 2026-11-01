@@ -22,7 +22,9 @@ for(const action of ['move','moveSection','deleteSelected']){
 }
 console.log('Confirmed section moves: source retained, old reads cancelled, source content and previews revalidated passed');
 const boardPage=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');
-assert(boardPage.includes("this.phase() === 'section' ? JSON.stringify(this.snapshot.flow?.pins || []) : ''"),'section list identity tracks the updated Pin snapshot');
+assert(!boardPage.includes('JSON.stringify(this.snapshot.flow?.pins || [])'), 'section updates do not replace the full WaterFlow');
+assert(boardPage.includes('this.snapshot.flow?.sectionId'), 'each section keeps its own layout identity');
+assert(boardPage.includes('this.pinCardKey(pin)'), 'changed individual cards still invalidate their presentation');
 
 let revalidate='';
 function findRevalidate(n){if(ts.isMethodDeclaration(n)&&n.name.getText(file)==='revalidateSectionAfterWrite')revalidate=n.getText(file);ts.forEachChild(n,findRevalidate);}findRevalidate(file);

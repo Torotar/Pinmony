@@ -4,16 +4,22 @@ const source = fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoa
 const transition = source.match(/const BOARD_ORGANIZE_PAGE_TRANSITION[\s\S]*?;\s*\n/);
 assert(transition && /x: '100%'[^\n]*duration: 180, curve: Curve\.EaseOut/.test(transition[0]) &&
   /x: '100%'[^\n]*duration: 150, curve: Curve\.EaseIn/.test(transition[0]), 'both entry and exit slide right');
-assert.equal((source.match(/\.transition\(BOARD_ORGANIZE_PAGE_TRANSITION\)/g) || []).length, 4,
-  'organize, destination, edit and cover pages use the same transition');
+for (const layer of ['showingIdeas', 'organizing', 'targeting', 'editing', 'covering']) {
+  const start = source.indexOf('if (this.' + layer + '()) {', source.indexOf('  build() {'));
+  assert(start >= 0, layer + ' page is mounted');
+  const nextLayer = source.indexOf('\n      if (', start + 1);
+  const block = source.slice(start, nextLayer < 0 ? source.indexOf('\n    }.width', start) : nextLayer);
+  assert(block.includes('.transition(BOARD_ORGANIZE_PAGE_TRANSITION)'),
+    layer + ' page uses the shared entry and exit transition');
+}
 function method(name) {
   const start = source.indexOf('  private ' + name + '(');
   assert(start >= 0);
   return source.slice(start, source.indexOf('\n  private ', start + 1)).replace(/\s*@Builder\s*$/, '');
 }
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
-  ['snapshotChanged', 'modernBoardActions', 'boardActionEnabled', 'back', 'phase'].map(method).join('\n') +
-  '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
+  ['snapshotChanged', 'modernBoardActions', 'boardActionEnabled', 'back', 'phase', 'closeTargetCreate', 'finishTargetCreateClose'].map(method).join('\n') +
+  '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, { PinmonyRuntimeLog: { info() {} } });
 const LayerHost = vm.runInNewContext(ts.transpileModule('class LayerHost {' +
   ['organizing', 'targeting', 'editing', 'covering', 'dispatch'].map(method).join('\n') +
   '} LayerHost;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);

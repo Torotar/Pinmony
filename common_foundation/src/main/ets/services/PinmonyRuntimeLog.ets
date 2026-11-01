@@ -9,6 +9,7 @@ export class PinmonyRuntimeLog {
   private static actionStage: string = 'none';
   private static actionAt: number = 0;
   static recentActionContext(): string {
+    if (!PinmonyRuntimeLog.actionAt || Date.now() - PinmonyRuntimeLog.actionAt > 5000) return 'stage=none ageMs=expired';
     return 'stage=' + PinmonyRuntimeLog.actionStage + ' ageMs=' +
       (PinmonyRuntimeLog.actionAt ? Math.max(0, Date.now() - PinmonyRuntimeLog.actionAt).toString() : 'unknown');
   }
@@ -21,6 +22,7 @@ export class PinmonyRuntimeLog {
   private static flushTimer: number = -1;
   private static writing: Promise<void> | undefined = undefined;
   private static snapshotDirty: boolean = false;
+  private static snapshotWrittenAt: number = 0;
   private static initializing: boolean = false;
   private static restoration: Promise<void> = Promise.resolve();
   private static snapshotRead: Promise<void> = Promise.resolve();
@@ -52,6 +54,7 @@ export class PinmonyRuntimeLog {
     PinmonyRuntimeLog.sessionPersisted = false;
     PinmonyRuntimeLog.sessionIncomplete = false;
     PinmonyRuntimeLog.initializing = true;
+    PinmonyRuntimeLog.snapshotWrittenAt = 0;
     PinmonyRuntimeLog.lines.clear();
     const generation: number = ++PinmonyRuntimeLog.initializationGeneration;
     PinmonyRuntimeLog.restoration = fs.readText(PinmonyRuntimeLog.path, { length: 4 * 1024 * 1024 }).then((history: string): void => {
@@ -77,7 +80,7 @@ export class PinmonyRuntimeLog {
   }
 
   private static record(level: string, message: string): void {
-    const stage: RegExpMatchArray | null = message.match(/^AsyncAction: stage=(share-close|more-close|snackbar-dismiss|snackbar-back)$/);
+    const stage: RegExpMatchArray | null = message.match(/^AsyncAction: stage=(share-close|more-close|snackbar-dismiss|snackbar-back|photo-menu-select|photo-menu-dismiss|notice-show|notice-dismiss|comment-action)(?: operation=(?:commentsMore|commentReplies|commentLike|commentTranslate|unsupported))?$/);
     if (stage) { PinmonyRuntimeLog.actionStage = stage[1]; PinmonyRuntimeLog.actionAt = Date.now(); }
     const safe: string = PinmonyRuntimeLog.sanitize(message);
     console.info('PinmonyLog: ' + level + ' ' + safe);
@@ -94,17 +97,18 @@ export class PinmonyRuntimeLog {
     PinmonyRuntimeLog.pending.push(line);
     PinmonyRuntimeLog.pendingBytes += line.length * 4;
     if (PinmonyRuntimeLog.pending.length >= 64 || PinmonyRuntimeLog.pendingBytes >= 65536) {
-      PinmonyRuntimeLog.flush();
+      PinmonyRuntimeLog.flush(false);
     } else if (PinmonyRuntimeLog.flushTimer < 0 && !PinmonyRuntimeLog.writing) {
-      PinmonyRuntimeLog.flushTimer = setTimeout((): void => { PinmonyRuntimeLog.flushTimer = -1; PinmonyRuntimeLog.flush(); }, 250);
+      PinmonyRuntimeLog.flushTimer = setTimeout((): void => { PinmonyRuntimeLog.flushTimer = -1; PinmonyRuntimeLog.flush(false); }, 1000);
     }
   }
 
-  static flush(): Promise<void> {
+  static flush(forceSnapshot: boolean = true): Promise<void> {
     if (PinmonyRuntimeLog.clearing) return Promise.resolve();
     if (PinmonyRuntimeLog.flushTimer >= 0) clearTimeout(PinmonyRuntimeLog.flushTimer);
     PinmonyRuntimeLog.flushTimer = -1;
-    if (PinmonyRuntimeLog.writing) return PinmonyRuntimeLog.writing;
+    if (PinmonyRuntimeLog.writing) return PinmonyRuntimeLog.writing.then((): Promise<void> =>
+      forceSnapshot && PinmonyRuntimeLog.snapshotDirty ? PinmonyRuntimeLog.flush(true) : Promise.resolve());
     if (!PinmonyRuntimeLog.path) return Promise.resolve();
     let failed: boolean = false;
     PinmonyRuntimeLog.writing = Promise.resolve().then(async (): Promise<void> => {
@@ -115,16 +119,22 @@ export class PinmonyRuntimeLog {
           new Date(PinmonyRuntimeLog.sessionStartedAt).toISOString() + ' ---\n');
         PinmonyRuntimeLog.initializing = false;
       }
-      while (PinmonyRuntimeLog.pending.length > 0 || PinmonyRuntimeLog.snapshotDirty) {
+      while (PinmonyRuntimeLog.pending.length > 0 || forceSnapshot && PinmonyRuntimeLog.snapshotDirty) {
         const batch: string[] = PinmonyRuntimeLog.pending;
         PinmonyRuntimeLog.pending = []; PinmonyRuntimeLog.pendingBytes = 0;
         const dropped: number = PinmonyRuntimeLog.dropped; PinmonyRuntimeLog.dropped = 0;
-        const snapshot: string = PinmonyRuntimeLog.lines.snapshot().join('\n') + '\n';
-        PinmonyRuntimeLog.snapshotDirty = false;
         try {
           const text: string = (dropped > 0 ? 'RuntimeLog: dropped=' + dropped + ' reason=storage-backpressure\n' : '') + batch.join('\n') + '\n';
           if (batch.length > 0 || dropped > 0) await PinmonyRuntimeLog.writeSession(text);
-          await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.path, snapshot, false);
+          // Session history is appended in every batch. The bounded restart
+          // snapshot is a checkpoint, not another full write for each batch.
+          if (PinmonyRuntimeLog.snapshotDirty && (forceSnapshot ||
+            Date.now() - PinmonyRuntimeLog.snapshotWrittenAt >= 5000)) {
+            const snapshot: string = PinmonyRuntimeLog.lines.snapshot().join('\n') + '\n';
+            PinmonyRuntimeLog.snapshotDirty = false;
+            await PinmonyRuntimeLog.writeFile(PinmonyRuntimeLog.path, snapshot, false);
+            PinmonyRuntimeLog.snapshotWrittenAt = Date.now();
+          }
         } catch (_) {
           failed = true;
           // Session append may already have succeeded: do not replay a partially written batch.
@@ -141,8 +151,8 @@ export class PinmonyRuntimeLog {
       console.warn('PinmonyLog: session initialization failed');
     }).finally((): void => {
       PinmonyRuntimeLog.writing = undefined;
-      if (!failed && (PinmonyRuntimeLog.pending.length > 0 || PinmonyRuntimeLog.snapshotDirty) && PinmonyRuntimeLog.flushTimer < 0) {
-        PinmonyRuntimeLog.flushTimer = setTimeout((): void => { PinmonyRuntimeLog.flushTimer = -1; PinmonyRuntimeLog.flush(); }, 250);
+      if (!failed && PinmonyRuntimeLog.pending.length > 0 && PinmonyRuntimeLog.flushTimer < 0) {
+        PinmonyRuntimeLog.flushTimer = setTimeout((): void => { PinmonyRuntimeLog.flushTimer = -1; PinmonyRuntimeLog.flush(false); }, 1000);
       }
     });
     return PinmonyRuntimeLog.writing;

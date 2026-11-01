@@ -7,8 +7,10 @@ assert(!/openCustomDialog|ComponentContent|PanGesture|Row\(|Column\(/.test(sourc
 const code = source.slice(source.indexOf('class PinmonyActionNoticeLease'), source.indexOf('  build()')) + '}\nPinmonyActionNotice;';
 const executable = code.replace('@Component', '').replace('export struct', 'class').replace(/@Prop\s*/g, '').replace(/@Watch\('[^']+'\)\s*/g, '');
 const shown = [], dismissed = []; let actions = 0;
+const PinmonySnackBarLifecycle = require('./snackbar-lifecycle-harness.cjs').loadSnackBarLifecycle(ts, {info(){},warn(){}});
 const Notice = vm.runInNewContext(ts.transpileModule(executable, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, {
   HdsSnackBar: class { show(icon, message, operation, style) { shown.push({ owner: this, icon, message, operation, style }); } dismiss() { dismissed.push(this); } },
+  PinmonyRuntimeLog: {info(){},warn(){}}, PinmonySnackBarLifecycle, Date,
   SnackBarIconType: { NORMAL: 1 }, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 }, $r: x => x
 });
 function notice(message = 'failure') {
@@ -24,10 +26,19 @@ first.actionEnabled = false; first.syncNotice(); assert.equal(shown.at(-1).opera
 const second = notice('second'); second.aboutToAppear(); const current = shown.at(-1); const count = dismissed.length;
 first.aboutToDisappear(); assert.equal(dismissed.length, count, 'old page cannot dismiss a newer page notice');
 current.style.pressBackCallback(); assert.equal(actions, 1, 'back only dismisses');
+assert.equal(dismissed.length,count,'native back must not trigger an application dismiss');
+current.style.pressBackCallback();assert.equal(dismissed.length,count,'repeated native back remains released');
 second.message = 'English failure'; second.syncNotice(); assert.equal(shown.at(-1).message.title, 'English failure');
 const inactive = shown.at(-1); second.active = false; second.syncNotice(); inactive.operation.onContentClick(); assert.equal(actions, 1);
 second.active = true; second.syncNotice(); assert.equal(shown.at(-1).message.title, 'English failure');
 second.aboutToDisappear(); shown.at(-1).operation.onContentClick(); assert.equal(actions, 1);
+const nativeClose = notice('native close'); nativeClose.aboutToAppear();
+const closes = dismissed.length;shown.at(-1).operation.onCloseButtonClick();
+assert.equal(dismissed.length,closes,'native close never dismisses HDS a second time');
+nativeClose.aboutToDisappear();assert.equal(dismissed.length,closes);
+const expired = notice('expired');expired.aboutToAppear();expired.expiresAt=Date.now()-1;
+const expireCloses=dismissed.length;expired.aboutToDisappear();
+assert.equal(dismissed.length,expireCloses,'native timeout does not trigger a second close');
 let pages = 0;
 for (const dir of fs.readdirSync('.').filter(x => x.startsWith('feature_'))) {
   const root = path.join(dir, 'src/main/ets/components');

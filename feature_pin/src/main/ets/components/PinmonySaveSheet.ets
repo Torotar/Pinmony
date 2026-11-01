@@ -50,15 +50,14 @@ export struct PinmonySaveSheet {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_reload_boards_c3e7cfa5"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.result.busy && !this.result.loading })
       }.width('100%').padding(20).backgroundColor($r('app.color.page_background'))
     } else {
+    Stack({ alignContent: Alignment.Center }) {
     Column({ space: 12 }) {
       if (this.result.error) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText('pm_reload_boards_c3e7cfa5'), actionEnabled: !this.result.busy, onAction: () => this.onRetry?.() })
       }
-      if (this.result.feedback) {
+      // Confirmed saves are announced once by the owner after the Sheet closes.
+      if (this.result.feedback && !this.result.savedId) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.feedback, this.uiLanguage) })
-      }
-      if (this.result.busy || this.result.loading) {
-        LoadingProgress().color($r('app.color.accent')).width(28).height(28)
       }
       if (this.creating) {
         Text(this.uiText("pm_board_name_dd9a7122")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
@@ -74,14 +73,15 @@ export struct PinmonySaveSheet {
             .onChange((value: boolean) => this.secret = value)
         }.width('100%')
         Row({ space: 12 }) {
-          Button(this.uiText("pm_back_to_boards_dcf21f0d")).layoutWeight(1).height(44).fontSize(14)
+          Button(this.uiText("pm_back_to_boards_dcf21f0d"), { type: ButtonType.Normal }).layoutWeight(1).height(44).fontSize(14).borderRadius(16)
             .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
             .enabled(!this.result.busy).onClick(() => {
               this.creating = false;
               if (this.onCreatingChange) this.onCreatingChange(false);
             })
-          Button(this.uiText("pm_create_cde2cd07")).layoutWeight(1).height(44).fontSize(14)
-            .backgroundColor($r('app.color.detail_accent')).fontColor($r('app.color.detail_on_accent'))
+          Button(this.uiText("pm_create_cde2cd07"), { type: ButtonType.Normal }).layoutWeight(1).height(44).fontSize(14).borderRadius(16)
+            .backgroundColor(!!this.name.trim() && !this.result.busy && !this.result.loading ? $r('app.color.accent') : $r('app.color.surface_muted'))
+            .fontColor(!!this.name.trim() && !this.result.busy && !this.result.loading ? $r('app.color.detail_on_accent') : $r('app.color.secondary_text'))
             .enabled(!!this.name.trim() && !this.result.busy && !this.result.loading)
             .onClick(() => { if (this.onCreate) this.onCreate(this.name.trim(), this.secret); })
         }.width('100%').margin({ top: 16 })
@@ -154,6 +154,10 @@ export struct PinmonySaveSheet {
         }
       }
     }.width('100%').height('100%').padding({left:16,right:16,top:16,bottom:0}).backgroundColor($r('app.color.page_background'))
+    if (this.result.busy || this.result.loading) {
+      LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None)
+    }
+    }.width('100%').height('100%')
     }
   }
 }

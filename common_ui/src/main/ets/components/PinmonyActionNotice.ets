@@ -1,4 +1,6 @@
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
+import { PinmonySnackBarLifecycle } from '../services/PinmonySnackBarLifecycle';
 
 class PinmonyActionNoticeLease {
   static serial: number = 0;
@@ -20,17 +22,22 @@ export struct PinmonyActionNotice {
   private closedKey: string = '';
   private generation: number = 0;
   private lease: number = -1;
+  private expiresAt: number = 0;
 
   aboutToAppear(): void { this.mounted = true; this.syncNotice(); }
   aboutToDisappear(): void { this.mounted = false; this.dismissNotice(); }
-  private dismissNotice(): void {
+  private dismissNotice(nativeClosed: boolean = false): void {
     this.generation++;
-    if (this.lease === PinmonyActionNoticeLease.serial) {
-      this.snack?.dismiss();
-      PinmonyActionNoticeLease.close = undefined;
+    const owns: boolean = this.lease === PinmonyActionNoticeLease.serial;
+    const snack: HdsSnackBar | undefined = this.snack;
+    const shouldDismiss: boolean = owns && !nativeClosed && Date.now() < this.expiresAt;
+    // Revoke ownership before calling HDS: close callbacks may be synchronous.
+    if (owns) PinmonyActionNoticeLease.close = undefined;
+    this.lease = -1; this.shownKey = ''; this.expiresAt = 0; this.snack = undefined;
+    if (shouldDismiss && snack) {
+      PinmonyRuntimeLog.info('AsyncAction: stage=notice-dismiss');
+      PinmonySnackBarLifecycle.dismiss(snack);
     }
-    this.lease = -1;
-    this.shownKey = '';
   }
   private syncNotice(): void {
     const key: string = this.scope + ':' + this.message + ':' + this.actionText + ':' + this.actionEnabled;
@@ -44,12 +51,14 @@ export struct PinmonyActionNotice {
     const generation: number = this.generation;
     if (!this.snack) this.snack = new HdsSnackBar(this.getUIContext());
     const canAct: boolean = !!this.actionText && this.actionEnabled;
-    const close = (): void => {
+    const close = (nativeClosed: boolean = false): void => {
       if (generation !== this.generation || !this.mounted) return;
       this.closedKey = key;
-      this.dismissNotice();
+      this.dismissNotice(nativeClosed);
     };
-    this.snack.show({ icon: $r('sys.symbol.exclamationmark_circle'), iconType: SnackBarIconType.NORMAL },
+    this.expiresAt = Date.now() + 4000;
+    PinmonyRuntimeLog.info('AsyncAction: stage=notice-show');
+    try { PinmonySnackBarLifecycle.show(this.snack, { icon: $r('sys.symbol.exclamationmark_circle'), iconType: SnackBarIconType.NORMAL },
       { title: this.message }, {
         operationType: canAct ? SnackBarOperationType.TEXT_WITH_CLOSE : SnackBarOperationType.CLOSE_BUTTON_ONLY,
         content: canAct ? this.actionText : undefined,
@@ -58,8 +67,9 @@ export struct PinmonyActionNotice {
           if (generation !== this.generation || !this.mounted || !this.active || !this.actionEnabled) return;
           close(); this.onAction?.();
         },
-        onCloseButtonClick: close
-      }, { duration: 4000, pressBackCallback: close });
+        onCloseButtonClick: (): void => close(true)
+      }, { duration: 4000, pressBackCallback: (): void => close(true) });
+    } catch (_) { this.closedKey = key; this.dismissNotice(true); PinmonyRuntimeLog.warn('ActionNotice: show-failed'); }
   }
   build() {
     Blank().width(0).height(0).accessibilityLevel('no').hitTestBehavior(HitTestMode.None)

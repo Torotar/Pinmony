@@ -1,4 +1,8 @@
 export interface PinmonyCountry { key: string; name: string; }
+export interface PinmonyRecommendationBoard {
+  id: string; name: string; image: string; pinCount?: number; updatedAt: number;
+  enabled?: boolean;
+}
 export interface PinmonyAccountSettings {
   page: string;
   token: number;

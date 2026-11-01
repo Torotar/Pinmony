@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -8,8 +9,9 @@ import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyP
 import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyProfilePanelPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private editTitleInset(): number { return this.snapshot.mode === 'edit' ? this.getUIContext().px2vp(this.statusBarHeightPx) + 56 : 0; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') @Watch('syncFollowingLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncUsername') snapshot: PinmonyProfilePanel;
@@ -83,9 +85,9 @@ export struct PinmonyProfilePanelPage {
   private readonly scroller: Scroller = new Scroller();
   aboutToAppear(): void { this.syncUsername(); this.paths.pushPath({ name: 'profile-panel' }, false); }
   private options(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: this.snapshot.mode !== 'edit',
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
       content: { title: { mainTitle: this.snapshot.mode === 'edit' ? this.uiText("pm_edit_profile_3b0b2bb8") : this.snapshot.mode === 'followers' ? this.uiText("pm_followers_261c51c9") : this.uiText("pm_following_7dfa5d8f") },
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.snapshot.mode === 'edit' ? [{ content: {
@@ -188,8 +190,9 @@ export struct PinmonyProfilePanelPage {
           }
           if (this.snapshot.moreError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_followers_db11cdc1"), actionEnabled: this.snapshot.mode === 'followers' && this.snapshot.hasMore && !this.snapshot.moreLoading && !this.followingBusy && !this.saving, onAction: () => { this.onLoadMore?.(); } }) }
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
-        }.width('100%').padding({ left: 24, right: 24, top: this.snapshot.mode === 'following' ? 0 : 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
+        }.width('100%').padding({ left: 24, right: 24, top: this.editTitleInset() + (this.snapshot.mode === 'following' ? 0 : 16), bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').height('100%').align(Alignment.Top).clip(true)
+        .scrollBarMargin({ start: LengthMetrics.vp(this.editTitleInset()) })
         .edgeEffect(this.snapshot.mode === 'edit' ? EdgeEffect.Spring : EdgeEffect.None, { alwaysEnabled: true })
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
           .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))

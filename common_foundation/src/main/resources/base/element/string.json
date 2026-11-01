@@ -1,6 +1,37 @@
 {
   "string": [
-    { "name": "pm_board_section_sync_pending", "value": "区块内容尚未同步，请稍后重试" },
+    {
+      "name": "pm_recommend_boards_description",
+      "value": "关闭图板的个性化开关，以移除基于该图板的主页标签和推荐。这不会影响图板及其中的 Pin 图。"
+    },
+    {
+      "name": "pm_recommend_board_unavailable",
+      "value": "暂时无法读取个性化设置"
+    },
+    {
+      "name": "pm_recommend_board_today",
+      "value": "今天"
+    },
+    {
+      "name": "pm_recommend_board_days",
+      "value": "{0} 天前"
+    },
+    {
+      "name": "pm_recommend_board_weeks",
+      "value": "{0} 周前"
+    },
+    {
+      "name": "pm_recommend_board_months",
+      "value": "{0} 个月前"
+    },
+    {
+      "name": "pm_recommend_board_years",
+      "value": "{0} 年前"
+    },
+    {
+      "name": "pm_board_section_sync_pending",
+      "value": "区块内容尚未同步，请稍后重试"
+    },
     {
       "name": "pm_detail_paid_link",
       "value": "付费链接"
@@ -1014,6 +1045,14 @@
       "value": "暂无推荐联系人"
     },
     {
+      "name": "pm_profile_minutes_ago",
+      "value": " 分钟前"
+    },
+    {
+      "name": "pm_profile_hours_ago",
+      "value": " 小时前"
+    },
+    {
       "name": "pm_just_now_de6785d9",
       "value": "刚刚"
     },
@@ -1188,6 +1227,14 @@
     {
       "name": "pm_content_made_entirely_or_partly_with_ai_3beb552d",
       "value": "完全或部分由 AI 制作的内容"
+    },
+    {
+      "name": "pm_remove_saved_pin",
+      "value": "移除此 Pin 图"
+    },
+    {
+      "name": "pm_remove_saved_pin_confirm",
+      "value": "确定要从你的图板移除此 Pin 图吗？"
     },
     {
       "name": "pm_delete_pin_e216e3fe",
@@ -5721,6 +5768,50 @@
       "name": "pm_publish_source_website",
       "value": "网站链接"
     },
-    {"name":"pm_board_cover_adjust","value":"调整封面位置"}
+    {
+      "name": "pm_board_cover_adjust",
+      "value": "调整封面位置"
+    },
+    {
+      "name": "pm_language_portuguese_brazil",
+      "value": "葡萄牙语（巴西）"
+    },
+    {
+      "name": "pm_message_recipient_settings_restricted",
+      "value": "糟糕！由于收件人的消息设置，消息无法发送"
+    },
+    {
+      "name": "pm_profile_pins_end",
+      "value": "没有更多 Pin 图了"
+    },
+    {
+      "name": "pm_photo_history_manage",
+      "value": "删除历史照片"
+    },
+    {
+      "name": "pm_photo_history_delete_all",
+      "value": "全部删除"
+    },
+    {
+      "name": "pm_photo_history_delete_all_confirm",
+      "value": "删除全部照片搜索历史？此操作会提交到服务器。"
+    },
+    { "name": "pm_photo_history_pending_delete", "value": "待删除" },
+    {
+      "name": "pm_photo_history_deleted",
+      "value": "已成功删除"
+    },
+    {
+      "name": "pm_photo_history_delete_unconfirmed",
+      "value": "删除结果未确认，请重新打开历史页核对。"
+    },
+    {
+      "name": "pm_photo_history_restore_unconfirmed",
+      "value": "恢复结果未确认，请重新打开历史页核对。"
+    },
+    {
+      "name": "pm_photo_history_delete_all_incomplete",
+      "value": "尚未读取全部历史，未执行全部删除。"
+    }
   ]
 }

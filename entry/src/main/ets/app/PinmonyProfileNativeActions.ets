@@ -2,7 +2,7 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileStore, PinmonyProfilePanel, PinmonyProfilePanelItem, PinmonyProfileSnapshot, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard, PIN_PROFILE_ORGANIZE_ENABLED, pickPublishPhotoUris, readProfileAvatarPhoto, PinmonyProfileAvatarPhoto } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
-import { PinmonyProfileSettingsClient, ProfileSettingsPorts, ProfileSettingsResponse, ProfileSettingsResource, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
+import { PIN_NATIVE_PROFILE_SETTINGS_ENABLED, PinmonyProfileSettingsClient, ProfileSettingsPorts, ProfileSettingsResponse, ProfileSettingsResource, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
 interface AvatarPending { account: string; tracking: string; }
 let avatarSequence: number = 0;
 let boardFollowSequence: number = 0;
@@ -211,7 +211,7 @@ export class PinmonyProfileNativeActions {
     private organize: PinmonyOrganizeSnapshot | undefined = undefined;
     private cursor: string = '';
     constructor(ports: PinmonyProfileNativeActionsPorts) { this.ports = ports; this.store = ports.store(); this.client = new PinmonyProfileSettingsClient(ports); }
-    private current(revision: number): boolean { const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.active() && this.ports.page() === this.page && this.store.panelToken === this.token; }
+    private current(revision: number): boolean { if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return false; const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.active() && this.ports.page() === this.page && this.store.panelToken === this.token; }
     private panel(): void {
         if (this.store.panel)
             this.store.panel = JSON.parse(JSON.stringify(this.store.panel)) as PinmonyProfilePanel;
@@ -329,6 +329,7 @@ export class PinmonyProfileNativeActions {
         return p.data as GraphData;
     }
     async open(mode: string, section: string): Promise<void> {
+        if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
         if (!this.ports.active() || this.store.saving || this.store.followingBusy || !['edit', 'following', 'followers'].includes(mode) || !['users', 'boards'].includes(section))
             return;
         const revision: number = this.begin();
@@ -432,6 +433,7 @@ export class PinmonyProfileNativeActions {
         finally { if(this.current(revision) && this.store.panel){this.store.panel.moreLoading = false;this.panel();} }
     }
     async follow(id: string): Promise<void> {
+        if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
         if(id && this.store.panel?.section === 'boards'){await this.followBoard(id);return;}
         if (!this.ports.active() || this.store.followingBusy || this.store.saving)
             return;
@@ -660,6 +662,7 @@ export class PinmonyProfileNativeActions {
         }
     }
     async save(text: string): Promise<void> {
+        if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
         const p: PinmonyProfilePanel | undefined = this.store.panel, revision: number = this.revision;
         if (!p || p.mode !== 'edit' || p.loading || p.avatarBusy || !this.current(revision) || this.saving || this.saveUnknown || !this.client.permissions.includes('own'))
             return;
@@ -772,6 +775,7 @@ export class PinmonyProfileNativeActions {
         }
     }
     async organizeAction(action: string, value: string, secret: boolean): Promise<void> {
+        if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
         if (!PIN_PROFILE_ORGANIZE_ENABLED || !this.ports.active())
             return;
         if (['morePins', 'retryPins'].includes(action)) {

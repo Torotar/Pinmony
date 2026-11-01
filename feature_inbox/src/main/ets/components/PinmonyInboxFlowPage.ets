@@ -1,10 +1,11 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, TextStyleMode, DividerShowType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { InboxFlowUser, InboxFlowMessage, PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyInboxBoardCard } from './PinmonyInboxBoardCard';
@@ -13,8 +14,10 @@ interface ReactionPopupState { isVisible: boolean; }
 
 @Component
 export struct PinmonyInboxFlowPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @State private flowHeaderHeight: number = 0;
+  private titleContentInset(): number { return (this.snapshot.screen === 'compose') ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('snapshotChanged') snapshot: PinmonyInboxFlowSnapshot = {} as PinmonyInboxFlowSnapshot;
@@ -558,6 +561,10 @@ export struct PinmonyInboxFlowPage {
     HdsNavDestination() {
     Stack({ alignContent: Alignment.Center }) {
     Column() {
+      Stack({alignContent:Alignment.TopStart}) {
+      if ((this.snapshot.screen === 'compose' && !this.snapshot.directContact) || !!this.snapshot.error ||
+          (this.snapshot.loading && this.snapshot.screen !== 'chat' && !this.snapshot.directContact)) {
+      Column() {
       if (this.snapshot.screen === 'compose' && !this.snapshot.directContact) {
         TextInput({ text: this.query, placeholder: this.uiText("pm_search_by_name_or_email_0c503b47") }).margin({ left: 16, right: 16, bottom: 8 })
           .enabled(!this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain)
@@ -571,13 +578,17 @@ export struct PinmonyInboxFlowPage {
       if (this.snapshot.error) {
         Column({ space: 8 }) {
           PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage),
-            actionText: this.snapshot.writeUncertain ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
+            actionText: this.snapshot.recipientRestricted ? '' : this.snapshot.writeUncertain ? this.uiText("pm_reload_df7392cc") : this.uiText("pm_retry_b8784c8d"),
             actionEnabled: !(this.snapshot.screen === 'settings' && this.snapshot.writeUncertain),
             onAction: () => this.act('retry') })
         }.padding(16)
       }
       if (this.snapshot.loading && this.snapshot.screen !== 'chat' && !this.snapshot.directContact) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
 
+      }.width('100%').margin({top:this.titleContentInset()}).backgroundColor($r('app.color.page_background')).zIndex(1)
+        .onAreaChange((_old:Area,area:Area) => {this.flowHeaderHeight = Number(area.height);})
+        .onDisAppear(() => { this.flowHeaderHeight = 0; })
+      }
       Scroll(this.scroller) {
         Column() {
           if (this.snapshot.screen === 'compose' && this.snapshot.directContact) {
@@ -600,7 +611,7 @@ export struct PinmonyInboxFlowPage {
               (message: InboxFlowMessage) => message.id)
           }
         }.width('100%').alignItems(HorizontalAlign.Start)
-          .padding({ bottom: this.snapshot.screen === 'settings' ? 120 : 20 })
+          .padding({ top:this.titleContentInset() + this.flowHeaderHeight, bottom: this.snapshot.screen === 'settings' ? 120 : 20 })
           .onAreaChange((_old: Area, area: Area) => {
             this.contentHeight = Number(area.height);
             if (this.historyPending && !this.snapshot.loading && this.contentHeight > this.historyHeight) {
@@ -609,8 +620,9 @@ export struct PinmonyInboxFlowPage {
             }
             this.positionChat();
           })
-      }.width('100%').layoutWeight(1).align(Alignment.TopStart)
+      }.width('100%').height('100%').align(Alignment.TopStart)
         .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: this.snapshot.screen === 'settings' || this.snapshot.screen === 'compose' })
         .onScrollStop(() => {
           if (this.chatPosition.canLoadHistory()) this.captureChatOffset();
           if (!this.active || this.snapshot.screen !== 'chat' || !this.chatPosition.canLoadHistory() || !this.snapshot.hasMore || this.snapshot.loading || this.historyPending || this.snapshot.error) return;
@@ -618,11 +630,13 @@ export struct PinmonyInboxFlowPage {
           this.historyHeight = this.contentHeight; this.historyOffset = this.scroller.currentOffset().yOffset;
           this.historyPending = true; this.act('more');
         })
+        .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.flowHeaderHeight)})
         .onAreaChange((_old: Area, area: Area) => { this.viewportHeight = Number(area.height); this.positionChat(); })
         .onDidScroll((_x: number, _y: number, state: ScrollState) => {
           const offset: number = this.scroller.currentOffset().yOffset;
           if (this.visible && this.active && this.snapshot.screen === 'chat') this.chatPosition.record(offset, state === ScrollState.Scroll);
         })
+      }.width('100%').layoutWeight(1)
       if (this.snapshot.screen === 'chat') {
         Row({ space: 8 }) {
           TextInput({ text: this.draft, placeholder: this.uiText("pm_write_a_message_2156709a") }).layoutWeight(1).maxLength(2000)
@@ -644,7 +658,7 @@ export struct PinmonyInboxFlowPage {
           }
         }.padding({ left: 16, right: 16, top: 8, bottom: 24 })
         if (this.snapshot.sendError) {
-          PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.sendError, this.uiLanguage), actionText: this.uiText("pm_reload_conversation_585a78c6"), onAction: () => this.act('retry') })
+          PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.sendError, this.uiLanguage), actionText: this.snapshot.recipientRestricted ? '' : this.uiText("pm_reload_conversation_585a78c6"), onAction: () => this.act('retry') })
         }
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
@@ -661,18 +675,18 @@ export struct PinmonyInboxFlowPage {
     }
     }.width('100%').height('100%')
     }.width('100%').height('100%')
-      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-        style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-          scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-          systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-          scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
+      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: (this.snapshot.screen === 'compose'),
+        style: { blurStrategy: (this.snapshot.screen !== 'compose' && this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.snapshot.screen !== 'compose' && this.immersiveLightMode !== 'off'),
+          scrollEffectOpts: { enableScrollEffect: (this.snapshot.screen !== 'compose' && this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+          systemMaterialEffect: this.snapshot.screen === 'compose' ? undefined : PinmonyImmersiveLight.effect(this.immersiveLightMode),
+          scrollEffectStyle: { backgroundStyle: { backgroundColor: this.snapshot.screen === 'compose' ? $r('app.color.page_background') : $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.snapshot.screen !== 'compose' && this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { dividerStyle: { dividerColor: Color.Transparent }, backIconStyle: { backgroundColor: (this.snapshot.screen === 'compose') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: (this.snapshot.screen === 'compose') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { dividerStyle: { dividerColor: Color.Transparent }, backIconStyle: { backgroundColor: (this.snapshot.screen === 'compose') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: (this.snapshot.screen === 'compose') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: this.snapshot.screen === 'compose' ? $r('app.color.page_background') : Color.Transparent, maskExtraHeight: 0, blurRadius: (this.snapshot.screen !== 'compose' && this.immersiveLightMode !== 'off') ? 18 : 0 } }
         },
-        content: { title: { mainTitle: this.snapshot.screen === 'chat' || this.snapshot.directContact ? '' :
+        content: { divider: { showType: DividerShowType.OFF }, title: { mainTitle: this.snapshot.screen === 'chat' || this.snapshot.directContact ? '' :
           this.snapshot.screen === 'compose' ? this.uiText("pm_new_message_3fc957bf") : PinmonyI18n.render(this.snapshot.title, this.uiLanguage) || this.uiText("pm_message_settings_57326743") },
           stackBuilder: this.conversationTitleBuilder,
           backIcon: { isEnabled: true, action: () => this.act('back') },
           menu: { value: this.snapshot.screen === 'chat' ? [{ content: { icon: $r('app.media.lucide_ellipsis'), label: this.uiText("pm_message_settings_57326743"), action: () => this.act('settings') } }] :
-            this.snapshot.screen === 'compose' && !this.snapshot.directContact ? [{ content: { icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontSize(24).fontWeight(FontWeight.Medium).fontColor([$r('app.color.primary_text')]), label: this.uiText("pm_next_acfc4e74"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
+            this.snapshot.screen === 'compose' && !this.snapshot.directContact ? [{ content: { icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontSize(24).fontWeight(FontWeight.Medium).fontColor([$r('app.color.primary_text')]), label: this.uiText("pm_next_acfc4e74"), isEnabled: !this.snapshot.loading && !this.snapshot.sending && !this.snapshot.messageBusy && !this.snapshot.writeUncertain && !this.snapshot.recipientRestricted && this.snapshot.selectedIds.length > 0, action: () => this.act('next') } }] : [] } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
       .backgroundColor($r('app.color.page_background'))
       .bindToScrollable([this.scroller])

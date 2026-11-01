@@ -1,4 +1,4 @@
-import { PinmonyActionNotice } from 'common_ui';
+import { PinmonyActionNotice, PinmonyListDataSource } from 'common_ui';
 import { BlurStrategy, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyImageSearchView, PinmonyImageSearchResult, PinmonyImageSearchItem, PinmonyImageCrop } from 'common_ui';
@@ -11,14 +11,31 @@ import { PinmonySearchQuizPanel } from './PinmonySearchQuizPanel';
 import { ComponentContent } from '@kit.ArkUI';
 import { buildPhotoMenu, PinmonyPhotoMenuOptions } from './PinmonyPhotoMenu';
 import { PinmonyPhotoHistoryView } from './PinmonyPhotoHistoryPage';
-import { PinmonyPhotoHistoryPage } from '../models/PinmonyPhotoHistory';
+import { PinmonyPhotoHistoryPage, PinmonyPhotoHistoryOrigin } from '../models/PinmonyPhotoHistory';
 import { Chip, ChipSize } from '@kit.ArkUI';
 import { HdsNavDestination, HdsNavigation, HdsNavDestinationTitleMode, HdsNavigationTitleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySearchCategory, PinmonySearchResult, PinmonySearchSnapshot,
   PinmonySearchQuiz, PinmonySearchSuggestion, PinmonySearchHero, PinmonySearchIdea, PinmonySearchIdeaSection } from '../models/PinmonySearch';
 
+interface PinmonySearchResultRow {
+  item?: PinmonySearchResult;
+  key: string;
+}
+
 @Component
 export struct PinmonySearchPage {
+  private readonly resultRows: PinmonyListDataSource<PinmonySearchResultRow> = new PinmonyListDataSource<PinmonySearchResultRow>();
+  private syncResultRows(): void {
+    const results: PinmonySearchResult[] = this.snapshot.results || [];
+    const rows: PinmonySearchResultRow[] = [];
+    if (this.entryQuiz && !results.every((item: PinmonySearchResult): boolean => item.kind === 'board')) {
+      rows.push({ key: 'search-inspiration:' + this.uiLanguage });
+    }
+    results.forEach((item: PinmonySearchResult): void => {
+      rows.push({ item: item, key: this.snapshot.pageKey + ':' + this.uiLanguage + ':' + JSON.stringify(item) });
+    });
+    this.resultRows.update(rows, rows.map((row: PinmonySearchResultRow): string => row.key));
+  }
   @StorageLink('pinmonyRootScrollTop1') @Watch('onRootScrollTop') private rootScrollTop: number = 0;
   private onRootScrollTop(): void {
     try {
@@ -33,30 +50,39 @@ export struct PinmonySearchPage {
   }
 
   @State private photoMenuOpen: boolean = false;
+  private photoMenuSelection: number = -1;
+  private photoMenuClosing: boolean = false;
+  private photoMenuEpoch: number = 0;
   private photoMenuContent: ComponentContent<PinmonyPhotoMenuOptions> | undefined = undefined;
   @State private photoHistoryVisible: boolean = false;
+  @State private photoHistoryOrigin: PinmonyPhotoHistoryOrigin | undefined = undefined;
+  @State private photoClosing: boolean = false;
+  @State private photoHistoryLifted: boolean = false;
   onPhotoHistory?: (cursor: string) => Promise<PinmonyPhotoHistoryPage>;
+  onDeletePhotoHistory?: (ids: string[]) => Promise<void>;
   onSelectPhotoHistory?: (id: string, onSelected: (uri: string) => void) => Promise<PinmonySearchResult[] | undefined>;
   private openPhotoHistory(): void {
     this.photoHistoryVisible = true;
     if (this.onPhotoVisibilityChange) this.onPhotoVisibilityChange(true);
-    this.searchPathStack.pushPath({ name: 'photo-history' }, false);
+    this.searchPathStack.pushPath({ name: 'photo-history' }, true);
   }
   private closePhotoHistory(): void {
     if (!this.photoHistoryVisible) return;
     this.photoHistoryVisible = false; this.photoGeneration++;
-    if (this.searchPathStack.getAllPathName().includes('photo-history')) this.searchPathStack.pop(false);
+    if (this.searchPathStack.getAllPathName().includes('photo-history')) this.searchPathStack.pop(true);
     if (this.onPhotoCancel) this.onPhotoCancel();
     if (this.onPhotoVisibilityChange) this.onPhotoVisibilityChange(false);
   }
-  private async selectPhotoHistory(id: string): Promise<void> {
+  private async selectPhotoHistory(id: string, origin?: PinmonyPhotoHistoryOrigin): Promise<void> {
     if (!this.onSelectPhotoHistory) return;
     const generation: number = ++this.photoGeneration;
     this.photoBusy = true; this.photoError = false; this.photoResults = [];
     try {
       const results: PinmonySearchResult[] | undefined = await this.onSelectPhotoHistory(id, (uri: string): void => {
         if (!this.active || generation !== this.photoGeneration) return;
-        this.photoHistoryVisible = false; this.searchPathStack.pop(false);
+        this.photoHistoryOrigin = origin && origin.width > 0 && origin.height > 0 ? origin : undefined;
+        this.photoClosing = false;
+        this.photoHistoryLifted = false;
         this.photoPreview = uri; this.searchPathStack.pushPath({ name: 'photo-search' }, false);
       });
       if (generation !== this.photoGeneration || !this.active) return;
@@ -68,28 +94,46 @@ export struct PinmonySearchPage {
     } finally { if (generation === this.photoGeneration) this.photoBusy = false; }
   }
   private async photoMenu(): Promise<void> {
-    if (!this.active || !this.interactionReady || this.photoMenuOpen || this.photoBusy) return;
+    if (!this.active || !this.interactionReady || this.photoMenuOpen || this.photoMenuClosing || this.photoBusy) return;
+    this.photoMenuSelection = -1;
+    const epoch: number = ++this.photoMenuEpoch;
     this.photoMenuOpen = true;
     try {
       const options: PinmonyPhotoMenuOptions = { select: (index: number) => { this.selectPhotoMenu(index); } };
       if (!this.photoMenuContent) this.photoMenuContent = new ComponentContent(this.getUIContext(), wrapBuilder(buildPhotoMenu), options);
       await this.getUIContext().getPromptAction().openMenu(this.photoMenuContent, { id: 'pinmony-photo-search-menu' }, {
-        onDisappear: () => { this.photoMenuOpen = false; }
+        onDisappear: () => { if (epoch === this.photoMenuEpoch) this.photoMenuDisappeared(); }
       });
     } catch (_) { this.photoMenuOpen = false; }
   }
-  private async selectPhotoMenu(index: number): Promise<void> {
-    await this.dismissPhotoMenu();
-    if (!this.active || !this.interactionReady || this.photoBusy) return;
-    if (index === 0) this.startPhotoSearch();
-    else if (index === 1) this.openPhotoHistory();
+  private selectPhotoMenu(index: number): void {
+    if (!this.photoMenuOpen || this.photoMenuClosing || this.photoMenuSelection >= 0 ||
+      !this.active || !this.interactionReady || this.photoBusy || (index !== 0 && index !== 1)) return;
+    // MenuItem owns dismissal. Do not close the same menu again from its click handler.
+    PinmonyRuntimeLog.info('AsyncAction: stage=photo-menu-select');
+    this.photoMenuSelection = index;
+  }
+  private photoMenuDisappeared(): void {
+    this.photoMenuOpen = false;
+    const selected: number = this.photoMenuSelection;
+    this.photoMenuSelection = -1;
+    if (this.photoMenuClosing || !this.active || !this.interactionReady || this.photoBusy) return;
+    try {
+      if (selected === 0) this.startPhotoSearch().catch((): void => {
+        PinmonyRuntimeLog.warn('PhotoMenu: selection failed action=upload');
+      });
+      else if (selected === 1) this.openPhotoHistory();
+    } catch (_) { PinmonyRuntimeLog.warn('PhotoMenu: selection failed action=history'); }
   }
   private async dismissPhotoMenu(): Promise<void> {
-    if (this.photoMenuContent && this.photoMenuOpen) {
+    this.photoMenuSelection = -1;
+    if (this.photoMenuContent && this.photoMenuOpen && !this.photoMenuClosing) {
+      this.photoMenuClosing = true;
+      PinmonyRuntimeLog.info('AsyncAction: stage=photo-menu-dismiss');
       try { await this.getUIContext().getPromptAction().closeMenu(this.photoMenuContent); }
       catch (_) { /* The system may already have dismissed the menu. */ }
+      finally { this.photoMenuClosing = false; this.photoMenuOpen = false; }
     }
-    this.photoMenuOpen = false;
   }
   @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
   @State private photoPreview: string = '';
@@ -118,16 +162,26 @@ export struct PinmonySearchPage {
   }
   onPhotoVisibilityChange?: (visible: boolean) => void;
 
-  private closePhotoSearch(): void {
+  private closePhotoSearch(returnToHistory: boolean = false): void {
+    if (returnToHistory && this.photoHistoryOrigin && this.photoPreview) {
+      this.photoClosing = true;
+      return;
+    }
     this.dismissPhotoMenu();
-    if (this.photoHistoryVisible) this.closePhotoHistory();
     this.photoGeneration++;
     const wasVisible: boolean = !!this.photoPreview;
     this.photoPreview = '';
-    if (wasVisible && this.onPhotoVisibilityChange) this.onPhotoVisibilityChange(false);
     if (wasVisible && this.searchPathStack.getAllPathName().includes('photo-search')) this.searchPathStack.pop(false);
     this.photoBusy = false;
+    this.photoError = false;
     this.photoResults = [];
+    this.photoHistoryOrigin = undefined;
+    this.photoClosing = false;
+    this.photoHistoryLifted = false;
+    // Keep the history destination and its loaded selection/scroll position.
+    if (returnToHistory && this.photoHistoryVisible) return;
+    if (this.photoHistoryVisible) this.closePhotoHistory();
+    else if (wasVisible && this.onPhotoVisibilityChange) this.onPhotoVisibilityChange(false);
     if (this.onPhotoCancel) this.onPhotoCancel();
   }
 
@@ -161,13 +215,20 @@ export struct PinmonySearchPage {
   @Builder
   private searchDestination(name?: string, param?: Object) {
     if (name === 'photo-history') {
-      PinmonyPhotoHistoryView({ onLoad: this.onPhotoHistory,
-        onConfirm: (id: string) => this.selectPhotoHistory(id), onClose: () => this.closePhotoHistory() })
+      PinmonyPhotoHistoryView({ onLoad: this.onPhotoHistory, onDelete: this.onDeletePhotoHistory, photoLifted: this.photoHistoryLifted,
+        onConfirm: (id: string, origin?: PinmonyPhotoHistoryOrigin) => this.selectPhotoHistory(id, origin), onClose: () => this.closePhotoHistory() })
     } else if (name === 'photo-search') {
       HdsNavDestination() {
         PinmonyImageSearchView({ imageUrl: this.photoPreview, uploadedPhoto: true, result: this.photoResult(),
+          animatePhoto: !!this.photoHistoryOrigin, closing: this.photoClosing,
+          sourceSelectionBorder: !!this.photoHistoryOrigin,
+          imageWidth: this.photoHistoryOrigin?.imageWidth || 1, imageHeight: this.photoHistoryOrigin?.imageHeight || 1,
+          originX: this.photoHistoryOrigin?.x || 0, originY: this.photoHistoryOrigin?.y || 0,
+          originWidth: this.photoHistoryOrigin?.width || 0, originHeight: this.photoHistoryOrigin?.height || 0,
+          onTransitionReady: () => { this.photoHistoryLifted = true; },
+          onTransitionClosed: () => { this.photoHistoryOrigin = undefined; this.closePhotoSearch(true); },
           onSearch: (crop: PinmonyImageCrop) => { this.searchPhotoRegion(crop); },
-          onClose: () => this.closePhotoSearch(),
+          onClose: () => this.closePhotoSearch(true),
           onRelated: (id: string) => {
             if (this.onPhotoResult) this.onPhotoResult(id);
             this.closePhotoSearch();
@@ -177,18 +238,17 @@ export struct PinmonySearchPage {
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
         { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
-      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-        content: { title: { mainTitle: this.uiText('pm_photo_search') },
-          backIcon: { isEnabled: true, action: () => this.closePhotoSearch() } } })
-      .onBackPressed(() => { this.closePhotoSearch(); return true; })
+      .titleBar(this.photoSearchTitleBarOptions())
+      .onBackPressed(() => { this.closePhotoSearch(true); return true; })
+      .mode(this.photoHistoryOrigin ? NavDestinationMode.DIALOG : NavDestinationMode.STANDARD)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
-      .backgroundColor($r('app.color.page_background'))
+      .backgroundColor(this.photoHistoryOrigin ? Color.Transparent : $r('app.color.page_background'))
     } else {
       this.searchRootDestination(name, param)
     }
   }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') @Watch('syncResultRows') private uiLanguage: string = 'zh';
   private searchPlaceholder(): string {
     const value: string = this.snapshot.placeholder || '';
     // Generic control copy follows app language; website ghost queries stay original.
@@ -242,7 +302,13 @@ export struct PinmonySearchPage {
     if (!this.active) this.closePhotoSearch();
     if (!this.pagePresent) return;
     if (this.active || this.detailReturnPreview) { this.restoreHeroPosition(); this.ensureSearchDestination(); }
-    else this.searchPathStack.clear(false);
+    else {
+      // Both watched props change when a Pin opens. Wait for the retained
+      // presentation flag before clearing an inactive destination.
+      Promise.resolve().then((): void => {
+        if (this.pagePresent && !this.active && !this.detailReturnPreview) this.searchPathStack.clear(false);
+      });
+    }
     this.tracePresentation();
   }
 
@@ -425,6 +491,7 @@ export struct PinmonySearchPage {
     if (!quiz) this.entryQuiz = undefined;
     else if (quiz.mode === 'entry') this.entryQuiz = quiz;
     this.quizSheetOpen = !!quiz && quiz.mode !== 'entry';
+    this.syncResultRows();
     const shape: string = (this.entryQuiz ? '1:' : '0:') + this.snapshot.results.length.toString() + ':' + this.contentColumns().toString();
     if (shape !== this.flowShape) {
       this.flowShape = shape;
@@ -1325,14 +1392,14 @@ export struct PinmonySearchPage {
         this.searchStatus()
       } else if (this.allPins()) {
         WaterFlow({ scroller: this.resultsScroller, sections: this.flowSections }) {
-          if (this.entryQuiz) { FlowItem() { this.inspirationEntry() }.width('100%') }
-          ForEach(this.snapshot.results, (item: PinmonySearchResult) => {
+          LazyForEach(this.resultRows, (row: PinmonySearchResultRow) => {
             FlowItem() {
-              this.pinCard(item)
+              if (row.item) { this.pinCard(row.item) }
+              else { this.inspirationEntry() }
             }
             .width('100%')
-            .height(this.pinCardHeight(item))
-          }, (item: PinmonySearchResult) => item.kind + ':' + item.targetUrl + ':' + item.title)
+            .height(row.item ? this.pinCardHeight(row.item) : undefined)
+          }, (row: PinmonySearchResultRow): string => row.key)
         }
         .columnsTemplate(this.contentColumnsTemplate())
         .columnsGap(12)
@@ -1359,9 +1426,9 @@ export struct PinmonySearchPage {
         })
       } else if (this.snapshot.results.every((item: PinmonySearchResult): boolean => item.kind === 'board')) {
         WaterFlow({ scroller: this.resultsScroller }) {
-          ForEach(this.snapshot.results, (item: PinmonySearchResult) => {
-            FlowItem() { this.boardResult(item) }.width('100%')
-          }, (item: PinmonySearchResult) => item.id)
+          LazyForEach(this.resultRows, (row: PinmonySearchResultRow) => {
+            FlowItem() { if (row.item) { this.boardResult(row.item) } }.width('100%')
+          }, (row: PinmonySearchResultRow): string => row.key)
         }.columnsTemplate(this.contentColumnsTemplate()).columnsGap(12).rowsGap(24)
           .width('100%').layoutWeight(1).padding({ left: 12, right: 12, top: this.searchFeedInset() + 16 })
           .clipContent(ContentClipMode.BOUNDARY).cachedCount(12, true).clip(false)
@@ -1376,12 +1443,13 @@ export struct PinmonySearchPage {
           .onAreaChange((_old: Area, area: Area) => this.resultsAreaChanged(area))
       } else {
         List({ scroller: this.resultsScroller }) {
-          if (this.entryQuiz) { ListItem() { this.inspirationEntry() }.padding(12) }
-          ForEach(this.snapshot.results, (item: PinmonySearchResult) => {
+          LazyForEach(this.resultRows, (row: PinmonySearchResultRow) => {
             ListItem() {
-              this.resultRow(item)
+              if (row.item) { this.resultRow(row.item) }
+              else { this.inspirationEntry() }
             }
-          }, (item: PinmonySearchResult) => item.kind + ':' + item.targetUrl + ':' + item.title)
+            .padding(row.item ? 0 : 12)
+          }, (row: PinmonySearchResultRow): string => row.key)
         }
         .width('100%')
         .layoutWeight(1)
@@ -1464,7 +1532,9 @@ export struct PinmonySearchPage {
           }.width('100%').height('100%')
             .zIndex(1)
             .transition(TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
-              TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })))
+              this.historyExitToRoot ?
+                TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn }) :
+                TransitionEffect.IDENTITY))
         }
       }.width('100%').height('100%')
     }
@@ -1561,6 +1631,18 @@ export struct PinmonySearchPage {
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .clip(false)
     .backgroundColor($r('app.color.page_background'))
+  }
+
+  private photoSearchTitleBarOptions(): HdsNavigationTitleBarOptions {
+    return {
+      avoidLayoutSafeArea: true,
+      enableComponentSafeArea: true,
+        style: { blurStrategy: BlurStrategy.DISABLE, thermoCtrl: false, scrollEffectOpts: { enableScrollEffect: false },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: 0 } } },
+      content: { title: { mainTitle: this.uiText('pm_photo_search') },
+        backIcon: { label: this.uiText('pm_back_572cf45b'), isEnabled: true, action: () => this.closePhotoSearch(true) } }
+    };
   }
 
   private searchTitleBarOptions(): HdsNavigationTitleBarOptions {

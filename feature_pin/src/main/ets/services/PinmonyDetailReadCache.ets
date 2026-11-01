@@ -12,12 +12,14 @@ export interface PinmonyDetailReadCachePorts {
 
 // Keeps retained comments/related reads presentation-only and session-bound.
 export class PinmonyDetailReadCache {
-  private readonly cache: LruCache<string> = new LruCache<string>(24, 300000);
+  private readonly cache: LruCache<string> = new LruCache<string>(24, 300000, undefined,
+    4 * 1024 * 1024, (value: string): number => value.length * 2);
   private retainedPin: string = '';
   private readonly ports: PinmonyDetailReadCachePorts;
   constructor(ports: PinmonyDetailReadCachePorts) { this.ports = ports; }
 
   clear(): void { this.cache.clear(); this.retainedPin = ''; }
+  trimMemory(): void { this.cache.clear(); }
   setPin(pin: string): void { this.retainedPin = this.ports.pinIdentity(pin); }
   getPin(): string { return this.retainedPin; }
 

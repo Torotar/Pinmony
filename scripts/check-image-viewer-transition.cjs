@@ -6,10 +6,10 @@ const tall=imageContainRect(720,360,400,800);assert.equal(tall.width,180);assert
 const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyImageViewer.ets','utf8');const sf=ts.createSourceFile('viewer.ts',source.replace(/\bstruct\b/g,'class'),99,true);
 const names=['aboutToAppear','aboutToDisappear','imageDecoded','beginTransition','containRect','sourceRect','sourceRadius','setFrame','transitionChanged'];const methods=[];
 function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(sf)))methods.push(n.getText(sf));ts.forEachChild(n,visit);}visit(sf);
-const timers=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;', {compilerOptions:{target:99}}).outputText,{imageContainRect,curves:{springMotion:()=>0},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{}});
+const timers=[],delays=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;', {compilerOptions:{target:99}}).outputText,{imageContainRect,PinmonyRuntimeLog:{info(){}},curves:{springMotion:()=>0},setTimeout:(fn,delay)=>{timers.push(fn);delays.push(delay);return timers.length;},clearTimeout:()=>{}});
 const x=new Host(),animations=[];let closed=0,ready=0;
 Object.assign(x,{origin:{x:12,y:90,width:336,height:400},detail:{imageWidth:800,imageHeight:400},viewportWidth:360,viewportHeight:720,transitionVersion:0,previewReady:false,originalReady:false,viewportMeasured:true,naturalWidth:0,naturalHeight:0,closing:false,onClosed:()=>closed++,onReady:()=>ready++,stopInertia:()=>{},getUIContext:()=>({animateTo:(o,fn)=>{animations.push(o);fn();}})});
-x.aboutToAppear();assert.equal(x.frameY,90);x.beginTransition();assert.equal(ready,0);x.imageDecoded(-1,false);assert.equal(ready,0);x.imageDecoded(0,false,800,400);assert.equal(ready,1,'data ready unblocks hidden preview');x.imageDecoded(1,false,800,400);assert.equal(ready,1,'render callback does not restart entry');timers.shift()();assert.equal(x.frameHeight,180);assert.equal(x.frameRadius,0);
+x.aboutToAppear();assert.equal(x.frameY,90);x.beginTransition();assert.equal(ready,0);x.imageDecoded(-1,false);assert.equal(ready,0);x.imageDecoded(0,false,800,400);assert.equal(ready,0,'data-ready must retain the detail photo');assert.equal(x.previewReady,true,'preview is exposed at source so it can render');assert.equal(timers.length,0);x.imageDecoded(1,false,800,400);assert.equal(ready,1,'only a rendered preview permits hiding the detail photo');assert.equal(delays.at(-1),32,'commit the rendered source before motion');timers.shift()();assert.equal(x.frameHeight,180);assert.equal(x.frameRadius,0);
 x.imageDecoded(1,true,800,400);assert.equal(x.originalReady,false,'original waits for opening animation');animations.at(-1).onFinish();assert.equal(x.originalReady,true);
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');assert(!page.includes('opacity(this.viewerMounted ? 0 : 1)'), 'source image stays visible until decoded handoff');
 x.scaleValue=3;x.dx=100;x.closing=true;x.transitionChanged();const old=animations.at(-1);assert.equal(x.scaleValue,1);assert.equal(x.dx,0);assert.equal(x.frameY,206);assert.equal(x.frameHeight,168);assert.equal(x.frameRadius,0,'letterboxed image remains square during return');
@@ -24,12 +24,35 @@ x.closing=true;x.transitionChanged();animations.at(-1).onFinish();assert.equal(c
 x.transitionChanged();const late=animations.at(-1);x.aboutToDisappear();late.onFinish();assert.equal(closed,1,'disposed transition cannot close newer page');
 console.log('Image transition: contain geometry, decode handoff, reverse/zoom reset, rapid reopen and stale disposal passed');
 
+function awaitingOriginal() {
+ const host=new Host();
+ Object.assign(host,{origin:{x:12,y:90,width:336,height:400},detail:{imageWidth:800,imageHeight:400},viewportWidth:360,viewportHeight:720,
+   transitionVersion:0,previewReady:true,previewRendered:true,originalReady:false,originalDecoded:false,originalDataReady:false,
+   viewportMeasured:true,naturalWidth:800,naturalHeight:400,closing:false,transitionStarted:true,transitioning:false,
+   stopInertia(){},getUIContext:()=>({animateTo:(opts,fn)=>{animations.push(opts);fn();}}),onReady(){throw Error('upgrade must not restart entry');}});
+ host.aboutToAppear();return host;
+}
+const upgrade=awaitingOriginal();upgrade.imageDecoded(0,true,800,400);
+assert.equal(upgrade.originalDataReady,true,'data-ready exposes the full image above the retained preview');
+assert.equal(upgrade.originalReady,false,'data-ready must not hide the rendered preview');assert.equal(upgrade.originalDecoded,false);
+upgrade.imageDecoded(1,true,800,400);assert.equal(upgrade.originalReady,true,'full image takes over only after render completion');
+const during=awaitingOriginal();during.transitioning=true;during.imageDecoded(0,true,800,400);
+assert.equal(during.originalReady,false);assert.equal(during.originalDecoded,false);
+during.getUIContext=()=>({animateTo:(opts,fn)=>{animations.push(opts);fn();}});during.transitionChanged();animations.at(-1).onFinish();
+assert.equal(during.originalReady,false,'animation completion cannot turn data readiness into render readiness');
+during.imageDecoded(1,true,800,400);assert.equal(during.originalReady,true);
+const originalOnly=awaitingOriginal();originalOnly.transitionStarted=false;originalOnly.previewReady=false;originalOnly.previewRendered=false;let originalHandoffs=0;originalOnly.onReady=()=>originalHandoffs++;
+originalOnly.imageDecoded(0,true,800,400);assert.equal(originalHandoffs,0);assert.equal(originalOnly.originalDataReady,true);
+originalOnly.imageDecoded(1,true,800,400);assert.equal(originalHandoffs,1,'original-only path also waits for render');timers.shift()();
+const disposedUpgrade=awaitingOriginal();disposedUpgrade.aboutToDisappear();disposedUpgrade.imageDecoded(1,true,800,400);assert.equal(disposedUpgrade.originalReady,false);
+console.log('Viewer handoff: rendered preview before source hide, rendered original before preview hide, mid-animation data-only upgrade, original-only and disposed callbacks passed');
+
 const detailFile=ts.createSourceFile('detail.ts',page.replace(/\bstruct\b/g,'class'),99,true);let prepare='';
 function findPrepare(n){if(ts.isMethodDeclaration(n)&&n.name.getText(detailFile)==='prepareViewerReturn')prepare=n.getText(detailFile);ts.forEachChild(n,findPrepare);}findPrepare(detailFile);
 const ReturnHost=vm.runInNewContext(ts.transpileModule('class ReturnHost {'+prepare+'} ReturnHost;',{compilerOptions:{target:99}}).outputText);
 for(const [top,height,offset,reset] of [[-40,700,120,true],[-900,700,920,false],[80,700,0,false],[800,300,200,false]]){
  const host=new ReturnHost();let scroll=offset,reported=-1;
- Object.assign(host,{viewportHeight:720,detail:{pinUrl:'pin'},measureViewerOrigin:()=>({x:18,y:top,width:324,height}),detailScroller:{offset:()=>({yOffset:scroll}),scrollTo:o=>{assert.equal(o.animation,false);scroll=o.yOffset;}},onScrollPosition:(_pin,y)=>reported=y});
+ Object.assign(host,{viewportHeight:720,displayedDetail:()=>({pinUrl:'pin'}),measureViewerOrigin:()=>({x:18,y:top,width:324,height}),detailScroller:{offset:()=>({yOffset:scroll}),scrollTo:o=>{assert.equal(o.animation,false);scroll=o.yOffset;}},onScrollPosition:(_pin,y)=>reported=y});
  const target=host.prepareViewerReturn();assert.equal(scroll,reset?0:offset);assert.equal(target.y,reset?top+offset:top);assert.equal(reported,reset?0:-1);
 }
 console.log('Viewer return: visible photo resets to top with matching destination; offscreen and unscrolled positions retained passed');

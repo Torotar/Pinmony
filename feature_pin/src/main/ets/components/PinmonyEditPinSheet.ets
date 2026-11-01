@@ -51,10 +51,10 @@ export struct PinmonyEditPinSheet {
     this.deleteDialogOpen = true;
     this.act('editPhase', ',"confirm"');
     this.getUIContext().showAlertDialog({
-      title: this.uiText('pm_delete_this_pin_bd01697d'),
+      title: this.uiText(this.result.editableContent ? 'pm_delete_this_pin_bd01697d' : 'pm_remove_saved_pin_confirm'),
       message: this.uiText('pm_this_cannot_be_undone_55d5e34b'),
       primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => this.cancelDelete(epoch, pin) },
-      secondaryButton: { value: this.uiText('pm_delete_2f9daa82'), action: () => {
+      secondaryButton: { value: this.uiText(this.result.editableContent ? 'pm_delete_2f9daa82' : 'pm_remove_saved_pin'), action: () => {
         if (!this.sheetVisible || !this.deleteDialogOpen || this.deleteDialogEpoch !== epoch ||
           this.result.pin !== pin || this.result.phase !== 'confirm' || this.result.loading || this.result.busy ||
           this.result.error || this.result.uncertain || this.result.picker.busy) return;
@@ -146,7 +146,7 @@ export struct PinmonyEditPinSheet {
           Text(this.uiText("pm_actions_ed31fbb4")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
           Button({ type: ButtonType.Normal }) {
             Column({ space: 8 }) {
-              Text(this.uiText("pm_delete_pin_e216e3fe")).fontSize(18).fontWeight(FontWeight.Bold)
+              Text(this.uiText(this.result.editableContent ? 'pm_delete_pin_e216e3fe' : 'pm_remove_saved_pin')).fontSize(18).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text')).width('100%')
               Text(this.uiText("pm_remove_this_pin_from_your_board_0b19fa7e")).fontSize(14)
                 .fontColor($r('app.color.secondary_text')).width('100%')

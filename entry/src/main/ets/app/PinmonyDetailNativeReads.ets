@@ -6,7 +6,9 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyRouteParser } from './PinmonyRouteParser';
 import { readProductPresentation, ProductPresentation, PinmonyCarouselItem } from 'feature_pin';
 
-export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_DETAIL_READS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_DETAIL_READS_ROLLOUT_ENABLED;
 interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
 interface CommentClient { user?: CommentUser; }
 interface RetainedRelatedRead {
@@ -200,7 +202,9 @@ export class PinmonyDetailNativeReads {
     const revision: number = this.revision;
     this.readAutoplay();
     this.readProduct();
-    await this.readPreview();
+    // Preview owns its loading/error state and catches failures. Recommendations
+    // depend on the validated Pin, not on the preview response.
+    this.readPreview().catch((): void => { PinmonyRuntimeLog.warn('DetailTrace: preview publication failed'); });
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
     if (retained) { this.ports.mark('related.native.retained'); return retained.reply; }
     return this.readRelated(false);
@@ -253,6 +257,12 @@ export class PinmonyDetailNativeReads {
     if (!this.owned() || !this.aggregate) return false;
     if (!this.previewLoading && !!this.previewError) this.readPreview();
     return true;
+  }
+  trimMemory(): void {
+    const activePin: string = this.pin;
+    this.retainedRelated.forEach((_entry: RetainedRelatedRead, key: string): void => {
+      if (key !== activePin) this.retainedRelated.delete(key);
+    });
   }
   loadMore(): void { if (this.owned() && !this.relatedLoading && (!this.relatedEnded || !!this.relatedError)) this.readRelated(!!this.bookmark); }
 
@@ -512,7 +522,15 @@ export class PinmonyDetailNativeReads {
     } catch (_) {
       if (revision === this.revision && this.owned()) { this.previewText = ''; this.previewError = this.ports.session().appVersion ?
         PinmonyI18n.message("pm_unable_to_load_comment_preview_please_retry_38deac0d") : PinmonyI18n.message("pm_comment_preview_request_not_ready_please_retry_bcf43624"); }
-    } finally { if (revision === this.revision && this.owned()) { this.previewLoading = false; this.apply(); } }
+    } finally { if (revision === this.revision && this.owned()) {
+      this.previewLoading = false;
+      const retained: RetainedRelatedRead | undefined = this.retainedRelated.get(this.pin);
+      if (retained) {
+        retained.previewText = this.previewText; retained.previewEmpty = this.previewEmpty;
+        retained.previewAvailable = this.previewAvailable; retained.previewReady = !this.previewError;
+      }
+      this.apply();
+    } }
   }
   private async readRelated(append: boolean): Promise<PinmonyNetworkReply> {
     const revision: number = this.revision;

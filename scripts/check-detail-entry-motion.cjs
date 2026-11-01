@@ -2,7 +2,7 @@ const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/
 const ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailEntryMotion.ets','utf8');
 const sf=ts.createSourceFile('motion.ts',source.replace(/\bstruct\b/g,'class'),99,true), methods=[];
-const names=['aboutToAppear','aboutToDisappear','target','heroVisible','begin','closeChanged','move'];
+const names=['aboutToAppear','aboutToDisappear','target','heroVisible','begin','imageComplete','closeChanged','move'];
 function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(sf)))methods.push(n.getText(sf));ts.forEachChild(n,visit);} visit(sf);
 const geometry=fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets','utf8').replace(/export /g,'');
 const imageContainRect=vm.runInNewContext(ts.transpileModule(geometry+';imageContainRect;',{compilerOptions:{target:99}}).outputText);
@@ -11,7 +11,7 @@ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n
  {imageContainRect,PinmonyRuntimeLog:{info:()=>{}},Curve:{EaseOut:0},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{}});
 let opened=0,closed=0,revealed=0;
 function fixture(){const x=new Host(); Object.assign(x,{photo:{x:20,y:130,width:160,height:200},targetId:'target',rootId:'root',imageWidth:400,imageHeight:500,bottomInset:28,restoredOffset:0,
-  decoded:false,measured:true,started:false,version:0,closing:false,showing:false,layoutAttempts:0,
+  decoded:false,rendered:true,measured:true,started:false,version:0,closing:false,showing:false,layoutAttempts:0,
   onOpened:()=>opened++,onClosed:()=>closed++,onReveal:()=>revealed++,getUIContext:()=>({px2vp:n=>n,getComponentUtils:()=>({
     getRectangleById:id=>id==='root'?{windowOffset:{x:0,y:30},size:{width:360,height:800}} :{windowOffset:{x:18,y:110},size:{width:324,height:433}}
   }),animateTo:(opts,fn)=>{animations.push(opts);fn();}})});x.aboutToAppear();return x;}
@@ -68,6 +68,35 @@ preview.detailReturnPreview=true;preview.ensureSearchDestination();assert.equal(
 preview.active=true;preview.detailReturnPreview=false;preview.ensureSearchDestination();assert.equal(paths.length,1,'handoff retains the same destination');
 console.log('Search return preview: inactive isolation, actual destination creation and no duplicate destination passed');
 
+let preserveSearch='';
+function findPreserveSearch(n){if(ts.isMethodDeclaration(n)&&n.name.getText(indexFile)==='preservingSearchForPin')preserveSearch=n.getText(indexFile);ts.forEachChild(n,findPreserveSearch);}findPreserveSearch(indexFile);
+const RetainedSearch=vm.runInNewContext(ts.transpileModule('class RetainedSearch {'+preserveSearch+'} RetainedSearch;',{compilerOptions:{target:99}}).outputText);
+const retained=new RetainedSearch();
+Object.assign(retained,{searchStore:{search:{pageKey:'search'},searchReturnPageKey:'search'},pinStore:{detailOpeningPin:'pin',detailPresentationOnly:true},currentPinUrl:()=>''});
+assert.equal(retained.preservingSearchForPin(),true,'opening detail retains search before native business URL ownership');
+retained.pinStore.detail={pinUrl:'pin'};retained.pinStore.detailOpeningPin='';
+assert.equal(retained.preservingSearchForPin(),true,'presentation-only snapshot retains the source during decode and flight');
+retained.searchStore.searchReturnPageKey='other';
+assert.equal(retained.preservingSearchForPin(),false,'unrelated search cannot become the detail underlay');
+retained.searchStore.searchReturnPageKey='search';retained.pinStore.detail=undefined;
+assert.equal(retained.preservingSearchForPin(),false,'completed return releases detail-only retention');
+console.log('Search entry underlay: opening identity, preview snapshot, origin isolation and release passed');
+
+let activeChanged='';
+function findActiveChanged(n){if(ts.isMethodDeclaration(n)&&n.name.getText(searchFile)==='activeChanged')activeChanged=n.getText(searchFile);ts.forEachChild(n,findActiveChanged);}findActiveChanged(searchFile);
+const pendingVisibility=[];
+const SearchLifecycle=vm.runInNewContext(ts.transpileModule('class SearchLifecycle {'+activeChanged+'} SearchLifecycle;',{compilerOptions:{target:99}}).outputText,{Promise:{resolve:()=>({then:fn=>pendingVisibility.push(fn)})}});
+const lifecycle=new SearchLifecycle();let clears=0;
+Object.assign(lifecycle,{pagePresent:true,active:false,detailReturnPreview:false,closePhotoSearch:()=>{},restoreHeroPosition:()=>{},ensureSearchDestination:()=>{},tracePresentation:()=>{},searchPathStack:{clear:()=>clears++}});
+lifecycle.activeChanged();assert.equal(clears,0,'active prop must not clear search before retained prop arrives');
+lifecycle.detailReturnPreview=true;lifecycle.activeChanged();pendingVisibility.shift()();
+assert.equal(clears,0,'same-frame preview handoff retains the original WaterFlow destination');
+lifecycle.detailReturnPreview=false;lifecycle.activeChanged();pendingVisibility.shift()();
+assert.equal(clears,1,'ordinary inactive search still releases its destination');
+lifecycle.activeChanged();lifecycle.pagePresent=false;pendingVisibility.shift()();
+assert.equal(clears,1,'disposed page ignores late visibility work');
+console.log('Search watched-prop handoff: no intermediate pop, inactive cleanup and disposal passed');
+
 const scrolled=fixture();scrolled.decoded=true;scrolled.closing=true;
 const baseUI=scrolled.getUIContext();
 scrolled.getUIContext=()=>({...baseUI,getComponentUtils:()=>({getRectangleById:id=>id==='root'?{windowOffset:{x:0,y:30},size:{width:360,height:800}}:{windowOffset:{x:18,y:-600},size:{width:324,height:433}}})});
@@ -107,18 +136,31 @@ assert(page.includes("'pinmony-related-photo-' + this.displayedDetail().pinUrl +
 assert(indexSource.includes("'pinmony-related-photo-' + parent + '-' + target"), 'geometry lookup matches the retained image node');
 console.log('Related entry capture, stable card identity and header anchor compensation passed');
 
-const completion=source.match(/\.onComplete\(\(event\) => \{ ([^\n]+) \}\)/);
-assert(completion);
-const complete=vm.runInNewContext('(function(event){'+completion[1]+'})');
-for(const status of [0,1]){
- const hidden=fixture(); complete.call(hidden,{loadingStatus:status});
- assert.equal(hidden.started,true,'data-ready image unblocks hidden entry');
- timers.shift()(); complete.call(hidden,{loadingStatus:1});
- assert.equal(timers.length,0,'render callback cannot restart entry');
-}
-const disposed=fixture();disposed.aboutToDisappear();complete.call(disposed,{loadingStatus:0});
+assert.match(source,/\.onComplete\(\(event\) => this.imageComplete\(event\?\.loadingStatus \?\? -1\)\)/);
+const hidden=fixture();hidden.rendered=false;
+const beforeReady=animations.length;
+hidden.imageComplete(0);
+assert.equal(hidden.started,false,'data-ready cannot start movement before a drawable frame');
+assert.equal(hidden.showing,true,'source photo becomes visible so a hidden Image can render');
+assert.equal(hidden.frame.y,100,'render preparation stays at the card source');
+assert.equal(timers.length,0,'no timed guess may hide the underlying page before the render callback');
+assert.equal(animations.length,beforeReady);
+hidden.imageComplete(0);assert.equal(timers.length,0,'duplicate data-ready keeps waiting');
+hidden.imageComplete(1);assert.equal(hidden.started,true);
+assert.equal(timers.length,1,'render-ready still commits the source before movement');
+timers.shift()();hidden.imageComplete(1);
+assert.equal(timers.length,0,'duplicate render callback cannot restart entry');
+assert.equal(animations.length,beforeReady+1);
+const direct=fixture();direct.rendered=false;direct.imageComplete(1);
+assert.equal(direct.started,true,'render-ready without a separate data callback also starts');timers.shift()();
+const pageOnly=fixture();pageOnly.rendered=false;pageOnly.restoredOffset=300;pageOnly.imageComplete(0);
+assert.equal(pageOnly.started,true,'page-only return never waits for an invisible photo to render');timers.shift()();
+const disposed=fixture();disposed.rendered=false;disposed.aboutToDisappear();disposed.imageComplete(0);disposed.imageComplete(1);
 assert.equal(disposed.started,false,'late data callback cannot open disposed detail');
-console.log('Hidden detail image readiness and disposal passed');
+assert.equal(disposed.rendered,false,'disposed image callback cannot mutate readiness');
+const preparing=fixture();preparing.rendered=false;preparing.imageComplete(0);preparing.closing=true;
+const beforeEarlyClose=closed;preparing.closeChanged();assert.equal(closed,beforeEarlyClose+1,'back during render preparation cannot trap navigation');
+console.log('Detail flight readiness: visible source preparation, render-gated movement, duplicate callbacks, page-only path, disposal and early back passed');
 
 assert(!indexSource.includes("this.profileSettingsVisible || this.homeEntryPhoto && this.homeEntryCardId.startsWith('pinmony-home-photo-')"),'detail entry must not add a second status inset to retained home tabs');
 const rootTabs = indexSource.slice(indexSource.indexOf('private buildRootTabs()'), indexSource.indexOf('private buildRootTabs()') + 5000);

@@ -1,4 +1,3 @@
-import { isProductPin } from 'common_foundation';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchUserFollow, PinmonySearchUserFollowPorts } from './PinmonySearchUserFollow';
 import { PinmonySearchBoardFollow, PinmonySearchBoardFollowPorts } from './PinmonySearchBoardFollow';
@@ -8,7 +7,9 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED, readNativeSearchProductRoute, PinmonySearchProductRoute } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyVideo, PinmonyVideoSource } from 'common_ui';
-export const PIN_NATIVE_SEARCH_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_SEARCH_READS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_SEARCH_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_SEARCH_READS_ROLLOUT_ENABLED;
 interface SearchReadOptions { query: string; scope: string; appliedProductFilters: string; domains: string | null; user: null; seoDrawerEnabled: boolean; applied_unified_filters: null; auto_correction_disabled: boolean; filter_genai: boolean; journey_depth: null; source_id: string; source_module_id: null; source_url: string; static_feed: boolean; selected_one_bar_modules: null; query_pin_sigs: null; page_size: number; gated: null; price_max: number | null; price_min: number | null; query_image_pins: null; request_params: null; top_pin_ids: string | null; article: null; corpus: null; filters: null; rs: string; bookmarks?: string[]; }
 interface SuggestionOptions { field_set_key: string; limit: number; num_recent_queries: number; personal_search_only: boolean; pin_scope: string; recent_queries_tags: string; term: string; autocomplete_request_surface: number; }
 interface ReadEnvelope { options: SearchReadOptions | SuggestionOptions; context: Record<string,string>; }
@@ -141,6 +142,7 @@ export class PinmonySearchNativeReads {
     catch (_) {if(live()){item.deleting = false;item.deletable = !this.auxiliary.historyLocked(query);this.suggestionError = item.deletable ? '删除未提交成功，请重试' : PinmonyI18n.message("pm_deletion_not_confirmed_refresh_history_to_check_it_will_not_be_r_c0622bda");this.apply();}}
   }
   eligible(): boolean {
+    if (!PIN_NATIVE_SEARCH_READS_ENABLED) return false;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     return PIN_NATIVE_SEARCH_READS_ENABLED && session.authenticated && !!session.accountId &&
       this.ports.page().startsWith(session.origin + '/search/');
@@ -203,6 +205,7 @@ export class PinmonySearchNativeReads {
   async refresh(): Promise<void> { if (this.bind() && this.query(this.page) && !this.busy && !this.boardFollow.pending() && !this.userFollow.pending()) await this.read(false); }
   async more(): Promise<void> { if (!this.bind() || this.busy) return; const feed: ReadFeed | undefined = this.feeds.get(this.page); if (feed?.snapshot.apiEnded && !this.error) return; await this.read(!!feed?.cursor && feed.cursor !== '-end-'); }
   navigate(target: string): boolean {
+    if (!PIN_NATIVE_SEARCH_READS_ENABLED) return false;
     if (!this.bind() || !this.supported(target) || !this.query(target)) { this.store.searchError = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); return false; }
     const previous: ReadFeed | undefined = this.feeds.get(this.page); const cached: number | undefined = this.store.searchCache.get(this.page)?.scrollOffset; if(previous && cached !== undefined) previous.scroll = cached;
     this.pause(false); this.ports.navigate(target); this.page = target; this.term = undefined; this.suggestions = []; this.error = '';
@@ -263,7 +266,6 @@ export class PinmonySearchNativeReads {
   }
   private map(item: Item): PinmonySearchResult | undefined {
     if (!item || !item.id) return undefined;
-    if (item.type === 'pin' && isProductPin(item)) return undefined;
     if (item.type === 'pin' && (item.is_promoted === true || item.ad_data || item.pin_promotion_id)) return undefined;
     let cover: ImageData | undefined = undefined; const sizes: Record<string, ImageData> = item.images || {};
     for (const size of ['474x', '736x', '564x', 'orig', '236x']) { const value: ImageData | undefined = sizes[size]; if (value && this.image(value.url) && Number.isFinite(value.width) && value.width > 0 && Number.isFinite(value.height) && value.height > 0) { cover = value; break; } }
@@ -290,6 +292,8 @@ export class PinmonySearchNativeReads {
     try { return await this.ports.network().requestBusinessSearchRead(job, (): PinmonyBusinessSessionContext => this.ports.session(), live); } finally { this.requests.delete(id); if (this.suggestionId === id) this.suggestionId = ''; if(this.filterId === id) this.filterId = ''; }
   }
   private async read(append: boolean): Promise<void> {
+    const startedAt: number = Date.now();
+    const operation: string = append ? 'pagination' : this.feeds.has(this.page) ? 'refresh' : 'initial';
     const revision: number = this.revision; const page: string = this.page; const live = (): boolean => revision === this.revision && this.owned() && page === this.page;
     if (!this.supported(page)) { this.error = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); this.apply(); return; }
     const feed: ReadFeed | undefined = this.feeds.get(page); const cursor: string = append ? feed?.cursor || '' : '';
@@ -311,7 +315,7 @@ export class PinmonySearchNativeReads {
         if (row.userId && typeof row.following === 'boolean') this.userFollow.reconcile(row.userId, row.following);
         if (row.boardId && typeof row.following === 'boolean') this.boardFollow.reconcile(row.boardId, row.following);
       });
-      if (resource.data.results.some((item: Item): boolean => !isProductPin(item)) && !incoming.length) throw new Error('unknown-search-items');
+      if (resource.data.results.length && !incoming.length) throw new Error('unknown-search-items');
       const results: PinmonySearchResult[] = append && feed ? feed.snapshot.results.slice() : []; incoming.forEach((item: PinmonySearchResult): void => { if (!results.some((value: PinmonySearchResult): boolean => value.id === item.id)) results.push(item); });
       const categories: PinmonySearchCategory[] = append && feed ? feed.snapshot.categories.slice() : [];
       if (!append && Array.isArray(resource.data.rankedGuides)) resource.data.rankedGuides.slice(0,40).forEach((guide: Guide): void => { if (!guide?.term?.trim() || guide.term.length > 300 || !guide.display?.trim() || categories.some((c: PinmonySearchCategory): boolean => c.id === 'api-guide-' + guide.term)) return; categories.push({ id: 'api-guide-' + guide.term, label: guide.display.slice(0,100), selected: false, enabled: true, targetUrl: this.origin + '/search/pins/?q=' + encodeURIComponent(guide.term), imageUrl: this.image(guide.image_medium_url), backgroundColor: /^#[0-9a-f]{6}$/i.test(guide.dominant_color || '') ? guide.dominant_color : '' }); });
@@ -321,7 +325,11 @@ export class PinmonySearchNativeReads {
       this.mapModules(resource.data.oneBarModules || [], value); this.feeds.set(page,value); if (this.feeds.size > 12) { const oldest: string | undefined = this.feeds.keys().next().value; if (oldest && oldest !== page) this.feeds.delete(oldest); }
       this.store.searchResultsResetPending = false; PinmonyRuntimeLog.info('SearchNativeTrace: results committed append=' + append.toString() + ' count=' + results.length.toString());
     } catch (_) { if (live()) this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_search_results_please_retry_8ba01840") : PinmonyI18n.message("pm_unable_to_load_search_results_please_retry_27aeffd1"); }
-    finally { if (revision === this.revision && page === this.page) { this.busy = false; if (live()) this.apply(); this.ports.settled(); } }
+    finally {
+      PinmonyRuntimeLog.info('PageDataPerf: page=search operation=' + operation + ' elapsedMs=' +
+        (Date.now() - startedAt).toString() + ' outcome=' + (!live() ? 'cancelled' : this.error ? 'error' : 'ready'));
+      if (revision === this.revision && page === this.page) { this.busy = false; if (live()) this.apply(); this.ports.settled(); }
+    }
   }
   async input(term: string, immediate: boolean = false): Promise<void> {
     if (typeof term !== 'string' || term.length > 300 || !this.bind()) return;

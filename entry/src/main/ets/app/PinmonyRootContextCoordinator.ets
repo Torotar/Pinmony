@@ -11,6 +11,7 @@ import { webview } from '@kit.ArkWeb';
 import { PinmonyAuthStatus } from 'common_session';
 import { PinmonyNavigationHistory } from './PinmonyNavigationHistory';
 export interface PinmonyRootContextCoordinatorPorts {
+  nativeBusinessOnly?: () => boolean;
   activeSheetKind: () => string;
   activeTab: () => number;
   authStatus: () => PinmonyAuthStatus;
@@ -129,6 +130,7 @@ async ensureRootActionContext(index: number, requireData: boolean = true, allowe
     if (this.ports.businessSuspended() || this.ports.authStatus() !== 'authenticated' || this.ports.activeTab() !== index || this.pinStore.detail ||
         this.pinStore.detailOpeningPin || (this.ports.activeSheetKind() && this.ports.activeSheetKind() !== allowedSheet) || !isCurrent())
         return false;
+    if (this.ports.nativeBusinessOnly?.()) return false;
     this.ports.setRootContentInteracted(true);
     if (this.rootActionContextReady(index, requireData)) {
         this.ports.clearRootTabGuard('content-action');
@@ -151,6 +153,7 @@ async ensureRootActionContext(index: number, requireData: boolean = true, allowe
 }
 
 requestRootPage(index: number): void {
+    if (this.ports.nativeBusinessOnly?.()) return;
     if (this.ports.businessSuspended() || this.ports.authStatus() !== 'authenticated' || this.ports.activeTab() !== index)
         return;
     if (this.pinStore.detail || this.pinStore.detailOpeningPin)
@@ -236,6 +239,7 @@ requestRootPage(index: number): void {
 }
 
 prepareRootPageRead(index: number): boolean {
+    if (this.ports.nativeBusinessOnly?.()) return true;
     if (this.ports.authStatus() !== 'authenticated' || this.ports.activeTab() !== index)
         return true;
     const address: string = this.ports.rootPresentationAddress(index);

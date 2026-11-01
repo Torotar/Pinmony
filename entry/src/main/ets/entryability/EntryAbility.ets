@@ -10,6 +10,7 @@ import lazy { NetworkManager } from 'common_network';
 
 const DOMAIN = 0x0000;
 const MODULE_EVALUATED_AT: number = Date.now();
+interface PinmonyRuntimeErrorDetails extends errorManager.GlobalError { code?: number; }
 PinmonyRuntimeLog.info('StartupBoundary: entry-module-evaluated');
 
 export default class EntryAbility extends UIAbility {
@@ -44,11 +45,28 @@ export default class EntryAbility extends UIAbility {
       /ForEach|duplicate.*key/i.test(message) ? 'node-identity' :
       /Webview|WebView|controller|runJavaScript/i.test(message) ? 'web-controller' :
       /cancel|abort/i.test(message) ? 'cancellation' : 'unknown';
+    const nativeCode: number | undefined = (reason as PinmonyRuntimeErrorDetails).code;
+    const messageCode: RegExpMatchArray | null = message.match(/\b(?:error\s*code|code)\s*[:=]\s*(-?[0-9]{1,10})\b/i);
+    const code: string = typeof nativeCode === 'number' && Number.isInteger(nativeCode) && Math.abs(nativeCode) <= 2147483647 ? nativeCode.toString() :
+      messageCode ? messageCode[1] : 'unknown';
     PinmonyRuntimeLog.error('Runtime: unhandled error ' + name + ' kind=' + kind + ' category=' + category + ' sequence=' + (++this.runtimeErrorSequence).toString());
     PinmonyRuntimeLog.error('Runtime action context: ' + PinmonyRuntimeLog.recentActionContext());
     const rawStack: string = typeof reason.stack === 'string' ? reason.stack : '';
+    const uiOperation: string = /closeMenu/i.test(message + rawStack) ? 'menu-close' :
+      /openMenu/i.test(message + rawStack) ? 'menu-open' :
+      /SnackBar/i.test(message + rawStack) ? 'snackbar' : 'unknown';
+    PinmonyRuntimeLog.error('Runtime error detail: code=' + code + ' operation=' + uiOperation +
+      ' messagePresent=' + (message.length > 0).toString() + ' stackPresent=' + (rawStack.length > 0).toString());
     // Keep source basenames/line numbers only, for both Ark and standard stack formats.
-    const frames: string[] = rawStack.match(/[A-Za-z][A-Za-z0-9_-]*\.(?:ets|ts|js):[0-9]+(?::[0-9]+)?/g) || [];
+    const normalizedStack: string = rawStack.slice(0, 32768)
+      .replace(/([A-Za-z][A-Za-z0-9_-]*\.(?:ets|ts|js|abc))\s*\(\s*([0-9]+)\s*[:,]\s*([0-9]+)\s*\)/g, '$1:$2:$3');
+    const frames: string[] = normalizedStack.match(/[A-Za-z][A-Za-z0-9_-]*\.(?:ets|ts|js|abc):[0-9]+(?::[0-9]+)?/g) || [];
+    if (frames.length === 0 && rawStack.length > 0) {
+      const sources: string[] = normalizedStack.match(/Pinmony[A-Za-z0-9_-]*\.(?:ets|ts|js|abc)\b/g) || [];
+      const format: string = /\[native|native code|\.so\b/i.test(normalizedStack) ? 'native' :
+        /bytecode|\.abc\b/i.test(normalizedStack) ? 'bytecode' : 'unrecognized';
+      PinmonyRuntimeLog.error('Runtime stack format: kind=' + format + ' source=' + (sources[0] || 'unavailable'));
+    }
     frames.slice(0, 12).forEach((line: string) => PinmonyRuntimeLog.error('Runtime stack: ' + line));
     if (frames.length === 0) PinmonyRuntimeLog.error('Runtime stack: unavailable');
   }
@@ -222,6 +240,14 @@ export default class EntryAbility extends UIAbility {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
     this.syncSystemColorMode();
     this.syncStatusBarHeight();
+  }
+
+  onMemoryLevel(level: AbilityConstant.MemoryLevel): void {
+    if (level !== AbilityConstant.MemoryLevel.MEMORY_LEVEL_LOW &&
+      level !== AbilityConstant.MemoryLevel.MEMORY_LEVEL_CRITICAL) return;
+    const sequence: number = AppStorage.get<number>('pinmonyMemoryPressureSequence') || 0;
+    AppStorage.setOrCreate<number>('pinmonyMemoryPressureSequence', sequence + 1);
+    PinmonyRuntimeLog.info('MemoryPressure: level=' + level.toString() + ' sequence=' + (sequence + 1).toString());
   }
 
   onBackground(): void {

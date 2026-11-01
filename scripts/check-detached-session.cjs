@@ -17,7 +17,7 @@ const { PinmonySessionVerification } = load('entry/src/main/ets/app/PinmonySessi
 const { PinmonySessionCoordinator } = load('entry/src/main/ets/app/PinmonySessionCoordinator.ets', name =>
   name === 'common_session' ? session : { PinmonyRuntimeLog: log, PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages });
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-assert(source.includes('private readonly nativeLoginEnabled: boolean = PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED && this.nativeBusinessRoutesEnabled;'),
+assert(source.includes('private readonly nativeLoginEnabled: boolean = PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED;'),
   'ArkUI must receive an initialized field; a struct getter is stripped by its compiler');
 const home = 'https://www.pinterest.com/', login = home + 'login/';
 function method(name) {
@@ -61,7 +61,8 @@ function fixture() {
   const host = new Host(), jobs = [], timers = [];
   const stores = ['home','profile','inbox','pin','board','settings'];
   for (const name of stores) host[name + 'Store'] = {};
-  for (const name of ['boardNativeReads','profileNativeReads','inboxUpdatesNativeReads','inboxMessagesNativeReads','searchNativeReads']) host[name] = { reset() {} };
+  for (const name of ['boardNativeReads','profileNativeReads','inboxUpdatesNativeReads','inboxMessagesNativeReads',
+    'searchNativeReads','searchDiscoveryNativeReads','homeNativeReads']) host[name] = { reset() {} };
   Object.assign(host, { nativeLoginEnabled: true, nativeBusinessRoutesEnabled: true, loginHostMounted: false,
     authStatus: 'checking', authEpoch: 0, nativeSessionEpoch: 0, nativeVerificationPending: false,
     nativeLoginEvidenceKey: '', nativeSessionOrigin: 'https://www.pinterest.com', businessSuspended: false,

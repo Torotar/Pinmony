@@ -1,4 +1,5 @@
 import { PinmonyActionNotice } from './PinmonyActionNotice';
+import { PinmonyImageSearchSelection } from './PinmonyImageSearchSelection';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin } from '../models/PinmonyImageSearch';
@@ -14,6 +15,7 @@ export struct PinmonyImageSearchView {
   @Prop imageHeight: number = 1;
   @Prop uploadedPhoto: boolean = false;
   @Prop animatePhoto: boolean = false;
+  @Prop sourceSelectionBorder: boolean = false;
   @Prop originX: number = 0;
   @Prop originY: number = 0;
   @Prop originWidth: number = 0;
@@ -21,6 +23,11 @@ export struct PinmonyImageSearchView {
   @Prop @Watch('closeTransition') closing: boolean = false;
   onTransitionClosed?: () => void;
   onTransitionReady?: () => void;
+  // Window-space photo frame for a host whose flight plane is outside HDS.
+  onPhotoFrame?: (x: number, y: number, width: number, height: number, radius: number, duration: number, chrome: number) => void;
+  onPhotoSelection?: (crop: PinmonyImageCrop) => void;
+  onPhotoFlight?: (active: boolean) => void;
+  @State private photoFlightActive: boolean = false;
   @State private frameX: number = 0;
   @State private frameY: number = 0;
   @State private frameWidth: number = 1;
@@ -38,6 +45,10 @@ export struct PinmonyImageSearchView {
   private sourceWidth: number = 1;
   private sourceHeight: number = 1;
   private closeRequested: boolean = false;
+  private resultSheetMounted: boolean = false;
+  private returnPhotoFinished: boolean = false;
+  private returnCompleted: boolean = false;
+  private reopenAfterSheet: boolean = false;
   @State private intrinsicWidth: number = 1;
   @State private intrinsicHeight: number = 1;
   @Prop result: PinmonyVisualResult;
@@ -60,11 +71,12 @@ export struct PinmonyImageSearchView {
   aboutToAppear(): void {
     this.alive = true;
     if (this.uploadedPhoto) this.crop = { x: 0, y: 0, w: 1, h: 1 };
+    // Network work does not depend on the photo transition or Sheet delay.
     this.initial = setTimeout(() => {
       if (!this.alive) return;
       if (!this.animatePhoto) this.sheetVisible = true;
       if (!this.uploadedPhoto && this.onSearch) this.onSearch(this.crop, false, true);
-    }, 100);
+    }, 0);
   }
   aboutToDisappear(): void { this.alive = false; this.transitionVersion++; clearTimeout(this.transitionTimer); clearTimeout(this.debounce); clearTimeout(this.initial); }
   private beginTransition(): void {
@@ -85,30 +97,101 @@ export struct PinmonyImageSearchView {
     }
     this.frameX = this.sourceX; this.frameY = this.sourceY;
     this.frameWidth = this.sourceWidth; this.frameHeight = this.sourceHeight;
+    this.publishPhotoFrame(true);
+    this.onPhotoSelection?.(this.crop);
+    this.photoFlightActive = true;
+    this.onPhotoFlight?.(true);
     this.onTransitionReady?.();
-    this.transitionTimer = setTimeout(() => { if (this.alive) this.runTransition(this.closing); }, 0);
+    this.transitionTimer = setTimeout(() => { if (this.alive) this.runTransition(this.closing); }, 32);
   }
   private closeTransition(): void {
     if (!this.animatePhoto || !this.alive) return;
-    if (!this.closing) { if (this.started) this.runTransition(false); return; }
+    if (!this.closing) {
+      this.transitionVersion++;
+      this.reopenAfterSheet = this.resultSheetMounted && this.closeRequested;
+      if (this.started && !this.reopenAfterSheet) this.runTransition(false);
+      return;
+    }
     clearTimeout(this.initial); clearTimeout(this.debounce); clearTimeout(this.transitionTimer);
-    this.sheetVisible = false;
     this.closeRequested = true;
-    if (!this.started) { this.onTransitionClosed?.(); return; }
-    this.runTransition(true);
+    this.returnPhotoFinished = false;
+    this.returnCompleted = false;
+    this.reopenAfterSheet = false;
+    if (!this.started) { this.sheetVisible = false; this.onTransitionClosed?.(); return; }
+    // Hand off both photo and selection before the HDS content origin changes.
+    this.transitionVersion++;
+    this.photoFlightActive = true;
+    this.onPhotoSelection?.(this.crop);
+    this.onPhotoFlight?.(true);
+    this.scheduleReturnPhoto();
+  }
+  private scheduleReturnPhoto(): void {
+    clearTimeout(this.transitionTimer);
+    const version: number = this.transitionVersion;
+    // Commit the visible host photo at its current frame before changing bounds.
+    this.transitionTimer = setTimeout(() => {
+      if (this.alive && this.closing && version === this.transitionVersion) {
+        this.sheetVisible = false;
+        PinmonyRuntimeLog.info('ImageSearchTrace: phase=close-together');
+        this.runTransition(true);
+      }
+    }, 32);
+  }
+  private resultSheetDisappeared(): void {
+    this.resultSheetMounted = false;
+    if (!this.alive) return;
+    PinmonyRuntimeLog.info('ImageSearchTrace: phase=sheet-closed');
+    if (this.reopenAfterSheet && !this.closing) {
+      this.reopenAfterSheet = false; this.runTransition(false);
+      return;
+    }
+    if (this.closing) { this.finishReturn(); return; }
+    if (!this.closing && !this.closeRequested) {
+      this.closeRequested = true; this.onClose?.();
+    }
+  }
+  private finishReturn(): void {
+    if (!this.alive || !this.closing || this.returnCompleted || !this.returnPhotoFinished || this.resultSheetMounted) return;
+    this.returnCompleted = true;
+    this.photoFlightActive = false; this.onPhotoFlight?.(false);
+    this.onTransitionClosed?.();
   }
   private runTransition(closing: boolean): void {
     const version: number = ++this.transitionVersion;
+    this.photoFlightActive = true;
+    this.onPhotoFlight?.(true);
     if (!closing) { this.closeRequested = false; this.sheetVisible = true; }
-    this.getUIContext().animateTo({ duration: closing ? 200 : 240, curve: Curve.EaseOut,
+    PinmonyRuntimeLog.info('ImageSearchTrace: phase=' + (closing ? 'close-photo-start' : 'open-photo-start'));
+    // Preserve the original photo timing; native Sheet lifecycle only gates cleanup.
+    const duration: number = closing ? 200 : 240;
+    this.getUIContext().animateTo({ duration: duration, curve: Curve.EaseOut,
       onFinish: () => {
         if (!this.alive || version !== this.transitionVersion) return;
-        if (closing) this.onTransitionClosed?.();
+        PinmonyRuntimeLog.info('ImageSearchTrace: phase=' + (closing ? 'close-photo-end' : 'open-photo-end'));
+        if (closing) { this.returnPhotoFinished = true; this.finishReturn(); }
+        else { this.photoFlightActive = false; this.onPhotoFlight?.(false); }
       } }, () => {
       this.frameX = closing ? this.sourceX : this.photoX(); this.frameY = closing ? this.sourceY : this.photoY();
       this.frameWidth = closing ? this.sourceWidth : this.photoWidth(); this.frameHeight = closing ? this.sourceHeight : this.photoHeight();
       this.frameRadius = closing ? 18 : 0; this.backdrop = closing ? 0 : 1; this.chrome = closing ? 0 : 1;
     });
+    // The host owns these animatable properties, so it starts its own transaction.
+    this.publishPhotoFrame(closing, duration);
+  }
+  private publishPhotoFrame(source: boolean, duration: number = 0): void {
+    if (!this.onPhotoFrame) return;
+    if (source) {
+      // The source belongs to the detail page before its title/safe-area change.
+      this.onPhotoFrame(this.originX + (this.originWidth - this.sourceWidth) / 2,
+        this.originY + (this.originHeight - this.sourceHeight) / 2, this.sourceWidth, this.sourceHeight, 18, duration, 0);
+      return;
+    }
+    try {
+      const ui = this.getUIContext();
+      const root = ui.getComponentUtils().getRectangleById('pinmony-search-flight-' + this.pin);
+      this.onPhotoFrame(ui.px2vp(root.windowOffset.x) + this.photoX(), ui.px2vp(root.windowOffset.y) + this.photoY(),
+        this.photoWidth(), this.photoHeight(), 0, duration, 1);
+    } catch (_) {}
   }
   private photoWidth(): number { return Math.min(this.widthValue, this.heightValue * 0.6 * (this.uploadedPhoto ? this.intrinsicWidth / this.intrinsicHeight : this.imageWidth / this.imageHeight)); }
   private photoHeight(): number { return this.photoWidth() * (this.uploadedPhoto ? this.intrinsicHeight / this.intrinsicWidth : this.imageHeight / this.imageWidth); }
@@ -140,15 +223,6 @@ export struct PinmonyImageSearchView {
     }
     this.crop = { x: left, y: top, w: right - left, h: bottom - top };
     this.queueSearch();
-  }
-  @Builder
-  private corner(index: number) {
-    Image($r('app.media.image_crop_corner')).width(28).height(28)
-      .rotate({ angle: index === 0 ? 0 : index === 1 ? 90 : index === 2 ? 270 : 180 })
-      .position({ x: this.photoX() + (this.crop.x + (index === 1 || index === 3 ? this.crop.w : 0)) * this.photoWidth() - 14,
-        y: this.photoY() + (this.crop.y + (index > 1 ? this.crop.h : 0)) * this.photoHeight() - 14 })
-      .hitTestBehavior(HitTestMode.None)
-      .accessibilityText(this.uiText("pm_adjust_search_area_corner_af495c18"))
   }
   @Builder
   private card(p: PinmonyRelatedPin) {
@@ -194,8 +268,9 @@ export struct PinmonyImageSearchView {
     Stack({ alignContent: Alignment.TopStart }) {
       Column().width('100%').height('100%').backgroundColor($r('app.color.page_background'))
         .opacity(this.animatePhoto ? this.backdrop : 1).hitTestBehavior(HitTestMode.None)
-      Image(this.imageUrl).width(this.animatePhoto ? this.frameWidth : this.photoWidth())
-        .height(this.animatePhoto ? this.frameHeight : this.photoHeight()).objectFit(ImageFit.Contain)
+      Stack({ alignContent: Alignment.TopStart }) {
+      Image(this.imageUrl).width(this.photoWidth())
+        .height(this.photoHeight()).objectFit(ImageFit.Contain)
         .onComplete((event) => {
           if (this.uploadedPhoto && event && event.width > 0 && event.height > 0) {
             this.intrinsicWidth = event.width; this.intrinsicHeight = event.height;
@@ -208,30 +283,20 @@ export struct PinmonyImageSearchView {
           }
         })
         .onError(() => { this.decoded = true; this.beginTransition(); })
-        .position({ x: this.animatePhoto ? this.frameX : this.photoX(), y: this.animatePhoto ? this.frameY : this.photoY() })
-        .borderRadius(this.animatePhoto ? this.frameRadius : 0).clip(true)
-        .opacity(this.animatePhoto && !this.started ? 0 : 1).hitTestBehavior(HitTestMode.None)
-      Stack({ alignContent: Alignment.TopStart }) {
-      Rect().fill('#77000000').width(this.photoWidth()).height(this.crop.y * this.photoHeight())
-        .position({ x: this.photoX(), y: this.photoY() }).hitTestBehavior(HitTestMode.None)
-      Rect().fill('#77000000').width(this.photoWidth()).height((1 - this.crop.y - this.crop.h) * this.photoHeight())
-        .position({ x: this.photoX(), y: this.photoY() + (this.crop.y + this.crop.h) * this.photoHeight() }).hitTestBehavior(HitTestMode.None)
-      Rect().fill('#77000000').width(this.crop.x * this.photoWidth()).height(this.crop.h * this.photoHeight())
-        .position({ x: this.photoX(), y: this.photoY() + this.crop.y * this.photoHeight() }).hitTestBehavior(HitTestMode.None)
-      Rect().fill('#77000000').width((1 - this.crop.x - this.crop.w) * this.photoWidth()).height(this.crop.h * this.photoHeight())
-        .position({ x: this.photoX() + (this.crop.x + this.crop.w) * this.photoWidth(), y: this.photoY() + this.crop.y * this.photoHeight() }).hitTestBehavior(HitTestMode.None)
-      Row().width(this.crop.w * this.photoWidth()).height(this.crop.h * this.photoHeight())
-        .border({ width: 1, color: Color.White }).borderRadius(12).backgroundColor(Color.Transparent)
-        .position({ x: this.photoX() + this.crop.x * this.photoWidth(), y: this.photoY() + this.crop.y * this.photoHeight() })
+        .opacity(this.onPhotoFrame && this.photoFlightActive || this.animatePhoto && !this.started ? 0 : 1).hitTestBehavior(HitTestMode.None)
+      PinmonyImageSearchSelection({ photoWidth: this.photoWidth(), photoHeight: this.photoHeight(), crop: this.crop })
+        .opacity(this.animatePhoto ? this.chrome : 1)
+        .visibility(this.onPhotoFrame && this.photoFlightActive ? Visibility.Hidden : Visibility.Visible)
         .hitTestBehavior(HitTestMode.None)
         .accessibilityText(this.uiText("pm_move_search_area_e4eb45c8"))
-      this.corner(0)
-      this.corner(1)
-      this.corner(2)
-      this.corner(3)
-      }.width('100%').height('100%').opacity(this.animatePhoto ? this.chrome : 1)
-        .animation({ duration: 100, curve: Curve.EaseOut })
-        .hitTestBehavior(this.animatePhoto && this.chrome < 1 ? HitTestMode.None : HitTestMode.Default)
+      }.width(this.photoWidth()).height(this.photoHeight())
+        .border({ width: this.sourceSelectionBorder ? 2 * (1 - this.chrome) : 0, color: $r('app.color.primary_text') })
+        .borderRadius(this.animatePhoto ? this.frameRadius : 0).clip(true)
+        .scale({ x: this.animatePhoto ? this.frameWidth / this.photoWidth() : 1,
+          y: this.animatePhoto ? this.frameHeight / this.photoHeight() : 1, centerX: 0, centerY: 0 })
+        .translate({ x: this.animatePhoto ? this.frameX : this.photoX(), y: this.animatePhoto ? this.frameY : this.photoY() })
+        .opacity(this.animatePhoto && !this.started || this.onPhotoFrame && this.photoFlightActive ? 0 : 1)
+        .hitTestBehavior(HitTestMode.None)
     }.width('100%').height('100%').id('pinmony-search-flight-' + this.pin)
       .onAreaChange((_old: Area, area: Area) => {
         this.widthValue = Number(area.width); this.heightValue = Number(area.height);
@@ -261,7 +326,7 @@ export struct PinmonyImageSearchView {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
         radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
+        onWillAppear: (): void => { this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: this.uiText("pm_more_pins_like_this_6e224087") },
         scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,
@@ -275,11 +340,7 @@ export struct PinmonyImageSearchView {
             this.closeRequested = true; this.onClose?.();
           }
         },
-        onDisappear: () => {
-          if (this.alive && !this.closing && !this.closeRequested) {
-            this.closeRequested = true; this.onClose?.();
-          }
-        }
+        onDisappear: () => this.resultSheetDisappeared()
       })
   }
 }

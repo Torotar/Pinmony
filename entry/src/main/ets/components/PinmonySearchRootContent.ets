@@ -6,6 +6,7 @@ import { PinmonyAuthStatus } from 'common_session';
 
 export interface PinmonySearchRootView {
   photoHistory: (cursor: string) => Promise<PinmonyPhotoHistoryPage>;
+  deletePhotoHistory: (ids: string[]) => Promise<void>;
   selectPhotoHistory: (id: string, onSelected: (uri: string) => void) => Promise<PinmonySearchResult[] | undefined>;
   photoRegionSearch: (crop: PinmonyImageCrop) => Promise<PinmonySearchResult[] | undefined>;
   photoSearch: (onSelected?: (uri: string) => void) => Promise<PinmonySearchResult[] | undefined>;
@@ -51,6 +52,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
             PinmonySearchPage({
               onPhotoSearch: view.photoSearch,
               onPhotoHistory: view.photoHistory,
+              onDeletePhotoHistory: view.deletePhotoHistory,
               onSelectPhotoHistory: view.selectPhotoHistory,
               onPhotoRegionSearch: view.photoRegionSearch,
               onPhotoCancel: view.cancelPhotoSearch,
@@ -101,6 +103,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               refreshing: view.rootPullKind === 'search',
               onRefresh: () => view.pullRefreshRoot('search'),
               onBack: () => {
+                if (view.preparingDetailReturn) { view.backFromSearch(); return; }
                 if (!view.returnFromSearchQuiz()) view.backFromSearch();
               },
               onRootBack: () => { view.rootBack(); },

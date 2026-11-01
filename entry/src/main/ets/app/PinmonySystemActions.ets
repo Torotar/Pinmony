@@ -75,6 +75,7 @@ export class PinmonySystemActions {
     const source: image.ImageSource = image.createImageSource(bytes);
     const packer: image.ImagePacker = image.createImagePacker();
     try { return await packer.packToData(source, { format: 'image/jpeg', quality: 90 }); }
+    catch (error) { throw new Error(error instanceof Error ? error.message : String(error)); }
     finally { await packer.release(); await source.release(); }
   }
   async readJpeg(uri: string): Promise<ArrayBuffer> {

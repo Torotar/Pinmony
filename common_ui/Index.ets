@@ -1,4 +1,5 @@
 export { PinmonyStatusPage } from './src/main/ets/components/PinmonyStatusPage';
+export { PinmonyListDataSource } from './src/main/ets/services/PinmonyListDataSource';
 export { PinmonyActionNotice } from './src/main/ets/components/PinmonyActionNotice';
 export { PinmonyUserAvatar } from './src/main/ets/components/PinmonyUserAvatar';
 export { PinmonyBoardPlaceholder } from './src/main/ets/components/PinmonyBoardPlaceholder';
@@ -26,8 +27,10 @@ export {
 
 export { PinmonyImmersiveLight } from './src/main/ets/services/PinmonyImmersiveLight';
 export { PinmonyImageSearchView } from './src/main/ets/components/PinmonyImageSearchView';
+export { PinmonyImageSearchSelection } from './src/main/ets/components/PinmonyImageSearchSelection';
 export { PinmonyVisualResult as PinmonyImageSearchResult } from './src/main/ets/models/PinmonyImageSearch';
 export { PinmonyRelatedPin as PinmonyImageSearchItem } from './src/main/ets/models/PinmonyImageSearch';
 export { PinmonyImageCrop } from './src/main/ets/models/PinmonyImageSearch';
 
 export { PinmonyDraggablePublishButton } from './src/main/ets/components/PinmonyDraggablePublishButton';
+export { PinmonySnackBarLifecycle } from './src/main/ets/services/PinmonySnackBarLifecycle';

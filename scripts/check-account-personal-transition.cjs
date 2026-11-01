@@ -1,0 +1,16 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const page=fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets','utf8');
+const account=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','utf8');
+const expression=page.match(/ForEach\((this\.store\.screen === 'root'[^\n]*), \(_screen:/)[1];
+const keys=new Function('return '+expression);
+assert.deepEqual(keys.call({store:{screen:'account'}}),['account']);
+assert.deepEqual(keys.call({store:{screen:'personal'}}),['account','personal'],'parent key survives; only new personal layer enters');
+assert.deepEqual(keys.call({store:{screen:'root'}}),[]);
+assert.deepEqual(keys.call({store:{screen:'gender'}}),['gender']);
+assert.deepEqual(keys.call({store:{screen:'socialMessages'}}),['social']);
+assert(page.includes("retainedAccount: screen === 'account' && this.store.screen === 'personal'"));
+assert(page.includes(".hitTestBehavior(_screen === 'account' && this.store.screen === 'personal' ? HitTestMode.None : HitTestMode.Default)"));
+assert(page.includes(".accessibilityLevel(_screen === 'account' && this.store.screen === 'personal' ? 'no-hide-descendants' : 'auto')"));
+assert.equal((account.match(/this\.retainedAccount \|\| this\.store\.screen === 'account'/g)||[]).length,2,'retained parent keeps its own title and body');
+assert(page.includes("TransitionEffect.translate({x:'100%'}).animation({duration:180,curve:Curve.EaseOut})"));
+console.log('Account to personal: stable parent key/title/body, incoming animation and underlying interaction isolation passed');

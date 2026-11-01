@@ -94,7 +94,7 @@ async function main() {
   assert.equal(authMessages.at(-1).status, 'authenticated', 'streamed initialization evidence can publish before page-end');
   assert.equal(authMessages.at(-1).epoch, 7);
   assert.equal(disconnected, true, 'evidence observation stops after confirmation');
-  const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
+  const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
   const pageMethods = ['onHomeChanged', 'onPrefetchAvailabilityChanged', 'prefetchVisibleDetails', 'feedStatusText'].map(name => {
     const start = page.indexOf('  private ' + name + '(');
     const rest = page.slice(start);
@@ -107,7 +107,7 @@ async function main() {
   const feed = new pageCtx.Feed(), ranges = [];
   Object.assign(feed, { activeSession: 1, activePageKey: home, activeTab: 'all', visibleFirst: 10, visibleLast: 15,
     home: { session: 2, pageKey: home, selectedTab: 'all', pins: Array.from({ length: 30 }) }, feedActive: true, actionsReady: true,
-    resumePendingEnd(){},fillShortViewport(){},uiText:require('./local-message-test-fixture.cjs').rawLocalMessages.text,onImageRecovery() {}, updateCategories() {}, prefetchNextScreen() {}, onPrefetchPins: (first, last) => ranges.push([first, last]) });
+    restoreDone:true, restoreScrollPosition(){},syncFeedRows(){},resumePendingEnd(){},fillShortViewport(){},uiText:require('./local-message-test-fixture.cjs').rawLocalMessages.text,onImageRecovery() {}, updateCategories() {}, prefetchNextScreen() {}, onPrefetchPins: (first, last) => ranges.push([first, last]) });
   feed.onHomeChanged();
   assert.deepEqual(ranges, [[10, 15]], 'session rebind resumes the retained viewport without another scroll event');
   assert.equal(feed.feedStatusText(), '正在恢复首页连接…');

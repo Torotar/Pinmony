@@ -142,6 +142,9 @@ interface ProfileAvatarUploadResponse { success?: boolean; image_upload_tracking
 interface PhotoSearchRegion { x: number; y: number; w: number; h: number; }
 interface PhotoHistoryOptions { url: string; data: Record<string, string>; bookmarks?: string[]; }
 interface PhotoHistoryEnvelope { options: PhotoHistoryOptions; context: Record<string, string>; }
+interface PhotoHistoryDeleteData { lens_history_ids: string[]; }
+interface PhotoHistoryDeleteOptions { url: string; data: PhotoHistoryDeleteData; }
+interface PhotoHistoryDeleteEnvelope { options: PhotoHistoryDeleteOptions; context: Record<string, string>; }
 interface ProfileAvatarStatusData { tracking_id: string; }
 interface ProfileAvatarStatusOptions { url: string; data: ProfileAvatarStatusData; }
 interface ProfileAvatarStatusEnvelope { options: ProfileAvatarStatusOptions; context: Record<string, string>; }
@@ -798,7 +801,7 @@ export class PinmonyNativeNetwork {
     const captured: PinmonyBusinessSessionContext = session();let permitted: boolean = false;
     try {
       const path: string = job.page.slice(captured.origin.length), username: string = path.split('/')[1];
-      const settingsHandler: boolean = job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' || job.headers['X-Pinterest-Pws-Handler'] === 'www/settings/permissions.js' && job.headers['X-Pinterest-Source-Url'] === '/settings/permissions/';
+      const settingsHandler: boolean = job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' || job.headers['X-Pinterest-Pws-Handler'] === 'www/settings/permissions.js' && job.headers['X-Pinterest-Source-Url'] === '/settings/permissions/' || job.headers['X-Pinterest-Pws-Handler'] === 'www/board/[id]/edit.js' && /^\/board\/\d{1,40}\/edit\/$/.test(job.headers['X-Pinterest-Source-Url'] || '');
       const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() && /^\/[A-Za-z0-9_]+\/$/.test(path) && job.page === profileUrl && job.page === captured.origin + path && job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['X-Pinterest-AppState'] === 'active' && job.epoch === captured.generation && job.id.startsWith('native_profile_settings_') && job.headers['Accept'] === 'application/json' && settingsHandler;
       const digits = (v: Object | null | undefined): boolean => typeof v === 'string' && /^\d{1,40}$/.test(v as string);
       if(job.url === captured.origin + '/_/graphql/') {
@@ -828,6 +831,15 @@ export class PinmonyNativeNetwork {
         else if(envelope && resource === '/resource/UserFollowingResource/get/')permitted = get && source === path && keys.length === 4 && o['username'] === username && o['page_size'] === 50 && o['exclude_not_explictly_followed'] === true && o['explicit_following'] === true;
         else if(envelope && resource === '/resource/UserSettingsResource/get/')permitted = get && own && !keys.length && ['/settings/account-settings/','/settings/profile-visibility/'].includes(source);
         else if(envelope && resource === '/resource/CountriesResource/get/')permitted = get && own && !keys.length && source === '/settings/edit/country-region/';
+        else if(envelope && own && ['/resource/BoardResource/get/','/resource/BoardResource/update/'].includes(resource)) {
+          const id: string = o['board_id'] as string;
+          const board: boolean = digits(id) && allowed.includes('recommend-board:' + id) && source === '/board/' + id + '/edit/' && job.headers['X-Pinterest-Pws-Handler'] === 'www/board/[id]/edit.js';
+          permitted = board && (get ? resource === '/resource/BoardResource/get/' && keys.length === 2 && o['field_set_key'] === 'edit' :
+            resource === '/resource/BoardResource/update/' && keys.length === 8 && allowed.includes('recommend-board-update:' + JSON.stringify(o)) &&
+            typeof o['name'] === 'string' && !!(o['name'] as string).trim() && o['name'] === (o['name'] as string).trim() && (o['name'] as string).length <= 300 &&
+            typeof o['description'] === 'string' && (o['description'] as string).length <= 500 && ['public','secret'].includes(o['privacy'] as string) &&
+            typeof o['allow_homefeed_recommendations'] === 'boolean' && typeof o['collaborator_invites_enabled'] === 'boolean' && typeof o['collaborator_requests_enabled'] === 'boolean' && o['sensitivity'] === null);
+        }
         else if(envelope && resource === '/resource/UserRecentActivityResource/get/')permitted = get && own && source === '/edit/activity/' && keys.length === 2 && o['username'] === 'me' && o['filter_type'] === 'all';
         else if(envelope && resource === '/resource/UserSettingsResource/update/' && !get && own) {
           const fields: string[] = keys.filter((k: string): boolean => !['user_id','surface_tag','user_confirm_skip_passcode'].includes(k)),field: string = fields[0],value: Object | null = o[field];
@@ -1658,6 +1670,34 @@ export class PinmonyNativeNetwork {
     return this.request(job,(): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});
   }
 
+  // Bootstrap only the read-only metadata endpoint. The caller must still match
+  // its response viewer against UserResource before using the ordering.
+  async requestBusinessProfileInitialSort(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    try {
+      const path: string = job.page.slice(captured.origin.length);
+      const match: RegExpMatchArray | null = job.url.slice(job.url.indexOf('?') + 1).match(/^source_url=([^&]+)&data=([^&]+)$/);
+      const envelope: NativeSearchEnvelope = JSON.parse(decodeURIComponent(match ? match[2] : '')) as NativeSearchEnvelope;
+      const options: Record<string,Object | null> = envelope.options;
+      const data: Record<string,Object | null> = options['data'] as Record<string,Object | null>;
+      permitted = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
+        job.page.startsWith(captured.origin + '/') && /^\/[A-Za-z0-9_]+\/$/.test(path) &&
+        job.id.startsWith('native_profile_sort_initial_') && job.epoch === captured.generation &&
+        job.method === 'GET' && job.body === '' && job.url.startsWith(captured.origin + '/resource/ApiResource/get/?') &&
+        !!match && decodeURIComponent(match[1]) === path && Object.keys(envelope).length === 2 &&
+        !Array.isArray(envelope.context) && Object.keys(envelope.context).length === 0 &&
+        !Array.isArray(options) && Object.keys(options).length === 2 && options['url'] === '/v3/users/' + path.split('/')[1] + '/metadata/' &&
+        !!data && !Array.isArray(data) && Object.keys(data).length === 0 &&
+        job.headers['Accept'] === 'application/json' && job.headers['X-Requested-With'] === 'XMLHttpRequest' &&
+        job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' && job.headers['Content-Type'] === 'application/x-www-form-urlencoded';
+    } catch (_) {}
+    return this.request(job, (): PinmonyNetworkContext => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
+        actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};
+    });
+  }
   async requestBusinessProfileSort(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
     userId: string, viewerId: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
@@ -1716,7 +1756,7 @@ export class PinmonyNativeNetwork {
       const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
         profileUrl.startsWith(captured.origin + '/') && /^\/[A-Za-z0-9_]+\/$/.test(path) &&
         job.page === profileUrl && job.id.startsWith('native_profile_') && job.epoch === captured.generation && job.method === 'GET' && job.body === '' &&
-        !!source && job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' && Object.keys(payload).length === 2 &&
+        !!source && (job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' || job.url.startsWith(captured.origin + '/resource/BoardsResource/get/?') && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username].js' && job.headers['X-Pinterest-Source-Url'] === decodeURIComponent(source[1]) && job.headers['X-Pinterest-AppState'] === 'active') && Object.keys(payload).length === 2 &&
         !Array.isArray(o) && !Array.isArray(payload.context) && Object.keys(payload.context).length === 0 &&
         (bookmarks === undefined || Array.isArray(bookmarks) && bookmarks.length === 1 && typeof bookmarks[0] === 'string' && bookmarks[0].length > 0 && bookmarks[0].length <= 4096);
       const own: boolean = typeof userId === 'string' && /^\d{1,40}$/.test(userId) && (!visitor || /^\d{1,40}$/.test(viewerId));
@@ -2191,6 +2231,47 @@ export class PinmonyNativeNetwork {
         if (cookies) await this.credentials.update(url, typeof cookies === 'string' ? [cookies] : cookies, live);
       }
       if (!live() || response.statusCode !== 200 || !response.body || response.body.byteLength > 8 * 1024 * 1024) throw new Error('history-response');
+      return response.body;
+    } finally { this.jobs.delete(id); this.pending.delete(id); this.cancelled.delete(id); }
+  }
+
+  async deletePhotoHistory(ids: string[], page: string, session: () => PinmonyBusinessSessionContext,
+      owner: () => boolean, id: string): Promise<ArrayBuffer> {
+    const state: PinmonyBusinessSessionContext = session();
+    const generation: number = this.generation;
+    const live = (): boolean => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return this.foreground && owner() && generation === this.generation && actual.authenticated &&
+        actual.accountId === state.accountId && actual.generation === state.generation && actual.origin === state.origin && !this.cancelled.has(id);
+    };
+    if (!PIN_BUSINESS_PIN_READ_ENABLED || !live() || !state.accountId || !/^https:\/\/(?:www|uk)\.pinterest\.com$/.test(state.origin) ||
+      !page.startsWith(state.origin + '/search/') || !/^native_photo_history_delete_\d+$/.test(id) || this.pending.has(id) ||
+      ids.length < 1 || ids.length > 1000 || new Set<string>(ids).size !== ids.length ||
+      !ids.every((value: string): boolean => /^[A-Za-z0-9_-]{1,200}$/.test(value))) throw new Error('history-delete-unavailable');
+    const url: string = state.origin + '/resource/ApiResource/delete/';
+    const source: string = page.slice(state.origin.length);
+    const payload: PhotoHistoryDeleteEnvelope = { options: { url: '/v3/visual_search/lens/history/', data: { lens_history_ids: ids } }, context: {} };
+    const body: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(payload));
+    this.pending.add(id); this.cancelled.delete(id);
+    try {
+      const cookie: string = await this.credentials.read(url);
+      const csrf: RegExpMatchArray | null = cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      if (!csrf || !live()) throw new Error('history-delete-session');
+      const headers: Record<string, string> = { 'Cookie': cookie, 'User-Agent': state.userAgent,
+        'Content-Type': 'application/x-www-form-urlencoded', 'Referer': page, 'Origin': state.origin,
+        'X-Pinterest-Source-Url': source, 'X-Pinterest-Pws-Handler': 'www/search/[scope].js',
+        'X-CSRFToken': decodeURIComponent(csrf[1]), 'X-Requested-With': 'XMLHttpRequest' };
+      const request: rcp.Request = new rcp.Request(url, 'POST', headers, body, undefined, undefined,
+        { transfer: { autoRedirect: false, timeout: { connectMs: 10000, transferMs: 30000 } } });
+      this.jobs.set(id, request);
+      const response: rcp.Response = await NetworkManager.enqueue(Priority.NORMAL, (): Promise<rcp.Response> => {
+        if (!live()) return Promise.reject(new Error('stale'));
+        return NetworkManager.getSession().fetch(request);
+      });
+      if (!live()) throw new Error('stale');
+      const cookies: string | string[] | undefined = response.headers['set-cookie'];
+      if (cookies) await this.credentials.update(url, typeof cookies === 'string' ? [cookies] : cookies, live);
+      if (!live() || response.statusCode !== 200 || !response.body || response.body.byteLength > 1024 * 1024) throw new Error('history-delete-response');
       return response.body;
     } finally { this.jobs.delete(id); this.pending.delete(id); this.cancelled.delete(id); }
   }

@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice, PinmonyImmersiveLight } from 'common_ui';
 import { BlurStrategy, HdsNavigation, HdsNavigationTitleBarOptions, HdsNavigationTitleMode, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
@@ -105,6 +106,13 @@ export struct PinmonyInboxPage {
       this.restoringScroll = false;
       this.reportScrollAvailability();
     }, 0);
+  }
+
+  private loadMoreUpdatesAtEnd(): void {
+    if (!this.interactionReady || !this.actionsReady || this.restoringScroll || this.loading || this.refreshing ||
+        this.snapshot.section !== 'updates' || this.snapshot.dataSource !== 'api' ||
+        this.snapshot.moreLoading || this.snapshot.moreError || !this.snapshot.hasMore) return;
+    if (this.onLoadMore) this.onLoadMore();
   }
 
   private contentOverflowsViewport(): boolean {
@@ -442,9 +450,8 @@ export struct PinmonyInboxPage {
             if (this.snapshot.section === 'updates' && this.snapshot.dataSource === 'api') {
               if (this.snapshot.moreLoading) {
                 LoadingProgress().color($r('app.color.accent')).width(28).height(28).alignSelf(ItemAlign.Center)
-              } else if (this.snapshot.hasMore || this.snapshot.moreError) {
-                Button(this.snapshot.moreError || this.uiText("pm_load_more_af90a08f")).alignSelf(ItemAlign.Center)
-                  .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+              } else if (this.snapshot.moreError) {
+                PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.interactionReady && !this.snapshot.moreLoading && this.onLoadMore) this.onLoadMore(); } })
               } else if (this.snapshot.items.length === 0 && !PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {
                 Text(this.uiText("pm_no_updates_yet_7891215d")).fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
               }
@@ -486,6 +493,7 @@ export struct PinmonyInboxPage {
         .width('100%')
         .align(Alignment.TopStart)
         .scrollBar(BarState.Off)
+        .scrollBarMargin({start:LengthMetrics.vp(this.inboxTopInset())})
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
         .clip(false)
         .onAreaChange((_oldArea: Area, newArea: Area) => {
@@ -494,6 +502,7 @@ export struct PinmonyInboxPage {
         })
         .onAppear(() => this.restoreScroll())
         .onDisAppear(() => this.releaseScrollMeasurements())
+        .onReachEnd(() => this.loadMoreUpdatesAtEnd())
         .onDidScroll((_xOffset: number, offset: number, state: ScrollState) => {
           this.reportScroll();
           this.reportScrollAvailability();

@@ -1,5 +1,5 @@
 import { PinmonyHomeMenuState } from '../models/PinmonyHomeMenu';
-import { PinmonyHomeSnapshot, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
+import { PinmonyHomeSnapshot, PinmonyHomeImageRecovery, PinmonyHomeTab } from '../models/PinmonyHome';
 
 @Observed
 export class PinmonyHomeStore {
@@ -26,6 +26,25 @@ export class PinmonyHomeStore {
   home: PinmonyHomeSnapshot | undefined = undefined;
   cachedHome: PinmonyHomeSnapshot | undefined = undefined;
   cachedHomeScrollOffset: number = 0;
+  homePresentationEpoch: number = 0;
+  private readonly categoryScrollOffsets: Map<string, number> = new Map<string, number>();
+
+  categoryScrollOffset(pageKey: string, categoryId: string): number | undefined {
+    return this.categoryScrollOffsets.get(pageKey + '|' + categoryId);
+  }
+
+  rememberCategoryScroll(pageKey: string, categoryId: string, offset: number): void {
+    if (!pageKey || !categoryId || !Number.isFinite(offset)) return;
+    this.categoryScrollOffsets.set(pageKey + '|' + categoryId, Math.max(0, offset));
+    const selected: string = this.cachedHome?.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected)?.id || '';
+    if (this.cachedHome?.pageKey === pageKey && selected === categoryId) this.cachedHomeScrollOffset = Math.max(0, offset);
+  }
+
+  clearCategoryPositions(): void {
+    this.categoryScrollOffsets.clear();
+    this.cachedHomeScrollOffset = 0;
+    this.homePresentationEpoch++;
+  }
   homeSourceWarning: string = '';
   retainingHomeFeed: boolean = false;
   homeAppendRequested: boolean = false;

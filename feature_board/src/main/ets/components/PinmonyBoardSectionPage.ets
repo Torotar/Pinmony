@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -9,7 +10,6 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 @Component
 export struct PinmonyBoardSectionPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop ready: boolean = false;
@@ -31,7 +31,7 @@ export struct PinmonyBoardSectionPage {
       if (this.busy) { LoadingProgress().color($r('app.color.accent')).width(24).height(24) }
       if (!this.ready && !this.busy && !this.error) { Text(this.uiText("pm_restoring_board_please_wait_9e819a8a")).fontColor($r('app.color.secondary_text')).fontSize(14) }
       if (this.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.error, this.uiLanguage) }) }
-    }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
+    }.width('100%').padding({ left: 20, right: 20, top: 68, bottom: 28 })
   }
   @Builder
   private nextButton() {
@@ -53,23 +53,24 @@ export struct PinmonyBoardSectionPage {
       Column() {
         Scroll(this.scroller) { this.sectionForm() }
           .width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
+          .scrollBarMargin({start:LengthMetrics.vp(56)})
         Column() { this.nextButton() }
           .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
       }.width('100%').height('100%')
     }.width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.scroller])
-      .titleBar({ enableComponentSafeArea: true,
-        style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-          scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+      .titleBar({ enableComponentSafeArea: false,
+        style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
+          scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
           systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
           originalStyle: {
-            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
             contentStyle: {
               menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
               titleStyle: { mainTitleColor: $r('app.color.primary_text') }
             }
           },
-          scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+          scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
             contentStyle: {
               menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
               titleStyle: { mainTitleColor: $r('app.color.primary_text') }

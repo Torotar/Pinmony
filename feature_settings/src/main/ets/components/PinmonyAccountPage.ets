@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -8,10 +9,12 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyCountry } from '../models/PinmonyAccountSettings';
 @Component
 export struct PinmonyAccountPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  @Prop retainedAccount: boolean = false;
   @ObjectLink store: PinmonySettingsStore;
   onRequest?: (action: string, value: string) => Promise<void>;
   onBack?: () => void;
@@ -31,7 +34,7 @@ export struct PinmonyAccountPage {
     this.store.screen = screen; this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
     if (screen === 'country') this.request('countries');
   }
-  private title(): string { return this.store.screen === 'account' ? this.uiText("pm_account_management_3c072712") : this.store.screen === 'personal' ? this.uiText("pm_personal_information_640803d8") : this.store.screen === 'birthdate' ? this.uiText("pm_date_of_birth_1c54caca") : this.store.screen === 'gender' ? this.uiText("pm_gender_a752a7d8") : this.uiText("pm_country_region_45e22a8a"); }
+  private title(): string { return (this.retainedAccount || this.store.screen === 'account') ? this.uiText("pm_account_management_3c072712") : this.store.screen === 'personal' ? this.uiText("pm_personal_information_640803d8") : this.store.screen === 'birthdate' ? this.uiText("pm_date_of_birth_1c54caca") : this.store.screen === 'gender' ? this.uiText("pm_gender_a752a7d8") : this.uiText("pm_country_region_45e22a8a"); }
   private date(): string { return this.year.padStart(4, '0') + '-' + this.month.padStart(2, '0') + '-' + this.day.padStart(2, '0'); }
   private canSave(): boolean {
     if (!this.store.data || this.store.loading || this.store.busy || this.store.error) return false;
@@ -45,10 +48,10 @@ export struct PinmonyAccountPage {
     if (!this.store.error && this.store.data?.saved && action !== 'gender') this.store.screen = 'personal';
   }
   private options(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: ['birthdate', 'gender'].includes(this.store.screen) ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]), label: this.uiText("pm_done_c0b3fbff"), isEnabled: this.canSave(),
@@ -76,7 +79,7 @@ export struct PinmonyAccountPage {
   private gender(): string { return this.store.data?.gender === 'female' ? this.uiText("pm_female_0ab4610b") : this.store.data?.gender === 'male' ? this.uiText("pm_male_4e79758a") : this.store.data?.gender === 'unspecified' ? this.store.data.customGender || this.uiText('pm_custom_gender_fallback') : ''; }
   private accountLanguage(): string {
     const locale: string = this.store.data?.accountLanguage || '';
-    const key: string = locale === 'zh-CN' || locale === 'zh_CN' ? 'pm_language_simplified_chinese' : locale === 'zh-TW' || locale === 'zh_TW' ? 'pm_language_traditional_chinese' : locale === 'en-GB' || locale === 'en_GB' ? 'pm_language_english_uk' : locale === 'en-US' || locale === 'en_US' || locale === 'en' ? 'pm_language_english' : locale === 'ja-JP' || locale === 'ja_JP' || locale === 'ja' ? 'pm_language_japanese' : locale === 'ko-KR' || locale === 'ko_KR' || locale === 'ko' ? 'pm_language_korean' : '';
+    const key: string = locale === 'zh-CN' || locale === 'zh_CN' ? 'pm_language_simplified_chinese' : locale === 'zh-TW' || locale === 'zh_TW' ? 'pm_language_traditional_chinese' : locale === 'en-GB' || locale === 'en_GB' ? 'pm_language_english_uk' : locale === 'en-US' || locale === 'en_US' || locale === 'en' ? 'pm_language_english' : locale === 'ja-JP' || locale === 'ja_JP' || locale === 'ja' ? 'pm_language_japanese' : locale === 'ko-KR' || locale === 'ko_KR' || locale === 'ko' ? 'pm_language_korean' : locale === 'pt-BR' || locale === 'pt_BR' || locale === 'pt' ? 'pm_language_portuguese_brazil' : '';
     return key ? this.uiText(key) : locale;
   }
   @Builder
@@ -111,13 +114,12 @@ export struct PinmonyAccountPage {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); }, actionEnabled: !this.store.loading && !this.store.busy })
           }
           if (this.store.data?.ready && !this.store.loading) {
-            if (this.store.screen === 'account') {
+            if ((this.retainedAccount || this.store.screen === 'account')) {
               Text(this.uiText("pm_your_account_d80b3d08")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
               this.row(this.uiText("pm_personal_information_640803d8"), '', 'personal')
               this.row(this.uiText("pm_email_1b2714b8"), this.store.data.email)
               this.row(this.uiText("pm_password_a621ab60"), this.uiText("pm_change_password_946e28f6"))
               this.row(this.uiText("pm_phone_number_8e87c0dd"), this.uiText("pm_add_number_9d820e33"))
-              this.row(this.uiText("pm_convert_to_a_business_account_4935be59"), '', '', this.uiText("pm_a_business_account_gives_you_tools_such_as_ads_and_analytics_to__50598c20"))
               Text(this.uiText("pm_deactivation_and_deletion_75be0aea")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
               this.row(this.uiText("pm_deactivate_your_account_06052a52"), '', '', this.uiText("pm_temporarily_hide_your_profile_pins_and_boards_a6d31140"))
               this.row(this.uiText("pm_delete_your_data_and_account_ff4cef48"), '', '', this.uiText("pm_permanently_delete_your_data_and_everything_associated_with_your_2cb85273"))
@@ -159,8 +161,9 @@ export struct PinmonyAccountPage {
               }, (c: PinmonyCountry) => (c.key) + ':' + this.uiLanguage)
             }
           }
-        }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
+        }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
         LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)

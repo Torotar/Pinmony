@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyBoardRecoveryPage } from './PinmonyBoardRecoveryPage';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -17,9 +18,9 @@ import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNav
 @Component
 export struct PinmonySettingsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @StorageLink('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   @State private exportingLog: boolean = false;
@@ -91,9 +92,13 @@ export struct PinmonySettingsPage {
     this.clearingLog = true;
     try {
       const cleared: boolean = await PinmonyRuntimeLog.clear();
-      if (this.pageVisible) this.getUIContext().getPromptAction().showToast({
-        message: this.uiText(cleared ? 'pm_logs_cleared' : 'pm_logs_clear_failed'), duration: 3000
-      });
+      if (this.pageVisible) {
+        try {
+          this.getUIContext().getPromptAction().showToast({
+            message: this.uiText(cleared ? 'pm_logs_cleared' : 'pm_logs_clear_failed'), duration: 3000
+          });
+        } catch (_) { /* page may disappear while the log operation completes */ }
+      }
     } finally { this.clearingLog = false; }
   }
   private readonly contentScroller: Scroller = new Scroller();
@@ -128,11 +133,11 @@ export struct PinmonySettingsPage {
   private titleBarOptions(): HdsNavigationTitleBarOptions {
     return {
       avoidLayoutSafeArea: true,
-      enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+      enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
+        scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } }
       },
       content: {
         title: { mainTitle: this.uiText("pm_settings_df3d58c7") },
@@ -146,6 +151,10 @@ export struct PinmonySettingsPage {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
       List({ space: 0, scroller: this.contentScroller }) {
+        ListItem() {
+          Row().width('100%').height(this.getUIContext().px2vp(this.statusBarHeightPx) + 56)
+            .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+        }
         if(!this.legacyProfile && this.onViewProfile) {
           ListItem() {
             Button({type:ButtonType.Normal}) {
@@ -196,7 +205,7 @@ export struct PinmonySettingsPage {
               if (id === 'notifications') { this.store.screen = 'notifications'; if (this.onRequest) this.onRequest('notifications', ''); }
               if (id === 'social') { this.store.screen = 'social'; if (this.onRequest) this.onRequest('socialRead', ''); }
               if (id === 'display') { this.store.screen = 'display'; if (this.onRequest) this.onRequest('read', ''); }
-              if (id === 'recommend' || id === 'visibility') { this.store.screen = id === 'recommend' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(id === 'recommend' ? 'aiRead' : 'read', ''); }
+              if (id === 'recommend' || id === 'visibility') { this.store.screen = id === 'recommend' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(id === 'recommend' ? this.store.recommendationTab === 'boards' ? 'recommendBoardsRead' : this.store.recommendationTab === 'activity' ? 'activityRead' : 'aiRead' : 'read', ''); }
               if (id === 'account') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
               if (id === 'logout') this.confirmLogout();
               if (id === 'logs') this.exportLog();
@@ -206,6 +215,7 @@ export struct PinmonySettingsPage {
         }, (id: string) => id + this.uiLanguage) }
       }
       .width('100%').height('100%')
+      .scrollBarMargin({ start: LengthMetrics.vp(this.getUIContext().px2vp(this.statusBarHeightPx) + 56) })
       .onAppear(() => this.restoreRootScroll())
       .onDidScroll(() => this.captureRootScroll())
       .contentEndOffset(this.getUIContext().px2vp(this.gestureBarHeightPx) + 12)
@@ -225,7 +235,7 @@ export struct PinmonySettingsPage {
   }
 
   @Builder
-  private settingsSubpage() {
+  private settingsSubpage(screen: string) {
     if (this.store.screen === 'boardRecovery') {
       PinmonyBoardRecoveryPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
     } else if (this.store.screen === 'about') {
@@ -237,7 +247,7 @@ export struct PinmonySettingsPage {
     } else if (['display', 'theme', 'recommend', 'visibility'].includes(this.store.screen)) {
       PinmonyPreferencesPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack, onPin: this.onPin })
     } else if (this.store.screen !== 'root') {
-      PinmonyAccountPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
+      PinmonyAccountPage({ store: this.store, retainedAccount: screen === 'account' && this.store.screen === 'personal', onRequest: this.onRequest, onBack: this.onBack })
     }
   }
 
@@ -252,8 +262,10 @@ export struct PinmonySettingsPage {
     .backgroundColor($r('app.color.page_background'))
     .hitTestBehavior(this.store.screen === 'root' ? HitTestMode.Default : HitTestMode.None)
     .accessibilityLevel(this.store.screen === 'root' ? 'auto' : 'no-hide-descendants')
-    ForEach(this.store.screen === 'root' ? [] : [this.store.screen.startsWith('social') ? 'social' : this.store.screen], (_screen: string) => {
-      Column() { this.settingsSubpage() }.width('100%').height('100%')
+    ForEach(this.store.screen === 'root' ? [] : this.store.screen === 'personal' ? ['account', 'personal'] : [this.store.screen.startsWith('social') ? 'social' : this.store.screen], (_screen: string) => {
+      Column() { this.settingsSubpage(_screen) }.width('100%').height('100%')
+        .hitTestBehavior(_screen === 'account' && this.store.screen === 'personal' ? HitTestMode.None : HitTestMode.Default)
+        .accessibilityLevel(_screen === 'account' && this.store.screen === 'personal' ? 'no-hide-descendants' : 'auto')
         .backgroundColor($r('app.color.page_background'))
         .transition(TransitionEffect.asymmetric(
           TransitionEffect.translate({x:'100%'}).animation({duration:180,curve:Curve.EaseOut}),

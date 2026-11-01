@@ -19,6 +19,7 @@ export struct PinmonyDetailEntryMotion {
   private source: ImageFlightRect = { x: 0, y: 0, width: 1, height: 1 };
   private alive: boolean = false;
   private decoded: boolean = false;
+  private rendered: boolean = false;
   private measured: boolean = false;
   private started: boolean = false;
   private version: number = 0;
@@ -69,11 +70,22 @@ export struct PinmonyDetailEntryMotion {
       }
       return;
     }
-    this.started = true;
     this.frame = this.closing ? target : this.source;
     this.showing = this.closing ? !this.photo.returnPageOnly && this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible();
+    // Data readiness may arrive before this Image has a drawable frame. Make
+    // the photo visible at its source first, then wait for its render callback.
+    // Page-only transitions do not display this Image and need no render wait.
+    if (this.showing && !this.rendered) return;
+    this.started = true;
     // Commit the source frame before starting the destination animation.
     this.timer = setTimeout(() => { if (this.alive) this.move(this.closing); }, 32);
+  }
+  private imageComplete(status: number): void {
+    if (!this.alive || status !== 0 && status !== 1) return;
+    this.decoded = true;
+    if (status === 1) this.rendered = true;
+    PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (status === 1 ? 'photo-rendered' : 'photo-data-ready'));
+    this.begin();
   }
   private closeChanged(): void {
     if (!this.closing || !this.alive) return;
@@ -106,7 +118,7 @@ export struct PinmonyDetailEntryMotion {
       Image(this.photo.imageUrl).width(this.frame.width).height(this.frame.height).objectFit(ImageFit.Cover)
         .borderRadius(18).clip(true).position({ x: this.frame.x, y: this.frame.y })
         .opacity(this.showing ? 1 : 0).accessibilityLevel('no')
-        .onComplete((event) => { if (event?.loadingStatus === 0 || event?.loadingStatus === 1) { this.decoded = true; this.begin(); } })
+        .onComplete((event) => this.imageComplete(event?.loadingStatus ?? -1))
         .onError(() => { if (this.closing) this.onClosed?.(); else this.onOpened?.(); })
     }.width('100%').height('100%').clip(true).hitTestBehavior(HitTestMode.None)
       .onAreaChange(() => { this.measured = true; this.begin(); })

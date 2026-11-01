@@ -23,6 +23,12 @@ assert.equal(result.items[0].rotation,90);assert.equal(result.canvasWidth,1080);
 const cropped=readShufflePresentation(body([{...item,bitmap_mask:{mask_bounds:[[0,0],[1,1]]},shuffle_asset:{cutout_images:{originals:{...image,width:40,height:60}}}}]),'303');
 assert.equal(cropped.items[0].hitWidth,40);assert.equal(cropped.items[0].hitHeight,60);
 assert.equal(cropped.items[0].imageWidth,200,'card retains original Pin dimensions');
+const bounded=readShufflePresentation(body([{...item,bitmap_mask:{mask_bounds:[[.1,.2],[.5,.6]]},shuffle_asset:{cutout_images:{originals:{...image,width:100,height:240}}}}]),'303');
+assert.equal(JSON.stringify(bounded.items[0].cutoutBounds),JSON.stringify({x:.1,y:.2,width:.5,height:.6}),'preserve normalized origin plus extent, not opposite corners');
+for(const bounds of [[[.8,.2],[.5,.6]],[[-.1,.2],[.5,.6]],[[.1,.2],[0,.6]]]) {
+ const invalid=readShufflePresentation(body([{...item,bitmap_mask:{mask_bounds:bounds},shuffle_asset:{cutout_images:{originals:image}}}]),'303');
+ assert.equal(invalid.items[0].cutoutBounds,undefined,'invalid bounds never produce an off-image transition rectangle');
+}
 const unusedCutout=readShufflePresentation(body([{...item,shuffle_asset:{cutout_images:{originals:{...image,width:40,height:60}}}}]),'303');
 assert.equal(unusedCutout.items[0].cutoutUrl,undefined,'unused automatic cutout must not replace an unmasked poster');
 assert.equal(unusedCutout.items[0].hitWidth,160);assert.equal(unusedCutout.items[0].hitHeight,320);
@@ -92,6 +98,20 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  assert.match(page,/Scroll\(\) \{ this.shuffleSelectedCard\(item\) \}.width\('100%'\).height\(188\)/,'metadata must not move the photo');
  assert.equal(owner.previewUrls[0],'https://www.pinterest.com/pin/202/','adjacent card must be requested before selecting it');
  const canvas=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyShuffleCanvas.ets','utf8');
+ const hero=method('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','heroImage');
+ const heroAst=ts.createSourceFile('hero.ts','class Hero {'+hero+'}',99,true);
+ let retainedHero=false;
+ function inspectHero(n,collageBranch=false) {
+  const inside=collageBranch || ts.isIfStatement(n) && n.expression.getText(heroAst).includes('displayedDetail().shuffle');
+  if(ts.isCallExpression(n)&&n.expression.getText(heroAst)==='PinmonyDetailHero') {
+   retainedHero=true;
+   assert.equal(inside,false,'late collage data must not replace the decoded hero subtree');
+  }
+  ts.forEachChild(n,child=>inspectHero(child,inside));
+ }
+ inspectHero(heroAst);assert(retainedHero);
+ assert.match(hero,/coverProvided:true/,'collage interaction overlay reuses the retained hero');
+ assert.match(canvas,/if \(!this.coverProvided\) \{\s*Image\(this.coverUrl\)/,'overlay does not decode a duplicate cover when the hero already supplies it');
  assert.match(canvas,/\.onClick\([\s\S]*?\}, 8\)/);
  assert.doesNotMatch(canvas,/\.gesture\(/,'item clicks must yield to the parent scroll recognizer');
  const root=method('entry/src/main/ets/pages/Index.ets','detailRootIdentity');
@@ -103,7 +123,7 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  owner.pinStore.detail={pinUrl:'https://www.pinterest.com/pin/505/'};owner.pinStore.detailPin=owner.pinStore.detail.pinUrl;owner.currentPinUrl=()=>pin;owner.pinStore.detailNativeReadsReady=false;owner.pinStore.detailPreparing=true;owner.detailNativeReads.owned=()=>false;
  owner.openShufflePin('item-1');assert.equal(opens.length,3,'rapid sibling swipe must not await previous Pin metadata');
  assert.equal(opens[2][0],'https://www.pinterest.com/pin/202/');
- assert.match(page,/\.disableSwipe\(!this.videoActive\)/,'swiping is independent of network readiness');
+ assert.match(page,/\.disableSwipe\(!this.videoActive \|\| this\.shuffleFlightActive\)/,'swiping is disabled during the image flight');
  owner.authStatus='anonymous';owner.openShufflePin('item-1');assert.equal(opens.length,3);
  const fullMethod=method('entry/src/main/ets/pages/Index.ets','openShuffleDetail');
  const Full=vm.runInNewContext(ts.transpileModule('class Full {'+fullMethod+'} Full;',{compilerOptions:{target:99}}).outputText);
@@ -113,14 +133,18 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  const Back=vm.runInNewContext(ts.transpileModule('class Back {'+back+'} Back;',{compilerOptions:{target:99}}).outputText,{PinmonyRuntimeLog:{info:()=>{}},Date});
  Object.setPrototypeOf(full,Back.prototype);full.pageHistory={isPending:()=>false};full.pinStore.shareBackHandledUntil=0;await full.backFromDetail();assert.equal(full.shuffleFullDetail,false);assert.equal(full.shuffleSelectedIndex,2,'back restores the same selected content');
  const layoutFile='feature_pin/src/main/ets/components/PinmonyDetailPage.ets';
- const detailMethod=method(layoutFile,'displayedDetail')+method(layoutFile,'fallbackDetail');
- const Retained=vm.runInNewContext(ts.transpileModule('class Retained {'+detailMethod+method(layoutFile,'shuffleImageReady')+method(layoutFile,'shuffleViewerVisible')+method(layoutFile,'closeShuffleViewer')+method(layoutFile,'onShuffleSelectionChanged')+method(layoutFile,'action')+'} Retained;',{compilerOptions:{target:99}}).outputText,{setTimeout:()=>0});
+ const detailMethod=method(layoutFile,'displayedDetail')+method(layoutFile,'fallbackDetail')+method(layoutFile,'shufflePhotoUrl');
+ const Retained=vm.runInNewContext(ts.transpileModule('class Retained {'+detailMethod+method(layoutFile,'shuffleImageReady')+method(layoutFile,'shuffleViewerVisible')+method(layoutFile,'closeShuffleViewer')+method(layoutFile,'onShuffleSelectionChanged')+method(layoutFile,'action')+'} Retained;',{compilerOptions:{target:99}}).outputText,{setTimeout:()=>0,clearTimeout:()=>{}});
  const retainedView=new Retained(),parentSnapshot={pinUrl:'parent',shuffle:result,actions:[{kind:'save',id:'parent-save'}],imageUrl:'collage.jpg'},childSnapshot={pinUrl:'child',actions:[{kind:'save',id:'child-save'}]};
  Object.assign(retainedView,{currentDetail:childSnapshot,shuffleParentDetail:parentSnapshot,shuffleSelectedImage:'cutout.png',shuffleBackdrop:'collage.jpg',shuffleItems:[{imageUrl:'thumb.jpg'}],shuffleIndex:0,shuffleReadyImages:[],shuffleReadyBackdrop:'',shuffleViewerPresented:false,shuffleFullDetail:false});
  assert.equal(retainedView.displayedDetail(),parentSnapshot,'underlying collage keeps its complete snapshot while child reads update');
  assert.equal(retainedView.action('save').id,'child-save','viewer actions must target the current child, not the retained parent');
+ retainedView.shuffleSourceOnCanvas=true;retainedView.shuffleItems[0].cutoutUrl='cutout.png';
  retainedView.shuffleImageReady('photo:cutout.png');retainedView.shuffleImageReady('card:thumb.jpg');assert.equal(retainedView.shuffleViewerVisible(),false,'photo alone must not expose an empty backdrop');
  retainedView.shuffleReadyBackdrop='collage.jpg';retainedView.shuffleImageReady('backdrop');assert.equal(retainedView.shuffleViewerVisible(),true,'viewer reveals with current photo, thumbnail and backdrop ready');
+ retainedView.shuffleSourceOnCanvas=false;retainedView.shuffleViewerPresented=false;retainedView.shuffleReadyImages=[];
+ retainedView.shuffleImageReady('photo:cutout.png');retainedView.shuffleImageReady('card:thumb.jpg');
+ assert.equal(retainedView.shuffleViewerVisible(),true,'thumbnail entry readiness follows the cutout identity');
  retainedView.shuffleSelectedImage='next.png';assert.equal(retainedView.shuffleViewerVisible(),true,'sibling swipe does not flash the original collage');
  retainedView.shuffleSelectedImage='';retainedView.currentDetail={pinUrl:'parent',actions:[]};retainedView.onShuffleSelectionChanged();assert.equal(retainedView.displayedDetail(),parentSnapshot,'return placeholder cannot replace decoded collage');assert.equal(retainedView.shuffleViewerVisible(),false);
  retainedView.currentDetail=childSnapshot;retainedView.shuffleFullDetail=true;assert.equal(retainedView.displayedDetail(),childSnapshot,'full child detail uses its own snapshot');
@@ -195,5 +219,30 @@ assert(canonicalHit);assert.equal(canonicalHit.u,0.5);assert.equal(canonicalHit.
  reader.revision++;reader.store.detail={pinUrl:'https://www.pinterest.com/pin/404/',shuffleId:'404'};
  respond({status:200,body:body()});await pending;
  assert.equal(reader.store.detail.pinUrl,'https://www.pinterest.com/pin/404/');assert.equal(reader.store.detail.shuffle,undefined,'late parent response must not replace child');
- console.log('Shuffle: response identity, safe images, read allowlist, stale ownership and selected Pin navigation passed');
+ const Motion=vm.runInNewContext(ts.transpileModule('class Motion {'+
+   method(layoutFile,'shuffleItemOrigin')+method(layoutFile,'startShuffleFlight')+
+   method(layoutFile,'failShuffleFlight')+method(layoutFile,'shufflePress')+'} Motion;',
+   {compilerOptions:{target:99}}).outputText,{Curve:{EaseOut:1}});
+ const motion=new Motion(),completions=[];let motionBacks=0;
+ Object.assign(motion,{shuffleFlightActive:true,shuffleFlightStarted:false,shuffleFlightRevision:1,
+   shuffleFlightClosing:false,shuffleFlightTarget:{x:20,y:30,width:200,height:300},shuffleFlightTargetRotation:0,
+   getUIContext:()=>({animateTo:(options,change)=>{change();if(options.onFinish)completions.push(options.onFinish)}}),
+   onBack:()=>motionBacks++,videoActive:true,readsReady:true});
+ motion.startShuffleFlight();assert.equal(motion.shuffleFlightFrame,motion.shuffleFlightTarget);
+ motion.startShuffleFlight();assert.equal(completions.length,1,'repeated image decode callbacks cannot restart flight');
+ completions.shift()();assert.equal(motion.shuffleFlightActive,false);assert.equal(motionBacks,0,'entry animation never navigates back');
+ Object.assign(motion,{shuffleFlightActive:true,shuffleFlightStarted:false,shuffleFlightClosing:true});
+ motion.startShuffleFlight();assert.equal(motionBacks,0,'closing waits for the reverse flight');
+ completions.shift()();assert.equal(motionBacks,1);assert.equal(motion.shuffleViewerPresented,false);
+ Object.assign(motion,{shuffleFlightActive:true,shuffleFlightStarted:false,shuffleFlightClosing:true});
+ motion.startShuffleFlight();motion.shuffleFlightRevision++;completions.shift()();
+ assert.equal(motionBacks,1,'a stale animation cannot pop a later page');
+ motion.shuffleFlightActive=false;motion.shufflePress('selected',true);assert.equal(motion.shufflePressScale,0.94);
+ motion.shufflePress('selected',false);assert.equal(motion.shufflePressScale,1,'release and cancel restore the pressed Pin');
+ motion.shuffleRect=()=>({x:10,y:20,width:200,height:100});
+ motion.displayedDetail=()=>({shuffle:{canvasWidth:200,canvasHeight:100,coordinateWidth:200}});
+ const origin=motion.shuffleItemOrigin({imageWidth:20,imageHeight:40,scale:2,offsetX:10,offsetY:-5,rotation:30},true);
+ assert.equal(origin.x,100);assert.equal(origin.y,25);assert.equal(origin.width,40);assert.equal(origin.height,80);
+ assert.equal(motion.shuffleFlightSourceRotation,30,'canvas origin keeps item rotation');
+ console.log('Shuffle: response identity, safe images, read allowlist, stale ownership, selected Pin navigation and bidirectional motion guards passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,6 +1,8 @@
 const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
 const ts=require(process.argv[2]||'typescript');
+const { PinmonyHomeStore } = require('./arkts-module-loader.cjs').createArktsLoader(ts)
+  .loadFile('feature_home/src/main/ets/stores/PinmonyHomeStore.ets');
 function load(file,deps){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps||(()=>({}))),console});return exports;}
 const {PinmonyHomeNativeReads}=load('entry/src/main/ets/app/PinmonyHomeNativeReads.ets', name=>name==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const flush=()=>new Promise(r=>setImmediate(r));
@@ -8,13 +10,19 @@ const pins=(ids,cursor)=>JSON.stringify({resource_response:{status:'success',dat
 const categories=JSON.stringify({resource_response:{status:'success',data:[{type:'board',id:'7',name:'Board'},{type:'board',id:'8',name:'Other'}]}});
 function fixture(){
  let session={authenticated:true,generation:1,accountId:'account',origin:'https://www.pinterest.com',userAgent:'fixture'}, active=true;
- const store={homeSourceWarning:'',homeActionsReady:false,cachedHomeScrollOffset:123},jobs=[],canceled=[],commits=[],kinds=[];
+ const store=Object.assign(new PinmonyHomeStore(),{homeSourceWarning:'',homeActionsReady:false,cachedHomeScrollOffset:123}),jobs=[],canceled=[],commits=[],kinds=[];
  const controller=new PinmonyHomeNativeReads({store:()=>store,session:()=>session,username:()=> 'reader',active:()=>active,saved:()=>false,
  network:()=>({cancel:id=>canceled.push(id),requestBusinessHomeRead(job,getSession,user,board,current){assert(current());assert.equal(job.page,session.origin+'/');return new Promise(resolve=>jobs.push({job,board,current,resolve:body=>resolve({status:current()?200:0,error:current()?'':'cancelled',body})}));}}),committed:(snapshot,kind)=>{commits.push(snapshot);kinds.push(kind);}});
  return {controller,store,jobs,canceled,commits,kinds,setSession:value=>session=value,session:()=>session,setActive:value=>active=value};
 }
 async function ready(f){const read=f.controller.demand();assert.match(f.jobs[0].job.url,/UserHomefeedResource/);assert.match(f.jobs[1].job.url,/BoardsFeedResource/);f.jobs[0].resolve(pins([1,2],'next'));await read;f.jobs[1].resolve(categories);await flush();}
 async function main(){
+ const concurrent=fixture();const initial=concurrent.controller.demand();
+ await concurrent.controller.demand();
+ assert.equal(concurrent.jobs.length,2,'auth and visible demand share one feed and one category request');
+ concurrent.jobs[0].resolve(pins([1],''));await initial;
+ assert.equal(concurrent.store.home.pins.length,1,'feed commits before category metadata');
+ concurrent.jobs[1].resolve(categories);await flush();
  const recovery=fixture();await ready(recovery);const failedPage=recovery.controller.more();
  recovery.jobs[2].resolve('invalid');await failedPage;assert(recovery.store.homeError);
  const existing=recovery.store.home.pins.slice();recovery.controller.pause();recovery.setActive(false);

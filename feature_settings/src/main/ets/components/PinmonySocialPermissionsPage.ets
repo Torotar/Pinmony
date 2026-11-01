@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { BlurStrategy, HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -5,8 +6,9 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { SocialBlockedUser, SocialMessageGroup, SocialMessageChoice } from '../models/PinmonySocialPermissions';
 @Component
 export struct PinmonySocialPermissionsPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
   onBack?: () => void;
@@ -198,7 +200,7 @@ export struct PinmonySocialPermissionsPage {
   }
   @Builder
   private messageTabs() {
-    Column({ space:16 }) {
+    Stack({ alignContent: Alignment.TopStart }) {
       Scroll() {
         Row({ space:8 }) {
           ForEach(this.messageTabIds(), (id: number, index: number) => {
@@ -211,7 +213,8 @@ export struct PinmonySocialPermissionsPage {
               .onClick(() => this.selectMessageTab(index))
           }, (id: number): string => id + ':' + this.store.socialMessageGroup + ':' + this.store.busy + ':' + this.store.loading + ':' + this.uiLanguage)
         }.height(36)
-      }.width('100%').height(36).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.Start)
+      }.width('100%').height(36).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.TopStart)
+        .margin({ top:this.titleContentInset() }).backgroundColor($r('app.color.page_background')).zIndex(1)
       Scroll(this.scroller) {
         Column({ space:16 }) {
           if (this.store.social.business && this.store.socialMessageGroup === -1) {
@@ -221,8 +224,9 @@ export struct PinmonySocialPermissionsPage {
           } else {
             this.messageChoices()
           }
-        }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom:28 })
-      }.width('100%').layoutWeight(1).align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+        }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:this.titleContentInset() + 52,bottom:28 })
+      }.width('100%').height('100%').align(Alignment.TopStart)
+        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset() + 52) }).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 12 })
           .onActionStart(() => { this.suppressSwipeClick = true; })
           .onActionEnd((event: GestureEvent) => { this.swipeMessageTab(event.offsetX, event.offsetY); }))
@@ -333,8 +337,9 @@ export struct PinmonySocialPermissionsPage {
         Scroll(this.scroller) {
           Column({ space:16 }) {
             this.body()
-          }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:16,bottom:28 })
-        }.width('100%').height('100%').align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+          }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:this.titleContentInset() + 16,bottom:28 })
+        }.width('100%').height('100%').align(Alignment.TopStart)
+          .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) }).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         }
         }.width('100%').height('100%')
           .transition(this.store.screen === 'social' ? TransitionEffect.IDENTITY : TransitionEffect.asymmetric(
@@ -343,10 +348,10 @@ export struct PinmonySocialPermissionsPage {
         }, (screen: string): string => screen)
         if (this.store.loading || this.store.busy) { LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None) }
       }.width('100%').height('100%')
-    }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+    }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])

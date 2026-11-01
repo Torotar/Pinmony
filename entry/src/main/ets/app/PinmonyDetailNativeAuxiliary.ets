@@ -4,7 +4,9 @@ import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyVideo, PinmonyVideoSourc
   PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin, PIN_VIDEO_API_ENABLED, PIN_CAROUSEL_API_ENABLED, PIN_VISUAL_SEARCH_API_ENABLED } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
-export const PIN_NATIVE_DETAIL_AUXILIARY_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_DETAIL_AUXILIARY_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_DETAIL_AUXILIARY_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_DETAIL_AUXILIARY_ROLLOUT_ENABLED;
 interface Art { url: string; width: number; height: number; duration?: number; }
 interface VideoList { V_HLSV4?: Art; V_720P?: Art; vHLSV4?: Art; v720P?: Art; }
 interface Videos { video_list?: VideoList; videoList?: VideoList; }
@@ -240,6 +242,7 @@ export class PinmonyDetailNativeAuxiliary {
     if (!this.ready() || !PIN_VISUAL_SEARCH_API_ENABLED || this.store.imageLayer !== 'search' || !crop ||
       ![crop.x,crop.y,crop.w,crop.h].every((v: number): boolean => Number.isFinite(v)) || crop.x < 0 || crop.y < 0 || crop.w < 0.04 || crop.h < 0.04 || crop.x + crop.w > 1.00001 || crop.y + crop.h > 1.00001) return;
     const selected: PinmonyImageCrop = {x:crop.x,y:crop.y,w:crop.w,h:crop.h}, key: string = JSON.stringify(selected);
+    if (!append && key === this.crop && this.store.visualResult.pin === this.pin && this.store.visualResult.loading) return;
     if (append && (key !== this.crop || this.store.visualResult.loading || this.store.visualResult.ended || !this.bookmark)) return;
     this.cancelVisual(); this.crop = key; if (!append) this.bookmark = '';
     const revision: number = ++this.visualRevision, pin: string = this.pin, previous: string = append ? this.bookmark : '';

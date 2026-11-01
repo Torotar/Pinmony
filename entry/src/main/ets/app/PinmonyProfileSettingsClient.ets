@@ -1,7 +1,9 @@
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
-export const PIN_NATIVE_PROFILE_SETTINGS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_PROFILE_SETTINGS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_PROFILE_SETTINGS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_PROFILE_SETTINGS_ROLLOUT_ENABLED;
 export interface ProfileSettingsPorts {
     session: () => PinmonyBusinessSessionContext;
     network: () => PinmonyNativeNetwork;
@@ -57,10 +59,11 @@ export class PinmonyProfileSettingsClient {
     constructor(ports: ProfileSettingsPorts) { this.ports = ports; }
     cancel(): void { this.waits.forEach((release: () => void, id: string): void => { this.ports.network().cancel(id); release(); }); this.waits.clear(); }
     async request(page: string, name: string, verb: string, options: Object, source: string, current: () => boolean, postRead: boolean = false): Promise<ProfileSettingsResponse> {
+        if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) throw new Error('disabled');
         if (!current())
             throw new Error('stale');
         const s: PinmonyBusinessSessionContext = this.ports.session(), graph: boolean = name === 'graphql', get: boolean = verb === 'get' && !postRead, envelope: Envelope = { options: options, context: {} }, form: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope)), json: boolean = !!(options as Record<string,Object>)['send_as_json'];
-        const handler: string = source === '/settings/permissions/' ? 'www/settings/permissions.js' : 'www/index.js';
+        const handler: string = /^\/board\/\d{1,40}\/edit\/$/.test(source) ? 'www/board/[id]/edit.js' : source === '/settings/permissions/' ? 'www/settings/permissions.js' : 'www/index.js';
         const jsonBody: JsonRequest = { source_url: source, data: envelope };
         const job: PinmonyNetworkJob = { id: 'native_profile_settings_' + (++sequence).toString(), epoch: s.generation, page: page, url: s.origin + (graph ? '/_/graphql/' : '/resource/' + name + '/' + verb + '/' + (get ? '?' + form : '')), method: get ? 'GET' : 'POST', body: get ? '' : graph ? JSON.stringify(options) : json ? JSON.stringify(jsonBody) : form, headers: { 'Accept': 'application/json', 'Content-Type': graph || json ? 'application/json' : 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Pws-Handler': handler, 'X-Pinterest-Source-Url': source } };
         if (s.appVersion)

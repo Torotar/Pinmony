@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyDraggablePublishButton, PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -11,11 +12,15 @@ import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNaviga
 
 @Component
 export struct PinmonyPublishPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
-  @Prop state: PinmonyPublishFlow;
+  @Prop @Watch('syncDraftCards') state: PinmonyPublishFlow;
+  @State private draftCards: PinmonyPublishDraft[] = [];
+  @State private draftLayoutRevision: number = 0;
+  private draftCardsToken: number = -1;
   @State private link: string = '';
   @State private sourceAreaWidth: number = 0;
   @State private sourceAreaHeight: number = 0;
@@ -24,7 +29,23 @@ export struct PinmonyPublishPage {
   private readonly stack: NavPathStack = new NavPathStack();
   private readonly scroller: Scroller = new Scroller();
   onAction: (action: string, value: string, secret: boolean) => void = () => {};
-  aboutToAppear(): void { this.stack.pushPath({ name: 'publish' }, false); }
+  aboutToAppear(): void { this.syncDraftCards(); this.stack.pushPath({ name: 'publish' }, false); }
+
+  private syncDraftCards(): void {
+    const next: PinmonyPublishDraft[] = (this.state.drafts || []).slice();
+    const removed: boolean = this.draftCardsToken === this.state.token && this.state.phase === 'photo' &&
+      !this.state.draftLoading && next.length < this.draftCards.length &&
+      next.every((draft: PinmonyPublishDraft): boolean => this.draftCards.some((previous: PinmonyPublishDraft): boolean => previous.id === draft.id));
+    this.draftCardsToken = this.state.token;
+    if (removed) {
+      this.getUIContext().animateTo({ duration: 280, curve: Curve.EaseOut }, () => {
+        this.draftCards = next;
+        this.draftLayoutRevision++;
+      });
+    } else {
+      this.draftCards = next;
+    }
+  }
 
   private act(action: string): void { this.onAction(action, action === 'scrape' ? this.link.trim() : action === 'back' ? this.state.phase : '', false); }
   private submitWebsite(): void {
@@ -53,21 +74,33 @@ export struct PinmonyPublishPage {
     });
   }
 
+  private readonly retainedDraftSections: WaterFlowSections = new WaterFlowSections();
+  private draftSectionCount: number = -1;
+  private draftSectionInset: number = -1;
+  private draftSections(): WaterFlowSections {
+    const count: number = this.draftCards.length + (this.state.error ? 1 : 0);
+    const inset: number = this.titleContentInset() + 16;
+    if (count !== this.draftSectionCount || inset !== this.draftSectionInset) {
+      this.retainedDraftSections.splice(0,this.retainedDraftSections.length(),[{itemsCount:count,crossCount:2,columnsGap:12,rowsGap:16,margin:{left:16,right:16,top:inset,bottom:16}}]);
+      this.draftSectionCount = count;this.draftSectionInset = inset;
+    }
+    return this.retainedDraftSections;
+  }
   private titleBar(): HdsNavigationTitleBarOptions {
     const draftTitle: string = this.uiText("pm_publish_draft_box") + ' · ' + PinmonyI18n.format('pm_pin_drafts_count', [(this.state.drafts || []).length], this.uiLanguage);
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
+        scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         originalStyle: {
-          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
           }
         },
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
@@ -104,8 +137,8 @@ export struct PinmonyPublishPage {
   }
   @Builder
   private draftFlow() {
-    WaterFlow({scroller:this.scroller}) {
-      ForEach(this.state.drafts || [], (draft: PinmonyPublishDraft) => {
+    WaterFlow({scroller:this.scroller,sections:this.draftSections()}) {
+      ForEach(this.draftCards, (draft: PinmonyPublishDraft) => {
         FlowItem() {
           Column({space:6}) {
             Stack({alignContent:Alignment.BottomEnd}) {
@@ -114,11 +147,12 @@ export struct PinmonyPublishPage {
             }.width('100%')
             if (draft.expiresAt) { Text(PinmonyI18n.format('pm_pin_drafts_days',[Math.max(0,Math.ceil((draft.expiresAt - Date.now()) / 86400000))],this.uiLanguage)).fontSize(16).fontColor($r('app.color.primary_text')).width('100%') }
           }.width('100%')
+            .geometryTransition('pinmony-draft-layout-' + this.state.token.toString() + '-' + draft.id, { follow: true })
         }.width('100%')
-      }, (draft: PinmonyPublishDraft) => draft.id + ':' + this.uiLanguage)
+      }, (draft: PinmonyPublishDraft) => draft.id + ':' + this.uiLanguage + ':' + this.draftLayoutRevision.toString())
       if (this.state.error) { FlowItem() { PinmonyActionNotice({message:PinmonyI18n.render(this.state.error,this.uiLanguage)}) } }
     }.columnsTemplate('1fr 1fr').columnsGap(12).rowsGap(16)
-      .width('100%').height('100%').padding(16).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+      .width('100%').height('100%').scrollBar(BarState.Off).scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
   }
   @Builder
   private destination(_name?: string, _param?: Object) {
@@ -146,7 +180,7 @@ export struct PinmonyPublishPage {
             }
           }
           if (this.state.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error,this.uiLanguage) }) }
-        }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
+        }.width('100%').alignItems(HorizontalAlign.Start).padding({left:16,right:16,top:this.titleContentInset() + 16,bottom:16})
       }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
       }
       if (this.state.phase === 'photo' && !this.state.loading && !this.state.draftLoading && !this.state.draftError && !(this.state.drafts || []).length) {
@@ -170,6 +204,10 @@ export struct PinmonyPublishPage {
   build() {
     if (this.state.kind === 'photo' && ['select','topics','products','productImages','productSearch','productConfirm','advanced'].includes(this.state.phase)) {
       PinmonyPublishPhotoEditor({state:this.state,viewState:this.photoViewState,onAction:this.onAction})
+        .zIndex(1)
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
+          TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })))
     } else if (['select','boards','sections','create'].includes(this.state.phase)) {
       PinmonyPublishBoardPage({state:this.state,pins:this.state.pins,pinsLoading:this.state.loading,onAction:this.onAction})
     } else {
@@ -178,6 +216,10 @@ export struct PinmonyPublishPage {
         if (this.state.kind === 'photo' && (this.state.loading || this.state.draftLoading)) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None) }
         else if (this.state.loading || this.state.busy) { PinmonyLoadingOverlay({message:this.uiText('pm_loading_photos_35b3ef9b')}) }
       }.width('100%').height('100%')
+        .zIndex(0)
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.IDENTITY,
+          TransitionEffect.IDENTITY))
     }
   }
 }

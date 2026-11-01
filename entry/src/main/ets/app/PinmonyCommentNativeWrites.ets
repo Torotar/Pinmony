@@ -3,7 +3,9 @@ import { PinmonyPinStore, PinmonyComment, PinmonyCommentResult, PIN_POST_EXTENSI
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PinmonyNetworkContext } from 'common_network';
 import { PinmonyDetailNativeReads, NativeCommentData } from './PinmonyDetailNativeReads';
-export const PIN_NATIVE_COMMENT_WRITES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_POST_EXTENSIONS_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_COMMENT_WRITES_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_COMMENT_WRITES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_COMMENT_WRITES_ROLLOUT_ENABLED && PIN_POST_EXTENSIONS_ENABLED;
 interface Input { action: string; id?: string; text?: string; imageUri?: string; }
 interface Resource { status: string; code?: number; error?: Object; endpoint_name?: string; data: Object | null; }
 interface Viewer { id: string; }

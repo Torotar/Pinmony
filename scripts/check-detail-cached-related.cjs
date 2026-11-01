@@ -13,6 +13,7 @@ const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true
   PinmonyRuntimeLog: { info() {}, warn() {} } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
   ${method('async openImageRelated')}
+  selectDetailEntryMotion() {}
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}
 } globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);

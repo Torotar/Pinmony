@@ -6,6 +6,7 @@ import { PinmonyAuthStatus } from 'common_session';
 export interface PinmonyProfileRootView {
   profileStore: PinmonyProfileStore;
   pinStore: PinmonyPinStore;
+  retainPinSource: boolean;
   loadFailed: boolean;
   authStatus: PinmonyAuthStatus;
   activeTab: number;
@@ -41,13 +42,13 @@ export interface PinmonyProfileRootView {
 @Builder
 export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
           if ((view.profileStore.profile || view.profileStore.profileLoading || view.profileStore.profileError) &&
-              !view.profileStore.profileWebFlow && !view.pinStore.detail && !view.loadFailed) {
+              !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource) && !view.loadFailed) {
             Stack() {
-              if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && !view.pinStore.detail && !view.loadFailed) {
+              if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource) && !view.loadFailed) {
                 PinmonyProfilePage({
-                  interactionReady: view.authStatus === 'authenticated' &&
+                  interactionReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.authStatus === 'authenticated' &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
-                  automaticLoadingEnabled: (view.profileStore.profileNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) &&
+                  automaticLoadingEnabled: !view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.profileStore.profileNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
                   profile: view.profileStore.profile,
@@ -95,7 +96,8 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
             .width('100%')
             .height('100%')
             .visibility(view.profileStore.origins.length > 0 || view.activeTab === 3 ? Visibility.Visible : Visibility.Hidden)
-            .hitTestBehavior(view.profileStore.origins.length > 0 || view.activeTab === 3 ? HitTestMode.Default : HitTestMode.None)
+            .hitTestBehavior(!view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.profileStore.origins.length > 0 || view.activeTab === 3) ? HitTestMode.Default : HitTestMode.None)
+            .accessibilityLevel(view.pinStore.detail || view.pinStore.detailOpeningPin ? 'no-hide-descendants' : 'auto')
             .onTouch((event: TouchEvent) => view.onTouch(event))
           }
 
@@ -106,13 +108,13 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
 function PinmonyBuildProfileStatus(view: PinmonyProfileRootView) {
     Column() {
       Column({ space: 18 }) {
-        if (view.profileStore.profileLoading) {
+        if (view.profileStore.profileLoading || !view.profileStore.profileError) {
           LoadingProgress().color($r('app.color.accent')).width(36).height(36)
           Text(PinmonyI18n.text(PinmonyI18n.message("pm_loading_profile_503bfab4")))
             .fontSize(15)
             .fontColor($r('app.color.secondary_text'))
         } else {
-          Text(view.profileStore.profileError)
+          Text(PinmonyI18n.text(view.profileStore.profileError))
             .fontSize(16)
             .fontColor($r('app.color.primary_text'))
           Button(PinmonyI18n.text("pm_reload_df7392cc"))

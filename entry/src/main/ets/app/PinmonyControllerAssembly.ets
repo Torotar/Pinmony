@@ -6,7 +6,7 @@ import { PinmonySearchNativeReads } from './PinmonySearchNativeReads';
 import { PinmonySearchDiscoveryNativeReads } from './PinmonySearchDiscoveryNativeReads';
 import { PinmonyHomeNativeReads } from './PinmonyHomeNativeReads';
 import { PinmonyDetailNativeReads } from './PinmonyDetailNativeReads';
-import { PinmonyControllerHooks } from './PinmonyControllerLifecycle';
+import { PinmonyControllerHooks, PinmonyHostControllerHooks } from './PinmonyControllerLifecycle';
 
 import { PinmonySearchStore } from 'feature_search';
 import { PinmonySharePanelsController, PinmonyDetailOperationsController, PinmonyDetailReadController, PinmonyPostPanelsController, PinmonyPinStore, PinmonyDetailController } from 'feature_pin';
@@ -57,7 +57,7 @@ function resumeHook(name: string, pause: () => void, resume: () => void): Pinmon
 }
 
 export function assembleControllerLifecycle(controllers: PinmonyProductControllers,
-  pauseCoordination: () => void): PinmonyControllerLifecycle {
+  pauseCoordination: () => void, hostHooks: PinmonyHostControllerHooks[] = []): PinmonyControllerLifecycle {
   return new PinmonyControllerLifecycle([
     pauseHook('board-collaborators', (): void => controllers.boardCollaborators.pause()),
     resumeHook('publish', (): void => controllers.publish.pause(), (): void => controllers.publish.resume()),
@@ -85,7 +85,7 @@ export function assembleControllerLifecycle(controllers: PinmonyProductControlle
     resumeHook('profile-read', (): void => controllers.profileRead.pause(), (): void => controllers.profileRead.resume()),
     resumeHook('profile-actions', (): void => controllers.profileActions.pause(), (): void => controllers.profileActions.resume()),
     resumeHook('inbox-read', (): void => controllers.inboxRead.pause(), (): void => controllers.inboxRead.resume())
-  ]);
+  ], hostHooks);
 }
 
 export function bindStoreNavigation(stores: PinmonyNavigationAwareStore[],

@@ -16,7 +16,7 @@ function boot(system = 'zh-CN') {
   }, { AppStorage: { get: key => memory.get(key), setOrCreate: (k,v) => memory.set(k,v) },
     PersistentStorage: { persistProp: (k,v) => { if (!memory.has(k)) memory.set(k,v); } } });
   const api = loader.loadFile('common_foundation/src/main/ets/services/PinmonyI18n.ets').PinmonyI18n;
-  api.initialize({ resourceManager: { getConfigurationSync: () => ({}), getOverrideResourceManager: config => ({ getStringByNameSync: key => { if(failResource)throw Error('synthetic resource');const locale = config.locale === 'en-US' ? 'en_US' : config.locale === 'en-GB' ? 'en_GB' : config.locale === 'ja-JP' ? 'ja' : config.locale === 'ko-KR' ? 'ko' : config.locale === 'ru-RU' ? 'ru' : config.locale === 'zh-TW' ? 'zh_TW' : 'zh_CN'; const rows = JSON.parse(fs.readFileSync('common_foundation/src/main/resources/' + locale + '/element/string.json', 'utf8')).string; const row = rows.find(row => row.name === key); if (!row) throw Error('Missing resource: ' + key); return row.value; } }) } }); return { api, memory, system: value => currentSystem = value };
+  api.initialize({ resourceManager: { getConfigurationSync: () => ({}), getOverrideResourceManager: config => ({ getStringByNameSync: key => { if(failResource)throw Error('synthetic resource');const locale = config.locale === 'en-US' ? 'en_US' : config.locale === 'en-GB' ? 'en_GB' : config.locale === 'ja-JP' ? 'ja' : config.locale === 'ko-KR' ? 'ko' : config.locale === 'ru-RU' ? 'ru' : config.locale === 'pt-BR' ? 'pt_BR' : config.locale === 'zh-TW' ? 'zh_TW' : 'zh_CN'; const rows = JSON.parse(fs.readFileSync('common_foundation/src/main/resources/' + locale + '/element/string.json', 'utf8')).string; const row = rows.find(row => row.name === key); if (!row) throw Error('Missing resource: ' + key); return row.value; } }) } }); return { api, memory, system: value => currentSystem = value };
 }
 failOpen=true;assert.throws(()=>boot(),/language-storage-read-unavailable/);failOpen=false;
 failRead=true;assert.throws(()=>boot(),/language-storage-read-unavailable/);failRead=false;
@@ -42,6 +42,13 @@ assert.equal(f.api.text('pm_retry_b8784c8d', 'ru'), 'Повторить');
 f = boot('zh-CN'); assert.equal(f.memory.get('pinmonyLanguage'), 'ru');
 f.api.select('system'); f.system('ru-RU'); f.api.syncSystemLanguage(); assert.equal(f.memory.get('pinmonyLanguage'), 'ru');
 f.api.syncAccountLanguage('ru-RU'); assert.equal(f.memory.get('pinmonyLanguage'), 'ru');
+assert.equal(f.api.resolve('system', 'pt-BR'), 'pt_BR');
+assert.equal(f.api.resolve('system', 'pt'), 'pt_BR');
+f.api.select('pt_BR'); assert.equal(f.memory.get('pinmonyLanguage'), 'pt_BR');
+assert.equal(f.api.text('pm_retry_b8784c8d', 'pt_BR'), 'Tentar novamente');
+f = boot('zh-CN'); assert.equal(f.memory.get('pinmonyLanguage'), 'pt_BR');
+f.api.select('system'); f.system('pt-BR'); f.api.syncSystemLanguage(); assert.equal(f.memory.get('pinmonyLanguage'), 'pt_BR');
+f.api.syncAccountLanguage('pt-BR'); assert.equal(f.memory.get('pinmonyLanguage'), 'pt_BR');
 assert.equal(f.api.resolve('system', 'ko-KR'), 'ko');
 assert.equal(f.api.resolve('ko', 'en-US'), 'ko');
 assert.equal(f.api.resolve('system', 'zh-TW'), 'zh_TW');
@@ -92,7 +99,7 @@ for (const file of ['feature_pin/src/main/ets/components/PinmonyMoreSheet.ets','
 }
 
 // Screenshot regression: execute the actual snapshot producers, not hand-written labels.
-const nativeLoader = createArktsLoader(ts, { common_foundation: { PinmonyI18n: f.api }, common_network: {}, '@kit.ArkTS':{}, '@kit.ImageKit':{} });
+const nativeLoader = createArktsLoader(ts, { common_foundation: { PinmonyI18n: f.api }, common_network: { PIN_BUSINESS_PIN_READ_ENABLED: true }, '@kit.ArkTS':{}, '@kit.ImageKit':{} });
 const ProfileReader = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyProfileNativeReads.ets').PinmonyProfileNativeReads;
 const profile = Object.create(ProfileReader.prototype);
 Object.assign(profile, { owned: () => true, store: {}, section: 'saved', page: 'https://www.pinterest.com/test/', origin: 'https://www.pinterest.com',

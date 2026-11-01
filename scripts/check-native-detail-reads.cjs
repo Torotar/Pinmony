@@ -52,6 +52,15 @@ function fixture() {
     setForeground(value) { foreground = value; }, setRoot(value) { root = value; } };
 }
 async function main() {
+  const parallel = fixture();
+  const parallelRead = parallel.controller.start(pinUrl(1), 1, base(1));
+  assert.equal(parallel.requests.length, 2, 'both independent reads start before either response');
+  parallel.requests[1].resolve(related([2], '-end-')); await parallelRead;
+  assert.equal(parallel.store.detail.related.length, 1, 'recommendations publish while preview is pending');
+  assert.equal(parallel.store.detail.commentLoading, true);
+  parallel.requests[0].resolve(preview('late successful preview')); await flush();
+  assert.equal(parallel.store.detail.commentPreview, 'late successful preview');
+  assert.equal(parallel.controller.retainedRelated.get(pinUrl(1)).previewText, 'late successful preview', 'retained state includes a later preview');
   const retained = fixture();
   let retaining = retained.controller.start(pinUrl(1), 1, base(1));
   retained.requests[0].resolve(preview('preview')); await flush();
@@ -115,12 +124,12 @@ async function main() {
   assert.equal(f.store.detail.actions.find(a=>a.kind==='comment').countText,'3');
   assert(f.store.detail.actions.some(a=>a.kind==='save'));
   assert(f.store.detail.actions.some(a=>a.kind==='more'));
-  assert.equal(f.requests.length, 1); assert.match(f.requests[0].job.url, /UnifiedCommentsPreviewResource/);
+  assert.equal(f.requests.length, 2, 'preview and related are dispatched without serial waiting'); assert.match(f.requests[0].job.url, /UnifiedCommentsPreviewResource/);
   assert.equal(f.requests[0].job.headers['X-App-Version'], 'fixture.1');
   assert.equal(f.requests[0].job.headers['X-Pinterest-Pws-Handler'], 'www/pin/[id].js');
   assert.equal(f.store.detailActionsReady, false, 'native reads never grant mutation permission');
   f.requests[0].resolve(preview('confirmed preview')); await flush();
-  assert.equal(f.requests.length, 2, 'related starts only after preview settles');
+  assert.equal(f.requests.length, 2, 'preview completion does not duplicate related reads');
   f.requests[1].resolve(related([2,3], 'next')); await first;
   assert.equal(f.store.detail.commentPreview, 'confirmed preview'); assert.equal(f.store.detail.related.length, 2);
   assert.equal(f.store.detailNativeReadsReady, true);
@@ -222,8 +231,9 @@ async function main() {
   for (const revoke of [f => f.controller.pause(), f => f.setSession({ ...f.getSession(), generation: 2, accountId: 'other' }),
     f => { f.store.detailOpeningToken++; }, f => f.setRoot(true), f => f.setForeground(false)]) {
     const stale = fixture(); const pending = stale.controller.start(pinUrl(1), 1, base(1)).catch(() => 'cancelled');
-    revoke(stale); stale.requests[0].resolve(preview('late')); await pending;
-    assert.equal(stale.requests.length, 1, 'revoked preview cannot start related');
+    revoke(stale); stale.requests[0].resolve(preview('late')); stale.requests[1].resolve(related([99], '-end-')); await pending;
+    assert.equal(stale.requests.length, 2, 'revoked parallel reads cannot dispatch additional reads');
+    assert(!stale.store.detail.related.some(item => item.id === '99'), 'revoked recommendations cannot publish');
     assert.notEqual(stale.store.detail.commentPreview, 'late'); assert.equal(stale.controller.owned(), false);
     assert.notEqual(stale.store.detailCache.get('1')?.detail.commentPreview, 'late', 'revoked reads cannot update return cache');
   }
@@ -362,6 +372,7 @@ async function main() {
   assert.equal(evaluate(readyExpression), false, 'unconfirmed cached media cannot play');
   mediaView.traceId++; assert.notEqual(evaluate(ownerExpression), owner, 'new detail opening invalidates the previous player');
   assert(page.includes('if ((this.actionsReady || this.readsReady) && !this.detail.relatedError && this.onLoadMore)'));
-  console.log('Native detail reads: ordered preview/related, metadata, pagination, dedupe, observed result publication, errors/retry, stale bridge and cancellation passed');
+  console.log('Native detail reads: parallel preview/related in either completion order, metadata, pagination, dedupe, publication, errors/retry and cancellation passed');
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+const deadline = setTimeout(() => { console.error('Native detail reads did not settle'); process.exit(1); }, 10000);
+main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(deadline));

@@ -13,18 +13,141 @@ const userBody=(extra={})=>body(user,'',{client_context:{user:{id:'42'}},...extr
 const flush=()=>new Promise(r=>setImmediate(r));
 function fixture(mergeRequest){let session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'},target=page,active=true,selected=true,document=origin+'/',epoch=7;
 const store={profileSession:0,profileActionsReady:false,profileSessionReady:false,profileScrollOffset:0,profileCache:new Cache(),origins:[]},requests=[],cancelled=[],addresses=[];
-const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({requestBusinessBoardManagementWrite: (...args)=>mergeRequest(...args),requestBusinessProfileSort:(job,session,user,viewer,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
+const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({requestBusinessProfileInitialSort:(job,session,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},requestBusinessBoardManagementWrite: (...args)=>mergeRequest(...args),requestBusinessProfileSort:(job,session,user,viewer,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
 return {reader,store,requests,cancelled,addresses,getSession:()=>session,setSession:s=>session=s,setPage:p=>target=p,setActive:v=>active=v,setSelected:v=>selected=v,setDocument:d=>document=d,setEpoch:v=>epoch=v};}
 function options(job){return JSON.parse(new URL(job.url).searchParams.get('data')).options;}
 function endpoint(job){return new URL(job.url).pathname;}
-async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
+async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,3,'main and unorganized reads start together after verified identity');assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
 async function main(){
+const initialHub=fixture();initialHub.reader.ports.initialBoardsHub=()=>true;
+const hubDone=initialHub.reader.demand();assert.equal(initialHub.requests.length,2,'identity and initial metadata start concurrently');initialHub.requests[0].resolve(userBody());await flush();
+assert.equal(initialHub.store.profile.hubMode,'boards','choose modern root before identity publication');
+assert.equal(initialHub.requests.length,3,'one preference and one unorganized read');
+assert(!initialHub.requests.some(r=>endpoint(r.job)==='/resource/BoardsFeedResource/get/'));
+const sameRoute=initialHub.reader.select('hub:boards:0:0');await sameRoute;
+assert.equal(initialHub.requests.length,3);assert.equal(initialHub.cancelled.length,0,'UI confirmation does not cancel initial reads');
+const preference=initialHub.requests.find(r=>r.job.id.startsWith('native_profile_sort_initial_'));
+preference.resolve(body({most_recent_board_sort_order:'alphabetical'},'',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_metdata_get',data:{most_recent_board_sort_order:'alphabetical'}},client_context:{user:{id:'42'}}}));
+initialHub.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await flush();
+assert.equal(initialHub.requests.length,4);assert.equal(endpoint(initialHub.requests[3].job),'/resource/BoardsResource/get/');
+initialHub.requests[3].resolve(body([board(1)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(1)],bookmark:'-end-'}}));await hubDone;
+assert.equal(initialHub.store.profile.boards.length,1);assert.equal(initialHub.cancelled.length,0);
+initialHub.reader.invalidateContent();
+assert.equal(initialHub.store.profile,undefined,'mutated content must not remain visible as current');
+const contentReread=initialHub.reader.demand();
+assert.equal(endpoint(initialHub.requests[4].job),'/resource/UserResource/get/','identity and counts are refreshed');
+initialHub.requests[4].resolve(userBody());await flush();
+assert.equal(initialHub.requests.length,7,'confirmed sort avoids another metadata round trip');
+assert.equal(endpoint(initialHub.requests[5].job),'/resource/BoardsResource/get/');
+initialHub.requests[5].resolve(body([board(2)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(2)],bookmark:'-end-'}}));
+initialHub.requests[6].resolve(body([]));await contentReread;
+assert.equal(initialHub.store.profile.boards[0].title,'Board 2','only refreshed content is published');
+initialHub.reader.invalidateContent();
+initialHub.setSession({...initialHub.getSession(),generation:2});
+const changed=initialHub.reader.demand();initialHub.requests[7].resolve(userBody());await flush();
+assert(initialHub.requests.slice(8).some(r=>r.job.id.startsWith('native_profile_sort_initial_')),'new session cannot reuse previous ordering');
+initialHub.reader.pause();
+for(const request of initialHub.requests.slice(8))request.resolve(body([]));
+await changed;
+
+// Bootstrap is read-only and never publishes ordering before identity proof.
+const preferenceBody=(viewer='42',sort='alphabetical')=>body(null,'',{
+ resource_response:{status:'success',code:0,endpoint_name:'v3_user_metdata_get',data:{most_recent_board_sort_order:sort}},
+ client_context:{user:{id:viewer}}
+});
+for(const metadataFirst of [true,false]) {
+ const boot=fixture();boot.reader.ports.initialBoardsHub=()=>true;
+ const done=boot.reader.demand();assert.equal(boot.requests.length,2);
+ if(metadataFirst){boot.requests[1].resolve(preferenceBody());await flush();assert.equal(boot.requests.length,2);assert.equal(boot.reader.boardSort,'');}
+ boot.requests[0].resolve(userBody());await flush();
+ if(!metadataFirst){assert.equal(boot.requests.length,3);boot.requests[1].resolve(preferenceBody());await flush();}
+ const boards=boot.requests.find(r=>endpoint(r.job)==='/resource/BoardsResource/get/');assert(boards);
+ assert.equal(options(boards.job).sort,'alphabetical');
+ boards.resolve(body([board(1)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(1)],bookmark:'-end-'}}));boot.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await done;
+ assert.equal(boot.store.profile.boards.length,1);
+}
+for(const payload of [preferenceBody('99'),preferenceBody('', 'alphabetical'),preferenceBody('42','unsupported'),'{']) {
+ const boot=fixture();boot.reader.ports.initialBoardsHub=()=>true;
+ const done=boot.reader.demand();boot.requests[1].resolve(payload);boot.requests[0].resolve(userBody());await flush();
+ boot.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await done;
+ assert(!boot.requests.some(r=>endpoint(r.job)==='/resource/BoardsResource/get/'));
+ assert.equal(boot.reader.boardSort,'');assert(boot.store.profile.contentError,'invalid bootstrap remains an explicit error');
+}
+const rejectedIdentity=fixture();rejectedIdentity.reader.ports.initialBoardsHub=()=>true;
+const rejectedDone=rejectedIdentity.reader.demand();rejectedIdentity.requests[0].resolve(userBody({client_context:{user:{id:'99'}}}));await rejectedDone;
+assert(rejectedIdentity.cancelled.includes(rejectedIdentity.requests[1].job.id));
+rejectedIdentity.requests[1].resolve(preferenceBody());await flush();assert.equal(rejectedIdentity.reader.boardSort,'');assert.equal(rejectedIdentity.requests.length,2);
+const bootCancelled=fixture();bootCancelled.reader.ports.initialBoardsHub=()=>true;
+const bootCancelledDone=bootCancelled.reader.demand();bootCancelled.reader.pause();
+assert.equal(bootCancelled.cancelled.length,2,'pause cancels both bootstrap reads');
+bootCancelled.requests[1].resolve(preferenceBody());bootCancelled.requests[0].resolve(userBody());await bootCancelledDone;
+assert.equal(bootCancelled.reader.boardSort,'');
+const bootFailure=fixture();bootFailure.reader.ports.initialBoardsHub=()=>true;
+const failedBootDone=bootFailure.reader.demand();bootFailure.requests[1].resolve('',503);await flush();
+assert.equal(bootFailure.requests.length,2,'early metadata failure does not dispatch another request');
+bootFailure.requests[0].resolve(userBody());await flush();
+bootFailure.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await failedBootDone;
+assert.equal(bootFailure.requests.length,3);assert(bootFailure.store.profile.contentError);
+const bootVisitor=fixture();bootVisitor.reader.ports.initialBoardsHub=()=>true;bootVisitor.reader.ports.visitor=()=>true;
+const visitorDone=bootVisitor.reader.demand();assert.equal(bootVisitor.requests.length,1,'visitor does not bootstrap own metadata');
+bootVisitor.reader.pause();bootVisitor.requests[0].resolve(userBody());await visitorDone;
+
+const bootstrapNetwork=new Network();let bootstrapSent=0,bootstrapContext;
+bootstrapNetwork.request=async(job,current)=>{bootstrapContext=current;if(!acceptsNetworkJob(job,current()))return{error:'rejected'};bootstrapSent++;return{error:''};};
+const bootstrapJob=initialHub.requests[1].job;
+let bootstrapSession=initialHub.getSession();bootstrapSession={...bootstrapSession,generation:bootstrapJob.epoch};
+assert.equal((await bootstrapNetwork.requestBusinessProfileInitialSort(bootstrapJob,()=>bootstrapSession,()=>true)).error,'');
+const bootstrapMutate=fn=>{const u=new URL(bootstrapJob.url),e=JSON.parse(u.searchParams.get('data'));fn(e);u.searchParams.set('data',JSON.stringify(e));return {...bootstrapJob,url:u.toString()};};
+for(const bad of [{...bootstrapJob,method:'POST'}, {...bootstrapJob,body:'write'}, {...bootstrapJob,id:'native_profile_other'},
+ {...bootstrapJob,page:origin+'/other/'}, {...bootstrapJob,epoch:99},
+ bootstrapMutate(e=>e.options.url='/v3/users/me/metadata/'),bootstrapMutate(e=>e.options.data={most_recent_board_sort_order:'custom'}),
+ bootstrapMutate(e=>e.options.extra=true),bootstrapMutate(e=>e.context={extra:true})]) {
+ assert((await bootstrapNetwork.requestBusinessProfileInitialSort(bad,()=>bootstrapSession,()=>true)).error);
+}
+assert.equal(bootstrapSent,1,'bootstrap cannot authorize writes, other paths or extra fields');
+assert((await bootstrapNetwork.requestBusinessProfileInitialSort(bootstrapJob,()=>bootstrapSession,()=>false)).error);
+await bootstrapNetwork.requestBusinessProfileInitialSort(bootstrapJob,()=>bootstrapSession,()=>true);
+bootstrapSession={...bootstrapSession,accountId:'changed'};assert.equal(bootstrapContext().authenticated,false);
+assert((await bootstrapNetwork.requestBusinessProfileInitialSort(bootstrapJob,()=>({...bootstrapSession,authenticated:false}),()=>true)).error);
+console.log('Profile cold start: parallel metadata/identity, viewer proof, failure, cancellation, visitor and narrow read-only transport passed');
+
+// Parallel reads publish the main content without waiting for auxiliary Pins.
+for(const auxiliaryFirst of [false,true]) {
+ const concurrent=fixture(),done=concurrent.reader.demand();
+ concurrent.requests[0].resolve(userBody());await flush();
+ assert.equal(concurrent.requests.length,3);
+ if(auxiliaryFirst){concurrent.requests[2].resolve(body([pin(3)]));await flush();}
+ concurrent.requests[1].resolve(body([board(1)]));await flush();
+ assert.equal(concurrent.store.profile.boards.length,1,'main content publishes independently');
+ if(!auxiliaryFirst)concurrent.requests[2].resolve(body([pin(3)]));
+ await done;assert.equal(concurrent.reader.unorganized.pins.length,1);
+}
+const parallelCancel=fixture(),cancelDone=parallelCancel.reader.demand();
+parallelCancel.requests[0].resolve(userBody());await flush();
+parallelCancel.reader.pause();
+for(const request of parallelCancel.requests.slice(1)){
+ assert(parallelCancel.cancelled.includes(request.job.id),'pause cancels both pending reads');
+ request.resolve(body([board(99)]));
+}
+await cancelDone;assert.equal(parallelCancel.store.profile.boards.length,0,'late responses remain discarded');
+const auxiliaryFailure=fixture(),failureDone=auxiliaryFailure.reader.demand();
+auxiliaryFailure.requests[0].resolve(userBody());await flush();
+auxiliaryFailure.requests[2].resolve('',503);auxiliaryFailure.requests[1].resolve(body([board(1)]));
+await failureDone;assert.equal(auxiliaryFailure.store.profile.boards.length,1);
+assert(auxiliaryFailure.reader.unorganized.error,'auxiliary failure remains independently visible');
+
 
 const alphabetic=fixture();await first(alphabetic,[board(1)],'-end-');alphabetic.reader.boardSort='alphabetical';
-const orderedRead=alphabetic.reader.read(false,false);assert.equal(options(alphabetic.requests.at(-1).job).sort,'alphabetical');
-alphabetic.requests.at(-1).resolve(body([{...board(1),name:'Zebra'},{...board(2),name:'apple'}]));await orderedRead;
-assert.deepEqual(Array.from(alphabetic.store.profile.boards,b=>b.title),['apple','Zebra'],'loaded boards follow the chosen name order even when the response is unsorted');
-console.log('Alphabetical board order sorts the loaded response by title');
+const orderedRead=alphabetic.reader.read(false,false);assert.equal(options(alphabetic.requests.at(-1).job).sort,'alphabetical');assert.equal(alphabetic.requests.at(-1).job.headers['X-Pinterest-Pws-Handler'],'www/[username].js');assert.equal(alphabetic.requests.at(-1).job.headers['X-Pinterest-Source-Url'],'/sample/');assert.equal(alphabetic.requests.at(-1).job.headers['X-Pinterest-AppState'],'active');
+alphabetic.requests.at(-1).resolve(body([{...board(1),name:'人物'},{...board(2),name:'包装'}],'alphabet-page2'));await orderedRead;
+assert.deepEqual(Array.from(alphabetic.store.profile.boards,b=>b.title),['人物','包装'],'A-Z preserves server collation instead of applying local pinyin collation');
+const alphabetMore=alphabetic.reader.more();assert.equal(options(alphabetic.requests.at(-1).job).sort,'alphabetical');assert.equal(options(alphabetic.requests.at(-1).job).bookmarks[0],'alphabet-page2');
+alphabetic.requests.at(-1).resolve(body([{...board(2),name:'包装'},{...board(3),name:'插画'}]));await alphabetMore;
+assert.deepEqual(Array.from(alphabetic.store.profile.boards,b=>b.title),['人物','包装','插画'],'pagination keeps server order and deduplicates overlapping boards');
+console.log('Alphabetical board order preserves server collation and pagination');
+
+
+const mismatch=fixture();await first(mismatch);mismatch.reader.boardSort='alphabetical';let mismatchRead=mismatch.reader.read(false,false);mismatch.requests.at(-1).resolve(body([board(2)],'-end-',{resource:{options:{sort:'last_pinned_to'}}}));await mismatchRead;assert(mismatch.store.profile.contentError,'reject mismatched echoed order');assert.equal(mismatch.store.profile.boards[0].id,'profile-api-native-1');
 
 const coverFixture=fixture();
 const customCover='https://i.pinimg.com/custom_covers/200x150/synthetic-cover.jpg',alternateCover='https://i.pinimg.com/custom_covers/236x/synthetic-cover.jpg';
@@ -93,7 +216,7 @@ pending=f.reader.refresh(true);assert(f.store.profilePullRefreshing);assert.equa
 for(const revoke of [g=>g.reader.pause(),g=>g.setActive(false),g=>g.setSelected(false),g=>g.setPage(origin+'/other/'),g=>g.setSession({...g.getSession(),accountId:'other',generation:2})]){const g=fixture(),p=g.reader.demand();revoke(g);g.requests[0].resolve(userBody());await p;assert.equal(g.requests.length,1);assert.equal(g.store.profile?.displayName||'','');}
 for(const invalid of [userBody({client_context:{user:{id:'99'}}}),userBody({client_context:{}}),body({...user,username:'other'},'',{client_context:{user:{id:'42'}}})]){const g=fixture(),p=g.reader.demand();g.requests[0].resolve(invalid);await p;assert(g.store.profileError);await g.reader.demand();assert.equal(g.requests.length,1,'identity failure requires explicit retry');}
 const g=fixture();await first(g);g.setSession({...g.getSession(),accountId:'new-cache-hash',generation:2});pending=g.reader.demand();assert.equal(g.store.profile.boards.length,0);assert.equal(g.store.profileCache.get(page,'saved'),undefined);g.requests[3].resolve(userBody());await flush();g.requests[4].resolve(body([]));await flush();g.requests[5].resolve(body([]));await pending;assert.equal(g.store.profile.boards.length,0);
-const story={type:'story',id:'all',story_type:'all_pins',title:{text:'所有 Pin'},action:{url:'/users/42/pins/'},objects:[{image_medium_url:avatar}]};const s=fixture();await first(s,[story]);assert.equal(s.store.profile.boards[0].targetUrl,page+'pins/');const invalidStory=fixture();pending=invalidStory.reader.demand();invalidStory.requests[0].resolve(userBody());await flush();invalidStory.requests[1].resolve(body([{...story,action:{url:'/users/99/pins/'}}]));await pending;assert(invalidStory.store.profile.contentError);await invalidStory.reader.demand();assert.equal(invalidStory.requests.length,2);
+const story={type:'story',id:'all',story_type:'all_pins',title:{text:'所有 Pin'},action:{url:'/users/42/pins/'},objects:[{image_medium_url:avatar}]};const s=fixture();await first(s,[story]);assert.equal(s.store.profile.boards[0].targetUrl,page+'pins/');const invalidStory=fixture();pending=invalidStory.reader.demand();invalidStory.requests[0].resolve(userBody());await flush();invalidStory.requests[1].resolve(body([{...story,action:{url:'/users/99/pins/'}}]));invalidStory.requests[2].resolve(body([]));await pending;assert(invalidStory.store.profile.contentError);await invalidStory.reader.demand();assert.equal(invalidStory.requests.length,3);
 const write=fixture();await first(write);write.setDocument(page);pending=write.reader.more();
 const mutation={kind:'state',nativeOwn:true,nativeVersion:write.store.profile.nativeVersion,nativeInvalidation:1,contextEpoch:7,session:1,profileUrl:page,section:'saved'};
 write.reader.updateBridge(JSON.stringify(mutation));assert.equal(write.requests.length,4,'confirmed invalidation coalesces with the current GET');write.requests[3].resolve(body([board(1)],'-end-'));await pending;assert.equal(write.requests.length,5,'finish current GET then re-read, never replay the write');
@@ -126,7 +249,7 @@ while(timers.length)timers.shift()();assert.equal(f.store.profile.organize.phase
 // Execute the actual Index read entrypoints while hidden Web stays on home.
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\(')),end=index.indexOf('\n  private ',start+1);assert(start>=0,name);return index.slice(start,end);}
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['usesNativeProfileReads','currentProfileUrl','refreshProfile','loadMoreProfile','prepareProfileInteraction','onRootPageVisible'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_PROFILE_READS_ENABLED:true, PinmonyRuntimeLog:{info(){},warn(){}}});
-const host=new Host();let nativeCalls=0;Object.assign(host,{profileStore:{origins:[]},authStatus:'authenticated',profileNativeReads:{eligible:()=>true,refresh:()=>nativeCalls++,more:()=>nativeCalls++},authenticatedProfileUrl:page,profileUrlFromAddress:a=>a,controller:{getUrl(){throw Error('hidden Web must not gate own root')}},profileReadController:{refresh(){throw Error('legacy read')},loadMore(){throw Error('legacy paging')}}});assert.equal(host.currentProfileUrl(),page);host.refreshProfile(true);host.loadMoreProfile();assert.equal(nativeCalls,2);
+const host=new Host();let nativeCalls=0;Object.assign(host,{nativeBusinessRoutesEnabled:true,profileStore:{origins:[]},authStatus:'authenticated',profileNativeReads:{eligible:()=>true,refresh:()=>nativeCalls++,more:()=>nativeCalls++},authenticatedProfileUrl:page,profileUrlFromAddress:a=>a,controller:{getUrl(){throw Error('hidden Web must not gate own root')}},profileReadController:{refresh(){throw Error('legacy read')},loadMore(){throw Error('legacy paging')}}});assert.equal(host.currentProfileUrl(),page);host.refreshProfile(true);host.loadMoreProfile();assert.equal(nativeCalls,2);
 let legacyReads=0,visibleDemands=0;Object.assign(host,{activeTab:3,tabRequestToken:1,nativeRootTabsVisible:()=>true,pagePerformance:{mark(){}},markRootPerformance(){},requestRootPage(){legacyReads++},coordinatorTasks:{timeout:fn=>fn()}});
 host.profileNativeReads.demand=()=>{visibleDemands++};host.onRootPageVisible(3,true);assert.equal(visibleDemands,1);assert.equal(legacyReads,0,'waiting for business identity never prepares hidden Web');
 // Reusing a profile document on the other segment must install before waiting for its session.

@@ -1,4 +1,5 @@
 export interface PinmonyPhotoHistoryItem { id: string; imageUrl: string; width: number; height: number; }
+export interface PinmonyPhotoHistoryOrigin { x: number; y: number; width: number; height: number; imageWidth: number; imageHeight: number; }
 export interface PinmonyPhotoHistoryPage { items: PinmonyPhotoHistoryItem[]; cursor: string; ended: boolean; }
 interface Size { width: number; height: number; }
 interface Item { id: string; type: string; image_urls: Record<string, string>; image_sizes: Record<string, Size>; }

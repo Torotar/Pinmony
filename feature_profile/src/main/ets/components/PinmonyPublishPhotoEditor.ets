@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyImmersiveLight, PinmonyActionNotice } from 'common_ui';
 import { PinmonyLoadingOverlay } from 'common_ui';
 import { Chip, ChipSize, SymbolGlyphModifier } from '@kit.ArkUI';
@@ -25,8 +26,11 @@ export class PinmonyPublishPhotoViewState {
 
 @Component
 export struct PinmonyPublishPhotoEditor {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @State private productHeaderHeight: number = 0;
+  @State private productSearchHeaderHeight: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @Prop @Watch('syncPhase') state: PinmonyPublishFlow;
   @State private title: string = '';
@@ -133,11 +137,11 @@ export struct PinmonyPublishPhotoEditor {
       (!this.link || /^https?:\/\/[^\s/@?#]+(?:[/?#][^\s]*)?$/.test(this.link));
   }
   private titleBar(phase: string): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl:this.immersiveLightEnabled, systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius:this.immersiveLightEnabled ? 18 : 0 },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl:(this.immersiveLightMode !== 'off'), systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius:(this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } } },
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius:this.immersiveLightEnabled ? 18 : 0 },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius:(this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } } } },
       content: { title: { mainTitle: this.text(phase === 'advanced' ? 'pm_publish_advanced' : ['topics','products','productImages','productSearch','productConfirm'].includes(phase) ? phase === 'topics' ? 'pm_publish_topics' : 'pm_publish_products' : 'pm_publish_create_pin') },
         backIcon: { label: this.text('pm_back_572cf45b'), isEnabled: !this.state.busy, action: () => this.back(phase) },
@@ -294,8 +298,7 @@ export struct PinmonyPublishPhotoEditor {
     }.width('100%').alignItems(HorizontalAlign.Start).padding({left:20,right:20,top:16,bottom:32})
   }
   @Builder
-  private productResults(link: boolean) {
-    Scroll(link ? this.productLinkScroller : this.productScroller) {
+  private productResultsBody() {
       Column({space:16}) {
         if(this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
         else if(this.state.productError) {
@@ -325,7 +328,13 @@ export struct PinmonyPublishPhotoEditor {
           }.width('100%').alignItems(VerticalAlign.Top)
         }
       }.width('100%').padding({bottom:28})
-    }.width('100%').layoutWeight(1).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true}).scrollBar(BarState.Off)
+  }
+  @Builder
+  private productResults(link: boolean) {
+    Scroll(link ? this.productLinkScroller : this.productScroller) {
+      Column() { this.productResultsBody() }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + (this.state.phase === 'products' ? 56 + this.productHeaderHeight : this.productSearchHeaderHeight)})
+    }.width('100%').height('100%').edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true}).scrollBar(BarState.Off)
+      .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + (this.state.phase === 'products' ? 56 + this.productHeaderHeight : this.productSearchHeaderHeight))})
   }
   @Builder
   private productImagePage() {
@@ -354,21 +363,25 @@ export struct PinmonyPublishPhotoEditor {
           },(column: number): string => column.toString())
         }.width('100%').alignItems(VerticalAlign.Top)
         if(this.state.productError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage) }) }
-      }.width('100%').padding({left:16,right:16,top:16,bottom:28})
-    }.width('100%').height('100%').align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+      }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + 16,bottom:28})
+    }.width('100%').height('100%').align(Alignment.TopStart).scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
   }
   @Builder
   private tagTabs() {
     Tabs({index:this.productTab}) {
       TabContent() {
+        Stack({alignContent:Alignment.TopStart}) {
         Column({ space: 20 }) {
           Row() { Text(this.query || this.text('pm_publish_product_search')).fontSize(17).fontColor($r('app.color.secondary_text')) }.width('100%').height(48).padding(12).borderRadius(16).backgroundColor($r('app.color.surface_muted')).onClick(() => this.onAction('openProductSearch','',false))
           if(!this.query.trim()) { Text(this.text('pm_publish_product_recommendations')).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).width('100%') }
+        }.width('100%').padding(16).margin({top:this.titleContentInset() + 56}).backgroundColor($r('app.color.page_background')).zIndex(1)
+          .onAreaChange((_old:Area,area:Area) => {this.productHeaderHeight = Number(area.height);})
           this.productResults(false)
-        }.width('100%').height('100%').padding(16).alignItems(HorizontalAlign.Start)
-      }.tabBar(SubTabBarStyle.of(this.text('pm_publish_search_pins')).indicator({ color: $r('app.color.primary_text'), height: 2, borderRadius: 0 })
+        }.width('100%').height('100%')
+      }.tabBar(SubTabBarStyle.of(this.text('pm_publish_search_pins')).padding({top:this.titleContentInset() + 16,bottom:16,left:16,right:16}).indicator({ color: $r('app.color.primary_text'), height: 2, borderRadius: 0 })
         .labelStyle({ selectedColor: $r('app.color.primary_text'), unselectedColor: $r('app.color.primary_text'), font: { size: 17, weight: FontWeight.Bold } }))
       TabContent() {
+        Scroll(this.productLinkScroller) {
         Column({ space: 16 }) {
           TextInput({ text: this.productLink, placeholder: this.text('pm_publish_product_link') }).type(InputType.URL).maxLength(4096)
             .onChange((value: string) => { this.productLink = value; this.viewState.productLink = value;this.onAction('productQuery','',false); })
@@ -379,10 +392,12 @@ export struct PinmonyPublishPhotoEditor {
           if(this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
           if(this.state.productError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage) }) }
           if(this.state.productMode === 'link' && !this.state.productLoading && !(this.state.productResults || []).length) { Text(this.text('pm_publish_product_empty')).fontColor($r('app.color.secondary_text')) }
-        }.width('100%').height('100%').padding(16)
-      }.tabBar(SubTabBarStyle.of(this.text('pm_publish_use_link')).indicator({ color: $r('app.color.primary_text'), height: 2, borderRadius: 0 })
+        }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + 72,bottom:16})
+        }.width('100%').height('100%').align(Alignment.TopStart)
+          .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + 56)})
+      }.tabBar(SubTabBarStyle.of(this.text('pm_publish_use_link')).padding({top:this.titleContentInset() + 16,bottom:16,left:16,right:16}).indicator({ color: $r('app.color.primary_text'), height: 2, borderRadius: 0 })
         .labelStyle({ selectedColor: $r('app.color.primary_text'), unselectedColor: $r('app.color.primary_text'), font: { size: 17, weight: FontWeight.Bold } }))
-    }.barMode(BarMode.Fixed).barHeight(56).width('100%').height('100%').animationDuration(0)
+    }.barMode(BarMode.Fixed).barHeight(this.titleContentInset() + 56).barOverlap(true).barBackgroundColor(Color.Transparent).width('100%').height('100%').animationDuration(0)
       .onChange((index: number): void => {
         if(index === this.productTab)return;
         this.productTab = index;this.viewState.productTab = index;
@@ -393,6 +408,7 @@ export struct PinmonyPublishPhotoEditor {
   }
   @Builder
   private productSearchPage() {
+    Stack({alignContent:Alignment.TopStart}) {
     Column({space:16}) {
       Row({space:12}) {
         TextInput({text:this.query, placeholder:this.text('pm_publish_product_search')}).layoutWeight(1).height(48).maxLength(200).fontSize(17).borderRadius(16).onChange((value: string): void => this.searchProducts(value)).onSubmit(() => { if(this.productTimer >= 0)clearTimeout(this.productTimer); this.onAction('searchProducts',this.query,false); })
@@ -403,16 +419,20 @@ export struct PinmonyPublishPhotoEditor {
         }
         Button(this.text('pm_cancel_2cd0f3be')).borderRadius(16).onClick(() => this.back('productSearch'))
       }.width('100%')
+      }.width('100%').padding(16).margin({top:this.titleContentInset()}).backgroundColor($r('app.color.page_background')).zIndex(1)
+        .onAreaChange((_old:Area,area:Area) => {this.productSearchHeaderHeight = Number(area.height);})
       if (this.state.productSuggesting) {
+        Scroll(this.productScroller) {
         Column() {
           ForEach(this.state.productSuggestions || [], (term: string) => {
             Row({space:20}) { SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(22).fontColor([$r('app.color.primary_text')]); Text(term).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1) }.width('100%').padding({top:16,bottom:16}).onClick(() => { if(this.productTimer >= 0)clearTimeout(this.productTimer); this.query = term; this.viewState.productQuery = term; this.onAction('searchProducts',term,false); })
           }, (term: string) => term)
           if (this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
           if (this.state.productError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage) }) }
-        }.width('100%')
+        }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + this.productSearchHeaderHeight,bottom:16})
+        }.width('100%').height('100%').scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.productSearchHeaderHeight)})
       } else { this.productResults(false) }
-    }.width('100%').height('100%').padding(16)
+    }.width('100%').height('100%')
   }
   @Builder
   private productConfirmPage() {
@@ -438,8 +458,8 @@ export struct PinmonyPublishPhotoEditor {
                   .type(ButtonType.Normal).width(40).height(40).backgroundColor(Color.Transparent).onClick(() => this.onAction('removeProduct',pin.id,false))
               }.width('100%')
             }, (pin: PinmonyCreatedPin): string => pin.id)
-          }.width('100%').alignItems(HorizontalAlign.Center).padding({left:20,right:20,top:16,bottom:112})
-        }.width('100%').layoutWeight(1).align(Alignment.TopStart).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+          }.width('100%').alignItems(HorizontalAlign.Center).padding({left:20,right:20,top:this.titleContentInset() + 16,bottom:112})
+        }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
       }.width('100%').height('100%')
       Button('+', {type:ButtonType.Normal}).width(56).height(56).fontSize(32)
         .backgroundColor(Color.Transparent)
@@ -453,22 +473,25 @@ export struct PinmonyPublishPhotoEditor {
   private destination(phase: string) {
     HdsNavDestination() {
       if (phase === 'topics') { Stack({alignContent:Alignment.Center}) {
-        Scroll(this.topicScroller) { this.topicsPage() }.width('100%').height('100%').align(Alignment.TopStart)
+        Scroll(this.topicScroller) { Column() { this.topicsPage() }.width('100%').padding({top:this.titleContentInset()}) }.width('100%').height('100%').align(Alignment.TopStart)
+        .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
         .initialOffset({yOffset:this.viewState.topicOffset}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .onDidScroll((): void => { this.viewState.topicOffset = Math.max(0,this.topicScroller.currentOffset().yOffset); })
         if (this.state.topicLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None) }
         }.width('100%').height('100%') }
-      else if(phase === 'advanced') { Scroll(this.advancedScroller) { this.advancedPage() }.width('100%').height('100%').align(Alignment.TopStart)
+      else if(phase === 'advanced') { Scroll(this.advancedScroller) { Column() { this.advancedPage() }.width('100%').padding({top:this.titleContentInset()}) }.width('100%').height('100%').align(Alignment.TopStart)
+        .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
         .initialOffset({yOffset:this.viewState.advancedOffset}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .onDidScroll((): void => { this.viewState.advancedOffset = Math.max(0,this.advancedScroller.currentOffset().yOffset); }) }
       else if (phase === 'products') { this.tagTabs() }
       else if(phase === 'productImages') { this.productImagePage() }
       else if(phase === 'productSearch') { this.productSearchPage() }
       else if(phase === 'productConfirm') { this.productConfirmPage() }
-      else { Scroll(this.scroller) { this.editor() }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
+      else { Scroll(this.scroller) { Column() { this.editor() }.width('100%').padding({top:this.titleContentInset()}) }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
+        .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
         .initialOffset({yOffset:this.viewState.editorOffset}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .onDidScroll((): void => { this.viewState.editorOffset = Math.max(0,this.scroller.currentOffset().yOffset); }) }
-    }.titleBar(this.titleBar(phase)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable(phase === 'productImages' ? [this.productImageScroller] : phase === 'productConfirm' ? [this.productConfirmScroller] : phase === 'products' ? [this.productScroller,this.productLinkScroller] : [phase === 'topics' ? this.topicScroller : phase === 'advanced' ? this.advancedScroller : this.scroller])
+    }.titleBar(this.titleBar(phase)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable(phase === 'productImages' ? [this.productImageScroller] : phase === 'productConfirm' ? [this.productConfirmScroller] : phase === 'products' || phase === 'productSearch' ? [this.productScroller,this.productLinkScroller] : [phase === 'topics' ? this.topicScroller : phase === 'advanced' ? this.advancedScroller : this.scroller])
       .onBackPressed(() => { this.back(phase); return true; })
       .onShown((): void => this.startProducts(phase))
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))

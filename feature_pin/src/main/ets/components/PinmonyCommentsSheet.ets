@@ -86,6 +86,8 @@ export struct PinmonyCommentsSheet {
         }.alignItems(VerticalAlign.Center)
         if (item.text) {
           Text(item.translationVisible && item.translatedText ? item.translatedText : item.text)
+            .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+            .copyOption(CopyOptions.LocalDevice)
             .fontSize(15).fontColor($r('app.color.primary_text'))
         }
         if (item.translationError) {

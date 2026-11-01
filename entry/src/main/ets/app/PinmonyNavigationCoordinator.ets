@@ -277,6 +277,7 @@ selectNativeRootTab(index: number): void {
     PinmonyRuntimeLog.info('RootTabTrace: native-switch targetTab=' + index.toString() +
         ' mode=presentation-only webNavigation=false apiDemand=false');
     this.ports.syncFloatingTabsMotion();
+    this.ports.rootPresented?.(index);
 }
 
 presentNativeBackTarget(target: string): void {

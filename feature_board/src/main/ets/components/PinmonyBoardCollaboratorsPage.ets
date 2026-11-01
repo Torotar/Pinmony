@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -57,8 +58,9 @@ export struct PinmonyBoardCollaboratorsPage {
 
 @Component
 struct PinmonyBoardCollaboratorsSurface {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop snapshot: PinmonyBoardCollaborators;
@@ -80,9 +82,9 @@ struct PinmonyBoardCollaboratorsSurface {
     else this.onAction('members', '');
   }
   private titleOptions(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
       content: { title: { mainTitle: this.snapshot.phase === 'invite' ? this.uiText("pm_invite_collaborators_d6dc0e1e") :
         this.snapshot.phase === 'permissions' ? this.uiText("pm_collaborators_can_82551ec5") :
           this.snapshot.users.filter((user: PinmonyBoardCollaborator): boolean => user.status === 'owner' || user.status === 'accepted').length.toString() + this.uiText("pm_collaborators_7b9e7279") },
@@ -127,10 +129,10 @@ struct PinmonyBoardCollaboratorsSurface {
   @Builder
   private destination(_name?: string, _param?: Object) {
       HdsNavDestination() {
+        Stack({ alignContent: Alignment.Center }) {
         Column() {
           Scroll(this.scroller) {
             Column({ space: 16 }) {
-              if (this.snapshot.loading || this.snapshot.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
               if (this.snapshot.error) {
                 PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.onAction('retry', ''), actionEnabled: !this.snapshot.uncertain && !this.snapshot.busy })
               } else if (!this.snapshot.loading) {
@@ -163,13 +165,20 @@ struct PinmonyBoardCollaboratorsSurface {
                   Text(this.uiText("pm_collaborators_can_invite_others_to_this_board_ccf60f85")).fontColor($r('app.color.secondary_text'))
                 }
               }
-            }.width('100%').alignItems(HorizontalAlign.Start).padding(20)
+            }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:this.titleContentInset() + 20,bottom:20 })
           }.layoutWeight(1).width('100%').align(Alignment.Top)
+            .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+            .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
           if (this.snapshot.canInvite === true && this.snapshot.phase === 'members' && !this.snapshot.loading && !this.snapshot.error) {
             Button(this.uiText("pm_invite_collaborators_602179cf")).type(ButtonType.Normal).borderRadius(16).width('100%').height(56).backgroundColor($r('app.color.surface_muted'))
               .fontColor($r('app.color.primary_text')).onClick(() => { this.query = ''; this.onAction('invite', ''); })
           }
         }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+          if (this.snapshot.loading || this.snapshot.busy) {
+            LoadingProgress().color($r('app.color.accent')).width(28).height(28)
+              .hitTestBehavior(HitTestMode.None)
+          }
+        }.width('100%').height('100%')
       }.titleBar(this.titleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
         .onBackPressed(() => { this.back(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])

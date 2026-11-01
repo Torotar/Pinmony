@@ -167,7 +167,7 @@ export struct SmartImage {
 
   private resetImage(): void {
     const nextTier: string = pickCoverImageTier(this.images, this.widthVp);
-    const nextUrl: string = pickCoverImageUrl(this.images, this.widthVp) || this.url;
+    const nextUrl: string = validImageUrl(this.images, nextTier) || this.url;
     // Snapshot object identity and layout updates do not invalidate a decoded source.
     if (this.imageRevision > 0 && nextUrl === this.sourceUrl) return;
     this.imageRevision++;

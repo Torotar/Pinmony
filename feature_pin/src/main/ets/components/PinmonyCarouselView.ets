@@ -90,7 +90,7 @@ export struct PinmonyCarouselView {
               this.productScroller.scrollTo({ xOffset: this.productOffset, yOffset: 0 });
             }
           })
-          .onScroll(() => {
+          .onDidScroll((_xOffset: number, _yOffset: number, _state: ScrollState) => {
             if (this.productPositionRestored) this.onProductOffset?.(this.productScroller.currentOffset().xOffset);
           })
       } else {

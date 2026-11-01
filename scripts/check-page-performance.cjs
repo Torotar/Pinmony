@@ -17,6 +17,11 @@ now += 12000; assert.equal(perf.restoreHome(), false); perf.mark(0, 'content-rea
 const completed = logs.length; perf.mark(0, 'document-ready'); assert.equal(logs.length, completed, 'later document callbacks do not become cached return durations');
 assert.equal(logs.filter(s => s.includes('event=content-ready tab=0')).at(-1), restored, 'later pagination cannot stretch a completed return sample');
 perf.begin(1, 'return'); assert.equal(perf.restoreHome(), false);
+perf.begin(1, 'tab'); now += 64; perf.mark(1, 'cache-visible');
+const cachedVisit = logs.filter(s => s.includes('event=content-ready tab=1')).at(-1);
+assert(cachedVisit.includes('elapsedMs=64'));
+now += 5000; perf.mark(1, 'content-ready');
+assert.equal(logs.filter(s => s.includes('event=content-ready tab=1')).at(-1), cachedVisit, 'pagination cannot become first content after cached presentation');
 perf.begin(0, 'tab'); assert.equal(perf.restoreHome(), false, 'restored home timings only apply to actual returns');
 for (let i = 0; i < 90; i++) { perf.begin(3, 'tab'); now += i; perf.mark(3, 'visible'); }
 assert(logs.at(-1).includes('samples=64')); assert(!logs.some(s => /https:|cookie|account_id/.test(s)));
@@ -38,3 +43,7 @@ for(const page of ['detail','board','chat','share']) {
   assert(source.includes("this.pagePerformance.markSecondary('"+page+"'"),'Index marks '+page);
 }
 console.log('Page performance: bounded percentiles, stage deduplication, stale tab and cancellation passed');
+
+perf.beginSecondary('detail','return-case');now+=33;perf.begin(1,'return');
+assert.equal(perf.secondary.size,0,'root return ends secondary sample immediately');
+assert(logs.some(s=>s.includes('event=end page=detail')&&s.includes('outcome=interrupted')&&s.includes('elapsedMs=33')));

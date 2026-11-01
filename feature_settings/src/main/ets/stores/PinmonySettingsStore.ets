@@ -1,4 +1,4 @@
-import { PinmonyAccountSettings } from '../models/PinmonyAccountSettings';
+import { PinmonyAccountSettings, PinmonyRecommendationBoard } from '../models/PinmonyAccountSettings';
 import { NotificationGroup } from '../models/PinmonyNotifications';
 import { SocialPermissions, emptySocialPermissions } from '../models/PinmonySocialPermissions';
 export interface PinmonyRecoverableBoard { id: string; name: string; imageUrl: string; pinCount: number; sectionCount: number; restored: boolean; }
@@ -13,6 +13,9 @@ export class PinmonySettingsStore {
   socialMessageGroup: number = 0;
   social: SocialPermissions = emptySocialPermissions();
   recommendationTab: string = 'ai';
+  recommendationBoards: PinmonyRecommendationBoard[] = [];
+  recommendationBoardsReady: boolean = false;
+  recommendationBoardCursor: string = '';
   themeReturn: string = 'display';
   confirmOpen: boolean = false;
   pendingPrivate: boolean = false;
@@ -22,7 +25,7 @@ export class PinmonySettingsStore {
   writeUncertain: boolean = false;
   error: string = '';
   token: number = 0;
-  reset(preserveScroll: boolean = false): void { if (!preserveScroll) this.rootScrollOffset = 0; this.token++; this.notifications = []; this.recoverableBoards = []; this.boardRecoveryReady = false; this.boardRecoveryFromProfile = false; this.social = emptySocialPermissions(); this.socialMessageGroup = 0; this.screen = 'root'; this.confirmOpen = false; this.recommendationTab = 'ai'; this.data = undefined; this.loading = false; this.busy = false; this.writeUncertain = false; this.error = ''; }
+  reset(preserveScroll: boolean = false): void { if (!preserveScroll) this.rootScrollOffset = 0; this.token++; this.recommendationBoards = []; this.recommendationBoardsReady = false; this.recommendationBoardCursor = ''; this.notifications = []; this.recoverableBoards = []; this.boardRecoveryReady = false; this.boardRecoveryFromProfile = false; this.social = emptySocialPermissions(); this.socialMessageGroup = 0; this.screen = 'root'; this.confirmOpen = false; this.recommendationTab = 'ai'; this.data = undefined; this.loading = false; this.busy = false; this.writeUncertain = false; this.error = ''; }
   back(): boolean {
     if (this.busy) return true;
     if (this.confirmOpen) { this.confirmOpen = false; return true; }

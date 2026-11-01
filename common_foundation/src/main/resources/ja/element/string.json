@@ -1,6 +1,37 @@
 {
   "string": [
-    { "name": "pm_board_section_sync_pending", "value": "セクションの内容はまだ同期されていません。後でもう一度お試しください" },
+    {
+      "name": "pm_recommend_boards_description",
+      "value": "ボードのパーソナライズをオフにすると、そのボードに基づくホームフィードのタブとおすすめが非表示になります。ボードやピンには影響しません。"
+    },
+    {
+      "name": "pm_recommend_board_unavailable",
+      "value": "パーソナライズ設定を現在読み込めません"
+    },
+    {
+      "name": "pm_recommend_board_today",
+      "value": "今日"
+    },
+    {
+      "name": "pm_recommend_board_days",
+      "value": "{0} 日前"
+    },
+    {
+      "name": "pm_recommend_board_weeks",
+      "value": "{0} 週間前"
+    },
+    {
+      "name": "pm_recommend_board_months",
+      "value": "{0} か月前"
+    },
+    {
+      "name": "pm_recommend_board_years",
+      "value": "{0} 年前"
+    },
+    {
+      "name": "pm_board_section_sync_pending",
+      "value": "セクションの内容はまだ同期されていません。後でもう一度お試しください"
+    },
     {
       "name": "pm_detail_paid_link",
       "value": "有料リンク"
@@ -1014,6 +1045,14 @@
       "value": "おすすめの連絡先はありません"
     },
     {
+      "name": "pm_profile_minutes_ago",
+      "value": " 分前"
+    },
+    {
+      "name": "pm_profile_hours_ago",
+      "value": " 時間前"
+    },
+    {
       "name": "pm_just_now_de6785d9",
       "value": "たった今"
     },
@@ -1188,6 +1227,14 @@
     {
       "name": "pm_content_made_entirely_or_partly_with_ai_3beb552d",
       "value": "AIで全部または一部作成されたコンテンツ"
+    },
+    {
+      "name": "pm_remove_saved_pin",
+      "value": "このピンを削除"
+    },
+    {
+      "name": "pm_remove_saved_pin_confirm",
+      "value": "このピンをボードから削除しますか？"
     },
     {
       "name": "pm_delete_pin_e216e3fe",
@@ -5721,6 +5768,50 @@
       "name": "pm_publish_source_website",
       "value": "ウェブサイトのリンク"
     },
-    {"name":"pm_board_cover_adjust","value":"カバーの位置を調整"}
+    {
+      "name": "pm_board_cover_adjust",
+      "value": "カバーの位置を調整"
+    },
+    {
+      "name": "pm_language_portuguese_brazil",
+      "value": "ポルトガル語（ブラジル）"
+    },
+    {
+      "name": "pm_message_recipient_settings_restricted",
+      "value": "受信者のメッセージ設定により、メッセージを送信できません。"
+    },
+    {
+      "name": "pm_profile_pins_end",
+      "value": "これ以上のピンはありません"
+    },
+    {
+      "name": "pm_photo_history_manage",
+      "value": "写真の履歴を削除"
+    },
+    {
+      "name": "pm_photo_history_delete_all",
+      "value": "すべて削除"
+    },
+    {
+      "name": "pm_photo_history_delete_all_confirm",
+      "value": "写真検索の履歴をすべて削除しますか？削除はサーバーに送信されます。"
+    },
+    { "name": "pm_photo_history_pending_delete", "value": "削除予定" },
+    {
+      "name": "pm_photo_history_deleted",
+      "value": "削除しました"
+    },
+    {
+      "name": "pm_photo_history_delete_unconfirmed",
+      "value": "削除を確認できませんでした。履歴を開き直して確認してください。"
+    },
+    {
+      "name": "pm_photo_history_restore_unconfirmed",
+      "value": "復元を確認できませんでした。履歴を開き直して確認してください。"
+    },
+    {
+      "name": "pm_photo_history_delete_all_incomplete",
+      "value": "履歴をすべて読み込めなかったため、一括削除しませんでした。"
+    }
   ]
 }

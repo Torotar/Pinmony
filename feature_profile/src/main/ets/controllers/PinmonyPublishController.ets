@@ -6,6 +6,7 @@ import { PinmonyProfileSnapshot, PinmonyPublishOption, PinmonyCreatedPin, Pinmon
 
 export interface PinmonyPublishPorts {
   nativeFlow?: () => boolean;
+  requestsEnabled?: () => boolean;
   nativeMenu?: (current: () => boolean) => Promise<boolean>;
   nativeOpen?: () => Promise<boolean>;
   nativeAction?: (action: string,value: string,secret: boolean) => Promise<void>;
@@ -77,6 +78,7 @@ export class PinmonyPublishController {
   }
 
   openMenu(): void {
+    if (this.ports.requestsEnabled?.() === false) return;
     this.ports.traceEntry();
     const profile: PinmonyProfileSnapshot | undefined = this.store.profile;
     const url: string = profile?.profileUrl || this.ports.profileAddress();
@@ -165,6 +167,7 @@ export class PinmonyPublishController {
   }
 
   async select(id: string): Promise<void> {
+    if (this.ports.requestsEnabled?.() === false) return;
     const profile: PinmonyProfileSnapshot | undefined = this.store.profile;
     if (!profile || !this.ports.menuVisible() || !this.ports.authenticated() || !this.ports.foreground() ||
         this.store.publishFlow || this.selecting || !this.ports.nativeEnabled()) return;
@@ -285,6 +288,7 @@ export class PinmonyPublishController {
   }
 
   action(action: string, value: string = '', secret: boolean = false): void {
+    if (this.ports.requestsEnabled?.() === false && !['close','back','cancelDraftExit'].includes(action)) return;
     const flow: PinmonyPublishFlow | undefined = this.store.publishFlow;
     if (!flow || this.store.publishPicking || !this.ports.foreground() || !this.isCurrent(flow.token, flow.page)) return;
     if (action === 'cancelDraftExit') { this.close(true); return; }

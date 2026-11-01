@@ -54,6 +54,7 @@ export interface PinmonyInboxFlowSnapshot {
   sending?: boolean;
   sentRevision?: number;
   sendError?: string;
+  recipientRestricted?: boolean;
   messageBusy?: boolean;
   canUnsubscribePin?: boolean;
   unsubscribedPin?: boolean;

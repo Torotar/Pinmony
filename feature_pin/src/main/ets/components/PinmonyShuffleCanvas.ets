@@ -7,6 +7,7 @@ import { PinmonyRuntimeLog, PinmonyI18n } from 'common_foundation';
 export struct PinmonyShuffleCanvas {
   @Prop @Watch('warmHitMasks') shuffle: PinmonyShuffleSnapshot;
   @Prop coverUrl: string = '';
+  @Prop coverProvided: boolean = false;
   @Prop canvasWidthVp: number = 1;
   @Prop canvasHeightVp: number = 1;
   @Prop @Watch('warmHitMasks') interactionReady: boolean = false;
@@ -71,7 +72,9 @@ export struct PinmonyShuffleCanvas {
   }
   build() {
     Stack() {
-      Image(this.coverUrl).width('100%').height('100%').objectFit(ImageFit.Contain).hitTestBehavior(HitTestMode.None)
+      if (!this.coverProvided) {
+        Image(this.coverUrl).width('100%').height('100%').objectFit(ImageFit.Contain).hitTestBehavior(HitTestMode.None)
+      }
       if (this.hitLoading) {
         LoadingProgress().width(28).height(28).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }

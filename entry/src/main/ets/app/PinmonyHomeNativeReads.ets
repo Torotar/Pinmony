@@ -1,4 +1,3 @@
-import { isProductPin } from 'common_foundation';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeStore, PinmonyHomeSnapshot, PinmonyHomePin, PinmonyHomeTab, PinmonyHomeBoard } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -6,7 +5,9 @@ import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSIN
 import { PinmonyVideo, PinmonyVideoSource } from 'common_ui';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
-export const PIN_NATIVE_HOME_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_HOME_READS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_HOME_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_HOME_READS_ROLLOUT_ENABLED;
 interface HomeImage { url: string; width: number; height: number; }
 interface HomeVideo { video_list?: Record<string, HomeVideoSource>; }
 interface HomeVideoSource { url: string; width: number; height: number; duration: number; }
@@ -58,17 +59,18 @@ export class PinmonyHomeNativeReads {
     this.failedAppend = false;
     this.pause(); this.feeds.clear(); this.account = ''; this.generation = -1; this.origin = ''; this.username = '';
     this.board = ''; this.bookmark = ''; this.boardSummary = undefined; this.tabs = []; this.categoriesReady = false;
-    this.store.home = undefined; this.store.cachedHome = undefined; this.store.cachedHomeScrollOffset = 0;
+    this.store.home = undefined; this.store.cachedHome = undefined; this.store.clearCategoryPositions();
     this.store.homeNativeReadsReady = false; this.store.homeActionsReady = false; this.store.homeSourceWarning = '';
   }
   pause(): void {
-    if (!PIN_NATIVE_HOME_READS_ENABLED) return;
     this.revision++; this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear();
     this.busy = false; this.categoriesBusy = false;
     this.store.homeLoading = false; this.store.homeRefreshing = false; this.store.pendingHomeTab = '';
     if (this.store.home) { this.store.home.loadingMore = false; this.store.home.refreshing = false; }
   }
   private bind(): boolean {
+    // A request gate must stop before binding can clear or replace presentation state.
+    if (!PIN_NATIVE_HOME_READS_ENABLED) return false;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if (!session.authenticated) return false;
     const username: string = this.ports.username();
@@ -78,7 +80,7 @@ export class PinmonyHomeNativeReads {
       this.pause(); this.feeds.clear(); this.bookmark = ''; this.categoriesReady = false; this.tabs = [];
       this.board = ''; this.boardSummary = undefined; this.store.homeNativeReadsReady = false; this.store.homeActionsReady = false;
       this.failedAppend = false;
-      if (!sameAccount && this.account) { this.store.home = undefined; this.store.cachedHome = undefined; this.store.cachedHomeScrollOffset = 0; }
+      if (!sameAccount && this.account) { this.store.home = undefined; this.store.cachedHome = undefined; this.store.clearCategoryPositions(); }
       this.store.homeSourceWarning = '';
       this.account = session.accountId; this.generation = session.generation; this.origin = session.origin; this.username = username;
     }
@@ -116,7 +118,8 @@ export class PinmonyHomeNativeReads {
     if (!target || target.selected && !this.store.homeError) return;
     this.pause(); this.board = id === 'tab:all' ? '' : id.slice(4); this.bookmark = ''; this.boardSummary = undefined;
     this.failedAppend = false;
-    this.store.cachedHomeScrollOffset = 0; this.store.homeNativeReadsReady = false;
+    this.store.cachedHomeScrollOffset = this.store.categoryScrollOffset(this.origin + '/', id) || 0;
+    this.store.homeNativeReadsReady = false;
     const cached: HomeFeed | undefined = this.feeds.get(this.board);
     if (cached) { this.bookmark = cached.bookmark; this.commit(cached.snapshot, 'cache'); return; }
     // Keep the native page and category controls mounted while only the feed loads.
@@ -196,7 +199,7 @@ export class PinmonyHomeNativeReads {
       const data: HomeResource = (JSON.parse(reply.body) as HomeResponse).resource_response;
       if (data?.status !== 'success' || data.error || data.code !== undefined && data.code !== 0 || !Array.isArray(data.data) || data.data.length > 3000) throw new Error('invalid-home');
       const incoming: PinmonyHomePin[] = this.mapPins(data.data);
-      if (data.data.some((item: HomeItem): boolean => !isProductPin(item)) && !incoming.length) throw new Error('invalid-pins');
+      if (data.data.length && !incoming.length) throw new Error('invalid-pins');
       const pins: PinmonyHomePin[] = append ? (this.store.home?.pins || []).slice() : [];
       incoming.forEach((pin: PinmonyHomePin): void => { if (pins.length < 3000 && !pins.some((old: PinmonyHomePin): boolean => old.id === pin.id)) pins.push(pin); });
       const cursor: string = typeof data.bookmark === 'string' && data.bookmark.length <= 4096 ? data.bookmark : '';
@@ -250,7 +253,7 @@ export class PinmonyHomeNativeReads {
   private mapPins(data: HomeItem[]): PinmonyHomePin[] {
     const pins: PinmonyHomePin[] = [];
     data.forEach((item: HomeItem): void => {
-      if (!item || isProductPin(item) || item.type !== 'pin' || !/^\d+$/.test(String(item.id || '')) || pins.some((pin: PinmonyHomePin): boolean => pin.id === String(item.id))) return;
+      if (!item || item.type !== 'pin' || !/^\d+$/.test(String(item.id || '')) || pins.some((pin: PinmonyHomePin): boolean => pin.id === String(item.id))) return;
       const image: HomeImage | undefined = ['474x', '736x', '564x', 'orig', '236x'].map((size: string): HomeImage | undefined => item.images?.[size])
         .find((value: HomeImage | undefined): boolean => !!value && !!this.imageUrl(value.url || '') && value.width > 0 && value.height > 0);
       if (!image) return;

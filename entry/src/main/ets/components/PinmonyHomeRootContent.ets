@@ -53,6 +53,8 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               paginationReady: view.authStatus === 'authenticated' && !view.offlinePreviewMode &&
                 (view.homeStore.homeNativeReadsReady || view.homeStore.homeActionsReady),
               initialScrollOffset: view.homeStore.cachedHomeScrollOffset,
+              presentationEpoch: view.homeStore.homePresentationEpoch,
+              scrollOffsetForCategory: (pageKey: string, categoryId: string) => view.homeStore.categoryScrollOffset(pageKey, categoryId),
               pendingTabId: view.homeStore.pendingHomeTab,
               menuLoadingId: PIN_NATIVE_PIN_MENUS_ENABLED ? '' : view.homeStore.homeMoreLoadingId,
               loading: view.homeStore.homeLoading ||
@@ -77,9 +79,8 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               },
               onRefresh: () => view.refreshHome(),
               onPrefetchPins: (first: number, last: number) => view.prefetchHomePinDetails(first, last),
-              onScrollPosition: (pageKey: string, offset: number) => {
-                if (view.homeStore.cachedHome?.pageKey === pageKey) view.homeStore.cachedHomeScrollOffset = offset;
-              },
+              onScrollPosition: (pageKey: string, offset: number, categoryId: string) =>
+                view.homeStore.rememberCategoryScroll(pageKey, categoryId, offset),
               onRetry: () => view.retryHome()
             })
             .width('100%')

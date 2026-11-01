@@ -12,6 +12,9 @@ function bind(native, ts) {
     { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, exports);
   native.controllerLifecycle = Host.prototype.controllerLifecycle;
   native.homeStore ||= {};
+  native.profileSearchReads ||= { pause() {}, resume() {}, close() {} };
+  native.inboxMenuNative ||= { pause() {} };
+  native.boardInvitationNative ||= { pause() {} };
   require('./product-coordination-harness.cjs').bind(native, ts, {}, ['NativeBoardReads', 'NativeProfileReads', 'NativeHomeReads', 'NativeSearchDiscovery', 'NativeSearchReads', 'NativeInboxUpdates', 'NativeInboxMessages']);
   native.photoMenuCoordinator ||= { pause() {}, notify() {} };
   native.rootContextCoordinator ||= { pause() {}, notify() {} };

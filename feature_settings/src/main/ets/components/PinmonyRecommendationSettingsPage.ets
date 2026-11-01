@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -5,7 +6,7 @@ import { PinmonyI18n } from 'common_foundation';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier, ComponentContent } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
-import { PinmonyAiTopic, PinmonyRecentActivity } from '../models/PinmonyAccountSettings';
+import { PinmonyAiTopic, PinmonyRecentActivity, PinmonyRecommendationBoard } from '../models/PinmonyAccountSettings';
 import { PinmonyRuntimeLog } from 'common_foundation';
 interface RecommendationInfoOptions { source: string; }
 @Component
@@ -24,8 +25,9 @@ function buildRecommendationInfo(options: RecommendationInfoOptions) {
 }
 @Component
 export struct PinmonyRecommendationSettingsPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
@@ -57,7 +59,7 @@ export struct PinmonyRecommendationSettingsPage {
       onContentClick: () => {
         if (!this.pageVisible || key !== this.errorSnackKey || this.store.busy || this.store.loading) return;
         this.dismissErrorSnack();
-        this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
+        this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'boards' ? 'recommendBoardsRead' : this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
       }
     }, { duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
@@ -65,27 +67,27 @@ export struct PinmonyRecommendationSettingsPage {
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
   private async request(action: string, value: string = ''): Promise<void> { if (!this.store.busy && !this.store.loading && this.onRequest) await this.onRequest(action, value); }
   private selectRecommendation(index: number): void {
-    if (this.store.busy || this.store.loading || (index !== 0 && index !== 1)) return;
-    const tab: string = index === 0 ? 'ai' : 'activity';
+    if (this.store.busy || this.store.loading || ![0, 1, 2].includes(index)) return;
+    const tab: string = index === 0 ? 'ai' : index === 1 ? 'activity' : 'boards';
     if (this.store.recommendationTab === tab) return;
     this.store.recommendationTab = tab;
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
-    this.request(index === 0 ? 'aiRead' : 'activityRead');
+    this.request(index === 0 ? 'aiRead' : index === 1 ? 'activityRead' : 'recommendBoardsRead');
   }
   private options(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
+        scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         originalStyle: {
-          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
           }
         },
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
@@ -182,10 +184,48 @@ export struct PinmonyRecommendationSettingsPage {
     }.width('100%').constraintSize({ minHeight: 52 })
   }
   @Builder
+  private recommendationBoard(board: PinmonyRecommendationBoard) {
+    Row({ space: 12 }) {
+      if (board.image) {
+        Image(board.image).width(64).height(64).objectFit(ImageFit.Cover).borderRadius(12)
+          .backgroundColor($r('app.color.surface_muted')).accessibilityLevel('no')
+      } else {
+        Stack() { SymbolGlyph($r('sys.symbol.square_grid_2x2')).fontSize(28).fontColor([$r('app.color.secondary_text')]) }
+          .width(64).height(64).borderRadius(12).backgroundColor($r('app.color.surface_muted')).accessibilityLevel('no')
+      }
+      Column({ space: 4 }) {
+        Text(board.name).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.boardSummary(board))
+          .fontSize(14).fontColor($r('app.color.secondary_text'))
+        if (board.enabled === undefined) {
+          Text(this.uiText('pm_recommend_board_unavailable')).fontSize(12).fontColor($r('app.color.secondary_text'))
+        }
+      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      Toggle({ type: ToggleType.Switch, isOn: board.enabled === true }).selectedColor($r('app.color.accent'))
+        .enabled(this.store.recommendationBoardsReady && !this.store.busy && !this.store.loading && !this.store.writeUncertain && board.enabled !== undefined)
+        .onChange((enabled: boolean) => {
+          if (!this.store.busy && !this.store.loading && !this.store.writeUncertain && board.enabled !== undefined && enabled !== board.enabled)
+            this.request('recommendBoardSet', JSON.stringify({ id: board.id, enabled: enabled }));
+        }).accessibilityText(board.name + ' ' + this.uiText('pm_personalization_38c043e0'))
+    }.width('100%').padding({ top: 10, bottom: 10 })
+  }
+  private boardAge(timestamp: number): string {
+    if (!timestamp) return '';
+    const days: number = Math.max(0, Math.floor((Date.now() - timestamp) / 86400000));
+    const key: string = days < 1 ? 'pm_recommend_board_today' : days < 7 ? 'pm_recommend_board_days' : days < 30 ? 'pm_recommend_board_weeks' : days < 365 ? 'pm_recommend_board_months' : 'pm_recommend_board_years';
+    const count: number = days < 7 ? days : days < 30 ? Math.floor(days / 7) : days < 365 ? Math.floor(days / 30) : Math.floor(days / 365);
+    return PinmonyI18n.format(key, [count], this.uiLanguage);
+  }
+  private boardSummary(board: PinmonyRecommendationBoard): string {
+    const count: string = board.pinCount === undefined ? '' : PinmonyI18n.format('pm_value_pins_d1922567', [board.pinCount], this.uiLanguage);
+    const age: string = this.boardAge(board.updatedAt);
+    return count + (count && age ? ' · ' : '') + age;
+  }
+  @Builder
   private recommend() {
     CapsuleSegmentButtonV2({
-      items: new SegmentButtonV2Items([{ text: this.uiText("pm_ai_content_7cdf4844") }, { text: this.uiText("pm_activity_780353e5") }]),
-      selectedIndex: this.store.recommendationTab === 'ai' ? 0 : 1,
+      items: new SegmentButtonV2Items([{ text: this.uiText("pm_ai_content_7cdf4844") }, { text: this.uiText("pm_activity_780353e5") }, { text: this.uiText('pm_boards_53f23afe') }]),
+      selectedIndex: this.store.recommendationTab === 'ai' ? 0 : this.store.recommendationTab === 'activity' ? 1 : 2,
       $selectedIndex: (index: number) => { this.selectRecommendation(index); }
     }).width('100%').margin({ bottom: 12 }).enabled(!this.store.busy && !this.store.loading)
     if (this.store.recommendationTab === 'ai') {
@@ -206,6 +246,17 @@ export struct PinmonyRecommendationSettingsPage {
       ForEach(this.store.data?.topics || [], (topic: PinmonyAiTopic) => { this.aiTopic(topic) }, (topic: PinmonyAiTopic) => topic.key)
       if (this.store.data?.ready && !this.store.loading && !this.store.error && !this.store.data.topics.length) {
         Text(this.uiText("pm_no_ai_topics_available_to_adjust_2f24acde")).fontColor($r('app.color.secondary_text'))
+      }
+    } else if (this.store.recommendationTab === 'boards') {
+      Text(this.uiText('pm_recommend_boards_description')).fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 16 })
+      ForEach(this.store.recommendationBoards, (board: PinmonyRecommendationBoard) => { this.recommendationBoard(board) },
+        (board: PinmonyRecommendationBoard): string => board.id + ':' + board.enabled + ':' + this.store.token + ':' + this.uiLanguage)
+      if (this.store.recommendationBoardsReady && !this.store.loading && !this.store.error && !this.store.recommendationBoards.length) {
+        Text(this.uiText('pm_no_boards_yet_43790af9')).fontColor($r('app.color.secondary_text'))
+      }
+      if (this.store.recommendationBoardsReady && this.store.recommendationBoardCursor) {
+        Button(this.uiText('pm_load_more_af90a08f')).enabled(!this.store.loading && !this.store.busy)
+          .onClick(() => { this.request('recommendBoardsMore'); })
       }
     } else {
       Text(this.uiText("pm_hide_pins_related_to_those_you_recently_saved_or_opened_2e744f08")).width('100%').textAlign(TextAlign.Center).fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 16 })
@@ -231,8 +282,9 @@ export struct PinmonyRecommendationSettingsPage {
       Scroll(this.scroller) {
         Column({ space: 8 }) {
           this.recommend()
-        }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
+        }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
         LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)

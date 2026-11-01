@@ -1,5 +1,6 @@
 import { ImageFlightRect, imageContainRect } from '../services/PinmonyImageTransition';
 import { curves } from '@kit.ArkUI';
+import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyDetailSnapshot, PinmonyDetailAction } from '../models/PinmonyDetail';
 import { AnimatorResult } from '@kit.ArkUI';
 import { imagePanBounds, imageFling, imageFlingDistance } from '../services/PinmonyImageMotion';
@@ -28,27 +29,39 @@ export struct PinmonyImageViewer {
   private naturalWidth: number = 0;
   private naturalHeight: number = 0;
   private originalDecoded: boolean = false;
+  private previewRendered: boolean = false;
+  @State private originalDataReady: boolean = false;
   aboutToAppear(): void {
     this.mounted = true;
     this.setFrame(this.origin.width > 0 && this.origin.height > 0 ? this.origin : this.containRect());
   }
   private imageDecoded(status: number, original: boolean, width: number = 0, height: number = 0): void {
-    // Hidden transition images may be data-ready before their first rendered frame.
+    // Data readiness exposes an image for rendering, but cannot hide its source.
     if (!this.mounted || (status !== 0 && status !== 1)) return;
+    const first: boolean = original ? status === 1 ? !this.originalDecoded : !this.originalDataReady : status === 1 ? !this.previewRendered : !this.previewReady;
+    if (first) PinmonyRuntimeLog.info('ViewerMotionTrace: image=' + (original ? 'original' : 'preview') +
+      ' event=' + (status === 1 ? 'rendered' : 'data-ready'));
     if (!this.transitionStarted && width > 0 && height > 0) { this.naturalWidth = width; this.naturalHeight = height; }
     if (original) {
-      this.originalDecoded = true;
-      if (!this.previewReady || !this.transitioning) this.originalReady = true;
-    } else this.previewReady = true;
+      this.originalDataReady = true;
+      if (status === 1) {
+        this.originalDecoded = true;
+        if (!this.previewReady || !this.transitioning) this.originalReady = true;
+      }
+    } else {
+      this.previewReady = true;
+      if (status === 1) this.previewRendered = true;
+    }
     this.beginTransition();
   }
   private beginTransition(): void {
-    if (!this.mounted || !this.viewportMeasured || this.transitionStarted || (!this.previewReady && !this.originalReady)) return;
+    if (!this.mounted || !this.viewportMeasured || this.transitionStarted || (!this.previewRendered && !this.originalDecoded)) return;
     // Match the visible image bounds, excluding letterboxing and carousel controls.
     this.setFrame(this.sourceRect());
     this.frameRadius = this.sourceRadius();
     this.transitionStarted = true; this.onReady?.();
-    this.transitionTimer = setTimeout(() => { if (this.mounted) this.transitionChanged(); }, 0);
+    PinmonyRuntimeLog.info('ViewerMotionTrace: event=source-ready');
+    this.transitionTimer = setTimeout(() => { if (this.mounted) this.transitionChanged(); }, 32);
   }
   private containRect(): ImageFlightRect {
     return imageContainRect(this.viewportWidth, this.viewportHeight, this.naturalWidth || this.detail.imageWidth, this.naturalHeight || this.detail.imageHeight);
@@ -210,7 +223,8 @@ export struct PinmonyImageViewer {
         .onComplete((event) => this.imageDecoded(event?.loadingStatus ?? -1, false, event?.width || 0, event?.height || 0))
       Image(this.imageUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain)
         .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
-        .opacity(this.originalReady ? 1 : 0)
+        // Keep the rendered preview underneath until the full image renders.
+        .opacity(this.originalReady || this.originalDataReady && (!this.transitioning || !this.previewReady) ? 1 : 0)
         .onComplete((event) => this.imageDecoded(event?.loadingStatus ?? -1, true, event?.width || 0, event?.height || 0))
       }.width(this.frameWidth).height(this.frameHeight).position({ x: this.frameX, y: this.frameY })
         .borderRadius(this.frameRadius).clip(this.transitioning)

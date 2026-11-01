@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -10,8 +11,10 @@ import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay, PinmonyBoardPickerRow, 
 
 @Component
 export struct PinmonyOrganizePage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  @State private organizeHeaderHeight: number = 0;
+  private titleContentInset(): number { return (this.state.phase === 'boards') ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop state: PinmonyOrganizeSnapshot = {} as PinmonyOrganizeSnapshot;
@@ -45,21 +48,21 @@ export struct PinmonyOrganizePage {
   private titleBarOptions(): HdsNavigationTitleBarOptions {
     return {
       avoidLayoutSafeArea: true,
-      enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: {
-          backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
-          menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+      enableComponentSafeArea: (this.state.phase === 'boards'),
+      style: { blurStrategy: (this.state.phase !== 'boards' && this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.state.phase !== 'boards' && this.immersiveLightMode !== 'off'),
+        scrollEffectOpts: { enableScrollEffect: (this.state.phase !== 'boards' && this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        systemMaterialEffect: this.state.phase === 'boards' ? undefined : PinmonyImmersiveLight.effect(this.immersiveLightMode),
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: this.state.phase === 'boards' ? $r('app.color.page_background') : $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.state.phase !== 'boards' && this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: {
+          backIconStyle: { backgroundColor: (this.state.phase === 'boards') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+          menuStyle: { backgroundColor: (this.state.phase === 'boards') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
           titleStyle: { mainTitleColor: $r('app.color.primary_text') }
         } },
 
         originalStyle: { contentStyle: {
-          backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
-          menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
+          backIconStyle: { backgroundColor: (this.state.phase === 'boards') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
+          menuStyle: { backgroundColor: (this.state.phase === 'boards') || this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
           titleStyle: { mainTitleColor: $r('app.color.primary_text') }
-        }, backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } }
+        }, backgroundStyle: { backgroundColor: this.state.phase === 'boards' ? $r('app.color.page_background') : Color.Transparent, maskExtraHeight: 0, blurRadius: (this.state.phase !== 'boards' && this.immersiveLightMode !== 'off') ? 18 : 0 } }
       },
       content: {
         title: { mainTitle: this.state.phase === 'select' ? (this.suggestionTitle ? this.suggestionTitle : this.publishing ? this.uiText("pm_select_pins_46854e37") : this.uiText("pm_organize_into_boards_ce266233")) :
@@ -200,6 +203,8 @@ export struct PinmonyOrganizePage {
   @Builder
   private organizeContent() {
     Column() {
+      Stack({alignContent:Alignment.TopStart}) {
+      Column() {
       if (!this.suggestionTitle && this.state.selectedIds.length && this.state.phase !== 'create') {
         Scroll() {
           Row({ space: 8 }) {
@@ -216,13 +221,17 @@ export struct PinmonyOrganizePage {
       if ((this.state.error || this.state.feedback) && !(this.state.phase === 'boards' && this.state.error && !this.state.uncertain)) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error || this.state.feedback, this.uiLanguage) })
       }
+      }.width('100%').margin({top:this.titleContentInset()}).backgroundColor($r('app.color.page_background')).zIndex(1)
+        .onAreaChange((_old:Area,area:Area) => {this.organizeHeaderHeight = Number(area.height);})
       Scroll(this.contentScroller) {
         Column() {
           if (this.state.phase === 'select') { this.selection() }
           else if (this.state.phase === 'create') { this.createForm() }
           else { this.boardList() }
-        }.width('100%').padding({ left: 16, right: 16, top: 16, bottom: 24 })
-      }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.TopStart)
+        }.width('100%').padding({ left: 16, right: 16, top: this.titleContentInset() + this.organizeHeaderHeight + 16, bottom: 24 })
+      }.height('100%').width('100%').scrollBar(BarState.Off).align(Alignment.TopStart)
+        .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.organizeHeaderHeight)})
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: this.state.phase === 'create' })
       .onReachEnd(() => {
         if (this.state.busy || this.state.uncertain) return;
         if (this.state.phase === 'select' && this.pinsHasMore && !this.pinsLoading && !this.pinsError) {
@@ -231,6 +240,7 @@ export struct PinmonyOrganizePage {
           this.act('moreBoards');
         }
       })
+      }.width('100%').layoutWeight(1)
       if (this.state.phase === 'boards') {
         PinmonyBoardPickerFooter({actionEnabled:!this.state.busy && !this.state.uncertain && !this.state.loading,
           onSelect:() => this.act('createForm')})

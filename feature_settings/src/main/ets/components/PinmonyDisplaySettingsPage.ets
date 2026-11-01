@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -10,8 +11,9 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyDisplaySettingsPage {
+  @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
@@ -109,19 +111,19 @@ export struct PinmonyDisplaySettingsPage {
     } catch (_) { PinmonyRuntimeLog.warn('ImmersiveLight: capability query unavailable mode=' + this.immersiveLightMode); }
   }
   private options(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
-      style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled,
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
+        scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         originalStyle: {
-          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
             titleStyle: { mainTitleColor: $r('app.color.primary_text') }
           }
         },
-        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
           contentStyle: {
             backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
             menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') },
@@ -139,9 +141,9 @@ export struct PinmonyDisplaySettingsPage {
       Text(this.uiText("pm_language_9f6fee1a")).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
-        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }])
-        .selected(Math.max(0, ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru'].indexOf(this.languagePreference)))
-        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.uiText("pm_follow_system_217cfe7d"))
+        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }, { value: 'Português (Brasil)' }])
+        .selected(Math.max(0, ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].indexOf(this.languagePreference)))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.languagePreference === 'pt_BR' ? 'Português (Brasil)' : this.uiText("pm_follow_system_217cfe7d"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
         .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
@@ -149,8 +151,8 @@ export struct PinmonyDisplaySettingsPage {
         .optionFontColor($r('app.color.primary_text'))
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
-          if (index >= 0 && index < 8) {
-            const value: string = ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru'][index];
+          if (index >= 0 && index < 9) {
+            const value: string = ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'][index];
             try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
             catch (_) {
               PinmonyRuntimeLog.warn('LanguagePreference: save failed');
@@ -275,8 +277,9 @@ export struct PinmonyDisplaySettingsPage {
       Scroll(this.scroller) {
         Column() {
           if (this.store.screen === 'theme') { this.theme() } else { this.display() }
-        }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
+        }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
         LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)

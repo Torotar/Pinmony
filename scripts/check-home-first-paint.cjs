@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
-const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
+const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
+const parentPage = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
 const store = fs.readFileSync('feature_home/src/main/ets/stores/PinmonyHomeStore.ets', 'utf8');
 const auth = fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8');
 assert.match(page, /lastHomePinCount: number = 0/, 'home tracks the initial API pin count');
@@ -24,7 +25,8 @@ const code = auth.replace(/export /g, '') + '\n' +
   '\nclass Native {\n' + ['homePageKeyFromAddress', 'isHomeRootAddress', 'homePresentationPageKey',
     'prepareHomeForPageBegin', 'expectHome', 'clearHome', 'clearRootTabCaches'].map(name => method(index, name)).join('\n') + '\n}\n' +
   'class Feed {\n' + method(page, 'canShowFeed') + '\n}\n' +
-  'globalThis.Store=PinmonyHomeStore;globalThis.Native=Native;globalThis.Feed=Feed;';
+  'class Categories {\n' + ['categoryId','retainSnapshot','snapshotFor','canShowFeed','activePane'].map(name => method(parentPage,name)).join('\n') + '\n}\n' +
+  'globalThis.Store=PinmonyHomeStore;globalThis.Native=Native;globalThis.Feed=Feed;globalThis.Categories=Categories;';
 const root = 'https://www.pinterest.com/';
 const timers = [];
 const context = { PINTEREST_URL: root, PinmonyRuntimeLog: { info() {}, warn() {} },
@@ -93,10 +95,27 @@ Object.assign(feed, { home: saved, pendingTabId: '', loading: true, synchronizin
 assert.equal(feed.canShowFeed(), true, 'background loading does not blank completed cards');
 feed.error = 'refresh failed';
 assert.equal(feed.canShowFeed(), true, 'refresh failure keeps cards with an error notice');
-feed.pendingTabId = 'tab:all';
-assert.equal(feed.canShowFeed(), true, 'restoring the same category keeps its cards');
-feed.pendingTabId = 'tab:other';
-assert.equal(feed.canShowFeed(), false, 'switching categories never presents old cards under a new selection');
+const categories = new context.Categories();
+const all = { ...saved, tabs: [{ id:'tab:all',label:'All',selected:true,enabled:true },{ id:'tab:other',label:'Other',selected:false,enabled:true }] };
+Object.assign(categories, {home:all,snapshots:[],categories:all.tabs,selectedId:'tab:all',pagerMoving:false});
+categories.retainSnapshot();
+assert.equal(categories.canShowFeed(), true, 'the current category keeps its completed cards');
+categories.selectedId = 'tab:other';
+feed.home = categories.snapshotFor('tab:other');
+assert.equal(feed.home.kind, 'loading');
+assert.equal(feed.canShowFeed(), false, 'an uncached target category never receives previous-category cards');
+assert.equal(categories.activePane('tab:all'), false, 'retained old-category pane loses business interactions');
+assert.equal(categories.activePane('tab:other'), false, 'new category waits for its own confirmed snapshot');
+categories.home = { ...all, selectedTab:'Other', pins:[{id:'other-pin'}], tabs:all.tabs.map(tab=>({...tab,selected:tab.id==='tab:other'})) };
+categories.retainSnapshot();
+feed.home = categories.snapshotFor('tab:other');
+assert.equal(feed.home.pins[0].id,'other-pin');
+assert.equal(categories.activePane('tab:other'),true);
+categories.selectedId = 'tab:all'; feed.home = categories.snapshotFor('tab:all');
+assert.equal(feed.home.pins[0].id, saved.pins[0].id, 'returning restores only that category snapshot');
+categories.home = { ...categories.home, pageKey: root + '?feed=another' };
+assert.equal(categories.snapshotFor('tab:all').pins.length,0,'snapshots cannot cross page addresses');
+assert(parentPage.includes('home: this.snapshotFor(tab.id)'), 'the actual category builder supplies each pane its own snapshot');
 feed.home = { ...saved, pins: [] }; feed.pendingTabId = '';
 assert.equal(feed.canShowFeed(), false, 'first load and empty results do not invent content');
 console.log('Home first paint: runtime cache, early shell, auth/route guards, category isolation and failure retention passed');

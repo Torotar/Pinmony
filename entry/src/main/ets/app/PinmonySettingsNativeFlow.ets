@@ -2,7 +2,9 @@ import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonySettingsStore, PinmonyRecoverableBoard, PinmonyAccountSettings, PinmonyAiTopic, PinmonyRecentActivity, NotificationGroup, NotificationCategory, NotificationChannel, NotificationChoice, notificationWritable, notificationGlobal } from 'feature_settings';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessageChoice, SocialSettingsResponse, SocialCommentFilterResponse, SocialMessageResponse, emptySocialPermissions, socialMessagePath, socialMessageLevel } from 'feature_settings';
-import { ProfileSettingsPorts, PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
+import { PIN_NATIVE_PROFILE_SETTINGS_ENABLED, ProfileSettingsPorts, PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsRejected } from './PinmonyProfileSettingsClient';
+import { PinmonyRecommendationBoard } from 'feature_settings';
+import { RecommendationBoardWire, RecommendationBoardChoice, RecommendationBoardUpdate, RecommendationBoardReadOptions, RecommendationBoardsQuery, recommendationBoardRow, recommendationBoardUpdate } from './PinmonyRecommendationBoards';
 interface RecoveryFields { fields: string[]; }
 interface RecoveryBoardResponse { id: string; name: string; image_cover_url?: string; pin_count: number; section_count: number; }
 interface User {
@@ -161,9 +163,10 @@ export class PinmonySettingsNativeFlow {
     private uncertain: Map<string, string> = new Map();
     private activityUnknown: Set<string> = new Set();
     private activityClosed: Set<string> = new Set();
+    private recommendationBoardCursors: Set<string> = new Set();
     private value: PinmonyAccountSettings | undefined = undefined;
     constructor(ports: PinmonySettingsNativePorts) { this.ports = ports; this.store = ports.store(); this.client = new PinmonyProfileSettingsClient(ports); }
-    private current(revision: number): boolean { const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.active() && this.page === this.ports.page() && this.token === this.store.token && this.screen === this.store.screen; }
+    private current(revision: number): boolean { if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return false; const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.active() && this.page === this.ports.page() && this.token === this.store.token && this.screen === this.store.screen; }
     pause(): void {
         if (this.owned && this.sent && this.pending) {
             this.uncertain.set(this.pending, this.uncertain.get(this.pending) || '');
@@ -189,6 +192,8 @@ export class PinmonySettingsNativeFlow {
             this.uncertain.clear();
             this.activityUnknown.clear();
             this.activityClosed.clear();
+            this.recommendationBoardCursors.clear();
+            this.store.recommendationBoards = []; this.store.recommendationBoardsReady = false; this.store.recommendationBoardCursor = '';
             this.store.data = undefined;
             this.store.notifications = [];this.store.recoverableBoards = [];this.store.boardRecoveryReady = false;
             this.store.social = emptySocialPermissions(); this.store.socialMessageGroup = 0;
@@ -507,12 +512,121 @@ export class PinmonySettingsNativeFlow {
         this.uncertain.delete(this.pending);this.sent = false;this.store.writeUncertain = this.uncertain.size > 0;
         this.store.recoverableBoards = this.store.recoverableBoards.map((b: PinmonyRecoverableBoard): PinmonyRecoverableBoard => ({id:b.id,name:b.name,imageUrl:b.imageUrl,pinCount:b.pinCount,sectionCount:b.sectionCount,restored:b.restored || b.id === id}));
     }
+    private async recommendationBoardRead(id: string, revision: number): Promise<RecommendationBoardWire> {
+        const options: RecommendationBoardReadOptions = { board_id: id, field_set_key: 'edit' };
+        const response: ProfileSettingsResponse = await this.request('BoardResource', 'get', options, '/board/' + id + '/edit/', revision);
+        if (response.resource_response?.endpoint_name && response.resource_response.endpoint_name !== 'v3_get_board') throw new Error('board-endpoint');
+        const board: RecommendationBoardWire = response.resource_response!.data as RecommendationBoardWire;
+        recommendationBoardUpdate(board, id, this.client.viewer, board.allow_homefeed_recommendations === true);
+        return board;
+    }
+    private async recommendationBoardReadback(id: string, enabled: boolean, revision: number, acknowledged?: RecommendationBoardWire): Promise<RecommendationBoardWire> {
+        // A validated update response containing the requested flag already confirms the write.
+        // A following GET may still return the previous cached value; it must not undo that acknowledgement.
+        const attempts: number = acknowledged ? 1 : 4;
+        for (let attempt: number = 0; attempt < attempts; attempt++) {
+            if (!this.current(revision)) throw new Error('stale');
+            if (attempt) await new Promise<void>((resolve: () => void): void => { setTimeout(resolve, 400 * attempt); });
+            if (!this.current(revision)) throw new Error('stale');
+            try {
+                const actual: RecommendationBoardWire = await this.recommendationBoardRead(id, revision);
+                const matches: boolean = actual.allow_homefeed_recommendations === enabled;
+                PinmonyRuntimeLog.info('RecommendationBoardTrace: phase=readback attempt=' + attempt.toString() + ' matches=' + matches.toString() + ' acknowledged=' + (!!acknowledged).toString());
+                if (matches) return actual;
+            } catch (_) {
+                if (!this.current(revision)) throw new Error('stale');
+                PinmonyRuntimeLog.info('RecommendationBoardTrace: phase=readback-unavailable attempt=' + attempt.toString() + ' acknowledged=' + (!!acknowledged).toString());
+            }
+        }
+        if (acknowledged && this.current(revision)) return acknowledged;
+        throw new Error('board-readback');
+    }
+    private publishRecommendationBoard(actual: RecommendationBoardWire, enabled: boolean): void {
+        this.store.recommendationBoards = this.store.recommendationBoards.map((row: PinmonyRecommendationBoard): PinmonyRecommendationBoard => {
+            if (row.id !== actual.id) return row;
+            const updated: PinmonyRecommendationBoard = recommendationBoardRow(actual);
+            updated.image = updated.image || row.image; updated.pinCount = actual.pin_count === undefined ? row.pinCount : updated.pinCount;
+            updated.updatedAt = updated.updatedAt || row.updatedAt; updated.enabled = enabled; return updated;
+        });
+    }
+    private async recommendationBoards(action: string, value: string, revision: number): Promise<void> {
+        if (action === 'recommendBoardSet') {
+            const choice: RecommendationBoardChoice = JSON.parse(value) as RecommendationBoardChoice;
+            if (!choice || typeof choice.enabled !== 'boolean' || !/^\d{1,40}$/.test(choice.id) || !this.store.recommendationBoardsReady ||
+                !this.store.recommendationBoards.some((board: PinmonyRecommendationBoard): boolean => board.id === choice.id && board.enabled !== undefined)) throw new Error('board-selection');
+            this.client.allowed = ['recommend-board:' + choice.id];
+            const board: RecommendationBoardWire = await this.recommendationBoardRead(choice.id, revision);
+            const update: RecommendationBoardUpdate = recommendationBoardUpdate(board, choice.id, this.client.viewer, choice.enabled);
+            let acknowledged: RecommendationBoardWire | undefined = undefined;
+            if (board.allow_homefeed_recommendations !== choice.enabled) {
+                this.client.allowed.push('recommend-board-update:' + JSON.stringify(update));
+                this.pending = 'recommend-board:' + choice.id;
+                this.uncertain.set(this.pending, choice.enabled.toString()); this.sent = true;
+                const result: ProfileSettingsResponse = await this.request('BoardResource', 'update', update, '/board/' + choice.id + '/edit/', revision);
+                const saved: RecommendationBoardWire = result.resource_response!.data as RecommendationBoardWire;
+                if (result.resource_response?.endpoint_name !== 'v3_edit_board' || saved?.type !== 'board' || saved.id !== choice.id || saved.owner?.id !== this.client.viewer || saved.name !== update.name || saved.privacy !== update.privacy) throw new Error('board-result');
+                if (saved.allow_homefeed_recommendations === choice.enabled) {
+                    acknowledged = saved;
+                    this.uncertain.delete('recommend-board:' + choice.id); this.sent = false;
+                    this.store.writeUncertain = this.uncertain.size > 0;
+                    this.publishRecommendationBoard(saved, choice.enabled);
+                }
+                PinmonyRuntimeLog.info('RecommendationBoardTrace: phase=update validated=true flagConfirmed=' + (!!acknowledged).toString());
+            }
+            const actual: RecommendationBoardWire = await this.recommendationBoardReadback(choice.id, choice.enabled, revision, acknowledged);
+            if (!this.current(revision)) return;
+            this.uncertain.delete('recommend-board:' + choice.id); this.sent = false;
+            this.publishRecommendationBoard(actual, choice.enabled);
+        } else {
+            const append: boolean = action === 'recommendBoardsMore';
+            if (append && (!this.store.recommendationBoardsReady || !this.store.recommendationBoardCursor)) return;
+            const previous: string = append ? this.store.recommendationBoardCursor : '';
+            if (!append) this.recommendationBoardCursors.clear();
+            const options: RecommendationBoardsQuery = { privacy_filter: 'all', sort: 'custom', field_set_key: 'profile_grid_item', filter_stories: true,
+                username: this.page.slice(this.origin.length).split('/')[1], page_size: 25, group_by: 'mix_public_private', include_archived: true, filter_all_pins: false };
+            if (previous) options.bookmarks = [previous];
+            const response: ProfileSettingsResponse = await this.request('BoardsResource', 'get', options, this.page.slice(this.origin.length), revision);
+            const rows: RecommendationBoardWire[] = response.resource_response!.data as RecommendationBoardWire[];
+            if (!Array.isArray(rows) || rows.length > 500 || rows.some((board: RecommendationBoardWire): boolean => !board || board.type !== 'board' || !/^\d{1,40}$/.test(board.id) || typeof board.name !== 'string')) throw new Error('boards');
+            const owned: RecommendationBoardWire[] = rows.filter((board: RecommendationBoardWire): boolean => board.owner?.id === this.client.viewer && board.is_archived !== true && board.archived_by_me !== true && !board.archived_by_me_at);
+            const loaded: PinmonyRecommendationBoard[] = [];
+            this.client.allowed = owned.map((board: RecommendationBoardWire): string => 'recommend-board:' + board.id);
+            // Four concurrent reads at most; no writes are retried or replayed.
+            for (let offset: number = 0; offset < owned.length; offset += 4) {
+                const batch: PinmonyRecommendationBoard[] = await Promise.all(owned.slice(offset, offset + 4).map(async (board: RecommendationBoardWire): Promise<PinmonyRecommendationBoard> => {
+                    const row: PinmonyRecommendationBoard = recommendationBoardRow(board);
+                    try {
+                        const actual: RecommendationBoardWire = await this.recommendationBoardRead(board.id, revision);
+                        row.enabled = actual.allow_homefeed_recommendations;
+                        const key: string = 'recommend-board:' + board.id;
+                        if (this.current(revision)) this.uncertain.delete(key);
+                    } catch (_) { /* Unknown settings stay disabled; never infer a saved value. */ }
+                    return row;
+                }));
+                if (!this.current(revision)) return;
+                batch.forEach((row: PinmonyRecommendationBoard): void => { loaded.push(row); });
+            }
+            const combined: PinmonyRecommendationBoard[] = append ? this.store.recommendationBoards.concat(loaded) : loaded;
+            this.store.recommendationBoards = combined.filter((board: PinmonyRecommendationBoard, index: number): boolean => combined.findIndex((other: PinmonyRecommendationBoard): boolean => other.id === board.id) === index).slice(0, 500);
+            const next: string = response.resource_response?.bookmark || response.resource?.options?.bookmarks?.[0] || '';
+            if (typeof next !== 'string' || next.length > 8192) throw new Error('board-bookmark');
+            this.store.recommendationBoardCursor = next && next !== '-end-' && next !== previous && !this.recommendationBoardCursors.has(next) && rows.length && this.store.recommendationBoards.length < 500 ? next : '';
+            if (previous) this.recommendationBoardCursors.add(previous);
+            this.store.recommendationBoardsReady = true;
+        }
+        if (this.current(revision)) {
+            this.store.writeUncertain = this.uncertain.size > 0;
+            if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
+        }
+    }
     async requestAction(action: string, value: string): Promise<void> {
+        if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
+        if (action.startsWith('recommendBoard') && (this.store.screen !== 'recommend' || this.store.recommendationTab !== 'boards')) return;
         if (['autoplayWifi','autoplayCellular'].includes(action) && this.store.screen !== 'display') return;
         if(action.startsWith('boardRecovery') && this.store.screen !== 'boardRecovery')return;
-        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityOpen', 'activityGroup', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','socialComments','socialShopping','socialIdeaDownloads','socialCommentFilter','autoplayWifi','autoplayCellular','boardRecoveryRead','boardRecoveryRestore'].includes(action))
+        if (!this.ports.active() || this.store.busy || this.store.loading || !['read', 'countries', 'birthdate', 'gender', 'customGender', 'country', 'aiRead', 'aiTopic', 'aiAll', 'activityRead', 'activityOpen', 'activityGroup', 'activityClose', 'privateProfile', 'searchPrivacy', 'notifications', 'notificationSet', 'socialRead', 'socialBlocked', 'socialMentions', 'socialMessage', 'socialUnblock','socialComments','socialShopping','socialIdeaDownloads','socialCommentFilter','autoplayWifi','autoplayCellular','boardRecoveryRead','boardRecoveryRestore','recommendBoardsRead','recommendBoardsMore','recommendBoardSet'].includes(action))
             return;
-        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityOpen', 'activityGroup', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','socialComments','socialShopping','socialIdeaDownloads','socialCommentFilter','autoplayWifi','autoplayCellular','boardRecoveryRestore'].includes(action);
+        const write: boolean = ['birthdate', 'gender', 'customGender', 'country', 'aiTopic', 'aiAll', 'activityOpen', 'activityGroup', 'activityClose', 'privateProfile', 'searchPrivacy', 'notificationSet','socialMentions','socialMessage','socialUnblock','socialComments','socialShopping','socialIdeaDownloads','socialCommentFilter','autoplayWifi','autoplayCellular','boardRecoveryRestore','recommendBoardSet'].includes(action);
         this.bind();
         if (write && this.uncertain.size) {
             this.store.writeUncertain = true;
@@ -544,6 +658,7 @@ export class PinmonySettingsNativeFlow {
             this.client.user = u.id;
             this.client.viewer = u.id;
             this.client.permissions = ['own'];
+            if (action.startsWith('recommendBoard')) { await this.recommendationBoards(action, value, revision); return; }
             if (action.startsWith('boardRecovery')) { await this.recoverBoard(action,value,revision);return; }
             if (action.startsWith('social')) { await this.socialAction(action,value,revision); if (this.current(revision)) this.store.writeUncertain = this.uncertain.size > 0; return; }
             if (action === 'notificationSet') {

@@ -169,7 +169,13 @@ async function integration(){
  vm.runInNewContext(script,{window});
  assert.equal(api.commentsAdopt(pin,'{}'),false);assert.equal(api.commentPhotoBegin(pin),false);assert.equal(api.commentPhotoFail(pin),false);
  assert.equal(await api.commentWrite(pin,input('create')),false);assert.equal(await api.commentLike(pin,'5'),false);
- const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');assert(index.includes('nativeCommentWrite: PIN_NATIVE_COMMENT_WRITES_ENABLED'));assert(index.includes('cancelNativeCommentWrites:'));assert(index.includes('commentActionsReady: PIN_NATIVE_COMMENT_WRITES_ENABLED'));
+ const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');assert(index.includes('nativeCommentWrite: PIN_NATIVE_COMMENT_WRITES_ENABLED'));assert(index.includes('cancelNativeCommentWrites:'));const expression=index.match(/commentActionsReady:\s*([^,\r\n]+)/)?.[1];
+ assert(expression,'comment readiness must be bound by Index');
+ const ready=Function('PIN_NATIVE_COMMENT_WRITES_ENABLED','_identity','return '+expression);
+ for(const enabled of [true,false])for(const owned of [true,false])for(const current of [true,false]) {
+   assert.equal(ready.call({detailRootIdentity:()=> 'active',detailNativeReads:{owned:()=>owned}},enabled,current?'active':'old'),enabled&&owned&&current,
+     'comment writes require the native flag, current detail identity and owned read context');
+ }
 }
 const timeout=setTimeout(()=>{console.error('native comment test timeout');process.exit(1)},20000);
 main().then(()=>clearTimeout(timeout)).catch(error=>{clearTimeout(timeout);console.error(error);process.exitCode=1});

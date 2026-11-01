@@ -5,7 +5,9 @@ function diagnosticResourcePresent(body: string): boolean {
     try { const value: DraftDiagnostic = JSON.parse(body) as DraftDiagnostic; return !!value.resource_response; } catch (_) { return false; }
 }
 let requestSequence: number = 0;
-export const PIN_NATIVE_SHARE_PUBLISH_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_SHARE_PUBLISH_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_SHARE_PUBLISH_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_SHARE_PUBLISH_ROLLOUT_ENABLED;
 export interface PinmonySharePublishClientPorts {
     session: () => PinmonyBusinessSessionContext;
     network: () => PinmonyNativeNetwork;
@@ -36,6 +38,7 @@ export class PinmonySharePublishClient {
     constructor(ports: PinmonySharePublishClientPorts) { this.ports = ports; }
     cancel(): void { this.waits.forEach((release: () => void, id: string): void => { this.ports.network().cancel(id); release(); }); this.waits.clear(); }
     async request(owner: PinmonySharePublishOwner, name: string, verb: string, options: Object, source: string, handler: string, current: () => boolean): Promise<string> {
+        if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) throw new Error('disabled');
         const session: PinmonyBusinessSessionContext = this.ports.session();
         if (!current() || !session.authenticated)
             throw new Error('stale');

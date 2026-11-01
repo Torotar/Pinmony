@@ -4,14 +4,16 @@ import { PinmonyPinStore, PinmonySaveResult, PinmonySaveBoard, PinmonyEditPinRes
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
-export const PIN_NATIVE_POST_OPERATIONS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_POST_API_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_POST_OPERATIONS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_POST_OPERATIONS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_POST_OPERATIONS_ROLLOUT_ENABLED && PIN_POST_API_ENABLED;
 interface Owner { id: string; }
 interface PinBoard { id: string; name?: string; privacy?: string; layout?: string; }
 interface Reaction { reaction_by_me?: number; reaction_counts?: Record<string,number>; }
 interface Art { url: string; }
 interface NativePin { id: string; pinner?: Owner; board?: PinBoard; is_repin?: boolean; title?: string; description?: string;
   section?: Owner;
-  tracking_params?: string; client_tracking_params?: string; reaction_by_me?: number; reaction_data?: Reaction;
+  tracking_params?: string; client_tracking_params?: string; reaction_by_me?: number; reaction_data?: Reaction; reaction_counts?: Record<string,number>;
   ai_disclosures?: number[]; image_medium_url?: string; images?: Record<string,Art>; }
 interface NativeBoard { id: string; name: string; privacy?: string; section_count?: number; image_cover_url?: string; image_cover_hd_url?: string; access?: string[]; owner?: Owner; }
 interface PickerData { all_boards: NativeBoard[]; boards_shortlist: NativeBoard[]; }
@@ -55,6 +57,7 @@ export class PinmonyPostNativeOperations {
   private busy: boolean = false; private sent: boolean = false; private token: number = 0;
   private readonly requests: Set<string> = new Set<string>(); private readonly waits: Map<string,() => void> = new Map<string,() => void>();
   private readonly saved: Map<string,SaveCopy> = new Map<string,SaveCopy>(); private readonly liked: Set<string> = new Set<string>();
+  private readonly likeCounts: Map<string,string> = new Map<string,string>();
   private readonly uncertainLikes: Set<string> = new Set<string>();
   private readonly uncertainCancels: Set<string> = new Set<string>();
   private readonly edited: Map<string,NativePin> = new Map<string,NativePin>();
@@ -64,7 +67,7 @@ export class PinmonyPostNativeOperations {
   private image(value: string | undefined): string {return typeof value === 'string' && value.length <= 2048 && /^https:\/\/i\.pinimg\.com\//.test(value) ? value : '';}
   private key(): string {const s: PinmonyBusinessSessionContext = this.ports.session();return s.authenticated ? s.accountId + ':' + s.generation.toString() + ':' + s.origin : '';}
   private sync(): boolean {
-    const key: string = this.key();if(key !== this.account){this.pause();this.account = key;this.saved.clear();this.liked.clear();this.edited.clear();this.uncertainLikes.clear();this.uncertainCancels.clear();this.mode = '';this.raw = undefined;}
+    const key: string = this.key();if(key !== this.account){this.pause();this.account = key;this.saved.clear();this.liked.clear();this.likeCounts.clear();this.edited.clear();this.uncertainLikes.clear();this.uncertainCancels.clear();this.mode = '';this.raw = undefined;}
     return !!key && this.ports.session().authenticated;
   }
   private publish(): void {
@@ -89,12 +92,11 @@ export class PinmonyPostNativeOperations {
       const r: Resource = (JSON.parse(body) as Response).resource_response, p: NativePin = r?.data as NativePin;
       if(r?.status !== 'success' || r.error || r.code !== undefined && r.code !== 0 || p?.id !== this.id(pin))return;
       const reaction: number | undefined = p.reaction_data?.reaction_by_me === undefined ? p.reaction_by_me : p.reaction_data.reaction_by_me;
-      if(reaction === 1){this.liked.add(p.id);this.uncertainLikes.delete(p.id);}
+      if(reaction === 1){this.liked.add(p.id);this.rememberLikeCount(p,false);this.uncertainLikes.delete(p.id);}
       this.apply();
     }catch (_) {}
   }
   pause(): void {
-    if(!PIN_NATIVE_POST_OPERATIONS_ENABLED)return;
     this.markUnknown();
     this.revision++;this.requests.forEach((id: string): void => this.ports.network().cancel(id));this.requests.clear();
     this.waits.forEach((cancel: () => void): void => cancel());this.waits.clear();
@@ -287,15 +289,33 @@ export class PinmonyPostNativeOperations {
     else if(this.store.confirmedSaves.isSaved(this.id(pin)) || this.store.detail?.actions.some((a: PinmonyDetailAction): boolean => a.kind === 'save' && a.selected))await this.cancelSave(pin);else await this.openSave(pin);
     return true;
   }
+  private rememberLikeCount(pin: NativePin, newlyLiked: boolean): void {
+    const reported: number | undefined = pin.reaction_data?.reaction_counts?.['1'] ?? pin.reaction_counts?.['1'];
+    if (typeof reported === 'number' && Number.isSafeInteger(reported) && reported >= 0) {
+      this.likeCounts.set(pin.id, reported.toString()); return;
+    }
+    if (!newlyLiked) return;
+    const rawCount: number | undefined = this.raw?.reaction_data?.reaction_counts?.['1'] ?? this.raw?.reaction_counts?.['1'];
+    const detail = this.store.detail;
+    const text: string = detail && this.id(detail.pinUrl) === pin.id ?
+      detail.actions.find((action: PinmonyDetailAction): boolean => action.kind === 'like')?.countText || '' : '';
+    const count: number | undefined = typeof rawCount === 'number' ? rawCount :
+      /^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text) ? Number(text.replace(/,/g, '')) : undefined;
+    // Only a validated new reaction may advance a known exact baseline.
+    // Compact/unknown counts are retained until an authoritative read arrives.
+    if (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 && count < Number.MAX_SAFE_INTEGER)
+      this.likeCounts.set(pin.id, (count + 1).toString());
+  }
+
   async like(pin: string): Promise<void> {
     if(!this.sync())return;
     if(this.likeBlocked(pin)){this.ports.feedback(PinmonyI18n.message("pm_like_result_not_confirmed_refresh_to_check_before_submitting_aga_35091826"));return;}
     if(!this.begin('like',pin))return;const revision: number = this.revision;this.busy = true;
     try {const raw: NativePin = await this.base(revision), reaction: number | undefined = raw.reaction_data?.reaction_by_me === undefined ? raw.reaction_by_me : raw.reaction_data.reaction_by_me;
-      if(reaction === 1 || this.liked.has(this.id())){this.liked.add(this.id());this.apply();return;}
+      if(reaction === 1 || this.liked.has(this.id())){this.liked.add(this.id());this.rememberLikeCount(raw,false);this.apply();return;}
       if(reaction !== 0 || !raw.tracking_params || raw.tracking_params.length > 16384)throw new Error('reaction');
       this.sent = true;const r: Resource = await this.request('ApiResource','create',{url:'/v3/pins/' + this.id() + '/react/',data:{client_tracking_params:raw.tracking_params,reaction_type:1}},revision) as Resource,p: NativePin = r.data as NativePin;
-      if(!p || p.id !== this.id())throw new Error('like');this.sent = false;this.liked.add(this.id());this.apply();this.ports.committed('like',pin);
+      if(!p || p.id !== this.id())throw new Error('like');this.sent = false;this.rememberLikeCount(p,true);this.liked.add(this.id());this.apply();this.ports.committed('like',pin);
     }catch (_) {if(revision === this.revision)this.markUnknown();if(this.valid(revision))this.ports.feedback(this.sent ? PinmonyI18n.message("pm_like_result_not_confirmed_reload_to_check_it_will_not_be_resubmi_30ddc2ea") : PinmonyI18n.message("pm_like_status_or_tracking_details_not_confirmed_5341ec8c"));}
     finally {if(revision === this.revision){this.busy = false;this.sent = false;}}
   }
@@ -332,11 +352,11 @@ export class PinmonyPostNativeOperations {
   apply(): void {
     if(this.key() !== this.account || !this.store.detail)return;const detail = this.store.detail, id: string = this.id(detail.pinUrl);
     const actions: PinmonyDetailAction[] = this.store.confirmedSaves.actions(id,detail.actions).map((a: PinmonyDetailAction): PinmonyDetailAction => {
-      if(a.kind !== 'like' || !this.liked.has(id))return a;return {id:a.id,kind:a.kind,label:a.label,countText:a.selected ? a.countText : '',enabled:false,selected:true};});
+      if(a.kind !== 'like' || !this.liked.has(id))return a;return {id:a.id,kind:a.kind,label:a.label,countText:this.likeCounts.get(id) ?? a.countText,enabled:false,selected:true};});
     if(!actions.some((a: PinmonyDetailAction): boolean => a.kind === 'save'))actions.push({
       id:'native-save',kind:'save',label:this.store.confirmedSaves.isSaved(id) ? PinmonyI18n.message("pm_saved_471dd4d7") : PinmonyI18n.message("pm_save_60a53514"),countText:'',enabled:true,selected:this.store.confirmedSaves.isSaved(id)});
     if(!actions.some((a: PinmonyDetailAction): boolean => a.kind === 'like'))actions.push({
-      id:'native-like',kind:'like',label:PinmonyI18n.message("pm_like_aced5d7f"),countText:'',enabled:!this.liked.has(id) && !this.likeBlocked(detail.pinUrl),selected:this.liked.has(id)});
+      id:'native-like',kind:'like',label:PinmonyI18n.message("pm_like_aced5d7f"),countText:this.likeCounts.get(id) || '',enabled:!this.liked.has(id) && !this.likeBlocked(detail.pinUrl),selected:this.liked.has(id)});
     detail.actions = this.store.confirmedSaves.actions(id,actions);const edit: NativePin | undefined = this.edited.get(id);if(edit){if(typeof edit.title === 'string')detail.title = edit.title;if(typeof edit.description === 'string')detail.description = edit.description;}
     this.store.detail = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
   }

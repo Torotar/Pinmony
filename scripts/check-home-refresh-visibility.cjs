@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
+const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets','utf8');
 const indicator=source.slice(source.indexOf('  private homeRefreshIndicator()'),source.indexOf('  private feedContent()'));
 assert(indicator.includes(".height(64).justifyContent(FlexAlign.Center)"),'home indicator must occupy and center within the refresh slot');
 assert(indicator.includes('this.homeTopInset() + 48 + (this.home.board ? 68 : 0)'), 'board feed refresh must clear both category bar and board summary');

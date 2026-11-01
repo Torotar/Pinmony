@@ -10,6 +10,7 @@ export interface PinmonyShuffleItem {
   pinUrl?: string;
   imageUrl?: string;
   cutoutUrl?: string;
+  cutoutBounds?: PinmonyShuffleCutoutBounds;
   imageWidth: number;
   imageHeight: number;
   hitWidth?: number;
@@ -23,6 +24,13 @@ export interface PinmonyShuffleItem {
   hidden: boolean;
   alpha: number;
   effects: PinmonyShuffleEffect[];
+}
+
+export interface PinmonyShuffleCutoutBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface PinmonyShuffleSnapshot {

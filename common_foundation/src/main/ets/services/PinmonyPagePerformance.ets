@@ -36,6 +36,9 @@ export class PinmonyPagePerformance {
     (message: string): void => PinmonyRuntimeLog.info(message)) { this.now = now; this.log = log; }
   begin(tab: number, reason: 'tab' | 'return'): void {
     if (!Number.isInteger(tab) || tab < 0 || tab > 3) return;
+    // Returning to a root ends the visible lifetime of all secondary samples.
+    this.secondary.forEach((sample: SecondarySample, page: PinmonySecondaryPage): void => this.endSecondary(page, sample));
+    this.secondary.clear();
     this.active = new PageSample(tab, ++this.sequence, this.now(), reason);
     this.log('PagePerf: event=begin tab=' + tab + ' sequence=' + this.sequence + ' reason=' + reason);
   }
@@ -53,6 +56,9 @@ export class PinmonyPagePerformance {
     this.log('PagePerf: event=' + stage + ' tab=' + tab + ' sequence=' + sample.sequence + ' elapsedMs=' + elapsed +
       ' samples=' + ordered.length + ' p50Ms=' + ordered[Math.ceil(ordered.length * 0.5) - 1] +
       ' p95Ms=' + ordered[Math.ceil(ordered.length * 0.95) - 1]);
+    // Cached content already satisfies this visit. Later pagination/refresh must
+    // not become its first-content measurement.
+    if (stage === 'cache-visible') this.mark(tab, 'content-ready');
   }
   restoreHome(): boolean {
     if (!this.active || this.active.tab !== 0 || this.active.reason !== 'return' || this.active.stages.has('content-ready')) return false;
@@ -72,6 +78,8 @@ export class PinmonyPagePerformance {
   }
   beginSecondary(page: PinmonySecondaryPage, identity: string): void {
     if (!identity) return;
+    const previous: SecondarySample | undefined = this.secondary.get(page);
+    if (previous) this.endSecondary(page, previous);
     this.secondary.set(page, new SecondarySample(identity, ++this.sequence, this.now()));
     this.log('PagePerf: event=begin page=' + page + ' sequence=' + this.sequence);
   }
@@ -92,6 +100,13 @@ export class PinmonyPagePerformance {
   cancel(): void {
     if (this.active) this.log('PagePerf: event=end tab=' + this.active.tab + ' sequence=' + this.active.sequence);
     this.active = undefined;
+    this.secondary.forEach((sample: SecondarySample, page: PinmonySecondaryPage): void => this.endSecondary(page, sample));
     this.secondary.clear();
+  }
+  private endSecondary(page: PinmonySecondaryPage, sample: SecondarySample): void {
+    const outcome: string = sample.stages.has('image-ready') ? 'image-ready' :
+      sample.stages.has('content-ready') ? 'content-ready' : 'interrupted';
+    this.log('PagePerf: event=end page=' + page + ' sequence=' + sample.sequence +
+      ' outcome=' + outcome + ' elapsedMs=' + Math.max(0, this.now() - sample.started));
   }
 }

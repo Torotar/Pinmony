@@ -30,18 +30,20 @@ if(process.argv[3]) {
 }
 console.log('Photo history validation, original ratio, empty, pagination and deduplication passed');
 const historySource=fs.readFileSync('feature_search/src/main/ets/components/PinmonyPhotoHistoryPage.ets','utf8');
+assert(!historySource.includes('sys.symbol.checkmark_circle_fill'),'history photo selection uses its border without a checkmark overlay');
 const selectStart=historySource.indexOf('  private selectPhoto(');
 const selectEnd=historySource.indexOf('\n  aboutToAppear',selectStart);
 const Selection=vm.runInNewContext(ts.transpileModule('class Selection {'+historySource.slice(selectStart,selectEnd)+'}\nSelection;',
  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
-const selection=new Selection();let warnings=0;
-selection.selected='';selection.confirming=false;selection.text=key=>key;
-selection.getUIContext=()=>({getPromptAction:()=>({showToast:()=>warnings++})});
+const selection=new Selection();let openedPhotos=0;
+Object.assign(selection,{selected:'',confirming:false,busy:false,deleting:false,managing:false,pendingIds:[],uncertainIds:[],confirm:()=>openedPhotos++});
 selection.selectPhoto('first');assert.equal(selection.selected,'first');
-selection.selectPhoto('second');assert.equal(selection.selected,'first');assert.equal(warnings,1);
-selection.selectPhoto('first');assert.equal(selection.selected,'');
+assert.equal(openedPhotos,1,'photo tap opens search without a title-bar confirmation');
 selection.selectPhoto('second');assert.equal(selection.selected,'second');
 selection.confirming=true;selection.selectPhoto('second');assert.equal(selection.selected,'second');
+selection.confirming=false;selection.managing=true;selection.selectPhoto('third');assert.equal(selection.selected,'second');
+assert(!historySource.slice(historySource.indexOf(".titleBar({")).includes("sys.symbol.checkmark"),'history title has no checkmark confirmation');
+assert(historySource.includes('.blur(this.pendingIds.includes(item.id) ? 18 : 0)'),'pending deletions retain a blurred card');
 assert(historySource.includes('SmartImage({'), 'History must reuse the shared image component');
 assert(historySource.includes('crossCount: this.columns()'), 'A single item must retain the waterfall column width');
 assert(!historySource.includes('Math.min(440'), 'Image heights must not be cropped to a history-specific cap');
@@ -58,8 +60,47 @@ for(const width of [328,600,900]){
 console.log('History cards: shared image, fixed waterfall columns and uncropped aspect ratios passed');
 const flowSource=fs.readFileSync('entry/src/main/ets/app/PinmonyPhotoSearchFlow.ets','utf8').replace(/^import .*;\r?\n/gm,'');
 const Flow=vm.runInNewContext(ts.transpileModule(flowSource+'\nPinmonyPhotoSearchFlow;', {compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,
- {exports:{},util:{TextDecoder:{create:()=>({decodeWithStream:bytes=>Buffer.from(bytes).toString('utf8')})}},parsePhotoHistory:parse,parsePhotoSearch:()=>[]});
+ {exports:{},util:{TextDecoder:{create:()=>({decodeWithStream:bytes=>Buffer.from(bytes).toString('utf8'),decodeToString:bytes=>Buffer.from(bytes).toString('utf8')})}},parsePhotoHistory:parse,parsePhotoSearch:()=>[]});
 (async()=>{
+ const navigationMethods=['selectPhotoHistory','closePhotoSearch','closePhotoHistory'].map(name=>{
+  const start=pageSource.search(new RegExp('  private (?:async )?'+name+'\\('));assert(start>=0);
+  const end=pageSource.indexOf('\n  }',start);assert(end>start);
+  return pageSource.slice(start,end+4);
+ }).join('\n');
+ const Navigation=vm.runInNewContext(ts.transpileModule('class Navigation {'+navigationMethods+'}\nNavigation;',
+  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+ const nav=new Navigation(),paths=['search','photo-history'],visibility=[];
+ let cancels=0,finishResults;
+ Object.assign(nav,{active:true,photoGeneration:0,photoHistoryVisible:true,photoPreview:'',
+  dismissPhotoMenu:()=>{},onPhotoCancel:()=>cancels++,onPhotoVisibilityChange:v=>visibility.push(v),
+  searchPathStack:{getAllPathName:()=>paths.slice(),pushPath:p=>paths.push(p.name),pop:()=>paths.pop()},
+  onSelectPhotoHistory:async(id,selected)=>{selected('history-image');return new Promise(resolve=>{finishResults=resolve;});}});
+ const selecting=nav.selectPhotoHistory('history-test');
+ assert.deepEqual(paths,['search','photo-history','photo-search']);
+ nav.closePhotoSearch(true);
+ assert.deepEqual(paths,['search','photo-history'],'back reveals the retained history destination');
+ assert.equal(nav.photoHistoryVisible,true);assert.equal(cancels,0);assert.deepEqual(visibility,[]);
+ finishResults([{id:'late'}]);await selecting;
+ assert.equal(nav.photoResults.length,0,'late results cannot repopulate the closed search');
+ nav.photoPreview='history-image';paths.push('photo-search');nav.closePhotoSearch();
+ assert.deepEqual(paths,['search'],'full cleanup removes results before history');
+ assert.equal(nav.photoHistoryVisible,false);assert.deepEqual(visibility,[false]);
+ paths.push('photo-history');nav.photoHistoryVisible=true;
+ const cardOrigin={x:12,y:150,width:158,height:240,imageWidth:316,imageHeight:480};
+ const animated=nav.selectPhotoHistory('history-test',cardOrigin);
+ assert.equal(nav.photoHistoryOrigin,cardOrigin);
+ nav.closePhotoSearch(true);
+ assert.equal(nav.photoClosing,true);assert.equal(paths.at(-1),'photo-search','reverse animation completes before popping');
+ nav.closePhotoSearch(true);assert.equal(paths.at(-1),'photo-search','repeated back does not pop during flight');
+ nav.photoHistoryOrigin=undefined;nav.closePhotoSearch(true);
+ assert.deepEqual(paths,['search','photo-history']);assert.equal(nav.photoHistoryLifted,false);
+ finishResults([{id:'late-animation'}]);await animated;assert.equal(nav.photoResults.length,0);
+ assert(pageSource.includes('animatePhoto: !!this.photoHistoryOrigin, closing: this.photoClosing'));
+ assert(pageSource.includes('NavDestinationMode.DIALOG'),'animated search keeps history rendered underneath');
+ assert(historySource.includes(".id('pinmony-history-photo-' + item.id)"));
+ assert(pageSource.includes('onBackPressed(() => { this.closePhotoSearch(true); return true; })'));
+ assert(pageSource.includes("backIcon: { label: this.uiText('pm_back_572cf45b'), isEnabled: true, action: () => this.closePhotoSearch(true) }"));
+ console.log('Photo history navigation: retained parent, system/title back, late results and full cleanup passed');
  const origin='https://www.pinterest.com',session={authenticated:true,accountId:'test',generation:1,origin};
  let sent=0,preview='',pending;
  const text=Buffer.from(JSON.stringify({resource_response:resource}));
@@ -70,7 +111,26 @@ const Flow=vm.runInNewContext(ts.transpileModule(flowSource+'\nPinmonyPhotoSearc
  const flow=new Flow(ports);await flow.history('');
  await flow.selectHistory('unknown',()=>{});assert.equal(sent,0);
  await flow.selectHistory('history-test',uri=>{preview=uri;});assert.equal(sent,1);assert.equal(preview,pin.image_urls['736x']);
- await flow.history('');session.generation++;await flow.selectHistory('history-test',()=>{});assert.equal(sent,1);
+ const normalRead=network.readPhotoHistory;
+ let downloaded,encoded,shown=0;
+ network.readPhotoHistory=()=>new Promise(resolve=>{downloaded=resolve;});
+ ports.jpeg=()=>new Promise(resolve=>{encoded=resolve;});
+ const immediate=flow.selectHistory('history-test',()=>{shown++;});
+ assert.equal(shown,1,'history preview opens before download finishes');assert.equal(sent,1);
+ downloaded(new ArrayBuffer(12));await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(sent,1,'upload waits for JPEG preparation');assert.equal(shown,1);
+ encoded(new ArrayBuffer(12));await immediate;assert.equal(sent,2);
+ const cancelled=flow.selectHistory('history-test',()=>{shown++;});
+ flow.cancel();downloaded(new ArrayBuffer(12));assert.equal(await cancelled,undefined);
+ assert.equal(sent,2,'closing during preparation prevents upload');
+ network.readPhotoHistory=normalRead;ports.jpeg=async b=>b;await flow.history('');
+ network.readPhotoHistory=async()=>{throw new Error('download');};
+ await assert.rejects(flow.selectHistory('history-test',()=>{shown++;}));
+ assert.equal(shown,3,'download failure occurs after opening the preview');assert.equal(sent,2);
+ network.readPhotoHistory=normalRead;
+ const stopped=await flow.selectHistory('history-test',()=>flow.cancel());
+ assert.equal(stopped,undefined);assert.equal(sent,2,'synchronous close cannot dispatch a download or upload');
+ await flow.history('');session.generation++;await flow.selectHistory('history-test',()=>{});assert.equal(sent,2);
  session.generation++;network.readPhotoHistory=()=>new Promise(resolve=>{pending=resolve;});
  const late=flow.history('');flow.cancel();pending(buffer);await assert.rejects(late);
  console.log('History selection identity, session change and cancelled read checks passed');

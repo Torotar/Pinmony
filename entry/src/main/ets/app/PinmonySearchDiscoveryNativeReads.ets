@@ -4,7 +4,9 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
-export const PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_SEARCH_DISCOVERY_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_SEARCH_DISCOVERY_ROLLOUT_ENABLED;
 interface FormattedText { format?: string; }
 interface FeaturedMetadata { boardHdCoverUrl?: string; boardSubtitle?: string; }
 interface DiscoveryObject { boardType?: string; boardName?: string; boardUrl?: string; featuredBoardMetadata?: FeaturedMetadata; imageMediumUrl?: string; }
@@ -47,6 +49,7 @@ export class PinmonySearchDiscoveryNativeReads {
   private sections: PinmonySearchIdeaSection[] = [];
   constructor(ports: PinmonySearchDiscoveryNativeReadsPorts) { this.ports = ports; this.store = ports.store(); }
   eligible(): boolean {
+    if (!PIN_NATIVE_SEARCH_DISCOVERY_ENABLED) return false;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     return PIN_NATIVE_SEARCH_DISCOVERY_ENABLED && session.authenticated && !!session.accountId &&
       (this.ports.page() === session.origin + '/search/' || this.ports.page() === session.origin + '/search');
@@ -57,7 +60,6 @@ export class PinmonySearchDiscoveryNativeReads {
       session.generation === this.generation && session.origin === this.origin;
   }
   pause(): void {
-    if (!PIN_NATIVE_SEARCH_DISCOVERY_ENABLED) return;
     this.revision++; if (this.requestId) this.ports.network().cancel(this.requestId);
     this.requestId = ''; this.busy = false; this.store.searchDiscoveryReadsReady = false;
   }
@@ -111,6 +113,8 @@ export class PinmonySearchDiscoveryNativeReads {
   private image(value: string | undefined): string { return typeof value === 'string' && value.length <= 2000 && /^https:\/\/i\.pinimg\.com\//i.test(value) ? value : ''; }
   private text(value: FormattedText | undefined): string { return typeof value?.format === 'string' ? value.format.trim().slice(0, 180) : ''; }
   private async read(append: boolean): Promise<void> {
+    const startedAt: number = Date.now();
+    const operation: string = append ? 'pagination' : this.ready ? 'refresh' : 'initial';
     const revision: number = this.revision; const previous: string = append ? this.cursor : '';
     const page: string = this.ports.page();
     const live = (): boolean => revision === this.revision && this.owned() && this.ports.page() === page;
@@ -162,6 +166,10 @@ export class PinmonySearchDiscoveryNativeReads {
       this.ready = true; this.ports.committed(page);
       PinmonyRuntimeLog.info('SearchNativeTrace: discovery committed append=' + append.toString() + ' sections=' + sections.length.toString());
     } catch (_) { if (live()) this.error = PinmonyI18n.message("pm_unable_to_load_search_discovery_please_retry_f37a889f"); }
-    finally { if (revision === this.revision) { this.requestId = ''; this.busy = false; if (live()) this.apply(); this.ports.settled(); } }
+    finally {
+      PinmonyRuntimeLog.info('PageDataPerf: page=search-discovery operation=' + operation + ' elapsedMs=' +
+        (Date.now() - startedAt).toString() + ' outcome=' + (!live() ? 'cancelled' : this.error ? 'error' : 'ready'));
+      if (revision === this.revision) { this.requestId = ''; this.busy = false; if (live()) this.apply(); this.ports.settled(); }
+    }
   }
 }

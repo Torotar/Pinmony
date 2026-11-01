@@ -36,6 +36,7 @@ const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true
   PINTEREST_URL: 'https://www.pinterest.com/', acceptsNetworkJob,
   PinmonyRuntimeLog: log, readRelatedPresentation: () => undefined, setTimeout() {}, clearTimeout() {} };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
+  selectDetailEntryMotion() {}
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}
   ${method('startOpeningDetailRead')}
@@ -64,6 +65,7 @@ async function main() {
   native.nativeBusinessSessionContext = () => ({ authenticated: state.authenticated, generation: 1,
     accountId: 'synthetic-account', origin: 'https://www.pinterest.com', userAgent: 'synthetic' });
   Object.assign(native, { authStatus: 'authenticated', nativeBackTarget: '', detailPrefetchTimer: -1,
+    detailOpeningCoordinator: { pauseShufflePreviews() {} },
     detailJourney: { begin() {}, mark() {}, current() { return 1; } },
     detailRequestOwners: new Map(), detailReturnReads: new Map(), detailReturnReadPin: '',
     pinStore: { detailPrefetch: cache, detailOpeningToken: 0, videoForeground: true, detailOpeningPin: '',

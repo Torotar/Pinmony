@@ -16,7 +16,8 @@ interface ApiOptions { url: string; data?: ReactionData; }
 interface WriteEnvelope { options: SendOptions | CreateOptions | ApiOptions; context: Record<string,string>; }
 interface WriteUser { id: string; }
 interface WriteData { id: string; type?: string; text?: string; sender?: WriteUser; created_at?: string; conversation_id?: string; users?: WriteUser[]; }
-interface WriteResource { status: string; code?: number; error?: Object; endpoint_name: string; data: WriteData | null; }
+interface InboxWriteFailure { status?: string; http_status?: number; code?: number; api_error_code?: number; }
+interface WriteResource { status: string; code?: number; error?: InboxWriteFailure; endpoint_name: string; data: WriteData | null; }
 interface WriteResponse { resource_response: WriteResource; client_context?: WriteContext; }
 interface WriteContext { user?: WriteUser; }
 export interface PinmonyInboxNativeWritePorts {
@@ -37,7 +38,7 @@ export class PinmonyInboxNativeWrites {
   private clone(f: PinmonyInboxFlowSnapshot): PinmonyInboxFlowSnapshot {
     return {directContact:f.directContact,nativeAccountGeneration:f.nativeAccountGeneration,kind:f.kind,pageUrl:f.pageUrl,session:f.session,contextEpoch:f.contextEpoch,nativeToken:f.nativeToken,nativeRead:f.nativeRead,
       screen:f.screen,title:f.title,loading:f.loading,error:f.error,users:f.users.slice(),messages:f.messages.slice(),selectedIds:f.selectedIds.slice(),hasMore:f.hasMore,
-      conversationId:f.conversationId,sending:f.sending,sentRevision:f.sentRevision,sendError:f.sendError,messageBusy:f.messageBusy,
+      conversationId:f.conversationId,sending:f.sending,sentRevision:f.sentRevision,sendError:f.sendError,recipientRestricted:f.recipientRestricted,messageBusy:f.messageBusy,
       blocked:f.blocked,blockedUserId:f.blockedUserId,blockRevision:f.blockRevision,writeUncertain:f.writeUncertain,writeAction:f.writeAction,writeTarget:f.writeTarget};
   }
   private publish(f: PinmonyInboxFlowSnapshot): void {this.displayed = this.clone(f);this.ports.changed(this.displayed);}
@@ -58,7 +59,7 @@ export class PinmonyInboxNativeWrites {
     const original: PinmonyInboxFlowSnapshot | undefined = this.ports.state(), identity: PinmonyInboxWriteIdentity | undefined = this.ports.identity();
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if(this.job || !original || !identity || !session.authenticated || !session.accountId || !/^\d{1,40}$/.test(identity.viewerId) ||
-      original.loading || original.sending || original.messageBusy || original.writeUncertain || original.error || original.sendError)return;
+      original.loading || original.sending || original.messageBusy || original.writeUncertain || original.error || original.sendError || original.recipientRestricted && (action === 'next' || action === 'send'))return;
     let options: SendOptions | CreateOptions | ApiOptions, name: string, verb: string, endpoint: string, target: string = '', submitted: string = value;
     if(action === 'send') {
       submitted = typeof value === 'string' ? value.trim() : '';
@@ -101,8 +102,21 @@ export class PinmonyInboxNativeWrites {
         identity.viewerId,identity.conversationId,identity.contacts,identity.selectedIds,identity.messages.filter((m: PinmonyInboxWriteMessage): boolean => !m.deleted && m.reactable).map((m: PinmonyInboxWriteMessage): string => m.id),
         identity.messages.filter((m: PinmonyInboxWriteMessage): boolean => !m.deleted && m.own).map((m: PinmonyInboxWriteMessage): string => m.id),current),cancelled]);
       if(!current())return;
-      if(!reply || reply.error || reply.status < 200 || reply.status >= 300 || !reply.body || reply.body.length > 4000000)throw new Error('request');
+      if(!reply || reply.error || !reply.body || reply.body.length > 4000000)throw new Error('request');
       const body: WriteResponse = JSON.parse(reply.body) as WriteResponse, r: WriteResource = body.resource_response, data: WriteData | null = r?.data;
+      if(body.client_context?.user && body.client_context.user.id !== identity.viewerId)throw new Error('identity');
+      const rejected: InboxWriteFailure | undefined = r?.error;
+      if ((action === 'next' || action === 'send') && reply.status === 409 && rejected?.status === 'failure' &&
+        rejected.http_status === 409 && rejected.code === 4372 && rejected.api_error_code === 4372) {
+        state.sending = false; state.messageBusy = false; state.loading = false;
+        state.writeUncertain = false; state.recipientRestricted = true;
+        const text: string = PinmonyI18n.message('pm_message_recipient_settings_restricted');
+        if (action === 'send') state.sendError = text; else state.error = text;
+        this.publish(state);
+        PinmonyRuntimeLog.info('InboxNativeWrite: outcome=rejected reason=recipient-settings code=4372 action=' + action);
+        return;
+      }
+      if(reply.status < 200 || reply.status >= 300)throw new Error('request');
       if(!r || r.status !== 'success' || r.error || r.code !== undefined && r.code !== 0 || r.endpoint_name !== endpoint ||
         body.client_context?.user && body.client_context.user.id !== identity.viewerId)throw new Error('business');
       if(action === 'send') {

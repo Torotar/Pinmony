@@ -55,6 +55,8 @@ export class ApiCache {
   }
 
   put<T extends Object | string | number | boolean>(key: string, value: T, ttlMs: number): void {
+    // An explicit confirmed value supersedes older reads for this key.
+    this.inFlight.delete(key);
     this.store(key, value, ttlMs);
   }
 
@@ -63,24 +65,29 @@ export class ApiCache {
     const memoryValue: Object | string | number | boolean | null = this.memory.get(key, ttlMs);
     if (memoryValue !== null) {
       const value: T = memoryValue as T;
+      this.refreshInBackground(key, ttlMs, fetcher, onValue);
       if (onValue) onValue(value, 'memory');
-      this.refreshInBackground(key, ttlMs, fetcher, onValue);
       return value;
-    }
-
-    const diskResult: DiskCacheReadResult<T> = this.disk.getWithMetadata<T>(key, ttlMs);
-    const diskValue: T | null = diskResult.value;
-    if (diskValue !== null) {
-      this.memory.put(key, diskValue, ttlMs, diskResult.ageMs);
-      if (onValue) onValue(diskValue, 'disk');
-      this.refreshInBackground(key, ttlMs, fetcher, onValue);
-      return diskValue;
     }
 
     const existing: Promise<Object | string | number | boolean> | undefined = this.inFlight.get(key);
     if (existing) return await existing as T;
-    const request: Promise<T> = Promise.resolve().then((): Promise<T> => fetcher());
+    const diskResult: DiskCacheReadResult<T> = this.disk.getWithMetadata<T>(key, ttlMs);
+    const diskValue: T | null = diskResult.value;
+    if (diskValue !== null) {
+      this.memory.put(key, diskValue, ttlMs, diskResult.ageMs);
+      this.refreshInBackground(key, ttlMs, fetcher, onValue);
+      if (onValue) onValue(diskValue, 'disk');
+      return diskValue;
+    }
+
+    const request: Promise<T> = Promise.resolve().then((): Promise<T> => {
+      // Invalidation can happen before the deferred fetch is dispatched.
+      if (this.inFlight.get(key) !== tracked) throw new Error('cache-invalidated');
+      return fetcher();
+    });
     const tracked: Promise<Object | string | number | boolean> = request.then((value: T): T => {
+      if (this.inFlight.get(key) !== tracked) throw new Error('cache-invalidated');
       this.store(key, value, ttlMs);
       if (onValue) onValue(value, 'network');
       return value;
@@ -89,32 +96,43 @@ export class ApiCache {
     try {
       return await tracked as T;
     } finally {
-      this.inFlight.delete(key);
+      // A replacement read may already own the same key.
+      if (this.inFlight.get(key) === tracked) this.inFlight.delete(key);
     }
   }
 
   remove(key: string): void {
+    this.inFlight.delete(key);
     this.memory.remove(key);
     this.disk.remove(key);
   }
 
   clear(): number {
+    this.inFlight.clear();
     this.memory.clear();
     return this.disk.clear();
   }
+
+  trimMemory(): void { this.memory.clear(); }
 
   private refreshInBackground<T extends Object | string | number | boolean>(key: string, ttlMs: number,
     fetcher: () => Promise<T>, onValue?: (value: T, source: string) => void): void {
     const pending: Promise<Object | string | number | boolean> | undefined = this.inFlight.get(key);
     if (pending) return;
-    const request: Promise<T> = Promise.resolve().then((): Promise<T> => fetcher());
+    const request: Promise<T> = Promise.resolve().then((): Promise<T> => {
+      if (this.inFlight.get(key) !== tracked) throw new Error('cache-invalidated');
+      return fetcher();
+    });
     const tracked: Promise<Object | string | number | boolean> = request.then((value: T): T => {
+      if (this.inFlight.get(key) !== tracked) throw new Error('cache-invalidated');
       this.store(key, value, ttlMs);
       if (onValue) onValue(value, 'network');
       return value;
     });
     this.inFlight.set(key, tracked);
-    tracked.catch((): void => {}).finally((): void => { this.inFlight.delete(key); });
+    tracked.catch((): void => {}).finally((): void => {
+      if (this.inFlight.get(key) === tracked) this.inFlight.delete(key);
+    });
   }
 
   private store<T extends Object | string | number | boolean>(key: string, value: T, ttlMs: number): void {

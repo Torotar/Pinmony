@@ -48,7 +48,7 @@ function harness() {
     tabsController: { changeIndex: index => indices.push(index) },
     pageHistory: { key: url => (url || '').split('#')[0], cancelBack() {} },
     traceAction() {}, logPageLifecycle() {}, syncFloatingTabsMotion() {}, cancelHomeDetailMore() {},
-    detailRequestOwners: new Map(), detailJourney: { close() {} }, detailImageTimer: -1,
+    detailOpeningCoordinator: { pauseShufflePreviews() {} }, detailRequestOwners: new Map(), detailJourney: { close() {} }, detailImageTimer: -1,
     pageTasks: { cancelTimeout() {} }, detailReadNetwork: { invalidate() {} }, dismissPostSnack() {},
     detailNativeAuxiliary: { pause() {}, cancelVisual() {}, apply() {} }, detailDocumentBindingService: { reset() {} }, detailImageStage: { reset() {} },
     restoreRetainedSearch() {}, restoreInbox() {}, restoreProfile() {},

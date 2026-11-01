@@ -4,7 +4,9 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyInboxNativeWrites, PinmonyInboxWriteIdentity, PinmonyInboxWriteMessage } from './PinmonyInboxNativeWrites';
-export const PIN_NATIVE_INBOX_MESSAGES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_INBOX_MESSAGES_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_INBOX_MESSAGES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_INBOX_MESSAGES_ROLLOUT_ENABLED;
 interface RawUser { id: string; username?: string; full_name?: string; image_medium_url?: string; image_large_url?: string; image_small_url?: string; type?: string; pin_thumbnail_urls?: string[]; recent_pin_images?: Record<string,RawImage[]>; }
 interface RawImage { url?: string; width?: number; height?: number; }
 interface RawPin { id?: string; images?: Record<string,RawImage>; }
@@ -20,6 +22,7 @@ interface InboxClientContext { user?: RawUser; }
 interface TypeaheadData { items: RawUser[]; }
 interface NativeContact extends PinmonyInboxItem { userId: string; username: string; }
 export interface PinmonyInboxMessagesNativeReadsPorts {
+  feedback?: (message: string) => void;
   username?: () => string;
   store: () => PinmonyInboxStore;
   session: () => PinmonyBusinessSessionContext;
@@ -86,6 +89,14 @@ export class PinmonyInboxMessagesNativeReads {
       session: (): PinmonyBusinessSessionContext => this.ports.session(),network: (): PinmonyNativeNetwork => this.ports.network(),
       changed: (flow: PinmonyInboxFlowSnapshot): void => {
         this.flow = flow;
+        if(flow.recipientRestricted) {
+          this.ports.feedback?.(flow.sendError || flow.error);
+          this.flowRevision++;this.cancel('flow');this.flowBusy = false;this.writePreparing = false;
+          this.flow = undefined;this.chat = undefined;this.store.flowDismissed = true;
+          this.store.retainedChat = undefined;this.store.chatReturnConversation = '';this.store.chatScrollOffset = 0;
+          this.store.listSection = '';this.store.inboxFlow = undefined;this.apply();
+          return;
+        }
         if(flow.writeUncertain && (flow.writeAction === 'blockUser' || flow.writeAction === 'unblockUser') && flow.writeTarget)this.uncertainBlocks.add(flow.writeTarget);
         if(flow.writeUncertain && flow.writeAction === 'next' && flow.writeTarget)this.uncertainCreations.add(flow.writeTarget);
         this.publish(true);
@@ -134,7 +145,7 @@ export class PinmonyInboxMessagesNativeReads {
     this.store.inboxLoading = !this.listReady && this.listBusy; this.store.inboxError = this.listError; this.store.inboxWebFlow = false; this.store.pendingInboxSection = ''; this.store.restoringInboxSection = '';
     if(this.listReady && !this.listBusy && !this.listError)this.store.inboxCache.put(snapshot,this.store.inboxScrollOffset);
   }
-  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.flow){ if(this.ownsFlow() && !this.flow.directContact && this.flow.error && !this.flow.writeUncertain && !this.flow.sending && !this.flow.messageBusy)await this.action('retry',''); return; } await Promise.all([this.listReady || this.listBusy ? Promise.resolve() : this.readList(false),this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
+  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.flow){ if(this.ownsFlow() && !this.flow.directContact && this.flow.error && !this.flow.recipientRestricted && !this.flow.writeUncertain && !this.flow.sending && !this.flow.messageBusy)await this.action('retry',''); return; } await Promise.all([this.listReady || this.listBusy ? Promise.resolve() : this.readList(false),this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
   async refresh(): Promise<void> { if(this.bind() && !this.flow)await Promise.all([this.listBusy ? Promise.resolve() : this.readList(false),this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
   async refreshContacts(): Promise<void> { if(this.bind() && !this.contactsBusy && !this.flow)await this.readContacts(); }
   async poll(): Promise<void> { if(!this.bind())return; if(this.flow){if(this.ownsFlow() && this.flow.screen === 'chat' && !this.flowBusy && !this.flow.sending && !this.flow.messageBusy && !this.flow.sendError && !this.flow.error && !this.flow.writeUncertain)await this.readMessages(false,true);}else if(this.listReady && !this.listBusy)await this.readList(true); }
@@ -234,7 +245,7 @@ export class PinmonyInboxMessagesNativeReads {
     this.store.inboxFlow = {directContact:flow.directContact,nativeAccountGeneration:this.generation,kind:flow.kind,pageUrl:flow.pageUrl,session:this.store.inboxSession,contextEpoch:flow.contextEpoch,
       writeUncertain:flow.writeUncertain,writeAction:flow.writeAction,writeTarget:flow.writeTarget,nativeToken:flow.nativeToken,nativeRead:flow.nativeRead,screen:flow.screen,title:flow.title,loading:flow.loading,error:flow.error,
       users:flow.users,messages:flow.messages,selectedIds:flow.selectedIds,hasMore:flow.hasMore,conversationId:flow.conversationId,
-      sending:flow.sending,sentRevision:flow.sentRevision,sendError:flow.sendError,messageBusy:flow.messageBusy,
+      sending:flow.sending,sentRevision:flow.sentRevision,sendError:flow.sendError,recipientRestricted:flow.recipientRestricted,messageBusy:flow.messageBusy,
       blocked:flow.blocked,blockedUserId:flow.blockedUserId,blockRevision:flow.blockRevision};
   }
   async open(id: string): Promise<boolean> {
@@ -274,6 +285,7 @@ export class PinmonyInboxMessagesNativeReads {
       return true;
     }
     if(flow.sending || flow.messageBusy || this.writePreparing || this.writes.busy())return true;
+    if(flow.recipientRestricted && ['send','next','retry'].includes(action))return true;
     if(flow.writeUncertain) {
       if(action === 'retry')await this.recoverWrite();
       return true;
@@ -297,7 +309,7 @@ export class PinmonyInboxMessagesNativeReads {
     }
     if(action === 'settings' && flow.screen === 'chat' && !flow.loading){this.chat = flow; const settings: PinmonyInboxFlowSnapshot = this.newFlow('settings'); settings.title = PinmonyI18n.message("pm_message_settings_57326743"); settings.users = flow.users;settings.conversationId = flow.conversationId; settings.blockedUserId = flow.users.find((u: InboxFlowUser): boolean => !u.self)?.id || ''; settings.blocked = this.knownBlocks.get(settings.blockedUserId) === true; settings.blockRevision = 0;
       if(this.uncertainBlocks.has(settings.blockedUserId)){settings.writeUncertain = true;settings.error = PinmonyI18n.message("pm_block_result_not_confirmed_and_status_cannot_be_checked_yet_it_w_1ef0fcac");} settings.loading = false; this.publish(); return true;}
-    if(action === 'select' && flow.screen === 'compose' && !flow.loading){if(flow.users.some((u: InboxFlowUser): boolean => u.id === value && !u.self))flow.selectedIds = flow.selectedIds.includes(value) ? flow.selectedIds.filter((id: string): boolean => id !== value) : flow.selectedIds.concat([value]); this.publish(); return true;}
+    if(action === 'select' && flow.screen === 'compose' && !flow.loading){if(flow.users.some((u: InboxFlowUser): boolean => u.id === value && !u.self)){flow.selectedIds = flow.selectedIds.includes(value) ? flow.selectedIds.filter((id: string): boolean => id !== value) : flow.selectedIds.concat([value]);if(flow.recipientRestricted){flow.recipientRestricted = false;flow.error = '';flow.sendError = '';}} this.publish(); return true;}
     if(action === 'search' && flow.screen === 'compose'){await this.readCompose(value.trim().slice(0,500)); return true;}
     if(action === 'more' && flow.screen === 'chat'){if(flow.hasMore && !this.flowBusy)await this.readMessages(true,false); return true;}
     if(action === 'retry'){if(flow.screen === 'chat')await this.readChat(); else if(flow.screen === 'compose' && flow.directContact)await this.action('next',''); else if(flow.screen === 'compose')await this.readCompose(this.query); return true;}

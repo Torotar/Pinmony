@@ -33,7 +33,7 @@ for (const [discovery, profile, featured] of [[true, false, true], [true, true, 
   assert.equal(options.content.menu.value[0].content.label, '图板选项');
   assert.equal(options.style.originalStyle.contentStyle.backIconStyle.backgroundColor, undefined);
   assert.equal(options.style.originalStyle.contentStyle.menuStyle.backgroundColor, undefined);
-  assert.equal(options.avoidLayoutSafeArea, true); assert.equal(options.enableComponentSafeArea, true);
+  assert.equal(options.avoidLayoutSafeArea, true); assert.equal(options.enableComponentSafeArea, false);
 }
 for (const [profile, featured] of [[true, false], [true, true], [false, false]]) {
   const options = header(false, profile, featured);
@@ -53,8 +53,7 @@ assert.equal(selectionHost.selectedIds[0], '1', 'targets retain selected preview
 selectionHost.creatingTarget = true;selectionHost.targetName = 'New';selectionHost.snapshot.flow.busy = true;selectionHost.snapshotChanged();
 assert.equal(selectionHost.creatingTarget, true, 'submission retains name page');
 assert.equal(selectionHost.titleBarOptions().content.title.mainTitle, '添加图板区块');
-assert(selectionHost.titleBarOptions().content.menu.value[0].content.icon,'add-section title action must supply its checkmark icon');
-assert.equal(selectionHost.titleBarOptions().content.menu.value[0].content.isEnabled, false);
+assert.equal(selectionHost.titleBarOptions().content.menu.value.length, 0, 'target creation retains its existing in-content create action');
 selectionHost.snapshot.nativeAccountGeneration++;selectionHost.snapshotChanged();assert.equal(selectionHost.selectedIds.length, 0);
 const presentation = compile('feature_board/src/main/ets/services/PinmonyBoardPresentation.ets');
 const { PinmonyBoardOperationsController } = compile('feature_board/src/main/ets/controllers/PinmonyBoardOperationsController.ets', () => presentation);

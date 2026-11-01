@@ -1,4 +1,3 @@
-import { isProductPin } from 'common_foundation';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardCoverNativeFlow, PinmonyBoardCoverIdentity } from './PinmonyBoardCoverNativeFlow';
 import { PinmonyBoardSectionNativeWrites, BoardSectionWriteIdentity } from './PinmonyBoardSectionNativeWrites';
@@ -12,7 +11,9 @@ import { PinmonyBoardManagementNativeWrites, PinmonyBoardManagementIdentity } fr
 import { PinmonyBoardPinNativeWrites, PinmonyBoardPinWriteIdentity } from './PinmonyBoardPinNativeWrites';
 import { PinmonyBoardCollaboratorsNativeWrites, PinmonyBoardWriteIdentity } from './PinmonyBoardCollaboratorsNativeWrites';
 
-export const PIN_NATIVE_BOARD_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED;
+// Per-feature manual rollout; the transport safety gate is still mandatory.
+const PIN_NATIVE_BOARD_READS_ROLLOUT_ENABLED: boolean = true;
+export const PIN_NATIVE_BOARD_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_BOARD_READS_ROLLOUT_ENABLED;
 interface PrivacyEditValues { name: string; description: string; privacy: string; recommend: boolean; invites: boolean; requests: boolean; }
 interface PrivacyEditAction { action: string; value: PrivacyEditValues; }
 interface BoardUser { type?: string; id: string; username: string; full_name?: string; pin_count?: number;
@@ -159,7 +160,6 @@ export class PinmonyBoardNativeReads {
   }
   eligible(): boolean { return PIN_NATIVE_BOARD_READS_ENABLED && this.ports.active(); }
   pause(): void {
-    if(!PIN_NATIVE_BOARD_READS_ENABLED)return;
     this.coverFlow?.pause();
     this.followWrites.pause();
     this.sectionWrites.pause();this.contentWrites.pause();this.managementWrites.pause();this.pinWrites.pause();this.collaboratorWrites.pause();
@@ -173,6 +173,7 @@ export class PinmonyBoardNativeReads {
   }
   reset(): void { this.favoriteOnly = false;this.pause();this.cancelledCards.clear();this.cancelledPositions.clear();this.refreshedCancelledIds.clear();this.cancelledDisplayCount = undefined; this.sectionSource = undefined;this.sectionComplete = false;this.page = ''; this.account = ''; this.generation = -1; this.board = undefined; this.viewer = ''; this.verified = false; this.pins = []; this.sections = []; this.ready = false; this.attempted = false; this.error = ''; this.sectionsReady = false; this.sectionsError = ''; this.cursor = ''; this.ended = false; this.targetCursor = ''; this.selectedIds = []; this.sources = []; this.flow = undefined; this.store.collaborators = undefined; }
   private bind(): boolean {
+    if(!PIN_NATIVE_BOARD_READS_ENABLED)return false;
     const s: PinmonyBusinessSessionContext = this.ports.session(), page: string = this.store.boardDetail?.pageKey || '';
     if(!this.eligible() || !s.authenticated || !s.accountId || !page.startsWith(s.origin + '/') ||
       !/^\/[^/?#]+\/[^/?#]+\/$/.test(page.slice(s.origin.length)))return false;
@@ -580,14 +581,13 @@ export class PinmonyBoardNativeReads {
         const pins: PinmonyBoardPin[] = append ? f.pins.slice() : [], sources: BoardSourcePin[] = append ? this.sources.slice() : [];
         let mapped: number = 0;
         rows.forEach((p: BoardPinData): void => {
-          if(!products && isProductPin(p))return;
           let pin: PinmonyBoardPin;try {pin = this.mapPin(p);}catch (_) {return;}mapped++;
           if(!pins.some((old: PinmonyBoardPin): boolean => old.id === pin.id)){
             pins.push(pin);sources.push({id:pin.id,tracking_params:typeof p.tracking_params === 'string' && p.tracking_params.length <= 16384 ? p.tracking_params : undefined,
               title:typeof p.title === 'string' ? p.title.slice(0,1000) : '',description:typeof p.description === 'string' ? p.description.slice(0,10000) : '',link:typeof p.link === 'string' ? p.link.slice(0,8192) : ''});
           }
         });
-        if(rows.some((p: BoardPinData): boolean => p?.type === 'pin' && (products || !isProductPin(p))) && !mapped)throw new Error('unsupported-ideas');
+        if(rows.some((p: BoardPinData): boolean => p?.type === 'pin') && !mapped)throw new Error('unsupported-ideas');
         const next: string = this.next(body);
         f.pins = pins.slice(0,500);this.sources = sources.slice(0,500);f.saved = this.pinWrites.savedIds();
         f.hasMore = !!next && next !== '-end-' && next !== this.ideaCursor && !!rows.length && pins.length < 500;this.ideaCursor = next;
@@ -725,9 +725,12 @@ export class PinmonyBoardNativeReads {
     finally {if(live()){state.loading = false;this.syncAuxiliary();}}
   }
   async collaboratorsAction(action: string, value: string): Promise<boolean> {
-    const s: PinmonyBoardCollaborators | undefined = this.store.collaborators;if(!this.current() || !s || s.busy)return true;
+    const s: PinmonyBoardCollaborators | undefined = this.store.collaborators;if(!s || s.busy)return true;
     if(action === 'close'){this.cancelCollaborators();this.store.collaborators = undefined;this.store.collaboratorsToken++;this.syncAuxiliary();return true;}
-    if(s.uncertain)return true;if(action === 'retry'){await this.readCollaborators();return true;}if(s.loading || s.error)return true;
+    if(s.uncertain)return true;
+    if(action === 'members'){s.phase = 'members';this.syncAuxiliary();return true;}
+    if(!this.current())return true;
+    if(action === 'retry'){await this.readCollaborators();return true;}if(s.loading || s.error)return true;
     if(['members','invite','permissions'].includes(action)){if(action === 'permissions' && !s.owner)return true;s.phase = action;this.syncAuxiliary();return true;}
     if(action === 'send'){if(s.phase !== 'invite' || !s.canInvite || !s.suggestions.some((u: PinmonyBoardCollaborator): boolean => u.id === value && !u.status))return true;}
     else if(action === 'save'){let v: BoardPermissionValue;try {v = JSON.parse(value) as BoardPermissionValue;}catch (_) {return true;}if(s.phase !== 'permissions' || !s.owner || ![0,1].includes(v.permission) || typeof v.invites !== 'boolean')return true;}
