@@ -15,6 +15,17 @@ assert.equal(result.title, 'validated');
 assert.deepEqual(JSON.parse(JSON.stringify(result.actions)), card.actions);
 assert.deepEqual(JSON.parse(JSON.stringify(result.related)), card.related);
 assert.equal(card.shuffleId, undefined, 'cached opening card is not mutated');
+const linkOpening = {...card, imageUrl:'', imageWidth:0, imageHeight:0};
+const cover = {imageUrl:'https://i.pinimg.com/example.jpg',imageWidth:736,imageHeight:1000,
+  originalImageUrl:'https://i.pinimg.com/original.jpg'};
+const linked = merge(linkOpening,cover);
+assert.equal(linked.imageUrl,cover.imageUrl,'link entry acquires validated cover');
+assert.equal(linked.imageWidth,736); assert.equal(linked.imageHeight,1000);
+assert.equal(linked.originalImageUrl,cover.originalImageUrl);
+assert.equal(linkOpening.imageUrl,'','opening cache is not mutated');
+const preview = {...card,imageUrl:'https://i.pinimg.com/preview.jpg',imageWidth:236,imageHeight:320};
+assert.equal(merge(preview,cover).imageUrl,preview.imageUrl,'existing decoded preview stays mounted');
+assert.equal(merge(preview,cover).imageWidth,236);
 const loaded = {...card, shuffleId:'77', shuffle:{id:'77',items:[{id:'22'}]}, shuffleLoading:false};
 assert.deepEqual(JSON.parse(JSON.stringify(merge(loaded,{shuffleId:'77'}).shuffle)), loaded.shuffle, 'same collage retains loaded children');
 assert.equal(merge(loaded,{shuffleId:'88'}).shuffle, undefined, 'different collage identity cannot retain stale children');

@@ -108,7 +108,7 @@ export class PinmonyInboxMessagesNativeReads {
   selected(): boolean { return PIN_NATIVE_INBOX_MESSAGES_ENABLED && (this.section === 'messages' || !this.section && (!this.store.inbox || this.store.inbox.section === 'messages')); }
   eligible(): boolean { const s: PinmonyBusinessSessionContext = this.ports.session(); return this.selected() && s.authenticated && !!s.accountId && this.ports.page().startsWith(s.origin + '/') && /^\/(?:inbox|messages|updates|notifications)\/$/.test(this.ports.page().slice(s.origin.length)); }
   owned(): boolean { const s: PinmonyBusinessSessionContext = this.ports.session(); return this.eligible() && this.ports.active() && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.page() === this.page; }
-  ownsFlow(): boolean { return this.owned() && !!this.flow && !this.store.flowDismissed && this.store.inboxFlow?.nativeToken === this.flow.nativeToken; }
+  ownsFlow(): boolean { return this.owned() && !!this.flow && this.store.inboxFlow?.screen !== 'news' && !this.store.flowDismissed && this.store.inboxFlow?.nativeToken === this.flow.nativeToken; }
   private bind(): boolean {
     if (!this.eligible() || !this.ports.active()) return false;
     const s: PinmonyBusinessSessionContext = this.ports.session();

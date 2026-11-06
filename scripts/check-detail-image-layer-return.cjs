@@ -36,7 +36,17 @@ async function main() {
   const failed = fixture(); const pending = failed.controller.openImageLayer('search'); failed.resolve(false); await pending;
   assert.equal(failed.store.imageLayer, '');
   const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
-  assert.match(page, /\.enabled\(this.acceptsActionIntent\(item\)\)/);
+  assert.match(page, /\.enabled\(this.actionButtonEnabled\(item\)\)/);
+  assert.match(page, /\.onClick\(\(\) => \{\s*if \(!this.acceptsActionIntent\(item\)\) return;/);
+  const enableMethod=page.match(/  private actionButtonEnabled\([\s\S]*?\r?\n  \}/)[0];
+  const actionPage=vm.runInNewContext(ts.transpileModule('class ActionPage {'+enableMethod+'} ActionPage;',
+    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+  const actions=new actionPage();
+  actions.acceptsActionIntent=()=>false;
+  assert.equal(actions.actionButtonEnabled({kind:'like',selected:true}),true,'confirmed like keeps its presentation');
+  assert.equal(actions.actionButtonEnabled({kind:'comment',selected:false}),false,'unavailable actions remain disabled');
+  actions.acceptsActionIntent=()=>true;
+  assert.equal(actions.actionButtonEnabled({kind:'comment',selected:false}),true,'available actions remain enabled');
   assert.match(page, /actionText: this\.uiText\("pm_load_recommendations_08df83f8"\), actionEnabled: this.deferredActions \|\| this.readsReady \|\| this.actionsReady/);
   assert.ok(!page.includes('推荐内容需要重新读取'));
   assert.match(page, /this\.displayedDetail\(\)\.kind === 'cached' && !this\.displayedDetail\(\)\.relatedLoading && this\.displayedDetail\(\)\.relatedError/);

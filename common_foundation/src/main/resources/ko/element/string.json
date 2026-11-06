@@ -1,6 +1,9 @@
 {
   "string": [
-    {"name":"pm_photo_history_save_unconfirmed","value":"검색은 완료되었지만 사진 기록 저장은 확인되지 않았습니다."},
+    {
+      "name": "pm_photo_history_save_unconfirmed",
+      "value": "검색은 완료되었지만 사진 기록 저장은 확인되지 않았습니다."
+    },
     {
       "name": "pm_recommend_boards_description",
       "value": "보드의 맞춤 설정을 끄면 해당 보드를 기반으로 한 홈 피드 탭과 추천이 숨겨집니다. 보드와 핀에는 영향을 주지 않습니다."
@@ -2120,6 +2123,10 @@
     {
       "name": "pm_search_44ce7ae9",
       "value": "검색"
+    },
+    {
+      "name": "pm_search_keywords_or_link",
+      "value": "키워드 또는 링크 검색"
     },
     {
       "name": "pm_profile_7f1d9dd0",
@@ -5801,7 +5808,10 @@
       "name": "pm_photo_history_delete_all_confirm",
       "value": "사진 검색 기록을 모두 삭제할까요? 삭제 요청이 서버로 전송됩니다."
     },
-    { "name": "pm_photo_history_pending_delete", "value": "삭제 예정" },
+    {
+      "name": "pm_photo_history_pending_delete",
+      "value": "삭제 예정"
+    },
     {
       "name": "pm_photo_history_deleted",
       "value": "삭제되었습니다"
@@ -5837,6 +5847,14 @@
     {
       "name": "pm_created_board_choose_pins",
       "value": "새 보드에 핀을 저장하세요"
+    },
+    {
+      "name": "pm_news_explore_home",
+      "value": "홈 피드에서 더 많은 아이디어 찾아보기"
+    },
+    {
+      "name": "pm_news_start",
+      "value": "시작하기"
     }
   ]
 }

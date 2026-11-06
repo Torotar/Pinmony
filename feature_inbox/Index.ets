@@ -17,3 +17,5 @@ export { PinmonyInboxReadController, PinmonyInboxReadPorts } from './src/main/et
 export { PinmonyInboxActionsController, PinmonyInboxActionsPorts } from './src/main/ets/controllers/PinmonyInboxActionsController';
 
 export { PinmonyInboxListPage } from './src/main/ets/components/PinmonyInboxListPage';
+
+export { PinmonyInboxNewsCard } from './src/main/ets/models/PinmonyInboxFlow';

@@ -31,6 +31,9 @@ export interface PinmonySearchPorts {
   navigateSearch: (target: string, source: string) => void;
   navigateFilterAfterClose?: (target: string, source: string) => void;
   navigateResult: (target: string, source: string) => void;
+  openSubmittedPin?: (pinId: string, source: string) => void;
+  resolveSubmittedPin?: (link: string, current: () => boolean) => Promise<string>;
+  cancelSubmittedPin?: () => void;
   cancelNavigation: (clearRetained: boolean) => void;
   clearOpeningDetail: () => void;
   sheetKind: () => string;

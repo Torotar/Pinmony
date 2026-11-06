@@ -8,9 +8,11 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 const PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_PIN_MENUS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED && PIN_POST_API_ENABLED;
 interface Image { url?: string; }
+interface PinmonyMenuCarouselSlot { images?: Record<string,Image>; videos?: Object; }
+interface PinmonyMenuCarousel { carousel_slots?: PinmonyMenuCarouselSlot[]; }
 interface User { id?: string; }
 interface Topic { name?: string; }
-interface Pin { favorited_by_me?: boolean; id: string; pinner?: User; is_repin?: boolean; images?: Record<string,Image>; ai_disclosures?: number[]; gen_ai_topics?: Topic[];
+interface Pin { title?: string; is_video?: boolean; videos?: Object; carousel_data?: PinmonyMenuCarousel; favorited_by_me?: boolean; id: string; pinner?: User; is_repin?: boolean; images?: Record<string,Image>; ai_disclosures?: number[]; gen_ai_topics?: Topic[];
   client_tracking_params?: string; tracking_params?: string; through_id?: string; rec_reason_type?: number; source?: number; }
 interface Resource { status: string; code?: number; endpoint_name?: string; error?: Object; data?: Pin; }
 interface Response { resource_response: Resource; client_context?: Client; }
@@ -74,6 +76,29 @@ export class PinmonyPinMenuNative {
   private async read(revision: number): Promise<void> {await this.request({id:this.id(),field_set_key:'auth_web_main_pin',noCache:true,fetch_visual_search_objects:false,get_page_metadata:false,
     add_fields:'pin.gen_ai_topics,pin.is_eligible_for_image_download,pin.is_eligible_for_ai_comparison,pin.has_hidden_inner_pin'},revision);}
   private image(): string {const images = this.raw?.images, url: string = (images?.['orig'] || images?.['736x'] || images?.['474x'])?.url || '';return url.length <= 2048 && /^https:\/\/i\.pinimg\.com\//.test(url) ? url : '';}
+  shareImageSource(pin: string): string {
+    if (pin !== this.pin || !this.current(this.revision) || !this.raw || this.raw.is_video || this.raw.videos || this.raw.carousel_data) return '';
+    return this.image();
+  }
+  shareLinkOnly(pin: string): boolean {
+    return pin === this.pin && this.current(this.revision) && !!this.raw &&
+      (this.raw.is_video === true || !!this.raw.videos ||
+        this.raw.carousel_data?.carousel_slots?.some((slot: PinmonyMenuCarouselSlot): boolean => !!slot?.videos) === true);
+  }
+  shareImageSources(pin: string): string[] {
+    if (pin !== this.pin || !this.current(this.revision) || !this.raw || this.shareLinkOnly(pin)) return [];
+    if (!this.raw.carousel_data) { const source: string = this.shareImageSource(pin); return source ? [source] : []; }
+    const slots: PinmonyMenuCarouselSlot[] | undefined = this.raw.carousel_data.carousel_slots;
+    if (!Array.isArray(slots) || !slots.length || slots.length > 100) return [];
+    const sources: string[] = [];
+    for (const slot of slots) {
+      const images: Record<string,Image> | undefined = slot?.images;
+      const source: string = (images?.['orig'] || images?.['1200x'] || images?.['736x'] || images?.['474x'])?.url || '';
+      if (source.length > 2048 || !/^https:\/\/i\.pinimg\.com\//.test(source)) return [];
+      sources.push(source);
+    }
+    return sources;
+  }
   private enabled(action: string): boolean {return !this.submitted.has(this.pin + ':' + action);}
   private canOpenEdit(): boolean {return PIN_EDIT_API_ENABLED && /^\d{1,30}$/.test(this.viewer) && this.raw?.pinner?.id === this.viewer;}
   async photoRead(token: number,pin: string): Promise<PinmonyHomeMenuState> {

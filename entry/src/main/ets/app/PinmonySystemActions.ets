@@ -11,8 +11,20 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 
 import { PinmonyImageDownload, PinmonyDownloadedImage, acceptsImageDownloadUrl } from 'common_network';
 
+interface PinmonySharedImageFile {
+  path: string;
+  type: string;
+  bytes: number;
+  createdAt: number;
+}
+
 export class PinmonySystemActions {
   private readonly imageDownload: PinmonyImageDownload = new PinmonyImageDownload();
+  private readonly shareImageDownload: PinmonyImageDownload = new PinmonyImageDownload();
+  private imageShareBusy: boolean = false;
+  private imageShareSequence: number = 0;
+  private readonly sharedImageFiles: Map<string, PinmonySharedImageFile> = new Map<string, PinmonySharedImageFile>();
+  private sharedImageScope: string = '';
   private imageDownloadBusy: boolean = false;private imageDownloadSequence: number = 0;
   private readonly downloadDelegate: webview.WebDownloadDelegate = new webview.WebDownloadDelegate();
   private active: boolean = true;
@@ -30,6 +42,8 @@ export class PinmonySystemActions {
 
   dispose(): void {
     this.active = false; this.generation++;this.imageDownload.cancel();this.imageDownloadBusy = false;
+    this.shareImageDownload.cancel(); this.imageShareBusy = false;
+    this.sharedImageFiles.clear();
     this.selectingDownloads.forEach((item: webview.WebDownloadItem): void => {
       try { this.cancelDownload(item); } catch (_) { PinmonyRuntimeLog.warn('PhotoDownload: cancellation unavailable'); }
     });
@@ -47,6 +61,114 @@ export class PinmonySystemActions {
       previewMode: systemShare.SharePreviewMode.DEFAULT
     });
     } catch (_) { throw new Error(PinmonyI18n.message("pm_unable_to_open_share_panel_43eea06a")); }
+  }
+
+  async shareImage(source: string, title: string, current: () => boolean): Promise<void> {
+    await this.shareImages([source], title, current);
+  }
+
+  async shareImages(sources: string[], title: string, current: () => boolean, scope: string = ''): Promise<void> {
+    if (!this.active || this.imageShareBusy || !current()) return;
+    if (scope !== this.sharedImageScope) {
+      this.sharedImageFiles.clear();
+      this.sharedImageScope = scope;
+    }
+    if (!sources.length || sources.length > 100 || !sources.every((source: string): boolean => acceptsImageDownloadUrl(source)))
+      throw new Error(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+    const generation: number = this.generation;
+    const sequence: number = ++this.imageShareSequence;
+    const live = (): boolean => this.active && generation === this.generation && current();
+    this.imageShareBusy = true;
+    const outputs: string[] = [];
+    const prepared: Map<string, PinmonySharedImageFile> = new Map<string, PinmonySharedImageFile>();
+    let presented: boolean = false;
+    try {
+      let loadingShown: boolean = false;
+      const context: common.UIAbilityContext = this.context();
+      const directory: string = context.cacheDir + '/pinmony-shared-images';
+      if (!await fileIo.access(directory)) await fileIo.mkdir(directory);
+      // Receivers may still read after the panel closes. Keep published files
+      // for a day and prune only our own expired cache entries on the next share.
+      const files: string[] = await fileIo.listFile(directory);
+      for (const name of files) {
+        const match: RegExpMatchArray | null = name.match(/^pin-([0-9]{13})-[0-9]+\.(jpg|png|gif|webp|avif)$/);
+        if (match && Date.now() - Number(match[1]) > 86400000) {
+          try { await fileIo.unlink(directory + '/' + name); } catch (_) {}
+        }
+      }
+      if (!live()) return;
+      let data: systemShare.SharedData | undefined = undefined;
+      let totalBytes: number = 0;
+      for (let index: number = 0; index < sources.length; index++) {
+      const source: string = sources[index];
+      let cached: PinmonySharedImageFile | undefined = prepared.get(source) || this.sharedImageFiles.get(source);
+      if (cached) {
+        let available: boolean = false;
+        try { available = Date.now() - cached.createdAt < 86400000 && await fileIo.access(cached.path); } catch (_) {}
+        if (!live()) return;
+        if (!available) { this.sharedImageFiles.delete(source); cached = undefined; }
+      }
+      let output: string;
+      let type: string;
+      if (cached) {
+        totalBytes += cached.bytes;
+        output = cached.path;
+        type = cached.type;
+        PinmonyRuntimeLog.info('SystemShareTrace: phase=image-cache-hit');
+      } else {
+      if (!loadingShown) {
+        this.showMessage(PinmonyI18n.message('pm_loading_please_wait_b6aaac70'));
+        loadingShown = true;
+      }
+      const result: PinmonyDownloadedImage = await this.shareImageDownload.read(sources[index], live);
+      if (!live()) return;
+      totalBytes += result.data.byteLength;
+      if (totalBytes > 32 * 1024 * 1024) throw new Error('image-share-size');
+      type = utd.getUniformDataTypeByFilenameExtension('.' + result.extension, utd.UniformDataType.IMAGE);
+      if (!type) throw new Error('image-share-type');
+      output = directory + '/pin-' + Date.now().toString() + '-' + (sequence * 100 + index).toString() + '.' + result.extension;
+      outputs.push(output);
+      const file: fileIo.File = await fileIo.open(output, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      try {
+        let offset: number = 0;
+        while (offset < result.data.byteLength) {
+          const written: number = await fileIo.write(file.fd, result.data.slice(offset));
+          if (written <= 0) throw new Error('image-share-write');
+          offset += written;
+        }
+      } finally { await fileIo.close(file); }
+      prepared.set(source, { path: output, type: type, bytes: result.data.byteLength, createdAt: Date.now() });
+      }
+      if (totalBytes > 32 * 1024 * 1024) throw new Error('image-share-size');
+      if (!live()) return;
+      const uri: string = fileUri.getUriFromPath(output);
+      const record: systemShare.SharedRecord = { utd: type, uri: uri, thumbnailUri: uri, title: title.slice(0, 300) };
+      if (data) data.addRecord(record);
+      else data = new systemShare.SharedData(record);
+      }
+      if (!data || !live()) return;
+      const controller: systemShare.ShareController = new systemShare.ShareController(data);
+      await controller.show(context, {
+        selectionMode: sources.length > 1 ? systemShare.SelectionMode.BATCH : systemShare.SelectionMode.SINGLE,
+        previewMode: systemShare.SharePreviewMode.DETAIL
+      });
+      presented = true;
+      if (this.active && generation === this.generation && scope === this.sharedImageScope) {
+        prepared.forEach((cached: PinmonySharedImageFile, source: string): void => {
+          this.sharedImageFiles.delete(source);
+          this.sharedImageFiles.set(source, cached);
+        });
+        // Bound the session index; published files remain available to receivers.
+        const keys: string[] = [];
+        this.sharedImageFiles.forEach((_cached: PinmonySharedImageFile, source: string): void => { keys.push(source); });
+        for (let index: number = 0; index < keys.length - 100; index++) this.sharedImageFiles.delete(keys[index]);
+      }
+    } catch (_) {
+      if (live()) throw new Error(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+    } finally {
+      if (!presented) for (const output of outputs) { try { await fileIo.unlink(output); } catch (_) {} }
+      if (generation === this.generation && sequence === this.imageShareSequence) this.imageShareBusy = false;
+    }
   }
 
   async copyText(value: string): Promise<void> {

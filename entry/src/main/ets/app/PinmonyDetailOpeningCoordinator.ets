@@ -110,6 +110,14 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
                 // The opening card may be cached with no author or text. Refresh
                 // validated content without discarding retained interactions.
                 const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(previous)) as PinmonyDetailSnapshot;
+                // Link entries have no feed thumbnail. Publish the validated
+                // cover before native reads start; retain existing previews.
+                if (!next.imageUrl) {
+                    next.imageUrl = detail.imageUrl;
+                    next.imageWidth = detail.imageWidth;
+                    next.imageHeight = detail.imageHeight;
+                }
+                next.originalImageUrl = detail.originalImageUrl || next.originalImageUrl;
                 next.title = detail.title || next.title;
                 next.description = detail.description || next.description;
                 next.creator = detail.creator || next.creator;

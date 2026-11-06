@@ -1,3 +1,4 @@
+import { PinmonyInboxNewsPage } from './PinmonyInboxNewsPage';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -530,7 +531,10 @@ export struct PinmonyInboxFlowPage {
   }
 
   build() {
-    if (this.snapshot.screen === 'updatesMenu' && this.snapshot.newsUndoing) {
+    if (this.snapshot.screen === 'news') {
+      PinmonyInboxNewsPage({snapshot:this.snapshot,active:this.active,onAction:(action: string,value: string): void => this.act(action,value),
+        onMenu:(url: string): void => {if(this.active)this.onPinAction?.('more',url);},onCoveredBack:this.onCoveredBack})
+    } else if (this.snapshot.screen === 'updatesMenu' && this.snapshot.newsUndoing) {
       Column().width(1).height(1).hitTestBehavior(HitTestMode.Transparent)
       if (this.snapshot.error) { PinmonyActionNotice({ active: this.active, message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
     } else if (this.snapshot.screen === 'updatesMenu') {

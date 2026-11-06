@@ -44,7 +44,7 @@ interface ArrayResponse { resource_response: ArrayResource; }
 interface HintItem { text?: string; }
 interface HintResource { status: string; data: HintItem[]; }
 interface HintResponse { resource_response: HintResource; }
-interface ReadFeed { product?: ProductFilters; snapshot: PinmonySearchSnapshot; cursor: string; filters: PinmonySearchFilterOption[]; targets: Map<string, string>; modules: boolean; filterCursor: string; scroll: number; }
+interface ReadFeed { retryPagination?: boolean; product?: ProductFilters; snapshot: PinmonySearchSnapshot; cursor: string; filters: PinmonySearchFilterOption[]; targets: Map<string, string>; modules: boolean; filterCursor: string; scroll: number; }
 export interface PinmonySearchNativeReadsPorts {
   store: () => PinmonySearchStore;
   session: () => PinmonyBusinessSessionContext;
@@ -210,7 +210,8 @@ export class PinmonySearchNativeReads {
   async demand(): Promise<void> {
     if (!this.bind()) return; this.apply();
     if (!this.hintReady) { this.hintReady = true; this.readHint(); }
-    if (this.query(this.page) && !this.feeds.has(this.page) && !this.busy) await this.read(false);
+    const feed: ReadFeed | undefined = this.feeds.get(this.page);
+    if (this.query(this.page) && !this.busy && (!feed || feed.retryPagination === true && !this.error && !this.store.searchInputFocused && !this.store.searchFilterOpen && this.term === undefined)) await this.read(!!feed);
     this.auxiliary.demand();
   }
   async refresh(): Promise<void> { if (this.bind() && this.query(this.page) && !this.busy && !this.boardFollow.pending() && !this.userFollow.pending()) await this.read(false); }
@@ -275,9 +276,12 @@ export class PinmonySearchNativeReads {
     }
     return '';
   }
+  private promoted(item: Item): boolean {
+    return !!item && item.type === 'pin' && (item.is_promoted === true || !!item.ad_data || !!item.pin_promotion_id);
+  }
   private map(item: Item): PinmonySearchResult | undefined {
     if (!item || !item.id) return undefined;
-    if (item.type === 'pin' && (item.is_promoted === true || item.ad_data || item.pin_promotion_id)) return undefined;
+    if (this.promoted(item)) return undefined;
     let cover: ImageData | undefined = undefined; const sizes: Record<string, ImageData> = item.images || {};
     for (const size of ['474x', '736x', '564x', 'orig', '236x']) { const value: ImageData | undefined = sizes[size]; if (value && this.image(value.url) && Number.isFinite(value.width) && value.width > 0 && Number.isFinite(value.height) && value.height > 0) { cover = value; break; } }
     if (item.type === 'board' || item.type === 'user') {
@@ -288,10 +292,12 @@ export class PinmonySearchNativeReads {
     }
     if (item.type !== 'pin' || !/^\d+$/.test(String(item.id)) || !cover) return undefined;
     const list: Record<string, VideoData> = item.videos?.video_list || {}; const sources: PinmonyVideoSource[] = [];
-    for (const key of ['V_HLSV4', 'V_720P']) { const source: VideoData | undefined = list[key]; const kind: string = key === 'V_HLSV4' ? 'hls' : 'mp4'; if (source && source.url.length <= 2000 && /^https:\/\/(?:[A-Za-z0-9-]+\.)*pinimg\.com\/videos\/[^?#]+(?:\.mp4|\.m3u8)(?:\?[^#]*)?$/.test(source.url) && (kind === 'hls' ? /\.m3u8(?:\?|$)/ : /\.mp4(?:\?|$)/).test(source.url)) sources.push({ url: source.url, kind: kind }); }
+    for (const key of ['V_HLSV4', 'V_720P']) { const source: VideoData | undefined = list[key]; const kind: string = key === 'V_HLSV4' ? 'hls' : 'mp4'; if (source && typeof source.url === 'string' && source.url.length <= 2000 && /^https:\/\/(?:[A-Za-z0-9-]+\.)*pinimg\.com\/videos\/[^?#]+(?:\.mp4|\.m3u8)(?:\?[^#]*)?$/.test(source.url) && (kind === 'hls' ? /\.m3u8(?:\?|$)/ : /\.mp4(?:\?|$)/).test(source.url)) sources.push({ url: source.url, kind: kind }); }
     const info: VideoData | undefined = list.V_HLSV4 || list.V_720P; const video: PinmonyVideo | undefined = sources.length && info ? { pinId: String(item.id), sources: sources, width: info.width || 0, height: info.height || 0, duration: Math.max(0, Math.min(86400000, info.duration || 0)) } : undefined;
     const offer: SearchOffer | undefined = item.rich_summary?.products?.[0]?.offer_summary;
-    return { merchant: item.rich_summary?.site_name?.slice(0, 180), price: typeof offer?.price === 'string' ? offer.price.slice(0, 80) : undefined, standardPrice: typeof offer?.standard_price === 'string' ? offer.standard_price.slice(0, 80) : undefined, id: 'api-pin-' + item.id, kind: 'pin', title: (item.grid_title || item.title || item.description || '').trim().slice(0,180), subtitle: '', targetUrl: /^\d+$/.test(String(item.id)) ? this.origin + '/pin/' + item.id + '/' : '', imageUrl: cover.url, imageWidth: cover.width, imageHeight: cover.height, enabled: /^\d+$/.test(String(item.id)), video: video };
+    const title: string = typeof item.grid_title === 'string' && item.grid_title.trim() ? item.grid_title : typeof item.title === 'string' && item.title.trim() ? item.title : typeof item.description === 'string' ? item.description : '';
+    const merchant: string | undefined = typeof item.rich_summary?.site_name === 'string' ? item.rich_summary.site_name.slice(0, 180) : undefined;
+    return { merchant: merchant, price: typeof offer?.price === 'string' ? offer.price.slice(0, 80) : undefined, standardPrice: typeof offer?.standard_price === 'string' ? offer.standard_price.slice(0, 80) : undefined, id: 'api-pin-' + item.id, kind: 'pin', title: title.trim().slice(0,180), subtitle: '', targetUrl: /^\d+$/.test(String(item.id)) ? this.origin + '/pin/' + item.id + '/' : '', imageUrl: cover.url, imageWidth: cover.width, imageHeight: cover.height, enabled: /^\d+$/.test(String(item.id)), video: video };
   }
   private async request(endpoint: string, data: Object, post: boolean, live: () => boolean, pagination: boolean = false): Promise<PinmonyNetworkReply> {
     const id: string = 'native_search_read_' + (++this.sequence).toString(); this.requests.add(id);
@@ -307,41 +313,79 @@ export class PinmonySearchNativeReads {
     const startedAt: number = Date.now();
     const operation: string = append ? 'pagination' : this.feeds.has(this.page) ? 'refresh' : 'initial';
     const paginationRevision: number = this.paginationRevision;
-    const revision: number = this.revision; const page: string = this.page; const live = (): boolean => revision === this.revision && this.owned() && page === this.page && (!append || paginationRevision === this.paginationRevision);
+    const revision: number = this.revision; const page: string = this.page; const live = (): boolean => revision === this.revision && this.owned() && page === this.page && paginationRevision === this.paginationRevision;
     if (!this.supported(page)) { this.error = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); this.apply(); return; }
     const feed: ReadFeed | undefined = this.feeds.get(page); const cursor: string = append ? feed?.cursor || '' : '';
+    if (feed) feed.retryPagination = false;
     this.busy = true; this.error = ''; this.apply();
     const options: SearchReadOptions = { query: this.query(page), scope: page.slice(this.origin.length).split('?')[0].split('/')[2] || 'pins', appliedProductFilters: '---', domains: null, user: null, seoDrawerEnabled: false, applied_unified_filters: null, auto_correction_disabled: false, filter_genai: false, journey_depth: null, source_id: this.param(page,'source_id'), source_module_id: null, source_url: page.slice(this.origin.length), static_feed: false, selected_one_bar_modules: null, query_pin_sigs: null, page_size: 25, gated: null, price_max: null, price_min: null, query_image_pins: null, request_params: null, top_pin_ids: this.param(page,'top_pin_ids') || null, article: null, corpus: null, filters: null, rs: this.param(page,'rs') || 'typed' };
     const product: PinmonySearchProductRoute = readNativeSearchProductRoute(page)!;
     options.domains = product.domains; options.price_min = product.priceMin; options.price_max = product.priceMax; options.appliedProductFilters = product.applied;
     if (append) options.bookmarks = [cursor];
+    let stage: string = 'request';
     try {
-      const reply: PinmonyNetworkReply = await this.request('BaseSearchResource', { options: options, context: {} as Record<string,string> } as ReadEnvelope, true, live, append);
-      if (!live()) return; if (reply.error || reply.status !== 200 || reply.body.length > 6000000) throw new Error('search-request');
-      const response: ResponseData = JSON.parse(reply.body) as ResponseData;
-      const resource: Resource = response.resource_response;
-      if (resource?.status !== 'success' || !Array.isArray(resource.data?.results) || resource.data.results.length > 500) throw new Error('search-response');
-      const viewer: string = response.client_context?.user?.id || '';
-      this.viewer = /^\d{1,40}$/.test(viewer) ? viewer : '';
-      const incoming: PinmonySearchResult[] = []; resource.data.results.forEach((item: Item): void => { const value: PinmonySearchResult | undefined = this.map(item); if (value && !incoming.some((pin: PinmonySearchResult): boolean => pin.id === value.id)) incoming.push(value); });
+      let resource: Resource | undefined = undefined;
+      let response: ResponseData | undefined = undefined;
+      let reachedEnd: boolean = false;
+      let firstData: SearchData | undefined = undefined;
+      const incoming: PinmonySearchResult[] = [];
+      const visited: Set<string> = new Set<string>();
+      visited.add(cursor);
+      for (let batch: number = 0; batch < 3; batch++) {
+        stage = 'request';
+        const reply: PinmonyNetworkReply = await this.request('BaseSearchResource', { options: options, context: {} as Record<string,string> } as ReadEnvelope, true, live, true);
+        if (!live()) return; if (reply.error || reply.status !== 200 || reply.body.length > 6000000) throw new Error('search-request');
+        stage = 'response';
+        response = JSON.parse(reply.body) as ResponseData;
+        resource = response.resource_response;
+        if (resource?.status !== 'success' || !Array.isArray(resource.data?.results) || resource.data.results.length > 500) throw new Error('search-response');
+        if (!firstData) firstData = resource.data;
+        const viewer: string = response.client_context?.user?.id || '';
+        this.viewer = /^\d{1,40}$/.test(viewer) ? viewer : '';
+        stage = 'mapping';
+        let mappedCount: number = 0;
+        resource.data.results.forEach((item: Item): void => {
+          const value: PinmonySearchResult | undefined = this.map(item);
+          if (!value) return;
+          mappedCount++;
+          if (append && feed?.snapshot.results.some((pin: PinmonySearchResult): boolean => pin.id === value.id)) return;
+          if (!incoming.some((pin: PinmonySearchResult): boolean => pin.id === value.id)) incoming.push(value);
+        });
+        if (resource.data.results.some((item: Item): boolean => !this.promoted(item)) && mappedCount === 0) {
+          PinmonyRuntimeLog.info('SearchNativeTrace: phase=unmapped count=' + resource.data.results.length.toString() + ' pins=' + resource.data.results.filter((item: Item): boolean => item?.type === 'pin').length.toString());
+          throw new Error('unknown-search-items');
+        }
+        const nextCursor: string = typeof resource.bookmark === 'string' && resource.bookmark.length <= 4096 ? resource.bookmark : '';
+        reachedEnd = !resource.data.results.length || !nextCursor || nextCursor === '-end-' || visited.has(nextCursor);
+        if (incoming.length || reachedEnd) break;
+        PinmonyRuntimeLog.info('SearchNativeTrace: phase=filtered-batch batch=' + (batch + 1).toString() + ' count=' + resource.data.results.length.toString());
+        if (batch === 2) break;
+        visited.add(nextCursor);
+        options.bookmarks = [nextCursor];
+      }
+      if (!resource || !response || !live()) return;
       incoming.forEach((row: PinmonySearchResult): void => {
         if (row.userId && typeof row.following === 'boolean') this.userFollow.reconcile(row.userId, row.following);
         if (row.boardId && typeof row.following === 'boolean') this.boardFollow.reconcile(row.boardId, row.following);
       });
-      if (resource.data.results.length && !incoming.length) throw new Error('unknown-search-items');
       const results: PinmonySearchResult[] = append && feed ? feed.snapshot.results.slice() : []; incoming.forEach((item: PinmonySearchResult): void => { if (!results.some((value: PinmonySearchResult): boolean => value.id === item.id)) results.push(item); });
       const categories: PinmonySearchCategory[] = append && feed ? feed.snapshot.categories.slice() : [];
-      if (!append && Array.isArray(resource.data.rankedGuides)) resource.data.rankedGuides.slice(0,40).forEach((guide: Guide): void => { if (!guide?.term?.trim() || guide.term.length > 300 || !guide.display?.trim() || categories.some((c: PinmonySearchCategory): boolean => c.id === 'api-guide-' + guide.term)) return; categories.push({ id: 'api-guide-' + guide.term, label: guide.display.slice(0,100), selected: false, enabled: true, targetUrl: this.origin + '/search/pins/?q=' + encodeURIComponent(guide.term), imageUrl: this.image(guide.image_medium_url), backgroundColor: /^#[0-9a-f]{6}$/i.test(guide.dominant_color || '') ? guide.dominant_color : '' }); });
+      const guides: Guide[] = firstData?.rankedGuides?.length ? firstData.rankedGuides : resource.data.rankedGuides || [];
+      const modules: FilterModule[] | undefined = firstData?.oneBarModules || resource.data.oneBarModules;
+      if (!append && Array.isArray(guides)) guides.slice(0,40).forEach((guide: Guide): void => { if (!guide?.term?.trim() || guide.term.length > 300 || !guide.display?.trim() || categories.some((c: PinmonySearchCategory): boolean => c.id === 'api-guide-' + guide.term)) return; categories.push({ id: 'api-guide-' + guide.term, label: guide.display.slice(0,100), selected: false, enabled: true, targetUrl: this.origin + '/search/pins/?q=' + encodeURIComponent(guide.term), imageUrl: this.image(guide.image_medium_url), backgroundColor: /^#[0-9a-f]{6}$/i.test(guide.dominant_color || '') ? guide.dominant_color : '' }); });
       const next: string = typeof resource.bookmark === 'string' && resource.bookmark.length <= 4096 ? resource.bookmark : '';
-      const snapshot: PinmonySearchSnapshot = { kind: 'state', session: 0, pageKey: page, query: this.query(page), placeholder: this.hint, selectedCategory: '', categories: categories, suggestions: [], heroes: [], ideaSections: [], results: results, api: true, apiActive: true, apiBusy: false, apiError: '', apiEnded: !next || next === '-end-' || next === cursor || !resource.data.results.length };
-      const value: ReadFeed = { product: resource.data.productFilters, snapshot: snapshot, cursor: next, filters: [], targets: new Map<string,string>(), modules: Array.isArray(resource.data.oneBarModules), filterCursor: next && next !== '-end-' ? next : feed?.filterCursor || '', scroll: this.store.searchScrollOffset };
-      this.mapModules(resource.data.oneBarModules || [], value); this.feeds.set(page,value); if (this.feeds.size > 12) { const oldest: string | undefined = this.feeds.keys().next().value; if (oldest && oldest !== page) this.feeds.delete(oldest); }
+      const snapshot: PinmonySearchSnapshot = { kind: 'state', session: 0, pageKey: page, query: this.query(page), placeholder: this.hint, selectedCategory: '', categories: categories, suggestions: [], heroes: [], ideaSections: [], results: results, api: true, apiActive: true, apiBusy: false, apiError: '', apiEnded: reachedEnd, apiContinuationPaused: !reachedEnd && incoming.length === 0 };
+      const value: ReadFeed = { product: firstData?.productFilters || resource.data.productFilters || (append ? feed?.product : undefined), snapshot: snapshot, cursor: next, filters: append && modules === undefined && feed ? feed.filters.slice() : [], targets: append && modules === undefined && feed ? new Map<string,string>(feed.targets) : new Map<string,string>(), modules: Array.isArray(modules) || append && modules === undefined && feed?.modules === true, filterCursor: next && next !== '-end-' ? next : feed?.filterCursor || '', scroll: this.store.searchScrollOffset };
+      this.mapModules(modules || [], value); this.feeds.set(page,value); if (this.feeds.size > 12) { const oldest: string | undefined = this.feeds.keys().next().value; if (oldest && oldest !== page) this.feeds.delete(oldest); }
       this.store.searchResultsResetPending = false; PinmonyRuntimeLog.info('SearchNativeTrace: results committed append=' + append.toString() + ' count=' + results.length.toString());
-    } catch (_) { if (live()) this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_search_results_please_retry_8ba01840") : PinmonyI18n.message("pm_unable_to_load_search_results_please_retry_27aeffd1"); }
+    } catch (error) { if (live()) {
+      if (append && feed) feed.retryPagination = true;
+      const reason: string = error instanceof Error && error.message === 'unknown-search-items' ? 'unsupported-items' : stage === 'mapping' ? 'invalid-fields' : stage;
+      PinmonyRuntimeLog.info('SearchNativeTrace: phase=failed stage=' + stage + ' append=' + append.toString() + ' reason=' + reason); this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_search_results_please_retry_8ba01840") : PinmonyI18n.message("pm_unable_to_load_search_results_please_retry_27aeffd1"); } }
     finally {
       PinmonyRuntimeLog.info('PageDataPerf: page=search operation=' + operation + ' elapsedMs=' +
         (Date.now() - startedAt).toString() + ' outcome=' + (!live() ? 'cancelled' : this.error ? 'error' : 'ready'));
-      if (revision === this.revision && page === this.page && (!append || paginationRevision === this.paginationRevision)) { this.busy = false; if (live()) this.apply(); this.ports.settled(); }
+      if (revision === this.revision && page === this.page && paginationRevision === this.paginationRevision) { this.busy = false; if (live()) this.apply(); this.ports.settled(); }
     }
   }
   async input(term: string, immediate: boolean = false): Promise<void> {

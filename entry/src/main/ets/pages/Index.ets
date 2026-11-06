@@ -1,3 +1,4 @@
+import { PinmonyInboxNewsNativeReads } from '../app/PinmonyInboxNewsNativeReads';
 import { PinmonyLogoutCoordinator, PinmonyLogoutPorts } from '../app/PinmonyLogoutCoordinator';
 import { HdsSnackBar } from '@kit.UIDesignKit';
 import { PinmonySnackBarLifecycle } from 'common_ui';
@@ -43,6 +44,7 @@ import { PinmonyNetworkBridgeCoordinator, PinmonyNetworkBridgeCoordinatorPorts }
 import { PinmonyFailureRecoveryCoordinator, PinmonyFailureRecoveryCoordinatorPorts } from '../app/PinmonyFailureRecoveryCoordinator';
 import { PinmonyBottomBarCoordinator, PinmonyBottomBarCoordinatorPorts } from '../app/PinmonyBottomBarCoordinator';
 import { PinmonyRouteParser } from '../app/PinmonyRouteParser';
+import { PinmonyPinLinkResolver } from 'common_network';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyWebLifecycleCoordinator, PinmonyWebLifecycleCoordinatorPorts } from '../app/PinmonyWebLifecycleCoordinator';
 import { PinmonySearchFilterSheet, PinmonySearchController, PinmonySearchPorts, PinmonySearchStore,
@@ -54,7 +56,7 @@ import { PinmonyMoreSheet, PinmonyShareSheet, PinmonySharePanelsController, Pinm
   PIN_VISUAL_SEARCH_API_SCRIPT, PinmonyPinStore, PinmonyDetailTrace, PinmonyDetailController,
   PinmonyDetailPorts, PinmonyDetailReadCache, PinmonyDetailReadCachePorts, PinmonyDetailImageStage,
   PinmonyDetailImageStagePorts, PinmonyDetailDocumentBinding, PinmonyDetailDocumentBindingPorts,
-  PinmonyPostResult, ShareSheetOption, PinmonyDetailPage, PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin, PinmonyShuffleItem,
+  PinmonyPostResult, ShareSheetOption, PinmonyDetailPage, PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyCarouselItem, PinmonyRelatedPin, PinmonyShuffleItem,
   PIN_DETAIL_API_ENABLED, PIN_POST_API_ENABLED, PIN_POST_EXTENSIONS_ENABLED, PinmonyEditPinSheet,
   PinmonySaveSheet, PinmonyCommentsSheet, PinmonyDetailEntryPhoto } from 'feature_pin';
 
@@ -73,7 +75,7 @@ import { PinmonyInboxReadController, PinmonyInboxReadPorts, PinmonyInboxActionsC
   PinmonyInboxActionsPorts, PinmonyInboxStore, PinmonyBoardInvitationController,
   PinmonyBoardInvitationPorts, PinmonyBoardInvitation, PinmonyBoardInvitationList,
   PIN_BOARD_INVITATION_SCRIPT, PinmonyInboxSnapshot, PIN_INBOX_CONVERSATIONS_API_ENABLED,
-  PinmonyInboxFlowSnapshot, PinmonyInboxFlowPage, PinmonyInboxListPage } from 'feature_inbox';
+  PinmonyInboxNewsCard, PinmonyInboxFlowSnapshot, PinmonyInboxFlowPage, PinmonyInboxListPage } from 'feature_inbox';
 import { PinmonyControllerLifecycle } from '../app/PinmonyControllerLifecycle';
 import { PinmonyPagePerformance, ApiCache, CACHE_TTL, hashCacheString, PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyProfileActionsController, PinmonyProfileActionsPorts, PinmonyProfileReadController,
@@ -142,7 +144,7 @@ const PINTEREST_URL: string = 'https://www.pinterest.com/';
 // Secondary page insertion/removal only; root tabs and data refreshes do not animate.
 const NATIVE_PAGE_TRANSITION: TransitionEffect = TransitionEffect.asymmetric(
   TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
-  TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })
+  TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut })
 );
 const DETAIL_PROFILE_TRANSITION: TransitionEffect = TransitionEffect.asymmetric(
   TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
@@ -150,7 +152,7 @@ const DETAIL_PROFILE_TRANSITION: TransitionEffect = TransitionEffect.asymmetric(
 );
 const BOARD_PAGE_TRANSITION: TransitionEffect = TransitionEffect.asymmetric(
   TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseOut }),
-  TransitionEffect.translate({ x: '100%' }).animation({ duration: 120, curve: Curve.EaseIn })
+  TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseOut })
 );
 
 interface PinmonySaveIdentity { id: string; }
@@ -188,6 +190,7 @@ struct Index {
   // Native presentation and routing are product invariants, independent of request rollout gates.
   private readonly nativeBusinessRoutesEnabled: boolean = true;
   private readonly nativeNetwork: PinmonyNativeNetwork = new PinmonyNativeNetwork();
+  private readonly submittedPinResolver: PinmonyPinLinkResolver = new PinmonyPinLinkResolver();
   private readonly photoSearchFlow: PinmonyPhotoSearchFlow = new PinmonyPhotoSearchFlow({
     jpeg: (bytes: ArrayBuffer) => this.systemActions.jpegFromBytes(bytes),
     session: () => this.nativeBusinessSessionContext(), network: () => this.nativeNetwork,
@@ -691,8 +694,8 @@ struct Index {
     notificationsScript: (): string => useNativeTransport(PIN_NOTIFICATIONS_READ_SCRIPT), jsonText: (raw: string): string => this.webJsonText(raw)
   } as PinmonySettingsPorts);
   private readonly inboxActionsController: PinmonyInboxActionsController = new PinmonyInboxActionsController(this.inboxStore, {
-    nativeOpen: (id: string): Promise<boolean> => PIN_NATIVE_INBOX_UPDATES_ENABLED && id.startsWith('news-menu:') ? this.inboxMenuNative.open(id) : this.inboxMessagesNativeReads.open(id),
-    nativeAction: (action: string,value: string): Promise<boolean> => PIN_NATIVE_INBOX_UPDATES_ENABLED && this.inboxStore.inboxFlow?.screen === 'updatesMenu' ? this.inboxMenuNative.action(action) : this.inboxMessagesNativeReads.action(action,value),
+    nativeOpen: (id: string): Promise<boolean> => id.startsWith('inbox-news-api-') ? this.inboxNewsNativeReads.open(id) : PIN_NATIVE_INBOX_UPDATES_ENABLED && id.startsWith('news-menu:') ? this.inboxMenuNative.open(id) : this.inboxMessagesNativeReads.open(id),
+    nativeAction: (action: string,value: string): Promise<boolean> => this.inboxStore.inboxFlow?.screen === 'news' ? this.inboxNewsNativeReads.action(action,value) : PIN_NATIVE_INBOX_UPDATES_ENABLED && this.inboxStore.inboxFlow?.screen === 'updatesMenu' ? this.inboxMenuNative.action(action) : this.inboxMessagesNativeReads.action(action,value),
     nativeWrites: (): boolean => this.inboxMessagesNativeReads.ownsFlow(),
     allowed: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 2,
     epoch: (): number => this.authEpoch, document: (): string => this.sessionDocumentUrl(), currentInbox: (): string => this.currentInboxUrl(),
@@ -1086,7 +1089,7 @@ struct Index {
     rejectOfflineAction: (action: string, message?: string): boolean => this.rejectOfflineAction(action, message),
     retainedBoardContent: (): PinmonyBoardDetail | undefined => this.retainedBoardContent,
     setRetainedBoardContent: (value: PinmonyBoardDetail | undefined): PinmonyBoardDetail | undefined => { this.retainedBoardContent = value; return value; },
-    shareBoardPinAfterMenu: (pin: string, page: string): Promise<void> => this.shareDetailPinAfterMenu(pin, page, false, true),
+    shareBoardPinAfterMenu: (pin: string, page: string): Promise<void> => this.shareDetailPinAfterMenu(pin, page, false, false),
     sharePinUrl: (url: string, title?: string): Promise<void> => this.sharePinUrl(url, title),
     showMessage: (message: string): void => this.showMessage(message),
     showNativeSheet: (): boolean => this.showNativeSheet,
@@ -1323,6 +1326,7 @@ struct Index {
       }, [
         { name: 'profile-search', pause: (): void => this.profileSearchReads.pause(),
           resume: (): void => this.profileSearchReads.resume(), reset: (): void => this.profileSearchReads.close() },
+        { name: 'inbox-news', pause: (): void => this.inboxNewsNativeReads.pause(), reset: (): void => {this.inboxNewsNativeReads.reset();this.inboxNewsSearchParent = undefined;this.inboxNewsSearchTarget = '';this.inboxNewsSearchReturnPage = '';this.inboxNewsSearchReturnSnapshot = undefined;this.inboxNewsSearchReturnScroll = 0;this.inboxNewsSearchReturnGeneration = -1;} },
         { name: 'inbox-menu', pause: (): void => this.inboxMenuNative.pause(),
           reset: (): void => this.inboxMenuNative.pause() },
         { name: 'board-invitation-native', pause: (): void => this.boardInvitationNative.pause(),
@@ -1435,6 +1439,40 @@ struct Index {
     page: (): string => this.nativeDisplayAddress().split('#')[0],active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && !this.pinStore.detail && !this.pinStore.detailOpeningPin && (this.activeTab === 2 || !!this.boardStore.boardDetail),
     username: (): string => this.authenticatedProfileUrl.split('/')[3] || '',avatar: (): string => this.profileStore.profile?.avatarUrl || '',feedback: (message: string): void => this.showMessage(message)
   } as PinmonyBoardInvitationNativePorts);
+  @State private inboxNewsSearchParent: PinmonyInboxFlowSnapshot | undefined = undefined;
+  private inboxNewsSearchTarget: string = '';
+  private inboxNewsSearchReturnPage: string = '';
+  private inboxNewsSearchReturnSnapshot: PinmonySearchSnapshot | undefined = undefined;
+  private inboxNewsSearchReturnScroll: number = 0;
+  private inboxNewsSearchReturnGeneration: number = -1;
+  private readonly inboxNewsNativeReads: PinmonyInboxNewsNativeReads = new PinmonyInboxNewsNativeReads({
+    store: (): PinmonyInboxStore => this.inboxStore,
+    session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
+    page: (): string => this.currentInboxUrl(),
+    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 2 && !this.activeSheetKind && !this.nativeBoardVisible() && !this.pinStore.detail && !this.pinStore.detailOpeningPin,
+    network: (): PinmonyNativeNetwork => this.nativeNetwork,
+    item: (id: string) => this.inboxUpdatesNativeReads.detailItem(id),
+    pin: (card: PinmonyInboxNewsCard): void => {
+      if(!this.isCurrentInboxMessagePin(card.target) || this.rejectOfflineAction('news pin'))return;
+      this.capturePinEntryPhoto(card.target,card.image,'pinmony-news-photo-' + card.id,card.imageWidth,card.imageHeight);
+      if (!this.homeEntryPhoto) this.homeEntryPhoto = {pinUrl:card.target,imageUrl:card.image,x:0,y:0,width:1,height:1,imageWidth:card.imageWidth,imageHeight:card.imageHeight,returnPageOnly:true};
+      this.inboxStore.retainedChat = this.inboxStore.inboxFlow;
+      this.beginDetailOpening(card.target,this.currentInboxUrl());
+    },
+    search: async (term: string): Promise<void> => {
+      const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+      this.inboxNewsSearchReturnGeneration = session.generation;
+      this.inboxNewsSearchReturnPage = this.searchStore.search?.pageKey || this.rootTabAddresses.get(1) || session.origin + '/search/';
+      if (this.searchStore.search) this.searchStore.searchCache.put(this.searchStore.search, this.searchStore.searchScrollOffset);
+      this.inboxNewsSearchReturnSnapshot = this.searchStore.searchCache.get(this.inboxNewsSearchReturnPage)?.snapshot;
+      this.inboxNewsSearchReturnScroll = this.searchStore.searchCache.get(this.inboxNewsSearchReturnPage)?.scrollOffset || 0;
+      this.inboxNewsSearchParent = this.inboxStore.inboxFlow;this.inboxStore.inboxFlow = undefined;
+      const target: string = this.nativeBusinessSessionContext().origin + '/search/pins/?q=' + encodeURIComponent(term);
+      this.selectNativeRootTab(1);this.inboxNewsSearchTarget = target;
+      if(!this.searchNativeReads.navigate(target)){this.inboxNewsSearchTarget = this.currentSearchPageKey();this.restoreInboxNewsSearchParent();}
+    },
+    home: async (): Promise<void> => {this.inboxNewsSearchParent = undefined;this.inboxNewsSearchTarget = '';this.selectNativeRootTab(0);await this.homeNativeReads.refresh();}
+  });
   private readonly inboxUpdatesNativeReads: PinmonyInboxUpdatesNativeReads = new PinmonyInboxUpdatesNativeReads({
     store: (): PinmonyInboxStore => this.inboxStore,
     session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
@@ -1963,6 +2001,25 @@ struct Index {
       if (this.searchNativeReads.eligible() && (!this.searchStore.search?.quiz || this.searchStore.search.quiz.mode === 'entry')) { this.searchNativeReads.navigate(target); return; }
       this.prepareSearchNavigation(target);
       this.loadSessionDocument(target);
+    },
+    openSubmittedPin: (pinId: string, source: string): void => {
+      if (!PIN_NATIVE_DETAIL_READS_ENABLED || this.authStatus !== 'authenticated' ||
+          this.businessSuspended || this.activeTab !== 1 || this.activeSheetKind ||
+          this.currentSearchPageKey() !== source || !/^[0-9]{1,30}$/.test(pinId)) return;
+      const target: string = this.nativeBusinessSessionContext().origin + '/pin/' + pinId + '/';
+      this.pageHistory.visit(source, 'load');
+      this.beginDetailOpening(target, source);
+    },
+    cancelSubmittedPin: (): void => this.submittedPinResolver.cancel(),
+    resolveSubmittedPin: (link: string, current: () => boolean): Promise<string> => {
+      const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+      const epoch: number = this.authEpoch;
+      return this.submittedPinResolver.resolve(link, (): boolean => {
+        const now: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+        return current() && session.authenticated && now.authenticated &&
+          session.accountId === now.accountId && session.generation === now.generation &&
+          epoch === this.authEpoch && !this.businessSuspended && this.nativeSearchPageVisible();
+      });
     },
     navigateResult: (target: string, source: string): void => {
       if(PIN_NATIVE_SEARCH_READS_ENABLED){this.openNativeSearchResult(target,source);return;}
@@ -2584,7 +2641,7 @@ struct Index {
 
   private isCurrentMorePin(pin: string): boolean {
     const identity: string = this.pinIdentity(pin);
-    return !!identity && (identity === this.pinIdentity(this.currentPinUrl()) ||
+    return !!identity && (this.inboxStore.inboxFlow?.screen === 'news' && this.isCurrentInboxMessagePin(pin) && identity === this.pinIdentity(this.homeStore.homeMenuPin) || identity === this.pinIdentity(this.currentPinUrl()) ||
       this.inboxStore.inboxFlow?.screen === 'chat' && this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() &&
       identity === this.pinIdentity(this.homeStore.homeMenuPin) &&
       this.inboxStore.inboxFlow.messages.some((message): boolean => this.pinIdentity(message.pinUrl || '') === identity) ||
@@ -2883,7 +2940,7 @@ struct Index {
     if (this.profileStore.searchVisible) return false;
     if (this.publishPageVisible()) return false;
     if (this.profileStore.origins.length > 0 || this.profileSettingsVisible || this.profileStore.panel) return false;
-    if (this.inboxStore.inboxFlow || this.inboxStore.listSection) return false;
+    if (this.inboxStore.inboxFlow || this.inboxStore.listSection || this.inboxNewsSearchParent) return false;
     if (this.searchStore.search && this.nativeSearchPageVisible() && this.searchStore.search.quiz && this.searchStore.search.quiz.mode !== 'entry') return false;
     if (this.profileStore.profile && this.profileStore.profile.organize) return false;
     if (this.boardStore.pendingBoardUrl) return false;
@@ -2941,12 +2998,72 @@ struct Index {
     return this.searchController.restoreRetainedSearch(pageKey);
   }
 
+  private inboxNewsPresentation(): PinmonyInboxFlowSnapshot | undefined {
+    const flow: PinmonyInboxFlowSnapshot | undefined = this.inboxStore.inboxFlow;
+    return flow?.screen === 'news' ? flow : this.inboxNewsSearchParent ||
+      (this.inboxStore.retainedChat?.screen === 'news' ? this.inboxStore.retainedChat : undefined);
+  }
+
+  private inboxNewsInteractive(): boolean {
+    return this.activeTab === 2 && this.authStatus === 'authenticated' && !this.businessSuspended &&
+      this.inboxStore.inboxFlow?.screen === 'news' && !this.inboxNewsSearchParent &&
+      !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() &&
+      !this.profileStore.origins.length && !this.activeSheetKind;
+  }
+
+  private async dispatchInboxNewsAction(action: string, value: string): Promise<void> {
+    const accepted: boolean = this.inboxNewsInteractive();
+    if (action !== 'newsScroll') PinmonyRuntimeLog.info('InboxNewsTrace: phase=host-action action=' + action + ' accepted=' + accepted.toString());
+    if (accepted) await this.inboxNewsNativeReads.action(action, value);
+  }
+
+  private inboxNewsPinSlide(): boolean {
+    return this.inboxStore.retainedChat?.screen === 'news' && (!this.homeEntryPhoto || this.homeEntryPhoto.width <= 1 || this.homeEntryPhoto.height <= 1);
+  }
+
+  private restoreInboxNewsSearchRoot(): void {
+    const target: string = this.inboxNewsSearchReturnPage;
+    if (!target) return;
+    this.inboxNewsSearchReturnPage = '';
+    const validSession: boolean = this.authStatus === 'authenticated' && this.inboxNewsSearchReturnGeneration === this.nativeBusinessSessionContext().generation;
+    this.inboxNewsSearchReturnGeneration = -1;
+    if (!validSession) {this.inboxNewsSearchReturnSnapshot = undefined;this.inboxNewsSearchReturnScroll = 0;return;}
+    if (this.inboxNewsSearchReturnSnapshot?.pageKey === target) this.searchStore.searchCache.put(this.inboxNewsSearchReturnSnapshot, this.inboxNewsSearchReturnScroll);
+    this.inboxNewsSearchReturnSnapshot = undefined;this.inboxNewsSearchReturnScroll = 0;
+    this.searchNativeReads.pause();this.searchDiscoveryNativeReads.pause();
+    this.searchController.invalidatePending();
+    this.rootTabAddresses.set(1, target);
+    this.searchStore.search = undefined;this.searchStore.retainedSearch = undefined;
+    this.searchStore.searchInputFocused = false;this.searchStore.searchInputStopEditing = undefined;
+    this.searchStore.searchQueryClearPage = '';this.searchStore.searchQuizReturnPage = '';
+    this.searchStore.searchNativeReadsReady = false;this.searchStore.searchNativeInputReady = false;
+    this.searchStore.searchDiscoveryReadsReady = false;
+    this.searchStore.searchScrollOffset = 0;this.searchStore.searchReturnPageKey = target;
+    this.searchStore.searchError = '';this.searchStore.searchLoading = false;
+    if (!this.restoreRetainedSearch(target)) {
+      this.searchStore.search = { kind: 'loading', session: 0, pageKey: target, query: '', placeholder: '',
+        selectedCategory: '', categories: [], suggestions: [], heroes: [], ideaSections: [], results: [] };
+      this.searchStore.searchLoading = true;
+    }
+    PinmonyRuntimeLog.info('SearchReturn: source=inbox-news root-restored=true');
+  }
+
+  private restoreInboxNewsSearchParent(): boolean {
+    const parent: PinmonyInboxFlowSnapshot | undefined = this.inboxNewsSearchParent;
+    if(!parent || this.activeTab !== 1 || this.currentSearchPageKey() !== this.inboxNewsSearchTarget || this.searchStore.searchInputFocused)return false;
+    this.inboxNewsSearchParent = undefined;this.inboxNewsSearchTarget = '';
+    if(parent.nativeAccountGeneration !== this.nativeBusinessSessionContext().generation || this.authStatus !== 'authenticated')return false;
+    this.searchNativeReads.pause();this.searchDiscoveryNativeReads.pause();
+    this.selectNativeRootTab(2);this.inboxStore.inboxFlow = parent;return true;
+  }
+
   private backFromSearch(): void {
     if (this.pinStore.detail || this.currentPinUrl()) {
       this.backFromDetail();
       return;
     }
     if (!this.currentSearchPageKey()) return;
+    if(this.restoreInboxNewsSearchParent())return;
     if (!this.searchStore.searchInputFocused && this.searchController.restoreCategorySearchParent()) return;
     if (!this.searchStore.searchInputFocused && this.restoreTopicSearchParent()) return;
     if (/[?&]q=[^&#]+/.test(this.currentSearchPageKey()) && !this.searchStore.searchInputFocused &&
@@ -3255,7 +3372,7 @@ struct Index {
     this.traceAction('inbox.section', section); await this.inboxReadController.selectSection(section);
   }
   private async performInboxAction(id: string): Promise<void> {
-    this.traceAction('inbox.action', id); await this.inboxActionsController.open(id);
+    this.traceAction('inbox.action', id); if(id.startsWith('inbox-news-api-')) {await this.inboxNewsNativeReads.open(id);return;} await this.inboxActionsController.open(id);
   }
   private async inboxFlowAction(action: string, value: string = ''): Promise<void> {
     const flow: PinmonyInboxFlowSnapshot | undefined = this.inboxStore.inboxFlow;
@@ -3345,7 +3462,7 @@ struct Index {
   }
 
   private selectNativeRootTab(index: number): void {
-    if (index !== 1) this.topicSearchReturns = [];
+    if (index !== 1) {this.restoreInboxNewsSearchRoot();this.topicSearchReturns = [];this.inboxNewsSearchParent = undefined;this.inboxNewsSearchTarget = '';}
     return this.navigationCoordinator.selectNativeRootTab(index);
   }
 
@@ -4044,6 +4161,7 @@ struct Index {
   private cancelHomeDetailMore(): void { return this.photoMenuCoordinator.cancelHomeDetailMore(); }
 
   private isCurrentInboxMessagePin(url: string): boolean {
+    if(this.inboxStore.inboxFlow?.screen === 'news')return this.inboxStore.inboxFlow.nativeAccountGeneration === this.nativeBusinessSessionContext().generation && this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() && !!this.inboxStore.inboxFlow.newsCards?.some((card: PinmonyInboxNewsCard): boolean => card.kind === 'pin' && card.target === url);
     return this.inboxStore.inboxFlow?.screen === 'chat' && this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() &&
       this.inboxStore.inboxFlow.messages.some((message): boolean => message.pinUrl === url);
   }
@@ -4280,7 +4398,7 @@ struct Index {
     this.presentNativeBackTarget(target);this.nativeBackTarget = '';this.navigationAddress = target;this.nativeRootOnly = true;this.detailReturnedToRoot = true;
     this.activeTab = root;this.tabsController.changeIndex(root);this.rootTabAddresses.set(root,target);this.pendingWebTab = -1;this.retainedRootTabPending = -1;
     this.boardStore.boardDetail = undefined;this.boardStore.pendingBoardUrl = '';this.boardStore.pendingBoardSource = '';this.boardStore.boardReturnUrl = '';this.boardStore.boardReturnPage = '';
-    if(root === 2 && retained){this.clearRootTabGuard('chat-return');this.inboxStore.inboxFlow = retained;this.inboxStore.retainedChat = undefined;this.inboxStore.flowDismissed = false;this.nativeRootOnly = false;this.nativeBackTarget = target;this.inboxMessagesNativeReads.demand();}
+    if(root === 2 && retained){this.clearRootTabGuard('chat-return');this.inboxStore.inboxFlow = retained;this.inboxStore.retainedChat = undefined;this.inboxStore.flowDismissed = false;this.nativeRootOnly = false;this.nativeBackTarget = target;if(retained.screen !== 'news')this.inboxMessagesNativeReads.demand();}
     this.syncFloatingTabsMotion();return true;
   }
 
@@ -4346,7 +4464,7 @@ struct Index {
       this.shuffleReturnParent = this.shuffleParentDetail.pinUrl;
       this.shuffleReturnItem = this.shuffleSiblingItems[this.shuffleSelectedIndex]?.id || '';
     }
-    if (this.homeEntryPhoto && !this.homeEntryBackCommitted && this.homeEntryPhoto.pinUrl === this.pinStore.detail?.pinUrl && !this.pinStore.imageLayer) {
+    if (this.homeEntryPhoto && !this.inboxNewsPinSlide() && !this.homeEntryBackCommitted && this.homeEntryPhoto.pinUrl === this.pinStore.detail?.pinUrl && !this.pinStore.imageLayer) {
       if (this.homeEntryClosing) return;
       if (this.homeEntryCardId.startsWith('pinmony-photo-result-')) { this.homeEntryClosing = true; return; }
       if (this.homeEntryCardId.startsWith('pinmony-search-photo-') && !this.searchEntryReturnPreparing) {
@@ -6460,9 +6578,26 @@ struct Index {
   private async shareDetailPinAfterMenu(pin: string, boardPage: string = '', sharePanel: boolean = false,
     contacts: boolean = false): Promise<void> {
     if (this.detailSystemShareClosed || !this.showNativeSheet || this.activeSheetKind !== (boardPage || sharePanel ? 'share' : 'more')) return;
-    const generation: number = this.nativeBusinessSessionContext().generation;
+    const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+    const generation: number = session.generation;
+    const accountId: string = session.accountId;
+    const epoch: number = this.authEpoch;
     const sourceRoute: string = this.nativeDisplayAddress();
     const menuToken: number = this.homeStore.customHomeMenuToken;
+    const rootPinShare: boolean = sharePanel && this.pinStore.sharePin === pin && !this.currentPinUrl();
+    const photo: PinmonyDetailSnapshot | undefined = !rootPinShare && !boardPage &&
+      this.pinStore.detail?.pinUrl === pin ? this.pinStore.detail : undefined;
+    const linkOnly: boolean = photo ? !!photo.isVideo || !!photo.video || photo.mediaKind === 'video' ||
+      photo.carousel?.items.some((item: PinmonyCarouselItem): boolean => !!item.video) === true : this.pinMenuNative.shareLinkOnly(pin);
+    const photoSources: string[] = !contacts && !photo ? this.pinMenuNative.shareImageSources(pin) : [];
+    if (photo && !linkOnly && !photo.mediaLoading) {
+      if (photo.carousel?.items.length) {
+        for (const item of photo.carousel.items) photoSources.push(item.imageUrl);
+      } else if (photo.mediaKind !== 'carousel' && !photo.carousel) {
+        const source: string = photo.originalImageUrl || photo.imageUrl;
+        if (source) photoSources.push(source);
+      }
+    }
     PinmonyRuntimeLog.info('SystemShareTrace: phase=menu-closing');
     const closed: boolean = await new Promise<boolean>((resolve) => {
       let timer: number = -1;
@@ -6487,8 +6622,10 @@ struct Index {
     });
     PinmonyRuntimeLog.info('SystemShareTrace: phase=frame-ready');
     if (closed && this.authStatus === 'authenticated' && !this.businessSuspended &&
+        this.authEpoch === epoch && this.nativeBusinessSessionContext().accountId === accountId &&
         this.nativeBusinessSessionContext().generation === generation &&
-        (boardPage ? this.nativeDisplayAddress() === sourceRoute && this.homeStore.customHomeMenuToken === menuToken + 1 : this.currentPinUrl() === pin) &&
+        (boardPage ? this.nativeDisplayAddress() === sourceRoute && this.homeStore.customHomeMenuToken === menuToken + 1 :
+          rootPinShare ? this.nativeDisplayAddress() === sourceRoute && !this.currentPinUrl() : this.currentPinUrl() === pin) &&
         !this.showNativeSheet && !this.activeSheetKind) {
       if (contacts) {
         this.homeStore.homeMenuPin = pin;
@@ -6499,7 +6636,18 @@ struct Index {
           return;
         }
         await this.shareNativeFlow.open('pin', pin, this.pinIdentity(pin));
-      } else await this.sharePinUrl(pin);
+      } else if (photoSources.length) {
+        try {
+          await this.systemActions.shareImages(photoSources, photo?.title || 'Pinterest Pin', (): boolean =>
+            this.authStatus === 'authenticated' && !this.businessSuspended && this.authEpoch === epoch &&
+            this.nativeBusinessSessionContext().accountId === accountId &&
+            this.nativeBusinessSessionContext().generation === generation &&
+            (boardPage ? this.nativeDisplayAddress() === sourceRoute && this.homeStore.customHomeMenuToken === menuToken + 1 :
+              rootPinShare ? this.nativeDisplayAddress() === sourceRoute && !this.currentPinUrl() : this.currentPinUrl() === pin) &&
+            !this.showNativeSheet && !this.activeSheetKind, epoch.toString() + ':' + generation.toString());
+        } catch (_) { this.showMessage(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc')); }
+      } else if (linkOnly) await this.sharePinUrl(pin);
+      else this.showMessage(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
     }
   }
 
@@ -6585,6 +6733,8 @@ struct Index {
   private rootExitBackAt: number = 0;
   private rootExitBackHandled: boolean = false;
   onBackPress(): boolean {
+    if (this.searchController.cancelSubmittedPin()) return true;
+    if(!this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.activeSheetKind && !this.profileStore.panel && !this.nativeBoardVisible() && this.restoreInboxNewsSearchParent())return true;
     PinmonyRuntimeLog.info('PinmonyReturn: host back profileChat=' + this.profileChatActive.toString() +
       ' flow=' + (this.inboxStore.inboxFlow?.screen || 'none') + ' profileDepth=' + this.profileStore.origins.length.toString() +
       ' detail=' + (!!this.pinStore.detail).toString());
@@ -6966,7 +7116,7 @@ struct Index {
       TabContent() {
         Stack() {
           this.buildRootStatus(1)
-          this.buildSearchRootContent()
+          if (!this.inboxNewsSearchParent) { this.buildSearchRootContent() }
           this.buildRootError(1)
         }
         .width('100%').height('100%')
@@ -7085,8 +7235,7 @@ struct Index {
                 TransitionEffect.IDENTITY, TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })) : NATIVE_PAGE_TRANSITION)
           }
 
-          if (this.activeTab === 2 && this.inboxStore.listSection && this.inboxStore.inbox &&
-              !this.pinStore.detail && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
+          if (this.activeTab === 2 && this.inboxStore.listSection && this.inboxStore.inbox) {
             PinmonyInboxListPage({ snapshot: this.inboxStore.inbox,
               section: this.inboxStore.listSection,
               onSearchBackChange: (handler: (() => boolean) | undefined) => { this.inboxStore.listSearchBack = handler; },
@@ -7097,10 +7246,30 @@ struct Index {
               onAction: (id: string) => this.performInboxAction(id),
               onRetry: () => this.retryInbox(), onContactsRetry: () => this.retryInboxContacts() })
               .width('100%').height('100%')
-              .hitTestBehavior(this.inboxStore.inboxFlow ? HitTestMode.None : HitTestMode.Default)
+              .hitTestBehavior(this.inboxStore.inboxFlow || this.pinStore.detail || this.pinStore.detailOpeningPin || this.nativeBoardVisible() || this.profileStore.origins.length ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.inboxStore.inboxFlow || this.pinStore.detail || this.pinStore.detailOpeningPin || this.nativeBoardVisible() || this.profileStore.origins.length ? 'no-hide-descendants' : 'auto')
               .transition(NATIVE_PAGE_TRANSITION)
           }
-          if (this.inboxStore.inboxFlow &&
+          if (this.inboxNewsPresentation()) {
+            PinmonyInboxFlowPage({ snapshot: this.inboxNewsPresentation()!, active: this.inboxNewsInteractive(),
+              onCoveredBack: (): boolean => this.onBackPress(),
+              onPinAction: (_action: string, url: string): void => {
+                if (this.inboxNewsInteractive() && this.isCurrentInboxMessagePin(url)) this.openCustomHomeMenu(url,this.currentInboxUrl(),'',true);
+              },
+              onAction: (action: string, value: string): void => { this.dispatchInboxNewsAction(action,value); } })
+              .width('100%').height('100%')
+              .hitTestBehavior(this.inboxNewsInteractive() ? HitTestMode.Default : HitTestMode.None)
+              .accessibilityLevel(this.inboxNewsInteractive() ? 'auto' : 'no-hide-descendants')
+              .transition(NATIVE_PAGE_TRANSITION)
+          }
+          if (this.inboxNewsSearchParent && this.activeTab === 1) {
+            Column() { this.buildSearchRootContent() }
+              .width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+              .hitTestBehavior(this.pinStore.detail || this.pinStore.detailOpeningPin ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.pinStore.detail || this.pinStore.detailOpeningPin ? 'no-hide-descendants' : 'auto')
+              .transition(NATIVE_PAGE_TRANSITION)
+          }
+          if (this.inboxStore.inboxFlow && this.inboxStore.inboxFlow.screen !== 'news' &&
               (this.profileChatActive || !(PIN_NATIVE_PROFILE_READS_ENABLED && this.profileStore.origins.length > 0 && this.currentProfileUrl()) && !this.nativeBoardVisible() ||
                 this.activeTab === 2 && this.inboxStore.inboxFlow.screen === 'chat') && (this.inboxStore.inboxFlow.pageUrl === this.currentInboxUrl() ||
               this.activeTab === 2 && !!this.inboxStore.retainedChat)) {
@@ -7129,6 +7298,7 @@ struct Index {
               },
               onPinAction: (action: string, url: string) => {
                 if (!this.isCurrentInboxMessagePin(url)) return;
+                if(this.inboxStore.inboxFlow?.screen === 'news') {this.openCustomHomeMenu(url,this.currentInboxUrl(),'',true);return;}
                 this.openCustomHomeMenu(url, this.currentInboxUrl(), action);
               },
               onPin: (url: string): void => {
@@ -7301,7 +7471,7 @@ struct Index {
                   onShuffleRetry: () => this.detailNativeAuxiliary.retryShuffle(),
                   renderIdentity: _identity === this.detailRootIdentity() ? this.detailRenderIdentity() : this.detailSearchParents.find((saved: PinmonyDetailSearchPresentation): boolean => saved.identity === _identity)?.renderIdentity || _identity,
                   traceId: _identity === this.detailRootIdentity() ? this.pinStore.detailOpeningToken : this.detailSearchParents.find((saved: PinmonyDetailSearchPresentation): boolean => saved.identity === _identity)?.traceId || this.relatedEntryParentTrace,
-                  entryPhoto: _identity === this.detailRootIdentity() && this.homeEntryPhoto?.pinUrl === this.pinStore.detail?.pinUrl ? this.homeEntryPhoto : undefined,
+                  entryPhoto: !this.inboxNewsPinSlide() && _identity === this.detailRootIdentity() && this.homeEntryPhoto?.pinUrl === this.pinStore.detail?.pinUrl ? this.homeEntryPhoto : undefined,
                   entryResumed: _identity === this.detailRootIdentity() && this.homeEntryResumed,
                   entryClosing: _identity === this.detailRootIdentity() && this.homeEntryClosing,
                   onEntryClosed: () => {
@@ -7476,7 +7646,7 @@ struct Index {
             .height('100%')
             .hitTestBehavior(this.detailProfileTransition && this.profileUrlFromAddress(this.navigationAddress) ? HitTestMode.None : HitTestMode.Default)
             .accessibilityLevel(this.detailProfileTransition && this.profileUrlFromAddress(this.navigationAddress) ? 'no-hide-descendants' : 'auto')
-            .transition(this.homeEntryPhoto || this.detailProfileTransition ? TransitionEffect.IDENTITY : NATIVE_PAGE_TRANSITION)
+            .transition(!this.inboxNewsPinSlide() && (this.homeEntryPhoto || this.detailProfileTransition) ? TransitionEffect.IDENTITY : NATIVE_PAGE_TRANSITION)
           }
           if (this.homeStore.pendingHomeMorePin && !this.loadFailed) {
             Column({ space: 16 }) {
@@ -7511,6 +7681,14 @@ struct Index {
             message: this.offlineCacheLoading ? '' : this.authStatus === 'error' ? this.failureDetails : '',
             loading: this.offlineCacheLoading || this.authStatus !== 'error', onRetry: () => this.retryLogin(),
           })
+        }
+        if (this.searchStore.submittedPinLoading && this.authStatus === 'authenticated' && !this.businessSuspended) {
+          Column({ space: 12 }) {
+            LoadingProgress().width(36).height(36).color($r('app.color.accent'))
+            Text(this.uiText('pm_loading_please_wait_b6aaac70')).fontSize(14).fontColor($r('app.color.primary_text'))
+          }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+            .backgroundColor('#66808080').hitTestBehavior(HitTestMode.Block).zIndex(100)
+            .accessibilityGroup(true)
         }
         if (this.authStatus !== 'authenticated') { this.networkNoticeView() }
       }

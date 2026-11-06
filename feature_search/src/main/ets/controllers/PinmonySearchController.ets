@@ -6,11 +6,13 @@ import { PinmonySearchPorts } from '../models/PinmonySearchPorts';
 import { PinmonySearchStore } from '../stores/PinmonySearchStore';
 import { PIN_SEARCH_UI_API_ENABLED } from '../services/PinmonySearchUiApiScript';
 import { findSearchResult, mergeSearchFeedResults } from '../services/PinmonySearchRetention';
+import { searchPinLinkIdentity, searchShortPinLink } from '../services/PinmonySearchPinLink';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 
 // Owns search business state; product navigation/session capabilities are injected.
 interface PinmonyCategorySearchReturn { source: string; target: string; }
 export class PinmonySearchController {
+  private submittedLinkGeneration: number = 0;
   private categoryReturns: PinmonyCategorySearchReturn[] = [];
   private readonly tasks: PinmonyTaskRegistry = new PinmonyTaskRegistry();
   private generation: number = 0;
@@ -36,9 +38,22 @@ export class PinmonySearchController {
   }
 
   private cancelTimers(): void {
+    this.cancelSubmittedLink();
     this.tasks.invalidate();
     this.waiting.forEach((settle: () => void): void => settle());
     this.waiting.clear();
+  }
+
+  private cancelSubmittedLink(): void {
+    this.submittedLinkGeneration++;
+    this.searchStore.submittedPinLoading = false;
+    this.ports.cancelSubmittedPin?.();
+  }
+
+  cancelSubmittedPin(): boolean {
+    if (!this.searchStore.submittedPinLoading) return false;
+    this.cancelSubmittedLink();
+    return true;
   }
 
   private pause(delayMs: number): Promise<void> {
@@ -560,6 +575,7 @@ export class PinmonySearchController {
   }
 
   async updateSearchQuery(value: string, refreshSuggestions: boolean = false): Promise<void> {
+    this.cancelSubmittedLink();
     if (this.ports.nativeSearch?.()) { this.ports.markInteracted(); await this.ports.nativeSearchInput?.(value,refreshSuggestions); return; }
     if (refreshSuggestions) PinmonyRuntimeLog.info("SearchInputTrace: panel-open refresh=true");
     if (value.trim()) this.searchStore.searchQueryClearPage = '';
@@ -588,13 +604,49 @@ export class PinmonySearchController {
   }
 
   async submitSearch(value: string): Promise<void> {
-    if (typeof value !== 'string' || !value.trim() || value.length > 300) return;
+    if (typeof value !== 'string' || !value.trim()) return;
+    this.cancelSubmittedLink();
+    let submittedPin: string = searchPinLinkIdentity(value);
+    const shortLink: string = searchShortPinLink(value);
+    if (!submittedPin && value.length > 300) return;
     this.searchStore.searchQueryClearPage = '';
     const intent: number = ++this.searchStore.searchIntentToken;
     this.searchStore.searchQueryToken++;
     if (!(this.ports.nativeSearch?.() || await this.ports.ensureContext(false)) || intent !== this.searchStore.searchIntentToken) return;
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
     if (!search || !(this.searchStore.searchNativeInputReady || this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
+    if (submittedPin || shortLink) {
+      if (!this.ports.isActive() || this.ports.sheetKind() || !this.ports.openSubmittedPin) return;
+      PinmonyRuntimeLog.info('PinLinkTrace: submit kind=' + (shortLink ? 'short' : 'complete'));
+      this.searchStore.searchCache.put(search, this.searchStore.searchScrollOffset);
+      this.invalidatePending();
+      if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();
+      this.searchStore.searchInputFocused = false;
+      this.searchStore.searchInputStopEditing = undefined;
+      this.ports.markInteracted();
+      if (shortLink) {
+        const generation: number = this.submittedLinkGeneration;
+        this.searchStore.submittedPinLoading = true;
+        const current = (): boolean => generation === this.submittedLinkGeneration &&
+          this.ports.isActive() && !this.ports.sheetKind() && search.pageKey === this.ports.currentPageKey();
+        try {
+          if (!this.ports.resolveSubmittedPin) throw new Error('pin-link-unavailable');
+          this.ports.showMessage(PinmonyI18n.message('pm_loading_please_wait_b6aaac70'));
+          submittedPin = await this.ports.resolveSubmittedPin(shortLink, current);
+          if (!current()) return;
+          if (!/^[0-9]{1,30}$/.test(submittedPin)) throw new Error('pin-link-unresolved');
+        } catch (_) {
+          PinmonyRuntimeLog.info('PinLinkTrace: submit-result current=' + current().toString() + ' outcome=not-opened');
+          if (current()) this.ports.showMessage(PinmonyI18n.message('pm_unable_to_open_pin_please_retry_1260c20b'));
+          return;
+        } finally {
+          if (generation === this.submittedLinkGeneration) this.searchStore.submittedPinLoading = false;
+        }
+      }
+      PinmonyRuntimeLog.info('PinLinkTrace: submit-result outcome=open-requested');
+      this.ports.openSubmittedPin(submittedPin, search.pageKey);
+      return;
+    }
     if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();
     this.searchStore.searchInputFocused = false; this.searchStore.searchInputStopEditing = undefined;
     this.ports.clearTabGuard('search-submit');

@@ -75,7 +75,7 @@ async function main() {
     pinIdentity: value => String(value || '').match(/\/pin\/(\d+)\//)?.[1] || '',
     closeImageLayer() {}, clearRootTabGuard() {}, pageHistory: { visit() {}, cancelBack() {} },
     clearDetail() { this.pinStore.detail = undefined; this.pinStore.detailActionsReady = false; this.pinStore.detailOpeningToken++; },
-    restoreCachedDetail() {}, probeDetailDocument() {}, detailReadNetwork: network,
+    restoreCachedDetail() {}, restoreDetailSearchPresentation() {}, probeDetailDocument() {}, detailReadNetwork: network,
     detailReadCache: { getPin() { return ''; }, retained() { return undefined; }, store() {}, clear() {}, reset() {} },
     detailImageStage: { reset() {} },
     nativeNetwork: { request() { throw Error('duplicate or unvalidated request reached regular network'); } },

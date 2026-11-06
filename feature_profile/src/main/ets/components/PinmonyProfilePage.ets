@@ -1355,7 +1355,7 @@ export struct PinmonyProfilePage {
           ForEach(['pins','boards','collages'], (tab: string) => {
             Button({type:ButtonType.Normal, stateEffect:false}) {
               Column({space:12}) {
-                Text(this.uiText('pm_profile_hub_' + tab)).fontSize(18).fontWeight(FontWeight.Bold)
+                Text(this.uiText('pm_profile_hub_' + tab)).fontSize(this.hubTab === tab ? 20 : 18).fontWeight(FontWeight.Bold)
                   .fontColor(this.hubTab === tab ? $r('app.color.detail_save_accent') : $r('app.color.primary_text'))
                 Row().height(2).width('100%').backgroundColor(Color.Transparent)
               }.padding({top:12,bottom:12})

@@ -110,12 +110,13 @@ export struct PinmonyShareSheet {
             .onChange((value: string) => {
               this.onSearch(value);
             })
-          if (!PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) {
           Scroll() {
             Column() {
+              if (!PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) {
               ForEach(this.pinStore.shareContacts, (contact: ShareSheetOption) => {
                 this.buildShareContactRow(contact)
               }, (contact: ShareSheetOption) => contact.id)
+              }
             }
             .width('100%')
             .justifyContent(FlexAlign.Start)
@@ -123,7 +124,6 @@ export struct PinmonyShareSheet {
           .align(Alignment.TopStart)
           .layoutWeight(1)
           .width('100%')
-          }
         } else {
           if (this.pinStore.shareSearchId) {
             Row({ space: 14 }) {

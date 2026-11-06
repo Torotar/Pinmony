@@ -34,6 +34,9 @@ async function main(){
   native.updateShareSheet('正在加载联系人…');assert.equal(events.length,0,'shell visibility does not mark contact data ready');
   native.updateShareSheet('没有可用的联系人');assert.deepEqual(events,['content-ready'],'a confirmed empty response counts as ready');
   const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyShareSheet.ets','utf8');
+  const searchBody=ui.slice(ui.indexOf('TextInput({ text: this.pinStore.shareQuery'),ui.indexOf('if (this.pinStore.shareSearchId)'));
+  assert(searchBody.indexOf('Scroll()') < searchBody.indexOf('if (!PinmonyI18n.isText'), 'loading guard hides contacts inside the retained scroll viewport');
+  assert(searchBody.includes('.layoutWeight(1)'), 'loading and loaded states reserve the same flexible contact area above footer');
   assert(!ui.includes('.height(280)'));assert(ui.includes('.layoutWeight(1)'));
   console.log('Share contacts: old query cancellation, newest response, close/pagehide cleanup, real readiness adapter and flexible viewport contract passed; device geometry excluded');
 }

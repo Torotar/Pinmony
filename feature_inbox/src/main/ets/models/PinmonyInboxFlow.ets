@@ -1,3 +1,12 @@
+export interface PinmonyInboxNewsCard {
+  id: string;
+  kind: string;
+  title: string;
+  image: string;
+  imageWidth: number;
+  imageHeight: number;
+  target: string;
+}
 export interface InboxFlowUser {
   id: string;
   name: string;
@@ -61,6 +70,9 @@ export interface PinmonyInboxFlowSnapshot {
   newsHidden?: boolean;
   newsUndoing?: boolean;
   newsId?: string;
+  newsCards?: PinmonyInboxNewsCard[];
+  newsEnded?: boolean;
+  newsScrollOffset?: number;
   blocked?: boolean;
   blockedUserId?: string;
   blockRevision?: number;

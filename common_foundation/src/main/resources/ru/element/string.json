@@ -1,6 +1,9 @@
 {
   "string": [
-    {"name":"pm_photo_history_save_unconfirmed","value":"Поиск завершён, но сохранение фотографии в истории не подтверждено."},
+    {
+      "name": "pm_photo_history_save_unconfirmed",
+      "value": "Поиск завершён, но сохранение фотографии в истории не подтверждено."
+    },
     {
       "name": "pm_recommend_boards_description",
       "value": "Отключите персонализацию доски, чтобы скрыть вкладки и рекомендации на её основе в главной ленте. Это не повлияет на доску и её пины."
@@ -2120,6 +2123,10 @@
     {
       "name": "pm_search_44ce7ae9",
       "value": "Поиск"
+    },
+    {
+      "name": "pm_search_keywords_or_link",
+      "value": "Поиск по ключевым словам или ссылкам"
     },
     {
       "name": "pm_profile_7f1d9dd0",
@@ -5801,7 +5808,10 @@
       "name": "pm_photo_history_delete_all_confirm",
       "value": "Удалить всю историю поиска по фото? Запрос на удаление будет отправлен на сервер."
     },
-    { "name": "pm_photo_history_pending_delete", "value": "Ожидает удаления" },
+    {
+      "name": "pm_photo_history_pending_delete",
+      "value": "Ожидает удаления"
+    },
     {
       "name": "pm_photo_history_deleted",
       "value": "Удалено"
@@ -5837,6 +5847,14 @@
     {
       "name": "pm_created_board_choose_pins",
       "value": "Сохраните пины на новую доску"
+    },
+    {
+      "name": "pm_news_explore_home",
+      "value": "Больше идей в вашей домашней ленте"
+    },
+    {
+      "name": "pm_news_start",
+      "value": "Начать"
     }
   ]
 }

@@ -1,6 +1,9 @@
 {
   "string": [
-    {"name":"pm_photo_history_save_unconfirmed","value":"検索は完了しましたが、写真履歴の保存は確認できませんでした。"},
+    {
+      "name": "pm_photo_history_save_unconfirmed",
+      "value": "検索は完了しましたが、写真履歴の保存は確認できませんでした。"
+    },
     {
       "name": "pm_recommend_boards_description",
       "value": "ボードのパーソナライズをオフにすると、そのボードに基づくホームフィードのタブとおすすめが非表示になります。ボードやピンには影響しません。"
@@ -2120,6 +2123,10 @@
     {
       "name": "pm_search_44ce7ae9",
       "value": "検索"
+    },
+    {
+      "name": "pm_search_keywords_or_link",
+      "value": "キーワードまたはリンクを検索"
     },
     {
       "name": "pm_profile_7f1d9dd0",
@@ -5801,7 +5808,10 @@
       "name": "pm_photo_history_delete_all_confirm",
       "value": "写真検索の履歴をすべて削除しますか？削除はサーバーに送信されます。"
     },
-    { "name": "pm_photo_history_pending_delete", "value": "削除予定" },
+    {
+      "name": "pm_photo_history_pending_delete",
+      "value": "削除予定"
+    },
     {
       "name": "pm_photo_history_deleted",
       "value": "削除しました"
@@ -5837,6 +5847,14 @@
     {
       "name": "pm_created_board_choose_pins",
       "value": "新しいボードにピンを保存"
+    },
+    {
+      "name": "pm_news_explore_home",
+      "value": "ホームフィードでアイデアをもっと探す"
+    },
+    {
+      "name": "pm_news_start",
+      "value": "始める"
     }
   ]
 }

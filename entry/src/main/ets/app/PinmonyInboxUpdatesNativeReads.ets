@@ -100,6 +100,7 @@ export class PinmonyInboxUpdatesNativeReads {
     this.apply();
   }
   confirmedUnsubscribe(newsId: string): void {const s: PinmonyBusinessSessionContext = this.ports.session();if(this.eligible() && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.page === this.ports.page() && this.rows.some((row: NativeNews): boolean => row.newsId === newsId)){const row: NativeNews | undefined = this.rows.find((item: NativeNews): boolean => item.newsId === newsId);if(row && /^\d{1,40}$/.test(row.notificationPinId)){this.muted.add(row.notificationPinId);this.apply();}}}
+  detailItem(id: string): PinmonyInboxItem | undefined { return this.owned() ? this.rows.find((row: NativeNews): boolean => row.id === id && !this.hidden.has(row.newsId)) : undefined; }
   menuItem(id: string): NativeNews | undefined {const s: PinmonyBusinessSessionContext = this.ports.session();return this.eligible() && this.account === s.accountId && this.generation === s.generation && this.origin === s.origin && this.page === this.ports.page() ? this.rows.map((row: NativeNews): NativeNews => { const next: NativeNews = JSON.parse(JSON.stringify(row)) as NativeNews; next.notificationMuted = row.notificationMuted === true || this.muted.has(row.notificationPinId); return next; }).find((row: NativeNews): boolean => row.moreId === id && !this.hidden.has(row.newsId)) : undefined;}
   installScript(): string {
     if(!this.owned())return '';
@@ -115,7 +116,7 @@ export class PinmonyInboxUpdatesNativeReads {
     const images: Record<string,NewsImage> | undefined = object?.images;
     const image: string = this.image(row.header_icon_image_url) || this.image(images?.['150x150']?.url) || this.image(images?.['345x']?.url) || this.image(object?.image_cover_url || object?.image_large_url);
     const id: string = 'inbox-news-api-' + this.generation.toString() + '-' + row.id;
-    return { id:id, newsId:row.id, notificationPinId: object?.type === 'pin' && /^\d+$/.test(object.id || '') ? object.id || '' : '', notificationMuted: object?.type === 'pin' && object.subscribed_to_notifications === false, title:title, subtitle:this.label(row.content_text || row.sub_header_text,row.text_mapping), imageUrl:image, updatedAt:this.clean(row.last_updated_at), unread:typeof row.unread === 'boolean' ? row.unread : undefined, enabled:false, moreId:'news-menu:' + id };
+    return { id:id, newsId:row.id, notificationPinId: object?.type === 'pin' && /^\d+$/.test(object.id || '') ? object.id || '' : '', notificationMuted: object?.type === 'pin' && object.subscribed_to_notifications === false, title:title, subtitle:this.label(row.content_text || row.sub_header_text,row.text_mapping), imageUrl:image, updatedAt:this.clean(row.last_updated_at), unread:typeof row.unread === 'boolean' ? row.unread : undefined, enabled:/^\d{1,40}$/.test(row.id), moreId:'news-menu:' + id };
   }
   private async read(append: boolean, quiet: boolean = false): Promise<void> {
     const visibilityRevision: number = this.visibilityRevision;

@@ -95,7 +95,7 @@ const RESOURCES: string[] = ['UserHomefeedResource', 'BoardContentRecommendation
   'BoardFeedResource', 'BoardSectionsResource', 'BoardSectionPinsResource', 'BoardSectionResource',
   'UserPinsResource', 'UserResource', 'BoardsResource', 'BoardsFeedResource',
   'UserSettingsResource', 'CountriesResource', 'UserRecentActivityResource', 'UserFollowingResource', 'UserActivityPinsResource', 'BoardlessPinsResource', 'PinResource', 'RelatedModulesResource', 'VisualSearchFlashlightUnifiedResource',
-  'SearchTabResource', 'AdvancedTypeaheadResource', 'BaseSearchResource', 'UserExperienceResource', 'ApiResource', 'ConversationMessagesResource',
+  'NewsHubDetailsResource', 'SearchTabResource', 'AdvancedTypeaheadResource', 'BaseSearchResource', 'UserExperienceResource', 'ApiResource', 'ConversationMessagesResource',
   'ConversationsResource', 'BoardInvitesResource', 'BoardInviteResource', 'ShareSuggestionsResource', 'ShareSuggestionsTypeaheadResource',
   'FindPinImagesResource', 'UserSessionResource', 'BoardPickerBoardsResource', 'UnifiedCommentsResource', 'UnifiedCommentsPreviewResource',
   'AggregatedCommentReplyFeedResource', 'AggregatedCommentReplyResource', 'AggregatedCommentResource', 'DidItCommentsResource', 'RepinResource'];
@@ -103,6 +103,8 @@ interface SessionVerificationOptions { url: string; data: Record<string, string>
 interface SessionVerificationEnvelope { options: SessionVerificationOptions; context: Record<string, string>; }
 interface NativeSearchEnvelope { options: Record<string, Object | null>; context: Record<string,string>; }
 interface NativeSearchApiOptions { url: string; data: Record<string,Object>; }
+interface InboxNewsReadOptions { news_id?: string; url?: string; data?: Record<string,string>; bookmarks?: string[]; }
+interface InboxNewsReadEnvelope { options: InboxNewsReadOptions; context: Record<string,string>; }
 interface InboxUpdatesReadOptions { url: string; data: InboxUpdatesData; redux_normalize_feed: boolean; field_sets: string[]; bookmarks?: string[]; }
 interface InboxUpdatesData { field_set_key: string; }
 interface InboxUpdatesEnvelope { options: InboxUpdatesReadOptions; context: Record<string,string>; }
@@ -1884,6 +1886,34 @@ export class PinmonyNativeNetwork {
       }
     } catch (_) {}
     return this.request(job, (): PinmonyNetworkContext => { const actual: PinmonyBusinessSessionContext = session(); return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent}; });
+  }
+  async requestBusinessInboxNewsRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    newsId: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    try {
+      const encoded: RegExpMatchArray | null = job.url.match(/[?&]data=([^&]+)/);
+      const source: RegExpMatchArray | null = job.url.match(/[?&]source_url=([^&]+)/);
+      const envelope: InboxNewsReadEnvelope = JSON.parse(decodeURIComponent(encoded ? encoded[1] : '')) as InboxNewsReadEnvelope;
+      const o: InboxNewsReadOptions = envelope.options;
+      const path: string = '/news_hub/' + newsId + '/';
+      const summary: boolean = job.url.startsWith(captured.origin + '/resource/ApiResource/get/?');
+      const keys: string[] = Object.keys(o);
+      const cursor: boolean = !keys.includes('bookmarks') || Array.isArray(o.bookmarks) && o.bookmarks.length === 1 &&
+        typeof o.bookmarks[0] === 'string' && o.bookmarks[0].length > 0 && o.bookmarks[0].length <= 4096 && o.bookmarks[0] !== '-end-';
+      permitted = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
+        /^\d{1,40}$/.test(newsId) && /^native_inbox_news_\d+$/.test(job.id) && job.epoch === captured.generation &&
+        job.page.startsWith(captured.origin + '/') && /^\/(?:inbox|messages|updates|notifications)\/$/.test(job.page.slice(captured.origin.length)) &&
+        job.method === 'GET' && job.body === '' && !!source && decodeURIComponent(source[1]) === path &&
+        job.headers['X-Pinterest-Source-Url'] === path && job.headers['X-Pinterest-Pws-Handler'] === 'www/news_hub/[id].js' &&
+        Object.keys(envelope).length === 2 && !Array.isArray(envelope.context) && Object.keys(envelope.context).length === 0 && !Array.isArray(o) &&
+        (summary ? keys.length === 2 && o.url === '/v3/news_hub/' + newsId + '/' && !!o.data && !Array.isArray(o.data) &&
+          Object.keys(o.data).length === 1 && o.data['fields'] === 'user.full_name,user.image_large_url,user.type,user.username' :
+          job.url.startsWith(captured.origin + '/resource/NewsHubDetailsResource/get/?') && cursor &&
+          keys.every((key: string): boolean => ['news_id','bookmarks'].includes(key)) && o.news_id === newsId);
+    } catch (_) {}
+    return this.request(job, (): PinmonyNetworkContext => { const actual: PinmonyBusinessSessionContext = session();
+      return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,
+        epoch: captured.generation, page: job.page, userAgent: actual.userAgent }; });
   }
   async requestBusinessInboxUpdatesRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
     ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {

@@ -1,6 +1,9 @@
 {
   "string": [
-    {"name":"pm_photo_history_save_unconfirmed","value":"A pesquisa foi concluída, mas não foi possível confirmar se a foto foi salva no histórico."},
+    {
+      "name": "pm_photo_history_save_unconfirmed",
+      "value": "A pesquisa foi concluída, mas não foi possível confirmar se a foto foi salva no histórico."
+    },
     {
       "name": "pm_recommend_boards_description",
       "value": "Desative a personalização de uma pasta para remover as abas e recomendações baseadas nela do feed inicial. Isso não afeta a pasta nem seus Pins."
@@ -2120,6 +2123,10 @@
     {
       "name": "pm_search_44ce7ae9",
       "value": "Pesquisar"
+    },
+    {
+      "name": "pm_search_keywords_or_link",
+      "value": "Pesquisar palavras-chave ou links"
     },
     {
       "name": "pm_profile_7f1d9dd0",
@@ -5801,7 +5808,10 @@
       "name": "pm_photo_history_delete_all_confirm",
       "value": "Excluir todo o histórico de pesquisa por fotos? A exclusão será enviada ao servidor."
     },
-    { "name": "pm_photo_history_pending_delete", "value": "Exclusão pendente" },
+    {
+      "name": "pm_photo_history_pending_delete",
+      "value": "Exclusão pendente"
+    },
     {
       "name": "pm_photo_history_deleted",
       "value": "Excluído com sucesso"
@@ -5837,6 +5847,14 @@
     {
       "name": "pm_created_board_choose_pins",
       "value": "Salve alguns Pins na sua nova pasta"
+    },
+    {
+      "name": "pm_news_explore_home",
+      "value": "Explore mais ideias no seu feed inicial"
+    },
+    {
+      "name": "pm_news_start",
+      "value": "Começar"
     }
   ]
 }

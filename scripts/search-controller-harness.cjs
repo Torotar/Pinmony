@@ -11,6 +11,7 @@ function createSearchRuntime(ts, globals = {}) {
   const Store = loader.loadFile('feature_search/src/main/ets/stores/PinmonySearchStore.ets').PinmonySearchStore;
 
   function bindIndex(native) {
+    native.submittedPinResolver ||= { cancel() {}, resolve: async () => { throw Error('unmocked short link'); } };
     native.runSessionScript ||= script=>native.controller.runJavaScript(script);
     native.loadSessionDocument ||= url=>native.controller.loadUrl(url);
     native.searchDiscoveryNativeReads ||= {eligible:()=>false};

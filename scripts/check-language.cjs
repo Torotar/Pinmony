@@ -218,9 +218,9 @@ function methodView(file, startName, endName) {
  const view = new Type(); view.uiLanguage = 'en'; view.uiText = key => f.api.text(key, view.uiLanguage); return view;
 }
 const searchView = methodView('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'searchPlaceholder(', '  private uiText(');
-searchView.snapshot = {placeholder:'搜索'}; assert.equal(searchView.searchPlaceholder(),'Search');
+searchView.snapshot = {placeholder:'搜索'}; assert.equal(searchView.searchPlaceholder(),'Search keywords or links');
 searchView.snapshot.placeholder='风景灵感'; assert.equal(searchView.searchPlaceholder(),'风景灵感');
-searchView.uiLanguage='zh'; searchView.snapshot.placeholder='Search'; assert.equal(searchView.searchPlaceholder(),'搜索');
+searchView.uiLanguage='zh'; searchView.snapshot.placeholder='Search'; assert.equal(searchView.searchPlaceholder(),'搜索关键词或链接');
 assert.equal(f.api.optionLabel('home-system-share','系统分享','en'),'Share');
 const accountView = methodView('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','birthday(', '  private gender(');
 accountView.store = {data:{birthdate:'1999-12-02'}}; assert.equal(accountView.birthday(),'12/02/1999');

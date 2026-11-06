@@ -54,14 +54,14 @@ async function productionMenus(){
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
   function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\(')),end=index.indexOf('\n  private ',start+1);assert(start>=0);return index.slice(start,end);}
   function field(name){const start=index.indexOf('  private readonly '+name+':'),end=index.indexOf('\n  private ',start+1);assert(start>=0);return index.slice(start,end).trim().replace(/^private readonly /,'this.').replace(/: [A-Za-z]+ = /,' = ');}
-  const context={PinmonyPinMenuNative:Menu,PinmonyPhotoMenuCoordinator:Photo,PinmonySharePanelsController:Panels,PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PIN_NATIVE_BOARD_READS_ENABLED:true,PinmonyRuntimeLog:foundation.PinmonyRuntimeLog};
+  const context={PinmonyI18n:{message:value=>value},PinmonyPinMenuNative:Menu,PinmonyPhotoMenuCoordinator:Photo,PinmonySharePanelsController:Panels,PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PIN_NATIVE_BOARD_READS_ENABLED:true,PinmonyRuntimeLog:foundation.PinmonyRuntimeLog};
   const out={};vm.runInNewContext(ts.transpileModule('export class Host{'+['dismissShareSheet','dismissMoreSheet','openApiDetailMore','performMoreAction','openCustomHomeMenu','performCustomHomeAction','shareDetailPinAfterMenu','dismissPhotoMenuAfterAction','notifyDetailSystemShareClosed'].map(method).join('\n')+'} export function bind(){'+['pinMenuNative','photoMenuCoordinator','sharePanelsController'].map(field).join('\n')+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:out,...context,setTimeout,clearTimeout});
   const f=fixture(),h=new out.Host(),effects=[],frames=[];let route=origin+'/',web=0;
   h.getUIContext=()=>({postFrameCallback:callback=>frames.push(callback)});
   Object.assign(h,{nativeBusinessRoutesEnabled:true,pinStore:f.store,homeStore:{customHomeMenuToken:0},inboxStore:{},boardStore:{},authStatus:'authenticated',businessSuspended:false,activeSheetKind:'',showNativeSheet:false,nativeNetwork:f.network,
     nativeBusinessSessionContext:f.getSession,nativeDisplayAddress:()=>route,isCurrentMorePin:p=>p===pin && (route===pin || h.homeStore.homeMenuPin===p),pinIdentity:p=>p.match(/\/pin\/(\d+)/)?.[1]||'',currentPinUrl:()=>pin,currentProfileUrl:()=>'',currentBoardUrl:()=>route,currentHomePageKey:()=>origin+'/',currentInboxUrl:()=>origin+'/conversation/1/',
     isCurrentBoardMenuPin:(p,page)=>page===route&&!!h.boardStore.boardDetail,isCurrentSearchMenuPin:()=>false,cancelledBoardPins:new Set(),dismissPostSnack(){},lastRootBackAt:0,rootContextCoordinator:{notify(){}},
-    shareNativeFlow:{pause(){},close(){},open:async(mode,p)=>effects.push(['contacts',mode,p])},systemActions:{openLink:async u=>effects.push(['help',u]),copyText:async()=>{},downloadImage:async u=>effects.push(['download',u])},
+    shareNativeFlow:{pause(){},close(){},open:async(mode,p)=>effects.push(['contacts',mode,p])},systemActions:{openLink:async u=>effects.push(['help',u]),copyText:async()=>{},downloadImage:async u=>effects.push(['download',u]),shareImages:async(sources,title,current)=>{assert(current());effects.push(['image-share',sources[0]]);}},
     sharePinUrl:async u=>effects.push(['system-share',u]),openEditPin:async p=>effects.push(['edit',p]),showMessage:m=>effects.push(['message',m]),showUndoSnack(){},
     controller:{runJavaScript(){web++;throw Error('hidden menu JS');},loadUrl(){web++;throw Error('hidden navigation');},startDownload:u=>effects.push(['download',u])},rejectOfflineAction:()=>false,clearRootTabGuard(){},traceAction(){},
     boardNativeReads:{cancelSavedPin:async()=>''},coordinatorTasks:{},boardOperation(){},setRetainedBoardContent(){},retainedBoardContent:undefined,
@@ -70,22 +70,31 @@ async function productionMenus(){
   let pending=h.openCustomHomeMenu(pin,origin+'/');f.jobs.at(-1).resolve(body(raw));await pending;
   assert.equal(h.homeStore.customHomeMenu.options.length,0);assert(h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-system-share'));assert.equal(web,0);
   await h.performCustomHomeAction('home-download');assert.equal(effects.at(-1)[0],'download');
-  pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);assert(h.homeStore.customHomeMenu,'home menu retained until disappearance');assert.notEqual(effects.at(-1)[0],'contacts');h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;assert.equal(effects.at(-1)[0],'contacts');assert.equal(web,0);assert(!effects.some(e=>e[0]==='system-share'),'card sharing never invokes ShareKit');
+  pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);assert(h.homeStore.customHomeMenu,'home menu retained until disappearance');assert.notEqual(effects.at(-1)[0],'image-share');h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['image-share',image]);assert.equal(web,0);assert(!effects.some(e=>e[0]==='system-share'),'photo card shares an image instead of a link');
+  for(const source of ['search','profile']){
+    route=origin+(source==='search'?'/search/pins/?q=synthetic':'/synthetic-profile/');
+    h.isCurrentSearchMenuPin=(p,page)=>source==='search'&&p===pin&&page===route;
+    pending=h.openCustomHomeMenu(pin,route,'',source==='profile');f.jobs.at(-1).resolve(body(raw));await pending;
+    assert(h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-system-share'&&o.enabled),source+' card exposes share');
+    pending=h.performCustomHomeAction('home-system-share');h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
+    assert.deepEqual(effects.at(-1),['image-share',image],source+' card shares the actual photo');
+  }
+  h.isCurrentSearchMenuPin=()=>false;
   route=origin+'/visitor/board/';h.boardStore.boardDetail={pageKey:route,editable:false,pins:[{id:'11',pinUrl:pin}]};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='board-menu-move'));assert(h.homeStore.customHomeMenu.actions.every(o=>o.enabled));
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-edit'),'board menu excludes edit even for an owned Pin');
   assert.equal(h.homeStore.customHomeMenu.actions.find(o=>o.id==='home-system-share').label,'分享');
-  const boardShares=effects.filter(e=>e[0]==='contacts').length;
+  const boardShares=effects.filter(e=>e[0]==='image-share').length;
   pending=h.performCustomHomeAction('home-system-share');assert.equal(h.showNativeSheet,false);
-  assert.equal(effects.filter(e=>e[0]==='contacts').length,boardShares,'board share waits for menu disappearance');
+  assert.equal(effects.filter(e=>e[0]==='image-share').length,boardShares,'board share waits for menu disappearance');
   assert.equal(h.activeSheetKind,'share');assert(h.homeStore.customHomeMenu,'keep board menu mounted during exit');
-  h.notifyDetailSystemShareClosed();await flush();assert.equal(effects.filter(e=>e[0]==='contacts').length,boardShares);
-  frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['contacts','pin',pin]);
-  const sharesBeforeRouteChange=effects.filter(e=>e[0]==='contacts').length;
+  h.notifyDetailSystemShareClosed();await flush();assert.equal(effects.filter(e=>e[0]==='image-share').length,boardShares);
+  frames.shift().onIdle();await pending;assert.deepEqual(effects.at(-1),['image-share',image]);
+  const sharesBeforeRouteChange=effects.filter(e=>e[0]==='image-share').length;
   pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body(raw));await pending;
   pending=h.performCustomHomeAction('home-system-share');h.notifyDetailSystemShareClosed();await flush();
   const originalRoute=route;route=origin+'/other/board/';frames.shift().onIdle();await pending;
-  assert.equal(effects.filter(e=>e[0]==='contacts').length,sharesBeforeRouteChange,'route change during menu dismissal cancels contact sharing');route=originalRoute;
+  assert.equal(effects.filter(e=>e[0]==='image-share').length,sharesBeforeRouteChange,'route change during menu dismissal cancels image sharing');route=originalRoute;
   h.boardStore.boardDetail={pageKey:route,editable:true,pins:[{id:'11',pinUrl:pin}]};pending=h.openCustomHomeMenu(pin,route);f.jobs.at(-1).resolve(body({...raw,is_repin:true}));await pending;
   assert(!h.homeStore.customHomeMenu.actions.some(o=>o.id==='home-edit'),'owned board menu excludes edit');
   const edits=effects.filter(e=>e[0]==='edit').length;await h.performCustomHomeAction('home-edit');assert.equal(effects.filter(e=>e[0]==='edit').length,edits,'hidden edit cannot be dispatched');
@@ -100,6 +109,7 @@ async function productionMenus(){
   assert.equal(effects.filter(e=>e[0]==='board-flow').length,flows,'target picker must wait until mask disappears');
   h.notifyDetailSystemShareClosed();await pending;assert.equal(effects.filter(e=>e[0]==='board-flow').length,flows+1);
   h.boardStore.boardDetail=undefined;route=pin;pending=h.openApiDetailMore();f.jobs.at(-1).resolve(body(raw));await pending;assert(h.pinStore.moreOptions.some(o=>o.id==='detail-see-more'));assert(!h.pinStore.moreOptions.some(o=>o.id==='detail-share'));
+  h.pinStore.detail.isVideo=true;
   const shareCount=effects.filter(e=>e[0]==='system-share').length;
   h.dismissMoreSheet();h.activeSheetKind='share';h.showNativeSheet=true;pending=h.shareDetailPinAfterMenu(pin,'',true);
   assert.equal(h.activeSheetKind,'share');assert.equal(h.showNativeSheet,false);
@@ -119,6 +129,15 @@ async function productionMenus(){
   f.setSession({...f.getSession(),generation:2});h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
   assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'account generation change cancels sharing');
   f.setSession({...f.getSession(),generation:1});
+
+  route=origin+'/';h.currentPinUrl=()=>'';h.pinStore.sharePin=pin;
+  h.showNativeSheet=true;h.activeSheetKind='share';pending=h.shareDetailPinAfterMenu(pin,'',true);
+  h.notifyDetailSystemShareClosed();await flush();frames.shift().onIdle();await pending;
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'missing root-card media must never silently share a link');
+  assert.equal(effects.at(-1)[0],'message','missing root-card media reports failure');
+  h.pinStore.sharePin=pin;h.showNativeSheet=true;h.activeSheetKind='share';pending=h.shareDetailPinAfterMenu(pin,'',true);
+  h.notifyDetailSystemShareClosed();await flush();route=origin+'/search/';frames.shift().onIdle();await pending;
+  assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'leaving home during dismissal cancels root sharing');
   assert(index.includes('this.notifyDetailSystemShareClosed();'),'real Sheet disappearance is bound to completion');
   pending=h.openCustomHomeMenu(pin,origin+'/');h.dismissShareSheet();f.jobs.at(-1).resolve(body(raw));await pending;assert.equal(h.homeStore.customHomeMenu,undefined,'late menu read cannot reopen a closed sheet');
   const before=f.jobs.length;await h.openCustomHomeMenu(pin,origin+'/conversation/1/','share');assert.equal(f.jobs.length,before);assert.equal(effects.at(-1)[0],'contacts');assert.equal(web,0);
@@ -152,3 +171,20 @@ async function directFavoriteContract(){
  console.log('Direct board star: fresh state, native transport, feedback, route cancellation and card binding passed');
 }
 directFavoriteContract().catch(e=>{console.error(e);process.exitCode=1;});
+
+async function cardShareImageContract(){
+  const f=fixture();await open(f,{...raw,shuffle:{id:'22',items:[{image_url:'https://i.pinimg.com/cutout.png'}]}});
+  assert.equal(f.menu.shareImageSource(pin),image,'collage shares the full image returned by the validated menu read');
+  assert.equal(f.menu.shareImageSource(origin+'/pin/99/'),'','another Pin cannot reuse menu media');
+  f.setSession({...f.getSession(),generation:2});assert.equal(f.menu.shareImageSource(pin),'','stale account cannot expose media');
+  for(const media of [{is_video:true},{videos:{video_list:{}}},{carousel_data:{carousel_slots:[{videos:{}}]}}]){
+    const other=fixture();await open(other,{...raw,...media});assert.equal(other.menu.shareImageSource(pin),'','video and carousel keep link sharing');
+    assert.equal(other.menu.shareLinkOnly(pin),true);other.setSession({...other.getSession(),generation:2});assert.equal(other.menu.shareLinkOnly(pin),false);
+  }
+  const multi=fixture();await open(multi,{...raw,carousel_data:{carousel_slots:[{images:{orig:{url:image}}},{images:{orig:{url:image+'?second'}}}]}});
+  assert.deepEqual(Array.from(multi.menu.shareImageSources(pin)),[image,image+'?second'],'card shares every carousel image in order');
+  assert.equal(multi.menu.shareLinkOnly(pin),false,'image carousel no longer shares a link');
+  const missing=fixture();await open(missing,{...raw,carousel_data:{carousel_slots:[{images:{orig:{url:image}}},{}]}});
+  assert.equal(missing.menu.shareImageSources(pin).length,0,'incomplete carousel cannot silently share a subset');
+}
+cardShareImageContract().catch(e=>{console.error(e);process.exitCode=1;});

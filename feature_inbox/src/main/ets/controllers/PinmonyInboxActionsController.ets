@@ -26,7 +26,7 @@ export class PinmonyInboxActionsController {
   pause(): void { this.generation++; this.intent++; this.opening = false; this.acting = false; }
   async open(id: string): Promise<void> {
     if (!this.ports.allowed() || !this.ports.enabled() || this.opening ||
-        !(id === 'compose' || id === 'home' || /^(?:conversation:|contact:|news-menu:)/.test(id))) return;
+        !(id === 'compose' || id === 'home' || /^(?:conversation:|contact:|news-menu:|inbox-news-api-)/.test(id))) return;
     if(this.ports.nativeOpen) {
       this.opening = true;
       try {if(await this.ports.nativeOpen(id))return;}

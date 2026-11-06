@@ -101,6 +101,7 @@ export interface PinmonySearchSnapshot {
   apiBusy?: boolean;
   apiActive?: boolean;
   apiEnded?: boolean;
+  apiContinuationPaused?: boolean;
   kind: string;
   session: number;
   pageKey: string;

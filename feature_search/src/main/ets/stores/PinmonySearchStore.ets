@@ -15,6 +15,7 @@ export class PinmonySearchStore {
     if (this.onNavigationChange) this.onNavigationChange();
   }
   searchLoading: boolean = false;
+  submittedPinLoading: boolean = false;
   searchError: string = '';
   searchFilterOptions: PinmonySearchFilterOption[] = [];
   searchFilterLoading: boolean = false;

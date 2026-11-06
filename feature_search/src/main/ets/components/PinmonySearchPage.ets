@@ -248,7 +248,7 @@ export struct PinmonySearchPage {
   private searchPlaceholder(): string {
     const value: string = this.snapshot.placeholder || '';
     // Generic control copy follows app language; website ghost queries stay original.
-    return !value || value === '搜索' || value === 'Search' ? this.uiText('pm_search_44ce7ae9') : PinmonyI18n.render(value, this.uiLanguage);
+    return !value || value === '搜索' || value === 'Search' ? this.uiText('pm_search_keywords_or_link') : PinmonyI18n.render(value, this.uiLanguage);
   }
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
@@ -540,7 +540,7 @@ export struct PinmonySearchPage {
     const needsMore: boolean = discovery ? this.snapshot.discoveryApi === true &&
       this.snapshot.discoveryActive === true && !this.snapshot.discoveryBusy && !this.snapshot.discoveryEnded &&
       !this.snapshot.discoveryError && this.snapshot.ideaSections.length < 6 : this.snapshot.api === true &&
-      !this.snapshot.apiBusy && !this.snapshot.apiEnded && !this.snapshot.apiError &&
+      !this.snapshot.apiBusy && !this.snapshot.apiEnded && !this.snapshot.apiContinuationPaused && !this.snapshot.apiError &&
       this.snapshot.results.length > 0 && this.resultsViewportReady &&
       this.initialFillResultsCount !== this.snapshot.results.length;
     if (!needsMore || !this.onLoadMore) return;
@@ -553,7 +553,7 @@ export struct PinmonySearchPage {
       if (!this.automaticLoadingEnabled || this.snapshot.pageKey !== page || !(this.actionsReady || this.resultsReadsReady || discovery && this.discoveryReadsReady) ||
           this.loading || this.restoringResultsScroll || !this.onLoadMore) return;
       if (!discovery) {
-        if (this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiError || !this.resultsViewportReady) return;
+        if (this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiContinuationPaused || this.snapshot.apiError || !this.resultsViewportReady) return;
         try {
           const position = this.resultsScroller.offset();
           if (!position || !this.resultsScroller.isAtEnd() || position.yOffset > 1) return;
@@ -569,7 +569,7 @@ export struct PinmonySearchPage {
 
   private resultsReachEnd(): void {
     if (!this.automaticLoadingEnabled || !(this.actionsReady || this.resultsReadsReady) || this.loading || this.snapshot.apiBusy ||
-        this.snapshot.apiEnded || this.snapshot.apiError || this.restoringResultsScroll || !this.onLoadMore) return;
+        this.snapshot.apiEnded || this.snapshot.apiContinuationPaused || this.snapshot.apiError || this.restoringResultsScroll || !this.onLoadMore) return;
     try {
       const position = this.resultsScroller.offset();
       if (!position) return;
@@ -588,7 +588,7 @@ export struct PinmonySearchPage {
       .map((item: PinmonySearchResult): string => item.imageUrl);
     if (urls.join('|') !== this.upcomingImageUrls.join('|')) this.upcomingImageUrls = urls;
     const reserve: number = Math.min(24, Math.max(8, (last - first + 1) * 2));
-    if (this.loading || this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiError ||
+    if (this.loading || this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiContinuationPaused || this.snapshot.apiError ||
         !this.onLoadMore || first < 0 || last < first || this.snapshot.results.length - cardLast - 1 > reserve ||
         this.lastPrefetchResultCount === this.snapshot.results.length) return;
     this.lastPrefetchResultCount = this.snapshot.results.length;
@@ -1304,11 +1304,19 @@ export struct PinmonySearchPage {
     Column({ space: 14 }) {
       if (this.query.trim() && !/[?&]q=[^&#]+/i.test(this.snapshot.pageKey) && !this.loading) {
         Text(this.uiText("pm_press_search_to_see_results_9e79a655")).fontColor($r('app.color.secondary_text'))
-      } else if (this.loading || this.snapshot.kind === 'loading' ||
+      } else if (this.loading || this.snapshot.apiBusy || this.snapshot.kind === 'loading' ||
           (this.snapshot.api && this.snapshot.apiActive === false && !this.error)) {
         this.searchLoadingState()
       } else if (this.error) {
-        PinmonyActionNotice({ active: this.active && this.interactionReady, message: PinmonyI18n.render(this.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { if (this.onRetry) this.onRetry(); } })
+        PinmonyActionNotice({ active: this.active && this.interactionReady, message: PinmonyI18n.render(this.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => {
+          if (this.snapshot.apiActive === true && !this.snapshot.apiEnded && this.onLoadMore) this.onLoadMore();
+          else if (this.onRetry) this.onRetry();
+        } })
+      } else if (this.query.trim() && this.snapshot.apiActive === true && !this.snapshot.apiEnded) {
+        Button(this.uiText('pm_load_more_af90a08f'))
+          .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+          .enabled(this.active && this.interactionReady && !this.snapshot.apiBusy)
+          .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
       } else if (this.profileSearchEmpty()) {
         Text(this.uiText("pm_we_could_not_find_anyone_named_a06407b4") + this.snapshot.query.trim() + this.uiText("pm_text_c74084fe"))
           .fontSize(15).fontColor($r('app.color.primary_text')).width('100%')
@@ -1358,6 +1366,9 @@ export struct PinmonySearchPage {
           .enterKeyType(EnterKeyType.Search)
           .cancelButton({ style: CancelButtonStyle.INPUT })
           .onChange((value: string) => {
+            // Closing the editing layer restores its committed value. A change
+            // from that inactive Search must not cancel a submitted Pin link.
+            if (!this.active || !this.inputEditing) return;
             if (this.query !== value) this.query = value;
             if (this.onQueryChange) this.onQueryChange(value);
           })
@@ -1489,6 +1500,13 @@ export struct PinmonySearchPage {
         .onScrollStop(() => this.reportResultsScroll(true))
         .onReachEnd(() => this.resultsReachEnd())
         .onAreaChange((_oldArea: Area, newArea: Area) => this.resultsAreaChanged(newArea))
+      }
+      if (this.snapshot.results.length > 0 && this.snapshot.apiContinuationPaused && !this.snapshot.apiEnded && !this.snapshot.apiBusy && !this.error) {
+        Button(this.uiText('pm_load_more_af90a08f'))
+          .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+          .enabled(this.active && this.interactionReady)
+          .onClick(() => { if (this.onLoadMore) this.onLoadMore(); })
+          .margin({ top: 8, bottom: 8 })
       }
     }
     .width('100%')

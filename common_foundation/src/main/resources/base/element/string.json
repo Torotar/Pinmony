@@ -1,6 +1,9 @@
 {
   "string": [
-    {"name":"pm_photo_history_save_unconfirmed","value":"搜索已完成，但照片历史保存结果未确认。"},
+    {
+      "name": "pm_photo_history_save_unconfirmed",
+      "value": "搜索已完成，但照片历史保存结果未确认。"
+    },
     {
       "name": "pm_recommend_boards_description",
       "value": "关闭图板的个性化开关，以移除基于该图板的主页标签和推荐。这不会影响图板及其中的 Pin 图。"
@@ -2120,6 +2123,10 @@
     {
       "name": "pm_search_44ce7ae9",
       "value": "搜索"
+    },
+    {
+      "name": "pm_search_keywords_or_link",
+      "value": "搜索关键词或链接"
     },
     {
       "name": "pm_profile_7f1d9dd0",
@@ -5801,7 +5808,10 @@
       "name": "pm_photo_history_delete_all_confirm",
       "value": "删除全部照片搜索历史？此操作会提交到服务器。"
     },
-    { "name": "pm_photo_history_pending_delete", "value": "待删除" },
+    {
+      "name": "pm_photo_history_pending_delete",
+      "value": "待删除"
+    },
     {
       "name": "pm_photo_history_deleted",
       "value": "已成功删除"
@@ -5837,6 +5847,14 @@
     {
       "name": "pm_created_board_choose_pins",
       "value": "收藏一些 Pin 图至你的新图板"
+    },
+    {
+      "name": "pm_news_explore_home",
+      "value": "探索你主页上的更多点子"
+    },
+    {
+      "name": "pm_news_start",
+      "value": "开始"
     }
   ]
 }

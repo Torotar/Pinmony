@@ -1,6 +1,9 @@
 {
   "string": [
-    {"name":"pm_photo_history_save_unconfirmed","value":"Search completed, but saving photo history was not confirmed."},
+    {
+      "name": "pm_photo_history_save_unconfirmed",
+      "value": "Search completed, but saving photo history was not confirmed."
+    },
     {
       "name": "pm_recommend_boards_description",
       "value": "Turn off personalization for a board to remove its home feed tabs and recommendations. This will not affect the board or its Pins."
@@ -2120,6 +2123,10 @@
     {
       "name": "pm_search_44ce7ae9",
       "value": "Search"
+    },
+    {
+      "name": "pm_search_keywords_or_link",
+      "value": "Search keywords or links"
     },
     {
       "name": "pm_profile_7f1d9dd0",
@@ -5801,7 +5808,10 @@
       "name": "pm_photo_history_delete_all_confirm",
       "value": "Delete all photo search history? This submits the deletion to the server."
     },
-    { "name": "pm_photo_history_pending_delete", "value": "Pending deletion" },
+    {
+      "name": "pm_photo_history_pending_delete",
+      "value": "Pending deletion"
+    },
     {
       "name": "pm_photo_history_deleted",
       "value": "Deleted successfully"
@@ -5837,6 +5847,14 @@
     {
       "name": "pm_created_board_choose_pins",
       "value": "Save some Pins to your new board"
+    },
+    {
+      "name": "pm_news_explore_home",
+      "value": "Explore more ideas on your home feed"
+    },
+    {
+      "name": "pm_news_start",
+      "value": "Get started"
     }
   ]
 }

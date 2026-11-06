@@ -18,7 +18,7 @@ async function main() {
   const host = new Host(), events = [], target = 'https://www.pinterest.com/sample/board/';
   Object.assign(host, {
     searchStore:{search:{pageKey:'https://www.pinterest.com/search/',heroes:[{id:'hero',enabled:true,targetUrl:target}]},searchCache:{put(){}}},
-    boardStore:{}, pinStore:{}, loadFailed:false, nativeRootOnly:true,
+    boardStore:{}, pinStore:{}, loadFailed:false, nativeRootOnly:true, nativeBusinessRoutesEnabled:true,
     boardUrlFromAddress:url=>url, nativeDisplayAddress:()=>host.navigationAddress || '',
     extractPinUrl:()=>'', shouldKeepSearchRootMounted:()=>true, nativeSearchPageVisible:()=>false,
     uiText:key=>key, rootStatusError:()=>'', rootStatusLoading:()=>true, nativeRootTabsVisible:()=>false,

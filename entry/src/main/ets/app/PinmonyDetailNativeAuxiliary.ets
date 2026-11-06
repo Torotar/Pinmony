@@ -1,4 +1,4 @@
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { readShufflePresentation, PinmonyShuffleSnapshot } from 'feature_pin';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyVideo, PinmonyVideoSource, PinmonyCarousel, PinmonyCarouselItem,
   PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin, PIN_VIDEO_API_ENABLED, PIN_CAROUSEL_API_ENABLED, PIN_VISUAL_SEARCH_API_ENABLED } from 'feature_pin';
@@ -101,9 +101,11 @@ export class PinmonyDetailNativeAuxiliary {
       this.pin = pin; this.token = token; this.account = this.key(); this.video = undefined; this.carousel = undefined;
       this.mediaVersion = 0; this.original = this.image(r.data.images?.orig?.url || r.data.images?.['736x']?.url || r.data.images?.['474x']?.url || ''); this.mediaError = '';
       this.mediaKind = r.data.carousel_data?.carousel_slots?.length ? 'carousel' : r.data.is_video === true || !!r.data.videos || !!this.storyVideo(r.data,false) ? 'video' : '';
+      PinmonyRuntimeLog.info('DetailMediaTrace: phase=base kind=' + (this.mediaKind || 'photo') +
+        ' slots=' + (r.data.carousel_data?.carousel_slots?.length || 0).toString());
+      this.resolve(r.data,false,false);
       const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
       if (detail?.title === '' || detail?.description === '' || detail?.creator === '' || r.data.story_pin_data_id || r.data.story_pin_data) this.readContent();
-      else this.resolve(r.data,false,false);
       if (this.store.detail?.shuffleId) {
         const revision: number = this.revision;
         this.shuffleTimer = setTimeout((): void => {
@@ -222,8 +224,15 @@ export class PinmonyDetailNativeAuxiliary {
         next.creatorVerified = creator.verifiedIdentity?.verified === true || creator.isVerifiedMerchant === true;
       }
       this.store.detail = next;
-      this.mediaKind = pin.carouselData?.carouselSlots?.length ? 'carousel' : pin.isVideo || pin.videos || this.storyVideo(pin,true) ? 'video' : '';
-      await this.resolve(pin,true,false);
+      const contentKind: string = pin.carouselData?.carouselSlots?.length ? 'carousel' : pin.isVideo || pin.videos || this.storyVideo(pin,true) ? 'video' : '';
+      PinmonyRuntimeLog.info('DetailMediaTrace: phase=content kind=' + (contentKind || 'unspecified') +
+        ' retained=' + (this.mediaKind || 'photo') + ' slots=' + (pin.carouselData?.carouselSlots?.length || 0).toString());
+      // Text enrichment is not evidence that existing media disappeared.
+      // The base media resolver owns any in-flight fallback request.
+      if (!this.mediaKind && contentKind) {
+        this.mediaKind = contentKind;
+        await this.resolve(pin,true,false);
+      }
     } catch (_) {
       if (revision === this.revision && this.ready()) this.store.detailApiError = PinmonyI18n.message('pm_unable_to_load_pin_please_retry_252ec41d');
     }
@@ -301,6 +310,8 @@ export class PinmonyDetailNativeAuxiliary {
       if (refresh) this.mediaVersion = (this.mediaVersion + 1) % 1000000;
       if (video) { video.readRevision = this.mediaVersion; this.video = video; }
       if (carousel) this.carousel = carousel;
+      PinmonyRuntimeLog.info('DetailMediaTrace: phase=resolved kind=' + this.mediaKind +
+        ' items=' + (this.carousel?.items.length || 0).toString());
     } catch (_) { if (this.ready() && revision === this.revision) this.mediaError = this.mediaKind === 'video' ? '视频地址读取失败，请重试' : PinmonyI18n.message("pm_unable_to_load_carousel_please_retry_e43842b8"); }
     finally { if (revision === this.revision && this.ready()) { this.mediaLoading = false; this.apply(); } }
   }

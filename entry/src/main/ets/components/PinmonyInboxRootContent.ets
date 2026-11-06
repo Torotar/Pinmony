@@ -34,7 +34,7 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
               onScrollAvailability: (scrollable: boolean) => view.updateInboxScrollAvailability(scrollable),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               snapshot: view.inboxStore.inbox || view.inboxPlaceholder(),
-              actionsReady: view.activeTab === 2 && (view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady) &&
+              actionsReady: view.activeTab === 2 && (view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady || view.inboxStore.inboxNativeUpdatesReady) &&
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),
               sectionReady: view.activeTab === 2 && view.inboxStore.inboxSectionReady &&
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),

@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
-const Aux=load('entry/src/main/ets/app/PinmonyDetailNativeAuxiliary.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='feature_pin'?{PIN_VIDEO_API_ENABLED:true,PIN_CAROUSEL_API_ENABLED:true,PIN_VISUAL_SEARCH_API_ENABLED:true}:{}).PinmonyDetailNativeAuxiliary;
+const Aux=load('entry/src/main/ets/app/PinmonyDetailNativeAuxiliary.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:n==='feature_pin'?{PIN_VIDEO_API_ENABLED:true,PIN_CAROUSEL_API_ENABLED:true,PIN_VISUAL_SEARCH_API_ENABLED:true}:{}).PinmonyDetailNativeAuxiliary;
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',pin=origin+'/pin/11/',flush=()=>new Promise(setImmediate),crop={x:.1,y:.1,w:.8,h:.8};
 const art=(url='https://i.pinimg.com/original.jpg')=>({url,width:736,height:1000});
@@ -18,6 +18,23 @@ function fixture(data=raw){
  return {aux,store,requests,cancelled,session:()=>session,setSession:s=>session=s,setOwned:v=>owned=v};
 }
 async function main(){
+ const carouselRaw={...raw,carousel_data:{carousel_slots:[{id:'one',images:{orig:art()}},{id:'two',images:{orig:art('https://i.pinimg.com/second.jpg')}}]}};
+ const missingText=fixture(carouselRaw);
+ missingText.store.detail.description='';missingText.store.detail.creator='';missingText.store.detail.carousel=undefined;
+ missingText.aux.start(pin,1,response(carouselRaw));
+ assert.equal(missingText.store.detail.carousel?.items.length,2,'base carousel must load without waiting for text enrichment');
+ const enrichment=missingText.requests.find(r=>r.job.id.startsWith('native_detail_aux_content_'));
+ assert(enrichment);enrichment.resolve(JSON.stringify({data:{v3GetPinQueryv2:{data:{entityId:'11',title:'Enriched title',closeupUnifiedDescription:'Description',carouselData:null}}}}));await flush();
+ assert.equal(missingText.store.detail.carousel?.items.length,2,'text-only response must not erase validated carousel');
+ assert.equal(missingText.store.detail.mediaKind,'carousel');assert.equal(missingText.store.detail.title,'Enriched title');
+ const failedText=fixture(carouselRaw);failedText.store.detail.description='';failedText.aux.start(pin,1,response(carouselRaw));
+ failedText.requests.find(r=>r.job.id.startsWith('native_detail_aux_content_')).resolve('invalid');await flush();
+ assert.equal(failedText.store.detail.carousel.items.length,2,'failed text enrichment retains complete base carousel');
+ const lateText=fixture(carouselRaw);lateText.store.detail.description='';lateText.aux.start(pin,1,response(carouselRaw));
+ const late=lateText.requests.find(r=>r.job.id.startsWith('native_detail_aux_content_'));
+ lateText.aux.pause();lateText.store.detail={pinUrl:origin+'/pin/99/',title:'New Pin'};
+ late.resolve(JSON.stringify({data:{v3GetPinQueryv2:{data:{entityId:'11',title:'Late title'}}}}));await flush();
+ assert.equal(lateText.store.detail.title,'New Pin');assert.equal(lateText.store.detail.carousel,undefined,'late enrichment cannot restore departed carousel');
  const deferred=fixture();deferred.store.detail.shuffleId='77';deferred.aux.start(pin,1,response(raw));
  assert.equal(deferred.requests.length,0,'shuffle does not compete with initial media');
  await new Promise(resolve=>setTimeout(resolve,300));assert.equal(deferred.requests.length,1);deferred.requests[0].resolve('{}');await flush();
@@ -90,6 +107,13 @@ async function main(){
  assert.equal(story.store.detail.creator,'Creator');assert(story.store.detail.creatorVerified);assert.equal(story.store.detail.creatorUrl,origin+'/creator/');
  assert.equal(story.store.detail.video.duration,12000);assert.equal(story.store.detail.video.sources.length,2);assert(story.store.detail.isVideo);
  assert.equal(story.store.detail.related[0].id,'retained');assert.equal(story.store.detail.actions[0].id,'save','content completion preserves current interactions');
+ for(const [kind,base] of [['video',{...raw,...video}],['mixed',{...raw,carousel_data:{carousel_slots:mixedSlots}}],['story',{...raw,story_pin_data:storyPin.storyPinData}]]){
+   const f=fixture(base);f.store.detail.description='';f.aux.start(pin,1,response(base));
+   const request=f.requests.find(r=>r.job.id.startsWith('native_detail_aux_content_'));assert(request,kind);
+   request.resolve(storyBody({entityId:'11',title:'Text-only update'}));await flush();
+   if(kind==='mixed')assert.equal(f.store.detail.carousel?.items.length,15,kind+' retains all slots');
+   else assert.equal(f.store.detail.video?.sources.length,2,kind+' retains video after text enrichment');
+ }
  const wrongStory=fixture({...raw,story_pin_data_id:'synthetic-story'});wrongStory.requests[0].resolve(storyBody({...storyPin,entityId:'99'}));await flush();assert.equal(wrongStory.store.detail.title,'body');assert(!wrongStory.store.detail.video);
  const staleStory=fixture({...raw,story_pin_data_id:'synthetic-story'});staleStory.aux.pause();staleStory.requests[0].resolve(storyBody(storyPin));await flush();assert.equal(staleStory.store.detail.title,'body');
  const multiStory=fixture({...raw,story_pin_data_id:'synthetic-story'});multiStory.requests[0].resolve(storyBody({...storyPin,storyPinData:{pages:[...storyPin.storyPinData.pages,...storyPin.storyPinData.pages]}}));await flush();assert(!multiStory.store.detail.video,'never treat the first page as the entire multipage story');
