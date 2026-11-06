@@ -71,7 +71,7 @@ export struct PinmonyDetailEntryMotion {
       return;
     }
     this.frame = this.closing ? target : this.source;
-    this.showing = this.closing ? !this.photo.returnPageOnly && this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible();
+    this.showing = !this.photo.returnPageOnly && (this.closing ? this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible());
     // Data readiness may arrive before this Image has a drawable frame. Make
     // the photo visible at its source first, then wait for its render callback.
     // Page-only transitions do not display this Image and need no render wait.
@@ -98,7 +98,7 @@ export struct PinmonyDetailEntryMotion {
     if (!measuredTarget && !closing) { this.onOpened?.(); return; }
     const target: ImageFlightRect = measuredTarget || this.frame;
     const version: number = ++this.version;
-    const pageExit: boolean = !measuredTarget || closing && this.photo.returnPageOnly === true || !this.heroVisible() || !closing && this.restoredOffset > 0;
+    const pageExit: boolean = !measuredTarget || this.photo.returnPageOnly === true || !this.heroVisible() || !closing && this.restoredOffset > 0;
     if (!this.showing) this.frame = target;
     this.showing = !pageExit;
     PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (closing ? 'close-start' : 'open-start'));

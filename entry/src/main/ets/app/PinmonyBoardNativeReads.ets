@@ -29,9 +29,12 @@ interface BoardImage { url: string; width: number; height: number; }
 interface BoardDimensions { width: number; height: number; }
 interface BoardVideo { duration?: number; }
 interface BoardVideos { video_list?: Record<string, BoardVideo>; }
+interface BoardStoryVideoBlock { block_type?: number; video?: BoardVideos; }
+interface BoardStoryVideoPage { blocks?: BoardStoryVideoBlock[]; }
+interface BoardStoryVideoData { is_deleted?: boolean; total_video_duration?: number; pages?: BoardStoryVideoPage[]; }
 interface BoardPinData { favorited_by_me?: boolean; type: string; id: string; images?: Record<string, BoardImage>; image_large_url?: string;
   image_medium_url?: string; image_large_size_pixels?: BoardDimensions; image_medium_size_pixels?: BoardDimensions;
-  grid_title?: string; title?: string; description?: string; link?: string; pinner?: BoardUser; board?: BoardPinOwner; videos?: BoardVideos; tracking_params?: string; }
+  grid_title?: string; title?: string; description?: string; link?: string; pinner?: BoardUser; board?: BoardPinOwner; videos?: BoardVideos; story_pin_data?: BoardStoryVideoData; tracking_params?: string; }
 interface BoardPinOwner { id: string; section_count?: number; }
 interface BoardCreatedSection { id: string; title: string; pin_count?: number | null; board: BoardPinOwner; }
 interface BoardToolData { type: string; tool: number; text: string; }
@@ -59,6 +62,7 @@ export interface PinmonyBoardNativeReadsPorts {
   bridge: (value: string) => void; committed: () => void; install: (script: string) => void;
   openPin: (pin: PinmonyBoardPin, board: PinmonyBoardDetail) => void;
   renamed?: (previous: string, next: string) => void; exited?: (action: string) => void;
+  categoriesChanged?: () => void;
   prepareDocument?: () => Promise<boolean>; runScript?: (script: string) => Promise<string>; jsonText?: (value: string) => string; feedback?: (message: string) => void; invalidateProfile?: () => void; movePage?: () => string; clearMovePage?: () => void;
 }
 
@@ -139,7 +143,7 @@ export class PinmonyBoardNativeReads {
       state: (): PinmonyBoardFlow | undefined => this.store.boardDetail?.flow,
       page: (): string => this.store.boardDetail?.pageKey || '',
       identity: (): PinmonyBoardPinWriteIdentity | undefined => this.current() && this.verified && this.ready && this.board && !this.collection() ?
-        {page:this.page,boardId:this.board.id,viewerId:this.viewer,intent:this.flowEpoch,canContribute:this.contributes(),recommendationPath:this.flow?.phase === 'ideas' && this.flow.sectionId ? this.sectionIdeaPath : undefined,loadedIds:(this.sectionSource?.pins || this.pins).map((pin: PinmonyBoardPin): string => pin.id),selectedIds:this.selectedIds.slice(),sources:this.sources.slice()} : undefined,
+        {page:this.page,boardId:this.board.id,viewerId:this.viewer,intent:this.flowEpoch,canContribute:this.contributes(),recommendationPath:this.flow?.createdBoardIdeas ? this.page.slice(this.origin.length) : this.flow?.phase === 'ideas' && this.flow.sectionId ? this.sectionIdeaPath : undefined,loadedIds:(this.sectionSource?.pins || this.pins).map((pin: PinmonyBoardPin): string => pin.id),selectedIds:this.selectedIds.slice(),sources:this.sources.slice()} : undefined,
       session: (): PinmonyBusinessSessionContext => this.ports.session(),network: (): PinmonyNativeNetwork => this.ports.network(),
       changed: (flow: PinmonyBoardFlow): void => {const unknown: boolean = flow.uncertain && !this.store.boardDetail?.flow?.uncertain;this.flow = flow;if(this.store.boardDetail)this.store.boardDetail.flow = flow;this.syncAuxiliary();if(unknown && this.ports.invalidateProfile)this.ports.invalidateProfile();},
       confirmed: (action: string, ids: string[], copy: string): void => this.pinWriteConfirmed(action,ids,copy)
@@ -223,6 +227,16 @@ export class PinmonyBoardNativeReads {
       ready:this.ready,error:this.error,hasMore:!this.ended && !!this.cursor,pins:this.pins.slice(),flow:this.flow || existing?.flow,revision:existing?.revision || 0};
     this.store.boardDetail = snapshot;
     if(this.ready)this.ports.committed();
+  }
+  async openCreatedIdeas(boardId: string): Promise<void> {
+    if(!this.bind() || !this.digits(boardId))return;
+    const page: string = this.page, revision: number = this.revision;
+    this.flow = this.emptyFlow();this.flow.phase = 'ideas';this.flow.createdBoardIdeas = true;this.flow.createdBoardId = boardId;this.flow.loading = true;const initial: PinmonyBoardFlow = this.flow;this.apply();
+    if(this.error){this.error = '';this.attempted = false;}
+    await this.demand();
+    if(!this.current() || this.page !== page || this.revision !== revision || this.flow !== initial)return;
+    if(this.board?.id !== boardId || !this.ready || !this.contributes()){initial.loading = false;initial.error = this.error || PinmonyI18n.message('pm_loading_interrupted_please_retry_b469c1dd');this.syncAuxiliary();return;}
+    await this.readAuxiliary('ideas',false);
   }
   async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.busy || this.error)return; if(!this.ready && !this.attempted)await this.read(false,false); else if(this.verified && !this.sectionsReady && !this.sectionsBusy && !this.sectionsError)await this.readSections(); }
   async refresh(): Promise<void> {
@@ -337,7 +351,7 @@ export class PinmonyBoardNativeReads {
       return true;
     }
     const phase: string = this.store.boardDetail?.flow?.phase || '';
-    if(['ideas','ideasMore','select','targets','targetsMore','edit','archiveConfirm'].includes(a.action) || ['ideas','targets','edit'].includes(phase) && a.action === 'retry' || a.action === 'close') {
+    if(['createdIdeasBack','createdIdeasDone','ideas','ideasMore','select','targets','targetsMore','edit','archiveConfirm'].includes(a.action) || ['ideas','targets','edit'].includes(phase) && a.action === 'retry' || a.action === 'close') {
       await this.auxiliaryAction(a);return true;
     }
     if(a.action === 'saveParentIdea') {
@@ -406,6 +420,7 @@ export class PinmonyBoardNativeReads {
     const old: BoardData = this.board, previous: string = this.page;
     this.pause();this.flow = this.emptyFlow();
     if(this.ports.invalidateProfile)this.ports.invalidateProfile();
+    if(this.ports.categoriesChanged)this.ports.categoriesChanged();
     if(action === 'editSave') {
       const b: BoardData = JSON.parse(raw) as BoardData;
       b.owner = {id:b.owner.id,username:b.owner.username || old.owner.username,full_name:b.owner.full_name || old.owner.full_name,
@@ -534,14 +549,17 @@ export class PinmonyBoardNativeReads {
     if(!this.bind() || this.store.boardDetail?.flow?.busy)return;
     const old: PinmonyBoardFlow | undefined = this.store.boardDetail?.flow;
     if(this.ports.movePage?.() === this.page && a.action === 'select')a.action = 'close';
-    if(a.action === 'close') {
+    const createdExit: boolean = (a.action === 'createdIdeasBack' || a.action === 'createdIdeasDone') && old?.createdBoardIdeas === true;
+    if((a.action === 'createdIdeasBack' || a.action === 'createdIdeasDone') && !createdExit)return;
+    if(createdExit || a.action === 'close') {
       if(this.sectionSource && !old?.uncertain) {
         if(this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
         await this.sectionAction({action:'sectionReturn'});return;
       }
       if(this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
-      const recover: boolean = old?.uncertain === true || old?.phase === 'archived';this.cancelFlow();this.cancelSection();this.flow = this.emptyFlow();this.sectionSource = undefined;this.targetCursor = '';this.selectedIds = [];this.sources = [];this.syncAuxiliary();if(recover)await this.refresh();return;
+      const recover: boolean = old?.uncertain === true || old?.phase === 'archived';this.cancelFlow();this.cancelSection();this.flow = this.emptyFlow();this.sectionSource = undefined;this.targetCursor = '';this.selectedIds = [];this.sources = [];this.syncAuxiliary();if(createdExit && a.action === 'createdIdeasBack'){this.ports.exited?.('createdIdeasBack');return;}if(recover || createdExit)await this.refresh();return;
     }
+    if(a.action === 'retry' && old?.createdBoardIdeas && (!this.ready || this.error)){await this.openCreatedIdeas(old.createdBoardId || '');return;}
     if(!this.verified || !this.ready || old?.uncertain)return;
     if(a.action === 'ideasMore') {if(old?.phase === 'ideas' && !old.sectionId && !old.error)await this.readAuxiliary('ideas',true);return;}
     if(a.action === 'sectionTargetBack' && old?.phase === 'targets') {this.cancelFlow();old.targetBoardId = undefined;old.targetSections = undefined;old.loading = false;old.error = '';this.flow = old;this.syncAuxiliary();return;}
@@ -566,18 +584,20 @@ export class PinmonyBoardNativeReads {
     const mergeTargets: boolean = phase === 'mergeTargets';
     if(mergeTargets)phase = 'targets';
     this.cancelFlow();const epoch: number = this.flowEpoch, revision: number = this.revision, board: BoardData = this.board;
-    if(!append){this.flow = this.emptyFlow();if(this.sectionSource && phase === 'targets'){this.flow.sectionId = this.sectionSource.sectionId;this.flow.sectionTitle = this.sectionSource.sectionTitle;this.flow.pins = this.sectionSource.pins.slice();}if(phase === 'ideas'){this.sources = [];this.ideaCursor = '';}}
+    const createdBoardIdeas: boolean = phase === 'ideas' && this.flow?.createdBoardIdeas === true;
+    const createdBoardId: string | undefined = this.flow?.createdBoardId;
+    if(!append){this.flow = this.emptyFlow();this.flow.createdBoardIdeas = createdBoardIdeas;this.flow.createdBoardId = createdBoardIdeas ? createdBoardId : undefined;if(this.sectionSource && phase === 'targets'){this.flow.sectionId = this.sectionSource.sectionId;this.flow.sectionTitle = this.sectionSource.sectionTitle;this.flow.pins = this.sectionSource.pins.slice();}if(phase === 'ideas'){this.sources = [];this.ideaCursor = '';}}
     const f: PinmonyBoardFlow | undefined = this.flow;if(!f)return;f.phase = mergeTargets ? 'mergeTargets' : phase;f.loading = true;f.error = '';this.syncAuxiliary();
     const live = (): boolean => this.current() && revision === this.revision && epoch === this.flowEpoch && this.flow === f;
     try {
       let name: string = 'BoardResource', o: BoardReadOptions = {board_id:board.id,field_set_key:'edit'};
-      if(phase === 'ideas'){name = 'BoardContentRecommendationResource';o = {id:board.id,type:'board',__track__referrer:this.page.slice(this.origin.length).split('/')[2] === '_products_you_tagged' ? '23' : 23};if(append)o.bookmarks = [this.ideaCursor];}
+      if(phase === 'ideas'){name = 'BoardContentRecommendationResource';o = {id:board.id,type:'board',__track__referrer:createdBoardIdeas ? 21 : this.page.slice(this.origin.length).split('/')[2] === '_products_you_tagged' ? '23' : 23};if(append)o.bookmarks = [this.ideaCursor];}
       else if(phase === 'targets'){name = 'BoardsResource';o = {privacy_filter:'all',sort:'custom',field_set_key:'profile_grid_item',filter_stories:true,username:board.owner.username,page_size:25,group_by:'mix_public_private',include_archived:true,filter_all_pins:false};if(append)o.bookmarks = [this.targetCursor];}
       const body: BoardResponse = await this.request(name,o,revision,-1,true,live);
       if(phase === 'ideas') {
         const rows: BoardPinData[] = body.resource_response.data as BoardPinData[];if(!Array.isArray(rows) || rows.length > 500)throw new Error('ideas');
         const products: boolean = this.page.slice(this.origin.length).split('/')[2] === '_products_you_tagged';
-        if(products && body.resource_response.endpoint_name !== 'v3_get_board_ideas_feed')throw new Error('ideas-endpoint');
+        if((products || createdBoardIdeas) && body.resource_response.endpoint_name !== 'v3_get_board_ideas_feed')throw new Error('ideas-endpoint');
         const pins: PinmonyBoardPin[] = append ? f.pins.slice() : [], sources: BoardSourcePin[] = append ? this.sources.slice() : [];
         let mapped: number = 0;
         rows.forEach((p: BoardPinData): void => {
@@ -740,7 +760,8 @@ export class PinmonyBoardNativeReads {
   private async request(name: string, options: BoardReadOptions, revision: number, section: number = -1, auxiliary: boolean = false, operationCurrent?: () => boolean): Promise<BoardResponse> {
     const envelope: BoardReadEnvelope = {options:options,context:{}};
     let source: string = this.page.slice(this.origin.length), handler: string = 'www/index.js';
-    if(auxiliary && name === 'BoardContentRecommendationResource'){source += '_tools/more-ideas/?ideas_referrer=23';handler = 'www/[username]/[slug]/_tools/more-ideas.js';}
+    if(auxiliary && name === 'BoardContentRecommendationResource' && this.flow?.createdBoardIdeas){handler = 'www/[username]/[slug].js';}
+    else if(auxiliary && name === 'BoardContentRecommendationResource'){source += '_tools/more-ideas/?ideas_referrer=23';handler = 'www/[username]/[slug]/_tools/more-ideas.js';}
     else if(auxiliary && name === 'BoardsResource'){source = '/board/' + (this.board?.id || '') + '/organize/repin/';handler = 'www/board/[id]/organize.js';}
     else if(auxiliary && name === 'BoardResource' && options.field_set_key === 'edit'){source = '/board/' + (this.board?.id || '') + '/edit/';handler = 'www/board/[id]/edit.js';}
     const job: PinmonyNetworkJob = {id:(auxiliary ? 'native_board_aux_' : 'native_board_') + (++this.sequence).toString(),epoch:this.generation,page:this.page,
@@ -749,7 +770,7 @@ export class PinmonyBoardNativeReads {
     this.requests.add(job.id); if(section >= 0)this.sectionRequests.add(job.id); let reply: PinmonyNetworkReply;
     const current = (): boolean => this.current() && revision === this.revision && (section < 0 || section === this.sectionEpoch) && (!operationCurrent || operationCurrent());
     if(auxiliary)(options.field_set_key === 'boardEdit' || name === 'BoardInvitesResource' || name === 'ShareSuggestionsResource' ? this.collabRequests : this.flowRequests).add(job.id);
-    try {reply = auxiliary ? await this.ports.network().requestBusinessBoardAuxRead(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.board?.id || '',this.board?.owner.username || '',this.viewer,current) : await this.ports.network().requestBusinessBoardRead(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.board?.id || '',section >= 0 ? this.flow?.sectionId || '' : '',this.viewer,this.board?.isOwn === true,current);} finally {this.requests.delete(job.id);this.sectionRequests.delete(job.id);this.flowRequests.delete(job.id);this.collabRequests.delete(job.id);}
+    try {reply = auxiliary ? await this.ports.network().requestBusinessBoardAuxRead(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.board?.id || '',this.board?.owner.username || '',this.viewer,current,this.flow?.createdBoardIdeas === true) : await this.ports.network().requestBusinessBoardRead(job,(): PinmonyBusinessSessionContext => this.ports.session(),this.board?.id || '',section >= 0 ? this.flow?.sectionId || '' : '',this.viewer,this.board?.isOwn === true,current);} finally {this.requests.delete(job.id);this.sectionRequests.delete(job.id);this.flowRequests.delete(job.id);this.collabRequests.delete(job.id);}
     if(!current())throw new Error('cancelled');
     if(!this.current() || revision !== this.revision || section >= 0 && section !== this.sectionEpoch)throw new Error('cancelled');
     if(reply.error || reply.status !== 200 || reply.body.length > 6000000)throw new Error('request');
@@ -766,9 +787,34 @@ export class PinmonyBoardNativeReads {
     ['736x','474x','236x','orig'].some((key: string): boolean => {const a: BoardImage | undefined = p.images?.[key]; if(a && this.image(a.url) && Number.isFinite(a.width) && a.width > 0 && Number.isFinite(a.height) && a.height > 0){art = a;return true;} return false;});
     if(!art) {const d: BoardDimensions | undefined = p.image_large_size_pixels || p.image_medium_size_pixels, url: string = this.image(p.image_large_url || p.image_medium_url); if(d && url && Number.isFinite(d.width) && d.width > 0 && Number.isFinite(d.height) && d.height > 0)art = {url:url,width:d.width,height:d.height};}
     if(!art)throw new Error('image');
-    let duration: string = ''; const videos: Record<string,BoardVideo> = p.videos?.video_list || {};
-    Object.keys(videos).some((key: string): boolean => {const ms: number | undefined = videos[key].duration; if(typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0 || ms > 86400000)return false; const secs: number = Math.floor(ms / 1000); duration = Math.floor(secs / 60).toString() + ':' + (secs % 60).toString().padStart(2,'0'); return true;});
+    const duration: string = this.pinDuration(p);
     return {favorite:p.favorited_by_me,id:p.id,pinUrl:this.origin + '/pin/' + p.id + '/',imageUrl:art.url,imageWidth:art.width,imageHeight:art.height,title:this.clean(p.grid_title || p.title),creatorName:this.clean(p.pinner?.full_name),duration:duration};
+  }
+  private durationLabel(ms: number | undefined): string {
+    if(typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0 || ms > 86400000)return '';
+    const secs: number = Math.floor(ms / 1000);
+    return Math.floor(secs / 60).toString() + ':' + (secs % 60).toString().padStart(2,'0');
+  }
+  private videoDuration(videos: BoardVideos | undefined): string {
+    const list: Record<string,BoardVideo> = videos?.video_list || {};
+    let label: string = '';
+    Object.keys(list).some((key: string): boolean => {
+      label = this.durationLabel(list[key]?.duration); return label !== '';
+    });
+    return label;
+  }
+  private pinDuration(pin: BoardPinData): string {
+    const regular: string = this.videoDuration(pin.videos);
+    if(regular)return regular;
+    const story: BoardStoryVideoData | undefined = pin.story_pin_data;
+    if(!story || story.is_deleted)return '';
+    const total: string = this.durationLabel(story.total_video_duration);
+    if(total)return total;
+    // Without a declared total, only a single video block has an unambiguous duration.
+    const pages: BoardStoryVideoPage[] = story.pages || [];
+    if(pages.length !== 1)return '';
+    const blocks: BoardStoryVideoBlock[] = pages[0].blocks || [];
+    return blocks.length === 1 && blocks[0].block_type === 3 ? this.videoDuration(blocks[0].video) : '';
   }
   private matchesBoardPage(value: string | undefined): boolean {
     if(typeof value !== 'string')return false;

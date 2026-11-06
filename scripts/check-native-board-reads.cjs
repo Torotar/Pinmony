@@ -4,6 +4,31 @@ function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpi
 const {PinmonyBoardNativeReads:Reader}=load('entry/src/main/ets/app/PinmonyBoardNativeReads.ets',n=>n === './PinmonyBoardSectionNativeWrites' ? load('entry/src/main/ets/app/PinmonyBoardSectionNativeWrites.ets') : n === './PinmonyBoardFollowNativeWrites' ? load('entry/src/main/ets/app/PinmonyBoardFollowNativeWrites.ets') : n === './PinmonyBoardContentNativeWrites' ? load('entry/src/main/ets/app/PinmonyBoardContentNativeWrites.ets', n => n === 'common_foundation' ? {PinmonyRuntimeLog:{info(){}}} : {}) : n==='./PinmonyBoardManagementNativeWrites'?load('entry/src/main/ets/app/PinmonyBoardManagementNativeWrites.ets',n=>n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{}):n==='./PinmonyBoardPinNativeWrites'?load('entry/src/main/ets/app/PinmonyBoardPinNativeWrites.ets',n=>n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{}):n==='./PinmonyBoardCollaboratorsNativeWrites'?load('entry/src/main/ets/app/PinmonyBoardCollaboratorsNativeWrites.ets',n=>n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{}):n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',page=origin+'/sample/board/',image='https://i.pinimg.com/synthetic.jpg';
+function checkVideoDurations() {
+ const reader=Object.create(Reader.prototype);reader.origin=origin;
+ const video=ms=>({video_list:{main:{duration:ms}}});
+ const story=ms=>({pages:[{blocks:[{block_type:3,video:video(ms)}]}]});
+ assert.equal(reader.pinDuration({videos:video(16300)}),'0:16');
+ assert.equal(reader.pinDuration({videos:null,story_pin_data:{...story(12000),total_video_duration:12000}}),'0:12');
+ assert.equal(reader.pinDuration({story_pin_data:story(11100)}),'0:11');
+ assert.equal(reader.pinDuration({story_pin_data:{...story(12000),is_deleted:true}}),'');
+ assert.equal(reader.pinDuration({story_pin_data:{pages:[...story(12000).pages,...story(16000).pages]}}),'');
+ assert.equal(reader.pinDuration({story_pin_data:{total_video_duration:28000,pages:[...story(12000).pages,...story(16000).pages]}}),'0:28');
+ for(const ms of [undefined,NaN,Infinity,-1,0,86400001,'12000'])assert.equal(reader.pinDuration({videos:video(ms)}),'');
+ assert.equal(reader.pinDuration({}),'');
+ if(process.argv[3]) {
+  const har=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
+  const entry=har.log.entries[337],content=entry.response.content;
+  assert(new URL(entry.request.url).pathname.includes('/BoardFeedResource/get/'));
+  const body=JSON.parse(content.encoding==='base64'?Buffer.from(content.text,'base64').toString('utf8'):content.text);
+  const pins=body.resource_response.data;
+  for(const [id,label] of [['911838255825766814','0:12'],['911838255825766811','0:11'],['911838255813428532','0:16']]) {
+   assert.equal(reader.mapPin(pins.find(pin=>pin.id===id)).duration,label);
+  }
+ }
+ console.log('Board duration: regular and Story videos, invalid/deleted/ambiguous metadata passed');
+}
+checkVideoDurations();
 const board={type:'board',id:'100',url:'/sample/board/',name:'Board',pin_count:3,privacy:'secret',owner:{id:'42',username:'sample',image_medium_url:image},is_collaborative:true,collaborating_users:[{id:'43',username:'peer',image_medium_url:image}],section_count:1,featured_board_metadata:{board_tag:'-1',curator:{id:'44',username:'curator',full_name:'Curator',image_medium_url:image}}};
 const pin=(id,boardId='100')=>({type:'pin',id:String(id),board:{id:boardId},images:{'736x':{url:image,width:100,height:200}},grid_title:'Pin',pinner:{id:'42',full_name:'Author'},videos:{video_list:{v720P:{duration:47000}}}});
 const section={type:'board_section',id:'456',title:'Section',pin_count:2,preview_pins:[{...pin(11),image_medium_url:image}]};

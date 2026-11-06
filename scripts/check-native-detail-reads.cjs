@@ -2,18 +2,21 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
+const secondaryTimers = new Map(); let secondaryTimerId = 0;
+async function advanceSecondary() { for (const [id, callback] of [...secondaryTimers]) { secondaryTimers.delete(id); callback(); } await flush(); }
 function load(file, deps) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText,
-    { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps || (() => ({}))), console });
+    { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps || (() => ({}))), console, setTimeout(callback) { const id = ++secondaryTimerId; secondaryTimers.set(id, callback); return id; }, clearTimeout(id) { secondaryTimers.delete(id); } });
   return exports;
 }
 const { readRelatedPresentation } = load('feature_pin/src/main/ets/services/PinmonyRelatedPresentation.ets');
 const { PinmonyDetailCache } = load('feature_pin/src/main/ets/services/PinmonyDetailCache.ets');
 const translationEvents = [];
+let translationLanguage = 'zh-CN,zh;q=0.9';
 const { PinmonyDetailNativeReads } = load('entry/src/main/ets/app/PinmonyDetailNativeReads.ets', name =>
   name === 'feature_pin' ? { readRelatedPresentation } : name === 'common_network' ? { PIN_BUSINESS_PIN_READ_ENABLED: true } :
-    name === 'common_foundation' ? { PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); }, warn() {} } } : {});
+    name === 'common_foundation' ? { PinmonyI18n: { ...require('./local-message-test-fixture.cjs').rawLocalMessages, translationAcceptLanguage: () => translationLanguage }, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); }, warn() {} } } : {});
 const pinUrl = id => 'https://www.pinterest.com/pin/' + id + '/';
 const related = (ids, bookmark) => JSON.stringify({ resource_response: { status: 'success', data: ids.map(id => ({
   id: String(id), type: 'pin', images: { '474x': { url: 'https://i.pinimg.com/' + id + '.jpg', width: 474, height: 700 } } })), bookmark } });
@@ -52,8 +55,17 @@ function fixture() {
     setForeground(value) { foreground = value; }, setRoot(value) { root = value; } };
 }
 async function main() {
+  for (const revoke of [f => f.controller.pause(), f => f.setSession({...f.getSession(),generation:2}), f => f.store.detailOpeningToken++]) {
+    const waiting=fixture();const pending=waiting.controller.start(pinUrl(1),1,base(1)).catch(()=> 'cancelled');
+    assert.equal(waiting.requests.length,0);revoke(waiting);await advanceSecondary();
+    assert.equal(await pending,'cancelled');assert.equal(waiting.requests.length,0,'retired entry must not dispatch deferred requests');
+  }
+  assert.equal(secondaryTimers.size,0,'pause clears deferred timers');
+
   const parallel = fixture();
   const parallelRead = parallel.controller.start(pinUrl(1), 1, base(1));
+  assert.equal(parallel.requests.length, 0, 'noncritical reads wait through the entry budget');
+  await advanceSecondary();
   assert.equal(parallel.requests.length, 2, 'both independent reads start before either response');
   parallel.requests[1].resolve(related([2], '-end-')); await parallelRead;
   assert.equal(parallel.store.detail.related.length, 1, 'recommendations publish while preview is pending');
@@ -63,6 +75,7 @@ async function main() {
   assert.equal(parallel.controller.retainedRelated.get(pinUrl(1)).previewText, 'late successful preview', 'retained state includes a later preview');
   const retained = fixture();
   let retaining = retained.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   retained.requests[0].resolve(preview('preview')); await flush();
   retained.requests[1].resolve(related([2, 3], 'retained-next')); await retaining;
   retained.controller.pause();
@@ -74,6 +87,7 @@ async function main() {
   assert.equal(retained.store.detail.commentPreview, 'preview');
   retained.controller.pause();
   retaining = retained.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   assert.equal(retained.store.detail.relatedLoading, false);
   assert.equal(retained.store.detail.commentPreview, 'preview', 'revalidation keeps the existing preview until the response replaces it');
   assert.equal(retained.store.detail.commentsRetained, true);
@@ -85,6 +99,7 @@ async function main() {
   retained.setSession({ ...retained.getSession(), generation: 2, accountId: 'other' });
   assert.equal(retained.controller.resume(pinUrl(1), 1), false, 'account changes reject native back state');
   retaining = retained.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   retained.requests[4].resolve(preview('other preview')); await flush();
   assert.equal(retained.requests.length, 6, 'new account generation cannot reuse retained recommendations');
   retained.requests[5].resolve(related([], '-end-')); await retaining;
@@ -94,6 +109,7 @@ async function main() {
     { id: '1', aggregated_pin_id: 'invalid', aggregated_pin_data: { id: '777' } } ]) {
     const nested = fixture();
     const started = nested.controller.start(pinUrl(1), 1, JSON.stringify({ resource_response: { status: 'success', data } }));
+  await advanceSecondary();
     assert.match(nested.requests[0].job.url, /UnifiedCommentsPreviewResource/);
     assert.equal(JSON.parse(new URL(nested.requests[0].job.url).searchParams.get('data')).options.aggregated_pin_id, '777');
     nested.requests[0].resolve(preview('nested preview')); await flush();
@@ -108,6 +124,7 @@ async function main() {
   for (const data of [ { id: '1' }, { id: '1', aggregated_pin_data: { id: 'invalid' } } ]) {
     const missing = fixture();
     const started = missing.controller.start(pinUrl(1), 1, JSON.stringify({ resource_response: { status: 'success', data } }));
+  await advanceSecondary();
     await flush(); assert.equal(missing.requests.length, 1); assert.match(missing.requests[0].job.url, /RelatedModulesResource/);
     assert.equal(missing.store.detail.commentsAvailable, false); assert.match(missing.store.detail.commentError, /缺少评论标识/);
     assert.equal(missing.store.detail.commentEmpty, false, 'missing identity is not an empty comment feed');
@@ -120,6 +137,7 @@ async function main() {
   }
   const f = fixture();
   const first = f.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   assert.equal(f.store.detail.actions.find(a=>a.kind==='like').countText,'12');
   assert.equal(f.store.detail.actions.find(a=>a.kind==='comment').countText,'3');
   assert(f.store.detail.actions.some(a=>a.kind==='save'));
@@ -203,6 +221,7 @@ async function main() {
   for (const revoke of [g => g.controller.pause(), g => g.setForeground(false), g => g.setRoot(true),
     g => g.setSession({ ...g.getSession(), accountId: 'other', generation: 2 }), g => { g.store.detailOpeningToken++; }]) {
     const g = fixture(); const started = g.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
     g.requests[0].resolve(preview(null)); await flush(); g.requests[1].resolve(related([], '-end-')); await started;
     g.store.commentToken = 1; const list = g.controller.readComments(false, () => true);
     g.requests[2].resolve(commentsBody([21], '')); await list;
@@ -211,6 +230,7 @@ async function main() {
     assert(!g.store.commentResult.items[0].replies.some(item => item.id === '99'), 'revoked reply ownership cannot commit');
   }
   const failed = fixture(); const initial = failed.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   failed.requests[0].resolve(preview(null)); await flush();
   failed.requests[1].resolve('bad-json'); await initial;
   assert(failed.store.detail.relatedError); assert.equal(failed.store.detail.commentEmpty, true);
@@ -221,6 +241,7 @@ async function main() {
 
   const metadata = fixture(); metadata.setSession({ ...metadata.getSession(), appVersion: '' });
   const metadataRead = metadata.controller.start(pinUrl(1), 1, base(1)); await flush();
+  await advanceSecondary();
   assert.equal(metadata.requests.length, 1); assert.match(metadata.requests[0].job.url, /RelatedModulesResource/);
   assert.match(metadata.store.detail.commentError, /请求信息/); assert.equal(metadata.store.detail.commentLoading, false);
   metadata.requests[0].resolve(related([], '-end-')); await metadataRead;
@@ -231,6 +252,7 @@ async function main() {
   for (const revoke of [f => f.controller.pause(), f => f.setSession({ ...f.getSession(), generation: 2, accountId: 'other' }),
     f => { f.store.detailOpeningToken++; }, f => f.setRoot(true), f => f.setForeground(false)]) {
     const stale = fixture(); const pending = stale.controller.start(pinUrl(1), 1, base(1)).catch(() => 'cancelled');
+  await advanceSecondary();
     revoke(stale); stale.requests[0].resolve(preview('late')); stale.requests[1].resolve(related([99], '-end-')); await pending;
     assert.equal(stale.requests.length, 2, 'revoked parallel reads cannot dispatch additional reads');
     assert(!stale.store.detail.related.some(item => item.id === '99'), 'revoked recommendations cannot publish');
@@ -241,6 +263,7 @@ async function main() {
   assert.equal(wrong.requests.length, 0);
   const t = fixture();
   const begin = t.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   t.requests[0].resolve(preview(null)); await flush(); t.requests[1].resolve(related([], '-end-')); await begin;
   const original = { id: '21', type: 'aggregatedcomment', text: 'Bonjour', canTranslate: true, replies: [] };
   t.store.commentToken = 1;
@@ -255,12 +278,14 @@ async function main() {
   const options = JSON.parse(decodeURIComponent(t.requests[2].job.url.match(/[?&]data=([^&]+)/)[1])).options;
   assert.deepEqual(options, { url: '/v3/aggregated_comments/21/translate/' });
   assert.equal(t.requests[2].job.method, 'GET');
+  assert.equal(t.requests[2].job.headers['Accept-Language'], 'zh-CN,zh;q=0.9');
+  assert.equal(t.requests[0].job.headers['Accept-Language'], undefined, 'unrelated reads do not gain a translation language');
   t.requests[2].resolve(translation(null)); await pending;
   assert.equal(original.translationError, '暂无可用译文');
   assert(translationEvents.includes('CommentsTranslationTrace: phase=response shape=null textLength=0'));
   assert(translationEvents.includes('CommentsTranslationTrace: phase=empty'));
   assert.equal(t.published.at(-1).items[0].translationLoading, false); assert.equal(t.published.at(-1).items[0].translationError, '暂无可用译文');
-  assert.equal(original.translatedText, undefined); assert.equal(original.translationLoading, false);
+  assert.equal(original.translatedText, ''); assert.equal(original.translationLoading, false);
   const retry = t.controller.translateComment('21', () => true);
   t.store.commentResult = { ...t.store.commentResult, items: [original, { id: '22', text: 'other' }] };
   // A plain-text success is synthetic branch coverage, not a captured online result.
@@ -273,8 +298,11 @@ async function main() {
   await t.controller.translateComment('21', () => true); assert.equal(original.translationVisible, false);
   await t.controller.translateComment('21', () => true); assert.equal(original.translationVisible, true);
   assert.equal(t.requests.length, 4, 'display toggles do not re-request translation');
-  original.translatedText = ''; original.translationVisible = false;
+  translationLanguage = 'en-US,en;q=0.9';
   const unconfirmed = t.controller.translateComment('21', () => true);
+  assert.equal(t.requests[4].job.headers['Accept-Language'], 'en-US,en;q=0.9');
+  assert.equal(original.translatedText, '', 'changing language cannot reuse the previous translation');
+  assert.equal(original.translationLanguage, translationLanguage);
   t.requests[4].resolve(translation({ text: 'unconfirmed object format' })); await unconfirmed;
   assert.equal(original.translationError, '暂无法识别译文格式');
   const closed = t.controller.translateComment('21', () => true);
@@ -286,7 +314,9 @@ async function main() {
   t.setSession({ ...t.getSession(), accountId: 'other', generation: 2 });
   t.requests[6].resolve(translation('other account')); await staleTranslation;
   assert.notEqual(original.translatedText, 'other account');
+  translationLanguage = 'zh-CN,zh;q=0.9';
   const observed = fixture(); const baseRead = observed.controller.start(pinUrl(1), 1, base(1));
+  await advanceSecondary();
   observed.requests[0].resolve(preview(null)); await flush(); observed.requests[1].resolve(related([], '-end-')); await baseRead;
   observed.store.commentToken = 1;
   const abandoned = observed.controller.readComments(false, () => true);

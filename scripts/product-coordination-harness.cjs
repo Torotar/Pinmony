@@ -116,6 +116,7 @@ function run(ts, code, context = {}, options) {
     context.PinmonyRouteParser ||= runtime(ts, context).loadFile('entry/src/main/ets/app/PinmonyRouteParser.ets').PinmonyRouteParser;
     if (!context.require)
         context.require = spec => runtime(ts, context).loadPackage(spec);
+    context.setTimeout ||= setTimeout;
     const result = vm.runInNewContext(code, context, options);
     const classes = new Set([result, ...Object.values(context)].filter(v => typeof v === 'function' && v.prototype));
     for (const Type of classes) {

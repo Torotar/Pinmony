@@ -13,11 +13,20 @@ const captures=[];
 function fixture(data=raw){
  let session={authenticated:true,generation:1,accountId:'synthetic',origin,userAgent:'synthetic',appVersion:'synthetic'},owned=true;
  const requests=[],cancelled=[],store={detailPin:pin,detailOpeningToken:1,detail:{pinUrl:pin,title:'body',related:[{id:'retained'}],actions:[{id:'save'}]},visualToken:0,visualResult:{pin:'',loading:false,error:'',items:[],ended:false},detailMediaRetryBusy:false,imageLayer:''};
- const aux=new Aux({store:()=>store,session:()=>session,owned:()=>owned,network:()=>({cancel:id=>cancelled.push(id),requestBusinessDetailAuxiliary(job,...args){assert(args.at(-1)());return new Promise(resolve=>{const entry={job,args,session:()=>session,resolve:(body,status=200,error='')=>resolve({body,status,error})};requests.push(entry);captures.push(entry);});}})});
+ const aux=new Aux({store:()=>store,session:()=>session,owned:()=>owned,network:()=>({cancel:id=>cancelled.push(id),requestBusinessShuffleRead(job,...args){assert(args.at(-1)());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({body,status,error})}));},requestBusinessDetailAuxiliary(job,...args){assert(args.at(-1)());return new Promise(resolve=>{const entry={job,args,session:()=>session,resolve:(body,status=200,error='')=>resolve({body,status,error})};requests.push(entry);captures.push(entry);});}})});
  aux.start(pin,1,response(data));
  return {aux,store,requests,cancelled,session:()=>session,setSession:s=>session=s,setOwned:v=>owned=v};
 }
 async function main(){
+ const deferred=fixture();deferred.store.detail.shuffleId='77';deferred.aux.start(pin,1,response(raw));
+ assert.equal(deferred.requests.length,0,'shuffle does not compete with initial media');
+ await new Promise(resolve=>setTimeout(resolve,300));assert.equal(deferred.requests.length,1);deferred.requests[0].resolve('{}');await flush();
+ const cancelledShuffle=fixture();cancelledShuffle.store.detail.shuffleId='77';cancelledShuffle.aux.start(pin,1,response(raw));cancelledShuffle.aux.pause();
+ await new Promise(resolve=>setTimeout(resolve,300));assert.equal(cancelledShuffle.requests.length,0,'pause clears deferred shuffle');
+ const immediateShuffle=fixture();immediateShuffle.store.detail.shuffleId='77';immediateShuffle.aux.start(pin,1,response(raw));immediateShuffle.aux.retryShuffle();
+ assert.equal(immediateShuffle.requests.length,1);immediateShuffle.requests[0].resolve('{}');await flush();
+ await new Promise(resolve=>setTimeout(resolve,300));assert.equal(immediateShuffle.requests.length,1,'explicit retry consumes the scheduled read');
+
  const mixedSlots=Array.from({length:15},(_,i)=>({id:'slot-'+i,images:{'736x':art()},
    videos:i<5?video.videos:null}));
  const mixedCarousel=fixture({...raw,is_video:false,videos:null,carousel_data:{carousel_slots:mixedSlots}});
@@ -52,6 +61,7 @@ async function main(){
  let options=JSON.parse(new URL(f.requests[0].job.url).searchParams.get('data')).options;
  assert.deepEqual(options,{pin_id:'11',crop,crop_source:5,is_shopping:false,entry_source:'flashlight',entrypoint:'closeup_cta'});
  const loadingResult=f.store.visualResult;f.requests[0].resolve(visual([2,2,3]));await p;assert.notEqual(f.store.visualResult,loadingResult,'completed search publishes a new observable root object');assert.equal(f.store.visualResult.items.length,2);assert.equal(f.store.visualResult.loading,false);
+ const continuation=f.aux.visualContinuation();f.aux.restoreVisualContinuation();f.aux.restoreVisualContinuation(continuation);
  p=f.aux.search(crop,true,false);await f.aux.search(crop,true,false);assert.equal(f.requests.length,2);assert.equal(JSON.parse(new URL(f.requests[1].job.url).searchParams.get('data')).options.bookmarks[0],'next');
  f.requests[1].resolve(visual([3,4],'next'));await p;assert.equal(f.store.visualResult.items.length,3);assert(f.store.visualResult.ended);await f.aux.search(crop,true,false);assert.equal(f.requests.length,2);
  p=f.aux.search(crop,false,false);f.requests[2].resolve('bad');await p;assert(f.store.visualResult.error);
@@ -70,6 +80,19 @@ async function main(){
   r.resolve(visual([99]));await pending;assert(!g.store.visualResult.items.some(x=>x.id==='api:99'));if(change==='pause'||change==='close')assert(g.cancelled.length);
  }
  const direct=fixture({...raw,...video});assert.equal(direct.requests.length,0);assert.equal(direct.store.detail.video.sources.length,2);assert.equal(direct.store.detail.mediaLoading,false);
+ const storyPin={entityId:'11',title:'Story title',closeupUnifiedDescription:'Recipe\nIngredients',closeupUnifiedAttribution:{fullName:'Creator',username:'creator',imageMediumUrl:art().url,verifiedIdentity:{verified:true}},videos:null,isVideo:false,
+  storyPinData:{isDeleted:false,pages:[{blocks:[{__typename:'StoryPinVideoBlock',blockType:3,videoDataV2:{videoListMobile:{vHLSV3MOBILE:{...art('https://v1.pinimg.com/videos/story.m3u8'),duration:12000}},videoList720P:{v720P:art('https://v1.pinimg.com/videos/story.mp4')}}}]}]}};
+ const storyBody=p=>JSON.stringify({data:{v3GetPinQueryv2:{data:p}}});
+ const story=fixture({...raw,story_pin_data_id:'synthetic-story'});
+ assert.equal(story.requests.length,1);assert(story.requests[0].job.id.startsWith('native_detail_aux_content_'));
+ story.requests[0].resolve(storyBody(storyPin));await flush();
+ assert.equal(story.store.detail.title,'Story title');assert.equal(story.store.detail.description,'Recipe\nIngredients');
+ assert.equal(story.store.detail.creator,'Creator');assert(story.store.detail.creatorVerified);assert.equal(story.store.detail.creatorUrl,origin+'/creator/');
+ assert.equal(story.store.detail.video.duration,12000);assert.equal(story.store.detail.video.sources.length,2);assert(story.store.detail.isVideo);
+ assert.equal(story.store.detail.related[0].id,'retained');assert.equal(story.store.detail.actions[0].id,'save','content completion preserves current interactions');
+ const wrongStory=fixture({...raw,story_pin_data_id:'synthetic-story'});wrongStory.requests[0].resolve(storyBody({...storyPin,entityId:'99'}));await flush();assert.equal(wrongStory.store.detail.title,'body');assert(!wrongStory.store.detail.video);
+ const staleStory=fixture({...raw,story_pin_data_id:'synthetic-story'});staleStory.aux.pause();staleStory.requests[0].resolve(storyBody(storyPin));await flush();assert.equal(staleStory.store.detail.title,'body');
+ const multiStory=fixture({...raw,story_pin_data_id:'synthetic-story'});multiStory.requests[0].resolve(storyBody({...storyPin,storyPinData:{pages:[...storyPin.storyPinData.pages,...storyPin.storyPinData.pages]}}));await flush();assert(!multiStory.store.detail.video,'never treat the first page as the entire multipage story');
  const retained=JSON.stringify(direct.store.detail.related);p=direct.aux.retryMedia();await direct.aux.retryMedia();assert.equal(direct.requests.length,1);
  direct.requests[0].resolve(response({...raw,...video}));await p;assert.equal(direct.store.detail.video.readRevision,1);assert.equal(JSON.stringify(direct.store.detail.related),retained);assert.equal(direct.store.detail.title,'body');
  const before=direct.store.detail.video.sources[0].url;p=direct.aux.retryMedia();direct.requests[1].resolve(response({id:'different'}));await p;assert.equal(direct.store.detail.video.sources[0].url,before);assert(direct.store.detail.videoError);assert(!direct.store.detailMediaRetryBusy);
@@ -91,6 +114,18 @@ async function main(){
  let changeRead=changedCrop.aux.search(crop,false,true);changedCrop.requests[0].resolve(visual([7]));await changeRead;
  changeRead=changedCrop.aux.search({...crop,x:0},false,false);changedCrop.requests[1].resolve('bad');await changeRead;
  await changedCrop.aux.search({...crop,x:0},true,false);assert.equal(changedCrop.requests.length,2,'failed new crop cannot reuse an older crop cursor');
+ if(process.argv[3]) {
+  const har=JSON.parse(fs.readFileSync(process.argv[3],'utf8').replace(/^\uFEFF/,''));
+  const entry=har.log.entries.find(e=>{try{return JSON.parse(e.request.postData?.text||'{}').queryHash==='b39ed2f55c3ee5de2035ca16b0c943f09ad5737d6ea4cc6d20f6131a2f9589e8';}catch{return false;}});
+  assert(entry,'HAR contains the observed detail content query');
+  const c=entry.response.content,payload=JSON.parse(c.encoding==='base64'?Buffer.from(c.text,'base64').toString():c.text),data=payload.data.v3GetPinQueryv2.data;
+  data.entityId='11';
+  const captured=fixture({...raw,story_pin_data_id:'synthetic-story'});captured.requests[0].resolve(JSON.stringify(payload));await flush();
+  assert.equal(captured.store.detail.title,data.title);assert.equal(captured.store.detail.description,data.closeupUnifiedDescription||data.description);
+  assert.equal(captured.store.detail.creator,data.closeupUnifiedAttribution.fullName);assert(captured.store.detail.creatorAvatar);assert(captured.store.detail.creatorVerified);
+  assert.equal(captured.store.detail.video.duration,12000);assert.equal(captured.store.detail.video.sources.length,2);
+  console.log('Supplied HAR offline replay: full title/description/author/avatar/verified identity and 12-second HLS/MP4 Story video passed');
+ }
  await policy();await wiring();
  console.log('Native detail auxiliary passed: crop/paging/cancel/stale isolation, video/carousel parsing, GraphQL/fresh media, same-URL revision, preserved content, strict policy and zero Web business execution.');
 }
@@ -107,6 +142,7 @@ async function policy(){
    const url=new URL(r.job.url),body=JSON.parse(url.searchParams.get('data'));body.options.unexpected=true;url.searchParams.set('data',JSON.stringify(body));assert.equal((await send({...r.job,url:url.toString()})).error,'reject');
   }else {
    const q=JSON.parse(r.job.body);q.variables.isAuth=false;assert.equal((await send({...r.job,body:JSON.stringify(q)})).error,'reject');
+   const extra=JSON.parse(r.job.body);extra.variables.extra=true;assert.equal((await send({...r.job,body:JSON.stringify(extra)})).error,'reject');
   }
   assert.equal(sent,before);
  }
@@ -121,14 +157,21 @@ async function wiring(){
  document(){throw Error('Web document')},runScript(){throw Error('Web script')},ensureDetailActionContext(){throw Error('Web prepare')}});
  await controller.openImageLayer('zoom');await controller.searchImage(crop,false,true);await controller.retryDetailMedia();controller.pause();assert.deepEqual(calls,['zoom','search','retry','pause','cancel']);
  const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\('));assert(start>=0);return index.slice(start,index.indexOf('\n  private ',start+1));}
- const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['openImageRelated','downloadViewerImage','closeImageLayer'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_DETAIL_AUXILIARY_ENABLED:true});
+ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['openImageRelated','openDetailSearchResult','downloadViewerImage','closeImageLayer'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_DETAIL_AUXILIARY_ENABLED:true});
  const host=new Host(),routes=[],downloads=[];
  Object.assign(host,{pinStore:{detailPin:pin,detail:{pinUrl:pin},imageLayer:'',visualResult:{pin,items:[{id:'api:8',pinUrl:origin+'/pin/8/'}]},visualToken:0},detailNativeAuxiliary:{ready:()=>true,downloadUrl:()=>raw.images.orig.url},beginDetailOpening:(...args)=>routes.push(args),
  systemActions:{downloadImage:async u=>downloads.push(u)},controller:{startDownload(){throw Error('legacy Web download')},runJavaScript(){throw Error('Web script')},loadUrl(){throw Error('Web navigation')}},detailOperationsController:{cancelVisual(){}},rejectOfflineAction:()=>false,showMessage(){}});
- await host.openImageRelated('api:8');assert.equal(routes[0][0],origin+'/pin/8/');await host.downloadViewerImage();assert.deepEqual(downloads,[raw.images.orig.url]);host.closeImageLayer();
+ host.detailSearchParents=[];host.pinIdentity=url=>url.match(/\/pin\/(\d+)/)?.[1]||'';host.detailRenderIdentity=()=>pin;
+ host.pinStore.imageLayer='search';host.pinStore.detailCache={put(){}};
+ host.detailNativeAuxiliary.visualContinuation=()=>({pin,owner:'synthetic',bookmark:'next',crop:JSON.stringify(crop)});
+ await host.openImageRelated('api:8');assert.equal(routes[0][0],origin+'/pin/8/');
+ assert.equal(host.detailSearchParents.length,1);assert.equal(host.detailSearchParents[0].detail.pinUrl,pin);
+ await host.downloadViewerImage();assert.deepEqual(downloads,[raw.images.orig.url]);host.closeImageLayer();
  const VisualScript=load('feature_pin/src/main/ets/services/PinmonyVisualSearchApiScript.ets').PIN_VISUAL_SEARCH_API_SCRIPT;
  const window={PinmonyNativeDetailAuxiliaryEnabled:true};window.top=window;vm.runInNewContext(VisualScript,{window,location:{origin,href:pin,pathname:'/pin/11/'}});assert.equal(window.PinmonyVisualSearchApi.start(pin,crop,false,true),false);
  const {mapPrefetchedDetail}=load('feature_pin/src/main/ets/services/PinmonyDetailPrefetch.ets',()=>({PinmonyRuntimeLog:{info(){}}}));
  const base=response({...raw,is_video:true});assert.equal(mapPrefetchedDetail(base,pin),undefined);assert(mapPrefetchedDetail(base,pin,true),'demand reads can present a supported media Pin before GraphQL completes');
+ const storyBase=response({...raw,story_pin_data:{pages:[{blocks:[{block_type:3,video_data_v2:{}}]}]}});
+ assert.equal(mapPrefetchedDetail(storyBase,pin),undefined);assert(mapPrefetchedDetail(storyBase,pin,true),'demand reads retain Story text while auxiliary media resolves');
 }
 const timeout=setTimeout(()=>{console.error('native auxiliary test timeout');process.exit(1)},25000);main().then(()=>clearTimeout(timeout)).catch(e=>{clearTimeout(timeout);console.error(e);process.exitCode=1});

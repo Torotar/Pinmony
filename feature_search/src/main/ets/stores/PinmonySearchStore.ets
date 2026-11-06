@@ -18,6 +18,7 @@ export class PinmonySearchStore {
   searchError: string = '';
   searchFilterOptions: PinmonySearchFilterOption[] = [];
   searchFilterLoading: boolean = false;
+  searchFilterOpen: boolean = false;
   searchFilterError: string = '';
   searchFilterToken: number = 0;
   searchProductDomains: PinmonySearchFilterOption[] = [];

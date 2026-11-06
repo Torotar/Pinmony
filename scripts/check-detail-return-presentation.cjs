@@ -123,8 +123,19 @@ async function main() {
   assert.match(index, /detailReturnedToRoot && this\.extractPinUrl\(url\)/);
   assert.match(documentBinding, /document\.transport\.confirmed/);
   assert.match(documentBinding, /document\.transport\.wait\.timeout/);
-  assert.match(fs.readFileSync('entry/src/main/ets/app/PinmonyDetailOpeningCoordinator.ets','utf8'), /if \(detail && !this\.pinStore\.detailActionsReady && this\.pinStore\.detail\?\.kind !== 'cached'\)/,
-    'a late base-only read cannot wipe a full parent cache');
+  const opening=fs.readFileSync('entry/src/main/ets/app/PinmonyDetailOpeningCoordinator.ets','utf8');
+  const mergeStart=opening.indexOf('        if (!current()) return;',opening.indexOf('.then((body: string)'));
+  const mergeEnd=opening.indexOf("        this.pinStore.detailApiError = '';",mergeStart);
+  assert(mergeStart>=0&&mergeEnd>mergeStart);
+  const fresh={title:'Fresh title',description:'Full description',creator:'Author',creatorAvatar:'avatar',creatorUrl:'profile',creatorVerified:true};
+  const merge=vm.runInNewContext(ts.transpileModule('(function(body){'+opening.slice(mergeStart,mergeEnd)+'})',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,
+    {current:()=>true,PIN_NATIVE_DETAIL_READS_ENABLED:true,mapPrefetchedDetail:()=>fresh,pinUrl:pin(1)});
+  const prior={pinUrl:pin(1),kind:'cached',title:'',description:'',creator:'',imageUrl:'retained-cover',video:{sources:['retained']},actions:[{id:'save'}],related:[{id:'recommendation'}]};
+  const completion={pinStore:{detail:prior,detailActionsReady:false,detailPrefetch:{get(){throw Error('fresh body must take precedence');}}}};
+  merge.call(completion,'body');
+  assert.equal(completion.pinStore.detail.title,'Fresh title');assert.equal(completion.pinStore.detail.creator,'Author');
+  assert.equal(completion.pinStore.detail.imageUrl,'retained-cover');assert.equal(completion.pinStore.detail.video.sources[0],'retained');
+  assert.equal(completion.pinStore.detail.actions[0].id,'save');assert.equal(completion.pinStore.detail.related[0].id,'recommendation');
   assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNetworkBridgeCoordinator.ets','utf8').includes('this.detailReadCache.store(job, reply)'), 'successful current replies populate the return cache');
   assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8').includes('this.ports.detailReadCache().setPin(pin)'), 'return target enables Pin-scoped read reuse');
   assert(index.includes("if(pin){this.beginDetailOpening(pin, '', true);return true;}"), 'native Pin back explicitly requests a retained resume');

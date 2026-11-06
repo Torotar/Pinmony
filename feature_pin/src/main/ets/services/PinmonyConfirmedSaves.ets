@@ -1,7 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyDetailAction, PinmonyDetailSnapshot } from '../models/PinmonyDetail';
 
-// Current authenticated app session only: evidence is a validated write result.
+// Current authenticated app session only: validated writes or viewer-owned saved-copy reads.
 // Reopening the original Pin can create a fresh document without savedRead's map.
 export class PinmonyConfirmedSaves {
   private states: Map<string, boolean> = new Map<string, boolean>();

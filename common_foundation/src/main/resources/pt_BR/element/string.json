@@ -1,5 +1,6 @@
 {
   "string": [
+    {"name":"pm_photo_history_save_unconfirmed","value":"A pesquisa foi concluída, mas não foi possível confirmar se a foto foi salva no histórico."},
     {
       "name": "pm_recommend_boards_description",
       "value": "Desative a personalização de uma pasta para remover as abas e recomendações baseadas nela do feed inicial. Isso não afeta a pasta nem seus Pins."
@@ -1546,7 +1547,7 @@
     },
     {
       "name": "pm_photos_7b50017a",
-      "value": "Fotos"
+      "value": "Pin"
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
@@ -3270,7 +3271,7 @@
     },
     {
       "name": "pm_system_share_13a1c63f",
-      "value": "Compartilhamento do sistema"
+      "value": "Compartilhar com outros aplicativos"
     },
     {
       "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
@@ -4415,6 +4416,10 @@
     {
       "name": "pm_photo_search",
       "value": "Pesquisa de fotos"
+    },
+    {
+      "name": "pm_detail_photo_search",
+      "value": "Pesquisar fotos"
     },
     {
       "name": "pm_photo_search_loading",
@@ -5812,6 +5817,26 @@
     {
       "name": "pm_photo_history_delete_all_incomplete",
       "value": "Não foi possível carregar todo o histórico. A exclusão de tudo não foi realizada."
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_title",
+      "value": "Salve inspirações"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_body",
+      "value": "Salvar Pins no Pinterest é uma ótima maneira de reunir ideias. Explore Pins, salve o que você ama e volte aqui para se inspirar novamente."
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_title",
+      "value": "Organize suas ideias"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_body",
+      "value": "Pins são faíscas de inspiração, e as pastas são o lar deles. Crie pastas para organizar os Pins do seu jeito."
+    },
+    {
+      "name": "pm_created_board_choose_pins",
+      "value": "Salve alguns Pins na sua nova pasta"
     }
   ]
 }

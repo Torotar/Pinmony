@@ -6,12 +6,15 @@ const method = source.slice(start, source.indexOf('\n  private backFromSearchLan
 const timers = [], home = 'https://www.pinterest.com/', target = home + 'search/';
 const Native = require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + method + '} Native;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
-}).outputText, { PINTEREST_URL: home, PinmonyRuntimeLog: { info() {} }, setTimeout: fn => timers.push(fn) });
+}).outputText, { PINTEREST_URL: home, PIN_NATIVE_SEARCH_READS_ENABLED: false, PinmonyRuntimeLog: { info() {} }, setTimeout: fn => timers.push(fn) });
 for (const cached of [true, false]) {
   const n = new Native(), loads = [];
   Object.assign(n, { pinStore: {}, searchStore: { search: { pageKey: target + '?q=test', query: 'test' },
     searchCache: { put() {} }, searchScrollOffset: 180, searchActionsReady: true, searchInputReady: true },
     rootTabAddresses: new Map(), pageBackToken: 0,
+    searchController: { restoreCategorySearchParent: () => false },
+    restoreTopicSearchParent: () => false,
+    loadSessionDocument: value => loads.push(value),
     currentPinUrl: () => '', currentSearchPageKey: () => target + '?q=test',
     pageHistory: { cancelBack() {}, visit() {}, prepareBackTo() {} },
     clearSearch() { this.searchStore.search = undefined; this.searchStore.searchActionsReady = false; this.searchStore.searchInputReady = false; },

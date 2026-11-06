@@ -103,10 +103,34 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
         return reply.body;
     }, current, (id: string) => this.ports.detailReadNetwork().cancel(id)).then((body: string) => {
         if (!current()) return;
-        const detail: PinmonyDetailSnapshot | undefined = this.pinStore.detailPrefetch.get(pinUrl) || (PIN_NATIVE_DETAIL_READS_ENABLED ? mapPrefetchedDetail(body,pinUrl,true) : undefined);
-        if (detail && !this.pinStore.detailActionsReady && this.pinStore.detail?.kind !== 'cached') {
-            this.pinStore.detailPin = pinUrl;
-            this.pinStore.detail = this.pinStore.confirmedSaves.apply(this.ports.pinIdentity(pinUrl), detail);
+        const detail: PinmonyDetailSnapshot | undefined = (PIN_NATIVE_DETAIL_READS_ENABLED ? mapPrefetchedDetail(body,pinUrl,true) : undefined) || this.pinStore.detailPrefetch.get(pinUrl);
+        if (detail && !this.pinStore.detailActionsReady) {
+            const previous: PinmonyDetailSnapshot | undefined = this.pinStore.detail;
+            if (previous?.pinUrl === pinUrl) {
+                // The opening card may be cached with no author or text. Refresh
+                // validated content without discarding retained interactions.
+                const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(previous)) as PinmonyDetailSnapshot;
+                next.title = detail.title || next.title;
+                next.description = detail.description || next.description;
+                next.creator = detail.creator || next.creator;
+                next.creatorAvatar = detail.creatorAvatar || next.creatorAvatar;
+                next.creatorUrl = detail.creatorUrl || next.creatorUrl;
+                next.creatorVerified = detail.creatorVerified || next.creatorVerified;
+                next.sourceName = detail.sourceName || next.sourceName;
+                next.sourceUrl = detail.sourceUrl || next.sourceUrl;
+                next.sourceLabel = detail.sourceLabel || next.sourceLabel;
+                next.richDescription = detail.richDescription || next.richDescription;
+                if (detail.shuffleId && detail.shuffleId !== next.shuffleId) {
+                    next.shuffleId = detail.shuffleId;
+                    next.shuffle = undefined;
+                    next.shuffleLoading = false;
+                    next.shuffleError = '';
+                }
+                this.pinStore.detail = next;
+            } else {
+                this.pinStore.detailPin = pinUrl;
+                this.pinStore.detail = this.pinStore.confirmedSaves.apply(this.ports.pinIdentity(pinUrl), detail);
+            }
         }
         this.pinStore.detailApiError = '';
         this.ports.detailJourney().mark('base.validated');

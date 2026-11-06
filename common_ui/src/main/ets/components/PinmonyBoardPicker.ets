@@ -42,6 +42,7 @@ export struct PinmonyBoardPickerFooter {
   @Prop labelKey: string = 'pm_create_board_513babc9';
   @Prop back: boolean = false;
   @Prop inset: number = 16;
+  @Prop compact: boolean = false;
   @Prop actionEnabled: boolean = true;
   onSelect?: () => void;
   build() {
@@ -54,7 +55,7 @@ export struct PinmonyBoardPickerFooter {
         Text(PinmonyI18n.text(this.labelKey,this.language)).fontSize(19).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text')).layoutWeight(1)
       }.width('100%').alignItems(VerticalAlign.Center)
-    }.width('100%').height(76).padding({left:this.inset,right:this.inset,top:12,bottom:20})
+    }.width('100%').height(this.compact ? 64 : 76).padding({left:this.inset,right:this.inset,top:12,bottom:this.compact ? 8 : 20})
       .borderRadius(0).backgroundColor($r('app.color.page_background')).enabled(this.actionEnabled).onClick(() => this.onSelect?.())
   }
 }

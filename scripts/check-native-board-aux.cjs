@@ -15,6 +15,34 @@ return {reader,store,requests,cancelled,scripts,ports,session:()=>session,setSes
 async function ready(f,b=board){const p=f.reader.demand();f.requests[0].resolve(response(b));await flush();f.requests[1].resolve(response([pin(1),pin(2)]));await p;}
 const action=(f,a,value)=>f.reader.handle('flow',JSON.stringify({action:a,value}));
 async function main(){
+{
+const created=fixture(),exits=[];created.ports.exited=a=>exits.push(a);
+let cp=created.reader.openCreatedIdeas('100');assert.equal(created.store.boardDetail.flow.createdBoardIdeas,true);
+created.requests[0].resolve(response({...board,pin_count:0}));await flush();created.requests[1].resolve(response([]));await flush();
+assert.equal(created.requests.length,3);const cj=created.requests[2].job;
+assert.equal(opts(cj).__track__referrer,21);assert.equal(new URL(cj.url).searchParams.get('source_url'),'/sample/board/');assert.equal(cj.headers['X-Pinterest-Pws-Handler'],'www/[username]/[slug].js');
+created.requests[2].resolve(response([pin(7)],'next',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_ideas_feed',data:[pin(7)],bookmark:'next'}}));await cp;
+assert.equal(created.store.boardDetail.flow.createdBoardIdeas,true);assert.equal(created.store.boardDetail.flow.pins.length,1);
+cp=action(created,'ideasMore');assert.equal(opts(created.requests[3].job).__track__referrer,21);assert.deepEqual(opts(created.requests[3].job).bookmarks,['next']);
+created.requests[3].resolve(response([pin(8)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_ideas_feed',data:[pin(8)],bookmark:'-end-'}}));await cp;
+assert.equal(created.store.boardDetail.flow.pins.length,2);
+cp=action(created,'save','7');const co=JSON.parse(new URLSearchParams(created.requests[4].job.body).get('data')).options;assert.equal(co.eventContext.element,10599);assert.equal(co.board_id,'100');
+created.requests[4].resolve(response({id:'77',type:'pin',board:{id:'100'},pinner:{id:'42'},is_repin:true},'',{resource_response:{status:'success',code:0,endpoint_name:'v3_repin_handler',data:{id:'77',type:'pin',board:{id:'100'},pinner:{id:'42'},is_repin:true}}}));await cp;
+assert.equal(created.store.boardDetail.flow.createdBoardIdeas,true);assert.deepEqual(Array.from(created.store.boardDetail.flow.saved),['7']);
+const beforeBack=created.requests.length;await action(created,'createdIdeasBack');assert.deepEqual(exits,['createdIdeasBack']);assert.equal(created.requests.length,beforeBack,'back must not undo confirmed saves');
+const policy=new Network();let sentCreated=0;policy.request=async(job,current)=>{if(!current().authenticated)return {error:'rejected'};sentCreated++;return {error:''}};
+assert.equal((await policy.requestBusinessBoardAuxRead(cj,created.session,'100','sample','42',()=>true,true)).error,'');
+assert((await policy.requestBusinessBoardAuxRead(cj,created.session,'100','sample','42',()=>true)).error,'new route requires explicit owner mode');
+assert((await policy.requestBusinessBoardAuxRead(cj,created.session,'999','sample','42',()=>true,true)).error);
+assert.equal(sentCreated,1);
+const stale=fixture();await ready(stale);cp=stale.reader.openCreatedIdeas('100');await flush();const late=stale.requests.at(-1);await action(stale,'createdIdeasBack');late.resolve(response([pin(9)],'',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_ideas_feed',data:[pin(9)]}}));await cp;assert(!stale.store.boardDetail.flow?.createdBoardIdeas,'late recommendations must not reopen the picker');
+const failedPicker=fixture();cp=failedPicker.reader.openCreatedIdeas('100');failedPicker.requests[0].resolve(response(null));await cp;assert.equal(failedPicker.store.boardDetail.flow.loading,false);assert(failedPicker.store.boardDetail.flow.error);assert.equal(failedPicker.store.boardDetail.flow.createdBoardId,'100');
+cp=action(failedPicker,'retry');failedPicker.requests[1].resolve(response({...board,pin_count:0}));await flush();failedPicker.requests[2].resolve(response([]));await flush();assert.equal(opts(failedPicker.requests[3].job).__track__referrer,21);failedPicker.requests[3].resolve(response([],'',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_ideas_feed',data:[]}}));await cp;assert.equal(failedPicker.store.boardDetail.flow.error,'');
+const donePicker=fixture();await ready(donePicker);cp=donePicker.reader.openCreatedIdeas('100');await flush();donePicker.requests.at(-1).resolve(response([],'',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_board_ideas_feed',data:[]}}));await cp;
+const beforeDone=donePicker.requests.length;cp=action(donePicker,'createdIdeasDone');assert(!donePicker.store.boardDetail.flow?.createdBoardIdeas);assert.equal(donePicker.requests[beforeDone].job.method,'GET');donePicker.requests[beforeDone].resolve(response(board));await flush();donePicker.requests[beforeDone+1].resolve(response([pin(1)]));await cp;assert.equal(donePicker.store.boardDetail.ready,true);assert.equal(donePicker.store.boardDetail.pins.length,1);
+console.log('Created board picker: cold entry, referrer 21, paging, immediate save, back preserves saves, policy isolation and late replies passed');
+}
+
 const f=fixture();await ready(f);let p=action(f,'ideas');action(f,'ideas');assert.equal(f.requests.length,3,'duplicate first demand coalesces');assert.equal(f.store.boardDetail.flow.loading,true);assert.deepEqual(opts(f.requests[2].job),{id:'100',type:'board',__track__referrer:23});assert.equal(new URL(f.requests[2].job.url).searchParams.get('source_url'),'/sample/board/_tools/more-ideas/?ideas_referrer=23');f.requests[2].resolve(response([pin(7),pin(7),pin(8)]));await p;assert.equal(f.store.boardDetail.flow.pins.length,2);assert.equal(f.store.boardDetail.flow.hasMore,false);assert.equal(f.prepareCalls(),0,'readonly ideas never prepare Web navigation');
 await action(f,'close');await action(f,'select');const before=f.requests.length;await action(f,'targets',['99']);assert.equal(f.requests.length,before,'only loaded main Pin IDs can prepare a move');p=action(f,'targets',['1','2']);assert.equal(new URL(f.requests[3].job.url).searchParams.get('source_url'),'/board/100/organize/repin/');f.requests[3].resolve(response([target(100),target(200,[],{}),target(201,['write'],{archived_by_me:true}),target(202)],'next'));await p;assert.deepEqual(Array.from(f.store.boardDetail.flow.targets,t=>t.enabled),[false,false,false,true]);
 p=action(f,'targetsMore');assert.deepEqual(opts(f.requests[4].job).bookmarks,['next']);f.requests[4].resolve('invalid');await p;assert(f.store.boardDetail.flow.error);assert.equal(f.store.boardDetail.flow.targets.length,4);p=action(f,'retry');assert.deepEqual(opts(f.requests[5].job).bookmarks,['next']);f.requests[5].resolve(response([target(202),target(203)],'next'));await p;assert.equal(f.store.boardDetail.flow.targets.length,5);assert.equal(f.store.boardDetail.flow.hasMore,false);

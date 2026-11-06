@@ -1,0 +1,56 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const ts = require(process.argv[2] || 'typescript');
+const text = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
+const source = text.slice(text.indexOf('interface PinmonyDetailFlowRow'), text.indexOf('@Component\nexport struct PinmonyDetailPage'));
+const js = ts.transpileModule(source + '\nexport { PinmonyDetailFlowSource };', { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText;
+const loaded = {}; vm.runInNewContext(js, { exports: loaded });
+const flow = new loaded.PinmonyDetailFlowSource();
+const events = [];
+flow.registerDataChangeListener({ onDataAdd: i => events.push(['add', i]), onDataDelete: i => events.push(['delete', i]), onDataChange: i => events.push(['change', i]), onDataReloaded: () => events.push(['reload']) });
+const row = (key, fingerprint = '') => ({ key, fingerprint, kind: key });
+flow.update([row('header'), row('a', 'one'), row('footer')]); events.length = 0;
+flow.update([row('header'), row('a', 'one'), row('b', 'two'), row('footer')]);
+assert.deepEqual(events, [['add', 2]], 'pagination adds only the new card'); events.length = 0;
+flow.update([row('header'), row('a', 'updated'), row('b', 'two'), row('footer')]);
+assert.deepEqual(events, [['change', 1]], 'same card identity receives changed content'); events.length = 0;
+flow.update([row('header'), row('a', 'updated'), row('footer')]);
+assert.deepEqual(events, [['delete', 2]], 'removal retains the other nodes'); events.length = 0;
+flow.update([row('new-header'), row('footer')]); assert.deepEqual(events, [['reload']]);
+assert.match(text, /WaterFlow\(\{ scroller: this\.detailScroller, sections: this\.detailSections \}\)[\s\S]*?LazyForEach\(this\.detailRows/);
+assert.match(text, /\.cachedCount\(12, true\)/);
+// Execute the real synchronization method: changing the confirmed save action
+// must notify the retained LazyForEach header, even with no related-list change.
+const syncStart=text.indexOf('  private syncDetailFlow()'),syncEnd=text.indexOf('\n  private readonly detailPathStack',syncStart);
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+text.slice(syncStart,syncEnd)+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const host=new Host(),retained=new loaded.PinmonyDetailFlowSource(),notifications=[];
+retained.registerDataChangeListener({onDataAdd:i=>notifications.push(['add',i]),onDataDelete:i=>notifications.push(['delete',i]),onDataChange:i=>notifications.push(['change',i]),onDataReloaded:()=>notifications.push(['reload'])});
+let detail={pinUrl:'https://www.pinterest.com/pin/11/',actions:[{kind:'save',label:'Save',selected:false}],related:[]};
+Object.assign(host,{displayedDetail:()=>detail,isRecommendReady:()=>true,recommendColumnCount:()=>2,detailRows:retained,detailFlowShape:'0:2',detailSections:{length:()=>3,splice:()=>{}} });
+host.syncDetailFlow();notifications.length=0;
+detail={...detail,actions:[{kind:'save',label:'My long board name',selected:true}]};host.syncDetailFlow();
+assert.deepEqual(notifications,[['change',0]],'save success refreshes retained header without resetting the list');notifications.length=0;
+host.syncDetailFlow();assert.deepEqual(notifications,[],'same save state does not rebuild the header');
+detail={...detail,actions:[{kind:'save',label:'Save',selected:false}]};host.syncDetailFlow();
+assert.deepEqual(notifications,[['change',0]],'confirmed undo refreshes header back to Save');
+assert.match(text, /\.bindToScrollable\(this\.imageLayer === 'search' \? \[\] : \[this\.detailScroller\]\)/);
+const content = text.slice(text.indexOf('  private detailContent()'), text.indexOf('  private videoRetryNotice()'));
+const footer = text.slice(text.indexOf('  private detailFooter()'), text.indexOf('  private heroImage()'));
+const destination = text.slice(text.indexOf('  private detailDestination('), text.indexOf('\n  build()', text.indexOf('  private detailDestination(')));
+assert.match(content, /\.padding\(\{ left: 18, right: 18 \}\)/, 'the viewport has no fixed bottom inset');
+assert(!/padding\(\{ bottom:/.test(footer), 'the footer does not add a gesture-area spacer');
+assert.match(destination, /this\.imageLayer === 'search' \?[\s\S]*?LayoutSafeAreaEdge\.TOP, LayoutSafeAreaEdge\.BOTTOM/, 'detail extends to the bottom while photo search keeps its own layout');
+console.log('Detail related flow: incremental append, change, removal, stable keys and shared scroller passed');
+
+
+notifications.length=0;
+detail={...detail,shuffleId:'77'};host.syncDetailFlow();
+assert.deepEqual(notifications,[['change',0]],'late collage identity refreshes the retained header');notifications.length=0;
+detail={...detail,shuffleLoading:true};host.syncDetailFlow();
+assert.deepEqual(notifications,[['change',0]],'collage loading state refreshes the header');notifications.length=0;
+detail={...detail,shuffleLoading:false,shuffle:{id:'77',items:[{id:'child',pinId:'22',isTappable:true}]}};host.syncDetailFlow();
+assert.deepEqual(notifications,[['change',0]],'resolved collage restores canvas and child thumbnails');notifications.length=0;
+host.syncDetailFlow();assert.deepEqual(notifications,[],'unchanged collage retains header');
+detail={...detail,related:[{id:'23',pinUrl:'pin/23'}],relatedLoading:true};host.syncDetailFlow();
+assert(!notifications.some(e=>e[0]==='change'&&e[1]===0),'pagination does not rebuild collage header');

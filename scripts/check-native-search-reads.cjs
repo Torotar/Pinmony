@@ -9,6 +9,29 @@ const result=(ids,cursor='-end-',extra={})=>JSON.stringify({resource_response:{s
 function fixture(){let session={authenticated:true,accountId:'a',origin:'https://www.pinterest.com',generation:1,userAgent:'synthetic'},page=session.origin+'/search/pins/?q=art',active=true;const store={searchCache:new PinmonySearchCache(),searchScrollOffset:31,searchActionsReady:false,searchInputReady:false,searchFilterToken:0},requests=[],cancelled=[],navigations=[];const reader=new Reader({profile:()=>session.origin+'/fixture/',store:()=>store,page:()=>page,session:()=>session,active:()=>active,network:()=>({requestBusinessSearchUserFollow:(job,getSession,page,user,viewer,owner)=>{assert(owner());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({...job,body,status,error})}));},requestBusinessProfileBoardFollow:(job,getSession,page,board,viewer,owner)=>{assert(owner());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({...job,body,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessSearchRead:(job,getSession,owner)=>{assert(owner());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({...job,body,status,error})}));}}),navigate:target=>{navigations.push(target);page=target;},settled(){}});return{reader,store,requests,cancelled,navigations,setPage:p=>page=p,setActive:v=>active=v,setSession:s=>session=s,session:()=>session,page:()=>page};}
 const feedReq=f=>f.requests.filter(r=>r.job.url.includes('BaseSearchResource'));
 async function main(){
+const early=fixture();let initial=early.reader.demand();feedReq(early)[0].resolve(result([1],'next'));await initial;
+const oldMore=early.reader.more(),oldRequest=feedReq(early)[1];
+const typing=early.reader.input('new',true);
+assert(early.cancelled.includes(oldRequest.job.id),'typing cancels pagination before submitting another query');
+assert.equal(early.store.search.apiBusy,false);
+await early.reader.more();
+assert.equal(feedReq(early).length,2,'typing cannot restart the cancelled pagination');
+assert.equal(early.store.search.apiBusy,false);
+assert.deepEqual(Array.from(early.store.search.results,r=>r.id),['api-pin-1']);
+early.requests.find(r=>r.job.url.includes('AdvancedTypeaheadResource')).resolve(JSON.stringify({resource_response:{status:'success',data:{items:[]}}}));await typing;
+early.reader.term=undefined;early.store.searchInputFocused=true;await early.reader.more();
+assert.equal(feedReq(early).length,2,'focused input blocks pagination even before text changes');
+early.store.searchInputFocused=false;early.store.searchFilterOpen=true;await early.reader.more();
+assert.equal(feedReq(early).length,2,'open filters block pagination after filter loading completes');
+early.store.searchFilterOpen=false;
+const newMore=early.reader.more(),newRequest=feedReq(early)[2];
+oldRequest.resolve(result([99],'bad-cursor'));await oldMore;
+assert.equal(early.store.search.apiBusy,true,'cancelled completion cannot clear resumed pagination');
+assert.deepEqual(Array.from(early.store.search.results,r=>r.id),['api-pin-1']);
+newRequest.resolve(result([2],'-end-'));await newMore;
+assert.deepEqual(Array.from(early.store.search.results,r=>r.id),['api-pin-1','api-pin-2']);
+console.log('Search early cancellation: transport cancel, late response isolation and newer loading ownership passed');
+
 const board=fixture();board.setPage(board.session().origin+'/search/boards/?q=fixture');const boardRead=board.reader.demand();
 feedReq(board)[0].resolve(JSON.stringify({resource_response:{status:'success',data:{results:[{id:'77',type:'board',name:'Board',url:'/fixture/board/',followed_by_me:false}],oneBarModules:[]}},client_context:{user:{id:'22'}}}));await boardRead;
 assert.equal(board.store.search.results[0].boardId,'77');assert.equal(board.store.search.results[0].canFollow,true);
@@ -42,7 +65,7 @@ for(const extra of [{is_promoted:true},{ad_data:{}},{pin_promotion_id:'456'},{id
 let pending=f.reader.demand();f.reader.demand();assert.equal(feedReq(f).length,1);const first=feedReq(f)[0];const options=JSON.parse(new URLSearchParams(first.job.body).get('data')).options;assert.equal(Object.keys(options).length,27);assert.equal(options.query,'art');first.resolve(result([1],'cursor',{rankedGuides:[{term:'paint',display:'Paint'}],oneBarModules:[{action:{type:'contenttypefiltermoduleaction',title:'Type',filters:[{type:'filteroption',display:{display_text:'Videos'},action:{type:'onebarmoduleaction',feed_url:'/search/videos/?q=art&rs=content_type_filter'}},{type:'filteroption',display:{display_text:'Unknown'},action:{type:'onebarmoduleaction',feed_url:'/search/pins/?q=art&color=red'}}]}}]}));await pending;assert.equal(f.store.search.results.length,1);assert(f.store.searchNativeReadsReady&&f.store.searchNativeInputReady);assert.equal(f.store.searchActionsReady,false);assert.equal(f.store.searchInputReady,false);
 f.store.searchScrollOffset=49;f.reader.pause();await f.reader.demand();assert.equal(feedReq(f).length,1);assert.equal(f.store.searchScrollOffset,49);
 await f.reader.filters();assert.equal(f.store.searchFilterOptions.length,2);assert.equal(f.store.searchFilterOptions[1].enabled,false);assert.match(f.reader.filterTarget(f.store.searchFilterOptions[0].id),/search\/videos/);
-pending=f.reader.more();f.reader.more();assert.equal(feedReq(f).length,2);assert.deepEqual(JSON.parse(new URLSearchParams(feedReq(f)[1].job.body).get('data')).options.bookmarks,['cursor']);feedReq(f)[1].resolve('bad');await pending;assert.equal(f.store.search.results.length,1);assert(f.store.search.apiError);
+f.reader.cancelFilters();pending=f.reader.more();f.reader.more();assert.equal(feedReq(f).length,2);assert.deepEqual(JSON.parse(new URLSearchParams(feedReq(f)[1].job.body).get('data')).options.bookmarks,['cursor']);feedReq(f)[1].resolve('bad');await pending;assert.equal(f.store.search.results.length,1);assert(f.store.search.apiError);
 pending=f.reader.more();feedReq(f)[2].resolve(result([1,2],'cursor'));await pending;assert.equal(f.store.search.results.length,2);assert(f.store.search.apiEnded);await f.reader.more();assert.equal(feedReq(f).length,3);
 pending=f.reader.refresh();feedReq(f)[3].resolve(result([]));await pending;assert.equal(f.store.search.results.length,0);
 const rawInputs=f.requests.length;pending=f.reader.input('a',true);let old=f.requests.at(-1);const newer=f.reader.input('ab',true);const fresh=f.requests.at(-1);assert(f.cancelled.includes(old.job.id));old.resolve(JSON.stringify({resource_response:{status:'success',data:{items:[{query:'old'}]}}}));fresh.resolve(JSON.stringify({resource_response:{status:'success',data:{items:[{query:'new'},{query:'new'}]}}}));await Promise.all([pending,newer]);assert.equal(f.store.search.suggestions.length,1);assert.equal(f.store.search.suggestions[0].label,'new');assert.equal(f.store.search.suggestionBusy,false);assert.equal(f.store.search.suggestions[0].deletable,false);

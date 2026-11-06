@@ -7,10 +7,13 @@ export interface PinmonyProfileRootView {
   profileStore: PinmonyProfileStore;
   pinStore: PinmonyPinStore;
   retainPinSource: boolean;
+  detailProfileEntry: boolean;
   loadFailed: boolean;
   authStatus: PinmonyAuthStatus;
   activeTab: number;
   nativeRootOnly: boolean;
+  profileChatActive: boolean;
+  coveredBack: () => boolean;
   rootContentInteracted: boolean;
   handleRootContentScroll: (offset: number, state: ScrollState) => void;
   openUserProfile: (url: string) => void;
@@ -42,10 +45,13 @@ export interface PinmonyProfileRootView {
 @Builder
 export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
           if ((view.profileStore.profile || view.profileStore.profileLoading || view.profileStore.profileError) &&
-              !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource) && !view.loadFailed) {
+              !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource || view.detailProfileEntry) && !view.loadFailed) {
             Stack() {
               if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource) && !view.loadFailed) {
                 PinmonyProfilePage({
+                  onCoveredBack: () => view.coveredBack(),
+                  backActive: !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible &&
+                    (!view.pinStore.detail && !view.pinStore.detailOpeningPin || view.detailProfileEntry),
                   interactionReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.authStatus === 'authenticated' &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
                   automaticLoadingEnabled: !view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.profileStore.profileNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) &&
@@ -89,7 +95,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                 .width('100%')
                 .height('100%')
               } else if ((view.profileStore.profileLoading || view.profileStore.profileError || view.profileStore.profile?.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow &&
-                         !view.pinStore.detail && !view.loadFailed) {
+                         (!view.pinStore.detail || view.detailProfileEntry) && !view.loadFailed) {
                 PinmonyBuildProfileStatus(view)
               }
             }

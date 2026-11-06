@@ -1,5 +1,6 @@
 const fs = require('fs'), vm = require('vm'), assert = require('assert/strict'), ts = require(process.argv[2]);
 const pageSource = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
+const photoPageSource = fs.readFileSync('feature_search/src/main/ets/components/PinmonyPhotoSearchPage.ets', 'utf8');
 assert(!pageSource.includes('.bindMenu('), 'Root rendering must not execute the failing controlled menu binding');
 assert(pageSource.includes('getPromptAction().openMenu('), 'Photo actions must use the native anchored menu after an explicit click');
 assert(!pageSource.includes('showActionMenu('), 'Do not substitute a centered action dialog for the anchored menu');
@@ -29,6 +30,29 @@ if(process.argv[3]) {
  assert(count>0); console.log('Captured history responses mapped:',count);
 }
 console.log('Photo history validation, original ratio, empty, pagination and deduplication passed');
+const indexSource=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+const keyStart=indexSource.indexOf('  private detailPresentationKey(');
+assert(keyStart>=0);
+const keyEnd=indexSource.indexOf('\n  }',keyStart);
+const DetailKey=vm.runInNewContext(ts.transpileModule('class DetailKey {'+indexSource.slice(keyStart,keyEnd+4)+'} DetailKey;',
+ {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const detailKey=new DetailKey(), route='https://www.pinterest.com/pin/123/';
+detailKey.detailEntryCards=new Map();detailKey.detailPresentation=()=>({pinUrl:route});
+const ordinaryKey=detailKey.detailPresentationKey('123');
+detailKey.detailEntryCards.set(route,'pinmony-photo-result-123');
+const photoKey=detailKey.detailPresentationKey('123');
+assert.notEqual(photoKey,ordinaryKey,'history/photo result gets its own Pin component instance even for the same Pin');
+assert.equal(detailKey.detailPresentationKey('123'),photoKey,'snapshot updates retain the photo result instance');
+assert(indexSource.includes('}, (_identity: string) => this.detailPresentationKey(_identity))'));
+const detailSource=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
+assert(detailSource.includes('mainTitle: this.uiText("pm_detail_photo_search")'));
+assert(fs.readFileSync('feature_pin/src/main/ets/components/PinmonyVisualSearchView.ets','utf8').includes('PinmonyImageSearchView as PinmonyVisualSearchView'));
+assert(photoPageSource.includes('PinmonyImageSearchView({'),'detail and uploaded photos use the same search content within separate page hosts');
+for(const [locale,title] of [['zh_CN','搜索照片'],['en_US','Search photos']]){
+ const strings=JSON.parse(fs.readFileSync(`common_foundation/src/main/resources/${locale}/element/string.json`,'utf8')).string;
+ assert.equal(strings.find(item=>item.name==='pm_detail_photo_search').value,title);
+}
+console.log('Photo result Pin: independent stable instance, shared detail search content and localized title passed');
 const historySource=fs.readFileSync('feature_search/src/main/ets/components/PinmonyPhotoHistoryPage.ets','utf8');
 assert(!historySource.includes('sys.symbol.checkmark_circle_fill'),'history photo selection uses its border without a checkmark overlay');
 const selectStart=historySource.indexOf('  private selectPhoto(');
@@ -62,6 +86,12 @@ const flowSource=fs.readFileSync('entry/src/main/ets/app/PinmonyPhotoSearchFlow.
 const Flow=vm.runInNewContext(ts.transpileModule(flowSource+'\nPinmonyPhotoSearchFlow;', {compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,
  {exports:{},util:{TextDecoder:{create:()=>({decodeWithStream:bytes=>Buffer.from(bytes).toString('utf8'),decodeToString:bytes=>Buffer.from(bytes).toString('utf8')})}},parsePhotoHistory:parse,parsePhotoSearch:()=>[]});
 (async()=>{
+ const loadStart=historySource.indexOf('  private async load('),loadEnd=historySource.indexOf('\n  }',loadStart);
+ const Loader=vm.runInNewContext(ts.transpileModule('class Loader {'+historySource.slice(loadStart,loadEnd+4)+'} Loader;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+ const loader=new Loader();let hiddenReads=0;Object.assign(loader,{loadingActive:false,interactionActive:true,onLoad:async()=>{hiddenReads++;}});await loader.load();assert.equal(hiddenReads,0,'history covered by photo results cannot start reads that cancel those results');
+ assert(!historySource.includes('padding({left:16,right:16,bottom:16})'),'no fixed history bottom gutter');
+ assert(historySource.includes('.expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])'),'history content extends under bottom system area');
+
  const navigationMethods=['selectPhotoHistory','closePhotoSearch','closePhotoHistory'].map(name=>{
   const start=pageSource.search(new RegExp('  private (?:async )?'+name+'\\('));assert(start>=0);
   const end=pageSource.indexOf('\n  }',start);assert(end>start);
@@ -95,11 +125,14 @@ const Flow=vm.runInNewContext(ts.transpileModule(flowSource+'\nPinmonyPhotoSearc
  nav.photoHistoryOrigin=undefined;nav.closePhotoSearch(true);
  assert.deepEqual(paths,['search','photo-history']);assert.equal(nav.photoHistoryLifted,false);
  finishResults([{id:'late-animation'}]);await animated;assert.equal(nav.photoResults.length,0);
- assert(pageSource.includes('animatePhoto: !!this.photoHistoryOrigin, closing: this.photoClosing'));
- assert(pageSource.includes('NavDestinationMode.DIALOG'),'animated search keeps history rendered underneath');
+ assert(pageSource.includes('origin: this.photoHistoryOrigin, closing: this.photoClosing'));
+ assert(photoPageSource.includes('animatePhoto: !!this.origin, closing: this.closing'));
+ assert(photoPageSource.includes('NavDestinationMode.STANDARD'),'search owns a full page and a separate title bar');
+ assert(!photoPageSource.includes('NavDestinationMode.DIALOG'),'the history title must not remain beneath a dialog destination');
  assert(historySource.includes(".id('pinmony-history-photo-' + item.id)"));
- assert(pageSource.includes('onBackPressed(() => { this.closePhotoSearch(true); return true; })'));
- assert(pageSource.includes("backIcon: { label: this.uiText('pm_back_572cf45b'), isEnabled: true, action: () => this.closePhotoSearch(true) }"));
+ assert(pageSource.includes('onBack: () => this.backPhotoSearch()'));
+ assert(pageSource.includes('onClose: () => this.closePhotoSearch(true)'));
+ assert(photoPageSource.includes('this.onClose?.();'));
  console.log('Photo history navigation: retained parent, system/title back, late results and full cleanup passed');
  const origin='https://www.pinterest.com',session={authenticated:true,accountId:'test',generation:1,origin};
  let sent=0,preview='',pending;
@@ -108,7 +141,7 @@ const Flow=vm.runInNewContext(ts.transpileModule(flowSource+'\nPinmonyPhotoSearc
  const network={cancel(){},readPhotoHistory:async(cursor,url)=>url?new ArrayBuffer(12):buffer,
    searchUploadedPhoto:async()=>{sent++;return '{}';}};
  const ports={session:()=>session,network:()=>network,page:()=>origin+'/search/',active:()=>true,jpeg:async b=>b};
- const flow=new Flow(ports);await flow.history('');
+ const flow=new Flow(ports);let historyReads=0;const initialRead=network.readPhotoHistory;network.readPhotoHistory=async(...args)=>{historyReads++;return initialRead(...args);};await flow.history('');await flow.history('');assert.equal(historyReads,1,'same-session history reopen reuses the validated first page');
  await flow.selectHistory('unknown',()=>{});assert.equal(sent,0);
  await flow.selectHistory('history-test',uri=>{preview=uri;});assert.equal(sent,1);assert.equal(preview,pin.image_urls['736x']);
  const normalRead=network.readPhotoHistory;

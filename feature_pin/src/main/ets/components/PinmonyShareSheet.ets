@@ -75,7 +75,7 @@ export struct PinmonyShareSheet {
   build() {
     Stack({ alignContent: Alignment.Center }) {
     Column() {
-      if (this.pinStore.shareLoading) {
+      if (this.pinStore.shareLoading && !this.pinStore.shareSearchActive) {
         Row({ space: 12 }) {
           LoadingProgress().color($r('app.color.accent'))
             .width(24)
@@ -84,7 +84,9 @@ export struct PinmonyShareSheet {
             .fontSize(14)
             .fontColor($r('app.color.secondary_text'))
         }
+        .width('100%')
         .height(72)
+        .justifyContent(FlexAlign.Center)
         .padding({ left: 20, right: 20 })
       }
       if (!this.pinStore.shareLoading && (PinmonyI18n.render(this.pinStore.shareSectionLabel, this.uiLanguage) || this.pinStore.shareSearchId || this.pinStore.shareSearchActive ||
@@ -108,13 +110,7 @@ export struct PinmonyShareSheet {
             .onChange((value: string) => {
               this.onSearch(value);
             })
-          if (PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) {
-            Column({ space: 12 }) {
-              LoadingProgress().width(32).height(32).color($r('app.color.accent'))
-                .accessibilityText(this.uiText("pm_loading_contacts_72ddd22e"))
-              Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-            }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
-          } else {
+          if (!PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) {
           Scroll() {
             Column() {
               ForEach(this.pinStore.shareContacts, (contact: ShareSheetOption) => {
@@ -192,6 +188,18 @@ export struct PinmonyShareSheet {
       this.onReady();
     })
     .enabled(!PinmonyI18n.isText(this.pinStore.shareFeedback, '正在处理…'))
+    if (this.pinStore.shareSearchActive && (this.pinStore.shareLoading ||
+        PinmonyI18n.isText(this.pinStore.shareFeedback, '正在加载联系人…'))) {
+      Stack({ alignContent: Alignment.Center }) {
+        Column({ space: 12 }) {
+          LoadingProgress().width(32).height(32).color($r('app.color.accent'))
+            .accessibilityText(this.uiText("pm_loading_contacts_72ddd22e"))
+          Text(this.pinStore.shareLoading ? this.uiText("pm_loading_share_options_1790123c") :
+            PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage))
+            .fontSize(14).fontColor($r('app.color.secondary_text'))
+        }
+      }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+    }
     if (PinmonyI18n.isText(this.pinStore.shareFeedback, '正在处理…')) {
       Column({ space: 12 }) {
         LoadingProgress().width(40).height(40).color($r('app.color.accent'))

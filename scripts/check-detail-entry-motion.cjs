@@ -166,3 +166,9 @@ assert(!indexSource.includes("this.profileSettingsVisible || this.homeEntryPhoto
 const rootTabs = indexSource.slice(indexSource.indexOf('private buildRootTabs()'), indexSource.indexOf('private buildRootTabs()') + 5000);
 assert(!/\.padding\(\{ top:.*homeEntryPhoto/.test(rootTabs),'retained tabs must not shift when the return flight appears');
 console.log('Retained home geometry: detail entry and return do not change root tabs inset passed');
+const pageOnlyPhoto=fixture();pageOnlyPhoto.photo.returnPageOnly=true;pageOnlyPhoto.rendered=false;pageOnlyPhoto.decoded=true;
+const pageOnlyModes=[];pageOnlyPhoto.onReveal=(_closing,page)=>pageOnlyModes.push(page);
+const pageOnlyTimer=timers.length;pageOnlyPhoto.begin();assert.equal(pageOnlyPhoto.showing,false,'Sheet source uses page motion without hidden photo render wait');timers[pageOnlyTimer]();
+assert.equal(pageOnlyModes.at(-1),true);assert.equal(animations.at(-1).duration,240);animations.at(-1).onFinish();
+pageOnlyPhoto.closing=true;pageOnlyPhoto.closeChanged();assert.equal(pageOnlyModes.at(-1),true);assert.equal(animations.at(-1).duration,200);animations.at(-1).onFinish();
+console.log('Photo result motion: existing page entry/exit, hidden Sheet source and no invisible-image render wait passed');

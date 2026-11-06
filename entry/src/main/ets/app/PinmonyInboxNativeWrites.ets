@@ -8,9 +8,10 @@ export interface PinmonyInboxWriteMessage { id: string; own: boolean; deleted: b
 export interface PinmonyInboxWriteIdentity {
   page: string; viewerId: string; token: number; screen: string; conversationId: string;
   contacts: string[]; selectedIds: string[]; messages: PinmonyInboxWriteMessage[];
+  profileEntry?: boolean;
 }
 interface SendOptions { conversation_id: string; text: string; field_set_key: string[]; }
-interface CreateOptions { user_ids: string[]; emails: string[]; }
+interface CreateOptions { user_ids: string[]; emails?: string[]; }
 interface ReactionData { reaction_text: string; }
 interface ApiOptions { url: string; data?: ReactionData; }
 interface WriteEnvelope { options: SendOptions | CreateOptions | ApiOptions; context: Record<string,string>; }
@@ -68,7 +69,7 @@ export class PinmonyInboxNativeWrites {
     }else if(action === 'next') {
       const ids: string[] = identity.selectedIds;
       if(identity.screen !== 'compose' || !ids.length || ids.length > 1000 || !ids.every((id: string,index: number): boolean => /^\d{1,40}$/.test(id) && id !== identity.viewerId && ids.indexOf(id) === index && identity.contacts.includes(id)))return;
-      options = {user_ids:ids.slice(),emails:[]};name = 'ConversationsResource';verb = 'create';endpoint = 'v3_create_conversation';target = ids.slice().sort().join(',');
+      options = identity.profileEntry ? {user_ids:ids.slice()} : {user_ids:ids.slice(),emails:[]};name = 'ConversationsResource';verb = 'create';endpoint = 'v3_create_conversation';target = ids.slice().sort().join(',');
     }else if(action === 'react' || action === 'deleteMessage') {
       const parts: string[] = typeof value === 'string' ? value.split('|') : [];
       const message: PinmonyInboxWriteMessage | undefined = identity.messages.find((m: PinmonyInboxWriteMessage): boolean => m.id === parts[0]);
@@ -124,6 +125,7 @@ export class PinmonyInboxNativeWrites {
           data.type !== undefined && data.type !== 'message' || data.conversation_id !== undefined && data.conversation_id !== identity.conversationId)throw new Error('message');
       }else if(action === 'next') {
         if(!data || !/^\d{1,40}$/.test(data.id))throw new Error('conversation');
+        if(identity.profileEntry && (!Array.isArray(data.users) || !data.users.some((u: WriteUser): boolean => u?.id === identity.viewerId)))throw new Error('participants');
         if(data.users !== undefined) {
           if(!Array.isArray(data.users) || data.users.length > 1001)throw new Error('participants');
           const peers: string[] = data.users.filter((u: WriteUser): boolean => u?.id !== identity.viewerId).map((u: WriteUser): string => u.id);

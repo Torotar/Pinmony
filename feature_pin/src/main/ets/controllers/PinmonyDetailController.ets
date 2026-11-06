@@ -76,8 +76,7 @@ export class PinmonyDetailController {
       if (!this.ports.postApiEnabled() || !this.ports.postExtensionsEnabled()) return;
       const save = detail.actions.find((item: PinmonyDetailAction): boolean => item.id === id && item.kind === 'save');
       if (!save?.enabled || store.viewerSaveBusy) return;
-      if (save.selected) await this.ports.cancelSave(detail.pinUrl);
-      else await this.ports.openBoards();
+      await this.ports.openBoards();
       return;
     }
     if (this.ports.postApiEnabled() && kind === 'share') {

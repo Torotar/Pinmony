@@ -34,6 +34,7 @@ interface User {
     username: string;
 }
 interface Board {
+    url?: string;
     section_count?: number;
     id: string;
     type: string;
@@ -172,6 +173,7 @@ export interface PinmonyPublishNativePorts extends PinmonySharePublishClientPort
     foreground?: () => boolean;
     page: () => string;
     done: () => void;
+    createdBoard?: (id: string, url: string, title: string) => void;
 }
 export class PinmonyPublishNativeFlow {
     private readonly ports: PinmonyPublishNativePorts;
@@ -491,7 +493,8 @@ export class PinmonyPublishNativeFlow {
                     f.phase = 'done';
                     f.busy = false;
                     this.commit();
-                    this.ports.done();
+                    if (this.ports.createdBoard && typeof b.url === 'string' && /^\/[^/?#]+\/[^/?#]+\/$/.test(b.url)) this.ports.createdBoard(b.id, this.origin + b.url, b.name);
+                    else this.ports.done();
                     return;
                 }
                 if(f.kind === 'photo' && mapped.enabled){f.selectedBoardId = mapped.id;f.selectedSectionId = undefined;f.phase = 'select';f.busy = false;this.commit();return;}

@@ -18,7 +18,7 @@ const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,sel
 return {reader,store,requests,cancelled,addresses,getSession:()=>session,setSession:s=>session=s,setPage:p=>target=p,setActive:v=>active=v,setSelected:v=>selected=v,setDocument:d=>document=d,setEpoch:v=>epoch=v};}
 function options(job){return JSON.parse(new URL(job.url).searchParams.get('data')).options;}
 function endpoint(job){return new URL(job.url).pathname;}
-async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;f.reader.boardSort='last_pinned_to';}
+async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2);assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;f.reader.boardSort='last_pinned_to';}
 
 
 async function main(){
@@ -37,7 +37,7 @@ async function main(){
  for(const mode of ['boards','groups','secret']) {
    const cold=fixture();await first(cold);cold.reader.reset();
    let pending=cold.reader.demand();cold.requests.at(-1).resolve(userBody());await flush();
-   cold.requests.at(-2).resolve(body([board(1)]));cold.requests.at(-1).resolve(body([]));await pending;
+   cold.requests.at(-1).resolve(body([board(1)]));await flush();cold.requests.at(-1).resolve(body([]));await pending;
    pending=cold.reader.select('hub:'+mode+':0:0');assert(cold.requests.at(-1).job.id.startsWith('native_profile_sort_initial_'));
    cold.requests.at(-1).resolve(initialSortBody('alphabetical'));await flush();
    assert.equal(options(cold.requests.at(-1).job).sort,'alphabetical','reset must restore the saved order before requesting '+mode);
@@ -51,8 +51,8 @@ async function main(){
    const cold=fixture();await first(cold);cold.reader.boardSort='';let pending=cold.reader.select('hub:boards:0:0');const count=cold.requests.length;
    cold.requests.at(-1).resolve(initialSortBody(invalid));await pending;assert.equal(cold.requests.length,count);assert(cold.store.profile.contentError);
    pending=cold.reader.refresh();cold.requests.findLast(r=>endpoint(r.job)==='/resource/UserResource/get/').resolve(userBody());await flush();
-   const retryAux=cold.requests.at(-1);assert(cold.requests.at(-2).job.id.startsWith('native_profile_sort_initial_'));cold.requests.at(-2).resolve(initialSortBody('alphabetical'));await flush();
-   assert.equal(options(cold.requests.at(-1).job).sort,'alphabetical');cold.requests.at(-1).resolve(body([board(2),board(1)]));retryAux.resolve(body([]));await pending;
+   assert(cold.requests.at(-1).job.id.startsWith('native_profile_sort_initial_'));cold.requests.at(-1).resolve(initialSortBody('alphabetical'));await flush();
+   assert.equal(options(cold.requests.at(-1).job).sort,'alphabetical');cold.requests.at(-1).resolve(body([board(2),board(1)]));await flush();cold.requests.at(-1).resolve(body([]));await pending;
    assert.equal(cold.store.profile.contentError,'');assert.equal(cold.reader.hubFeed.sort,'alphabetical');
  }
  console.log('Board order initialization: reset, all board filters, missing cursor order and retry after invalid metadata passed');
@@ -73,10 +73,11 @@ async function main(){
    assert(refreshed.store.profile.boards[0].pinCount.startsWith(String(count)+' '));assert.equal(refreshed.store.profile.boards[0].covers[0],avatar.replace('synthetic','updated'+count));assert.equal(refreshed.store.profile.unorganizedPins.length,0);
  }
  const f=fixture();await first(f);let n=f.requests.length;
- let pending=f.reader.select('hub:pins:0:0');assert.equal(endpoint(f.requests[n].job),'/resource/ApiResource/get/');assert.equal(options(f.requests[n].job).url,'/v3/users/profile/pins/clusters/');
- f.requests[n++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_sample',type:'pincluster',names:['Example'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await flush();
- assert.equal(options(f.requests[n].job).data.flag_filters,'');const allJob=f.requests[n].job;
- f.requests[n++].resolve(body([pin(11)],'page2'));await pending;assert.equal(f.store.profile.createdPins.length,1);assert.equal(f.store.profile.suggestions.length,1);
+ let pending=f.reader.select('hub:pins:0:0');assert.equal(options(f.requests[n].job).data.flag_filters,'');const allJob=f.requests[n].job;
+ f.requests[n++].resolve(body([pin(11)],'page2'));await flush();
+ assert.equal(f.reader.busy,false,'clusters do not hold the main feed lock');assert(f.store.profileCache.get(page,f.store.profile.section),'pins are cached while clusters are pending');assert.equal(f.store.profile.createdPins.length,1,'pins publish before suggestions');assert.equal(f.store.profile.contentLoadingMore,false);
+ assert.equal(options(f.requests[n].job).url,'/v3/users/profile/pins/clusters/');
+ f.requests[n++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_sample',type:'pincluster',names:['Example'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await pending;assert.equal(f.store.profile.suggestions.length,1);
  pending=f.reader.select('hub:pins:1:0');assert.equal(options(f.requests[n].job).data.flag_filters,'FAVORITED');f.requests[n++].resolve(body([{...pin(12),favorited_by_me:true}]));await pending;assert.equal(f.store.profile.createdPins[0].favorite,true);
  pending=f.reader.select('hub:pins:1:1');const combinedJob=f.requests[n].job;assert.equal(options(f.requests[n].job).data.flag_filters,'FAVORITED,CREATED_BY_ME');f.requests[n++].resolve(body([pin(14)]));await pending;assert.equal(f.store.profile.createdPins.length,1);
  pending=f.reader.select('hub:pins:0:1');const createdJob=f.requests[n].job;assert.equal(options(f.requests[n].job).data.flag_filters,'CREATED_BY_ME');f.requests[n++].resolve(body([pin(14)]));await pending;
@@ -84,11 +85,11 @@ async function main(){
  pending=f.reader.select('hub:groups:0:0');assert.equal(options(f.requests[n].job).filter_types,2);f.requests[n++].resolve(body([]));await pending;assert.equal(f.store.profile.boards.length,0);
  pending=f.reader.select('hub:collages:0:0');assert.equal(options(f.requests[n].job).data.is_draft,false);assert.equal(options(f.requests[n].job).data.transform_to_pins,true);f.requests[n++].resolve(body([]));await pending;
  pending=f.reader.select('hub:drafts:0:0');const draftJob=f.requests[n].job;assert.equal(options(f.requests[n].job).data.is_draft,true);assert.equal(options(f.requests[n].job).data.fields[0],'shuffle.id');f.requests[n++].resolve(body([]));await pending;
- await f.reader.select('hub:pins:1:0');assert.equal(f.requests.length,n,'cached favorite tab does not request again');assert.equal(f.store.profile.createdPins[0].id,'profile-api-native-12'); await f.reader.select('hub:groups:0:0');assert.equal(f.requests.length,n,'cached group tab does not request again'); pending=f.reader.select('hub:pins:0:0');await pending;const refreshing=f.reader.refresh(true);f.requests[n++].resolve(userBody());await flush();f.requests[n++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[]}));await flush();const old=n++;const newer=f.reader.select('hub:groups:0:0');f.requests[n++].resolve(body([]));await newer;f.requests[old].resolve(body([pin(99)]));await refreshing;assert.equal(f.store.profile.hubMode,'groups');assert.equal(f.store.profile.createdPins.length,0);
+ await f.reader.select('hub:pins:1:0');assert.equal(f.requests.length,n,'cached favorite tab does not request again');assert.equal(f.store.profile.createdPins[0].id,'profile-api-native-12'); await f.reader.select('hub:groups:0:0');assert.equal(f.requests.length,n,'cached group tab does not request again'); pending=f.reader.select('hub:pins:0:0');await pending;const refreshing=f.reader.refresh(true);f.requests[n++].resolve(userBody());await flush();const old=n++;const newer=f.reader.select('hub:groups:0:0');f.requests[n++].resolve(body([]));await newer;f.requests[old].resolve(body([pin(99)]));await refreshing;assert.equal(f.store.profile.hubMode,'groups');assert.equal(f.store.profile.createdPins.length,0);
  pending=f.reader.select('saved');await pending;assert(!f.store.profile.hubMode);assert.equal(f.store.profile.boards.length,1);
 
  const w=fixture();await first(w);let wi=w.requests.length;
- let wp=w.reader.select('hub:pins:0:0');w.requests[wi++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_test',type:'pincluster',names:['Suggested'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await flush();w.requests[wi++].resolve(body([pin(1)]));await wp;
+ let wp=w.reader.select('hub:pins:0:0');w.requests[wi++].resolve(body([pin(1)]));await flush();w.requests[wi++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_test',type:'pincluster',names:['Suggested'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await wp;
  wp=w.reader.select('hub-create:cluster_test');const clusterJob=w.requests[wi].job;
  assert.equal(clusterJob.method,'GET');assert.equal(w.store.profile.organize.loading,true);
  w.requests[wi++].resolve(body([{id:'1',images:pin(1).images}],'cluster-page2'));await flush();assert.deepEqual(options(w.requests[wi].job).bookmarks,['cluster-page2']);
@@ -104,10 +105,10 @@ async function main(){
  await w.reader.select('hub-create:cluster_test');assert.equal(w.requests.length,wi,'no replay after partial write');
 
  const success=fixture();await first(success);let si=success.requests.length;
- let sp=success.reader.select('hub:pins:0:0');success.requests[si++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_ok',type:'pincluster',names:['Suggested'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await flush();success.requests[si++].resolve(body([pin(1)]));await sp;
+ let sp=success.reader.select('hub:pins:0:0');success.requests[si++].resolve(body([pin(1)]));await flush();success.requests[si++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[{id:'cluster_ok',type:'pincluster',names:['Suggested'],pin_count:2,thumbnails:[{'236x':{url:avatar}}]}]}));await sp;
  sp=success.reader.select('hub-create:cluster_ok');const abandoned=success.requests[si++];await success.reader.unorganizedAction('close');abandoned.resolve(body([pin(99)]));await sp;assert(!success.store.profile.organize,'late feed cannot reopen selection');sp=success.reader.select('hub-create:cluster_ok');success.requests[si++].resolve(body([pin(1),pin(2)]));await sp;await success.reader.unorganizedAction('close');assert(!success.store.profile.organize);sp=success.reader.select('hub-create:cluster_ok');success.requests[si++].resolve(body([pin(1),pin(2)]));await sp;sp=success.reader.unorganizedAction('next');success.requests[si++].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_create_board',data:{...board(9),name:'Suggested',access:['write']}}}));await flush();
  success.requests[si++].resolve(JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_move_cluster_pins',data:null}}));await flush();
- assert.equal(options(success.requests[si].job).url,'/v3/users/profile/pins/clusters/');success.requests[si++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[]}));await flush();success.requests[si++].resolve(body([]));await sp;assert.equal(success.store.profile.contentError,'');assert.equal(success.store.profile.suggestions.length,0);assert(!success.store.profile.suggestionWriting);
+ success.requests[si++].resolve(body([]));await flush();assert.equal(options(success.requests[si].job).url,'/v3/users/profile/pins/clusters/');success.requests[si++].resolve(body({type:'story',story_type:'user_organize_pin_groupings',objects:[]}));await sp;assert.equal(success.store.profile.contentError,'');assert.equal(success.store.profile.suggestions.length,0);assert(!success.store.profile.suggestionWriting);
  assert.equal(success.store.profile.organize,undefined,'confirmed organization closes the old selection snapshot');assert.equal(success.reader.unorganized.ready,false,'boardless content must be read again after organization');
  const bad=success.reader.select('hub:pins:1:0');success.requests[si++].resolve(body([pin(3)],'',{resource_response:{status:'success',code:0,endpoint_name:'wrong_endpoint',data:[pin(3)]}}));await bad;assert(success.store.profile.contentError);assert.equal(success.store.profile.createdPins.length,0);
  const net=new Network();let calls=0;net.request=async(job,current)=>{const ok=current().authenticated;if(ok)calls++;return {error:ok?'':'rejected'};};const session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'};

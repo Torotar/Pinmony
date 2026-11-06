@@ -198,7 +198,7 @@ export class PinmonyShareNativeFlow {
         this.store.shareError = '';
         this.store.shareLoading = true;
         this.store.shareOptions = mode === 'user' ? ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X'].map((v: string): ShareSheetOption => ({ id: 'native-share:' + v, label: v === '短信' ? PinmonyI18n.message('pm_messages_4da199fa') : v, icon: '', enabled: false })) : [];
-        this.store.shareActions = mode === 'user' ? [{ id: 'native-copy', label: PinmonyI18n.message("pm_copy_link_8e86f9b1"), icon: '', enabled: false }] : mode === 'pin' ? [{ id: 'native-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), icon: '', enabled: false }] : [];
+        this.store.shareActions = mode === 'user' || mode === 'pin' ? [{ id: 'native-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), icon: '', enabled: false }] : [];
         this.ports.show(mode !== 'pin');
         const revision: number = this.revision;
         try {
@@ -297,23 +297,20 @@ export class PinmonyShareNativeFlow {
         if (!this.current(revision) || this.busy)
             return;
         if (id === 'native-system-share') {
-            if (this.mode !== 'pin' || !this.store.shareActions.some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
+            if ((this.mode !== 'pin' && this.mode !== 'user') || this.mode === 'user' && !this.link || !this.store.shareActions.some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
                 return;
-            await this.ports.share(this.page);
+            try {
+                await this.ports.share(this.mode === 'user' ? this.link : this.page);
+            } catch (_) {
+                if (this.current(revision))this.store.shareError = PinmonyI18n.message("pm_sharing_incomplete_please_retry_2a3623dc");
+            }
             return;
         }
-        if (id === 'native-copy' || id.startsWith('native-share:')) {
+        if (id.startsWith('native-share:')) {
             if (this.mode !== 'user' || !this.link || !this.store.shareOptions.concat(this.store.shareActions).some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
                 return;
             try {
-                if (id === 'native-copy')
-                    await this.ports.copy(this.link);
-                else
-                    await this.ports.share(this.link);
-                if (this.current(revision) && id === 'native-copy') {
-                    this.store.shareFeedback = PinmonyI18n.message("pm_link_copied_6ce7dfa5");
-                    this.ports.feedback();
-                }
+                await this.ports.share(this.link);
             }
             catch (_) {
                 if (this.current(revision))

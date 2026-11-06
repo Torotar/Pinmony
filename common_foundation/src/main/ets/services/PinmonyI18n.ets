@@ -27,6 +27,19 @@ export class PinmonyI18n {
     return /^en[-_]GB(?:[-_]|$)/i.test(systemLanguage) ? 'en_GB' : 'en';
   }
 
+  static translationAcceptLanguage(language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {
+    switch (language) {
+      case 'zh_TW': return 'zh-TW,zh;q=0.9';
+      case 'en': return 'en-US,en;q=0.9';
+      case 'en_GB': return 'en-GB,en;q=0.9';
+      case 'ja': return 'ja-JP,ja;q=0.9';
+      case 'ko': return 'ko-KR,ko;q=0.9';
+      case 'ru': return 'ru-RU,ru;q=0.9';
+      case 'pt_BR': return 'pt-BR,pt;q=0.9';
+      default: return 'zh-CN,zh;q=0.9';
+    }
+  }
+
   static initialize(context: common.Context): void {
     const chineseConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
     chineseConfig.locale = 'zh-CN';

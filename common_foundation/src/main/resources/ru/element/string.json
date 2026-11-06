@@ -1,5 +1,6 @@
 {
   "string": [
+    {"name":"pm_photo_history_save_unconfirmed","value":"Поиск завершён, но сохранение фотографии в истории не подтверждено."},
     {
       "name": "pm_recommend_boards_description",
       "value": "Отключите персонализацию доски, чтобы скрыть вкладки и рекомендации на её основе в главной ленте. Это не повлияет на доску и её пины."
@@ -1546,7 +1547,7 @@
     },
     {
       "name": "pm_photos_7b50017a",
-      "value": "Фотографии"
+      "value": "Пин"
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
@@ -3270,7 +3271,7 @@
     },
     {
       "name": "pm_system_share_13a1c63f",
-      "value": "Поделиться через систему"
+      "value": "Поделиться в других приложениях"
     },
     {
       "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
@@ -4414,6 +4415,10 @@
     },
     {
       "name": "pm_photo_search",
+      "value": "Поиск фотографий"
+    },
+    {
+      "name": "pm_detail_photo_search",
       "value": "Поиск фотографий"
     },
     {
@@ -5812,6 +5817,26 @@
     {
       "name": "pm_photo_history_delete_all_incomplete",
       "value": "Не удалось загрузить всю историю. Полное удаление не выполнено."
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_title",
+      "value": "Сохраняйте вдохновение"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_body",
+      "value": "Сохраняйте пины в Pinterest, чтобы собирать идеи. Находите пины, сохраняйте понравившееся и возвращайтесь сюда за вдохновением."
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_title",
+      "value": "Упорядочивайте идеи"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_body",
+      "value": "Пины — это искры вдохновения, а доски — их дом. Создавайте доски и упорядочивайте пины так, как вам нравится."
+    },
+    {
+      "name": "pm_created_board_choose_pins",
+      "value": "Сохраните пины на новую доску"
     }
   ]
 }

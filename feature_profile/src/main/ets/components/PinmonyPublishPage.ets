@@ -10,6 +10,11 @@ import { PinmonyPublishPhotoEditor, PinmonyPublishPhotoViewState } from './Pinmo
 import { PinmonyPublishBoardPage } from './PinmonyPublishBoardPage';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 
+interface PinmonyPublishDestinationState {
+  phase: string;
+  websiteChild: boolean;
+}
+
 @Component
 export struct PinmonyPublishPage {
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
@@ -28,10 +33,67 @@ export struct PinmonyPublishPage {
   private readonly photoViewState: PinmonyPublishPhotoViewState = new PinmonyPublishPhotoViewState();
   private readonly stack: NavPathStack = new NavPathStack();
   private readonly scroller: Scroller = new Scroller();
+  private readonly websiteScroller: Scroller = new Scroller();
+  private draftRoot: boolean = false;
+  private mounted: boolean = false;
+  @State private websiteRouteOpen: boolean = false;
+  @State private websiteClosing: boolean = false;
+  @State private websiteMotionOffset: string = '100%';
   onAction: (action: string, value: string, secret: boolean) => void = () => {};
-  aboutToAppear(): void { this.syncDraftCards(); this.stack.pushPath({ name: 'publish' }, false); }
+  aboutToAppear(): void {
+    this.mounted = true;
+    this.draftRoot = this.state.kind === 'photo' || !!this.state.fromDraftBox;
+    this.stack.pushPath({ name: 'publish' }, false);
+    this.syncDraftCards();
+  }
+  aboutToDisappear(): void { this.mounted = false; }
+
+  private syncWebsiteRoute(): void {
+    const open: boolean = !!this.state.fromDraftBox && this.state.kind === 'website';
+    if (open && !this.websiteRouteOpen) {
+      this.websiteRouteOpen = true;
+      this.websiteClosing = false;
+      this.stack.pushPath({ name: 'draft-website' }, true);
+    } else if (!open && this.websiteRouteOpen && !this.websiteClosing && this.state.phase === 'photo') {
+      this.websiteClosing = true;
+      this.stack.pop(true);
+    }
+  }
+
+  private websiteTransition(from: NavContentInfo, to: NavContentInfo,
+    operation: NavigationOperation): NavigationAnimatedTransition | undefined {
+    if (from.name !== 'draft-website' && to.name !== 'draft-website') return undefined;
+    const closing: boolean = operation === NavigationOperation.POP;
+    return {
+      timeout: 400,
+      transition: (proxy: NavigationTransitionProxy): void => {
+        this.websiteMotionOffset = closing ? '0%' : '100%';
+        this.getUIContext().postFrameCallback({ onFrame: (): void => {}, onIdle: (): void => {
+          if (!this.mounted) { proxy.finishTransition(); return; }
+          this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut,
+            onFinish: (): void => { proxy.finishTransition(); } }, (): void => {
+            this.websiteMotionOffset = closing ? '100%' : '0%';
+          });
+        } });
+      },
+      onTransitionEnd: (_success: boolean): void => {
+        if (closing) { this.websiteRouteOpen = false; this.websiteClosing = false; }
+      }
+    };
+  }
+
+  private destinationPhase(name: string): string {
+    if (name === 'draft-website') return this.state.phase === 'empty' ? 'empty' : 'website';
+    return this.draftRoot ? 'photo' : this.state.phase;
+  }
+
+  private pageBack(phase: string): void {
+    if (this.websiteClosing || phase !== this.state.phase || this.state.busy) return;
+    this.act(phase === 'empty' || this.state.fromDraftBox ? 'back' : 'close');
+  }
 
   private syncDraftCards(): void {
+    this.syncWebsiteRoute();
     const next: PinmonyPublishDraft[] = (this.state.drafts || []).slice();
     const removed: boolean = this.draftCardsToken === this.state.token && this.state.phase === 'photo' &&
       !this.state.draftLoading && next.length < this.draftCards.length &&
@@ -86,7 +148,7 @@ export struct PinmonyPublishPage {
     }
     return this.retainedDraftSections;
   }
-  private titleBar(): HdsNavigationTitleBarOptions {
+  private titleBar(phase: string): HdsNavigationTitleBarOptions {
     const draftTitle: string = this.uiText("pm_publish_draft_box") + ' · ' + PinmonyI18n.format('pm_pin_drafts_count', [(this.state.drafts || []).length], this.uiLanguage);
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
@@ -108,13 +170,13 @@ export struct PinmonyPublishPage {
           }
         }
       },
-      content: { title: { mainTitle: this.state.phase === 'empty' ? this.uiText("pm_choose_image_9ad12a1a") : this.state.kind === 'photo' ? draftTitle : this.uiText("pm_website_fb8d739d") },
-        backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: !this.state.busy, action: () => this.act(this.state.phase === 'empty' || this.state.fromDraftBox ? 'back' : 'close') },
-        menu: { value: this.state.phase === 'photo' ? [{ content: {
+      content: { title: { mainTitle: phase === 'empty' ? this.uiText("pm_choose_image_9ad12a1a") : phase === 'photo' ? draftTitle : this.uiText("pm_website_fb8d739d") },
+        backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: !this.state.busy, action: () => this.pageBack(phase) },
+        menu: { value: phase === 'photo' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.info_circle')).fontSize(22).fontColor([$r('app.color.primary_text')]),
           label: this.uiText('pm_pin_drafts_expiry'), isEnabled: true,
           action: () => { this.showDraftExpiryTip = !this.showDraftExpiryTip; }
-        } }] : this.state.phase === 'website' ? [{ content: {
+        } }] : phase === 'website' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.arrow_right')).fontColor([$r('app.color.primary_text')]),
           label: this.uiText("pm_choose_image_9ad12a1a"), isEnabled: this.canReadWebsite(),
           action: () => { if (this.canReadWebsite()) this.submitWebsite(); }
@@ -155,21 +217,25 @@ export struct PinmonyPublishPage {
       .width('100%').height('100%').scrollBar(BarState.Off).scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
   }
   @Builder
-  private destination(_name?: string, _param?: Object) {
+  private destination(name: string, _param?: Object) {
+    this.pageDestination({ phase: this.destinationPhase(name), websiteChild: name === 'draft-website' })
+  }
+  @Builder
+  private pageDestination($$: PinmonyPublishDestinationState) {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.TopEnd }) {
       Column() {
       Stack({alignContent:Alignment.Center}) {
-      if (this.state.phase === 'photo' && !this.state.loading && !this.state.draftLoading && !this.state.draftError && (this.state.drafts || []).length > 0) {
+      if ($$.phase === 'photo' && (!this.state.loading || this.websiteRouteOpen) && !this.state.draftLoading && !this.state.draftError && (this.state.drafts || []).length > 0) {
         this.draftFlow()
       } else {
-      Scroll(this.scroller) {
+      Scroll($$.websiteChild ? this.websiteScroller : this.scroller) {
         Column({ space: 20 }) {
-          if (this.state.phase === 'website') {
+          if ($$.phase === 'website') {
             this.websiteSheet()
-          } else if (this.state.phase === 'empty') {
+          } else if ($$.phase === 'empty') {
             PinmonyActionNotice({ message: this.uiText("pm_no_images_available_to_create_a_pin_b7fe6e0c"), actionText: this.uiText("pm_go_back_and_retry_fa25b166"), onAction: () => this.act('back') })
-          } else if (this.state.phase === 'photo' && !this.state.loading) {
+          } else if ($$.phase === 'photo' && (!this.state.loading || this.websiteRouteOpen)) {
             if (this.state.draftLoading) { Column() }
             else if (this.state.draftError) {
               PinmonyActionNotice({ message: PinmonyI18n.render(this.state.draftError,this.uiLanguage) })
@@ -183,21 +249,24 @@ export struct PinmonyPublishPage {
         }.width('100%').alignItems(HorizontalAlign.Start).padding({left:16,right:16,top:this.titleContentInset() + 16,bottom:16})
       }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
       }
-      if (this.state.phase === 'photo' && !this.state.loading && !this.state.draftLoading && !this.state.draftError && !(this.state.drafts || []).length) {
+      if ($$.phase === 'photo' && (!this.state.loading || this.websiteRouteOpen) && !this.state.draftLoading && !this.state.draftError && !(this.state.drafts || []).length) {
         Text(this.uiText('pm_pin_drafts_empty')).fontSize(16).textAlign(TextAlign.Center).fontColor($r('app.color.secondary_text'))
       }
       }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').onAreaChange((_old: Area,area: Area) => {this.sourceAreaWidth = Number(area.width);this.sourceAreaHeight = Number(area.height);})
-      if (this.state.phase === 'photo') { PinmonyDraggablePublishButton({areaWidth:this.sourceAreaWidth,areaHeight:this.sourceAreaHeight,actionEnabled:!this.state.loading && !this.state.busy && !this.state.draftLoading,menuEnabled:true,menuItems:this.photoSources()}) }
-      if (this.state.phase === 'photo' && this.showDraftExpiryTip) {
+      if ($$.phase === 'photo') { PinmonyDraggablePublishButton({areaWidth:this.sourceAreaWidth,areaHeight:this.sourceAreaHeight,actionEnabled:!this.websiteRouteOpen && !this.websiteClosing && !this.state.loading && !this.state.busy && !this.state.draftLoading,menuEnabled:!this.websiteRouteOpen && !this.websiteClosing,menuItems:this.photoSources()}) }
+      if ($$.phase === 'photo' && this.showDraftExpiryTip) {
         Text(this.uiText('pm_pin_drafts_expiry')).fontSize(14).fontColor($r('app.color.primary_text'))
           .backgroundColor($r('app.color.surface_muted')).padding({left:14,right:14,top:10,bottom:10})
           .borderRadius(10).margin({top:8,right:12}).shadow({radius:8,color:'#26000000',offsetX:0,offsetY:3})
           .onClick(() => { this.showDraftExpiryTip = false; })
       }
       }
-    }.titleBar(this.titleBar()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
-      .onBackPressed(() => { this.act(this.state.phase === 'empty' ? 'back' : 'close'); return true; })
+    }.titleBar(this.titleBar($$.phase)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([$$.websiteChild ? this.websiteScroller : this.scroller])
+      .translate({ x: $$.websiteChild ? this.websiteMotionOffset : '0%' })
+      .hitTestBehavior(!$$.websiteChild && this.websiteRouteOpen ? HitTestMode.None : HitTestMode.Default)
+      .accessibilityLevel(!$$.websiteChild && this.websiteRouteOpen ? 'no-hide-descendants' : 'auto')
+      .onBackPressed(() => { this.pageBack(this.state.phase); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .backgroundColor($r('app.color.page_background'))
   }
@@ -212,7 +281,7 @@ export struct PinmonyPublishPage {
       PinmonyPublishBoardPage({state:this.state,pins:this.state.pins,pinsLoading:this.state.loading,onAction:this.onAction})
     } else {
       Stack({alignContent:Alignment.Center}) {
-        HdsNavigation(this.stack) { Column().width('100%').height('100%') }.width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
+        HdsNavigation(this.stack) { Column().width('100%').height('100%') }.customNavContentTransition((from: NavContentInfo, to: NavContentInfo, operation: NavigationOperation) => this.websiteTransition(from, to, operation)).width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
         if (this.state.kind === 'photo' && (this.state.loading || this.state.draftLoading)) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None) }
         else if (this.state.loading || this.state.busy) { PinmonyLoadingOverlay({message:this.uiText('pm_loading_photos_35b3ef9b')}) }
       }.width('100%').height('100%')

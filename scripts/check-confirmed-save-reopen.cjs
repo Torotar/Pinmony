@@ -38,14 +38,23 @@ assert.equal(saves.copyId('1'), '', 'session reset clears saved-copy identities'
 assert.equal(saves.apply('1', fresh).actions[0].selected, false, 'Session reset removes prior evidence');
 const index = readSourceFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const boardOpenBody = index.match(/openPin: \(pin: PinmonyBoardPin, board: PinmonyBoardDetail\): void => \{([\s\S]*?)\n    \}/)[1];
-const boardHost = { cancelledBoardPins: new Set(), pinStore: { confirmedSaves: saves, rememberDetailOrigin() {} },
+const boardHost = { cancelledBoardPins: new Set(), nativeBusinessRoutesEnabled:true,capturePinEntryPhoto(){},pinStore: { confirmedSaves: saves, rememberDetailOrigin() {} },
   pinIdentity: () => '42', beginDetailOpening() {
-    assert.equal(saves.apply('42', fresh).actions[0].label, '风景 Landscape', 'board title is available before detail opening');
+    assert.equal(saves.apply('42', fresh).actions[0].selected, false, 'board opening does not infer a confirmed save');
+    assert.equal(saves.known('42'),false,'source board title is not recorded as a save destination');
   } };
 vm.runInNewContext(compile('(function(pin,board){' + boardOpenBody + '}).call(host,pin,board)'), {
   host: boardHost, pin: { pinUrl: 'https://www.pinterest.com/pin/42/' },
   board: { pageKey: 'https://www.pinterest.com/test/landscape/', title: '风景 Landscape' }, PIN_NATIVE_DETAIL_READS_ENABLED: true
 });
+const rememberBody=index.match(/rememberPin: \(pin: string, page: string\): void => \{([^\n]+)\},/)[1];
+const origins=[];const legacy={pinStore:{confirmedSaves:saves,rememberDetailOrigin:(id,page)=>origins.push([id,page])},pinIdentity:()=> '43'};
+vm.runInNewContext(compile('(function(pin,page){'+rememberBody+'}).call(host,pin,page)'),{host:legacy,pin:'https://www.pinterest.com/pin/43/',page:'https://www.pinterest.com/test/landscape/'});
+assert.equal(saves.known('43'),false,'legacy board entry also retains ordinary save text');
+assert.equal(origins.length,1,'board return origin is preserved');
+saves.confirm('42',true,'900','Actual destination');
+boardHost.beginDetailOpening=()=>assert.equal(saves.apply('42',fresh).actions[0].label,'Actual destination','opening a board does not overwrite a real confirmed destination');
+vm.runInNewContext(compile('(function(pin,board){'+boardOpenBody+'}).call(host,pin,board)'),{host:boardHost,pin:{pinUrl:'https://www.pinterest.com/pin/42/'},board:{pageKey:'https://www.pinterest.com/test/landscape/',title:'Source board'}});
 const method = index.match(/  private beginDetailOpening\([^\n]*\): void \{[\s\S]*?(?=\r?\n  private restoreCachedDetail)/)[0];
 const events = [];
 const navContext = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: false,
@@ -54,6 +63,7 @@ require('./product-coordination-harness.cjs').run(ts,compile('class Native { ' +
 const native = require('./product-coordination-harness.cjs').createHost(navContext.Native, ts, navContext);
 native.detailJourney = { begin() {}, mark() {} };
 Object.assign(native, {
+    selectDetailEntryMotion() {}, detailOpeningCoordinator: { pauseShufflePreviews() {} }, restoreDetailSearchPresentation() {},
     nativeBackTarget: 'home', pageBackToken: 3,
     detailPrefetchTimer: -1, clearRootTabGuard() { },
     supersedeRootPreparationForDetail() { this.pageBackToken++; }, pageTasks: { cancelTimeout() { } },

@@ -527,6 +527,7 @@ onBackPress(): boolean {
         return true;
     }
     if (this.profileStore.panel) {
+        if (this.profileStore.panelSearchBack?.()) return true;
         this.ports.closeProfilePanel();
         return true;
     }

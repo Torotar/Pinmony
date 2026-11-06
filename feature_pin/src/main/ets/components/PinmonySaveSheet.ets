@@ -60,6 +60,8 @@ export struct PinmonySaveSheet {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.feedback, this.uiLanguage) })
       }
       if (this.creating) {
+        Scroll() {
+          Column({ space: 12 }) {
         Text(this.uiText("pm_board_name_dd9a7122")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
         TextInput({ placeholder: this.uiText("pm_board_name_dd9a7122"), text: this.name }).maxLength(100)
           .height(48).borderRadius(12).backgroundColor($r('app.color.input_surface'))
@@ -72,19 +74,21 @@ export struct PinmonySaveSheet {
           .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(!this.result.busy)
             .onChange((value: boolean) => this.secret = value)
         }.width('100%')
+          }.width('100%').alignItems(HorizontalAlign.Start)
+        }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
         Row({ space: 12 }) {
-          Button(this.uiText("pm_back_to_boards_dcf21f0d"), { type: ButtonType.Normal }).layoutWeight(1).height(44).fontSize(14).borderRadius(16)
+          Button(this.uiText("pm_back_to_boards_dcf21f0d"), { type: ButtonType.Normal }).layoutWeight(1).height(48).fontSize(16).fontWeight(FontWeight.Medium).borderRadius(20)
             .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
             .enabled(!this.result.busy).onClick(() => {
               this.creating = false;
               if (this.onCreatingChange) this.onCreatingChange(false);
             })
-          Button(this.uiText("pm_create_cde2cd07"), { type: ButtonType.Normal }).layoutWeight(1).height(44).fontSize(14).borderRadius(16)
-            .backgroundColor(!!this.name.trim() && !this.result.busy && !this.result.loading ? $r('app.color.accent') : $r('app.color.surface_muted'))
-            .fontColor(!!this.name.trim() && !this.result.busy && !this.result.loading ? $r('app.color.detail_on_accent') : $r('app.color.secondary_text'))
+          Button(this.uiText("pm_create_cde2cd07"), { type: ButtonType.Normal }).layoutWeight(1).height(48).fontSize(16).fontWeight(FontWeight.Medium).borderRadius(20)
+            .backgroundColor($r('app.color.detail_save_accent'))
+            .fontColor(Color.White)
             .enabled(!!this.name.trim() && !this.result.busy && !this.result.loading)
             .onClick(() => { if (this.onCreate) this.onCreate(this.name.trim(), this.secret); })
-        }.width('100%').margin({ top: 16 })
+        }.width('100%').padding({ left: 4, right: 4, top: 12, bottom: 28 })
       } else {
         Scroll() {
           Column({ space: 8 }) {
@@ -103,20 +107,20 @@ export struct PinmonySaveSheet {
                 Text(this.uiText('pm_this_board_has_no_sections_yet_2eb7dc0a')).fontColor($r('app.color.secondary_text'))
               }
             } else {
-            if (!this.result.loading && this.result.shortlist.length) {
+            if (this.result.shortlist.length) {
               Text(this.uiText("pm_featured_15b26cda")).fontColor($r('app.color.secondary_text')).width('100%')
               ForEach(this.result.shortlist, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
             }
-            if (!this.result.loading) {
+            if (this.result.items.length || this.result.shortlist.length || !this.result.loading) {
               Text(this.uiText("pm_all_boards_f1847589")).fontColor($r('app.color.secondary_text')).width('100%')
             }
-            if (!this.result.loading) {
+            if (this.result.items.length || this.result.shortlist.length || !this.result.loading) {
               ForEach(this.result.items, (board: PinmonySaveBoard) => { this.boardRow(board) }, (board: PinmonySaveBoard) => JSON.stringify(board) + ':' + this.uiLanguage)
             }
             if (!this.result.loading && !this.result.error && !this.result.items.length) {
               Text(this.uiText("pm_no_boards_yet_43790af9")).fontColor($r('app.color.secondary_text'))
             }
-            if (!this.result.loading && (this.result.suggestions || []).length) {
+            if ((this.result.suggestions || []).length) {
               Divider().color($r('app.color.secondary_text')).opacity(0.15).margin({ top: 12, bottom: 8 })
               Text(this.uiText("pm_or_tap_to_create_a_new_board_4c13492c")).fontSize(13)
                 .fontColor($r('app.color.secondary_text')).width('100%')
@@ -140,17 +144,27 @@ export struct PinmonySaveSheet {
           PinmonyBoardPickerFooter({inset:0,back:true,labelKey:'pm_back_to_boards_dcf21f0d',
             actionEnabled:!this.result.busy && !this.result.loading && !this.result.uncertain,onSelect:() => this.onBack?.()})
         } else {
-        if (!this.result.loading && !this.result.targetBoardId) {
+        if ((this.result.items.length || this.result.shortlist.length || !this.result.loading) && !this.result.targetBoardId) {
         Divider().color($r('app.color.secondary_text')).opacity(0.15)
-        PinmonyBoardPickerFooter({inset:0,actionEnabled:!this.result.busy && !this.result.loading && !this.result.error,
+        PinmonyBoardPickerFooter({inset:0,compact:!!this.result.savedId,actionEnabled:!this.result.busy && !this.result.loading && !this.result.error,
           onSelect:() => this.beginCreate()})
         } else {
           Blank().height(68)
         }
         }
         if (this.result.savedId) {
-          Button(this.uiText("pm_undo_save_8245d6cd") + this.result.savedBoard).enabled(!this.result.busy)
-            .onClick(() => { if (this.onRemove) this.onRemove(); })
+          Row() {
+            Button({ type: ButtonType.Normal }) {
+              Text(this.uiText("pm_undo_save_8245d6cd") + this.result.savedBoard)
+                .fontSize(16).fontWeight(FontWeight.Medium).fontColor(Color.White)
+                .maxLines(2).textAlign(TextAlign.Center).textOverflow({ overflow: TextOverflow.Ellipsis })
+            }.layoutWeight(1).height('auto').constraintSize({ minHeight: 48 }).borderRadius(20)
+              .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+              .backgroundColor($r('app.color.detail_save_accent'))
+              .accessibilityText(this.uiText("pm_undo_save_8245d6cd") + this.result.savedBoard)
+              .enabled(!this.result.busy)
+              .onClick(() => { if (this.onRemove) this.onRemove(); })
+          }.width('100%').padding({ left: 4, right: 4, top: 0, bottom: 28 })
         }
       }
     }.width('100%').height('100%').padding({left:16,right:16,top:16,bottom:0}).backgroundColor($r('app.color.page_background'))

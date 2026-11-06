@@ -63,7 +63,7 @@ export class PinmonyBoardPinNativeWrites {
     return identity.sources.filter((pin: PinmonyBoardRecommendationSource): boolean => this.savedCopies.has(this.key(pin.id, identity, session))).map((pin: PinmonyBoardRecommendationSource): string => pin.id);
   }
   private clone(state: PinmonyBoardFlow): PinmonyBoardFlow {
-    return {phase:state.phase,targetBoardId:state.targetBoardId,targetSections:state.targetSections?.slice(),sectionId:state.sectionId,sectionTitle:state.sectionTitle,loading:state.loading,busy:state.busy,
+    return {createdBoardId:state.createdBoardId,createdBoardIdeas:state.createdBoardIdeas,phase:state.phase,targetBoardId:state.targetBoardId,targetSections:state.targetSections?.slice(),sectionId:state.sectionId,sectionTitle:state.sectionTitle,loading:state.loading,busy:state.busy,
       uncertain:state.uncertain,error:state.error,description:state.description,privacy:state.privacy,recommend:state.recommend,
       invites:state.invites,requests:state.requests,pins:state.pins.slice(),targets:state.targets.slice(),saved:state.saved.slice(),hasMore:state.hasMore};
   }
@@ -99,7 +99,7 @@ export class PinmonyBoardPinNativeWrites {
       if(this.uncertainPins.has(key)){this.operationKey = key;this.unknown(this.clone(original));return;}
       this.operationKey = key;
       const sourcePath: string = identity.recommendationPath || identity.page.slice(session.origin.length) + '_tools/more-ideas/?ideas_referrer=23';
-      handler = identity.recommendationPath ? 'www/[username]/[slug]/[section_slug]/_tools/more-ideas.js' : 'www/[username]/[slug]/_tools/more-ideas.js';
+      handler = original.createdBoardIdeas && identity.recommendationPath === identity.page.slice(session.origin.length) ? 'www/[username]/[slug].js' : identity.recommendationPath ? 'www/[username]/[slug]/[section_slug]/_tools/more-ideas.js' : 'www/[username]/[slug]/_tools/more-ideas.js';
       source = sourcePath;
       if(action === 'unsave') {
         const copy: SavedRecommendation | undefined = this.savedCopies.get(key);
@@ -110,8 +110,8 @@ export class PinmonyBoardPinNativeWrites {
       if(original.phase !== 'ideas' || !pin || !original.pins.some((p): boolean => p.id === value) || original.saved.includes(value))return;
       const save: SaveOptions = {pin_id:value,board_id:identity.boardId,user_id:identity.viewerId};
       if(typeof pin.tracking_params === 'string' && pin.tracking_params.length <= 16384)save.clientTrackingParams = pin.tracking_params;
-      if(productBoard) {
-        if(identity.recommendationPath || typeof pin.title !== 'string' || pin.title.length > 1000 || typeof pin.description !== 'string' || pin.description.length > 10000 ||
+      if(productBoard || original.createdBoardIdeas) {
+        if(productBoard && identity.recommendationPath || typeof pin.title !== 'string' || pin.title.length > 1000 || typeof pin.description !== 'string' || pin.description.length > 10000 ||
           typeof pin.link !== 'string' || pin.link.length > 8192 || typeof pin.tracking_params !== 'string' || pin.tracking_params.length > 16384)return;
         options = {pin_id:value,board_id:identity.boardId,clientTrackingParams:pin.tracking_params,title:pin.title,description:pin.description,link:pin.link,
           image_base64:'',image_url:'',media_upload_id:'',is_buyable_pin:false,is_removable:false,eventContext:{viewType:5,viewParameter:3173,element:10599}};

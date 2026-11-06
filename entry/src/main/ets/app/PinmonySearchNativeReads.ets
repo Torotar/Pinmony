@@ -71,6 +71,16 @@ export class PinmonySearchNativeReads {
   private sequence: number = 0;
   private page: string = '';
   private busy: boolean = false;
+  private paginationId: string = '';
+  private paginationRevision: number = 0;
+  private cancelPagination(): void {
+    this.paginationRevision++;
+    if (!this.paginationId) return;
+    PinmonyRuntimeLog.info('SearchPagination: phase=cancel revision=' + this.paginationRevision.toString());
+    this.ports.network().cancel(this.paginationId);
+    this.requests.delete(this.paginationId); this.paginationId = '';
+    this.busy = false; this.apply();
+  }
   private error: string = '';
   private term: string | undefined = undefined;
   private suggestionRevision: number = 0;
@@ -83,7 +93,7 @@ export class PinmonySearchNativeReads {
   private hintReady: boolean = false;
   private filterRevision: number = 0;
   private filterId: string = '';
-  cancelFilters(): void { this.filterRevision++; if(this.filterId) this.ports.network().cancel(this.filterId); this.filterId = ''; this.store.searchFilterLoading = false; }
+  cancelFilters(): void { this.filterRevision++; if(this.filterId) this.ports.network().cancel(this.filterId); this.filterId = ''; this.store.searchFilterLoading = false; this.store.searchFilterOpen = false; }
   private readonly requests: Set<string> = new Set<string>();
   private readonly feeds: Map<string, ReadFeed> = new Map<string, ReadFeed>();
   private readonly auxiliary: PinmonySearchNativeAuxiliary;
@@ -161,6 +171,7 @@ export class PinmonySearchNativeReads {
     return true;
   }
   pause(preserveScroll: boolean = true): void {
+    this.paginationRevision++; this.paginationId = '';
     this.userFollow.pause();
     this.boardFollow.pause();
     this.auxiliary.pause();
@@ -169,7 +180,7 @@ export class PinmonySearchNativeReads {
     this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear(); this.suggestionId = ''; this.filterId = '';
     if (this.suggestionTimer >= 0) clearTimeout(this.suggestionTimer); this.suggestionTimer = -1;
     this.busy = false; this.suggestionBusy = false; this.term = undefined; this.suggestions = []; this.suggestionError = '';
-    this.store.searchNativeInputReady = false; this.store.searchNativeReadsReady = false; this.store.searchFilterLoading = false;
+    this.store.searchNativeInputReady = false; this.store.searchNativeReadsReady = false; this.store.searchFilterLoading = false; this.store.searchFilterOpen = false;
   }
   reset(): void { this.userFollow.reset(); this.boardFollow.reset(); this.viewer = ''; this.auxiliary.reset(); this.pause(); this.feeds.clear(); if(this.account) { this.store.search = undefined; this.store.retainedSearch = undefined; this.store.searchCache.clear(); this.store.searchScrollOffset = 0; } this.account = ''; this.generation = -1; this.origin = ''; this.page = ''; this.suggestions = []; this.hint = ''; this.hintReady = false; this.error = ''; this.store.searchFilterOptions = []; this.store.searchFilterError = ''; }
   apply(): void {
@@ -203,7 +214,7 @@ export class PinmonySearchNativeReads {
     this.auxiliary.demand();
   }
   async refresh(): Promise<void> { if (this.bind() && this.query(this.page) && !this.busy && !this.boardFollow.pending() && !this.userFollow.pending()) await this.read(false); }
-  async more(): Promise<void> { if (!this.bind() || this.busy) return; const feed: ReadFeed | undefined = this.feeds.get(this.page); if (feed?.snapshot.apiEnded && !this.error) return; await this.read(!!feed?.cursor && feed.cursor !== '-end-'); }
+  async more(): Promise<void> { if (!this.bind() || this.busy) return; if (this.store.searchInputFocused || this.store.searchFilterOpen || this.term !== undefined && this.term !== this.query(this.page)) { PinmonyRuntimeLog.info('SearchPagination: phase=blocked input=' + (!!this.store.searchInputFocused).toString() + ' filters=' + (!!this.store.searchFilterOpen).toString()); return; } const feed: ReadFeed | undefined = this.feeds.get(this.page); if (feed?.snapshot.apiEnded && !this.error) return; await this.read(!!feed?.cursor && feed.cursor !== '-end-'); }
   navigate(target: string): boolean {
     if (!PIN_NATIVE_SEARCH_READS_ENABLED) return false;
     if (!this.bind() || !this.supported(target) || !this.query(target)) { this.store.searchError = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); return false; }
@@ -282,19 +293,21 @@ export class PinmonySearchNativeReads {
     const offer: SearchOffer | undefined = item.rich_summary?.products?.[0]?.offer_summary;
     return { merchant: item.rich_summary?.site_name?.slice(0, 180), price: typeof offer?.price === 'string' ? offer.price.slice(0, 80) : undefined, standardPrice: typeof offer?.standard_price === 'string' ? offer.standard_price.slice(0, 80) : undefined, id: 'api-pin-' + item.id, kind: 'pin', title: (item.grid_title || item.title || item.description || '').trim().slice(0,180), subtitle: '', targetUrl: /^\d+$/.test(String(item.id)) ? this.origin + '/pin/' + item.id + '/' : '', imageUrl: cover.url, imageWidth: cover.width, imageHeight: cover.height, enabled: /^\d+$/.test(String(item.id)), video: video };
   }
-  private async request(endpoint: string, data: Object, post: boolean, live: () => boolean): Promise<PinmonyNetworkReply> {
+  private async request(endpoint: string, data: Object, post: boolean, live: () => boolean, pagination: boolean = false): Promise<PinmonyNetworkReply> {
     const id: string = 'native_search_read_' + (++this.sequence).toString(); this.requests.add(id);
+    if (pagination) this.paginationId = id;
     const fields: string = 'source_url=' + encodeURIComponent(this.page.slice(this.origin.length)) + '&data=' + encodeURIComponent(JSON.stringify(data));
     const job: PinmonyNetworkJob = { id: id, epoch: this.generation, page: this.page, url: this.origin + '/resource/' + endpoint + '/get/' + (post ? '' : '?' + fields), method: post ? 'POST' : 'GET', body: post ? fields : '', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Pws-Handler': 'www/index.js' } };
     if (post) job.headers['Content-Type'] = 'application/x-www-form-urlencoded';
     if (endpoint === 'AdvancedTypeaheadResource') this.suggestionId = id;
     if(endpoint === 'ApiResource' && post) this.filterId = id;
-    try { return await this.ports.network().requestBusinessSearchRead(job, (): PinmonyBusinessSessionContext => this.ports.session(), live); } finally { this.requests.delete(id); if (this.suggestionId === id) this.suggestionId = ''; if(this.filterId === id) this.filterId = ''; }
+    try { return await this.ports.network().requestBusinessSearchRead(job, (): PinmonyBusinessSessionContext => this.ports.session(), live); } finally { this.requests.delete(id); if (this.paginationId === id) this.paginationId = ''; if (this.suggestionId === id) this.suggestionId = ''; if(this.filterId === id) this.filterId = ''; }
   }
   private async read(append: boolean): Promise<void> {
     const startedAt: number = Date.now();
     const operation: string = append ? 'pagination' : this.feeds.has(this.page) ? 'refresh' : 'initial';
-    const revision: number = this.revision; const page: string = this.page; const live = (): boolean => revision === this.revision && this.owned() && page === this.page;
+    const paginationRevision: number = this.paginationRevision;
+    const revision: number = this.revision; const page: string = this.page; const live = (): boolean => revision === this.revision && this.owned() && page === this.page && (!append || paginationRevision === this.paginationRevision);
     if (!this.supported(page)) { this.error = PinmonyI18n.message("pm_these_filter_parameters_are_not_supported_by_the_native_interfac_1b61265a"); this.apply(); return; }
     const feed: ReadFeed | undefined = this.feeds.get(page); const cursor: string = append ? feed?.cursor || '' : '';
     this.busy = true; this.error = ''; this.apply();
@@ -303,7 +316,7 @@ export class PinmonySearchNativeReads {
     options.domains = product.domains; options.price_min = product.priceMin; options.price_max = product.priceMax; options.appliedProductFilters = product.applied;
     if (append) options.bookmarks = [cursor];
     try {
-      const reply: PinmonyNetworkReply = await this.request('BaseSearchResource', { options: options, context: {} as Record<string,string> } as ReadEnvelope, true, live);
+      const reply: PinmonyNetworkReply = await this.request('BaseSearchResource', { options: options, context: {} as Record<string,string> } as ReadEnvelope, true, live, append);
       if (!live()) return; if (reply.error || reply.status !== 200 || reply.body.length > 6000000) throw new Error('search-request');
       const response: ResponseData = JSON.parse(reply.body) as ResponseData;
       const resource: Resource = response.resource_response;
@@ -328,11 +341,12 @@ export class PinmonySearchNativeReads {
     finally {
       PinmonyRuntimeLog.info('PageDataPerf: page=search operation=' + operation + ' elapsedMs=' +
         (Date.now() - startedAt).toString() + ' outcome=' + (!live() ? 'cancelled' : this.error ? 'error' : 'ready'));
-      if (revision === this.revision && page === this.page) { this.busy = false; if (live()) this.apply(); this.ports.settled(); }
+      if (revision === this.revision && page === this.page && (!append || paginationRevision === this.paginationRevision)) { this.busy = false; if (live()) this.apply(); this.ports.settled(); }
     }
   }
   async input(term: string, immediate: boolean = false): Promise<void> {
     if (typeof term !== 'string' || term.length > 300 || !this.bind()) return;
+    this.cancelPagination();
     const version: number = ++this.suggestionRevision; const revision: number = this.revision;
     if (this.suggestionId) this.ports.network().cancel(this.suggestionId); if (this.suggestionTimer >= 0) clearTimeout(this.suggestionTimer);
     this.term = term; this.suggestions = []; this.suggestionError = ''; this.suggestionBusy = true; this.apply();
@@ -376,7 +390,8 @@ export class PinmonySearchNativeReads {
   }
 
   async filters(): Promise<void> {
-    if (!this.bind()) return; const page: string = this.page; const feed: ReadFeed | undefined = this.feeds.get(page); const token: number = ++this.filterRevision; const panel: number = this.store.searchFilterToken; const revision: number = this.revision;
+    if (!this.bind()) return;
+    this.store.searchFilterOpen = true; this.cancelPagination(); const page: string = this.page; const feed: ReadFeed | undefined = this.feeds.get(page); const token: number = ++this.filterRevision; const panel: number = this.store.searchFilterToken; const revision: number = this.revision;
     const live = (): boolean => this.owned() && page === this.page && token === this.filterRevision && panel === this.store.searchFilterToken && revision === this.revision;
     this.store.searchProductDomains = [];this.store.searchProductCurrency = '';this.store.searchProductPrices = false;this.store.searchProductError = '';
     if (!feed) {

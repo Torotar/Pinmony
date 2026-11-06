@@ -11,6 +11,11 @@ assert(discovery >= 0 && discovery < history && results < history);
 assert(destination.slice(results, history).includes('.zIndex(this.historyExitToRoot ? 0 : 2)'), 'results must remain above history when returning to history, and below it on the way to root');
 assert(destination.slice(history).includes('.zIndex(1)'), 'history exits above the root destination');
 assert.match(destination.slice(history), /TransitionEffect\.translate\(\{ x: '100%' \}\)\.animation\(\{ duration: 150, curve: Curve\.EaseIn \}\)/);
+assert(!destination.slice(history, destination.indexOf('.hideTitleBar(true)')).includes('this.historyExitToRoot ?'),
+  'history exit must be installed while visible, not selected in the removal update');
+assert(destination.slice(0, discovery).includes('if (!this.committedQuery())'), 'keep the discovery root mounted below history');
+assert(destination.slice(discovery, results).includes(".accessibilityLevel(this.inputEditing ? 'no-hide-descendants' : 'auto')"),
+  'covered discovery root must not receive accessibility focus');
 const start = source.indexOf('  private handleSearchBack(');
 const end = source.indexOf('\n  private ', start + 1);
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
@@ -47,4 +52,22 @@ const branch = navigation.slice(navigation.indexOf('else if (this.searchStore.se
   navigation.indexOf('else if (this.pinStore.detailWebFlow)'));
 assert(branch.includes('this.ports.backFromSearch()'));
 assert(!branch.includes('searchInputFocused = false'), 'Preserve history state until backFromSearch consumes it');
+function inputMethod(name) {
+  const a=source.indexOf('  private '+name+'('),b=source.indexOf('\n  private ',a+1);
+  assert(a>=0);return source.slice(a,b<0?source.lastIndexOf('\n}'):b);
+}
+const Input=vm.runInNewContext(ts.transpileModule('class Input {'+
+  ['onInputFocus','openSearchHistory','closeInputPanel','committedQuery'].map(inputMethod).join('\n')+'} Input;',
+  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const input=new Input();let stopEditing;
+Object.assign(input,{snapshot:{pageKey:'https://www.pinterest.com/search/pins/?q=test',query:'test'},
+  inputController:{stopEditing(){}},inputFocusRevision:0,onQueryChange(){},
+  onInputFocusChange(focused,stop){if(focused)stopEditing=stop;}});
+for(const enter of [()=>input.onInputFocus(true),()=>input.openSearchHistory()]){
+  enter();assert.equal(input.historyExitToRoot,false);assert.equal(input.inputEditing,true);
+  stopEditing();assert.equal(input.historyExitToRoot,true,'host system back uses root-return layering');
+  assert.equal(input.inputEditing,false,'host callback closes history without recursive parent navigation');
+}
+input.onInputFocus(true);input.closeInputPanel(false);
+assert.equal(input.historyExitToRoot,false,'submitting a search retains the results entrance layering');
 console.log('search history return checks passed');

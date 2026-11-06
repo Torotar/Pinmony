@@ -31,6 +31,15 @@ function fixture(move = false) {
     setIdentity: next => identity = next, setSession: next => session = next, setState: next => state = next};
 }
 async function main() {
+ { const f=fixture();f.setIdentity({...f.identity(),recommendationPath:'/sample/board/',sources:[{id:'7',tracking_params:'synthetic',title:'Title',description:'Description',link:''}]});f.state().createdBoardIdeas=true;
+ let saving=f.writer.submit('save','7');const job=f.requests[0].job;assert.equal(job.headers['X-Pinterest-Pws-Handler'],'www/[username]/[slug].js');
+ const n=new Network();n.request=async(job,current)=>({error:current().authenticated?'':'rejected'});
+ const transport=(j,copies=[])=>n.requestBusinessBoardPinWrite(j,f.session,'100','42',[],[],['7'],()=>true,copies,'/sample/board/');
+ assert.equal((await transport(job)).error,'');assert.equal((await transport({...job,headers:{...job.headers,'X-Pinterest-Pws-Handler':'www/index.js'}})).error,'rejected');
+ f.requests[0].resolve(resource(rawPin(77),'v3_repin_handler'));await saving;assert.equal(f.state().createdBoardIdeas,true);
+ saving=f.writer.submit('save','7');const undo=f.requests[1].job;assert.equal(JSON.parse(new URLSearchParams(undo.body).get('data')).options.id,'77');assert.equal((await transport(undo,['77'])).error,'');assert.equal((await transport(undo,[])).error,'rejected');f.requests[1].resolve(resource(null,'v3_delete_pin_handler'));await saving;assert.equal(f.state().saved.length,0);
+ console.log('Created board save/undo: captured route, strict handler, returned copy ownership and shared card state passed'); }
+
   const save = fixture(), original = save.state(); let pending = save.writer.submit('save', '7');
   assert(save.state().busy); assert.equal(original.busy, false); assert.equal(save.state().saved.length, 0);
   await save.writer.submit('save', '7'); assert.equal(save.requests.length, 1);

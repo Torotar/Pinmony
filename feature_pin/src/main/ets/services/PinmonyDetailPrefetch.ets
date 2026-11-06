@@ -31,11 +31,14 @@ interface PrefetchPin {
 }
 interface PrefetchAiTopic { name?: string; }
 interface PrefetchShuffle { id?: string; }
-interface PrefetchResource { status: string; data: PrefetchPin; }
-interface PrefetchResponse { resource_response: PrefetchResource; }
+interface PrefetchResource { status: string; data: PrefetchPin; code?: number; error?: Object; }
+interface PrefetchReadOwner { id?: string; }
+interface PrefetchReadContext { user?: PrefetchReadOwner; }
+interface PrefetchResponse { resource_response: PrefetchResource; client_context?: PrefetchReadContext; }
 interface PrefetchEntry { pinUrl: string; detail: PinmonyDetailSnapshot; expiresAt: number; }
 interface SelectedPinResource { status: string; data: Record<string, Object>; }
-interface SelectedPinResponse { resource_response: SelectedPinResource; }
+interface PrefetchSavedBoard { id: string; name: string; }
+interface SelectedPinResponse { resource_response: SelectedPinResource; pinmony_saved_board?: PrefetchSavedBoard; }
 type DetailReader = (url: string, id: string, current: () => boolean) => Promise<string>;
 
 // Select only business fields used by detail/media/post contracts. Never retain
@@ -44,7 +47,8 @@ function detailResource(body: string, pinUrl: string): string {
   if (body.length > 512 * 1024) throw new Error('detail-too-large');
   const response: PrefetchResponse = JSON.parse(body) as PrefetchResponse;
   const pin: PrefetchPin = response.resource_response?.data;
-  if (response.resource_response?.status !== 'success' || !pin || pin.type !== 'pin' ||
+  if (response.resource_response?.status !== 'success' || response.resource_response.error ||
+      response.resource_response.code !== undefined && response.resource_response.code !== 0 || !pin || pin.type !== 'pin' ||
       String(pin.id) !== pinUrl.split('/pin/')[1].split('/')[0]) throw new Error('invalid-detail');
   const input: Record<string, Object> = JSON.parse(JSON.stringify(pin)) as Record<string, Object>;
   const selected: Record<string, Object> = {};
@@ -53,7 +57,7 @@ function detailResource(body: string, pinUrl: string): string {
     'rich_metadata', 'rich_summary', 'price_value', 'price_currency', 'affiliate_disclosure',
     'closeup_attribution', 'closeup_unified_attribution',
     'link', 'mobile_link', 'tracked_link', 'utm_link', 'affiliate_link', 'pin_direct_to_site_url',
-    'ai_disclosures', 'gen_ai_topics', 'digital_media_source_type', 'is_video', 'videos', 'story_pin_data', 'carousel_data', 'aggregated_pin_id',
+    'ai_disclosures', 'gen_ai_topics', 'digital_media_source_type', 'is_video', 'videos', 'story_pin_data', 'story_pin_data_id', 'carousel_data', 'aggregated_pin_id',
     'aggregated_pin_data', 'comment_count', 'tracking_params', 'client_tracking_params', 'reaction_data', 'reaction_by_me', 'reaction_counts',
     'is_eligible_for_image_download', 'is_eligible_for_ai_comparison', 'has_hidden_inner_pin', 'board',
     'through_id', 'rec_reason_type', 'source'];
@@ -63,6 +67,13 @@ function detailResource(body: string, pinUrl: string): string {
     selected['shuffle'] = shuffleIdentity;
   }
   const result: SelectedPinResponse = { resource_response: { status: 'success', data: selected } };
+  const viewer: string | undefined = response.client_context?.user?.id;
+  const owner: PrefetchReadOwner = input['pinner'] as PrefetchReadOwner;
+  const board: PrefetchSavedBoard = input['board'] as PrefetchSavedBoard;
+  if(typeof viewer === 'string' && /^\d{1,30}$/.test(viewer) && owner?.id === viewer && input['is_repin'] === true &&
+      typeof board?.id === 'string' && /^\d{1,30}$/.test(board.id) && typeof board.name === 'string' && !!board.name && board.name.length <= 300) {
+    result.pinmony_saved_board = {id:board.id,name:board.name};
+  }
   return JSON.stringify(result);
 }
 
@@ -110,7 +121,7 @@ export function mapPrefetchedDetail(body: string, pinUrl: string, allowPendingMe
     // A cover is not a complete carousel/story. Keep their existing resolver.
     if (pin.carousel_data?.pages?.length || !allowPendingMedia && pin.carousel_data?.carousel_slots?.length) return undefined;
     const story: PrefetchStory | undefined = pin.story_pin_data;
-    if (story?.pages?.length || story?.story_pages?.length) {
+    if (!allowPendingMedia && (story?.pages?.length || story?.story_pages?.length)) {
       const blocks: PrefetchBlock[] | undefined = story.pages?.[0]?.blocks;
       const block: PrefetchBlock | undefined = blocks?.[0];
       if (story.is_deleted || story.pages?.length !== 1 || story.story_pages?.length || blocks?.length !== 1 || !block ||

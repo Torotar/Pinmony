@@ -1,5 +1,6 @@
 {
   "string": [
+    {"name":"pm_photo_history_save_unconfirmed","value":"検索は完了しましたが、写真履歴の保存は確認できませんでした。"},
     {
       "name": "pm_recommend_boards_description",
       "value": "ボードのパーソナライズをオフにすると、そのボードに基づくホームフィードのタブとおすすめが非表示になります。ボードやピンには影響しません。"
@@ -1546,7 +1547,7 @@
     },
     {
       "name": "pm_photos_7b50017a",
-      "value": "写真"
+      "value": "ピン"
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
@@ -3270,7 +3271,7 @@
     },
     {
       "name": "pm_system_share_13a1c63f",
-      "value": "システム共有"
+      "value": "他のアプリに共有"
     },
     {
       "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
@@ -4415,6 +4416,10 @@
     {
       "name": "pm_photo_search",
       "value": "写真検索"
+    },
+    {
+      "name": "pm_detail_photo_search",
+      "value": "写真を検索"
     },
     {
       "name": "pm_photo_search_loading",
@@ -5812,6 +5817,26 @@
     {
       "name": "pm_photo_history_delete_all_incomplete",
       "value": "履歴をすべて読み込めなかったため、一括削除しませんでした。"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_title",
+      "value": "インスピレーションを保存"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_body",
+      "value": "Pinterest でピンを保存して、アイデアを集めましょう。お気に入りのピンを保存すれば、ここでいつでも見返して、新たなひらめきを得られます。"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_title",
+      "value": "アイデアを整理"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_body",
+      "value": "ピンはひらめきのきっかけ、ボードはその居場所です。ボードを作成して、好きな方法でピンを整理しましょう。"
+    },
+    {
+      "name": "pm_created_board_choose_pins",
+      "value": "新しいボードにピンを保存"
     }
   ]
 }

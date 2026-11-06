@@ -53,6 +53,7 @@ export interface PinmonyOrganizeSnapshot {
 }
 
 export interface PinmonyProfileSnapshot {
+  privateRestricted?: boolean;
   suggestionTitle?: string;
   suggestionWriting?: boolean;
   suggestionUnavailableIds?: string[];

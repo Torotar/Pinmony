@@ -31,7 +31,7 @@ for (const [page, names] of [
       creatingTarget: false, creatingBoardTarget: false, snapshot: { title: 'Board', editable: false, phase: 'members', users: [] }, selectedIds: [], sectionEditName: '', uiText: s => s,
       modernBoardActions: () => false, canSave: () => false });
     assert.equal(host.titleContentInset(), 80);
-    const flows = page === 'PinmonyBoardPage' ? [undefined, ...['section', 'edit', 'sectionEdit', 'organize', 'targets', 'ideas'].map(phase => ({ phase })), { phase: 'edit', cover: {} }] : ['members', 'invite', 'permissions'].map(phase => ({ phase }));
+    const flows = page === 'PinmonyBoardPage' ? [undefined, ...['section', 'edit', 'sectionEdit', 'organize', 'targets', 'ideas'].map(phase => ({ phase })), { phase: 'edit', cover: {} }, { phase: 'ideas', createdBoardIdeas: true }] : ['members', 'invite', 'permissions'].map(phase => ({ phase }));
     for (const flow of flows) {
       host.snapshot.flow = flow;
       if (page === 'PinmonyBoardCollaboratorsPage') host.snapshot.phase = flow.phase;
@@ -41,6 +41,12 @@ for (const [page, names] of [
         assert.equal(host.titleContentInset(), 0, 'plain picker uses HDS safe area without duplicate inset');
         assert.equal(options.style.originalStyle.contentStyle.backIconStyle.backgroundColor, 'transparent');
         assert.equal(options.style.systemMaterialEffect, undefined);
+      }
+      if (flow?.createdBoardIdeas) {
+        assert.equal(host.titleContentInset(), 80, 'new board picker uses the same content inset as more ideas');
+        assert.equal(options.style.systemMaterialEffect, mode, 'new board picker follows the shared immersive material setting');
+        assert.equal(options.content.title.mainTitle, 'pm_created_board_choose_pins');
+        assert.equal(options.content.menu.value.length, 1, 'keep the completion action');
       }
       const enabled = mode !== 'off' && !(page === 'PinmonyBoardPage' && flow?.phase === 'targets');
       assert.equal(options.style.blurStrategy, enabled ? 1 : 0);

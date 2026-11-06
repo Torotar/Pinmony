@@ -14,6 +14,8 @@ export struct PinmonyPhotoHistoryView {
   @StorageLink('pinmonyLanguage') private language: string = 'zh';
   @StorageProp('systemDarkMode') private dark: boolean = false;
   @Prop photoLifted: boolean = false;
+  @Prop interactionActive: boolean = true;
+  @Prop loadingActive: boolean = true;
   @State private items: PinmonyPhotoHistoryItem[] = [];
   @State private selected: string = '';
   @State private busy: boolean = false;
@@ -45,6 +47,12 @@ export struct PinmonyPhotoHistoryView {
   onConfirm?: (id: string, origin?: PinmonyPhotoHistoryOrigin) => Promise<void>;
   onDelete?: (ids: string[]) => Promise<void>;
   onClose?: () => void;
+  onInactiveBack?: () => void;
+  private handleSystemBack(): boolean {
+    if (!this.interactionActive) { this.onInactiveBack?.(); return true; }
+    this.back();
+    return true;
+  }
   private text(key: string): string { return PinmonyI18n.text(key, this.language); }
   private selectPhoto(id: string): void {
     if (this.managementAnimating || this.confirming || this.busy || this.deleting || this.managing || this.pendingIds.includes(id) || this.uncertainIds.includes(id)) return;
@@ -57,7 +65,7 @@ export struct PinmonyPhotoHistoryView {
     this.managementAnimating = false; this.historyVisible = !this.managing; this.managementVisible = this.managing;
   }
   private async load(): Promise<void> {
-    if (this.managementAnimating || this.busy || this.deleting || this.ended || !this.onLoad) return;
+    if (!this.loadingActive || !this.interactionActive || this.managementAnimating || this.busy || this.deleting || this.ended || !this.onLoad) return;
     this.busy = true; this.failed = false;
     try {
       const page: PinmonyPhotoHistoryPage = await this.onLoad(this.cursor);
@@ -211,6 +219,7 @@ export struct PinmonyPhotoHistoryView {
             }.width(this.cardWidth()).height(this.cardHeight(item))
           }, (item: PinmonyPhotoHistoryItem) => item.id + ':' + this.language )
         }.columnsGap(RECOMMEND_PHONE_GAP_VP).rowsGap(RECOMMEND_PHONE_GAP_VP)
+          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
           .height('100%').width('100%')
           .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + 16)})
           .onReachEnd(() => { if (!this.failed) this.load(); }).scrollBar(BarState.Off)
@@ -230,9 +239,10 @@ export struct PinmonyPhotoHistoryView {
             Text(this.text('pm_photo_history_empty_hint')).fontSize(15).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
           }.width('100%').height('100%').padding({top:this.titleContentInset()}).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         }
-      }.width('100%').height('100%').padding({left:16,right:16,bottom:16})
+      }.width('100%').height('100%').padding({left:16,right:16})
         .backgroundColor($r('app.color.page_background'))
-        .enabled(!this.managementAnimating && this.managing === management)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+        .enabled(this.interactionActive && !this.managementAnimating && this.managing === management)
   }
   build() {
     HdsNavDestination() {
@@ -255,7 +265,9 @@ export struct PinmonyPhotoHistoryView {
         }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
-    }.titleMode(HdsNavDestinationTitleMode.MINI)
+    }.mode(NavDestinationMode.STANDARD)
+      .titleMode(HdsNavDestinationTitleMode.MINI)
+      .hideTitleBar(false)
       .systemBarStyle({ statusBarContentColor: this.dark ? '#F7F8FA' : '#1B1E25' }, { statusBarContentColor: this.dark ? '#F7F8FA' : '#1B1E25' })
       .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: false,
         style: { blurStrategy:this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,thermoCtrl:this.immersiveLightMode !== 'off',systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode),scrollEffectOpts:{enableScrollEffect:this.immersiveLightMode !== 'off',scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR},originalStyle:{contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')},menuStyle:{iconColor:$r('app.color.primary_text'),textColor:$r('app.color.primary_text')}},backgroundStyle:{backgroundColor:Color.Transparent,maskExtraHeight:0,blurRadius:this.immersiveLightMode !== 'off' ? 18 : 0}},scrollEffectStyle:{contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')},menuStyle:{iconColor:$r('app.color.primary_text'),textColor:$r('app.color.primary_text')}},backgroundStyle:{backgroundColor:$r('app.color.immersive_title_scrolled'),maskExtraHeight:0,blurRadius:this.immersiveLightMode !== 'off' ? 18 : 0}} },
@@ -263,15 +275,16 @@ export struct PinmonyPhotoHistoryView {
           menu: { value: [{ content: {
             icon: new SymbolGlyphModifier($r('sys.symbol.trash')).fontColor([$r('app.color.primary_text')]),
             label: this.text(this.managing ? 'pm_photo_history_delete_all' : 'pm_photo_history_manage'),
-            isEnabled: !this.managementAnimating && !this.busy && !this.confirming && !this.deleting &&
+            isEnabled: this.interactionActive && !this.managementAnimating && !this.busy && !this.confirming && !this.deleting &&
               (this.items.length > this.pendingIds.length || this.managing && !this.ended) &&
               !!this.onDelete && this.uncertainIds.length === 0,
             action: () => { if (this.managing) this.confirmDeleteAll(); else this.enterManagement(); }
           } }] }
         } })
       .bindToScrollable([this.managing ? this.managementScroller : this.scroller])
-      .onBackPressed(() => { this.back(); return true; })
+      .onBackPressed(() => this.handleSystemBack())
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .backgroundColor($r('app.color.page_background'))
   }
 }

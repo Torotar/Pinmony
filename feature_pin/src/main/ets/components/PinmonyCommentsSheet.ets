@@ -8,6 +8,9 @@ import { PinmonyComment, PinmonyCommentResult } from '../models/PinmonyComments'
 export struct PinmonyCommentsSheet {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  private hasCurrentTranslation(item: PinmonyComment): boolean {
+    return !!item.translatedText && item.translationLanguage === PinmonyI18n.translationAcceptLanguage(this.uiLanguage);
+  }
   @Prop @Watch('resultChanged') result: PinmonyCommentResult = { pin: '', loading: true, error: '', items: [] };
   @State private draft: string = '';
   @State private photoUri: string = '';
@@ -85,7 +88,7 @@ export struct PinmonyCommentsSheet {
           Text(this.ageLabel(item.createdAt)).fontSize(12).fontColor($r('app.color.secondary_text'))
         }.alignItems(VerticalAlign.Center)
         if (item.text) {
-          Text(item.translationVisible && item.translatedText ? item.translatedText : item.text)
+          Text(item.translationVisible && this.hasCurrentTranslation(item) ? (item.translatedText || item.text) : item.text)
             .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
             .copyOption(CopyOptions.LocalDevice)
             .fontSize(15).fontColor($r('app.color.primary_text'))
@@ -101,14 +104,14 @@ export struct PinmonyCommentsSheet {
           Button({ type: ButtonType.Normal }) {
             Row({ space: 5 }) {
               if (item.translationLoading) { LoadingProgress().width(14).height(14).color($r('app.color.accent')) }
-              Text(item.translationLoading ? this.uiText("pm_translating_07f81963") : item.translationVisible ? this.uiText("pm_show_original_098e6618") :
-                item.translatedText ? this.uiText("pm_show_translation_7cd62999") : item.translationError ? this.uiText("pm_translate_again_496b5f08") : this.uiText("pm_translate_a52a0833"))
+              Text(item.translationLoading ? this.uiText("pm_translating_07f81963") : item.translationVisible && this.hasCurrentTranslation(item) ? this.uiText("pm_show_original_098e6618") :
+                this.hasCurrentTranslation(item) ? this.uiText("pm_show_translation_7cd62999") : item.translationError ? this.uiText("pm_translate_again_496b5f08") : this.uiText("pm_translate_a52a0833"))
                 .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
             }
           }.height(32).padding({ left: 0, right: 4 }).backgroundColor(Color.Transparent)
             .enabled(!item.translationLoading && !this.result.loading && !this.result.busy && !this.result.uncertain)
             .onClick(() => { if (this.onTranslate) this.onTranslate(item.id); })
-            .accessibilityText(item.translationVisible ? this.uiText("pm_show_original_comment_373f6052") : this.uiText("pm_translate_comment_8a5fdd65"))
+            .accessibilityText(item.translationVisible && this.hasCurrentTranslation(item) ? this.uiText("pm_show_original_comment_373f6052") : this.uiText("pm_translate_comment_8a5fdd65"))
         }
         if (item.canReply) {
           Text(this.uiText("pm_reply_cf945e21")).fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))

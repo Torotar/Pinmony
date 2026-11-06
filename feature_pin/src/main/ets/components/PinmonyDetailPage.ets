@@ -27,6 +27,47 @@ import { SmartImage, getRecommendCardWidth, getRecommendColumnCount, RECOMMEND_C
 import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode,
   HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 
+interface PinmonyDetailFlowRow {
+  key: string;
+  kind: string;
+  pin?: PinmonyRelatedPin;
+  fingerprint: string;
+}
+
+class PinmonyDetailFlowSource implements IDataSource {
+  private rows: PinmonyDetailFlowRow[] = [];
+  private listeners: DataChangeListener[] = [];
+  totalCount(): number { return this.rows.length; }
+  getData(index: number): PinmonyDetailFlowRow { return this.rows[index]; }
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (!this.listeners.includes(listener)) this.listeners.push(listener);
+  }
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const index: number = this.listeners.indexOf(listener);
+    if (index >= 0) this.listeners.splice(index, 1);
+  }
+  update(rows: PinmonyDetailFlowRow[]): void {
+    const previous: PinmonyDetailFlowRow[] = this.rows;
+    let prefix: number = 0;
+    while (prefix < previous.length && prefix < rows.length && previous[prefix].key === rows[prefix].key) prefix++;
+    let suffix: number = 0;
+    while (suffix < previous.length - prefix && suffix < rows.length - prefix &&
+      previous[previous.length - 1 - suffix].key === rows[rows.length - 1 - suffix].key) suffix++;
+    this.rows = rows;
+    if (prefix + suffix === previous.length && rows.length > previous.length) {
+      for (let i: number = prefix; i < rows.length - suffix; i++) this.listeners.forEach((listener: DataChangeListener): void => listener.onDataAdd(i));
+    } else if (prefix + suffix === rows.length && previous.length > rows.length) {
+      for (let i: number = previous.length - suffix - 1; i >= prefix; i--) this.listeners.forEach((listener: DataChangeListener): void => listener.onDataDelete(i));
+    } else if (prefix !== previous.length || prefix !== rows.length) {
+      this.listeners.forEach((listener: DataChangeListener): void => listener.onDataReloaded());
+      return;
+    }
+    for (let i: number = 0; i < prefix; i++) {
+      if (previous[i].fingerprint !== rows[i].fingerprint) this.listeners.forEach((listener: DataChangeListener): void => listener.onDataChange(i));
+    }
+  }
+}
+
 @Component
 export struct PinmonyDetailPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -439,12 +480,14 @@ export struct PinmonyDetailPage {
     } catch (_) { return { x: 0, y: 0, width: 0, height: 0 }; }
   }
   @Prop visualResult: PinmonyVisualResult = emptyVisualResult();
+  @Prop pageActive: boolean = true;
   @State private zoomImageUrl: string = '';
   private productGalleryOffset: number = 0;
   @State private searchLabelVisible: boolean = true;
   private searchLabelTimer: number = -1;
   onImageLayer?: (layer: string) => void;
   onVisualSearch?: (crop: PinmonyImageCrop, append: boolean, first: boolean) => void;
+  onVisualResult?: (id: string) => boolean;
   onDownload?: () => void;
   onViewerSave?: () => void;
   onTagSearch?: (query: string, pin: string) => void;
@@ -473,6 +516,37 @@ export struct PinmonyDetailPage {
   @State private viewportWidth: number = 360;
   @State private viewportHeight: number = 800;
   private readonly detailScroller: Scroller = new Scroller();
+  private readonly detailRows: PinmonyDetailFlowSource = new PinmonyDetailFlowSource();
+  private readonly detailSections: WaterFlowSections = new WaterFlowSections();
+  private detailFlowShape: string = '';
+
+  private syncDetailFlow(): void {
+    const detail: PinmonyDetailSnapshot = this.displayedDetail();
+    const pins: PinmonyRelatedPin[] = this.isRecommendReady() ? detail.related : [];
+    // Async media and collage reads update the retained header independently
+    // of actions. Related pagination must not invalidate that header.
+    const header: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
+    header.related = [];
+    header.relatedLoading = false;
+    header.relatedError = '';
+    header.relatedEnded = false;
+    header.relatedRetained = false;
+    const rows: PinmonyDetailFlowRow[] = [{ key: 'header:' + detail.pinUrl, kind: 'header', fingerprint: JSON.stringify(header) }];
+    pins.forEach((pin: PinmonyRelatedPin): void => {
+      rows.push({ key: 'related:' + (pin.pinUrl || pin.id), kind: 'related', pin: pin,
+        fingerprint: JSON.stringify(pin) });
+    });
+    rows.push({ key: 'footer:' + detail.pinUrl, kind: 'footer', fingerprint: '' });
+    this.detailRows.update(rows);
+    const shape: string = pins.length.toString() + ':' + this.recommendColumnCount().toString();
+    if (shape !== this.detailFlowShape) {
+      this.detailFlowShape = shape;
+      const sections: SectionOptions[] = [{ itemsCount: 1, crossCount: 1 }];
+      if (pins.length > 0) sections.push({ itemsCount: pins.length, crossCount: this.recommendColumnCount(), columnsGap: 12, rowsGap: 18 });
+      sections.push({ itemsCount: 1, crossCount: 1 });
+      this.detailSections.splice(0, this.detailSections.length(), sections);
+    }
+  }
   private readonly detailPathStack: NavPathStack = new NavPathStack();
   private lastReportedScrollOffset: number = 0;
   private measuredHeaderHeight: number = 0;
@@ -481,6 +555,7 @@ export struct PinmonyDetailPage {
   private restoredPaginationAllowed: boolean = true;
   private restoringScroll: boolean = false;
   onBack?: () => void;
+  onCoveredBack?: () => boolean;
   onUser?: (url: string) => void;
   onAction?: (id: string, kind: string) => void;
   onRelated?: (id: string) => void;
@@ -510,6 +585,7 @@ export struct PinmonyDetailPage {
       this.startSearchLabel();
       if (this.onImageLayer) this.onImageLayer('');
     }
+    this.syncDetailFlow();
     this.updateDetailLayout();
     this.auditRecommendationGate('detail-update');
   }
@@ -533,6 +609,7 @@ export struct PinmonyDetailPage {
     if (this.entryPhoto && !this.entryResumed) this.entryOpacity = 0;
     if (this.entryResumed) this.entryMotionComplete = true;
     this.activePin = this.displayedDetail().pinUrl;
+    this.syncDetailFlow();
     this.updateDetailLayout();
     this.auditRecommendationGate('appear');
     this.auditRecommendationLayout();
@@ -567,10 +644,10 @@ export struct PinmonyDetailPage {
     const share: PinmonyDetailAction | undefined = this.action('share');
     if (this.imageLayer === 'search') {
       return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
-        style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
-          backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
-        content: { title: { mainTitle: this.uiText("pm_image_search_74a83573") }, menu: { value: [] }, backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: true,
+        style: { blurStrategy: BlurStrategy.DISABLE, thermoCtrl: false, scrollEffectOpts: { enableScrollEffect: false },
+        scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0, blurRadius: 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },
+          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0, blurRadius: 0 } } },
+        content: { title: { mainTitle: this.uiText("pm_detail_photo_search") }, menu: { value: [] }, backIcon: { label: this.uiText("pm_back_572cf45b"), isEnabled: true,
           action: () => { if (this.onImageLayer) this.onImageLayer(''); } } } };
     }
     return {
@@ -1150,9 +1227,15 @@ export struct PinmonyDetailPage {
             }
             Blank()
             if (this.action('save')) {
-              Button(this.saveBusy ? this.uiText("pm_cancelling_75dfaf26") : PinmonyI18n.render(this.action('save')!.label, this.uiLanguage), { type: ButtonType.Normal })
-                .height(44)
-                .padding({ left: 18, right: 18 })
+              Button({ type: ButtonType.Normal }) {
+                Text(this.action('save')!.selected ? PinmonyI18n.render(this.action('save')!.label, this.uiLanguage) : this.uiText("pm_save_60a53514"))
+                  .fontColor(Color.White).fontSize(16).fontWeight(FontWeight.Medium)
+                  .wordBreak(WordBreak.BREAK_ALL)
+                  .maxLines(2).textAlign(TextAlign.Center).textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+                .height('auto')
+                .constraintSize({ minHeight: 44, maxWidth: '42%' })
+                .padding({ left: 18, right: 18, top: 10, bottom: 10 })
                 .backgroundColor($r('app.color.detail_save_accent'))
                 .fontColor(Color.White)
                 .fontSize(16)
@@ -1165,7 +1248,7 @@ export struct PinmonyDetailPage {
                     this.onAction(item.id, item.kind);
                   }
                 })
-                .accessibilityText(this.saveBusy ? this.uiText("pm_unsaving_84e400ee") : PinmonyI18n.render(this.action('save')!.label, this.uiLanguage))
+                .accessibilityText(this.action('save')!.selected ? PinmonyI18n.render(this.action('save')!.label, this.uiLanguage) : this.uiText("pm_save_60a53514"))
             }
           }
           .width('100%')
@@ -1343,7 +1426,7 @@ export struct PinmonyDetailPage {
             }
           }
 
-    }.width('100%').padding({ bottom: 42 })
+    }.width('100%')
   }
 
   @Builder
@@ -1428,8 +1511,14 @@ export struct PinmonyDetailPage {
         PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError,this.uiLanguage), actionText: this.uiText('pm_retry_b8784c8d'), onAction: () => this.onContentRetry?.(), actionEnabled: this.contentRetryable })
       }
       Row({space:12}) {
-          Button(item.id === this.shuffleItems[this.shuffleIndex]?.id && this.action('save') ? PinmonyI18n.render(this.action('save')!.label,this.uiLanguage) : this.uiText('pm_save_60a53514'),{type:ButtonType.Normal})
-            .height(44).layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.detail_save_accent')).fontColor(Color.White)
+          Button({type:ButtonType.Normal}) {
+            Text(item.id === this.shuffleItems[this.shuffleIndex]?.id && this.action('save')?.selected ? PinmonyI18n.render(this.action('save')!.label,this.uiLanguage) : this.uiText('pm_save_60a53514'))
+              .fontSize(16).fontWeight(FontWeight.Medium).fontColor(Color.White)
+              .maxLines(2).textAlign(TextAlign.Center).textOverflow({overflow:TextOverflow.Ellipsis})
+          }
+            .height('auto').constraintSize({ minHeight: 44 }).padding({ left: 18, right: 18, top: 10, bottom: 10 })
+            .layoutWeight(1).borderRadius(16).backgroundColor($r('app.color.detail_save_accent')).fontColor(Color.White)
+            .accessibilityText(item.id === this.shuffleItems[this.shuffleIndex]?.id && this.action('save')?.selected ? PinmonyI18n.render(this.action('save')!.label,this.uiLanguage) : this.uiText('pm_save_60a53514'))
             .enabled(this.videoActive)
             .onClick(() => {
               const action: PinmonyDetailAction | undefined = this.action('save');
@@ -1533,47 +1622,46 @@ export struct PinmonyDetailPage {
   private detailContent() {
     Stack() {
     Column() {
-      Scroll(this.detailScroller) {
-        Column({ space: 18 }) {
-          this.detailHeader()
-          if (this.displayedDetail().dataSource === 'api' && !this.isRecommendReady()) {
-            Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
-            this.recommendationSkeleton()
-          } else if (this.displayedDetail().related.length > 0 && this.isRecommendReady()) {
-            Text(this.uiText("pm_more_to_explore_f7cba896"))
-              .fontSize(23)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.primary_text'))
-              .width('100%')
-              .margin({ top: 4 })
-            Row({ space: RECOMMEND_PHONE_GAP_VP }) {
-              ForEach(Array.from({ length: this.recommendColumnCount() }, (_value: number, index: number) => index), (index: number) => {
-                this.relatedCards(index, this.recommendColumnCount())
-              }, (index: number) => this.recommendColumnCount().toString() + ':' + index.toString())
+      WaterFlow({ scroller: this.detailScroller, sections: this.detailSections }) {
+        LazyForEach(this.detailRows, (row: PinmonyDetailFlowRow) => {
+          FlowItem() {
+            if (row.kind === 'header') {
+              Column({ space: 18 }) {
+                this.detailHeader()
+                if (this.displayedDetail().dataSource === 'api' && !this.isRecommendReady()) {
+                  Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
+                    .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
+                  this.recommendationSkeleton()
+                } else if (this.displayedDetail().related.length > 0 && this.isRecommendReady()) {
+                  Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
+                    .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
+                }
+              }.width('100%').padding({ top: this.titleContentInset() + 8, bottom: 18 })
+            } else if (row.kind === 'footer') {
+              this.detailFooter()
+            } else if (row.pin) {
+              if (row.pin.kind === 'topics') this.relatedTopicModule(row.pin)
+              else this.relatedCard(row.pin)
             }
-            .width('100%')
-            .alignItems(VerticalAlign.Top)
-          }
-          this.detailFooter()
-        }
-        .padding({ left: 18, right: 18, top: this.titleContentInset() + 8, bottom: 42 })
-        .width('100%')
-        .onAreaChange((_oldArea: Area, newArea: Area) => {
-          const width: number = Number(newArea.width);
-          if (width > 0 && Math.abs(width - this.contentWidth) > 1) {
-            this.contentWidth = width;
-            this.updateDetailLayout();
-            this.auditRecommendationLayout();
-          }
-        })
+          }.width('100%')
+        }, (row: PinmonyDetailFlowRow): string => row.key)
       }
       .layoutWeight(1)
       .width('100%')
       .scrollBar(BarState.Off)
       .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
-      .align(Alignment.TopStart)
+      .padding({ left: 18, right: 18 })
+      .cachedCount(12, true)
       .edgeEffect(EdgeEffect.Spring)
+      .onAreaChange((_oldArea: Area, newArea: Area) => {
+        const width: number = Number(newArea.width);
+        if (width > 0 && Math.abs(width - this.contentWidth) > 1) {
+          this.contentWidth = width;
+          this.syncDetailFlow();
+          this.updateDetailLayout();
+          this.auditRecommendationLayout();
+        }
+      })
       .onAppear(() => this.restoreScrollPosition())
       .onScrollFrameBegin((offset: number, state: ScrollState) => {
         if (!this.restoringScroll && state === ScrollState.Scroll && offset > 0) this.restoredPaginationAllowed = true;
@@ -1638,6 +1726,7 @@ export struct PinmonyDetailPage {
         Column() {
         PinmonyVisualSearchView({ pin: this.displayedDetail().pinUrl, imageUrl: this.displayedDetail().imageUrl || this.displayedDetail().originalImageUrl,
           imageWidth: this.displayedDetail().imageWidth, imageHeight: this.displayedDetail().imageHeight, result: this.visualResult,
+          presentationActive: this.pageActive,
           animatePhoto: true, originX: this.searchOrigin.x, originY: this.searchOrigin.y,
           originWidth: this.searchOrigin.width, originHeight: this.searchOrigin.height, closing: this.searchClosing,
           onPhotoFrame: (x: number, y: number, width: number, height: number, radius: number, duration: number, chrome: number) => {
@@ -1650,8 +1739,9 @@ export struct PinmonyDetailPage {
           onSearch: this.onVisualSearch,
           onClose: () => { if (this.onImageLayer) this.onImageLayer(''); },
           onRelated: (id: string) => {
-            if (this.onImageLayer) this.onImageLayer('');
+            if (this.onVisualResult) return this.onVisualResult(id);
             if (this.onRelated) this.onRelated(id);
+            return true;
           } })
         }.width('100%').height('100%').padding({ top: this.titleContentInset() })
       }
@@ -1664,6 +1754,7 @@ export struct PinmonyDetailPage {
     // Keep the title-bar geometry stable while the image is flying in or out.
     .hideTitleBar(false)
     .onBackPressed(() => {
+      if (!this.pageActive) { this.onCoveredBack?.(); return true; }
       PinmonyRuntimeLog.info('PinmonyReturn: detail destination back');
       if (this.searchMounted && this.searchClosing) return true;
       if (this.shuffleFlightActive) return true;
@@ -1675,7 +1766,8 @@ export struct PinmonyDetailPage {
       else if (this.onBack) this.onBack();
       return true;
     })
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], this.imageLayer === 'search' ?
+      [LayoutSafeAreaEdge.TOP] : [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor($r('app.color.page_background'))
   }
 

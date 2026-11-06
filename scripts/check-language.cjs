@@ -21,8 +21,13 @@ function boot(system = 'zh-CN') {
 failOpen=true;assert.throws(()=>boot(),/language-storage-read-unavailable/);failOpen=false;
 failRead=true;assert.throws(()=>boot(),/language-storage-read-unavailable/);failRead=false;
 let f = boot();failResource=true;assert.equal(f.api.text('搜索'),'搜索');failResource=false;
+for (const [language, header] of Object.entries({ zh: 'zh-CN,zh;q=0.9', zh_TW: 'zh-TW,zh;q=0.9', en: 'en-US,en;q=0.9', en_GB: 'en-GB,en;q=0.9', ja: 'ja-JP,ja;q=0.9', ko: 'ko-KR,ko;q=0.9', ru: 'ru-RU,ru;q=0.9', pt_BR: 'pt-BR,pt;q=0.9' })) {
+  assert.equal(f.api.translationAcceptLanguage(language), header);
+}
+assert.equal(f.api.translationAcceptLanguage(), 'zh-CN,zh;q=0.9');
  assert.equal(f.memory.get('pinmonyLanguage'), 'zh');
 f.api.select('en'); assert.equal(flushes, 1); assert.equal(disk.get('language'), 'en');
+assert.equal(f.api.translationAcceptLanguage(), 'en-US,en;q=0.9', 'translation language follows the live app preference');
 f = boot('zh-CN'); assert.equal(f.memory.get('pinmonyLanguagePreference'), 'en'); assert.equal(f.memory.get('pinmonyLanguage'), 'en');
 f.system('zh-TW'); f.api.syncSystemLanguage(); assert.equal(f.memory.get('pinmonyLanguage'), 'en');
 f.api.select('zh'); f = boot('en-US'); assert.equal(f.memory.get('pinmonyLanguage'), 'zh');
@@ -171,8 +176,9 @@ const PublishView = vm.runInNewContext(ts.transpileModule('class PublishView {'+
 const publishView = new PublishView(); publishView.uiLanguage='en'; publishView.uiText = source => f.api.text(source,publishView.uiLanguage);
 assert.equal(publishView.optionLabel({kind:'board',label:'图板'}),'Board');
 assert.equal(publishView.optionLabel({kind:'website',label:'网站'}),'Website');
-assert.equal(publishView.optionLabel({kind:'photo',label:'照片'}),'Photos');
+assert.equal(publishView.optionLabel({kind:'photo',label:'照片'}),'Pin');
 publishView.uiLanguage='zh'; assert.equal(publishView.optionLabel({kind:'board',label:'Board'}),'图板');
+assert.equal(publishView.optionLabel({kind:'photo',label:'Photos'}),'Pin 图');
 assert.equal(publishView.optionLabel({kind:'unknown',label:'原文'}),'原文');
 const Publish = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyPublishNativeFlow.ets').PinmonyPublishNativeFlow;
 (async () => {
@@ -180,8 +186,8 @@ const Publish = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyPublishNati
  Object.assign(publish,{store:{},pause(){},bind(){},identity:async()=>{},current:()=>true});
  assert.equal(await publish.menu(()=>true),true);
  assert.equal(f.api.render(publish.store.publishTitle,'en'),'Create');
- assert.deepEqual(Array.from(publish.store.publishOptions,o=>f.api.render(o.label,'en')),['Website','Photos','Board']);
- assert.deepEqual(Array.from(publish.store.publishOptions,o=>f.api.render(o.label,'zh')),['网站','照片','图板']);
+ assert.deepEqual(Array.from(publish.store.publishOptions,o=>f.api.render(o.label,'en')),['Website','Pin','Board']);
+ assert.deepEqual(Array.from(publish.store.publishOptions,o=>f.api.render(o.label,'zh')),['网站','Pin 图','图板']);
  assert.deepEqual(Array.from(publish.store.publishOptions,o=>o.id),['native-website','native-photo','native-board']);
  console.log('Language: persistence, reversible snapshots, publish menu, fixed search types, segment refresh and website/user text boundaries passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

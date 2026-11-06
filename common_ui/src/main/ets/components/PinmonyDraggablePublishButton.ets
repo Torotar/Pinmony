@@ -5,9 +5,9 @@ export struct PinmonyDraggablePublishButton {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @Prop @Watch('resize') areaWidth: number = 0;
   @Prop @Watch('resize') areaHeight: number = 0;
-  @Prop actionEnabled: boolean = true;
+  @Prop @Watch('syncMenuAvailability') actionEnabled: boolean = true;
   onPublish?: () => void;
-  @Prop menuEnabled: boolean = false;
+  @Prop @Watch('syncMenuAvailability') menuEnabled: boolean = false;
   @Prop menuItems: MenuElement[] = [];
   @State private menuOpen: boolean = false;
   @State private x: number = 0;
@@ -22,6 +22,8 @@ export struct PinmonyDraggablePublishButton {
   private suppressClickUntil: number = 0;
   private layoutWidth: number = 0;
   private layoutHeight: number = 0;
+  private mounted: boolean = false;
+  private pendingMenuAction?: () => void;
 
   private left(): number { return Math.min(16, Math.max(0, (this.areaWidth - 56) / 2)); }
   private top(): number { return Math.min(16, Math.max(0, (this.areaHeight - 76) / 2)); }
@@ -29,8 +31,40 @@ export struct PinmonyDraggablePublishButton {
   private maxY(): number { return Math.max(this.top(), this.areaHeight - 76); }
   private clamp(value: number, min: number, max: number): number { return Math.max(min, Math.min(max, value)); }
   aboutToAppear(): void {
+    this.mounted = true;
     this.xFraction = Number.isFinite(this.xFraction) ? this.clamp(this.xFraction,0,1) : (this.right ? 1 : 0);
     this.fraction = Number.isFinite(this.fraction) ? this.clamp(this.fraction, 0, 1) : 1; this.resize();
+  }
+  aboutToDisappear(): void {
+    this.mounted = false;
+    this.menuOpen = false;
+    this.pendingMenuAction = undefined;
+  }
+  private syncMenuAvailability(): void {
+    if (!this.menuEnabled || !this.actionEnabled) {
+      this.menuOpen = false;
+      this.pendingMenuAction = undefined;
+    }
+  }
+  private selectMenuItem(item: MenuElement): void {
+    if (!this.mounted || !this.menuOpen || this.pendingMenuAction || !this.menuEnabled ||
+      !this.actionEnabled || item.enabled === false) return;
+    this.pendingMenuAction = item.action;
+    this.menuOpen = false;
+    PinmonyRuntimeLog.info('PublishMenuTrace: event=selection-close');
+  }
+  private boundMenuItems(): MenuElement[] {
+    return this.menuItems.map((item: MenuElement): MenuElement => ({
+      value: item.value, icon: item.icon, symbolIcon: item.symbolIcon, enabled: item.enabled,
+      action: (): void => this.selectMenuItem(item)
+    }));
+  }
+  private finishMenuClose(): void {
+    this.menuOpen = false;
+    const action: (() => void) | undefined = this.pendingMenuAction;
+    this.pendingMenuAction = undefined;
+    PinmonyRuntimeLog.info('PublishMenuTrace: event=closed');
+    if (this.mounted && this.menuEnabled && this.actionEnabled) action?.();
   }
   private resize(): void {
     if (!Number.isFinite(this.areaWidth) || !Number.isFinite(this.areaHeight) ||
@@ -82,9 +116,9 @@ export struct PinmonyDraggablePublishButton {
       .visibility(this.areaWidth >= 56 && this.areaHeight >= 56 ? Visibility.Visible : Visibility.Hidden)
       .accessibilityText(PinmonyI18n.text('pm_publish_b61f333b', this.uiLanguage))
       .onClick(() => {
-        if (this.actionEnabled && !this.dragging && Date.now() >= this.suppressClickUntil) { if (this.menuEnabled) { this.menuOpen = true; PinmonyRuntimeLog.info('PublishMenuTrace: event=request items=' + this.menuItems.length.toString()); } else this.onPublish?.(); }
+        if (this.actionEnabled && !this.dragging && !this.pendingMenuAction && Date.now() >= this.suppressClickUntil) { if (this.menuEnabled) { this.menuOpen = true; PinmonyRuntimeLog.info('PublishMenuTrace: event=request items=' + this.menuItems.length.toString()); } else this.onPublish?.(); }
       })
-      .bindMenu(this.menuOpen,this.menuItems,{backgroundColor:$r('app.color.publish_source_button_glass'),backgroundBlurStyle:BlurStyle.COMPONENT_ULTRA_THICK,onAppear:(): void => {PinmonyRuntimeLog.info('PublishMenuTrace: event=shown');},onDisappear:(): void => {this.menuOpen = false;PinmonyRuntimeLog.info('PublishMenuTrace: event=closed');}})
+      .bindMenu(this.menuEnabled && this.menuOpen,this.boundMenuItems(),{backgroundColor:$r('app.color.publish_source_button_glass'),backgroundBlurStyle:BlurStyle.COMPONENT_ULTRA_THICK,onAppear:(): void => {PinmonyRuntimeLog.info('PublishMenuTrace: event=shown');},onDisappear:(): void => this.finishMenuClose()})
       .onTouch((event: TouchEvent) => {
         if (event.type === TouchType.Up || event.type === TouchType.Cancel) this.settle();
       })

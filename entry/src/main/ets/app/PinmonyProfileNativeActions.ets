@@ -33,6 +33,8 @@ interface Row {
     blocked_by_me?: boolean;
     explicitly_followed_by_me?: boolean;
     followed_by_me?: boolean;
+    is_private_profile?: boolean;
+    follower_count?: number;
 }
 interface Board {
     id: string;
@@ -64,6 +66,8 @@ interface EditData {
     id?: string;
 }
 interface FollowUser {
+    isPrivateProfile?: boolean;
+    followerCount?: number;
     id: string;
     entityId?: string;
     username?: string;
@@ -125,7 +129,7 @@ interface Identity {
     field_set_key: string;
 }
 interface Following {
-    exclude_not_explictly_followed: boolean;
+    bookmarks?: string[];
     page_size: number;
     explicit_following: boolean;
     username: string;
@@ -164,7 +168,7 @@ interface VariableUser {
     followee?: string;
     input?: Edit;
 }
-interface FollowersPageVariables { count: number; cursor: string; id: string; }
+interface FollowersPageVariables { count: number; cursor: string; userId: string; }
 export interface PinmonyProfileNativeActionsPorts extends ProfileSettingsPorts {
     store: () => PinmonyProfileStore;
     active: () => boolean;
@@ -197,6 +201,7 @@ export class PinmonyProfileNativeActions {
     private token: number = 0;
     private root: User | undefined = undefined;
     private followersCursor: string = '';
+    private followingCursor: string = '';
     private following: string = '';
     private desired: boolean = false;
     private saving: boolean = false;
@@ -263,9 +268,17 @@ export class PinmonyProfileNativeActions {
         this.saving = false;
         this.store.saving = false;
         this.store.followingBusy = false;
+        if (this.store.panel?.refreshing) {
+            this.store.panel.refreshing = false;
+            this.store.panel.error = PinmonyI18n.message('pm_loading_paused_please_reload_06c5d032');
+        }
         if (this.store.panel?.loading) {
             this.store.panel.loading = false;
             this.store.panel.error = PinmonyI18n.message("pm_loading_paused_please_reload_06c5d032");
+        }
+        if (this.store.panel?.moreLoading) {
+            this.store.panel.moreLoading = false;
+            this.store.panel.moreError = PinmonyI18n.message('pm_loading_paused_please_reload_06c5d032');
         }
         this.panel();
         if (this.organize) {
@@ -328,15 +341,17 @@ export class PinmonyProfileNativeActions {
             throw new Error('graph');
         return p.data as GraphData;
     }
-    async open(mode: string, section: string): Promise<void> {
+    async open(mode: string, section: string, refresh: boolean = false): Promise<void> {
         if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
         if (!this.ports.active() || this.store.saving || this.store.followingBusy || !['edit', 'following', 'followers'].includes(mode) || !['users', 'boards'].includes(section))
             return;
+        const previous: PinmonyProfilePanel | undefined = refresh && this.store.panel?.mode === mode && this.store.panel.section === section ? this.store.panel : undefined;
         const revision: number = this.begin();
         this.followersCursor = '';
+        this.followingCursor = '';
         this.organize = undefined;
         this.syncOrganize();
-        this.store.panel = { page: this.page, mode: mode, section: section, token: this.token, loading: true, error: '', items: [], firstName: '', lastName: '', about: '', website: '', username: '', avatar: '' };
+        this.store.panel = { page: this.page, mode: mode, section: section, token: this.token, loading: !previous, refreshing: !!previous, query: previous?.query || '', searchOpen: previous?.searchOpen, scrollOffset: previous?.scrollOffset, searchScrollOffset: previous?.searchScrollOffset, error: '', items: previous?.items || [], firstName: '', lastName: '', about: '', website: '', username: '', avatar: '' };
         this.ports.motion();
         try {
             await this.identity(revision);
@@ -362,25 +377,27 @@ export class PinmonyProfileNativeActions {
                     panel.error = PinmonyI18n.message("pm_previous_save_not_confirmed_check_your_current_profile_before_su_2a81fa99");
             }
             else if (mode === 'followers') {
-                const vars: VariableUser = { userId: this.root!.id }, d: GraphData = await this.graph('369b31865237e1a2f57f1879be69a6c01ee4d6d2806cc4c624d73baea9546b08', vars, revision), user: FollowersData | undefined = d.v3GetUserHandlerQuery?.data, connection: Connection | undefined = user?.followers?.connection;
+                const vars: VariableUser = { userId: this.root!.id }, d: GraphData = await this.graph('3480bae441bb3f3e6109f1731c42df4ca90e4f8ed5a1272573cf6f52607bb772', vars, revision), user: FollowersData | undefined = d.v3GetUserHandlerQuery?.data, connection: Connection | undefined = user?.followers?.connection;
                 if (!user || user.id !== this.relay(this.root!.id) || !connection || !Array.isArray(connection.edges) || connection.edges.length > 2000 || !connection.pageInfo)
                     throw new Error('followers');
                 panel.items = connection.edges.slice(0, 100).map((e: Edge): PinmonyProfilePanelItem => {
                     const u: FollowUser = e.node;
-                    if (!u || !/^\d{1,40}$/.test(u.entityId || '') || !/^[A-Za-z0-9_]+$/.test(u.username || '') || typeof u.explicitlyFollowedByMe !== 'boolean')
+                    if (!u || !/^\d{1,40}$/.test(u.entityId || '') || !/^[A-Za-z0-9_]+$/.test(u.username || ''))
                         throw new Error('user');
                     if (this.followUnknown.get(u.entityId!) === u.explicitlyFollowedByMe)
                         this.followUnknown.delete(u.entityId!);
-                    return { id: u.entityId!, name: (u.fullName || u.username || '').slice(0, 300), avatar: /^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '', profileUrl: this.origin + '/' + u.username + '/', following: u.explicitlyFollowedByMe, canFollow: !u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!) };
+                    return { followStateKnown: typeof u.explicitlyFollowedByMe === 'boolean', blocked: u.blockedByMe === true, privateProfile: u.isPrivateProfile === true, followerCount: typeof u.followerCount === 'number' && u.followerCount >= 0 ? u.followerCount : undefined, id: u.entityId!, username: u.username, name: (u.fullName || u.username || '').slice(0, 300), avatar: /^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '', profileUrl: this.origin + '/' + u.username + '/', following: u.explicitlyFollowedByMe === true, canFollow: typeof u.explicitlyFollowedByMe === 'boolean' && !u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!) };
                 });
                 this.followersCursor = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 8192 ? connection.pageInfo.endCursor : '';
+                panel.nextCursor = this.followersCursor;
                 panel.hasMore = connection.pageInfo.hasNextPage === true && !!this.followersCursor;
             }
             else {
-                const name: string = section === 'boards' ? 'ApiResource' : 'UserFollowingResource', username: string = this.root!.username, boards: FollowingBoards = { explicit_following: true, page_size: 12, fields: ['board.id', 'board.name', 'board.image_cover_url', 'board.followed_by_me', 'board.type', 'board.images[236x]', 'board.image_cover_hd_url', 'board.pin_count', 'board.board_order_modified_at', 'board.url', 'board.owner()', 'user.username'] }, api: Api = { url: '/v3/users/' + username + '/boards/following/', data: boards }, following: Following = { exclude_not_explictly_followed: true, page_size: 50, explicit_following: true, username: username };
+                const name: string = section === 'boards' ? 'ApiResource' : 'UserFollowingResource', username: string = this.root!.username, boards: FollowingBoards = { explicit_following: true, page_size: 12, fields: ['board.id', 'board.name', 'board.image_cover_url', 'board.followed_by_me', 'board.type', 'board.images[236x]', 'board.image_cover_hd_url', 'board.pin_count', 'board.board_order_modified_at', 'board.url', 'board.owner()', 'user.username'] }, api: Api = { url: '/v3/users/' + username + '/boards/following/', data: boards }, following: Following = { page_size: 50, explicit_following: true, username: username };
                 const p: ProfileSettingsResponse = await this.request(name, 'get', section === 'boards' ? api : following, revision, section === 'boards'), rows: Row[] = p.resource_response!.data as Row[];
                 if (!Array.isArray(rows) || rows.length > 2000)
                     throw new Error('list');
+                if (section === 'users') { this.followingCursor = this.bookmark(p); panel.nextCursor = this.followingCursor; panel.hasMore = !!this.followingCursor; }
                 panel.items = rows.slice(0, 100).map((r: Row): PinmonyProfilePanelItem => {
                     if (!r || !/^\d{1,40}$/.test(r.id) || typeof (r.full_name || r.name || r.username) !== 'string')
                         throw new Error('row');
@@ -391,7 +408,7 @@ export class PinmonyProfileNativeActions {
                     const target: string = r.url?.startsWith('/') ? this.origin + r.url : r.url || '', following: boolean = section === 'boards' ? r.followed_by_me === true : r.explicitly_followed_by_me === true;
                     if (this.followUnknown.get(r.id) === following)
                         this.followUnknown.delete(r.id);
-                    return { id: r.id, name: (r.full_name || r.name || r.username || '').slice(0, 300), avatar: /^https:\/\//.test(image) ? image : '', covers: covers, targetUrl: target.startsWith(this.origin + '/') && !/[?#\s]/.test(target) ? target : '', pinCount: typeof r.pin_count === 'number' ? r.pin_count.toString() + PinmonyI18n.message('pm_pins_0a89904f') : '', updated: this.updated(r.board_order_modified_at), profileUrl: /^[A-Za-z0-9_]+$/.test(r.username || '') ? this.origin + '/' + r.username + '/' : '', following: following, canFollow: section === 'boards' ? this.client.permissions.includes('own') && typeof r.followed_by_me === 'boolean' && !this.boardFollowUnknown.has(r.id) : r.blocked_by_me !== true && r.id !== this.client.viewer && typeof r.explicitly_followed_by_me === 'boolean' && !this.followUnknown.has(r.id) };
+                    return { followStateKnown: typeof (section === 'boards' ? r.followed_by_me : r.explicitly_followed_by_me) === 'boolean', blocked: r.blocked_by_me === true, privateProfile: r.is_private_profile === true, followerCount: typeof r.follower_count === 'number' && r.follower_count >= 0 ? r.follower_count : undefined, id: r.id, username: r.username, name: (r.full_name || r.name || r.username || '').slice(0, 300), avatar: /^https:\/\//.test(image) ? image : '', covers: covers, targetUrl: target.startsWith(this.origin + '/') && !/[?#\s]/.test(target) ? target : '', pinCount: typeof r.pin_count === 'number' ? r.pin_count.toString() + PinmonyI18n.message('pm_pins_0a89904f') : '', updated: this.updated(r.board_order_modified_at), profileUrl: /^[A-Za-z0-9_]+$/.test(r.username || '') ? this.origin + '/' + r.username + '/' : '', following: following, canFollow: section === 'boards' ? typeof r.followed_by_me === 'boolean' && !this.boardFollowUnknown.has(r.id) : r.blocked_by_me !== true && r.id !== this.client.viewer && typeof r.explicitly_followed_by_me === 'boolean' && !this.followUnknown.has(r.id) };
                 });
             }
         }
@@ -402,35 +419,114 @@ export class PinmonyProfileNativeActions {
         finally {
             if (this.current(revision) && this.store.panel) {
                 this.store.panel.loading = false;
+                this.store.panel.refreshing = false;
                 this.panel();
+                this.continueFollowerSearch();
             }
         }
     }
+    private bookmark(response: ProfileSettingsResponse): string {
+        const cursor: string = response.resource?.options?.bookmarks?.[0] || response.resource_response?.bookmark || '';
+        return cursor !== '-end-' && cursor.length <= 4096 ? cursor : '';
+    }
+    async more(): Promise<void> {
+        if (this.store.panel?.mode === 'followers') await this.moreFollowers();
+        else await this.moreFollowing();
+    }
+    async restore(snapshot: PinmonyProfilePanel): Promise<void> {
+        if (!this.ports.active() || snapshot.page !== this.ports.page() || !['followers','following'].includes(snapshot.mode)) return;
+        const revision: number = this.begin();
+        const restored: PinmonyProfilePanel = JSON.parse(JSON.stringify(snapshot)) as PinmonyProfilePanel;
+        restored.token = this.token; restored.loading = false; restored.moreLoading = false;
+        restored.items.forEach((item: PinmonyProfilePanelItem): void => { item.canFollow = false; });
+        this.followersCursor = snapshot.mode === 'followers' ? snapshot.nextCursor || '' : '';
+        this.followingCursor = snapshot.mode === 'following' ? snapshot.nextCursor || '' : '';
+        this.store.panel = restored; this.ports.motion();
+        try {
+            await this.identity(revision);
+            if (!this.current(revision) || !this.store.panel) return;
+            this.store.panel.items.forEach((item: PinmonyProfilePanelItem): void => {
+                item.canFollow = item.followStateKnown === true && (restored.section === 'boards' ? !this.boardFollowUnknown.has(item.id) : item.id !== this.client.viewer && !item.blocked && !this.followUnknown.has(item.id));
+            });
+        } catch (_) { if (this.current(revision) && this.store.panel) this.store.panel.error = PinmonyI18n.message('pm_unable_to_load_please_reload_d84df6b3'); }
+        finally { if (this.current(revision)) { this.panel(); this.continueFollowerSearch(); } }
+    }
+    searchFollowers(query: string): void {
+        const panel: PinmonyProfilePanel | undefined = this.store.panel;
+        if (!panel || panel.mode !== 'followers' || !this.current(this.revision)) return;
+        panel.query = query.slice(0, 200); this.panel();
+        this.continueFollowerSearch();
+    }
+    retainPanelPresentation(searchOpen: boolean, scrollOffset: number, searchScrollOffset: number): void {
+        const panel: PinmonyProfilePanel | undefined = this.store.panel;
+        if (!panel || panel.mode !== 'followers' || !this.current(this.revision)) return;
+        panel.searchOpen = searchOpen;
+        panel.scrollOffset = Number.isFinite(scrollOffset) ? Math.max(0, Math.min(scrollOffset, 10000000)) : 0;
+        panel.searchScrollOffset = Number.isFinite(searchScrollOffset) ? Math.max(0, Math.min(searchScrollOffset, 10000000)) : 0;
+    }
+    private continueFollowerSearch(): void {
+        const panel: PinmonyProfilePanel | undefined = this.store.panel;
+        if (panel?.mode === 'followers' && panel.query?.trim() && panel.items.length < 1000 &&
+            !panel.error && !panel.moreError) void this.moreFollowers();
+    }
+    async moreFollowing(): Promise<void> {
+        const panel: PinmonyProfilePanel | undefined = this.store.panel, revision: number = this.revision;
+        if (!panel || panel.mode !== 'following' || panel.section !== 'users' || panel.loading || panel.refreshing || panel.moreLoading ||
+            !panel.hasMore || !this.followingCursor || !this.root || this.store.followingBusy || this.store.saving || !this.current(revision)) return;
+        const cursor: string = this.followingCursor;
+        panel.moreLoading = true; panel.moreError = ''; this.panel();
+        try {
+            const options: Following = { page_size: 50, explicit_following: true, username: this.root.username, bookmarks: [cursor] };
+            const response: ProfileSettingsResponse = await this.request('UserFollowingResource', 'get', options, revision);
+            if (!this.current(revision) || this.store.panel?.section !== 'users') return;
+            const rows: Row[] = response.resource_response!.data as Row[];
+            if (!Array.isArray(rows) || rows.length > 50) throw new Error('following');
+            const incoming: PinmonyProfilePanelItem[] = rows.map((row: Row): PinmonyProfilePanelItem => {
+                if (!row || !/^\d{1,40}$/.test(row.id) || !/^[A-Za-z0-9_]+$/.test(row.username || '')) throw new Error('user');
+                return { followStateKnown: typeof row.explicitly_followed_by_me === 'boolean', blocked: row.blocked_by_me === true, id: row.id, username: row.username, name: (row.full_name || row.username || '').slice(0,300),
+                    avatar: /^https:\/\//.test(row.image_medium_url || '') ? row.image_medium_url! : '',
+                    profileUrl: this.origin + '/' + row.username + '/', privateProfile: row.is_private_profile === true,
+                    followerCount: typeof row.follower_count === 'number' && row.follower_count >= 0 ? row.follower_count : undefined,
+                    following: row.explicitly_followed_by_me === true,
+                    canFollow: typeof row.explicitly_followed_by_me === 'boolean' && !row.blocked_by_me && row.id !== this.client.viewer && !this.followUnknown.has(row.id) };
+            });
+            const current: PinmonyProfilePanel = this.store.panel;
+            incoming.forEach((item: PinmonyProfilePanelItem): void => { if (!current.items.some((old: PinmonyProfilePanelItem): boolean => old.id === item.id)) current.items.push(item); });
+            const next: string = this.bookmark(response);
+            this.followingCursor = next; current.nextCursor = next; current.hasMore = !!next && next !== cursor && rows.length > 0;
+        } catch (_) { if (this.current(revision) && this.store.panel) this.store.panel.moreError = PinmonyI18n.message('pm_unable_to_load_please_reload_d84df6b3'); }
+        finally { if (this.current(revision) && this.store.panel) { this.store.panel.moreLoading = false; this.panel(); } }
+    }
     async moreFollowers(): Promise<void> {
         const panel: PinmonyProfilePanel | undefined = this.store.panel, revision: number = this.revision;
-        if (!panel || panel.mode !== 'followers' || panel.loading || panel.moreLoading || !panel.hasMore ||
+        if (!panel || panel.mode !== 'followers' || panel.loading || panel.refreshing || panel.moreLoading || !panel.hasMore ||
             this.store.followingBusy || this.store.saving || !this.root || !this.followersCursor || !this.current(revision)) return;
         const cursor: string = this.followersCursor, userId: string = this.root.id;
+        const previousCount: number = panel.items.length;
+        const count: number = panel.query?.trim() && previousCount < 1000 ? 50 : 10;
         panel.moreLoading = true;panel.moreError = '';this.panel();
         try {
-            const variables: FollowersPageVariables = {count:10,cursor:cursor,id:this.relay(userId)};
-            const data: GraphData = await this.graph('aac6989e67cb8913e620879f06b197c7edee2e17bbf17bc73228a7a3ff560bfd',variables,revision);
+            const variables: FollowersPageVariables = {count:count,cursor:cursor,userId:userId};
+            const data: GraphData = await this.graph('077b1f0647c0a60d022d8dd228b21a5081440f703589da0cab5f497e2447665f',variables,revision);
             if (!this.current(revision) || this.store.panel?.mode !== 'followers') return;
-            const user: FollowersData | undefined = data.node, connection: Connection | undefined = user?.followers?.connection;
+            const user: FollowersData | undefined = data.v3GetUserHandlerQuery?.data, connection: Connection | undefined = user?.followers?.connection;
             if (!user || user.id !== this.relay(userId) || !connection || !Array.isArray(connection.edges) ||
-                connection.edges.length > 100 || !connection.pageInfo) throw new Error('followers');
+                connection.edges.length > count || !connection.pageInfo) throw new Error('followers');
             const incoming: PinmonyProfilePanelItem[] = connection.edges.map((edge: Edge): PinmonyProfilePanelItem => {
                 const u: FollowUser = edge.node;
-                if (!u || !/^\d{1,40}$/.test(u.entityId || '') || !/^[A-Za-z0-9_]+$/.test(u.username || '') || typeof u.explicitlyFollowedByMe !== 'boolean') throw new Error('user');
-                return {id:u.entityId!,name:(u.fullName || u.username || '').slice(0,300),avatar:/^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '',
-                    profileUrl:this.origin + '/' + u.username + '/',following:u.explicitlyFollowedByMe,canFollow:!u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!)};
+                if (!u || !/^\d{1,40}$/.test(u.entityId || '') || !/^[A-Za-z0-9_]+$/.test(u.username || '')) throw new Error('user');
+                return {followStateKnown:typeof u.explicitlyFollowedByMe === 'boolean',blocked:u.blockedByMe === true,privateProfile:u.isPrivateProfile === true,followerCount:typeof u.followerCount === 'number' && u.followerCount >= 0 ? u.followerCount : undefined,id:u.entityId!,username:u.username,name:(u.fullName || u.username || '').slice(0,300),avatar:/^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '',
+                    profileUrl:this.origin + '/' + u.username + '/',following:u.explicitlyFollowedByMe === true,canFollow:typeof u.explicitlyFollowedByMe === 'boolean' && !u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!)};
             });
             const current: PinmonyProfilePanel = this.store.panel;
             incoming.forEach((item: PinmonyProfilePanelItem): void => { if(!current.items.some((old: PinmonyProfilePanelItem): boolean => old.id === item.id))current.items.push(item); });
             const next: string = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 8192 ? connection.pageInfo.endCursor : '';
-            this.followersCursor = next;current.hasMore = connection.pageInfo.hasNextPage === true && !!next && next !== cursor && !!incoming.length;
+            this.followersCursor = next;current.nextCursor = next;current.hasMore = connection.pageInfo.hasNextPage === true && !!next && next !== cursor && !!incoming.length;
         } catch (_) { if(this.current(revision) && this.store.panel)this.store.panel.moreError = PinmonyI18n.message("pm_unable_to_load_followers_please_retry_7ce0b640"); }
-        finally { if(this.current(revision) && this.store.panel){this.store.panel.moreLoading = false;this.panel();} }
+        finally { if(this.current(revision) && this.store.panel){
+            this.store.panel.moreLoading = false; this.panel();
+            if (this.store.panel.items.length > previousCount) this.continueFollowerSearch();
+        } }
     }
     async follow(id: string): Promise<void> {
         if (!PIN_NATIVE_PROFILE_SETTINGS_ENABLED) return;
@@ -465,7 +561,9 @@ export class PinmonyProfileNativeActions {
             if (!this.current(revision))
                 return;
             if (item) {
-                item.following = this.desired;
+                // A pagination or search update can replace the panel while the request is pending.
+                const actual: PinmonyProfilePanelItem | undefined = this.store.panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === target);
+                if (actual) actual.following = this.desired;
                 if (item.profileUrl)
                     this.confirmed.set(item.profileUrl, this.desired);
             }
@@ -509,7 +607,7 @@ export class PinmonyProfileNativeActions {
         const item: PinmonyProfilePanelItem | undefined = panel?.items.find((row: PinmonyProfilePanelItem): boolean => row.id === id);
         if(!this.current(revision) || !panel || panel.mode !== 'following' || panel.section !== 'boards' || panel.loading ||
             !item || item.canFollow === false || !/^\d{1,40}$/.test(id) || this.store.followingBusy || this.store.saving ||
-            !this.client.permissions.includes('own') || this.boardFollowUnknown.has(id))return;
+            this.boardFollowUnknown.has(id))return;
         const desired: boolean = !item.following, source: string = this.page.slice(this.origin.length) + '_following/';
         const envelope: BoardFollowEnvelope = {options:{url:'/v3/boards/' + id + '/follow/'},context:{}};
         const session: PinmonyBusinessSessionContext = this.ports.session();

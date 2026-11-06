@@ -36,13 +36,14 @@ export struct PinmonyHomePage {
   @State private selectedId: string = '';
   @State private pagerIndex: number = 0;
   @State private pagerMoving: boolean = false;
+  @State private pagerPosition: number = -1;
   @State private suppressSwipeClick: boolean = false;
   @State private homeChromeCollapsed: boolean = false;
   private feedScroller: Scroller = new Scroller();
   @State private scrollerRevision: number = 0;
   private readonly categorySwiper: SwiperController = new SwiperController();
   private readonly paneScrollers: Map<string, Scroller> = new Map<string, Scroller>();
-  private readonly paneChrome: Map<string, boolean> = new Map<string, boolean>();
+  @State private paneChrome: Map<string, boolean> = new Map<string, boolean>();
   private readonly paneOffsets: Map<string, number> = new Map<string, number>();
   onTab?: (id: string) => void;
   onBoard?: (id: string) => void;
@@ -148,6 +149,7 @@ export struct PinmonyHomePage {
     this.paneScrollers.clear(); this.paneChrome.clear(); this.paneOffsets.clear();
     this.selectedId = this.pendingTabId || this.categoryId(this.home);
     this.pagerMoving = false;
+    this.pagerPosition = -1;
     this.scrollerRevision = 0;
     this.syncCategories();
   }
@@ -174,9 +176,10 @@ export struct PinmonyHomePage {
 
   private registerScroller(id: string, scroller: Scroller | undefined, epoch: number): void {
     if (epoch !== this.presentationEpoch) return;
-    if (!scroller) { this.paneScrollers.delete(this.paneKey(id)); return; }
+    if (!scroller) { this.paneScrollers.delete(this.paneKey(id)); this.scrollerRevision++; return; }
     this.paneScrollers.set(this.paneKey(id), scroller);
-    if (id === this.selectedId) { this.feedScroller = scroller; this.scrollerRevision++; }
+    if (id === this.selectedId) this.feedScroller = scroller;
+    this.scrollerRevision++;
   }
 
   private bindCurrentScroller(): void {
@@ -187,7 +190,29 @@ export struct PinmonyHomePage {
 
   private canShowFeed(): boolean { return this.snapshotFor(this.selectedId).pins.length > 0; }
 
-  private scrollBinding(): Scroller[] { return this.scrollerRevision > 0 ? [this.feedScroller] : []; }
+  private scrollBinding(): Scroller[] {
+    if (this.scrollerRevision <= 0) return [];
+    if (this.pagerPosition < 0) return [this.feedScroller];
+    // HDS derives material activation from the bound vertical scroller, not blurRadius.
+    // Bind an already scrolled visible pane during the drag, before onChange commits it.
+    const tabs: PinmonyHomeTab[] = this.pageTabs();
+    const first: number = Math.floor(this.pagerPosition), last: number = Math.ceil(this.pagerPosition);
+    let candidate: Scroller | undefined = undefined;
+    let greatestOffset: number = -1;
+    for (let index: number = first; index <= last; index++) {
+      const tab: PinmonyHomeTab | undefined = tabs[index];
+      if (!tab) continue;
+      const scroller: Scroller | undefined = this.paneScrollers.get(this.paneKey(tab.id));
+      if (!scroller) continue;
+      let offset: number = this.initialOffset(tab.id);
+      try { offset = scroller.currentOffset().yOffset; } catch (_) { }
+      if (!candidate || offset > greatestOffset) {
+        candidate = scroller;
+        greatestOffset = offset;
+      }
+    }
+    return [candidate ?? this.feedScroller];
+  }
 
   private activePane(id: string): boolean {
     return id === this.selectedId && id === this.categoryId(this.home) && !this.pagerMoving;
@@ -208,36 +233,78 @@ export struct PinmonyHomePage {
     this.categorySwiper.changeIndex(index, true);
   }
 
+  private paneChromeOpacity(id: string): number {
+    const collapsed: boolean = this.paneChrome.get(this.paneKey(id)) ??
+      (id === this.selectedId ? this.homeChromeCollapsed : false);
+    return collapsed ? 0 : 1;
+  }
+
+  private updatePaneChrome(id: string, collapsed: boolean): void {
+    if (this.paneChrome.get(this.paneKey(id)) === collapsed &&
+      (id !== this.selectedId || this.homeChromeCollapsed === collapsed)) return;
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+      this.paneChrome.set(this.paneKey(id), collapsed);
+      if (id === this.selectedId) this.homeChromeCollapsed = collapsed;
+    });
+  }
+
+  private paneBackdropOpacity(index: number): number {
+    const tab: PinmonyHomeTab | undefined = this.pageTabs()[index];
+    if (!tab) return 0;
+    const snapshot: PinmonyHomeSnapshot = this.snapshotFor(tab.id);
+    return snapshot.board && snapshot.pins.length > 0 ? this.paneChromeOpacity(tab.id) : 0;
+  }
+
+  private categoryBackdropOpacity(): number {
+    const tabs: PinmonyHomeTab[] = this.pageTabs();
+    if (!tabs.length) return 0;
+    const selected: number = Math.max(0,tabs.findIndex((tab: PinmonyHomeTab): boolean => tab.id === this.selectedId));
+    const position: number = Math.max(0,Math.min(tabs.length - 1,this.pagerPosition < 0 ? selected : this.pagerPosition));
+    const first: number = Math.floor(position), next: number = Math.ceil(position), progress: number = position - first;
+    return this.paneBackdropOpacity(first) * (1 - progress) + this.paneBackdropOpacity(next) * progress;
+  }
+
+  private updatePagerBackdrop(selected: number, index: number, position: number): void {
+    if (index !== selected || !Number.isFinite(position)) return;
+    this.pagerPosition = Math.max(0,Math.min(this.pageTabs().length - 1,index - position));
+    if (Math.abs(position) > 0.001 && Math.abs(position) < 0.999) { this.pagerMoving = true; this.suppressSwipeClick = true; }
+  }
+
+  private categoryTabSelected(index: number, tab: PinmonyHomeTab): boolean {
+    if (this.pagerPosition >= 0) {
+      return index === Math.round(this.pagerPosition);
+    }
+    return tab.selected;
+  }
+
   @Builder
   private categoryButtons() {
     Stack({alignContent:Alignment.TopStart}) {
-      if (this.home.board && this.canShowFeed()) {
         Column().width('100%').height(this.homeTopInset() + 48)
           .backgroundColor($r('app.color.page_background'))
-          .opacity(this.homeChromeCollapsed ? 0 : 1)
+          .opacity(this.categoryBackdropOpacity())
           .position({x:0,y:-this.homeTopInset()})
           .hitTestBehavior(HitTestMode.None)
           .accessibilityLevel('no')
-      }
     Column() {
       if (this.categories.length > 0) {
         Scroll() {
           Row({ space: 8 }) {
-            ForEach(this.categories, (tab: PinmonyHomeTab) => {
+            ForEach(this.categories, (tab: PinmonyHomeTab, index: number) => {
               Button(PinmonyI18n.render(tab.label, this.uiLanguage), { type: ButtonType.Capsule })
                 .height(36)
                 .padding({ left: 20, right: 20 })
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
-                .backgroundColor(tab.selected ? $r('app.color.home_category_selected') : $r('app.color.input_surface'))
-                .fontColor(tab.selected ? $r('app.color.page_background') : $r('app.color.primary_text'))
+                .backgroundColor(this.categoryTabSelected(index, tab) ? $r('app.color.detail_save_accent') : $r('app.color.input_surface'))
+                .fontColor(this.categoryTabSelected(index, tab) ? Color.White : $r('app.color.primary_text'))
                 .enabled((this.interactionReady || this.offlinePreview) && tab.enabled)
-                .accessibilitySelected(tab.selected)
+                .accessibilitySelected(this.categoryTabSelected(index, tab))
                 .onClick(() => {
                   const current: PinmonyHomeTab | undefined = this.categories.find((item: PinmonyHomeTab): boolean => item.id === tab.id);
                   if (current) this.selectTab(current);
                 })
-            }, (tab: PinmonyHomeTab) => tab.id + ':' + tab.label + ':' + tab.selected.toString() + ':' + tab.enabled.toString() + ':' + this.uiLanguage)
+            }, (tab: PinmonyHomeTab, index: number) => tab.id + ':' + tab.label + ':' + this.categoryTabSelected(index, tab).toString() + ':' + tab.enabled.toString() + ':' + this.uiLanguage)
           }
           .padding({ left: 24, right: 24 })
           .height(48)
@@ -261,6 +328,7 @@ export struct PinmonyHomePage {
         PinmonyHomeFeedPane({
           home: this.snapshotFor(tab.id), categoryId: tab.id, presentationEpoch: this.presentationEpoch,
           initialChromeCollapsed: this.paneChrome.get(this.paneKey(tab.id)) || false,
+          chromeOpacity: this.paneChromeOpacity(tab.id),
           paneActive: this.activePane(tab.id), suppressPinClick: this.suppressSwipeClick,
           imageRecovery: this.imageRecovery,
           mediaActive: this.mediaActive && this.activePane(tab.id),
@@ -279,8 +347,7 @@ export struct PinmonyHomePage {
           error: this.activePane(tab.id) ? this.error : '',
           onScrollerReady: (scroller: Scroller | undefined, epoch: number) => this.registerScroller(tab.id, scroller, epoch),
           onChromeChanged: (collapsed: boolean) => {
-            this.paneChrome.set(this.paneKey(tab.id), collapsed);
-            if (tab.id === this.selectedId) this.homeChromeCollapsed = collapsed;
+            this.updatePaneChrome(tab.id, collapsed);
           },
           onScrollPosition: (pageKey: string, offset: number, epoch: number) => this.rememberPosition(tab.id, pageKey, offset, epoch),
           onContentScroll: (offset: number, state: ScrollState) => {
@@ -304,10 +371,10 @@ export struct PinmonyHomePage {
         this.pagerIndex = index;
         this.requestCategory(this.pageTabs()[index]?.id || '');
       })
-      .onAnimationStart(() => { this.pagerMoving = true; this.suppressSwipeClick = true; })
-      .onAnimationEnd(() => { this.pagerMoving = false; this.bindCurrentScroller(); })
-      .onContentDidScroll((_selected: number, _index: number, position: number) => {
-        if (Math.abs(position) > 0.001 && Math.abs(position) < 0.999) { this.pagerMoving = true; this.suppressSwipeClick = true; }
+      .onAnimationStart((index: number) => { if(this.pagerPosition < 0)this.pagerPosition = index; this.pagerMoving = true; this.suppressSwipeClick = true; })
+      .onAnimationEnd(() => { this.pagerMoving = false; this.pagerPosition = -1; this.bindCurrentScroller(); })
+      .onContentDidScroll((selected: number, index: number, position: number) => {
+        this.updatePagerBackdrop(selected,index,position);
       })
       .onTouch((event: TouchEvent) => { if (event.type === TouchType.Down) this.suppressSwipeClick = false; })
       .width('100%').height('100%').clip(true)
@@ -322,6 +389,9 @@ export struct PinmonyHomePage {
         thermoCtrl: this.immersiveLightMode !== 'off',
         scrollEffectOpts: { enableScrollEffect: this.immersiveLightMode !== 'off',
           scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        // Radius sets the material appearance; scrollBinding activates it during a swipe.
+        originalStyle: { backgroundStyle: { maskExtraHeight: 0, blurRadius: this.immersiveLightMode !== 'off' ? 18 : 0 } },
+        scrollEffectStyle: { backgroundStyle: { maskExtraHeight: 0, blurRadius: this.immersiveLightMode !== 'off' ? 18 : 0 } },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
       },
       content: { stackBuilder: (): void => { this.categoryButtons(); } }

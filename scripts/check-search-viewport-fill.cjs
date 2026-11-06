@@ -25,7 +25,7 @@ const ahead = harness(false, 120);
 ahead.h.committedQuery = () => 'test'; ahead.h.upcomingImageUrls = []; ahead.h.lastPrefetchResultCount = -1;
 ahead.h.snapshot.results = Array.from({length:20}, (_, index) => ({imageUrl:'https://i.pinimg.com/'+index+'.jpg'}));
 ahead.h.resultsVisible(0,5); assert.equal(ahead.calls(),0); assert.equal(ahead.h.upcomingImageUrls.length,8);
-ahead.h.resultsVisible(10,15); assert.equal(ahead.calls(),1,'next page starts before the last card');
+ahead.h.resultsVisible(4,9); assert.equal(ahead.calls(),1,'next page starts before the last card');
 ahead.h.resultsVisible(10,15); assert.equal(ahead.calls(),1,'visible callbacks do not repeat the same prefetch');
 ahead.h.snapshot.results.push({imageUrl:'next'}); ahead.h.snapshot.apiBusy=true;
 ahead.h.resultsVisible(12,18); assert.equal(ahead.calls(),1,'busy read cannot start another page');

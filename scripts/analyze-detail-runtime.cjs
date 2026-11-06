@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const input = process.argv[2];
 if (!input) throw new Error('Usage: node scripts/analyze-detail-runtime.cjs <runtime-log>');
 const raw = fs.readFileSync(input, 'utf8');
-const current = raw.lastIndexOf('--- Current session ---');
+// Exports retain multiple launches whose openId values may repeat.
+const current = Math.max(raw.lastIndexOf('--- Current session ---'), raw.lastIndexOf('--- Application launch '));
 const lines = (current >= 0 ? raw.slice(current) : raw).split(/\r?\n/);
 const opens = new Map();
 let active = null, lastClick = null;

@@ -12,29 +12,43 @@ const body = { success: true, status: 'success', code: 0, endpoint_name: 'v3_len
 ] };
 const origin = 'https://www.pinterest.com';
 const searchPage = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
-const titleMethod = searchPage.slice(searchPage.indexOf('  private photoSearchTitleBarOptions()'), searchPage.indexOf('  private searchTitleBarOptions()'));
+const photoPage = fs.readFileSync('feature_search/src/main/ets/components/PinmonyPhotoSearchPage.ets', 'utf8');
+const titleMethod = photoPage.slice(photoPage.indexOf('  private photoSearchTitleBarOptions()'), photoPage.indexOf('  build()'));
 const Title = vm.runInNewContext(ts.transpileModule('class Title {' + titleMethod + '} Title;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
   { BlurStrategy: { ENABLE: 1, DISABLE: 0 }, ScrollEffectType: { IMMERSIVE_GRADIENT_BLUR: 1 }, Color: { Transparent: 'transparent' },
     $r: key => key, PinmonyImmersiveLight: { effect: mode => mode } });
 let closed = 0;
 for (const mode of ['off', 'gentle', 'immersive', 'always']) {
-  const title = new Title(); Object.assign(title, { immersiveLightMode: mode, uiText: key => key, closePhotoSearch: reverse => { assert.equal(reverse, true); closed++; } });
+  const title = new Title(); Object.assign(title, { immersiveLightMode: mode, uiText: key => key, onClose: () => { closed++; } });
   const options = title.photoSearchTitleBarOptions();
-  assert.equal(options.style.systemMaterialEffect, mode);
-  assert.equal(options.style.blurStrategy, 0, 'photo search retains material without title blur');
+  assert.equal(options.style.systemMaterialEffect, undefined, 'photo search does not tint the header with system material');
+  assert.equal(options.style.blurStrategy, 0, 'photo search uses an opaque header without title blur');
   assert.equal(options.style.thermoCtrl, false);
   assert.equal(options.style.scrollEffectOpts.enableScrollEffect, false);
   assert.equal(options.enableComponentSafeArea, true, 'preserve photo transition safe-area coordinates');
   for (const state of ['originalStyle', 'scrollEffectStyle']) {
     assert.equal(options.style[state].backgroundStyle.blurRadius, 0);
-    assert.equal(options.style[state].backgroundStyle.backgroundColor, 'transparent');
+    assert.equal(options.style[state].backgroundStyle.backgroundColor, 'app.color.page_background', 'search header owns an opaque background');
     assert.equal(options.style[state].contentStyle.backIconStyle.iconColor, 'app.color.primary_text');
     assert.equal(options.style[state].contentStyle.backIconStyle.backgroundColor, ['off','gentle'].includes(mode) ? 'transparent' : undefined);
   }
+  assert.equal(options.content.title.mainTitle, 'pm_detail_photo_search');
+  assert.equal(options.content.menu.value.length, 0, 'the search title must not inherit the history delete action');
   options.content.backIcon.action();
 }
 assert.equal(closed, 4);
-assert(searchPage.includes('.titleBar(this.photoSearchTitleBarOptions())'));
+assert(photoPage.includes('.titleBar(this.photoSearchTitleBarOptions())'));
+assert(photoPage.includes('.mode(NavDestinationMode.STANDARD)'), 'search is its own full page destination');
+assert(photoPage.includes('.hideTitleBar(false)'));
+assert(!photoPage.includes('NavDestinationMode.DIALOG'));
+assert(!photoPage.includes('pm_photo_history'));
+assert(searchPage.includes('PinmonyPhotoSearchPage({'));
+assert(searchPage.includes('interactionActive: this.active && !this.photoPreview'), 'the covered history cannot receive title or content actions');
+for (const [locale, expected] of [['zh_CN', '搜索照片'], ['en_US', 'Search photos']]) {
+  const strings = JSON.parse(fs.readFileSync(`common_foundation/src/main/resources/${locale}/element/string.json`, 'utf8')).string;
+  assert.equal(strings.find(item => item.name === 'pm_detail_photo_search').value, expected);
+}
+console.log('Photo pages: independent standard destination, dedicated localized header, opaque background and no inherited history menu passed');
 
 const indexSource = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const gate = indexSource.match(/searchResultsVisible: \(\): boolean => ([\s\S]*?),\s*floatingTabsMounted:/)[1];

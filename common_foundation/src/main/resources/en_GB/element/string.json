@@ -1,5 +1,6 @@
 {
   "string": [
+    {"name":"pm_photo_history_save_unconfirmed","value":"Search completed, but saving photo history was not confirmed."},
     {
       "name": "pm_recommend_boards_description",
       "value": "Turn off personalization for a board to remove its home feed tabs and recommendations. This will not affect the board or its Pins."
@@ -1546,7 +1547,7 @@
     },
     {
       "name": "pm_photos_7b50017a",
-      "value": "Photos"
+      "value": "Pin"
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
@@ -3270,7 +3271,7 @@
     },
     {
       "name": "pm_system_share_13a1c63f",
-      "value": "System share"
+      "value": "Share to other apps"
     },
     {
       "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
@@ -4415,6 +4416,10 @@
     {
       "name": "pm_photo_search",
       "value": "Photo search"
+    },
+    {
+      "name": "pm_detail_photo_search",
+      "value": "Search photos"
     },
     {
       "name": "pm_photo_search_loading",
@@ -5812,6 +5817,26 @@
     {
       "name": "pm_photo_history_delete_all_incomplete",
       "value": "Not all history could be loaded. Delete all was not performed."
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_title",
+      "value": "Save inspiration"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_body",
+      "value": "Saving Pins on Pinterest is a powerful way to collect ideas. Browse Pins, save what you love, and return here to find inspiration again."
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_title",
+      "value": "Organise your ideas"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_body",
+      "value": "Pins are sparks of inspiration, and boards are where they live. Create boards to organise Pins your way."
+    },
+    {
+      "name": "pm_created_board_choose_pins",
+      "value": "Save some Pins to your new board"
     }
   ]
 }

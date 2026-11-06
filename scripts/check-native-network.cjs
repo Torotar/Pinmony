@@ -476,6 +476,20 @@ async function main() {
       if(match) new Function(useNativeTransport(Function('return `'+match[1]+'`')()));
     }
   }
+  const languageNetwork = new PinmonyNativeNetwork();
+  const languageContext = { ...state, page: base.page };
+  response = { statusCode: 200, headers: {}, toString: () => '{}' };
+  const languageJob = { ...base, id: 'native_translation_language', headers: { 'Accept-Language': 'zh-CN,zh;q=0.9' },
+    url: 'https://www.pinterest.com/resource/ApiResource/get/?data=' + encodeURIComponent(JSON.stringify({ options: { url: '/v3/aggregated_comments/21/translate/' }, context: {} })) };
+  assert.equal((await languageNetwork.request(languageJob, () => languageContext)).status, 200);
+  assert.equal(requests.at(-1).headers['Accept-Language'], 'zh-CN,zh;q=0.9', 'translation language reaches RCP');
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_english', headers: { 'accept-language': 'en-US,en;q=0.9' } }, () => languageContext);
+  assert.equal(requests.at(-1).headers['Accept-Language'], 'en-US,en;q=0.9');
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_invalid', headers: { 'Accept-Language': 'zh-CN\r\nInjected: true' } }, () => languageContext);
+  assert.equal(requests.at(-1).headers['Accept-Language'], undefined, 'invalid language headers are stripped');
+  await languageNetwork.request({ ...base, id: 'unrelated_language', headers: languageJob.headers }, () => languageContext);
+  assert.equal(requests.at(-1).headers['Accept-Language'], undefined, 'unrelated requests retain existing headers');
+  languageNetwork.invalidate();
   native.invalidate();
   console.log('Native transport, credential isolation, observers, cancellation, stale cookies and actual home/search/board sections mapping passed');
 }

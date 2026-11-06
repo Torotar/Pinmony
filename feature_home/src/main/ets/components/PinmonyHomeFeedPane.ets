@@ -146,10 +146,11 @@ export struct PinmonyHomeFeedPane {
   @Prop error: string = '';
   @State private contentWidth: number = 360;
   @State private failedImages: string[] = [];
-  @State @Watch('notifyChromeChanged') private homeChromeCollapsed: boolean = false;
+  @State private homeChromeCollapsed: boolean = false;
   @Prop categoryId: string = '';
   @Prop presentationEpoch: number = 0;
   @Prop initialChromeCollapsed: boolean = false;
+  @Prop chromeOpacity: number = 1;
   @Prop @Watch('onPaneActiveChanged') paneActive: boolean = false;
   @Prop suppressPinClick: boolean = false;
   onScrollerReady?: (scroller: Scroller | undefined, epoch: number) => void;
@@ -191,6 +192,8 @@ export struct PinmonyHomeFeedPane {
   }
   private prefetchNotBefore: number = 0;
   private prefetchTimer: number = -1;
+  private detailPrefetchTimer: number = -1;
+  private viewportFillTimer: number = -1;
   private lastHomePinCount: number = 0;
   private paginationTraceAt: number = 0;
   private paginationTraceKey: string = '';
@@ -226,6 +229,7 @@ export struct PinmonyHomeFeedPane {
     this.paneMounted = true;
     if (this.paneActive) this.watchImageNetwork();
     this.homeChromeCollapsed = this.initialChromeCollapsed;
+    this.notifyChromeChanged();
     this.activeSession = this.home.session;
     this.activeTab = this.home.selectedTab;
     this.activePageKey = this.home.pageKey;
@@ -250,6 +254,8 @@ export struct PinmonyHomeFeedPane {
     this.paneMounted = false;
     if (this.restoreTimer !== -1) clearTimeout(this.restoreTimer);
     if (this.prefetchTimer !== -1) clearTimeout(this.prefetchTimer);
+    if (this.detailPrefetchTimer !== -1) clearTimeout(this.detailPrefetchTimer);
+    if (this.viewportFillTimer !== -1) clearTimeout(this.viewportFillTimer);
     this.imageNetworkVisible = false;
     this.imageRecoveryPending = false;
     const monitor: connection.NetConnection | undefined = this.imageNetwork;
@@ -261,6 +267,12 @@ export struct PinmonyHomeFeedPane {
 
   private notifyChromeChanged(): void {
     if (this.onChromeChanged) this.onChromeChanged(this.homeChromeCollapsed);
+  }
+
+  private setHomeChromeCollapsed(collapsed: boolean): void {
+    if (this.homeChromeCollapsed === collapsed) return;
+    this.homeChromeCollapsed = collapsed;
+    this.notifyChromeChanged();
   }
 
   private onPaneActiveChanged(): void {
@@ -285,6 +297,17 @@ export struct PinmonyHomeFeedPane {
     if (this.restoreAwaitingPinCount === this.home.pins.length && !this.home.endReached && !this.home.sourceError) return;
     this.restoringScroll = true;
     const target: number = Math.max(0, this.initialScrollOffset);
+    if (target <= 1) {
+      let current: number = 0;
+      try { current = Math.max(0, this.feedScroller.currentOffset().yOffset); } catch (_) { }
+      if (current <= 1) {
+        this.restoreDone = true;
+        this.restoringScroll = false;
+        this.lastChromeScrollOffset = current;
+        if (this.onScrollerReady) this.onScrollerReady(this.feedScroller, this.presentationEpoch);
+        return;
+      }
+    }
     this.restoreTimer = setTimeout((): void => {
       this.restoreTimer = -1;
       if (!this.paneMounted) return;
@@ -346,9 +369,7 @@ export struct PinmonyHomeFeedPane {
       if (position.yOffset <= 1) {
         this.chromeScrollDistance = 0;
         if (this.homeChromeCollapsed) {
-          this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-            this.homeChromeCollapsed = false;
-          });
+          this.setHomeChromeCollapsed(false);
         }
         return;
       }
@@ -360,9 +381,7 @@ export struct PinmonyHomeFeedPane {
       const collapsed: boolean = this.chromeScrollDistance > 0;
       this.chromeScrollDistance = 0;
       if (collapsed === this.homeChromeCollapsed) return;
-      this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-        this.homeChromeCollapsed = collapsed;
-      });
+      this.setHomeChromeCollapsed(collapsed);
     } catch (_) { }
   }
 
@@ -390,7 +409,7 @@ export struct PinmonyHomeFeedPane {
       if (!sameFeed) {
         this.pendingEnd = false;
         this.viewportFillKey = '';
-        this.homeChromeCollapsed = false;
+        this.setHomeChromeCollapsed(false);
         this.chromeScrollDistance = 0;
         this.recoveredSources = {}; this.recoveredRevisions = {}; this.lastImageRecovery = 0;
         this.visibleFirst = 0;
@@ -409,7 +428,7 @@ export struct PinmonyHomeFeedPane {
     if (!this.restoreDone) this.restoreScrollPosition();
     this.onImageRecovery();
     this.syncFeedRows();
-    setTimeout(() => { this.resumePendingEnd(); this.fillShortViewport(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.resumePendingEnd(); this.scheduleViewportFill(); this.scheduleDetailPrefetch(); this.prefetchNextScreen(); }, 0);
   }
 
   private prefetchNextScreen(): void {
@@ -443,7 +462,7 @@ export struct PinmonyHomeFeedPane {
   private onPrefetchAvailabilityChanged(): void {
     this.retryRecoveredImages();
     if (this.refreshing) this.viewportFillKey = '';
-    setTimeout(() => { this.resumePendingEnd(); this.prefetchVisibleDetails(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.resumePendingEnd(); this.scheduleDetailPrefetch(); this.prefetchNextScreen(); }, 0);
   }
 
   private fillShortViewport(): void {
@@ -462,11 +481,43 @@ export struct PinmonyHomeFeedPane {
     } catch (_) { }
   }
 
+  private scheduleViewportFill(): void {
+    if (this.viewportFillTimer !== -1) return;
+    this.viewportFillTimer = setTimeout((): void => {
+      this.viewportFillTimer = -1;
+      this.fillShortViewport();
+    }, 80);
+  }
+
+  private scheduleDetailPrefetch(): void {
+    if (this.detailPrefetchTimer !== -1) return;
+    this.detailPrefetchTimer = setTimeout((): void => {
+      this.detailPrefetchTimer = -1;
+      this.prefetchVisibleDetails();
+    }, 80);
+  }
+
   private resumePendingEnd(): void {
     if (!this.pendingEnd || !this.feedActive || !this.paginationReady || this.loading || this.refreshing ||
         this.pendingTabId || this.home.loadingMore || this.home.refreshing) return;
     this.pendingEnd = false;
     try { if (this.feedScroller.isAtEnd()) this.loadNextPageAtEnd(); } catch (_) {}
+  }
+
+  private nearEndKey: string = '';
+  private loadNearEnd(): void {
+    if (!this.restoreDone || this.restoringScroll || this.visibleFirst < 0 || this.visibleLast < 0 ||
+        !this.feedActive || !this.paginationReady || this.loading || this.refreshing || this.pendingTabId ||
+        this.home.loadingMore || this.home.refreshing) return;
+    const reserve: number = Math.min(24, Math.max(8, (this.visibleLast - this.visibleFirst + 1) * 2));
+    if (this.home.pins.length - this.visibleLast - 1 > reserve) return;
+    if (this.home.dataSource !== 'api' || this.home.endReached ||
+        (this.home.sourceError || this.error) && !this.home.categorySourceFailure) return;
+    const key: string = this.home.pageKey + ':' + this.home.session.toString() + ':' + this.home.selectedTab + ':' +
+      this.home.pins.length.toString() + ':' + (this.home.pins[0]?.id || '');
+    if (this.nearEndKey === key) return;
+    this.nearEndKey = key;
+    this.loadNextPageAtEnd();
   }
 
   private loadNextPageAtEnd(): void {
@@ -726,13 +777,26 @@ export struct PinmonyHomeFeedPane {
     });
   }
 
+  private canPullRefresh(): boolean {
+    return this.paneActive && this.feedActive && this.interactionReady && !this.offlinePreview &&
+      !this.loading && !this.refreshing && !this.home.refreshing && !this.pendingTabId;
+  }
+
+  private showRefreshIndicator(): boolean {
+    return this.paneActive && (this.refreshing || !!this.home.refreshing ||
+      this.canPullRefresh() && this.refreshGestureState === RefreshStatus.OverDrag);
+  }
+
+  private requestPullRefresh(): void {
+    if (this.canPullRefresh() && this.onRefresh) this.onRefresh();
+  }
+
   @Builder
   private homeRefreshIndicator() {
     Column() {
       LoadingProgress().width(24).height(24)
       .color($r('app.color.accent'))
-      .visibility(this.refreshing || this.refreshGestureState === RefreshStatus.Drag ||
-        this.refreshGestureState === RefreshStatus.OverDrag ? Visibility.Visible : Visibility.Hidden)
+      .visibility(this.showRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)
     }.width('100%').height(64).justifyContent(FlexAlign.Center)
       .offset({ y: this.homeTopInset() + 48 + (this.home.board ? 68 : 0) })
       .hitTestBehavior(HitTestMode.None)
@@ -810,6 +874,7 @@ export struct PinmonyHomeFeedPane {
             .padding({ left: 12, right: 12, top: this.homeTopInset() + (this.home.board ? 132 : 64) })
             .clipContent(ContentClipMode.BOUNDARY)
             .cachedCount(12, true)
+            .edgeEffect(EdgeEffect.None)
             .clip(false)
             .scrollBar(BarState.Off)
             .onAppear(() => this.restoreScrollPosition())
@@ -833,9 +898,10 @@ export struct PinmonyHomeFeedPane {
               this.visibleLast = Math.min(last, this.home.pins.length - 1);
               if (this.onVisiblePins) this.onVisiblePins(first, last);
               this.retryRecoveredImages();
-              this.prefetchVisibleDetails();
+              this.scheduleDetailPrefetch();
+              this.loadNearEnd();
               this.prefetchNextScreen();
-              setTimeout(() => this.fillShortViewport(), 0);
+              this.scheduleViewportFill();
             })
             .onScrollStop(() => {
               if (!this.paneActive) return;
@@ -850,7 +916,7 @@ export struct PinmonyHomeFeedPane {
               this.traceLayout('waterflow', newArea);
               this.viewportHeight = Number(newArea.height);
               this.restoreScrollPosition();
-              setTimeout(() => this.fillShortViewport(), 0);
+              this.scheduleViewportFill();
               const width: number = Number(newArea.width);
               if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
             })
@@ -858,7 +924,8 @@ export struct PinmonyHomeFeedPane {
           .width('100%')
           .height('100%')
           .clip(false)
-          .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
+          .pullToRefresh(this.canPullRefresh())
+          .onRefreshing(() => this.requestPullRefresh())
           .onStateChange((state: RefreshStatus) => { this.refreshGestureState = state; })
           this.feedStatus()
         }
@@ -879,11 +946,15 @@ export struct PinmonyHomeFeedPane {
     Stack({ alignContent: Alignment.TopStart }) {
       this.feedContent()
       if (this.home.board && this.canShowFeed()) {
-        Column() { this.boardSummary(this.home.board) }
-          .width('100%').height(68)
+        Column() {
+          Column() { this.boardSummary(this.home.board) }
+            .width('100%').height(68)
+            .flexShrink(0)
+            .opacity(this.chromeOpacity)
+        }
+          .width('100%').height(68 * this.chromeOpacity)
           .position({ x: 0, y: this.homeTopInset() + 48 })
           .backgroundColor($r('app.color.page_background'))
-          .opacity(this.homeChromeCollapsed ? 0 : 1)
           .clip(true)
           .hitTestBehavior(this.homeChromeCollapsed ? HitTestMode.None : HitTestMode.Default)
           .accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')

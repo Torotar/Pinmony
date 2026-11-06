@@ -8,6 +8,11 @@ import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/Pinmo
 import { PinmonyBoardInvitationList } from './PinmonyBoardInvitationList';
 import { PinmonyUserAvatar } from 'common_ui';
 
+interface PinmonyInboxUpdatesGroupOptions {
+  label: string;
+  items: PinmonyInboxItem[];
+}
+
 @Component
 export struct PinmonyInboxPage {
   @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
@@ -59,6 +64,7 @@ export struct PinmonyInboxPage {
 
   @State private sectionOpacity: number = 1;
   private restoringScroll: boolean = false;
+  private lastReportedScrollOffset: number = -1;
   private contentHeight: number = 0;
   private viewportHeight: number = 0;
   @Prop loading: boolean = false;
@@ -130,13 +136,15 @@ export struct PinmonyInboxPage {
     this.reportScrollAvailability();
   }
 
-  private reportScroll(): void {
+  private reportScroll(force: boolean = false): void {
     if (this.restoringScroll) return;
     try {
       const position = this.scroller.offset();
       if (!position) return;
-      if (this.onScrollPosition) this.onScrollPosition(this.snapshot.pageUrl, this.snapshot.section,
-        Math.max(0, position.yOffset));
+      const offset: number = Math.max(0, position.yOffset);
+      if (!force && this.lastReportedScrollOffset >= 0 && Math.abs(offset - this.lastReportedScrollOffset) < 1) return;
+      this.lastReportedScrollOffset = offset;
+      if (this.onScrollPosition) this.onScrollPosition(this.snapshot.pageUrl, this.snapshot.section, offset);
     } catch (_) { console.warn('Pinmony: inbox scroll position unavailable'); }
   }
 
@@ -192,10 +200,10 @@ export struct PinmonyInboxPage {
   }
 
   @Builder
-  private updatesGroup(label: string, items: PinmonyInboxItem[]) {
-    if (items.length > 0) {
-      if (label) { this.groupTitle(label) }
-      ForEach(items, (item: PinmonyInboxItem) => { this.itemRow(item, false) },
+  private updatesGroup($$: PinmonyInboxUpdatesGroupOptions) {
+    if ($$.items.length > 0) {
+      if ($$.label) { this.groupTitle($$.label) }
+      ForEach($$.items, (item: PinmonyInboxItem) => { this.itemRow(item, false) },
         (item: PinmonyInboxItem) => this.updateRowKey(item))
     }
   }
@@ -248,7 +256,7 @@ export struct PinmonyInboxPage {
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
       .onClick(() => { if (item.enabled && this.onAction) this.onAction(item.id); })
-      if (!contact && (this.timeText(item) || item.moreId)) {
+      if (!contact && (this.snapshot.section === 'updates' || this.timeText(item) || item.moreId)) {
         Column({ space: 8 }) {
           if (this.timeText(item)) {
             Column({ space: 4 }) {
@@ -260,7 +268,7 @@ export struct PinmonyInboxPage {
                 .fontSize(12).fontColor($r('app.color.secondary_text')).maxLines(1)
             }.alignItems(HorizontalAlign.End)
           }
-          if (item.moreId) {
+          if (this.snapshot.section === 'updates' || item.moreId) {
             Button({ type: ButtonType.Circle }) {
               Row({ space: 3 }) {
                 ForEach([0, 1, 2], (dot: number) => {
@@ -270,6 +278,7 @@ export struct PinmonyInboxPage {
               }
             }
               .padding(0).backgroundColor(Color.Transparent).width(40).height(40)
+              .visibility(item.moreId ? Visibility.Visible : Visibility.Hidden)
               .accessibilityText(this.uiText("pm_more_actions_9f07d2ce"))
               .onClick(() => {
                 if (item.moreId && this.onAction) this.onAction(item.moreId);
@@ -343,12 +352,12 @@ export struct PinmonyInboxPage {
               this.selectSection(index === 0 ? 'updates' : 'messages');
             }
           })
-          .width(280)
+          .width('100%')
         }
         .width('100%')
         .height(56)
         .justifyContent(FlexAlign.Center)
-        .padding({ top: 4, bottom: 4 })
+        .padding({ left: 20, right: 20, top: 4, bottom: 4 })
       }
     }.width('100%').height(56)
   }
@@ -440,11 +449,11 @@ export struct PinmonyInboxPage {
                 this.itemRow(item, false)
               }, (item: PinmonyInboxItem) => item.id)
             } else {
-              this.updatesGroup(PinmonyI18n.render(this.snapshot.unreadLabel || '', this.uiLanguage) || this.uiText("pm_unread_4d0680f9"),
-                this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === true))
-              this.updatesGroup(PinmonyI18n.render(this.snapshot.readLabel || '', this.uiLanguage) || this.uiText("pm_read_efdd1a47"),
-                this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === false))
-              this.updatesGroup('', this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === undefined))
+              this.updatesGroup({ label: PinmonyI18n.render(this.snapshot.unreadLabel || '', this.uiLanguage) || this.uiText("pm_unread_4d0680f9"),
+                items: this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === true) })
+              this.updatesGroup({ label: PinmonyI18n.render(this.snapshot.readLabel || '', this.uiLanguage) || this.uiText("pm_read_efdd1a47"),
+                items: this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === false) })
+              this.updatesGroup({ label: '', items: this.snapshot.items.filter((item: PinmonyInboxItem) => item.unread === undefined) })
             }
 
             if (this.snapshot.section === 'updates' && this.snapshot.dataSource === 'api') {
@@ -510,7 +519,7 @@ export struct PinmonyInboxPage {
             this.onContentScroll(offset, state);
           }
         })
-        .onScrollStop(() => this.reportScroll())
+        .onScrollStop(() => this.reportScroll(true))
       }
       }.width('100%').height('100%')
       }

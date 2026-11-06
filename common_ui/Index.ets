@@ -31,6 +31,7 @@ export { PinmonyImageSearchSelection } from './src/main/ets/components/PinmonyIm
 export { PinmonyVisualResult as PinmonyImageSearchResult } from './src/main/ets/models/PinmonyImageSearch';
 export { PinmonyRelatedPin as PinmonyImageSearchItem } from './src/main/ets/models/PinmonyImageSearch';
 export { PinmonyImageCrop } from './src/main/ets/models/PinmonyImageSearch';
+export { PinmonyImageSearchOrigin } from './src/main/ets/models/PinmonyImageSearch';
 
 export { PinmonyDraggablePublishButton } from './src/main/ets/components/PinmonyDraggablePublishButton';
 export { PinmonySnackBarLifecycle } from './src/main/ets/services/PinmonySnackBarLifecycle';

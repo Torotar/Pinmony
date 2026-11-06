@@ -61,6 +61,7 @@ export class PinmonyInboxMessagesNativeReads {
   private readonly jobs: Map<string,string> = new Map<string,string>();
   private readonly writes: PinmonyInboxNativeWrites;
   private writePreparing: boolean = false;
+  private profileContactEntry: boolean = false;
   private blockSequence: number = 0;
   private readonly knownBlocks: Map<string,boolean> = new Map<string,boolean>();
   private readonly uncertainBlocks: Set<string> = new Set<string>();
@@ -83,7 +84,7 @@ export class PinmonyInboxMessagesNativeReads {
       state: (): PinmonyInboxFlowSnapshot | undefined => this.flow,
       identity: (): PinmonyInboxWriteIdentity | undefined => this.ownsFlow() && this.flow && /^\d{1,40}$/.test(this.viewer) ?
         {page:this.page,viewerId:this.viewer,token:this.flow.nativeToken || 0,screen:this.flow.screen,conversationId:this.flow.conversationId || '',
-          contacts:this.flow.users.filter((u: InboxFlowUser): boolean => !u.self && u.id !== this.viewer).map((u: InboxFlowUser): string => u.id),selectedIds:this.flow.selectedIds.slice(),
+          contacts:this.flow.users.filter((u: InboxFlowUser): boolean => !u.self && u.id !== this.viewer).map((u: InboxFlowUser): string => u.id),selectedIds:this.flow.selectedIds.slice(),profileEntry:this.profileContactEntry,
           messages:this.flow.messages.map((m: InboxFlowMessage): PinmonyInboxWriteMessage =>
             ({id:m.id,own:m.own && m.sender?.id === this.viewer,deleted:m.deleted === true,reactable:!m.profile && !m.board}))} : undefined,
       session: (): PinmonyBusinessSessionContext => this.ports.session(),network: (): PinmonyNativeNetwork => this.ports.network(),
@@ -270,7 +271,19 @@ export class PinmonyInboxMessagesNativeReads {
     if(existing)return this.open('conversation:' + existing.id);
     const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose'); flow.users = [{id:id,name:this.clean(name),avatar:this.image(avatar),self:false,profileUrl:/^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : ''}]; flow.selectedIds = [id]; flow.loading = false; this.publish(); return true;
   }
+  async directProfile(id: string, name: string, avatar: string, username: string): Promise<boolean> {
+    if (!this.bind() || !/^\d{1,40}$/.test(id) || id === this.account || this.flow) return false;
+    this.profileContactEntry = true;
+    const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose', '', true);
+    flow.directContact = true;
+    flow.users = [{ id: id, name: this.clean(name), avatar: this.image(avatar), self: false,
+      profileUrl: /^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : '' }];
+    flow.selectedIds = [id]; flow.loading = false; this.publish();
+    await this.action('next', '');
+    return true;
+  }
   async action(action: string,value: string): Promise<boolean> {
+    if (action === 'back' && this.flow?.screen !== 'settings') this.profileContactEntry = false;
     if(action === 'back' && typeof this.store.inboxFlow?.nativeToken === 'number' && !this.ownsFlow()) {
       this.writes.pause();this.cancel('identity');this.writePreparing = false;this.flowRevision++; this.cancel('flow'); this.flowBusy = false;
       if(this.store.inboxFlow.screen === 'settings' && this.chat) { this.flow = this.chat; this.chat = undefined; this.flow.nativeToken = this.flowRevision; this.store.inboxFlow = this.flow; }

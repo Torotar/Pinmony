@@ -22,6 +22,7 @@ export interface PinmonyComment {
   canTranslate?: boolean;
   translationLoading?: boolean;
   translatedText?: string;
+  translationLanguage?: string;
   translationVisible?: boolean;
   translationError?: string;
 }

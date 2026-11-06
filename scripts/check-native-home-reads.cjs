@@ -23,6 +23,10 @@ async function main(){
  concurrent.jobs[0].resolve(pins([1],''));await initial;
  assert.equal(concurrent.store.home.pins.length,1,'feed commits before category metadata');
  concurrent.jobs[1].resolve(categories);await flush();
+ const dirty=fixture();await ready(dirty);dirty.controller.invalidateCategories();await dirty.controller.demand();
+ assert.equal(dirty.jobs.length,3,'confirmed board changes reload categories while preserving the feed');
+ dirty.jobs[2].resolve(JSON.stringify({resource_response:{status:'success',data:[{type:'board',id:'9',name:'Products'}]}}));await flush();
+ assert.deepEqual(Array.from(dirty.store.home.tabs, tab=>tab.id),['tab:all','tab:9']);
  const recovery=fixture();await ready(recovery);const failedPage=recovery.controller.more();
  recovery.jobs[2].resolve('invalid');await failedPage;assert(recovery.store.homeError);
  const existing=recovery.store.home.pins.slice();recovery.controller.pause();recovery.setActive(false);

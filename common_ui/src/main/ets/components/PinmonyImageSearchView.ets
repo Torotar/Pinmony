@@ -2,7 +2,7 @@ import { PinmonyActionNotice } from './PinmonyActionNotice';
 import { PinmonyImageSearchSelection } from './PinmonyImageSearchSelection';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin } from '../models/PinmonyImageSearch';
+import { PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin, PinmonyImageSearchOrigin } from '../models/PinmonyImageSearch';
 
 
 @Component
@@ -14,6 +14,54 @@ export struct PinmonyImageSearchView {
   @Prop imageWidth: number = 1;
   @Prop imageHeight: number = 1;
   @Prop uploadedPhoto: boolean = false;
+  @Prop @Watch('presentationChanged') presentationActive: boolean = true;
+  private relatedOpening: boolean = false;
+  private resumeRelatedSheet: boolean = false;
+  private sheetAppearing: boolean = false;
+  private resultScrollOffset: number = 0;
+  private openRelated(pin: PinmonyRelatedPin): void {
+    if (!this.alive || this.presentationActive === false || this.relatedOpening || this.result.loading || pin.pinUrl === this.pin) return;
+    this.relatedOpening = true;
+    try { this.resultScrollOffset = Math.max(0, this.resultScroller.offset()?.yOffset || 0); } catch (_) {}
+    this.sheetVisible = false;
+    PinmonyRuntimeLog.info('PhotoResultMotion: event=open-request immediate=true');
+    if (this.onRelated?.(pin.id) === false) {
+      this.relatedOpening = false;
+      this.sheetVisible = true;
+    }
+  }
+  private resultSheetAppeared(): void {
+    if (this.presentationActive && !this.closing && this.sheetVisible) {
+      try { this.resultScroller.scrollTo({ xOffset: 0, yOffset: this.resultScrollOffset, animation: false }); } catch (_) {}
+    }
+    this.sheetAppearing = false;
+    if (this.presentationActive && !this.closing && this.sheetVisible) {
+      this.relatedOpening = false;
+      this.resumeRelatedSheet = false;
+    }
+    PinmonyRuntimeLog.info('PhotoSheetTrace: event=appeared detent=' + (this.sheetHeight === SheetSize.LARGE ? 'large' : 'default'));
+  }
+  private updateSheetDetent(height: number): void {
+    if (this.sheetAppearing || this.relatedOpening || this.presentationActive === false || this.closing || !this.sheetVisible) return;
+    this.sheetHeight = this.getUIContext().px2vp(height) > this.heightValue * 0.7 ? SheetSize.LARGE : '40%';
+  }
+  private presentationChanged(): void {
+    if (!this.alive) return;
+    if (this.presentationActive && !this.closing) {
+      this.sheetAppearing = true;
+      if (this.relatedOpening && this.resultSheetMounted) {
+        this.resumeRelatedSheet = true;
+        return;
+      }
+      this.relatedOpening = false;
+      this.sheetVisible = true;
+    } else {
+
+      this.resumeRelatedSheet = false;
+      clearTimeout(this.debounce);
+      this.sheetVisible = false;
+    }
+  }
   @Prop animatePhoto: boolean = false;
   @Prop sourceSelectionBorder: boolean = false;
   @Prop originX: number = 0;
@@ -66,14 +114,14 @@ export struct PinmonyImageSearchView {
   private readonly resultScroller: Scroller = new Scroller();
   onSearch?: (crop: PinmonyImageCrop, append: boolean, first: boolean) => void;
   onClose?: () => void;
-  onRelated?: (id: string) => void;
+  onRelated?: (id: string, origin?: PinmonyImageSearchOrigin) => boolean | void;
 
   aboutToAppear(): void {
     this.alive = true;
     if (this.uploadedPhoto) this.crop = { x: 0, y: 0, w: 1, h: 1 };
     // Network work does not depend on the photo transition or Sheet delay.
     this.initial = setTimeout(() => {
-      if (!this.alive) return;
+      if (!this.alive || this.presentationActive === false) return;
       if (!this.animatePhoto) this.sheetVisible = true;
       if (!this.uploadedPhoto && this.onSearch) this.onSearch(this.crop, false, true);
     }, 0);
@@ -141,6 +189,15 @@ export struct PinmonyImageSearchView {
     this.resultSheetMounted = false;
     if (!this.alive) return;
     PinmonyRuntimeLog.info('ImageSearchTrace: phase=sheet-closed');
+    if (!this.closing && (this.relatedOpening || this.presentationActive === false)) {
+      if (this.resumeRelatedSheet && this.presentationActive) {
+        this.resumeRelatedSheet = false;
+        this.relatedOpening = false;
+        this.sheetAppearing = true;
+        this.sheetVisible = true;
+      }
+      return;
+    }
     if (this.reopenAfterSheet && !this.closing) {
       this.reopenAfterSheet = false; this.runTransition(false);
       return;
@@ -227,8 +284,9 @@ export struct PinmonyImageSearchView {
   @Builder
   private card(p: PinmonyRelatedPin) {
     Image(p.imageUrl).width('100%').height(Math.max(100, Math.min(430, (this.widthValue - 30) / 2 * p.imageHeight / p.imageWidth)))
+      .id((this.uploadedPhoto ? 'pinmony-photo-result-' : 'pinmony-visual-result-' + this.pin + '-') + p.id)
       .objectFit(ImageFit.Cover).borderRadius(16)
-      .onClick(() => { this.sheetVisible = false; if (this.onRelated) this.onRelated(p.id); })
+      .onClick(() => this.openRelated(p))
       .accessibilityText(p.title || this.uiText("pm_open_related_pin_e1e5dfc7"))
   }
   @Builder
@@ -257,7 +315,8 @@ export struct PinmonyImageSearchView {
         }.width('100%')
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
         .onReachEnd(() => {
-          if (!this.result.loading && !this.result.error && !this.result.ended && this.result.items.length && this.onSearch)
+          if (this.alive && this.presentationActive && !this.relatedOpening && !this.sheetAppearing && !this.closing &&
+            !this.result.loading && !this.result.error && !this.result.ended && this.result.items.length && this.onSearch)
             this.onSearch(this.crop, true, false);
         })
     }.padding({ left: 10, right: 10, top: 8, bottom: 16 }).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
@@ -326,17 +385,17 @@ export struct PinmonyImageSearchView {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
         radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-        onWillAppear: (): void => { this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
+        onWillAppear: (): void => { this.sheetAppearing = true; this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
+        onAppear: (): void => this.resultSheetAppeared(),
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: this.uiText("pm_more_pins_like_this_6e224087") },
+        detentSelection: this.sheetHeight,
         scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,
         onHeightDidChange: (height: number) => { this.expanded = this.getUIContext().px2vp(height) > this.heightValue * 0.7; },
-        onDetentsDidChange: (height: number) => {
-          this.sheetHeight = this.getUIContext().px2vp(height) > this.heightValue * 0.7 ? SheetSize.LARGE : '40%';
-        },
+        onDetentsDidChange: (height: number) => this.updateSheetDetent(height),
         onWillDismiss: (action: DismissSheetAction) => {
           action.dismiss();
-          if (this.alive && !this.closing && !this.closeRequested) {
+          if (this.alive && this.presentationActive && !this.relatedOpening && !this.closing && !this.closeRequested) {
             this.closeRequested = true; this.onClose?.();
           }
         },

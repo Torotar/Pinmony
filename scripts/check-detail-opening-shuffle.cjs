@@ -1,0 +1,23 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const ts = require(process.argv[2] || 'typescript');
+const source = fs.readFileSync('entry/src/main/ets/app/PinmonyDetailOpeningCoordinator.ets', 'utf8');
+const start = source.indexOf('                const next: PinmonyDetailSnapshot');
+const end = source.indexOf('                this.pinStore.detail = next;', start);
+assert(start >= 0 && end > start);
+const merge = vm.runInNewContext(ts.transpileModule('(function(previous, detail) {' +
+  source.slice(start, end) + '\nreturn next;})', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const card = {pinUrl:'https://www.pinterest.com/pin/11/', title:'card', actions:[{kind:'save', selected:true}], related:[{id:'33'}]};
+const result = merge(card, {title:'validated', shuffleId:'77'});
+assert.equal(result.shuffleId, '77', 'opening card acquires authoritative collage identity before auxiliary reads');
+assert.equal(result.title, 'validated');
+assert.deepEqual(JSON.parse(JSON.stringify(result.actions)), card.actions);
+assert.deepEqual(JSON.parse(JSON.stringify(result.related)), card.related);
+assert.equal(card.shuffleId, undefined, 'cached opening card is not mutated');
+const loaded = {...card, shuffleId:'77', shuffle:{id:'77',items:[{id:'22'}]}, shuffleLoading:false};
+assert.deepEqual(JSON.parse(JSON.stringify(merge(loaded,{shuffleId:'77'}).shuffle)), loaded.shuffle, 'same collage retains loaded children');
+assert.equal(merge(loaded,{shuffleId:'88'}).shuffle, undefined, 'different collage identity cannot retain stale children');
+assert.equal(merge(loaded,{}).shuffleId, '77', 'partial reads preserve confirmed collage identity');
+assert(end < source.indexOf('this.ports.startNativeReads(pinUrl, token, body)', end), 'identity is published before auxiliary starts');
+console.log('Detail opening collage: authoritative identity, retained interactions and stale child clearing passed');

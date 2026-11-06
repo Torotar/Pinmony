@@ -91,10 +91,17 @@ export class PinmonyHomeNativeReads {
     return PIN_NATIVE_HOME_READS_ENABLED && this.ports.active() && session.authenticated && session.generation === this.generation &&
       session.accountId === this.account && session.origin === this.origin && this.ports.username() === this.username;
   }
+  invalidateCategories(): void {
+    this.categoriesReady = false;
+  }
   async demand(): Promise<void> {
     if (!this.ports.active() || !this.bind()) return;
     const retained: HomeFeed | undefined = this.feeds.get(this.board);
-    if (retained) { this.bookmark = retained.bookmark; this.commit(retained.snapshot, 'cache'); return; }
+    if (retained) {
+      this.bookmark = retained.bookmark; this.commit(retained.snapshot, 'cache');
+      if (!this.categoriesReady && !this.categoriesBusy) this.readCategories();
+      return;
+    }
     const selected: PinmonyHomeTab | undefined = this.store.home?.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected);
     if (selected && /^tab:\d+$/.test(selected.id)) this.board = selected.id.slice(4);
     const feed: Promise<void> = this.readFeed(false);

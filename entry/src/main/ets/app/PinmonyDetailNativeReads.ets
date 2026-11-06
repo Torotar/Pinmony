@@ -96,11 +96,23 @@ export class PinmonyDetailNativeReads {
   private previewError: string = '';
   private previewAvailable: boolean = false;
   private readonly requests: Set<string> = new Set<string>();
+  private secondaryTimer: number = -1;
+  private releaseSecondary: (() => void) | undefined = undefined;
+  private async waitForEntryBudget(): Promise<void> {
+    await new Promise<void>((resolve: () => void): void => {
+      this.releaseSecondary = resolve;
+      this.secondaryTimer = setTimeout((): void => {
+        this.secondaryTimer = -1; this.releaseSecondary = undefined; resolve();
+      }, 280);
+    });
+  }
   private autoplayWifi: boolean | undefined = undefined;
   private autoplayCellular: boolean | undefined = undefined;
   constructor(ports: PinmonyDetailNativeReadsPorts) { this.ports = ports; this.store = ports.pinStore(); }
 
   pause(): void {
+    if (this.secondaryTimer >= 0) clearTimeout(this.secondaryTimer);
+    this.secondaryTimer = -1; this.releaseSecondary?.(); this.releaseSecondary = undefined;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if (!session.authenticated || this.retainedOwner !== session.accountId + ':' + session.generation.toString()) {
       this.retainedRelated.clear(); this.retainedOwner = '';
@@ -201,6 +213,10 @@ export class PinmonyDetailNativeReads {
       (!!presentation?.actions.some((item): boolean => item.kind === 'source')).toString());
     const revision: number = this.revision;
     this.readAutoplay();
+    // Leave the entry transition a frame budget before unrelated reads compete
+    // with the main image. pause() releases the wait and retires its generation.
+    await this.waitForEntryBudget();
+    if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
     this.readProduct();
     // Preview owns its loading/error state and catches failures. Recommendations
     // depend on the validated Pin, not on the preview response.
@@ -427,19 +443,21 @@ export class PinmonyDetailNativeReads {
     }
     if (!this.owned() || !current() || result.pin !== this.pin || result.loading || result.busy || result.uncertain ||
         !item || !/^\d+$/.test(commentId) || item.type !== 'aggregatedcomment' || typeof item.text !== 'string' || !item.text.trim() || item.translationLoading) return;
-    if (item.translatedText) { item.translationVisible = !item.translationVisible; this.publishComments(result); return; }
+    const language: string = PinmonyI18n.translationAcceptLanguage();
+    if (item.translatedText && item.translationLanguage === language) { item.translationVisible = !item.translationVisible; this.publishComments(result); return; }
     const selected: PinmonyComment = item;
     const revision: number = this.revision, token: number = this.store.commentToken, commentsRevision: number = this.commentsRevision;
     const text: string = selected.text;
     const live = (): boolean => revision === this.revision && commentsRevision === this.commentsRevision && token === this.store.commentToken &&
       this.owned() && current() && this.store.commentResult.pin === this.pin && selected.text === text &&
       (this.store.commentResult.items.includes(selected) || this.store.commentResult.items.some((parent: PinmonyComment): boolean => !!parent.replies?.includes(selected)));
+    selected.translatedText = ''; selected.translationVisible = false; selected.translationLanguage = language;
     selected.translationLoading = true; selected.translationError = ''; this.publishComments(result);
     try {
       if (!this.ports.session().appVersion) throw new Error(PinmonyI18n.message("pm_translation_request_not_ready_please_retry_bfacc5b2"));
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request');
       const options: TranslationOptions = { url: '/v3/aggregated_comments/' + commentId + '/translate/' };
-      const reply: PinmonyNetworkReply = await this.request('ApiResource', options, 'native_translation_', live, commentId);
+      const reply: PinmonyNetworkReply = await this.request('ApiResource', options, 'native_translation_', live, commentId, language);
       if (!live()) return;
       if (reply.error || reply.status !== 200 || reply.body.length > 128000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request-failed status=' + reply.status.toString()); throw new Error(PinmonyI18n.message('pm_comment_translation_request_failed_please_retry_9ff98b48')); }
       const resource: TranslationResource = (JSON.parse(reply.body) as TranslationResponse).resource_response;
@@ -451,8 +469,7 @@ export class PinmonyDetailNativeReads {
         PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=empty');
         selected.translationError = PinmonyI18n.message("pm_no_translation_available_52561070"); return;
       }
-      // The supplied HAR proves only null. Accept bounded plain text; never render
-      // an unconfirmed object shape or treat HTTP success alone as a translation.
+      // Captured responses include null and plain text. Reject unconfirmed shapes.
       if (typeof resource.data !== 'string' || resource.data.length > 10000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=unsupported-format'); throw new Error(PinmonyI18n.message('pm_unsupported_translation_format_9a4c1587')); }
       selected.translatedText = resource.data.trim(); selected.translationVisible = true;
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=committed');
@@ -480,7 +497,7 @@ export class PinmonyDetailNativeReads {
       this.apply();
     } catch (_) { PinmonyRuntimeLog.warn('VideoAutoplayTrace: preferences=unavailable'); }
   }
-  private async request(resource: string, options: Object, prefix: string, extraCurrent: () => boolean = (): boolean => true, commentId: string = ''): Promise<PinmonyNetworkReply> {
+  private async request(resource: string, options: Object, prefix: string, extraCurrent: () => boolean = (): boolean => true, commentId: string = '', translationLanguage: string = ''): Promise<PinmonyNetworkReply> {
     const session: PinmonyBusinessSessionContext = this.ports.session();
     const pin: string = this.pin;
     const revision: number = this.revision;
@@ -489,6 +506,7 @@ export class PinmonyDetailNativeReads {
     const headers: Record<string, string> = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
       'X-Pinterest-Pws-Handler': 'www/pin/[id].js', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Source-Url': source };
     if (session.appVersion) headers['X-App-Version'] = session.appVersion;
+    if (prefix === 'native_translation_') headers['Accept-Language'] = translationLanguage;
     if (prefix === 'native_autoplay_') headers['X-Pinterest-Pws-Handler'] = 'www/index.js';
     const envelope: ReadEnvelope = { options: options, context: {} };
     const job: PinmonyNetworkJob = { id: id, epoch: session.generation, page: pin, method: 'GET', body: '', headers: headers,

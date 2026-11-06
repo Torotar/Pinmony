@@ -11,6 +11,7 @@ export class PinmonyProfileStore {
   searchVisible: boolean = false;
   contentSearch: PinmonyProfileSearchSnapshot | undefined = undefined;
   searchBack: (() => void) | undefined = undefined;
+  panelSearchBack: (() => boolean) | undefined = undefined;
   followingBusy: boolean = false;
   saving: boolean = false;
   followUncertain: boolean = false;

@@ -63,13 +63,13 @@ async function main() {
     { compilerOptions: { target: 99 } }).outputText);
   for (const resumed of [false, true]) {
     const p = new Page(); Object.assign(p, { entryPhoto: {}, entryResumed: resumed, entryOpacity: 1, entryMotionComplete: false,
-      displayedDetail: () => ({ pinUrl: pin(1) }), updateDetailLayout() {}, auditRecommendationGate() {},
+      displayedDetail: () => ({ pinUrl: pin(1) }), syncDetailFlow() {}, updateDetailLayout() {}, auditRecommendationGate() {},
       auditRecommendationLayout() {}, startSearchLabel() {}, detailPathStack: { clear() {}, pushPath() {} } });
     p.aboutToAppear(); assert.equal(p.entryOpacity, resumed ? 1 : 0); assert.equal(p.entryMotionComplete, resumed);
   }
   assert.match(page, /!this\.entryMotionComplete \|\| this\.entryClosing/);
   assert.match(source, /entryResumed: _identity === this\.detailRootIdentity\(\) && this\.homeEntryResumed/);
-  assert.match(source, /resetAuthenticatedContent\(\): void \{ this\.detailEntryPhotos\.clear\(\); this\.detailEntryCards\.clear\(\)/);
+  assert.match(source, /resetAuthenticatedContent\(\): void \{[^}]*this\.detailEntryPhotos\.clear\(\); this\.detailEntryCards\.clear\(\)/);
   // Execute the actual opening statements around cache restoration. Returning
   // from a child and explicitly tapping a cached collage are different intents.
   const openingText=method(source,'beginDetailOpening');

@@ -30,6 +30,17 @@ assert(!host.boardTitleMenu().some(item => item.content.icon === 'app.media.luci
 host.snapshot = { ready: true, editable: false, canFollow: false, followBusy: true };
 assert(!host.boardTitleMenu().some(item => item.content.icon === 'app.media.lucide_ellipsis'), 'pending follow retains its disabled control');
 console.log('Board title: loading never infers follow permission; owned board keeps options; confirmed visitor behavior preserved');
+const loadingStart=source.indexOf('  private initialBoardLoading('),loadingEnd=source.indexOf('\n  private ',loadingStart+1);
+const Loading=vm.runInNewContext(ts.transpileModule('class Loading {'+source.slice(loadingStart,loadingEnd)+'} Loading;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const loading=new Loading();Object.assign(loading,{phase:()=>'',isDiscoveryBoard:()=>true,snapshot:{loading:true,ready:false}});
+assert.equal(loading.initialBoardLoading(),true,'discovery initial read uses the centered overlay');
+for(const snapshot of [{loading:false,ready:true},{loading:false,ready:false,error:'failed'},{loading:true,ready:false,postOperationLoading:true},{loading:true,ready:true,refreshing:true}]){loading.snapshot=snapshot;assert.equal(loading.initialBoardLoading(),false);}
+loading.snapshot={loading:true,ready:false};loading.phase=()=> 'section';assert.equal(loading.initialBoardLoading(),false);
+loading.phase=()=>'';loading.isDiscoveryBoard=()=>false;assert.equal(loading.initialBoardLoading(),true,'ordinary board entry uses the centered overlay');
+loading.snapshot={loading:true,ready:true};assert.equal(loading.initialBoardLoading(),true,'metadata readiness must not move the spinner before the initial feed finishes');
+loading.boardRefreshActive=true;assert.equal(loading.initialBoardLoading(),false,'gesture refresh stays below the title');loading.boardRefreshActive=false;
+assert(source.includes('!this.initialBoardLoading() && !this.snapshot.postOperationLoading'),'initial discovery loading is not duplicated beneath the header');
+assert.match(source,/else if \(this.initialBoardLoading\(\)\) \{\s*Stack\(\{ alignContent: Alignment.Center \}\) \{\s*LoadingProgress\(\)[\s\S]*?\.width\('100%'\)\.height\('100%'\)\.hitTestBehavior\(HitTestMode.None\)/,'indicator uses a full-page non-scrolling overlay');
 for (const ready of [false, true]) {
   host.snapshot = { pageKey: 'https://www.pinterest.com/example/pins/', ready, editable: false, canFollow: true };
   assert.equal(host.boardTitleMenu().length, 0, 'all Pins collection has no title actions even during loading');

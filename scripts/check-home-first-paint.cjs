@@ -12,7 +12,7 @@ assert.match(page, /const firstApiSnapshot: boolean = this\.home\.dataSource ===
   'home identifies the first non-empty API snapshot');
 assert.match(page, /if \(firstApiSnapshot\) this\.prefetchNotBefore = Date\.now\(\) \+ 900;/,
   'home delays pagination after the first card snapshot');
-assert.match(page, /this\.homeChromeCollapsed = false;/, 'home chrome remains expanded under the current product contract');
+assert.match(page, /this\.setHomeChromeCollapsed\(false\);/, 'home reset expands chrome through the shared animation owner');
 function method(source, name) {
   const start = source.search(new RegExp('  private (?:async )?' + name + '\\('));
   assert(start >= 0, name);

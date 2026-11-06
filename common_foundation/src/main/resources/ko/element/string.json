@@ -1,5 +1,6 @@
 {
   "string": [
+    {"name":"pm_photo_history_save_unconfirmed","value":"검색은 완료되었지만 사진 기록 저장은 확인되지 않았습니다."},
     {
       "name": "pm_recommend_boards_description",
       "value": "보드의 맞춤 설정을 끄면 해당 보드를 기반으로 한 홈 피드 탭과 추천이 숨겨집니다. 보드와 핀에는 영향을 주지 않습니다."
@@ -1546,7 +1547,7 @@
     },
     {
       "name": "pm_photos_7b50017a",
-      "value": "사진"
+      "value": "핀"
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
@@ -3270,7 +3271,7 @@
     },
     {
       "name": "pm_system_share_13a1c63f",
-      "value": "시스템 공유"
+      "value": "다른 앱으로 공유"
     },
     {
       "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
@@ -4414,6 +4415,10 @@
     },
     {
       "name": "pm_photo_search",
+      "value": "사진 검색"
+    },
+    {
+      "name": "pm_detail_photo_search",
       "value": "사진 검색"
     },
     {
@@ -5812,6 +5817,26 @@
     {
       "name": "pm_photo_history_delete_all_incomplete",
       "value": "모든 기록을 불러오지 못해 전체 삭제를 실행하지 않았습니다."
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_title",
+      "value": "영감 저장하기"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_body",
+      "value": "Pinterest에서 핀을 저장하며 아이디어를 모아 보세요. 마음에 드는 핀을 저장하면 나중에 여기에서 다시 살펴보고 새로운 영감을 얻을 수 있어요."
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_title",
+      "value": "아이디어 정리하기"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_body",
+      "value": "핀은 영감의 불꽃이고 보드는 핀이 머무는 공간이에요. 보드를 만들어 원하는 방식으로 핀을 정리해 보세요."
+    },
+    {
+      "name": "pm_created_board_choose_pins",
+      "value": "새 보드에 핀을 저장하세요"
     }
   ]
 }

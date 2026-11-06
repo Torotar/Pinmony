@@ -19,9 +19,11 @@ interface NativeBoard { id: string; name: string; privacy?: string; section_coun
 interface PickerData { all_boards: NativeBoard[]; boards_shortlist: NativeBoard[]; }
 interface NativeSection {id: string; type: string; title: string; board: Owner; preview_pins?: NativePin[];}
 interface SectionReadData {fields: string[]; orbac_subject_id: string;}
+interface SavedPinMoveData {board_id: string; pin_ids: string[]; section_id?: string;}
 interface Resource { status: string; code?: number; endpoint_name?: string; error?: Object; data: Object | null; }
 interface Response { resource_response: Resource; client_context?: Context; }
 interface Context { user?: Owner; }
+interface PrefetchedSavedPinResponse { resource_response: Resource; pinmony_saved_board?: PinBoard; }
 interface GraphOwner { entityId: string; }
 interface GraphBoard { entityId: string; name: string; imageCoverUrl?: string; }
 interface Suggestion { title: string; }
@@ -32,7 +34,7 @@ interface GraphPinData { data?: GraphPin; }
 interface GraphResponse { data?: GraphData; errors?: Object; }
 interface Options { id?: string; pin_id?: string; user_id?: string; board_id?: string; field_set_key?: string; shortlist_length?: number; shortlist_suggestions?: number;
   clientTrackingParams?: string; client_tracking_params?: string; name?: string; privacy?: string; initial_pin_client_tracking_params?: string[];
-  section?: string; board_section_id?: string; ai_disclosures?: number[]; title?: string; description?: string; url?: string; data?: ReactionWrite | SectionReadData; }
+  section?: string; board_section_id?: string; ai_disclosures?: number[]; title?: string; description?: string; url?: string; data?: ReactionWrite | SectionReadData | SavedPinMoveData; }
 interface ReactionWrite { client_tracking_params: string; reaction_type: number; }
 interface Envelope { options: Options; context: Record<string,string>; }
 interface GraphEnvelope { queryHash: string; variables: GraphVariables; }
@@ -86,13 +88,27 @@ export class PinmonyPostNativeOperations {
     if(this.mode === 'like' || this.mode === 'cancel')this.apply();
   }
   likeBlocked(pin: string): boolean {return this.key() === this.account && this.uncertainLikes.has(this.id(pin));}
+  observePrefetched(pin: string, body: string): void {
+    if(!PIN_NATIVE_POST_OPERATIONS_ENABLED || !this.ports.session().authenticated || this.ports.active && !this.ports.active() || this.store.detail?.pinUrl !== pin ||
+      (this.store.detailPin !== pin && this.store.detailOpeningPin !== pin) || !this.sync())return;
+    try {
+      const response: PrefetchedSavedPinResponse = JSON.parse(body) as PrefetchedSavedPinResponse;
+      const resource: Resource = response.resource_response, raw: NativePin = resource?.data as NativePin, board: PinBoard | undefined = response.pinmony_saved_board;
+      if(resource?.status !== 'success' || resource.error || resource.code !== undefined && resource.code !== 0 || raw?.id !== this.id(pin))return;
+      if(board && this.digits(board.id) && typeof board.name === 'string' && !!board.name && board.name.length <= 300 &&
+        (!this.store.confirmedSaves.known(raw.id) || this.store.confirmedSaves.isSaved(raw.id)))this.store.confirmedSaves.confirm(raw.id,true,'',board.name);
+      this.apply();
+    }catch (_) {}
+  }
   observe(pin: string, body: string): void {
     if(!PIN_NATIVE_POST_OPERATIONS_ENABLED || !this.ports.owns(pin) || !this.sync())return;
     try {
-      const r: Resource = (JSON.parse(body) as Response).resource_response, p: NativePin = r?.data as NativePin;
+      const response: Response = JSON.parse(body) as Response, r: Resource = response.resource_response, p: NativePin = r?.data as NativePin;
       if(r?.status !== 'success' || r.error || r.code !== undefined && r.code !== 0 || p?.id !== this.id(pin))return;
       const reaction: number | undefined = p.reaction_data?.reaction_by_me === undefined ? p.reaction_by_me : p.reaction_data.reaction_by_me;
       if(reaction === 1){this.liked.add(p.id);this.rememberLikeCount(p,false);this.uncertainLikes.delete(p.id);}
+      const viewer: string | undefined = response.client_context?.user?.id;
+      if(this.digits(viewer))this.observeSavedCopy(p,viewer!);
       this.apply();
     }catch (_) {}
   }
@@ -140,28 +156,35 @@ export class PinmonyPostNativeOperations {
     if(!r || r.status !== 'success' || r.error || r.code !== undefined && r.code !== 0 || viewer !== undefined && (!this.digits(viewer) || !!this.viewer && viewer !== this.viewer))throw new Error('resource');
     if(!this.viewer){if(!this.digits(viewer))throw new Error('viewer');this.viewer = viewer!;}return r;
   }
+  private observeSavedCopy(p: NativePin, viewer: string): void {
+    if(p.pinner?.id === viewer && p.is_repin === true && this.digits(p.board?.id) && (!this.store.confirmedSaves.known(p.id) || this.store.confirmedSaves.isSaved(p.id)))this.store.confirmedSaves.confirm(p.id,true,'',typeof p.board?.name === 'string' ? p.board.name : '');
+  }
   private async base(revision: number): Promise<NativePin> {
     const r: Resource = await this.request('PinResource','get',{id:this.id(),field_set_key:'auth_web_main_pin'},revision) as Resource;
     const p: NativePin = r.data as NativePin;if(!p || p.id !== this.id())throw new Error('pin');this.raw = p;
-    if(p.pinner?.id === this.viewer && p.is_repin === true && this.digits(p.board?.id) && (!this.store.confirmedSaves.known(p.id) || this.store.confirmedSaves.isSaved(p.id)))this.store.confirmedSaves.confirm(p.id,true,'',p.board?.name || '');
+    this.observeSavedCopy(p,this.viewer);
     this.apply();return p;
   }
   private board(b: NativeBoard): PinmonySaveBoard {
     if(!b || !this.digits(b.id) || typeof b.name !== 'string')throw new Error('board');
-    return {id:b.id,name:b.name.trim().slice(0,300),imageUrl:this.image(b.image_cover_url || b.image_cover_hd_url),secret:b.privacy === 'secret',hasSections:Number.isInteger(b.section_count) && (b.section_count || 0) > 0,enabled:Array.isArray(b.access) && b.access.includes('write')};
+    return {id:b.id,name:b.name.trim().slice(0,300),imageUrl:this.image(b.image_cover_url || b.image_cover_hd_url),secret:b.privacy === 'secret',hasSections:Number.isInteger(b.section_count) && (b.section_count || 0) >= 0 ? (b.section_count || 0) > 0 : undefined,enabled:Array.isArray(b.access) && b.access.includes('write')};
   }
   private async loadPicker(revision: number): Promise<void> {
     this.picker().loading = true;this.picker().error = '';this.publish();
     const r: Resource = await this.request('BoardPickerBoardsResource','get',{pin_id:this.id(),field_set_key:'profile_grid_item',shortlist_length:2,shortlist_suggestions:3,user_id:this.viewer},revision) as Resource;
     const d: PickerData = r.data as PickerData;if(!d || !Array.isArray(d.all_boards) || !Array.isArray(d.boards_shortlist) || d.all_boards.length > 2000 || d.boards_shortlist.length > 2000)throw new Error('picker');
     const p: PinmonySaveResult = this.picker();p.items = d.all_boards.map((b: NativeBoard): PinmonySaveBoard => this.board(b));p.shortlist = d.boards_shortlist.map((b: NativeBoard): PinmonySaveBoard => this.board(b));
-    if(this.mode === 'save' && PIN_PROFILE_ORGANIZE_ENABLED)p.items.push({id:'profile-quick-saves',name:PinmonyI18n.message("pm_profile_b94d13a4"),imageUrl:'',enabled:true,secret:false});
+    if(this.mode === 'save' && PIN_PROFILE_ORGANIZE_ENABLED)p.items.push({id:'profile-quick-saves',name:PinmonyI18n.message("pm_profile_b94d13a4"),imageUrl:'',enabled:!this.store.confirmedSaves.isSaved(this.id()),secret:false});
     p.loading = false;this.publish();
   }
   async openSave(pin: string): Promise<void> {
     if(!PIN_POST_EXTENSIONS_ENABLED || !this.begin('save',pin))return;this.store.saveCreating = false;this.store.saveResult = this.emptyPicker();this.store.saveResult.loading = true;this.publish();
     const revision: number = this.revision;this.busy = true;
-    try {await this.base(revision);await this.loadPicker(revision);const stored: SaveCopy | undefined = this.saved.get(this.id());if(stored){this.store.saveResult.savedId = stored.id;this.store.saveResult.savedBoard = stored.board;}
+    try {const raw: NativePin = await this.base(revision);await this.loadPicker(revision);const stored: SaveCopy | undefined = this.saved.get(this.id());if(stored){this.store.saveResult.savedId = stored.id;this.store.saveResult.savedBoard = stored.board;}
+      else if(raw.pinner?.id === this.viewer && raw.is_repin === true && this.digits(raw.board?.id) && this.store.confirmedSaves.isSaved(raw.id)) {
+        this.store.saveResult.savedId = raw.id;
+        this.store.saveResult.savedBoard = typeof raw.board?.name === 'string' && raw.board.name ? raw.board.name.slice(0,300) : this.store.saveResult.items.concat(this.store.saveResult.shortlist).find((board: PinmonySaveBoard): boolean => board.id === raw.board?.id)?.name || '';
+      }
       this.publish();this.busy = false;
       try {const g: GraphData = await this.request('','',{},revision,'22ab0618812233f56510dbaeb1d76e342780a08cabb50624896db33300f9070e') as GraphData;const p: GraphPin | undefined = g.v3GetPinQueryv2?.data;
         // The persisted query returns Relay Pin identity; a local encoder is supplied without credentials.
@@ -189,6 +212,8 @@ export class PinmonyPostNativeOperations {
   private async saveSections(boardId: string): Promise<void> {
     if(this.mode !== 'save' || this.busy || this.picker().uncertain || !this.valid(this.revision) || !this.digits(boardId) || !this.allowed().includes(boardId))return;
     const revision: number = this.revision, p: PinmonySaveResult = this.picker();
+    const selected: PinmonySaveBoard | undefined = p.items.concat(p.shortlist).find((b: PinmonySaveBoard): boolean => b.id === boardId);
+    if(selected?.hasSections === false) {await this.saveAction('boardsSave', ',' + JSON.stringify(boardId));return;}
     let directSave: boolean = false;
     this.busy = true;p.targetSections = [];p.loading = true;p.error = '';this.publish();
     try {
@@ -203,6 +228,34 @@ export class PinmonyPostNativeOperations {
     }catch (_) {if(this.valid(revision)){this.picker().targetBoardId = boardId;this.picker().error = PinmonyI18n.message('pm_unable_to_load_target_sections_please_retry_701b528d');}}
     finally {if(this.valid(revision)){this.busy = false;this.picker().loading = false;this.publish();}}
     if(directSave && this.valid(revision))await this.saveAction('boardsSave',',' + JSON.stringify(boardId));
+  }
+  private async selectSaveTarget(boardId: string, revision: number, sectionId: string = ''): Promise<void> {
+    if(!this.store.saveResult.savedId) {await this.repin(boardId,revision,sectionId);return;}
+    const target: PinmonySaveBoard | undefined = this.picker().items.concat(this.picker().shortlist).find((board: PinmonySaveBoard): boolean => board.id === boardId && board.enabled);
+    const copyId: string = this.store.saveResult.savedId;
+    if(!target || !this.digits(boardId) || !this.digits(copyId) || !this.store.confirmedSaves.isSaved(this.id()))throw new Error('move-target');
+    if(sectionId && (this.picker().targetBoardId !== boardId || !this.picker().targetSections?.some((section: PinmonySaveBoard): boolean => section.id === sectionId && section.enabled)))throw new Error('move-section');
+    let copy: NativePin | undefined = this.raw;
+    if(copyId !== this.id()) {const read: Resource = await this.request('PinResource','get',{id:copyId,field_set_key:'auth_web_main_pin'},revision) as Resource;copy = read.data as NativePin;}
+    if(!copy || copy.id !== copyId || copy.pinner?.id !== this.viewer || copy.is_repin !== true || !this.digits(copy.board?.id))throw new Error('move-owner');
+    if(copy.board?.id === boardId) {
+      if(sectionId && copy.section?.id !== sectionId)throw new Error('move-same-board-section');
+      this.store.saveResult.feedback = PinmonyI18n.message('pm_changes_saved_1045a8e6');return;
+    }
+    this.verifiedCopy = copyId === this.id() ? '' : copyId;
+    const data: SavedPinMoveData = {board_id:boardId,pin_ids:[copyId]};if(sectionId)data.section_id = sectionId;
+    this.sent = true;
+    const moved: Resource = await this.request('ApiResource','create',{url:'/v3/pins/bulk/move/',data:data},revision) as Resource;
+    if(moved.code !== 0 || moved.endpoint_name !== 'v3_move_pins')throw new Error('move-unconfirmed');
+    const read: Resource = await this.request('PinResource','get',{id:copyId,field_set_key:'auth_web_main_pin'},revision) as Resource, result: NativePin = read.data as NativePin;
+    if(!result || result.id !== copyId || result.pinner?.id !== this.viewer || result.is_repin !== true || result.board?.id !== boardId || (sectionId ? result.section?.id !== sectionId : !!result.section?.id))throw new Error('move-result');
+    this.sent = false;
+    if(copyId === this.id()) {this.raw = result;this.saved.delete(this.id());}
+    else this.saved.set(this.id(),{id:copyId,board:target.name,boardId:boardId,viewer:this.viewer,scope:this.ports.originToken?.() || ''});
+    this.store.confirmedSaves.confirm(this.id(),true,copyId,target.name);this.apply();
+    if(this.store.saveUndoPin === this.pin){this.store.saveUndoPin = '';this.store.saveUndoId = '';}
+    this.store.saveResult.savedBoard = target.name;this.store.saveResult.feedback = PinmonyI18n.message('pm_changes_saved_1045a8e6');
+    this.ports.committed('move-save',this.pin);
   }
   private async repin(boardId: string, revision: number, sectionId: string = ''): Promise<void> {
     const b: PinmonySaveBoard | undefined = this.picker().items.concat(this.picker().shortlist).find((b: PinmonySaveBoard): boolean => b.id === boardId && b.enabled);if(!b)throw new Error('target');
@@ -237,6 +290,7 @@ export class PinmonyPostNativeOperations {
     if(this.mode === 'edit' && this.store.editResult.phase !== 'boards')return;
     if(method === 'boardsSave' && (typeof a[0] !== 'string' || !this.picker().items.concat(this.picker().shortlist).some((b: PinmonySaveBoard): boolean => b.enabled && b.id === a[0])))return;
     if(method === 'boardsCreate' && (typeof a[0] !== 'string' || !a[0].trim() || a[0].trim().length > 300 || typeof a[1] !== 'boolean'))return;
+    const moving: boolean = this.mode === 'save' && !!this.store.saveResult.savedId;
     this.busy = true;this.lock(true);this.sent = false;
     try {
       if(method === 'boardsCreate') {
@@ -246,10 +300,10 @@ export class PinmonyPostNativeOperations {
         if(r.code !== 0 || r.endpoint_name !== 'v3_create_board' || !b || b.name !== name || b.privacy !== o.privacy || b.owner?.id !== undefined && b.owner.id !== this.viewer)throw new Error('create');
         const mapped: PinmonySaveBoard = this.board(b);this.sent = false;this.picker().items.push(mapped);this.ports.committed('create-board',this.pin);
         if(this.mode === 'edit'){this.store.editResult.board = mapped;this.store.editResult.phase = 'edit';this.store.saveCreating = false;return;}
-        await this.repin(mapped.id,revision);
-      }else if(method === 'boardsSave')await this.repin(a[0] as string,revision,typeof a[1] === 'string' ? a[1] : '');
+        await this.selectSaveTarget(mapped.id,revision);
+      }else if(method === 'boardsSave')await this.selectSaveTarget(a[0] as string,revision,typeof a[1] === 'string' ? a[1] : '');
       else {await this.removeCopy(revision);return;}
-      const feedback: string = this.store.saveResult.feedback;this.lock(false);this.busy = false;const savedPin: string = this.pin, copy: string = this.store.saveResult.savedId;this.dismiss('save');if(this.ports.saved)this.ports.saved(savedPin,copy,feedback);else this.ports.feedback(feedback);
+      const feedback: string = this.store.saveResult.feedback;this.lock(false);this.busy = false;const savedPin: string = this.pin, copy: string = this.store.saveResult.savedId;this.dismiss('save');if(!moving && this.ports.saved)this.ports.saved(savedPin,copy,feedback);else this.ports.feedback(feedback);
     }catch (_) {if(this.valid(revision))this.fail(this.sent ? '收藏操作结果未确认，请关闭后重新读取核对；不会重复提交' : PinmonyI18n.message("pm_action_not_submitted_or_loading_failed_check_before_retrying_93362fa3"),this.sent);}
     finally {if(revision === this.revision){if(this.sent && this.key() === this.account)this.fail(PinmonyI18n.message("pm_result_not_confirmed_close_and_reload_to_check_it_will_not_be_re_d952b803"),true);this.busy = false;this.sent = false;this.lock(false);}}
   }
@@ -286,7 +340,7 @@ export class PinmonyPostNativeOperations {
     if(!PIN_NATIVE_POST_OPERATIONS_ENABLED || !['like','save'].includes(kind))return false;
     const pin: string = this.store.detail?.pinUrl || '';if(!this.ports.owns(pin) || this.busy)return true;
     if(kind === 'like')await this.like(pin);
-    else if(this.store.confirmedSaves.isSaved(this.id(pin)) || this.store.detail?.actions.some((a: PinmonyDetailAction): boolean => a.kind === 'save' && a.selected))await this.cancelSave(pin);else await this.openSave(pin);
+    else await this.openSave(pin);
     return true;
   }
   private rememberLikeCount(pin: NativePin, newlyLiked: boolean): void {

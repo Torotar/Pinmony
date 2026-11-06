@@ -1,5 +1,6 @@
 {
   "string": [
+    {"name":"pm_photo_history_save_unconfirmed","value":"搜尋已完成，但照片歷史儲存結果未確認。"},
     {
       "name": "pm_recommend_boards_description",
       "value": "關閉圖板的個人化開關，以移除基於該圖板的首頁標籤和推薦。這不會影響圖板及其中的 Pin 圖。"
@@ -1534,7 +1535,7 @@
     },
     {
       "name": "pm_photos_7b50017a",
-      "value": "照片"
+      "value": "Pin 圖"
     },
     {
       "name": "pm_enter_a_link_to_create_a_pin_https_89a0cd78",
@@ -3258,7 +3259,7 @@
     },
     {
       "name": "pm_system_share_13a1c63f",
-      "value": "係统分享"
+      "value": "分享到其他應用程式"
     },
     {
       "name": "pm_unable_to_load_pin_actions_please_retry_1434adac",
@@ -4403,6 +4404,10 @@
     {
       "name": "pm_photo_search",
       "value": "照片搜索"
+    },
+    {
+      "name": "pm_detail_photo_search",
+      "value": "搜尋照片"
     },
     {
       "name": "pm_photo_search_loading",
@@ -5812,6 +5817,26 @@
     {
       "name": "pm_photo_history_delete_all_incomplete",
       "value": "尚未讀取全部歷史，未執行全部刪除。"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_title",
+      "value": "收藏靈感"
+    },
+    {
+      "name": "pm_profile_empty_saved_pins_body",
+      "value": "在 Pinterest 上，收藏 Pin 圖是一項強大功能。瀏覽 Pin 圖，收藏你喜歡的內容，日後可在這裡再次瀏覽，重新獲得靈感。"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_title",
+      "value": "整理你的點子"
+    },
+    {
+      "name": "pm_profile_empty_saved_boards_body",
+      "value": "Pin 圖是靈感的火花，圖板則是它們的棲身之所。建立圖板，按你喜歡的方式整理 Pin 圖。"
+    },
+    {
+      "name": "pm_created_board_choose_pins",
+      "value": "收藏一些 Pin 圖至你的新圖板"
     }
   ]
 }

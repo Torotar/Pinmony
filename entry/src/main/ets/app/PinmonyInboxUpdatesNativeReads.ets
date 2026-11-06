@@ -16,6 +16,7 @@ interface NewsOptions { url: string; data: NewsData; redux_normalize_feed: boole
 interface NewsData { field_set_key: string; }
 interface NewsEnvelope { options: NewsOptions; context: Record<string,string>; }
 interface NativeNews extends PinmonyInboxItem { newsId: string; notificationPinId: string; notificationMuted?: boolean; }
+interface NativeNewsHiddenRow { row: NativeNews; index: number; }
 export interface PinmonyInboxUpdatesNativeReadsPorts {
   store: () => PinmonyInboxStore;
   session: () => PinmonyBusinessSessionContext;
@@ -33,6 +34,7 @@ export class PinmonyInboxUpdatesNativeReads {
   private generation: number = -1;
   private page: string = '';
   private revision: number = 0;
+  private visibilityRevision: number = 0;
   private sequence: number = 0;
   private requestId: string = '';
   private busy: boolean = false;
@@ -44,6 +46,7 @@ export class PinmonyInboxUpdatesNativeReads {
   private moreError: string = '';
   private rows: NativeNews[] = [];
   private readonly hidden: Set<string> = new Set<string>();
+  private readonly hiddenRows: Map<string,NativeNewsHiddenRow> = new Map<string,NativeNewsHiddenRow>();
   private readonly refreshedHidden: Set<string> = new Set<string>();
   private readonly muted: Set<string> = new Set<string>();
   constructor(ports: PinmonyInboxUpdatesNativeReadsPorts) { this.ports = ports; this.store = ports.store(); }
@@ -58,7 +61,7 @@ export class PinmonyInboxUpdatesNativeReads {
     return true;
   }
   pause(): void { this.revision++; if (this.requestId) this.ports.network().cancel(this.requestId); this.requestId = ''; this.busy = false; this.polling = false; this.store.inboxNativeUpdatesReady = false; }
-  reset(): void { this.pause(); if(this.account) { this.store.inboxCache.clear(); if(this.store.inbox?.section === 'updates') this.store.inbox = undefined; } this.account = ''; this.origin = ''; this.generation = -1; this.page = ''; this.section = ''; this.ready = false; this.ended = false; this.cursor = ''; this.rows = []; this.hidden.clear(); this.refreshedHidden.clear(); this.muted.clear(); this.error = ''; this.moreError = ''; }
+  reset(): void { this.pause(); if(this.account) { this.store.inboxCache.clear(); if(this.store.inbox?.section === 'updates') this.store.inbox = undefined; } this.account = ''; this.origin = ''; this.generation = -1; this.page = ''; this.section = ''; this.ready = false; this.ended = false; this.cursor = ''; this.rows = []; this.hidden.clear(); this.hiddenRows.clear(); this.refreshedHidden.clear(); this.muted.clear(); this.error = ''; this.moreError = ''; }
   async select(section: string): Promise<boolean> {
     if (!PIN_NATIVE_INBOX_UPDATES_ENABLED || !this.ports.session().authenticated || !this.ports.active()) return false;
     if (section !== 'updates') { this.section = section; this.pause(); return false; }
@@ -79,7 +82,23 @@ export class PinmonyInboxUpdatesNativeReads {
   async poll(): Promise<void> { if(this.bind() && this.ready && !this.busy && !this.error && !this.moreError) await this.read(false, true); }
   async refresh(): Promise<void> { if(this.bind() && !this.busy) await this.read(false); }
   async more(): Promise<void> { if(!this.bind() || this.busy || this.ended && !this.moreError)return; await this.read(this.ready && !!this.cursor && !this.ended); }
-  confirmedVisibility(newsId: string, hidden: boolean): void { const s: PinmonyBusinessSessionContext = this.ports.session(); if(this.eligible() && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.page === this.ports.page() && this.rows.some((row: NativeNews): boolean => row.newsId === newsId)) { if(hidden)this.hidden.add(newsId); else { this.hidden.delete(newsId); this.refreshedHidden.delete(newsId); } this.apply(); } }
+  confirmedVisibility(newsId: string, hidden: boolean): void {
+    const s: PinmonyBusinessSessionContext = this.ports.session();
+    if(!this.eligible() || s.accountId !== this.account || s.generation !== this.generation || s.origin !== this.origin || this.page !== this.ports.page())return;
+    const index: number = this.rows.findIndex((row: NativeNews): boolean => row.newsId === newsId);
+    if(hidden === this.hidden.has(newsId))return;
+    this.visibilityRevision++;
+    if(hidden) {
+      if(index < 0)return;
+      if(!this.hiddenRows.has(newsId))this.hiddenRows.set(newsId,{row:this.rows[index],index:index});
+      this.hidden.add(newsId);
+    } else {
+      const retained: NativeNewsHiddenRow | undefined = this.hiddenRows.get(newsId);
+      if(index < 0 && retained)this.rows.splice(Math.min(retained.index,this.rows.length),0,retained.row);
+      this.hidden.delete(newsId);this.refreshedHidden.delete(newsId);this.hiddenRows.delete(newsId);
+    }
+    this.apply();
+  }
   confirmedUnsubscribe(newsId: string): void {const s: PinmonyBusinessSessionContext = this.ports.session();if(this.eligible() && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.page === this.ports.page() && this.rows.some((row: NativeNews): boolean => row.newsId === newsId)){const row: NativeNews | undefined = this.rows.find((item: NativeNews): boolean => item.newsId === newsId);if(row && /^\d{1,40}$/.test(row.notificationPinId)){this.muted.add(row.notificationPinId);this.apply();}}}
   menuItem(id: string): NativeNews | undefined {const s: PinmonyBusinessSessionContext = this.ports.session();return this.eligible() && this.account === s.accountId && this.generation === s.generation && this.origin === s.origin && this.page === this.ports.page() ? this.rows.map((row: NativeNews): NativeNews => { const next: NativeNews = JSON.parse(JSON.stringify(row)) as NativeNews; next.notificationMuted = row.notificationMuted === true || this.muted.has(row.notificationPinId); return next; }).find((row: NativeNews): boolean => row.moreId === id && !this.hidden.has(row.newsId)) : undefined;}
   installScript(): string {
@@ -99,6 +118,7 @@ export class PinmonyInboxUpdatesNativeReads {
     return { id:id, newsId:row.id, notificationPinId: object?.type === 'pin' && /^\d+$/.test(object.id || '') ? object.id || '' : '', notificationMuted: object?.type === 'pin' && object.subscribed_to_notifications === false, title:title, subtitle:this.label(row.content_text || row.sub_header_text,row.text_mapping), imageUrl:image, updatedAt:this.clean(row.last_updated_at), unread:typeof row.unread === 'boolean' ? row.unread : undefined, enabled:false, moreId:'news-menu:' + id };
   }
   private async read(append: boolean, quiet: boolean = false): Promise<void> {
+    const visibilityRevision: number = this.visibilityRevision;
     const revision: number = this.revision; const previous: string = append ? this.cursor : ''; const live = (): boolean => revision === this.revision && this.owned();
     const id: string = 'native_inbox_updates_' + (++this.sequence).toString(); this.requestId = id; this.busy = true; this.polling = quiet; if (!quiet) { this.error = ''; this.moreError = ''; this.apply(); }
     const options: NewsOptions = { url:'/v3/news_hub/feed/',data:{field_set_key:'unauthed'},redux_normalize_feed:true,field_sets:INBOX_UPDATE_FIELDS.slice() }; if(append)options.bookmarks = [previous];
@@ -106,7 +126,7 @@ export class PinmonyInboxUpdatesNativeReads {
     const job: PinmonyNetworkJob = {id:id,epoch:this.generation,page:this.page,url:this.origin+'/resource/ApiResource/get/?source_url='+encodeURIComponent('/inbox/')+'&data='+encodeURIComponent(JSON.stringify(envelope)),method:'GET',body:'',headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':'www/index.js'}};
     try {
       const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessInboxUpdatesRead(job,(): PinmonyBusinessSessionContext => this.ports.session(),live);
-      if(!live())return; if(reply.error || reply.status !== 200 || reply.body.length > 4000000)throw new Error('news-request');
+      if(!live() || visibilityRevision !== this.visibilityRevision)return; if(reply.error || reply.status !== 200 || reply.body.length > 4000000)throw new Error('news-request');
       const resource: NewsResource = (JSON.parse(reply.body) as NewsResponse).resource_response;
       if(resource?.status !== 'success' || resource.error || resource.code !== undefined && resource.code !== 0 || resource.endpoint_name && resource.endpoint_name !== 'v3_get_news_hub_feed' || !Array.isArray(resource.data) || resource.data.length > 500)throw new Error('news-response');
       const merged: NativeNews[] = append ? this.rows.slice() : []; resource.data.forEach((row: NewsRow): void => { const item: NativeNews = this.map(row); if(!merged.some((value: NativeNews): boolean => value.newsId === item.newsId))merged.push(item); });

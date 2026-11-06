@@ -2,10 +2,10 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
 function method(name){const start=source.indexOf('  private '+name+'(');assert(start>=0);return source.slice(start,source.indexOf('\n  private ',start+1));}
-const methods=['hubHeaderInset','hubChromeHeight','hubCollapseHeight','hubHeaderBackgroundOpacity','hubChromeVisibleHeight','hubContentInset','updateHubChrome','registerHubScroller','setHubChromeCollapsed'];
+const methods=['hubHeaderInset','hubChromeHeight','hubCollapseHeight','hubHeaderBackgroundOpacity','hubPaneChromeOffset','hubChromeVisibleHeight','hubContentInset','updateHubChrome','registerHubScroller','setHubChromeCollapsed'];
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.map(method).join('')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{ScrollState:{Scroll:1},Curve:{EaseOut:1}});
 let animations=0;
-const h=new Host();Object.assign(h,{modern:()=>true,hubPane:true,interactionReady:true,refreshing:false,loading:false,sortVisible:false,hubTab:'boards',hubChromeOffset:0,hubChromeOffsetVp:0,hubChromeScrollDistance:0,statusBarHeightPx:24,getUIContext:()=>({px2vp:n=>n,animateTo:(opts,fn)=>{assert.equal(opts.duration,260);assert.equal(opts.curve,1);animations++;fn();}})});
+const h=new Host();Object.assign(h,{modern:()=>true,hubPane:true,interactionReady:true,refreshing:false,loading:false,sortVisible:false,hubTab:'boards',hubChromeOffset:0,hubPagerPosition:-1,hubPaneChromeOffsets:new Map(),hubChromeOffsetVp:0,hubChromeScrollDistance:0,statusBarHeightPx:24,getUIContext:()=>({px2vp:n=>n,animateTo:(opts,fn)=>{assert.equal(opts.duration,260);assert.equal(opts.curve,1);animations++;fn();}})});
 h.updateHubChrome(6,1,100);assert.equal(h.hubChromeOffset,0);
 h.updateHubChrome(4,1,104);assert.equal(h.hubChromeOffset,112,'10vp triggers full eased collapse');
 const count=animations;h.updateHubChrome(20,1,124);assert.equal(animations,count,'same target does not restart animation');

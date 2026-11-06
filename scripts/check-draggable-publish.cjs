@@ -35,7 +35,7 @@ console.log('Publish drag: default position, bounds, free placement, resize, dis
 const binding=src.split('\n').find(line=>line.includes('.bindMenu(')).trim();
 let menuArguments;const menu={bindMenu:(...args)=>{menuArguments=args;}};
 const render=vm.runInNewContext(ts.transpileModule('function render(){menu'+binding+';} render;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{menu,$r:key=>key,PinmonyRuntimeLog:{info(){}},Color:{Transparent:0},BlurStyle:{COMPONENT_ULTRA_THICK:1}});
-const menuState={menuOpen:true,menuItems:[{value:'Photo',action:()=>{}}]};render.call(menuState);assert.equal(menuArguments[0],true);assert.equal(menuArguments[1].length,1);menuArguments[2].onAppear();menuArguments[2].onDisappear();assert.equal(menuState.menuOpen,false);menuState.menuOpen=true;render.call(menuState);assert.equal(menuArguments[0],true);
+const menuState=new Host();Object.assign(menuState,{mounted:true,menuEnabled:true,actionEnabled:true,menuOpen:true,menuItems:[{value:'Photo',action:()=>{}}]});render.call(menuState);assert.equal(menuArguments[0],true);assert.equal(menuArguments[1].length,1);menuArguments[2].onAppear();menuArguments[2].onDisappear();assert.equal(menuState.menuOpen,false);menuState.menuOpen=true;render.call(menuState);assert.equal(menuArguments[0],true);
 console.log('Publish menu: render expression has no runtime ReferenceError, dismiss resets state and reopen works');
 
 const page=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyPublishPage.ets','utf8');
@@ -45,3 +45,32 @@ const selected=[],sourceHost=new Source();sourceHost.uiText=key=>key;sourceHost.
 let click;const clickStart=src.indexOf('.onClick(() => {'),clickEnd=src.indexOf('.bindMenu(',clickStart);
 const install=vm.runInNewContext(ts.transpileModule('function install(){button'+src.slice(clickStart,clickEnd)+';} install;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{button:{onClick:handler=>{click=handler;}},Date,PinmonyRuntimeLog:{info(){}}});
 const clickable={actionEnabled:true,dragging:false,suppressClickUntil:0,menuEnabled:true,menuOpen:false,menuItems:items};install.call(clickable);click();assert.equal(clickable.menuOpen,true);console.log('Photo sources: click requests menu and both native menu actions dispatch to the original photo/website flows');
+
+// A native menu can remain mounted while the destination below it changes.
+// Selecting a source must lower the binding before dispatching navigation.
+const sequence=[];
+const sourceMenu=new Host();
+Object.assign(sourceMenu,{mounted:true,menuEnabled:true,actionEnabled:true,menuOpen:true,menuItems:[
+  {value:'Files',action:()=>sequence.push('files')},
+  {value:'Website',action:()=>{sequence.push('website');sourceMenu.menuEnabled=false;sourceMenu.syncMenuAvailability();}}
+]});
+render.call(sourceMenu);
+const websiteItem=menuArguments[1][1],closed=menuArguments[2].onDisappear;
+websiteItem.action();assert.equal(sourceMenu.menuOpen,false);assert.equal(sequence.length,0,'navigation waits for native menu disappearance');
+websiteItem.action();assert.equal(sequence.length,0,'duplicate selection does not dispatch');
+render.call(sourceMenu);assert.equal(menuArguments[0],false,'a rebuild during closing cannot request the menu again');
+closed();assert.deepEqual(sequence,['website']);closed();assert.deepEqual(sequence,['website'],'late duplicate close cannot navigate twice');
+render.call(sourceMenu);assert.equal(menuArguments[0],false,'covered draft source cannot reopen the menu');
+sourceMenu.menuEnabled=true;sourceMenu.actionEnabled=true;sourceMenu.menuOpen=true;
+render.call(sourceMenu);assert.equal(menuArguments[0],true,'returning to drafts allows an intentional reopen');
+menuArguments[2].onDisappear();assert.deepEqual(sequence,['website'],'outside dismissal never invokes a source action');
+for(const cancel of [host=>{host.menuEnabled=false;host.syncMenuAvailability();},host=>{host.actionEnabled=false;host.syncMenuAvailability();},host=>host.aboutToDisappear()]){
+  Object.assign(sourceMenu,{mounted:true,menuEnabled:true,actionEnabled:true,menuOpen:true});
+  sourceMenu.boundMenuItems()[0].action();cancel(sourceMenu);sourceMenu.finishMenuClose();
+  assert.deepEqual(sequence,['website'],'hidden, disabled or removed source cancels its pending selection');
+}
+Object.assign(sourceMenu,{mounted:true,menuEnabled:true,actionEnabled:true,menuOpen:true});
+sourceMenu.selectMenuItem({value:'disabled',enabled:false,action:()=>sequence.push('disabled')});
+assert.equal(sourceMenu.menuOpen,true);sourceMenu.finishMenuClose();assert.deepEqual(sequence,['website']);
+assert(page.includes('menuEnabled:!this.websiteRouteOpen && !this.websiteClosing'));
+console.log('Publish menu handoff: close before navigation, no reappearance on rebuild, single dispatch, covered-page gate, lifecycle cancellation and intentional reopen passed');

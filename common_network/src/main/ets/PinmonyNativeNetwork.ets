@@ -140,6 +140,7 @@ interface PinmonyResourceDiagnostic {
 }
 interface ProfileAvatarUploadResponse { success?: boolean; image_upload_tracking_id?: string; }
 interface PhotoSearchRegion { x: number; y: number; w: number; h: number; }
+interface PhotoHistoryCreateReply { success: boolean; status: string; code: number; endpoint_name: string; data: Object; }
 interface PhotoHistoryOptions { url: string; data: Record<string, string>; bookmarks?: string[]; }
 interface PhotoHistoryEnvelope { options: PhotoHistoryOptions; context: Record<string, string>; }
 interface PhotoHistoryDeleteData { lens_history_ids: string[]; }
@@ -807,11 +808,11 @@ export class PinmonyNativeNetwork {
       if(job.url === captured.origin + '/_/graphql/') {
         const q: PinmonyGraphQuery = JSON.parse(job.body) as PinmonyGraphQuery,v: Record<string,Object> = q.variables as Record<string,Object>;
         const graph: boolean = basic && job.headers['X-Pinterest-Source-Url'] === path && job.method === 'POST' && job.headers['Content-Type'] === 'application/json' && Object.keys(q).length === 2 && !!v && !Array.isArray(v) && Object.keys(v).length === 1;
-        if(q.queryHash === '369b31865237e1a2f57f1879be69a6c01ee4d6d2806cc4c624d73baea9546b08')permitted = graph && digits(userId) && v['userId'] === userId;
-        if(q.queryHash === 'aac6989e67cb8913e620879f06b197c7edee2e17bbf17bc73228a7a3ff560bfd')permitted = basic &&
+        if(['369b31865237e1a2f57f1879be69a6c01ee4d6d2806cc4c624d73baea9546b08','3480bae441bb3f3e6109f1731c42df4ca90e4f8ed5a1272573cf6f52607bb772'].includes(q.queryHash))permitted = graph && digits(userId) && v['userId'] === userId;
+        if(['aac6989e67cb8913e620879f06b197c7edee2e17bbf17bc73228a7a3ff560bfd','077b1f0647c0a60d022d8dd228b21a5081440f703589da0cab5f497e2447665f'].includes(q.queryHash))permitted = basic &&
           job.headers['X-Pinterest-Source-Url'] === path && job.method === 'POST' && job.headers['Content-Type'] === 'application/json' &&
           Object.keys(q).length === 2 && !!v && !Array.isArray(v) && Object.keys(v).length === 3 && digits(userId) &&
-          v['id'] === profileRelayUser(userId) && v['count'] === 10 && typeof v['cursor'] === 'string' &&
+          (q.queryHash === '077b1f0647c0a60d022d8dd228b21a5081440f703589da0cab5f497e2447665f' ? v['userId'] === userId && (v['count'] === 10 || v['count'] === 50) : v['id'] === profileRelayUser(userId) && v['count'] === 10) && typeof v['cursor'] === 'string' &&
           (v['cursor'] as string).length > 0 && (v['cursor'] as string).length <= 8192;
         else if(['5e6f83666a4e4fbd33b6c78f26f80166c097f4164e666b6e408b4bb62cb8c1e5','84f6cda9933f7aa2786ff803f5c7a7bc31af0392a37434f830fd7e2602c994c0'].includes(q.queryHash))permitted = graph && digits(viewer) && digits(v['followee']) && v['followee'] !== viewer && allowed.includes('follow:' + v['followee']);
         else if(q.queryHash === '7f7aa5597fc53cb10b582e1d45cac2e61336be40dde57f95a9f022fb83806e81') {
@@ -828,7 +829,7 @@ export class PinmonyNativeNetwork {
         const envelope: boolean = basic && (jsonBody || !!f) && job.headers['X-Pinterest-Source-Url'] === source && Object.keys(e).length === 2 && !!e.context && typeof e.context === 'object' && !Array.isArray(e.context) && !Object.keys(e.context).length && !!o && !Array.isArray(o) && (get ? job.body === '' : job.method === 'POST' && (jsonBody || job.headers['Content-Type'] === 'application/x-www-form-urlencoded'));
         const own: boolean = permissions.includes('own') && userId === viewer && digits(viewer);
         if(envelope && resource === '/resource/UserResource/get/')permitted = get && source === path && keys.length === 2 && o['username'] === username && o['field_set_key'] === 'profile';
-        else if(envelope && resource === '/resource/UserFollowingResource/get/')permitted = get && source === path && keys.length === 4 && o['username'] === username && o['page_size'] === 50 && o['exclude_not_explictly_followed'] === true && o['explicit_following'] === true;
+        else if(envelope && resource === '/resource/UserFollowingResource/get/')permitted = get && source === path && (keys.length === 3 || keys.length === 4 && Array.isArray(o['bookmarks']) && (o['bookmarks'] as string[]).length === 1 && typeof (o['bookmarks'] as string[])[0] === 'string' && !!(o['bookmarks'] as string[])[0] && (o['bookmarks'] as string[])[0] !== '-end-' && (o['bookmarks'] as string[])[0].length <= 4096) && keys.every((key: string): boolean => ['username','page_size','explicit_following','bookmarks'].includes(key)) && o['username'] === username && o['page_size'] === 50 && o['explicit_following'] === true;
         else if(envelope && resource === '/resource/UserSettingsResource/get/')permitted = get && own && !keys.length && ['/settings/account-settings/','/settings/profile-visibility/'].includes(source);
         else if(envelope && resource === '/resource/CountriesResource/get/')permitted = get && own && !keys.length && source === '/settings/edit/country-region/';
         else if(envelope && own && ['/resource/BoardResource/get/','/resource/BoardResource/update/'].includes(resource)) {
@@ -874,6 +875,13 @@ export class PinmonyNativeNetwork {
           if(get && own && source === path + '_saved/' && keys.length === 2 && url === '/v3/users/me/boards/soft_deleted/' && data && Object.keys(data).length === 1) {
             const fields: string[] = data['fields'] as string[];
             permitted = Array.isArray(fields) && fields.join(',') === 'board.image_cover_url,board.id,board.name,board.pin_count,board.section_count,board.url';
+          }
+          if (!get && source === path && keys.length === 3 && data && !Array.isArray(data) &&
+            url === '/v3/users/' + username + '/boards/following/' && data['explicit_following'] === true &&
+            data['page_size'] === 12 && Object.keys(data).length === 3 &&
+            JSON.stringify(data['fields']) === JSON.stringify(['board.id','board.name','board.image_cover_url','board.followed_by_me','board.type','board.images[236x]','board.image_cover_hd_url','board.pin_count','board.board_order_modified_at','board.url','board.owner()','user.username'])) {
+            const bookmarks: string[] = o['bookmarks'] as string[];
+            permitted = Array.isArray(bookmarks) && bookmarks.length === 1 && typeof bookmarks[0] === 'string' && !!bookmarks[0] && bookmarks[0].length <= 4096;
           }
           if(keys.length === 2 && data && !Array.isArray(data)) {
             if(get && !Object.keys(data).length)permitted = (url === '/v3/users/settings/' && own && [path,'/settings/permissions/','/settings/edit/birthdate/','/settings/messages/','/settings/edit/mentions/'].includes(source)) || own && url === '/v3/users/settings/gen_ai/' && source === '/edit/gen-ai-interests/';
@@ -1116,11 +1124,12 @@ export class PinmonyNativeNetwork {
         job.headers['Accept'] === 'application/json' && job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['X-Pinterest-AppState'] === 'active';
       if (job.url === captured.origin + '/_/graphql/') {
         const q: PinmonyGraphQuery = JSON.parse(job.body) as PinmonyGraphQuery, v: Record<string,Object> = q.variables as Record<string,Object>;
-        permitted = basic && job.id.startsWith('native_detail_aux_graph_') && job.method === 'POST' && job.headers['Content-Type'] === 'application/json' &&
+        const contentRead: boolean = job.id.startsWith('native_detail_aux_content_') && q.queryHash === 'b39ed2f55c3ee5de2035ca16b0c943f09ad5737d6ea4cc6d20f6131a2f9589e8' && !!v && !Array.isArray(v) && Object.keys(v).length === 5;
+        const mediaRead: boolean = job.id.startsWith('native_detail_aux_graph_') && q.queryHash === 'c025ad33faccf5d04c2ed38344405d0a6c46dd1d786c17f3954b6980ef798538' && !!v && !Array.isArray(v) && Object.keys(v).length === 7 && v['shouldPrefetchStoryPinFragment'] === false && v['shouldSkipImageViewerOnPageQuery'] === true;
+        permitted = basic && (contentRead || mediaRead) && job.method === 'POST' && job.headers['Content-Type'] === 'application/json' &&
           job.headers['X-Pinterest-Pws-Handler'] === 'www/pin/[id].js' && job.headers['X-Pinterest-Source-Url'] === path &&
-          Object.keys(q).length === 2 && q.queryHash === 'c025ad33faccf5d04c2ed38344405d0a6c46dd1d786c17f3954b6980ef798538' &&
-          !!v && !Array.isArray(v) && Object.keys(v).length === 7 && v['pinId'] === id && v['isAuth'] === true && v['isDesktop'] === false &&
-          v['isAuthDesktop'] === false && v['isUnauth'] === false && v['shouldPrefetchStoryPinFragment'] === false && v['shouldSkipImageViewerOnPageQuery'] === true;
+          Object.keys(q).length === 2 && v['pinId'] === id && v['isAuth'] === true && v['isDesktop'] === false &&
+          v['isAuthDesktop'] === false && v['isUnauth'] === false;
       } else {
         const form: RegExpMatchArray | null = job.url.slice(job.url.indexOf('?') + 1).match(/^source_url=([^&]+)&data=([^&]+)&_=\d+$/);
         const e: NativeSearchEnvelope = JSON.parse(decodeURIComponent(form ? form[2].replace(/\+/g,' ') : '')) as NativeSearchEnvelope;
@@ -1239,6 +1248,14 @@ export class PinmonyNativeNetwork {
           }else if(job.url === captured.origin + '/resource/ApiResource/create/') {
             const data: Record<string,Object> = o['data'] as Record<string,Object>;
             permitted = pinSource && keys.length === 2 && o['url'] === '/v3/pins/' + id + '/react/' && !!data && !Array.isArray(data) && Object.keys(data).length === 2 && data['reaction_type'] === 1 && typeof data['client_tracking_params'] === 'string' && !!data['client_tracking_params'] && text(data['client_tracking_params'],16384);
+            if(o['url'] === '/v3/pins/bulk/move/') {
+              const section: boolean = data?.['section_id'] !== undefined;
+              const movable: string = copyOwned && /^\d{1,30}$/.test(copyId) && copyId !== id ? copyId : ownsPin ? id : '';
+              permitted = pinSource && keys.length === 2 && !!movable && !!data && !Array.isArray(data) && Object.keys(data).length === (section ? 3 : 2) &&
+                typeof data['board_id'] === 'string' && /^\d{1,30}$/.test(data['board_id'] as string) && writableBoards.includes(data['board_id'] as string) &&
+                Array.isArray(data['pin_ids']) && (data['pin_ids'] as Object[]).length === 1 && (data['pin_ids'] as Object[])[0] === movable &&
+                (!section || typeof data['section_id'] === 'string' && /^\d{1,30}$/.test(data['section_id'] as string) && writableBoards.includes('section:' + data['board_id'] + ':' + data['section_id']));
+            }
           }else if(job.url === captured.origin + '/resource/PinResource/update/') {
             const disclosures: number[] = o['ai_disclosures'] as number[];
             permitted = pinSource && ownsPin && o['id'] === id && typeof o['board_id'] === 'string' && writableBoards.includes(o['board_id'] as string) &&
@@ -1406,14 +1423,15 @@ export class PinmonyNativeNetwork {
         !!form && Object.keys(envelope).length === 2 && !!envelope.context && typeof envelope.context === 'object' && !Array.isArray(envelope.context) && Object.keys(envelope.context).length === 0 &&
         !!o && typeof o === 'object' && !Array.isArray(o);
       const section: boolean = recommendationPath.startsWith(path) && /^\/[^/?#]+\/[^/?#]+\/[^/?#]+\/_tools\/more-ideas\/\?ideas_referrer=24$/.test(recommendationPath);
-      const recommendation: boolean = section ? source === recommendationPath && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug]/[section_slug]/_tools/more-ideas.js' : !recommendationPath && source === path + '_tools/more-ideas/?ideas_referrer=23' && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug]/_tools/more-ideas.js';
+      const createdBoardIdeas: boolean = recommendationPath === path && source === path && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug].js';
+      const recommendation: boolean = createdBoardIdeas || (section ? source === recommendationPath && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug]/[section_slug]/_tools/more-ideas.js' : !recommendationPath && source === path + '_tools/more-ideas/?ideas_referrer=23' && job.headers['X-Pinterest-Pws-Handler'] === 'www/[username]/[slug]/_tools/more-ideas.js');
       if(job.url === captured.origin + '/resource/PinResource/delete/') {
         permitted = basic && recommendation && keys.length === 2 && typeof o['id'] === 'string' && /^\d{1,30}$/.test(o['id'] as string) && savedCopies.includes(o['id'] as string) && typeof o['client_tracking_params'] === 'string' && (o['client_tracking_params'] as string).length <= 16384;
       }else if(job.url === captured.origin + '/resource/RepinResource/create/') {
         const product: boolean = parts[1] === '_products_you_tagged';
         const event: Record<string,Object> | undefined = o['eventContext'] as Record<string,Object> | undefined;
         permitted = basic && recommendation &&
-          (product ? !recommendationPath && keys.length === 12 && keys.every((key: string): boolean => ['pin_id','board_id','clientTrackingParams','description','title','link','image_base64','image_url','media_upload_id','is_buyable_pin','is_removable','eventContext'].includes(key)) &&
+          (product || createdBoardIdeas ? (createdBoardIdeas || !recommendationPath) && keys.length === 12 && keys.every((key: string): boolean => ['pin_id','board_id','clientTrackingParams','description','title','link','image_base64','image_url','media_upload_id','is_buyable_pin','is_removable','eventContext'].includes(key)) &&
             typeof o['title'] === 'string' && (o['title'] as string).length <= 1000 && typeof o['description'] === 'string' && (o['description'] as string).length <= 10000 && typeof o['link'] === 'string' && (o['link'] as string).length <= 8192 &&
             typeof o['clientTrackingParams'] === 'string' && (o['clientTrackingParams'] as string).length <= 16384 && o['image_base64'] === '' && o['image_url'] === '' && o['media_upload_id'] === '' && o['is_buyable_pin'] === false && o['is_removable'] === false &&
             !!event && !Array.isArray(event) && Object.keys(event).length === 3 && event['viewType'] === 5 && event['viewParameter'] === 3173 && event['element'] === 10599 &&
@@ -1523,7 +1541,7 @@ export class PinmonyNativeNetwork {
     return this.request(job,(): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});
   }
   async requestBusinessBoardAuxRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
-    boardId: string, username: string, viewerId: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    boardId: string, username: string, viewerId: string, ownerCurrent: () => boolean, createdBoardIdeas: boolean = false): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session();let permitted: boolean = false;
     try {
       const encoded: RegExpMatchArray | null = job.url.match(/[?&]data=([^&]+)/), source: RegExpMatchArray | null = job.url.match(/[?&]source_url=([^&]+)/);
@@ -1538,7 +1556,7 @@ export class PinmonyNativeNetwork {
         (cursor === undefined || Array.isArray(cursor) && cursor.length === 1 && typeof cursor[0] === 'string' && cursor[0].length > 0 && cursor[0].length <= 4096);
       const sourcePath: string = source ? decodeURIComponent(source[1]) : '';
       if(job.url.startsWith(captured.origin + '/resource/BoardContentRecommendationResource/get/?')) {
-        permitted = basic && sourcePath === path + '_tools/more-ideas/?ideas_referrer=23' && handler === 'www/[username]/[slug]/_tools/more-ideas.js' && (keys.length === 3 || keys.length === 4 && keys.includes('bookmarks')) && o['id'] === boardId && o['type'] === 'board' && o['__track__referrer'] === (parts[1] === '_products_you_tagged' ? '23' : 23);
+        permitted = basic && (createdBoardIdeas ? sourcePath === path && handler === 'www/[username]/[slug].js' && o['__track__referrer'] === 21 : sourcePath === path + '_tools/more-ideas/?ideas_referrer=23' && handler === 'www/[username]/[slug]/_tools/more-ideas.js' && o['__track__referrer'] === (parts[1] === '_products_you_tagged' ? '23' : 23)) && (keys.length === 3 || keys.length === 4 && keys.includes('bookmarks')) && o['id'] === boardId && o['type'] === 'board';
       } else if(job.url.startsWith(captured.origin + '/resource/BoardsResource/get/?')) {
         permitted = basic && sourcePath === '/board/' + boardId + '/organize/repin/' && handler === 'www/board/[id]/organize.js' &&
           (keys.length === 9 || keys.length === 10 && keys.includes('bookmarks')) && keys.every((k: string): boolean => ['privacy_filter','sort','field_set_key','filter_stories','username','page_size','group_by','include_archived','filter_all_pins','bookmarks'].includes(k)) &&
@@ -1816,7 +1834,7 @@ export class PinmonyNativeNetwork {
           (o['text'] as string).length > 0 && (o['text'] as string).length <= 2000 && (o['text'] as string).trim() === o['text'] && Array.isArray(fields) && fields.length === 1 && fields[0] === 'default_with_reactions';
       }else if(job.url === captured.origin + '/resource/ConversationsResource/create/') {
         const ids: string[] = o['user_ids'] as string[], emails: string[] = o['emails'] as string[];
-        permitted = basic && !conversationId && keys.length === 2 && Array.isArray(emails) && emails.length === 0 && Array.isArray(ids) && ids.length > 0 && ids.length <= 1000 &&
+        permitted = basic && !conversationId && (keys.length === 2 && Array.isArray(emails) && emails.length === 0 || keys.length === 1 && emails === undefined && Array.isArray(ids) && ids.length === 1) && Array.isArray(ids) && ids.length > 0 && ids.length <= 1000 &&
           ids.length === selectedIds.length && ids.every((id: string,index: number): boolean => typeof id === 'string' && /^\d{1,40}$/.test(id) && id !== viewerId && ids.indexOf(id) === index && contacts.includes(id) && selectedIds[index] === id);
       }else if(job.url === captured.origin + '/resource/ApiResource/create/') {
         const url: RegExpMatchArray | null = typeof o['url'] === 'string' ? (o['url'] as string).match(/^\/v3\/conversations\/messages\/(\d{1,40})\/$/) : null;
@@ -2278,6 +2296,19 @@ export class PinmonyNativeNetwork {
 
   async searchUploadedPhoto(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
       owner: () => boolean, id: string, crop?: PhotoSearchRegion): Promise<string> {
+    return this.uploadPhoto(bytes, page, session, owner, id, crop);
+  }
+
+  async saveUploadedPhotoHistory(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
+      owner: () => boolean, id: string): Promise<void> {
+    const text: string = await this.uploadPhoto(bytes, page, session, owner, id, undefined, true);
+    const result: PhotoHistoryCreateReply = JSON.parse(text) as PhotoHistoryCreateReply;
+    if (result.success !== true || result.status !== 'success' || result.code !== 0 ||
+      result.endpoint_name !== 'v3_create_lens_history' || !result.data || Array.isArray(result.data) || typeof result.data !== 'object') throw new Error('history-save-unconfirmed');
+  }
+
+  private async uploadPhoto(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
+      owner: () => boolean, id: string, crop?: PhotoSearchRegion, history: boolean = false): Promise<string> {
     const region: PhotoSearchRegion = crop || { x: 0, y: 0, w: 1, h: 1 };
     if (![region.x, region.y, region.w, region.h].every((n: number): boolean => Number.isFinite(n)) ||
       region.x < 0 || region.y < 0 || region.w < 0.08 || region.h < 0.08 ||
@@ -2295,7 +2326,7 @@ export class PinmonyNativeNetwork {
       page !== origin + '/search/' || !/^native_photo_search_\d+$/.test(id) ||
       bytes.byteLength < 12 || bytes.byteLength > 4 * 1024 * 1024 || head[0] !== 255 || head[1] !== 216 ||
       this.pending.has(id) || this.pending.size >= 12 || NetworkManager.requestRemainingMs() > 0) throw new Error('photo-unavailable');
-    const url: string = origin + '/upload-lens-image/';
+    const url: string = origin + (history ? '/upload-lens-image-history/' : '/upload-lens-image/');
     this.pending.add(id); this.cancelled.delete(id);
     const live = (): boolean => current() && this.pending.has(id) && !this.cancelled.has(id);
     try {
@@ -2305,10 +2336,13 @@ export class PinmonyNativeNetwork {
       if (!csrf) throw new Error('missing-session');
       const fields: rcp.MultipartFormFields = {};
       fields['image'] = { contentOrPath: { content: bytes }, contentType: 'image/jpeg', remoteFileName: 'lens-file-image' };
+      if (history) fields['source_type'] = 'CAMERA_GALLERY';
+      else {
       fields['x'] = region.x.toString(); fields['y'] = region.y.toString();
       fields['w'] = region.w.toString(); fields['h'] = region.h.toString();
       fields['crop_source'] = '5'; fields['source_type'] = '1';
-      const request: rcp.Request = new rcp.Request(url, 'POST', {
+      }
+      const request: rcp.Request = new rcp.Request(url, history ? 'PUT' : 'POST', {
         'Cookie': cookie, 'Referer': page, 'Origin': origin, 'User-Agent': state.userAgent,
         'X-CSRFToken': decodeURIComponent(csrf[1]), 'X-Requested-With': 'XMLHttpRequest'
       }, new rcp.MultipartForm(fields), undefined, undefined,
@@ -2584,6 +2618,11 @@ export class PinmonyNativeNetwork {
         'x-pinterest-source-url', 'x-pinterest-appstate', 'x-app-version'];
       Object.keys(job.headers).forEach((key: string) => {
         const value: string = job.headers[key];
+        if (key.toLowerCase() === 'accept-language' && job.id.startsWith('native_translation_') &&
+            /\/resource\/ApiResource\/get\//.test(job.url) &&
+            /^(?:zh-CN,zh|zh-TW,zh|en-US,en|en-GB,en|ja-JP,ja|ko-KR,ko|ru-RU,ru|pt-BR,pt);q=0\.9$/.test(value)) {
+          headers['Accept-Language'] = value;
+        }
         if (allowed.includes(key.toLowerCase()) && typeof value === 'string' && value.length <= 4096 && !/[\r\n]/.test(value))
           headers[key] = value;
       });

@@ -23,6 +23,7 @@ export struct PinmonyInboxFlowPage {
   @Prop @Watch('snapshotChanged') snapshot: PinmonyInboxFlowSnapshot = {} as PinmonyInboxFlowSnapshot;
   onUser?: (url: string) => void;
   onAction?: (action: string, value: string) => void;
+  onCoveredBack?: () => boolean;
   onPin?: (url: string) => void;
   onBoard?: (messageId: string) => void;
   onCopyText?: (text: string) => Promise<boolean>;
@@ -377,6 +378,31 @@ export struct PinmonyInboxFlowPage {
   }
 
   @Builder
+  private messageSideActions(message: InboxFlowMessage) {
+    Column({ space: 8 }) {
+      if (!message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
+      if (!message.deleted && !message.board && !message.profile) {
+        Button({ type: ButtonType.Circle }) {
+          Row() {
+            SymbolGlyph($r('sys.symbol.face_smiling')).fontSize(20).fontColor([$r('app.color.primary_text')])
+            Text('+').fontSize(12).fontColor($r('app.color.primary_text'))
+          }
+        }.width(40).height(40).backgroundColor($r('app.color.page_background'))
+          .border({ width: 1, color: $r('app.color.surface_muted') })
+          .accessibilityText(this.uiText("pm_choose_a_message_reaction_caf4b514"))
+          .onClick(() => { this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id; })
+          .bindPopup(this.reactionMessageId === message.id, {
+            builder: this.reactionChoices, placement: Placement.Top, showInSubWindow: false,
+            onStateChange: (event: ReactionPopupState) => { if (!event.isVisible && this.reactionMessageId === message.id) this.reactionMessageId = ''; }
+          })
+        if (message.reactions?.length) {
+          Text(message.reactions.join(' ')).fontSize(18).fontColor($r('app.color.primary_text'))
+        }
+      }
+    }.padding({ top: !message.own && message.sender?.name ? (this.senderLabelHeights.get(this.messageLayoutKey(message)) || 16) + 8 : 0 })
+  }
+
+  @Builder
   private messageRow(message: InboxFlowMessage) {
     Column({ space: 12 }) {
       if (message.createdAt) {
@@ -384,7 +410,7 @@ export struct PinmonyInboxFlowPage {
           .fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
       }
       Row({ space: 8 }) {
-        if (message.own && !message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
+        if (message.own && !message.deleted && (!message.board && !message.profile || !!message.image && !!message.pinUrl)) { this.messageSideActions(message) }
         if (!message.own && message.sender) {
           Column() { this.avatar(message.sender, this.messageAvatarSize(message)) }
             .alignSelf(this.textAvatarOffset(message) >= 0 ? ItemAlign.Start : ItemAlign.End)
@@ -465,29 +491,10 @@ export struct PinmonyInboxFlowPage {
           } else if (message.pinUrl && !message.image) {
             Text(this.uiText("pm_pin_image_unavailable_3240b81a")).fontColor($r('app.color.secondary_text'))
           }
-          if (!message.deleted && !message.board && !message.profile) {
-            Button({ type: ButtonType.Normal }) {
-              Row() {
-                if (message.reactions?.length) {
-                  Text(message.reactions.join(' ')).fontSize(18).fontColor($r('app.color.primary_text'))
-                } else {
-                  SymbolGlyph($r('sys.symbol.face_smiling')).fontSize(20).fontColor([$r('app.color.primary_text')])
-                  Text('+').fontSize(12).fontColor($r('app.color.primary_text'))
-                }
-              }
-            }.constraintSize({ minWidth: 40 }).height(30).padding({ left: 6, right: 6 }).borderRadius(18)
-              .backgroundColor($r('app.color.surface_muted'))
-              .alignSelf(ItemAlign.End).margin({ top: -16, right: 4 }).zIndex(1)
-              .accessibilityText(this.uiText("pm_choose_a_message_reaction_caf4b514"))
-              .onClick(() => { this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id; })
-              .bindPopup(this.reactionMessageId === message.id, {
-                builder: this.reactionChoices, placement: Placement.Top, showInSubWindow: false,
-                onStateChange: (event: ReactionPopupState) => { if (!event.isVisible && this.reactionMessageId === message.id) this.reactionMessageId = ''; }
-              })
-          }
+
         }.constraintSize({ maxWidth: 260 }).alignItems(HorizontalAlign.Start)
           .parallelGesture(LongPressGesture().onAction(() => { if (!message.deleted) { this.selectedMessage = message; this.showMessageMenu = true; } }))
-        if (!message.own && !message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
+        if (!message.own && !message.deleted && (!message.board && !message.profile || !!message.image && !!message.pinUrl)) { this.messageSideActions(message) }
       }.width('100%').justifyContent(message.own ? FlexAlign.End : FlexAlign.Start)
         .padding({ left: 20, right: 20 })
     }.width('100%').padding({ top: 12, bottom: 12 })
@@ -691,6 +698,9 @@ export struct PinmonyInboxFlowPage {
       .backgroundColor($r('app.color.page_background'))
       .bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
-      .onBackPressed(() => { this.act('back'); return true; })
+      .onBackPressed(() => {
+        if (!this.active) { this.onCoveredBack?.(); return true; }
+        this.act('back'); return true;
+      })
   }
 }

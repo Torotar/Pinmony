@@ -74,6 +74,8 @@ export interface PinmonyBoardTarget {
 }
 
 export interface PinmonyBoardFlow {
+  createdBoardIdeas?: boolean;
+  createdBoardId?: string;
   cover?: PinmonyBoardCoverState;
   coverImage?: string;
   coverPreview?: PinmonyBoardCoverPreview;

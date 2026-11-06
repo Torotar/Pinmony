@@ -4,6 +4,8 @@ function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpi
 const logs=[],log={PinmonyRuntimeLog:{info:s=>logs.push(s)}};
 const Native=load('entry/src/main/ets/app/PinmonyPostNativeOperations.ets',n=>n==='feature_profile'?{PIN_PROFILE_ORGANIZE_ENABLED:true}:n==='feature_pin'?{PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_EDIT_API_ENABLED:true}:n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?log:{}).PinmonyPostNativeOperations;
 const Confirmed=load('feature_pin/src/main/ets/services/PinmonyConfirmedSaves.ets').PinmonyConfirmedSaves;
+const prefetchExports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailPrefetch.ets','utf8')+'\nexport { detailResource };',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:prefetchExports,require:withLocalMessages(()=>log)});
+const selectPrefetched=prefetchExports.detailResource;
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',pin=origin+'/pin/11/';
 const raw={id:'11',pinner:{id:'99'},is_repin:true,title:'Old',description:'Old description',tracking_params:'synthetic',reaction_data:{reaction_by_me:0},board:{id:'90'},images:{'736x':{url:'https://i.pinimg.com/synthetic.jpg'}}};
@@ -20,8 +22,43 @@ const ops=new Native({store:()=>store,session:()=>session,network:()=>({cancel:i
 return {ops,store,requests,cancelled,messages,commits,session:()=>session,setSession:s=>session=s,setVisible:v=>visible=v,setOwned:v=>ownedHere=v,setScope:v=>scope=v,sheet:()=>sheet,dismissed:()=>dismissed};}
 async function openSave(f,base=raw){const start=f.requests.length,p=f.ops.openSave(pin);f.requests[start].resolve(resource(base));await flush();f.requests[start+1].resolve(resource(boards));await flush();assert.equal(f.store.saveResult.items.length,3,'observable picker includes current boards and profile');f.requests[start+2].resolve(JSON.stringify({data:{v3GetPinQueryv2:{data:{id:Buffer.from('Pin:11').toString('base64'),boardTitleSuggestions:[{title:'Suggested'}]}}}}));await p;assert.deepEqual(Array.from(f.store.saveResult.suggestions),['Suggested']);}
 async function openEdit(f,base=owned,g=graph){const start=f.requests.length,p=f.ops.openEdit(pin);f.requests[start].resolve(resource(base));await flush();if(f.requests.length>start+1)f.requests[start+1].resolve(JSON.stringify(g));await p;}
+async function savedMoveChecks(){
+ for(const mapped of [false,true]){
+  const f=fixture(),copyId=mapped?'77':'11',source={...savedCopy(copyId),board:{id:'100',name:'Target'}};
+  if(mapped){await openSave(f);const saving=f.ops.saveAction('boardsSave',',"100"');f.requests[3].resolve(resource(source,'v3_repin_handler'));await saving;await openSave(f);}else await openSave(f,source);
+  f.store.saveResult.items.push({id:'300',name:'Destination',enabled:true,secret:false});
+  let at=f.requests.length;const moving=f.ops.saveAction('boardsSave',',"300"');
+  if(mapped){assert.equal(JSON.parse(new URL(f.requests[at].job.url).searchParams.get('data')).options.id,copyId);f.requests[at++].resolve(resource(source));await flush();}
+  const move=f.requests[at++];assert(move.job.url.endsWith('/ApiResource/create/'));const options=JSON.parse(new URLSearchParams(move.job.body).get('data')).options;
+  assert.deepEqual(options,{url:'/v3/pins/bulk/move/',data:{board_id:'300',pin_ids:[copyId]}},'move preserves the existing saved Pin identity');
+  const net=new Network();net.request=async(job,current)=>({error:acceptsNetworkJob(job,current())?'':'reject'});
+  const send=job=>net.requestBusinessPost(job,()=>f.session(),...move.args.slice(1,-1),()=>true);
+  assert.equal((await send(move.job)).error,'');
+  for(const change of [o=>o.data.pin_ids=['999'],o=>o.data.pin_ids=[copyId,'999'],o=>o.data.board_id='999',o=>o.data.section_id='5']){const q=new URLSearchParams(move.job.body),e=JSON.parse(q.get('data'));change(e.options);q.set('data',JSON.stringify(e));assert.equal((await send({...move.job,body:q.toString()})).error,'reject');}
+  move.resolve(resource(null,'v3_move_pins'));await flush();assert.equal(JSON.parse(new URL(f.requests[at].job.url).searchParams.get('data')).options.id,copyId);
+  f.requests[at].resolve(resource({...source,board:{id:'300',name:'Destination'}}));await moving;
+  assert.equal(f.store.saveResult.savedId,copyId);assert.equal(f.store.saveResult.savedBoard,'Destination');assert.equal(f.store.detail.actions.find(a=>a.kind==='save').label,'Destination');assert(f.commits.some(c=>c[0]==='move-save'));
+  assert.equal(f.requests.filter(r=>r.job.url.endsWith('/RepinResource/create/')).length,mapped?1:0,'moving never creates another saved copy');
+ }
+ const same=fixture();await openSave(same,{...savedCopy('11'),board:{id:'100',name:'Target'}});const count=same.requests.length;await same.ops.saveAction('boardsSave',',"100"');assert.equal(same.requests.length,count,'choosing the current board performs no write');
+ const bad=fixture();await openSave(bad,{...savedCopy('11'),board:{id:'100',name:'Target'}});bad.store.saveResult.items.push({id:'300',name:'Destination',enabled:true});const work=bad.ops.saveAction('boardsSave',',"300"');bad.requests[3].resolve(resource(null,'v3_move_pins'));await flush();bad.requests[4].resolve(resource({...savedCopy('11'),board:{id:'100'}}));await work;assert(bad.store.saveResult.uncertain);assert.equal(bad.store.saveResult.savedBoard,'Target');await bad.ops.saveAction('boardsSave',',"300"');assert.equal(bad.requests.length,5,'unconfirmed move is never replayed');
+}
 async function main(){
 await sectionSaveChecks();
+await savedMoveChecks();
+const existingCopy={...savedCopy('11'),board:{id:'100',name:'Existing board'}};
+const selected=selectPrefetched(resource({...existingCopy,type:'pin'}),pin),selectedBody=JSON.parse(selected);
+assert.equal(selectedBody.client_context,undefined,'prefetch never retains the viewer context');assert.equal(selectedBody.resource_response.data.is_repin,undefined,'raw ownership evidence is not retained');assert.deepEqual(selectedBody.pinmony_saved_board,{id:'100',name:'Existing board'});
+const opening=fixture();opening.store.detailPin='';opening.store.detailOpeningPin=pin;opening.store.detailNativeReadsReady=false;opening.setOwned(false);opening.ops.observePrefetched(pin,selected);assert.equal(opening.store.detail.actions.find(a=>a.kind==='save').label,'Existing board','first detail frame consumes normalized saved evidence before mutation gates are ready');assert.equal(opening.requests.length,0,'initial label does not require opening the save picker');assert(!opening.ops.ready(),'read-only state never grants mutation permission');
+const otherOpening=fixture();otherOpening.store.detailPin='';otherOpening.store.detailOpeningPin=origin+'/pin/22/';otherOpening.ops.observePrefetched(pin,selected);assert(!otherOpening.store.confirmedSaves.isSaved('11'));
+const removedOpening=fixture();removedOpening.store.detailPin=pin;removedOpening.store.confirmedSaves.confirm('11',false);removedOpening.ops.observePrefetched(pin,selected);assert(!removedOpening.store.confirmedSaves.isSaved('11'),'normalized cached evidence does not reverse confirmed unsave');
+for(const data of [{...existingCopy,pinner:{id:'99'}},{...existingCopy,is_repin:false}])assert.equal(JSON.parse(selectPrefetched(resource({...data,type:'pin'}),pin)).pinmony_saved_board,undefined);
+const observed=fixture();observed.ops.observe(pin,resource(existingCopy));assert.equal(observed.requests.length,0,'saved-copy observation reuses the detail read');assert.equal(observed.store.detail.actions.find(a=>a.kind==='save').label,'Existing board');
+const existing=fixture();await openSave(existing,existingCopy);assert.equal(existing.store.saveResult.savedId,'11');assert.equal(existing.store.saveResult.savedBoard,'Existing board');
+const undoExisting=existing.ops.saveAction('boardsRemove');assert.equal(existing.requests.length,4,'existing own copy uses the established deletion path');assert.equal(JSON.parse(new URLSearchParams(existing.requests[3].job.body).get('data')).options.id,'11');existing.requests[3].resolve(resource(null,'v3_delete_pin_handler'));await undoExisting;assert.equal(existing.store.saveResult.savedId,'');assert(!existing.store.confirmedSaves.isSaved('11'));
+const unnamed=fixture();await openSave(unnamed,{...existingCopy,board:{id:'100'}});assert.equal(unnamed.store.saveResult.savedBoard,'Target','picker metadata supplies a missing board title');
+for(const bad of [{...existingCopy,pinner:{id:'99'}},{...existingCopy,is_repin:false},{...existingCopy,board:{id:'bad',name:'Invalid'}}]){const rejected=fixture();rejected.ops.observe(pin,resource(bad));assert(!rejected.store.confirmedSaves.isSaved('11'));await openSave(rejected,bad);assert.equal(rejected.store.saveResult.savedId,'','foreign or original Pins never expose saved-copy undo');}
+const cancelled=fixture();cancelled.store.confirmedSaves.confirm('11',false);cancelled.ops.observe(pin,resource(existingCopy));await openSave(cancelled,existingCopy);assert(!cancelled.store.confirmedSaves.isSaved('11'),'an old read cannot restore a cancelled save');assert.equal(cancelled.store.saveResult.savedId,'');
 const f=fixture();await openSave(f);let p=f.ops.saveAction('boardsSave',',"100"');const save=f.requests[3];assert.equal(f.store.saveResult.busy,true);await f.ops.saveAction('boardsSave',',"100"');f.ops.dismiss('save');assert.equal(f.sheet(),'save');assert.equal(f.requests.length,4);assert.deepEqual(JSON.parse(new URLSearchParams(save.job.body).get('data')).options,{pin_id:'11',user_id:'42',board_id:'100',clientTrackingParams:'synthetic'});save.resolve(resource(savedCopy(),'v3_repin_handler'));await p;assert.equal(f.sheet(),'');assert(f.store.confirmedSaves.isSaved('11'));assert.equal(f.dismissed(),1);assert(f.store.detail.actions.find(a=>a.kind==='save').selected);
 p=f.ops.cancelSave(pin);f.requests[4].resolve(resource(raw));await flush();assert.equal(JSON.parse(new URLSearchParams(new URL(f.requests[5].job.url).search).get('data')).options.id,'77');f.requests[5].resolve(resource(savedCopy()));await flush();const copyDelete=f.requests[6];copyDelete.resolve(resource(null,'v3_delete_pin_handler'));await p;assert(!f.store.confirmedSaves.isSaved('11'));assert(f.messages.includes('已取消本次收藏'));
 const like=fixture();p=like.ops.like(pin);like.requests[0].resolve(resource(raw));await flush();const react=like.requests[1];assert.equal(JSON.parse(new URLSearchParams(react.job.body).get('data')).options.url,'/v3/pins/11/react/');react.resolve(resource({id:'11'}));await p;assert(like.store.detail.actions[0].selected);assert.equal(like.store.detail.actions[0].enabled,false);p=like.ops.like(pin);like.requests[2].resolve(resource({...raw,reaction_data:{reaction_by_me:1}}));await p;assert.equal(like.requests.length,3,'already liked never unlikes or repeats POST');like.store.detail.actions[0].selected=false;like.ops.apply();assert(like.store.detail.actions[0].selected);
@@ -44,6 +81,16 @@ const rootUndo=fixture();await openSave(rootUndo);p=rootUndo.ops.saveAction('boa
 await policy([f.requests[0],f.requests[1],f.requests[2],save,react,update,deleteJob,copyDelete,createBoard,quick.requests[3]]);await wiring();assert(!logs.some(s=>s.includes('synthetic')||s.includes('/pin/11')));
 console.log('Native post operations passed: picker/GraphQL reads, save/quick-save/create/copy cancellation, like, owned edit/delete, strict policy, observable state, stale/cancel/unknown isolation and zero Web submit.');}
 async function sectionSaveChecks(){
+  const zero=fixture();await openSave(zero);
+  const input={id:'100',name:'Target',access:['write']};
+  assert.equal(zero.ops.board(input).hasSections,undefined,'missing count must remain unknown');
+  assert.equal(zero.ops.board({...input,section_count:-1}).hasSections,undefined,'invalid count must remain unknown');
+  zero.store.saveResult.items[0]=zero.ops.board({...input,section_count:0});
+  const zeroSave=zero.ops.saveAction('boardsSections',',"100"');
+  assert.equal(zero.requests.length,4);
+  assert.match(zero.requests[3].job.url,/RepinResource\/create/,'known empty board skips section lookup');
+  assert.equal(zero.store.saveResult.targetBoardId,undefined);
+  zero.requests[3].resolve(resource(savedCopy(),'v3_repin_handler'));await zeroSave;
   const plain=fixture();await openSave(plain);let direct=plain.ops.saveAction('boardsSections',',"100"');
   assert.equal(plain.store.saveResult.targetBoardId,undefined,'loading does not open section selection');
   plain.requests[3].resolve(resource([],'get_all_boards_sections'));await flush();
@@ -54,6 +101,8 @@ async function sectionSaveChecks(){
   const failed=fixture();await openSave(failed);let failedRead=failed.ops.saveAction('boardsSections',',"100"');
   failed.requests[3].resolve('',503,'network');await failedRead;assert.equal(failed.requests.length,4,'failed read cannot infer empty sections and save');
   const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonySaveSheet.ets','utf8');
+  assert(ui.includes('if (this.result.shortlist.length)'),'loaded shortlist remains visible during section lookup');
+  assert(!ui.includes('if (!this.result.loading) {'),'loaded boards are not cleared during section lookup');
   assert(ui.includes(".align(Alignment.TopStart)"));assert(ui.includes("back:true,labelKey:'pm_back_to_boards_dcf21f0d'"));
   assert(!ui.includes("Button(this.uiText('pm_back_to_boards_dcf21f0d'))"),'section return uses fixed footer');
   const sections=[{id:'300',type:'board_section',title:'Section',board:{id:'100'},
@@ -111,6 +160,7 @@ const window={PinmonyNativePostOperationsEnabled:true,PinmonyPostApiEnabled:true
 for(const [file,key] of [['feature_pin/src/main/ets/services/PinmonyPostApiScript.ets','PIN_POST_API_SCRIPT'],['feature_pin/src/main/ets/services/PinmonyPostExtensionsScript.ets','PIN_POST_EXTENSIONS_SCRIPT'],['feature_pin/src/main/ets/services/PinmonyEditPinApiScript.ets','PIN_EDIT_API_SCRIPT']])vm.runInNewContext(load(file)[key],ctx);
 const api=window.PinmonyPostApi;assert(api);assert.equal(api.like(pin,()=>{},()=>{}),false);assert.equal(api.boardsStart(pin),false);assert.equal(await api.boardsSave(pin,'100'),false);assert.equal(await api.boardsCreate(pin,'New',false),false);assert.equal(await api.boardsRemove(pin),false);assert.equal(api.saveUndo(pin,'77'),false);assert.equal(await api.editStart(pin),false);assert.equal(await api.editCommit(pin,true),false);
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+assert(index.includes('this.postNativeOperations.observePrefetched(pin,body)'),'initial detail reads consume the normalized prefetch evidence');
 function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\('));assert(start>=0);return index.slice(start,index.indexOf('\n  private ',start+1));}
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['openApiBoards','saveApiAction','dismissApiBoards','openEditPin','editPinAction','dismissEditPin','cancelDetailSave','undoSavedPin'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_POST_OPERATIONS_ENABLED:true});
 const h=new Host(),calls=[];Object.assign(h,{pinStore:{detail:{pinUrl:pin},saveResult:{pin},saveUndoPin:pin,saveUndoId:'77'},activeSheetKind:'',rootContextCoordinator:{notify(){}},postPanelsController:new Proxy({},{get(){throw Error('legacy post panel called')}}),postNativeOperations:{openSave:p=>calls.push(['save',p]),saveAction:(...a)=>calls.push(['saveAction',...a]),dismiss:(...a)=>calls.push(['dismiss',...a]),openEdit:p=>calls.push(['edit',p]),editAction:(...a)=>calls.push(['editAction',...a]),cancelSave:p=>calls.push(['cancel',p]),owns:()=>true},controller:{runJavaScript(){throw Error('Web request')}}});

@@ -2,7 +2,8 @@ const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),ts=require(process.argv[2]||'typescript');
 function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const {PinmonyProfileCache:Cache}=load('feature_profile/src/main/ets/services/PinmonyProfileCache.ets');
-const {PinmonyProfileNativeReads:Reader}=load('entry/src/main/ets/app/PinmonyProfileNativeReads.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
+const settingsClient=load('entry/src/main/ets/app/PinmonyProfileSettingsClient.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
+const {PinmonyProfileNativeReads:Reader}=load('entry/src/main/ets/app/PinmonyProfileNativeReads.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:n==='./PinmonyProfileSettingsClient'?settingsClient:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',page=origin+'/sample/',avatar='https://i.pinimg.com/synthetic.jpg';
 const user={type:'user',id:'42',username:'sample',full_name:'Sample',profile_cover:{source:'image',images:{'736x':{url:avatar,width:736,height:414}}},image_large_url:avatar,follower_count:12,following_count:3,pin_count:2};
@@ -13,34 +14,95 @@ const userBody=(extra={})=>body(user,'',{client_context:{user:{id:'42'}},...extr
 const flush=()=>new Promise(r=>setImmediate(r));
 function fixture(mergeRequest){let session={authenticated:true,accountId:'cache-hash',generation:1,origin,userAgent:'synthetic'},target=page,active=true,selected=true,document=origin+'/',epoch=7;
 const store={profileSession:0,profileActionsReady:false,profileSessionReady:false,profileScrollOffset:0,profileCache:new Cache(),origins:[]},requests=[],cancelled=[],addresses=[];
-const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({requestBusinessProfileInitialSort:(job,session,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},requestBusinessBoardManagementWrite: (...args)=>mergeRequest(...args),requestBusinessProfileSort:(job,session,user,viewer,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
+const reader=new Reader({store:()=>store,session:()=>session,page:()=>target,selected:()=>selected,active:()=>active,network:()=>({requestBusinessProfileInitialSort:(job,session,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},requestBusinessProfileSettings:(job,session,page,user,viewer,allowed,permissions,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},requestBusinessBoardManagementWrite: (...args)=>mergeRequest(...args),requestBusinessProfileSort:(job,session,user,viewer,live)=>{assert(live());return new Promise(resolve=>requests.push({job,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessProfileRead:(job,s,p,id,owns)=>{assert(owns());return new Promise(resolve=>requests.push({job,userId:id,resolve:(payload,status=200,error='')=>resolve({...job,body:payload,status,error})}));}}),settled(){store.profilePullRefreshing=false},recordAddress:a=>addresses.push(a),document:()=>document,documentEpoch:()=>epoch});
 return {reader,store,requests,cancelled,addresses,getSession:()=>session,setSession:s=>session=s,setPage:p=>target=p,setActive:v=>active=v,setSelected:v=>selected=v,setDocument:d=>document=d,setEpoch:v=>epoch=v};}
 function options(job){return JSON.parse(new URL(job.url).searchParams.get('data')).options;}
 function endpoint(job){return new URL(job.url).pathname;}
-async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,3,'main and unorganized reads start together after verified identity');assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
+async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){const pending=f.reader.demand();f.reader.demand();assert.equal(f.requests.length,1);assert.equal(endpoint(f.requests[0].job),'/resource/UserResource/get/');f.requests[0].resolve(userBody());await flush();assert.equal(f.requests.length,2,'main list starts before unorganized content');assert.equal(endpoint(f.requests[1].job),'/resource/BoardsFeedResource/get/');f.requests[1].resolve(body(boards,cursor));await flush();assert.equal(f.requests.length,3);assert.equal(endpoint(f.requests[2].job),'/resource/BoardlessPinsResource/get/');f.requests[2].resolve(body(unorganized));await pending;}
 async function main(){
+const layered=fixture();const layeredInitial=layered.reader.demand();
+layered.requests[0].resolve(userBody());await flush();
+layered.requests[1].resolve(body([board(1)],'next'));await flush();
+assert.equal(layered.reader.busy,false,'auxiliary does not hold main list lock');
+assert(layered.store.profileCache.get(page,'saved'),'main presentation is cached before auxiliary completes');
+const layeredMore=layered.reader.more();assert.equal(layered.requests.length,4,'pagination starts while auxiliary is pending');
+layered.requests[2].resolve(body([]));await layeredInitial;
+assert.equal(layered.reader.busy,true,'old auxiliary completion cannot clear newer pagination lock');
+layered.requests[3].resolve(body([board(2)],'-end-'));await layeredMore;
+
+const empty=fixture();await first(empty,[],'-end-',[]);
+const emptyHubBody=()=>body([],'-end-',{resource_response:{status:'success',code:0,data:[],bookmark:'-end-',endpoint_name:'v3_get_user_filtered_pins_handler'}});
+let pendingEmpty=empty.reader.select('hub:pins:1:0');await flush();
+const emptyRequest=empty.requests.at(-1);const beforeEmpty=empty.requests.length;
+await empty.reader.select('hub:pins:1:0');await empty.reader.demand();
+assert.equal(empty.requests.length,beforeEmpty,'same in-flight empty filter is coalesced');
+emptyRequest.resolve(emptyHubBody());await pendingEmpty;
+assert(empty.reader.hubFeed.emptyUntil>Date.now());
+await empty.reader.select('saved');await empty.reader.select('hub:pins:1:0');
+assert.equal(empty.requests.length,beforeEmpty,'short-lived empty result survives filter round trip');
+empty.reader.hubFeed.emptyUntil=Date.now()-1;
+pendingEmpty=empty.reader.demand();assert.equal(empty.requests.length,beforeEmpty+1,'expired emptiness is revalidated');
+empty.requests.at(-1).resolve(emptyHubBody());await pendingEmpty;
+pendingEmpty=empty.reader.refresh();assert.equal(empty.requests.length,beforeEmpty+2,'explicit refresh bypasses empty cache');
+empty.requests.at(-1).resolve(userBody());await flush();empty.requests.at(-1).resolve(emptyHubBody());await pendingEmpty;
+empty.reader.invalidateContent();assert.equal(empty.reader.hubFeeds.size,0,'confirmed mutations invalidate filtered emptiness');
+const emptyFollowing=fixture();await first(emptyFollowing);
+let followingEmpty=emptyFollowing.reader.select('hub:following:0:0');await flush();
+emptyFollowing.requests.at(-1).resolve(body([],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_boards_following_handler',data:[],bookmark:'-end-'}}));await followingEmpty;
+const followingCount=emptyFollowing.requests.length;await emptyFollowing.reader.select('saved');await emptyFollowing.reader.select('hub:following:0:0');
+assert.equal(emptyFollowing.requests.length,followingCount,'following empty cache also prevents immediate reread');
+console.log('Profile empty cache: in-flight dedupe, filter identity, TTL, explicit refresh and mutation invalidation passed');
+
+const followed=fixture(); await first(followed); const initialCount=followed.requests.length;
+const followingRead=followed.reader.select('hub:following:0:0'); await flush();
+assert.equal(followed.requests.length,initialCount+1); const followJob=followed.requests[initialCount].job;
+assert.equal(followJob.method,'POST'); assert.equal(endpoint(followJob),'/resource/ApiResource/get/');
+const followOptions=JSON.parse(new URLSearchParams(followJob.body).get('data')).options;
+assert.equal(followOptions.url,'/v3/users/sample/boards/following/'); assert.equal(followOptions.data.page_size,12);
+followed.requests[initialCount].resolve(body([board(91)],'next',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_boards_following_handler',data:[board(91)],bookmark:'next'}})); await followingRead;
+assert.equal(followed.store.profile.hubMode,'following'); assert.equal(followed.store.profile.section,'saved');
+assert.equal(followed.store.profile.boards[0].title,'Board 91'); assert.equal(followed.store.profile.contentHasMore,true);
+const nextFollowing=followed.reader.more(); await flush(); const nextReq=followed.requests[initialCount+1];
+assert.deepEqual(JSON.parse(new URLSearchParams(nextReq.job.body).get('data')).options.bookmarks,['next']);
+const guarded=Object.create(Network.prototype); let allowed=false;
+guarded.request=async (job,context)=>{allowed=context().authenticated; return {status:0,error:'synthetic'};};
+await guarded.requestBusinessProfileSettings(nextReq.job,followed.getSession,page,'42','42',[],['own'],()=>true); assert(allowed,'captured cursor form is accepted');
+for (const bad of [[],[''],['x'.repeat(4097)],['a','b']]) {
+ const job={...nextReq.job,headers:{...nextReq.job.headers}}, form=new URLSearchParams(job.body), env=JSON.parse(form.get('data'));
+ env.options.bookmarks=bad; form.set('data',JSON.stringify(env)); job.body=form.toString();
+ await guarded.requestBusinessProfileSettings(job,followed.getSession,page,'42','42',[],['own'],()=>true); assert(!allowed,'invalid cursor must be rejected');
+}
+
+nextReq.resolve(body([board(92)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_get_boards_following_handler',data:[board(92)],bookmark:'-end-'}})); await nextFollowing;
+assert.equal(followed.store.profile.boards.length,2); assert.equal(followed.store.profile.contentHasMore,false);
+const profileView=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
+assert(profileView.indexOf("hubStateButton('pm_profile_hub_secret','secret')") < profileView.indexOf("hubStateButton('pm_following_7dfa5d8f','following')"));
+console.log('Following boards: own-session read, profile card mapping and filter order passed');
+
 const initialHub=fixture();initialHub.reader.ports.initialBoardsHub=()=>true;
 const hubDone=initialHub.reader.demand();assert.equal(initialHub.requests.length,2,'identity and initial metadata start concurrently');initialHub.requests[0].resolve(userBody());await flush();
 assert.equal(initialHub.store.profile.hubMode,'boards','choose modern root before identity publication');
-assert.equal(initialHub.requests.length,3,'one preference and one unorganized read');
+assert.equal(initialHub.requests.length,2,'auxiliary waits for the visible boards');
 assert(!initialHub.requests.some(r=>endpoint(r.job)==='/resource/BoardsFeedResource/get/'));
 const sameRoute=initialHub.reader.select('hub:boards:0:0');await sameRoute;
-assert.equal(initialHub.requests.length,3);assert.equal(initialHub.cancelled.length,0,'UI confirmation does not cancel initial reads');
+assert.equal(initialHub.requests.length,2);assert.equal(initialHub.cancelled.length,0,'UI confirmation does not cancel initial reads');
 const preference=initialHub.requests.find(r=>r.job.id.startsWith('native_profile_sort_initial_'));
 preference.resolve(body({most_recent_board_sort_order:'alphabetical'},'',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_metdata_get',data:{most_recent_board_sort_order:'alphabetical'}},client_context:{user:{id:'42'}}}));
-initialHub.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await flush();
-assert.equal(initialHub.requests.length,4);assert.equal(endpoint(initialHub.requests[3].job),'/resource/BoardsResource/get/');
-initialHub.requests[3].resolve(body([board(1)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(1)],bookmark:'-end-'}}));await hubDone;
+await flush();
+assert.equal(initialHub.requests.length,3);assert.equal(endpoint(initialHub.requests[2].job),'/resource/BoardsResource/get/');
+initialHub.requests[2].resolve(body([board(1)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(1)],bookmark:'-end-'}}));await flush();
+assert.equal(initialHub.store.profile.boards.length,1,'main list publishes before auxiliary completes');
+initialHub.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await hubDone;
 assert.equal(initialHub.store.profile.boards.length,1);assert.equal(initialHub.cancelled.length,0);
 initialHub.reader.invalidateContent();
 assert.equal(initialHub.store.profile,undefined,'mutated content must not remain visible as current');
 const contentReread=initialHub.reader.demand();
 assert.equal(endpoint(initialHub.requests[4].job),'/resource/UserResource/get/','identity and counts are refreshed');
 initialHub.requests[4].resolve(userBody());await flush();
-assert.equal(initialHub.requests.length,7,'confirmed sort avoids another metadata round trip');
+assert.equal(initialHub.requests.length,6,'confirmed sort avoids another metadata round trip');
 assert.equal(endpoint(initialHub.requests[5].job),'/resource/BoardsResource/get/');
 initialHub.requests[5].resolve(body([board(2)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(2)],bookmark:'-end-'}}));
-initialHub.requests[6].resolve(body([]));await contentReread;
+await flush();initialHub.requests[6].resolve(body([]));await contentReread;
 assert.equal(initialHub.store.profile.boards[0].title,'Board 2','only refreshed content is published');
 initialHub.reader.invalidateContent();
 initialHub.setSession({...initialHub.getSession(),generation:2});
@@ -60,16 +122,16 @@ for(const metadataFirst of [true,false]) {
  const done=boot.reader.demand();assert.equal(boot.requests.length,2);
  if(metadataFirst){boot.requests[1].resolve(preferenceBody());await flush();assert.equal(boot.requests.length,2);assert.equal(boot.reader.boardSort,'');}
  boot.requests[0].resolve(userBody());await flush();
- if(!metadataFirst){assert.equal(boot.requests.length,3);boot.requests[1].resolve(preferenceBody());await flush();}
+ if(!metadataFirst){assert.equal(boot.requests.length,2);boot.requests[1].resolve(preferenceBody());await flush();}
  const boards=boot.requests.find(r=>endpoint(r.job)==='/resource/BoardsResource/get/');assert(boards);
  assert.equal(options(boards.job).sort,'alphabetical');
- boards.resolve(body([board(1)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(1)],bookmark:'-end-'}}));boot.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await done;
+ boards.resolve(body([board(1)],'-end-',{resource_response:{status:'success',code:0,endpoint_name:'v3_user_profile_boards_feed',data:[board(1)],bookmark:'-end-'}}));await flush();boot.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await done;
  assert.equal(boot.store.profile.boards.length,1);
 }
 for(const payload of [preferenceBody('99'),preferenceBody('', 'alphabetical'),preferenceBody('42','unsupported'),'{']) {
  const boot=fixture();boot.reader.ports.initialBoardsHub=()=>true;
  const done=boot.reader.demand();boot.requests[1].resolve(payload);boot.requests[0].resolve(userBody());await flush();
- boot.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await done;
+ await done;
  assert(!boot.requests.some(r=>endpoint(r.job)==='/resource/BoardsResource/get/'));
  assert.equal(boot.reader.boardSort,'');assert(boot.store.profile.contentError,'invalid bootstrap remains an explicit error');
 }
@@ -86,8 +148,8 @@ const bootFailure=fixture();bootFailure.reader.ports.initialBoardsHub=()=>true;
 const failedBootDone=bootFailure.reader.demand();bootFailure.requests[1].resolve('',503);await flush();
 assert.equal(bootFailure.requests.length,2,'early metadata failure does not dispatch another request');
 bootFailure.requests[0].resolve(userBody());await flush();
-bootFailure.requests.find(r=>endpoint(r.job)==='/resource/BoardlessPinsResource/get/').resolve(body([]));await failedBootDone;
-assert.equal(bootFailure.requests.length,3);assert(bootFailure.store.profile.contentError);
+await failedBootDone;
+assert.equal(bootFailure.requests.length,2);assert(bootFailure.store.profile.contentError);
 const bootVisitor=fixture();bootVisitor.reader.ports.initialBoardsHub=()=>true;bootVisitor.reader.ports.visitor=()=>true;
 const visitorDone=bootVisitor.reader.demand();assert.equal(bootVisitor.requests.length,1,'visitor does not bootstrap own metadata');
 bootVisitor.reader.pause();bootVisitor.requests[0].resolve(userBody());await visitorDone;
@@ -111,17 +173,16 @@ bootstrapSession={...bootstrapSession,accountId:'changed'};assert.equal(bootstra
 assert((await bootstrapNetwork.requestBusinessProfileInitialSort(bootstrapJob,()=>({...bootstrapSession,authenticated:false}),()=>true)).error);
 console.log('Profile cold start: parallel metadata/identity, viewer proof, failure, cancellation, visitor and narrow read-only transport passed');
 
-// Parallel reads publish the main content without waiting for auxiliary Pins.
-for(const auxiliaryFirst of [false,true]) {
- const concurrent=fixture(),done=concurrent.reader.demand();
- concurrent.requests[0].resolve(userBody());await flush();
- assert.equal(concurrent.requests.length,3);
- if(auxiliaryFirst){concurrent.requests[2].resolve(body([pin(3)]));await flush();}
- concurrent.requests[1].resolve(body([board(1)]));await flush();
- assert.equal(concurrent.store.profile.boards.length,1,'main content publishes independently');
- if(!auxiliaryFirst)concurrent.requests[2].resolve(body([pin(3)]));
- await done;assert.equal(concurrent.reader.unorganized.pins.length,1);
-}
+// Visible content commits before auxiliary Pins are dispatched.
+const concurrent=fixture(),layeredDone=concurrent.reader.demand();
+concurrent.requests[0].resolve(userBody());await flush();
+assert.equal(concurrent.requests.length,2);
+concurrent.requests[1].resolve(body([board(1)]));await flush();
+assert.equal(concurrent.store.profile.boards.length,1);
+assert.equal(concurrent.requests.length,3);
+assert.equal(concurrent.store.profile.contentLoading,false);
+concurrent.requests[2].resolve(body([pin(3)]));await layeredDone;
+assert.equal(concurrent.reader.unorganized.pins.length,1);
 const parallelCancel=fixture(),cancelDone=parallelCancel.reader.demand();
 parallelCancel.requests[0].resolve(userBody());await flush();
 parallelCancel.reader.pause();
@@ -132,7 +193,7 @@ for(const request of parallelCancel.requests.slice(1)){
 await cancelDone;assert.equal(parallelCancel.store.profile.boards.length,0,'late responses remain discarded');
 const auxiliaryFailure=fixture(),failureDone=auxiliaryFailure.reader.demand();
 auxiliaryFailure.requests[0].resolve(userBody());await flush();
-auxiliaryFailure.requests[2].resolve('',503);auxiliaryFailure.requests[1].resolve(body([board(1)]));
+auxiliaryFailure.requests[1].resolve(body([board(1)]));await flush();auxiliaryFailure.requests[2].resolve('',503);
 await failureDone;assert.equal(auxiliaryFailure.store.profile.boards.length,1);
 assert(auxiliaryFailure.reader.unorganized.error,'auxiliary failure remains independently visible');
 
@@ -216,7 +277,7 @@ pending=f.reader.refresh(true);assert(f.store.profilePullRefreshing);assert.equa
 for(const revoke of [g=>g.reader.pause(),g=>g.setActive(false),g=>g.setSelected(false),g=>g.setPage(origin+'/other/'),g=>g.setSession({...g.getSession(),accountId:'other',generation:2})]){const g=fixture(),p=g.reader.demand();revoke(g);g.requests[0].resolve(userBody());await p;assert.equal(g.requests.length,1);assert.equal(g.store.profile?.displayName||'','');}
 for(const invalid of [userBody({client_context:{user:{id:'99'}}}),userBody({client_context:{}}),body({...user,username:'other'},'',{client_context:{user:{id:'42'}}})]){const g=fixture(),p=g.reader.demand();g.requests[0].resolve(invalid);await p;assert(g.store.profileError);await g.reader.demand();assert.equal(g.requests.length,1,'identity failure requires explicit retry');}
 const g=fixture();await first(g);g.setSession({...g.getSession(),accountId:'new-cache-hash',generation:2});pending=g.reader.demand();assert.equal(g.store.profile.boards.length,0);assert.equal(g.store.profileCache.get(page,'saved'),undefined);g.requests[3].resolve(userBody());await flush();g.requests[4].resolve(body([]));await flush();g.requests[5].resolve(body([]));await pending;assert.equal(g.store.profile.boards.length,0);
-const story={type:'story',id:'all',story_type:'all_pins',title:{text:'所有 Pin'},action:{url:'/users/42/pins/'},objects:[{image_medium_url:avatar}]};const s=fixture();await first(s,[story]);assert.equal(s.store.profile.boards[0].targetUrl,page+'pins/');const invalidStory=fixture();pending=invalidStory.reader.demand();invalidStory.requests[0].resolve(userBody());await flush();invalidStory.requests[1].resolve(body([{...story,action:{url:'/users/99/pins/'}}]));invalidStory.requests[2].resolve(body([]));await pending;assert(invalidStory.store.profile.contentError);await invalidStory.reader.demand();assert.equal(invalidStory.requests.length,3);
+const story={type:'story',id:'all',story_type:'all_pins',title:{text:'所有 Pin'},action:{url:'/users/42/pins/'},objects:[{image_medium_url:avatar}]};const s=fixture();await first(s,[story]);assert.equal(s.store.profile.boards[0].targetUrl,page+'pins/');const invalidStory=fixture();pending=invalidStory.reader.demand();invalidStory.requests[0].resolve(userBody());await flush();invalidStory.requests[1].resolve(body([{...story,action:{url:'/users/99/pins/'}}]));await pending;assert(invalidStory.store.profile.contentError);await invalidStory.reader.demand();assert.equal(invalidStory.requests.length,2);
 const write=fixture();await first(write);write.setDocument(page);pending=write.reader.more();
 const mutation={kind:'state',nativeOwn:true,nativeVersion:write.store.profile.nativeVersion,nativeInvalidation:1,contextEpoch:7,session:1,profileUrl:page,section:'saved'};
 write.reader.updateBridge(JSON.stringify(mutation));assert.equal(write.requests.length,4,'confirmed invalidation coalesces with the current GET');write.requests[3].resolve(body([board(1)],'-end-'));await pending;assert.equal(write.requests.length,5,'finish current GET then re-read, never replay the write');

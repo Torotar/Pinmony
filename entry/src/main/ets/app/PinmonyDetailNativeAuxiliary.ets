@@ -8,11 +8,19 @@ import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSIN
 const PIN_NATIVE_DETAIL_AUXILIARY_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_DETAIL_AUXILIARY_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_DETAIL_AUXILIARY_ROLLOUT_ENABLED;
 interface Art { url: string; width: number; height: number; duration?: number; }
-interface VideoList { V_HLSV4?: Art; V_720P?: Art; vHLSV4?: Art; v720P?: Art; }
-interface Videos { video_list?: VideoList; videoList?: VideoList; }
+interface VideoList { V_HLSV4?: Art; V_720P?: Art; vHLSV4?: Art; v720P?: Art; vHLSV3MOBILE?: Art; }
+interface Videos { video_list?: VideoList; videoList?: VideoList; videoListMobile?: VideoList; videoList720P?: VideoList; v_hlsv4_video_list?: VideoList; }
+interface DetailStoryBlock { __typename?: string; blockType?: number; block_type?: number; videoDataV2?: Videos; video_data_v2?: Videos; }
+interface DetailStoryPage { blocks?: DetailStoryBlock[]; }
+interface DetailStory { isDeleted?: boolean; is_deleted?: boolean; pages?: DetailStoryPage[]; }
+interface DetailContentCreator { fullName?: string; username?: string; imageMediumUrl?: string; verifiedIdentity?: DetailContentVerified; isVerifiedMerchant?: boolean; }
+interface DetailContentVerified { verified?: boolean; }
 interface Slot { videos?: Videos; id?: string; slot_id?: string; slotId?: string; title?: string; images?: Record<string,Art>; images_1200x?: Art; images_736x?: Art; images_474x?: Art; images_564x?: Art; images_orig?: Art; images_236x?: Art; }
 interface Carousel { carousel_slots?: Slot[]; carouselSlots?: Slot[]; }
-interface NativePin { id?: string; entityId?: string; type?: string; is_video?: boolean; videos?: Videos; carousel_data?: Carousel; carouselData?: Carousel; images?: Record<string,Art>; grid_title?: string; title?: string; }
+interface NativePin { id?: string; entityId?: string; type?: string; is_video?: boolean; isVideo?: boolean; videos?: Videos; carousel_data?: Carousel; carouselData?: Carousel; images?: Record<string,Art>; grid_title?: string; title?: string;
+  story_pin_data_id?: string; storyPinDataId?: string; story_pin_data?: DetailStory; storyPinData?: DetailStory;
+  gridTitle?: string; closeupUnifiedTitle?: string; description?: string; closeupUnifiedDescription?: string;
+  closeupUnifiedAttribution?: DetailContentCreator; nativeCreator?: DetailContentCreator; closeupAttribution?: DetailContentCreator; }
 interface ShuffleReadFields { fields: string[]; }
 interface ShuffleReadOptions { url: string; fetchPolicy: string; data: ShuffleReadFields; }
 interface ShuffleReadEnvelope { options: ShuffleReadOptions; context: Record<string,string>; }
@@ -26,8 +34,9 @@ interface VisualResource { status: string; code: number; error?: Object; endpoin
 interface VisualResponse { resource_response: VisualResource; }
 interface ReadOptions { id?: string; field_set_key?: string; noCache?: boolean; fetch_visual_search_objects?: boolean; get_page_metadata?: boolean; add_fields?: string;
   pin_id?: string; crop?: PinmonyImageCrop; crop_source?: number; is_shopping?: boolean; entry_source?: string; entrypoint?: string; bookmarks?: string[]; }
+export interface PinmonyVisualSearchContinuation { pin: string; owner: string; bookmark: string; crop: string; }
 interface Envelope { options: ReadOptions; context: Record<string,string>; }
-interface Variables { pinId: string; isAuth: boolean; isDesktop: boolean; isAuthDesktop: boolean; isUnauth: boolean; shouldPrefetchStoryPinFragment: boolean; shouldSkipImageViewerOnPageQuery: boolean; }
+interface Variables { pinId: string; isAuth: boolean; isDesktop: boolean; isAuthDesktop: boolean; isUnauth: boolean; shouldPrefetchStoryPinFragment?: boolean; shouldSkipImageViewerOnPageQuery?: boolean; }
 interface Query { queryHash: string; variables: Variables; }
 export interface PinmonyDetailNativeAuxiliaryPorts {
   store: () => PinmonyPinStore; session: () => PinmonyBusinessSessionContext; network: () => PinmonyNativeNetwork;
@@ -53,6 +62,7 @@ export class PinmonyDetailNativeAuxiliary {
   private crop: string = '';
   private readonly requests: Set<string> = new Set<string>();
   private readonly waits: Map<string,() => void> = new Map<string,() => void>();
+  private shuffleTimer: number = -1;
   constructor(ports: PinmonyDetailNativeAuxiliaryPorts) { this.ports = ports; this.store = ports.store(); }
   private key(): string { const s: PinmonyBusinessSessionContext = this.ports.session(); return s.authenticated ? s.origin + ':' + s.accountId + ':' + s.generation.toString() : ''; }
   ready(): boolean { return PIN_NATIVE_DETAIL_AUXILIARY_ENABLED && !!this.pin && this.account === this.key() && this.token === this.store.detailOpeningToken && this.store.detailPin === this.pin && this.ports.owned(); }
@@ -60,6 +70,8 @@ export class PinmonyDetailNativeAuxiliary {
     this.requests.forEach((id: string): void => { if (id.startsWith(prefix)) { this.ports.network().cancel(id); this.waits.get(id)?.(); } });
   }
   pause(): void {
+    if (this.shuffleTimer >= 0) clearTimeout(this.shuffleTimer);
+    this.shuffleTimer = -1;
     this.revision++; this.cancelVisual(); this.cancel('native_detail_aux_');
     if (this.store.detail?.shuffleLoading && this.store.detail.pinUrl === this.pin) {
       const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
@@ -72,6 +84,14 @@ export class PinmonyDetailNativeAuxiliary {
     this.visualRevision++; this.cancel('native_detail_aux_visual_');
     if (this.store.visualResult.loading) this.store.visualResult = {pin:this.store.visualResult.pin,loading:false,error:PinmonyI18n.message("pm_image_search_paused_please_retry_c19326c2"),ended:this.store.visualResult.ended,items:this.store.visualResult.items};
   }
+  visualContinuation(): PinmonyVisualSearchContinuation {
+    return { pin: this.pin, owner: this.account, bookmark: this.bookmark, crop: this.crop };
+  }
+  restoreVisualContinuation(saved?: PinmonyVisualSearchContinuation): void {
+    const valid: boolean = !!saved && saved.owner === this.key() && saved.pin === this.store.detailPin;
+    this.bookmark = valid && saved ? saved.bookmark : '';
+    this.crop = valid && saved ? saved.crop : '';
+  }
   start(pin: string, token: number, body: string): void {
     this.pause();
     if (!PIN_NATIVE_DETAIL_AUXILIARY_ENABLED || !this.ports.owned()) return;
@@ -80,15 +100,25 @@ export class PinmonyDetailNativeAuxiliary {
       if (!r || r.status !== 'success' || r.error || r.code !== undefined && r.code !== 0 || r.data?.id !== pin.match(/\/pin\/(\d+)\/$/)?.[1]) return;
       this.pin = pin; this.token = token; this.account = this.key(); this.video = undefined; this.carousel = undefined;
       this.mediaVersion = 0; this.original = this.image(r.data.images?.orig?.url || r.data.images?.['736x']?.url || r.data.images?.['474x']?.url || ''); this.mediaError = '';
-      this.mediaKind = r.data.carousel_data?.carousel_slots?.length ? 'carousel' : r.data.is_video === true || !!r.data.videos ? 'video' : '';
-      this.resolve(r.data,false,false);
-      if (this.store.detail?.shuffleId) this.readShuffle(r.data);
+      this.mediaKind = r.data.carousel_data?.carousel_slots?.length ? 'carousel' : r.data.is_video === true || !!r.data.videos || !!this.storyVideo(r.data,false) ? 'video' : '';
+      const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
+      if (detail?.title === '' || detail?.description === '' || detail?.creator === '' || r.data.story_pin_data_id || r.data.story_pin_data) this.readContent();
+      else this.resolve(r.data,false,false);
+      if (this.store.detail?.shuffleId) {
+        const revision: number = this.revision;
+        this.shuffleTimer = setTimeout((): void => {
+          this.shuffleTimer = -1;
+          if (revision === this.revision && this.ready()) this.readShuffle(r.data);
+        }, 280);
+      }
     } catch (_) {}
   }
   apply(): void { if (this.ready()) this.applyMedia(); }
   retryShuffle(): void {
     const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
     if (!this.ready() || !detail?.shuffleId || detail.shuffleLoading) return;
+    if (this.shuffleTimer >= 0) clearTimeout(this.shuffleTimer);
+    this.shuffleTimer = -1;
     const original: Art = {url:this.original,width:detail.shuffle?.canvasWidth || detail.imageWidth,height:detail.shuffle?.canvasHeight || detail.imageHeight};
     const images: Record<string,Art> = {};
     images['orig'] = original;
@@ -164,10 +194,46 @@ export class PinmonyDetailNativeAuxiliary {
     return /^https:\/\/i\.pinimg\.com\//.test(this.original) ? this.original : '';
   }
   private image(value: string): string { return typeof value === 'string' && value.length <= 4096 && /^https:\/\/(?:[a-z0-9-]+\.)*pinimg\.com\/[^\s#]+$/i.test(value) ? value : ''; }
+  private storyVideo(p: NativePin, graph: boolean): Videos | undefined {
+    const story: DetailStory | undefined = graph ? p.storyPinData : p.story_pin_data;
+    if (!story || story.isDeleted || story.is_deleted || story.pages?.length !== 1) return undefined;
+    const blocks: DetailStoryBlock[] | undefined = story.pages[0].blocks;
+    if (blocks?.length !== 1) return undefined;
+    const block: DetailStoryBlock = blocks[0];
+    if (block.__typename !== 'StoryPinVideoBlock' && block.blockType !== 3 && block.block_type !== 3) return undefined;
+    return block.videoDataV2 || block.video_data_v2;
+  }
+  private async readContent(): Promise<void> {
+    const revision: number = this.revision;
+    try {
+      const response: GraphResponse = JSON.parse(await this.request('content',{},this.pin.slice(this.ports.session().origin.length),(): boolean => revision === this.revision && this.ready())) as GraphResponse;
+      if (!this.ready() || revision !== this.revision) return;
+      const pin: NativePin | undefined = response.data?.v3GetPinQueryv2?.data;
+      if (response.errors || !pin || pin.entityId !== this.pin.match(/\/pin\/(\d+)\/$/)?.[1] || !this.store.detail) throw new Error('content');
+      const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(this.store.detail)) as PinmonyDetailSnapshot;
+      const text = (v: string | undefined, limit: number): string => typeof v === 'string' ? v.trim().slice(0,limit) : '';
+      const creator: DetailContentCreator | undefined = pin.closeupUnifiedAttribution || pin.nativeCreator || pin.closeupAttribution;
+      next.title = text(pin.closeupUnifiedTitle || pin.title || pin.gridTitle,500) || next.title;
+      next.description = text(pin.closeupUnifiedDescription || pin.description,12000) || next.description;
+      if (creator) {
+        next.creator = text(creator.fullName || creator.username,180) || next.creator;
+        next.creatorAvatar = this.image(creator.imageMediumUrl || '') || next.creatorAvatar;
+        if (/^[a-zA-Z0-9_]+$/.test(creator.username || '')) next.creatorUrl = this.ports.session().origin + '/' + creator.username + '/';
+        next.creatorVerified = creator.verifiedIdentity?.verified === true || creator.isVerifiedMerchant === true;
+      }
+      this.store.detail = next;
+      this.mediaKind = pin.carouselData?.carouselSlots?.length ? 'carousel' : pin.isVideo || pin.videos || this.storyVideo(pin,true) ? 'video' : '';
+      await this.resolve(pin,true,false);
+    } catch (_) {
+      if (revision === this.revision && this.ready()) this.store.detailApiError = PinmonyI18n.message('pm_unable_to_load_pin_please_retry_252ec41d');
+    }
+  }
   private videoMap(p: NativePin, graph: boolean): PinmonyVideo | undefined {
     if ((graph ? p.entityId : p.id) !== this.pin.match(/\/pin\/(\d+)\/$/)?.[1]) return undefined;
-    const list: VideoList | undefined = graph ? p.videos?.videoList : p.videos?.video_list;
-    const hls: Art | undefined = graph ? list?.vHLSV4 : list?.V_HLSV4, mp4: Art | undefined = graph ? list?.v720P : list?.V_720P;
+    const story: Videos | undefined = this.storyVideo(p,graph);
+    const list: VideoList | undefined = (graph ? p.videos?.videoList : p.videos?.video_list) || story?.videoList || story?.video_list;
+    const hls: Art | undefined = (graph ? list?.vHLSV4 || list?.vHLSV3MOBILE : list?.V_HLSV4 || list?.vHLSV3MOBILE) || story?.v_hlsv4_video_list?.vHLSV4 || story?.videoListMobile?.vHLSV3MOBILE;
+    const mp4: Art | undefined = (graph ? list?.v720P : list?.V_720P) || story?.videoList720P?.v720P;
     const sources: PinmonyVideoSource[] = [];
     const valid = (v: Art | undefined, kind: string): boolean => !!v && !!this.image(v.url) && /^https:\/\/(?:[a-z0-9-]+\.)*pinimg\.com\/videos\/[^\s?#]+\.(?:m3u8|mp4)(?:\?[^\s#]*)?$/i.test(v.url) &&
       (kind === 'hls' ? /\.m3u8(?:\?|$)/i : /\.mp4(?:\?|$)/i).test(v.url);
@@ -273,8 +339,9 @@ export class PinmonyDetailNativeAuxiliary {
     const session: PinmonyBusinessSessionContext = this.ports.session(), id: string = this.pin.match(/\/pin\/(\d+)\/$/)![1];
     if (kind === 'pin') options = {id:id,field_set_key:'auth_web_main_pin',noCache:true,fetch_visual_search_objects:false,get_page_metadata:false,add_fields:'pin.gen_ai_topics,pin.is_eligible_for_image_download,pin.is_eligible_for_ai_comparison,pin.has_hidden_inner_pin'};
     const envelope: Envelope = {options:options,context:{}}, form: string = 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
-    const graph: boolean = kind === 'graph';
-    const query: Query = {queryHash:'c025ad33faccf5d04c2ed38344405d0a6c46dd1d786c17f3954b6980ef798538',variables:{pinId:id,isAuth:true,isDesktop:false,isAuthDesktop:false,isUnauth:false,shouldPrefetchStoryPinFragment:false,shouldSkipImageViewerOnPageQuery:true}};
+    const graph: boolean = kind === 'graph' || kind === 'content';
+    const query: Query = kind === 'content' ? {queryHash:'b39ed2f55c3ee5de2035ca16b0c943f09ad5737d6ea4cc6d20f6131a2f9589e8',variables:{pinId:id,isAuth:true,isDesktop:false,isAuthDesktop:false,isUnauth:false}} :
+      {queryHash:'c025ad33faccf5d04c2ed38344405d0a6c46dd1d786c17f3954b6980ef798538',variables:{pinId:id,isAuth:true,isDesktop:false,isAuthDesktop:false,isUnauth:false,shouldPrefetchStoryPinFragment:false,shouldSkipImageViewerOnPageQuery:true}};
     const headers: Record<string,string> = {'Accept':'application/json','Content-Type':graph ? 'application/json' : 'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest',
       'X-Pinterest-AppState':'active','X-Pinterest-Source-Url':source,'X-Pinterest-Pws-Handler':kind === 'visual' ? 'www/pin/[id]/visual-search.js' : 'www/pin/[id].js'};
     if (session.appVersion) headers['X-App-Version'] = session.appVersion;
