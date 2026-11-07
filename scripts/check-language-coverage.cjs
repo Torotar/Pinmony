@@ -7,6 +7,15 @@ const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 const locales = ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'];
 const tables = locales.map(locale => JSON.parse(read(`common_foundation/src/main/resources/${locale}/element/string.json`)).string);
 const names = tables[0].map(row => row.name).sort();
+const simplifiedChinese = new Map(tables[1].map(row => [row.name, row.value]));
+for (const row of tables[0]) {
+  assert.equal(row.value, simplifiedChinese.get(row.name), `Default Chinese copy mismatch: ${row.name}`);
+}
+// These characters have distinct traditional forms and must not leak into zh_TW.
+for (const row of tables[2]) {
+  assert(!/[这该载图设译评论关创显错败暂简选择删标钟个张块动态时间页户务计数状发网对术业复写体资从为无开]/.test(row.value),
+    `Simplified Chinese in traditional resource: ${row.name}`);
+}
 for (let i = 0; i < tables.length; i++) {
   assert.equal(new Set(tables[i].map(row => row.name)).size, tables[i].length, `Duplicate language key: ${locales[i]}`);
   assert.deepEqual(tables[i].map(row => row.name).sort(), names, `Language key parity: ${locales[i]}`);
