@@ -38,6 +38,7 @@ export function normalizeHomeCacheRecord(record: PinmonyHomeCacheRecord, pageKey
       .slice(0, 60).map((pin: PinmonyHomePin): PinmonyHomePin => ({
         id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
         imageWidth: pin.imageWidth, imageHeight: pin.imageHeight,
+        isVideo: pin.isVideo === true || !!pin.video,
         title: typeof pin.title === 'string' ? pin.title.slice(0, 160) : '', hasMore: false
       }));
     const snapshot: PinmonyHomeSnapshot = {

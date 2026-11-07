@@ -23,6 +23,19 @@ const pin = 'https://www.pinterest.com/pin/123/sent/?invite_code=example&sender=
 const reply = (status, location) => ({statusCode:status,headers:{location}});
 async function flush() {await new Promise(resolve=>setImmediate(resolve));}
 async function main() {
+  const profile = 'https://www.pinterest.com/sample_user/';
+  const profiles=fixture([reply(308,middle),reply(302,profile+'?tracking=example')]);
+  assert.equal(await profiles.reader.resolveTarget('https://pin.it/Example',()=>true),profile);
+  assert.equal(profiles.requests.length,2,'profile shortener uses the same bounded public redirect chain');
+  const legacy=fixture([reply(302,profile)]);
+  await assert.rejects(legacy.reader.resolve('https://pin.it/Example',()=>true),/target/,
+    'legacy Pin-only callers cannot consume a profile as a Pin identity');
+  for (const target of ['https://pinterest.com/settings/','https://pinterest.com/notifications/',
+    'https://user@pinterest.com/sample_user/','http://pinterest.com/sample_user/',
+    'https://pinterest.com/sample_user/board/','https://pinterest.com.evil.test/sample_user/']) {
+    const blocked=fixture([reply(302,target)]);
+    await assert.rejects(blocked.reader.resolveTarget('https://pin.it/Example',()=>true));
+  }
   const f=fixture([reply(308,middle),reply(302,pin)]);
   assert.equal(await f.reader.resolve('https://pin.it/Example',()=>true),'123');
   assert.deepEqual(f.requests.map(r=>r.url),['https://pin.it/Example',middle]);

@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -213,8 +214,8 @@ export struct PinmonyCommentsSheet {
     }.width('100%').height('100%').padding({ left: 16, right: 16, top: 12, bottom: 20 })
       .backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.menuOpen, this.commentMenu(), {
-        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyCommentsSheet.menuOpen radius=four-corners-32vp'); },
+        radius: LengthMetrics.vp(32),
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyCommentsSheet.menuOpen radius=uniform-32vp'); },
         height: SheetSize.FIT_CONTENT, showClose: !this.deleteOpen,
         dragBar: !this.deleteOpen, backgroundColor: $r('app.color.page_background'), maskColor: '#66000000' })
   }
@@ -266,7 +267,7 @@ export struct PinmonyCommentsSheet {
             if (this.result.busy) { LoadingProgress().color($r('app.color.accent')).width(20).height(20) }
             else { SymbolGlyph(this.editing ? $r('sys.symbol.checkmark') : $r('sys.symbol.arrow_up'))
               .fontSize(20).fontColor([$r('app.color.detail_on_accent')]) }
-          }.width(32).height(32).borderRadius(16).backgroundColor($r('app.color.accent'))
+          }.width(44).height(44).borderRadius(16).backgroundColor($r('app.color.accent'))
             .enabled(!this.result.loading && !this.result.busy && !this.result.uncertain && !this.choosing && (!!this.draft.trim() || !!this.photoUri))
             .onClick(() => this.send()).accessibilityText(this.editing ? this.uiText("pm_save_comment_80c50b4a") : this.uiText("pm_send_comment_d25f5715"))
         }.width('100%')

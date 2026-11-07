@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -9,6 +10,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 
 @Component
 export struct PinmonyBoardSectionPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
@@ -59,7 +61,7 @@ export struct PinmonyBoardSectionPage {
       }.width('100%').height('100%')
     }.width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.scroller])
-      .titleBar({ enableComponentSafeArea: false,
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { enableComponentSafeArea: false,
         style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
           scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
           systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
@@ -80,14 +82,14 @@ export struct PinmonyBoardSectionPage {
         content: { title: { mainTitle: this.uiText("pm_add_section_779008ec") }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, isEnabled: !this.busy, label: this.uiText("pm_close_3fd47edc"), action: () => { if (!this.busy) { this.visible = false; this.onClose(); } }
-        } }] } } })
+        } }] } } }, this.hdsDarkMode))
       .backgroundColor($r('app.color.page_background'))
   }
   build() {
     Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
       .bindSheet($$this.visible, this.sectionSheet(), {
-        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardSectionPage.visible radius=four-corners-32vp'); },
+        radius: LengthMetrics.vp(32),
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardSectionPage.visible radius=uniform-32vp'); },
         height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
         backgroundColor: $r('app.color.page_background'),
         onWillDismiss: (action: DismissSheetAction) => {

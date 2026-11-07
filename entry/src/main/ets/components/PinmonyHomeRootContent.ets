@@ -22,7 +22,7 @@ export interface PinmonyHomeRootView {
   homeMenuReady: () => boolean;
   offlinePreviewMode: boolean;
   selectHomeTab: (id: string, restoring?: boolean) => Promise<void>;
-  openHomePin: (id: string) => Promise<void>;
+  openHomePin: (id: string, imageUrl?: string) => Promise<void>;
   openHomeBoard: (id: string) => void;
   openHomeMore: (id: string) => Promise<void>;
   loadMoreHome: () => Promise<void>;
@@ -38,6 +38,7 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               (!view.nativeRootOnly || view.homeStore.home || view.homeStore.cachedHome)) {
             PinmonyHomePage({
               imageRecovery: view.homeStore.imageRecovery,
+              imageLoadingActive: view.activeTab === 0 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.pinStore.detailOpeningPin,
               prefetchedImageUrls: view.pinStore.prefetchedImageUrls,
               feedActive: (view.homeStore.homeNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) && view.activeTab === 0 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.homeStore.homeNativeReadsReady || !view.currentPinUrl()),
               mediaActive: view.activeTab === 0 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.pinStore.detailOpeningPin && !view.currentPinUrl(),
@@ -70,7 +71,7 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               refreshing: view.homeStore.homeRefreshing,
               error: view.homeStore.homeError,
               onTab: (id: string) => view.selectHomeTab(id),
-              onPin: (id: string) => view.openHomePin(id),
+              onPin: (id: string, imageUrl?: string) => view.openHomePin(id, imageUrl),
               onBoard: (id: string) => view.openHomeBoard(id),
               onMore: (id: string) => view.openHomeMore(id),
               onLoadMore: () => view.loadMoreHome(),

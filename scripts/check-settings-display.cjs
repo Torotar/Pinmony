@@ -10,9 +10,11 @@ function method(source, name, endName) {
 const ability = fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets', 'utf8');
 const component = fs.readFileSync('feature_settings/src/main/ets/components/PinmonyDisplaySettingsPage.ets', 'utf8');
 const selected = [];
+const state = new Map(), traces = [];
 let preference = 'system', resourceMode = 1;
 const context = { ConfigurationConstant: { ColorMode: { COLOR_MODE_LIGHT: 1, COLOR_MODE_DARK: 0, COLOR_MODE_NOT_SET: -1 } },
-  AppStorage: { get: () => preference, setOrCreate() {} }, hilog: { error() {} }, DOMAIN: 0 };
+  AppStorage: { get: key => key === 'themePreference' ? preference : state.get(key), setOrCreate: (key, value) => state.set(key,value) },
+  PinmonyRuntimeLog: {info: line => traces.push(line)}, hilog: { error() {} }, DOMAIN: 0 };
 vm.runInNewContext(ts.transpileModule('class Theme {' + method(ability, 'syncSystemColorMode', '  onForeground(') +
   method(component, 'selectTheme', '  private options(') + '} globalThis.Theme = Theme;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const native = new context.Theme();
@@ -23,9 +25,17 @@ preference = 'system'; native.syncSystemColorMode(0); assert.equal(selected.at(-
 native.syncSystemColorMode(1); assert.equal(selected.at(-1).navigationBarContentColor, '#1B1E25');
 preference = 'dark'; native.syncSystemColorMode(1); assert.equal(selected.at(-1).statusBarContentColor, '#F7F8FA');
 preference = 'light'; native.syncSystemColorMode(0); assert.equal(selected.at(-1).statusBarContentColor, '#1B1E25');
+preference = 'system'; resourceMode = 0; native.syncSystemColorMode();
+const traceCount = traces.length; native.syncSystemColorMode(); assert.equal(traces.length,traceCount,'unchanged theme diagnostics are coalesced');
+resourceMode = -1; native.syncSystemColorMode(); assert.equal(state.get('systemDarkMode'),true,'unknown system mode retains the last effective theme');
+native.context.resourceManager.getConfigurationSync = () => {throw Error('must not query resource mode for explicit theme');};
+preference = 'light'; native.syncSystemColorMode(); assert.equal(state.get('systemDarkMode'),false);
 const changes = [], errors = [];
 native.themePreference = 'system';
-native.getUIContext = () => ({ getHostContext: () => ({ getApplicationContext: () => ({ setColorMode: mode => changes.push(mode) }) }), getPromptAction: () => ({ showToast: value => errors.push(value) }) });
+native.getUIContext = () => ({ getHostContext: () => ({ getApplicationContext: () => ({ setColorMode: mode => {
+  assert.equal(native.themePreference, changes.length === 0 ? 'system' : 'dark','native mode is applied before publishing preference');
+  changes.push(mode);
+} }) }), getPromptAction: () => ({ showToast: value => errors.push(value) }) });
 native.selectTheme('dark'); assert.equal(native.themePreference, 'dark'); assert.equal(changes.at(-1), 0);
 native.selectTheme('system'); assert.equal(changes.at(-1), -1);
 native.getUIContext = () => ({ getHostContext: () => ({ getApplicationContext: () => ({ setColorMode() { throw Error('synthetic'); } }) }), getPromptAction: () => ({ showToast: value => errors.push(value) }) });

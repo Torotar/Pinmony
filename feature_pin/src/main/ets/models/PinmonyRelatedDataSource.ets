@@ -16,11 +16,16 @@ export class PinmonyRelatedDataSource implements IDataSource {
     const append: boolean = items.length >= this.items.length && this.items.every((item: PinmonyRelatedPin, index: number): boolean =>
       JSON.stringify(item) === JSON.stringify(items[index]));
     const previous: number = this.items.length;
-    this.items = items;
-    this.listeners.forEach((listener: DataChangeListener) => {
-      if (append) {
-        for (let index: number = previous; index < items.length; index++) listener.onDataAdd(index);
-      } else listener.onDataReloaded();
-    });
+    if (append) {
+      this.items = this.items.slice();
+      for (let index: number = previous; index < items.length; index++) {
+        this.items.push(items[index]);
+        this.listeners.forEach((listener: DataChangeListener): void => listener.onDataAdd(index));
+      }
+      this.items = items.slice();
+    } else {
+      this.items = items.slice();
+      this.listeners.forEach((listener: DataChangeListener): void => listener.onDataReloaded());
+    }
   }
 }

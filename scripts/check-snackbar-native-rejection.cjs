@@ -43,9 +43,16 @@ async function main() {
   assert.deepEqual(order,['old-show','old-dismiss','new-show'],'late old page cleanup and native callbacks cannot close current notice');
   lifecycle.dismiss(current);lifecycle.dismiss(current);
   assert.deepEqual(order,['old-show','old-dismiss','new-show','new-dismiss'],'global native owner closes once');
+  let persistentDismissals=0;
+  const persistent={show(){},dismiss(){persistentDismissals++;}};
+  lifecycle.show(persistent,{},{},{},{duration:0});
+  assert(lifecycle.isCurrent(persistent),'persistent owner remains current');
+  lifecycle.dismiss(persistent);lifecycle.dismiss(persistent);
+  assert.equal(lifecycle.isCurrent(persistent),false);
+  assert.equal(persistentDismissals,1,'persistent notice remains dismissible and closes once');
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-  assert.equal((index.match(/PinmonySnackBarLifecycle\.show\(snack,/g)||[]).length,8);
+  assert.equal((index.match(/PinmonySnackBarLifecycle\.show\(snack,/g)||[]).length,9);
   assert(!/\bsnack\.(show|dismiss)\(/.test(index),'every Index HDS call uses the boundary');
-  console.log('Snackbar native boundary: delayed back/show and dismiss rejection, synchronous errors, void returns, eight entry points and private diagnostics passed');
+  console.log('Snackbar native boundary: delayed back/show and dismiss rejection, persistent owner, synchronous errors, void returns, nine entry points and private diagnostics passed');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>process.removeListener('unhandledRejection',onUnhandled));

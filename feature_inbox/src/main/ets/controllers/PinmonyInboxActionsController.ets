@@ -26,12 +26,14 @@ export class PinmonyInboxActionsController {
   pause(): void { this.generation++; this.intent++; this.opening = false; this.acting = false; }
   async open(id: string): Promise<void> {
     if (!this.ports.allowed() || !this.ports.enabled() || this.opening ||
-        !(id === 'compose' || id === 'home' || /^(?:conversation:|contact:|news-menu:|inbox-news-api-)/.test(id))) return;
+        !(id === 'compose' || id === 'home' || id === 'activity-retry' || /^conversation-remove:\d{1,40}$/.test(id) || /^activity-(?:follow|chat):\d{1,40}$/.test(id) || /^(?:conversation:|contact:|news-menu:|inbox-news-api-)/.test(id))) return;
     if(this.ports.nativeOpen) {
       this.opening = true;
       try {if(await this.ports.nativeOpen(id))return;}
       finally {this.opening = false;}
     }
+    if(id.startsWith('conversation-remove:'))return;
+    if(id === 'activity-retry' || id.startsWith('activity-follow:') || id.startsWith('activity-chat:'))return;
     const generation: number = this.generation;
     let epoch: number = -1;
     let page: string = '', session: number = -1;

@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from './PinmonyActionNotice';
 import { PinmonyImageSearchSelection } from './PinmonyImageSearchSelection';
 import { PinmonyI18n } from 'common_foundation';
@@ -384,8 +385,8 @@ export struct PinmonyImageSearchView {
     Column() { this.searchContent() }.width('100%').height('100%')
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
-        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-        onWillAppear: (): void => { this.sheetAppearing = true; this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=four-corners-32vp'); },
+        radius: LengthMetrics.vp(32),
+        onWillAppear: (): void => { this.sheetAppearing = true; this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=uniform-32vp'); },
         onAppear: (): void => this.resultSheetAppeared(),
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: this.uiText("pm_more_pins_like_this_6e224087") },
         detentSelection: this.sheetHeight,

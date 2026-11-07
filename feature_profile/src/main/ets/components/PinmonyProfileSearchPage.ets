@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
@@ -6,6 +7,7 @@ import { PinmonyProfileSearchSnapshot, PinmonyProfileSearchPin, PinmonyProfileSe
 
 @Component
 export struct PinmonyProfileSearchPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
@@ -100,13 +102,13 @@ export struct PinmonyProfileSearchPage {
           .onReachEnd(() => { if (!this.snapshot.editing && !this.snapshot.error) this.onMore(); })
       }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
     }.width('100%').height('100%')
-      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
       style: { blurStrategy: this.immersiveLightEnabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: this.immersiveLightEnabled, scrollEffectOpts: { enableScrollEffect: this.immersiveLightEnabled, scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightEnabled ? 18 : 0 } } },
         content: { title: { mainTitle: this.text('pm_search_44ce7ae9') },
           backIcon: { isEnabled: true, action: () => this.onBack() },
-          menu: { value: [] } } })
+          menu: { value: [] } } }, this.hdsDarkMode))
       .titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
       .bindToScrollable([this.scroller]).backgroundColor($r('app.color.page_background'))
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])

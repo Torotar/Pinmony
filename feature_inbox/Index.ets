@@ -19,3 +19,4 @@ export { PinmonyInboxActionsController, PinmonyInboxActionsPorts } from './src/m
 export { PinmonyInboxListPage } from './src/main/ets/components/PinmonyInboxListPage';
 
 export { PinmonyInboxNewsCard } from './src/main/ets/models/PinmonyInboxFlow';
+export { PinmonyInboxHiddenConversations } from './src/main/ets/services/PinmonyInboxHiddenConversations';

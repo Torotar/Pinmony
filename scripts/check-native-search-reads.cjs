@@ -9,6 +9,21 @@ const result=(ids,cursor='-end-',extra={})=>JSON.stringify({resource_response:{s
 function fixture(){let session={authenticated:true,accountId:'a',origin:'https://www.pinterest.com',generation:1,userAgent:'synthetic'},page=session.origin+'/search/pins/?q=art',active=true;const store={searchCache:new PinmonySearchCache(),searchScrollOffset:31,searchActionsReady:false,searchInputReady:false,searchFilterToken:0},requests=[],cancelled=[],navigations=[];const reader=new Reader({profile:()=>session.origin+'/fixture/',store:()=>store,page:()=>page,session:()=>session,active:()=>active,network:()=>({requestBusinessSearchUserFollow:(job,getSession,page,user,viewer,owner)=>{assert(owner());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({...job,body,status,error})}));},requestBusinessProfileBoardFollow:(job,getSession,page,board,viewer,owner)=>{assert(owner());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({...job,body,status,error})}));},cancel:id=>cancelled.push(id),requestBusinessSearchRead:(job,getSession,owner)=>{assert(owner());return new Promise(resolve=>requests.push({job,resolve:(body,status=200,error='')=>resolve({...job,body,status,error})}));}}),navigate:target=>{navigations.push(target);page=target;},settled(){}});return{reader,store,requests,cancelled,navigations,setPage:p=>page=p,setActive:v=>active=v,setSession:s=>session=s,session:()=>session,page:()=>page};}
 const feedReq=f=>f.requests.filter(r=>r.job.url.includes('BaseSearchResource'));
 async function main(){
+// Terminal video informational cards are empty content, not transport failures.
+for (const items of [[], [{type:'message',message:'No results'}], [{type:'presentation',id:'fixture-empty'}]]) {
+  const video=fixture();video.setPage(video.session().origin+'/search/videos/?q=art');
+  const reading=video.reader.demand();feedReq(video)[0].resolve(JSON.stringify({resource_response:{status:'success',bookmark:'-end-',data:{results:items}}}));await reading;
+  assert.equal(video.store.search.apiError,'');assert.equal(video.store.search.apiActive,true);assert.equal(video.store.search.apiEnded,true);assert.equal(video.store.search.apiBusy,false);assert.equal(video.store.search.results.length,0);
+  await video.reader.more();assert.equal(feedReq(video).length,1,'terminal empty videos never repaginate');
+  video.setPage(video.session().origin+'/search/pins/?q=art');const pins=video.reader.demand();feedReq(video).at(-1).resolve(result([123]));await pins;assert.equal(video.store.search.results.length,1);
+}
+for (const [scope,items,status] of [['videos',[{type:'unknown',images:{}}],200],['videos',[{type:'board',id:'123'}],200],['videos',[{type:'user',id:'123'}],200],['videos',[{type:'pin',id:'123'}],200],['pins',[{type:'message'}],200],['videos',[],503]]) {
+  const invalid=fixture();invalid.setPage(invalid.session().origin+'/search/'+scope+'/?q=art');const reading=invalid.reader.demand();feedReq(invalid)[0].resolve(JSON.stringify({resource_response:{status:'success',bookmark:'-end-',data:{results:items}}}),status);await reading;assert(invalid.store.search.apiError,'invalid responses remain errors');
+}
+const videoPage=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');
+const videoFailure=videoPage.slice(videoPage.indexOf('} else if (this.error) {'),videoPage.indexOf('} else if (this.query.trim() && this.snapshot.apiActive === true && !this.snapshot.apiEnded)'));
+assert.match(videoFailure,/search\\\/videos/);
+assert(videoFailure.indexOf('Text(PinmonyI18n.render(this.error') < videoFailure.indexOf('PinmonyActionNotice'), 'video first-page failures render inline before the notice fallback');
 const early=fixture();let initial=early.reader.demand();feedReq(early)[0].resolve(result([1],'next'));await initial;
 const oldMore=early.reader.more(),oldRequest=feedReq(early)[1];
 const typing=early.reader.input('new',true);

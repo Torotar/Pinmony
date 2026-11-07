@@ -24,18 +24,26 @@ export class PinmonyListDataSource<T extends Object> implements IDataSource {
     let suffix: number = 0;
     while (suffix < commonCount - prefix &&
       this.keys[previousCount - 1 - suffix] === keys[keys.length - 1 - suffix]) suffix++;
-    this.items = items.slice(); this.keys = keys.slice();
-    if (prefix === previousCount && previousCount === keys.length) return;
+    if (prefix === previousCount && previousCount === keys.length) {
+      this.items = items.slice(); this.keys = keys.slice(); return;
+    }
     if (prefix + suffix === previousCount && keys.length > previousCount) {
+      this.items = this.items.slice(); this.keys = this.keys.slice();
       for (let index: number = prefix; index < keys.length - suffix; index++) {
+        this.items.splice(index, 0, items[index]); this.keys.splice(index, 0, keys[index]);
         this.listeners.forEach((listener: DataChangeListener): void => listener.onDataAdd(index));
       }
     } else if (prefix + suffix === keys.length && previousCount > keys.length) {
+      this.items = this.items.slice(); this.keys = this.keys.slice();
       for (let index: number = previousCount - suffix - 1; index >= prefix; index--) {
+        this.items.splice(index, 1); this.keys.splice(index, 1);
         this.listeners.forEach((listener: DataChangeListener): void => listener.onDataDelete(index));
       }
     } else {
+      this.items = items.slice(); this.keys = keys.slice();
       this.listeners.forEach((listener: DataChangeListener): void => listener.onDataReloaded());
+      return;
     }
+    this.items = items.slice(); this.keys = keys.slice();
   }
 }

@@ -11,6 +11,7 @@ const js = ts.transpileModule(`class Filter { ${methods} ${navigation} ${searchN
 }).outputText;
 const context = { exports: {} }; vm.runInNewContext(js, context);
 const filter = new context.exports.Filter();
+filter.closeConversationActions = () => {};
 filter.snapshot = {
   items: [{ id: 'one', title: 'Display name', subtitle: 'unrelated text', usernames: ['Alice'] },
     { id: 'group', title: 'Group', subtitle: 'Alice in body', usernames: ['Bob', 'CAROL'] }],

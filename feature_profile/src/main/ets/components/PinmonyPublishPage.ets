@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyDraggablePublishButton, PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -17,6 +18,7 @@ interface PinmonyPublishDestinationState {
 
 @Component
 export struct PinmonyPublishPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -262,7 +264,7 @@ export struct PinmonyPublishPage {
           .onClick(() => { this.showDraftExpiryTip = false; })
       }
       }
-    }.titleBar(this.titleBar($$.phase)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([$$.websiteChild ? this.websiteScroller : this.scroller])
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleBar($$.phase), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([$$.websiteChild ? this.websiteScroller : this.scroller])
       .translate({ x: $$.websiteChild ? this.websiteMotionOffset : '0%' })
       .hitTestBehavior(!$$.websiteChild && this.websiteRouteOpen ? HitTestMode.None : HitTestMode.Default)
       .accessibilityLevel(!$$.websiteChild && this.websiteRouteOpen ? 'no-hide-descendants' : 'auto')

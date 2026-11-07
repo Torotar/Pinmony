@@ -48,7 +48,11 @@ assert.equal(decoded.length, notifications, 'callbacks must match immutable moun
 const cached = hero(); cached.confirmedLoaded = true; cached.stageReady = true; cached.onStageChanged();
 assert.equal(cached.decoded, false, 'a previous snapshot does not fake decode of a newly mounted node');
 cached.completeImage(1); assert.equal(decoded.length, notifications + 1);
-assert(source.includes('Image(this.source.url)'));
+assert(source.includes('PinmonyCdnImage({ url: this.source.url, fit: ImageFit.Contain'));
+assert(source.includes('onDecoded: () => this.completeImage(1)'));
+const cdn=fs.readFileSync('common_ui/src/main/ets/components/PinmonyCdnImage.ets','utf8');
+assert(cdn.includes('event?.loadingStatus === 1'), 'wrapper forwards drawable-image completion only');
+assert(cdn.includes('generation === this.generation'), 'replaced source callbacks remain isolated');
 assert(!source.slice(source.indexOf('build()')).includes("if (this.imageState === 'loaded')"), 'loading feedback never removes the actual Image');
 assert(parent.includes('private heroImage()'));
 assert(!logs.join('\n').includes('https://'), 'node diagnostics exclude Pin and image URLs');

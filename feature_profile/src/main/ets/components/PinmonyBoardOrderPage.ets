@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { vibrator } from '@kit.SensorServiceKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { PinmonyBoardPlaceholder, PinmonyActionNotice } from 'common_ui';
@@ -6,6 +7,7 @@ import { PinmonyBoard } from '../models/PinmonyProfile';
 
 @Component
 export struct PinmonyBoardOrderPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @Prop boards: PinmonyBoard[] = [];
   onDone?: (ids: string[]) => void;
@@ -146,11 +148,11 @@ export struct PinmonyBoardOrderPage {
           }, (board: PinmonyBoard) => board.id + ':' + this.uiLanguage)
         }.width('100%').padding({ top: 12, bottom: 24 }).justifyContent(FlexAlign.Start).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Auto).enableScrollInteraction(this.dragging < 0)
-    }.titleMode(HdsNavDestinationTitleMode.MINI).titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: true,
+    }.titleMode(HdsNavDestinationTitleMode.MINI).titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: true, enableComponentSafeArea: true,
       style: { scrollEffectOpts: { enableScrollEffect: false },
         originalStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 }, contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text') } } },
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0 }, contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, backIconStyle: { iconColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text') } } } },
-      content: { title: { mainTitle: this.text('pm_profile_sort_custom') }, backIcon: { isEnabled: !this.busy, action: () => { this.requestBack(); } }, menu: { value: [{ content: { icon: $r('sys.symbol.checkmark'), label: this.text('pm_done_c0b3fbff'), isEnabled: !this.busy && !this.blocked && this.dragging < 0, action: () => { if (!this.busy && !this.blocked && this.dragging < 0 && this.onDone) this.onDone(this.ordered.map((board: PinmonyBoard): string => board.id.replace(/^profile-api-native-/, ''))); } } }] } } })
+      content: { title: { mainTitle: this.text('pm_profile_sort_custom') }, backIcon: { isEnabled: !this.busy, action: () => { this.requestBack(); } }, menu: { value: [{ content: { icon: $r('sys.symbol.checkmark'), label: this.text('pm_done_c0b3fbff'), isEnabled: !this.busy && !this.blocked && this.dragging < 0, action: () => { if (!this.busy && !this.blocked && this.dragging < 0 && this.onDone) this.onDone(this.ordered.map((board: PinmonyBoard): string => board.id.replace(/^profile-api-native-/, ''))); } } }] } } }, this.hdsDarkMode))
       .bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .backgroundColor($r('app.color.page_background'))

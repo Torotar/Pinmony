@@ -9,6 +9,8 @@ const logs = [];
 const context = { filesDir: '/private', getApplicationContext: () => ({ setColorMode: mode => events.push('theme:' + mode) }) };
 let languageFails = false;
 const modules = {
+  feature_inbox: { PinmonyInboxHiddenConversations: { initialize: () => events.push('inbox-local') } },
+  '@kit.ArkData': { preferences: { getPreferencesSync: () => ({ getSync: () => '[]' }) } },
   common_session: { PinmonySessionHistory: { initialize: () => state.set('pinmonySessionConfirmed', false) } },
   '@kit.AbilityKit': { StartupTask: class {}, ConfigurationConstant: { ColorMode: { COLOR_MODE_DARK: 0, COLOR_MODE_LIGHT: 1, COLOR_MODE_NOT_SET: -1 } } },
   common_foundation: {
@@ -24,7 +26,8 @@ const modules = {
   } } }
 };
 function load(task) {
-  const source = fs.readFileSync('entry/src/main/' + task.srcEntry, 'utf8').replace('@Sendable', '');
+  const source = fs.readFileSync('entry/src/main/' + task.srcEntry, 'utf8').replace('@Sendable', '')
+    .replace(/import lazy \{/g, 'import {');
   const exports = {};
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, {
     exports, require: name => { assert(name in modules); return modules[name]; },
@@ -41,7 +44,7 @@ function load(task) {
     await load(task).init(context);
     done.add(task.name);
   }
-  assert.deepEqual(events, ['log', 'language', 'profile-layout', 'anchor', 'theme:0', 'retention', 'engine']);
+  assert.deepEqual(events, ['log', 'theme:0', 'language', 'profile-layout', 'inbox-local', 'anchor', 'retention', 'engine']);
   assert.equal(state.get('immersiveLightMode'), 'off', 'legacy disabled setting survives migration');
   assert.equal(state.get('themePreference'), 'dark', 'saved preference survives default registration');
   assert.equal(state.get('pinmonySessionConfirmed'), false);
@@ -51,5 +54,23 @@ function load(task) {
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
   assert(!index.slice(index.indexOf('aboutToAppear()'), index.indexOf('aboutToDisappear()')).includes('PinmonyUpdateNotice.start'));
   assert(index.includes("this.authStatus === 'authenticated' && !snapshot.sourceError && !this.businessSuspended"));
+  let probeNow = 60000;
+  const probeTimers = [], probeLogs = [], stageExports = {};
+  const stageSource = fs.readFileSync('entry/src/main/ets/entryability/PinmonyAbilityStage.ets', 'utf8');
+  vm.runInNewContext(ts.transpileModule(stageSource, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021
+  } }).outputText, { exports: stageExports,
+    require: name => name === '@kit.AbilityKit' ? { AbilityStage: class {} } : {
+      PinmonyRuntimeLog: { info: line => probeLogs.push(line) }
+    }, Date: { now: () => probeNow }, AppStorage: {
+      get: key => state.get(key), setOrCreate: (key, value) => state.set(key, value)
+    }, setTimeout: (callback, delay) => probeTimers.push({ callback, delay }) });
+  new stageExports.default().onCreate();
+  for (const target of [0, 1000, 2000, 3000, 4000]) {
+    assert.equal(probeTimers.length, 1, 'only one bounded startup probe pending');
+    const timer = probeTimers.shift(); probeNow += timer.delay + 20; timer.callback();
+    assert(probeLogs.at(-1).includes('sinceStageMs=' + (target + 20)), 'probes use stage-relative deadlines');
+  }
+  assert.equal(probeTimers.length, 0, 'probes stop after the five samples');
   console.log('Startup: dependency order, nonblocking log restore, saved preferences, language fallback and Web engine setup passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

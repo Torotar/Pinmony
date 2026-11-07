@@ -15,6 +15,7 @@ export interface PinmonySearchRootView {
   searchStore: PinmonySearchStore;
   shouldKeepSearchRootMounted: () => boolean;
   preparingDetailReturn: boolean;
+  profileCovered: boolean;
   pinStore: PinmonyPinStore;
   loadFailed: boolean;
   activeTab: number;
@@ -123,7 +124,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
             })
             .width('100%')
             .height('100%')
-            .visibility(view.nativeSearchPageVisible() || view.preparingDetailReturn ? Visibility.Visible : Visibility.Hidden)
+            .visibility(view.nativeSearchPageVisible() || view.preparingDetailReturn || view.profileCovered ? Visibility.Visible : Visibility.Hidden)
             .hitTestBehavior(view.nativeSearchPageVisible() ? HitTestMode.Default : HitTestMode.None)
             .accessibilityLevel(view.nativeSearchPageVisible() ? 'auto' : 'no-hide-descendants')
             .onTouch((event: TouchEvent) => view.onTouch(event))

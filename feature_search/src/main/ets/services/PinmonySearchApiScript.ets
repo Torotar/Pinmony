@@ -122,7 +122,11 @@ export const PIN_SEARCH_API_SCRIPT: string = `
       var items = resource && resource.data && resource.data.results;
       if (!resource || resource.status !== 'success' || !Array.isArray(items)) throw new Error('invalid-response');
       var incoming = mapResults(items);
-      if (items.length && !incoming.length) throw new Error('invalid-pins');
+      var videoEmpty = new URL(requestedKey).pathname === '/search/videos/' &&
+        (!resource.bookmark || resource.bookmark === '-end-') && items.length > 0 &&
+        items.every(function (item) { return item && typeof item.type === 'string' &&
+          item.type !== 'pin' && item.type !== 'board' && item.type !== 'user' && !item.images && !item.videos; });
+      if (items.length && !incoming.length && !videoEmpty) throw new Error('invalid-pins');
       if (!append) categories = mapGuides(resource.data, requestedKey);
       var next = typeof resource.bookmark === 'string' ? resource.bookmark : '';
       var merged = append ? results.slice() : [];
@@ -170,7 +174,11 @@ export const PIN_SEARCH_API_SCRIPT: string = `
           if (active && results.length && !items.length) return { categories: categories, results: results, busy: busy, active: active, error: error, ended: ended };
           generation++; if (abort) abort.abort(); abort = null; busy = false;
           attempted = true;
-          if (items.length && !incoming.length) {
+          var videoEmpty = route.pathname === '/search/videos/' &&
+            (!observed.resource.bookmark || observed.resource.bookmark === '-end-') && items.length > 0 &&
+            items.every(function (item) { return item && typeof item.type === 'string' &&
+              item.type !== 'pin' && item.type !== 'board' && item.type !== 'user' && !item.images && !item.videos; });
+          if (items.length && !incoming.length && !videoEmpty) {
             results = []; categories = []; active = false; error = '此类搜索结果的接口解析尚未接入'; ended = true;
           } else {
             categories = mapGuides(observed.resource.data, page);

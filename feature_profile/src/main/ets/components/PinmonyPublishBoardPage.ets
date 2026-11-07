@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyBoardPickerRow, PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -14,6 +15,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 // from the profile's ordinary "整理到图板" flow.
 @Component
 export struct PinmonyPublishBoardPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -72,7 +74,7 @@ export struct PinmonyPublishBoardPage {
       }.width('100%').height('100%')
     }.width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.createScroller])
-      .titleBar({ enableComponentSafeArea: false,
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { enableComponentSafeArea: false,
         style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
           scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
           systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
@@ -94,7 +96,7 @@ export struct PinmonyPublishBoardPage {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, label: this.uiText("pm_close_3fd47edc"), isEnabled: !this.state.busy,
           action: () => { if (!this.state.busy) { this.createVisible = false; this.closeCreate(); } }
-        } }] } } })
+        } }] } } }, this.hdsDarkMode))
       .backgroundColor($r('app.color.page_background'))
   }
 
@@ -116,7 +118,7 @@ export struct PinmonyPublishBoardPage {
       }.width('100%').height('100%').align(Alignment.TopStart)
         .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
     }.width('100%').height('100%').titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.sectionsScroller])
-      .titleBar({avoidLayoutSafeArea:true,enableComponentSafeArea:false,style:{blurStrategy:(this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,thermoCtrl:(this.immersiveLightMode !== 'off'),systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode),scrollEffectOpts:{enableScrollEffect:(this.immersiveLightMode !== 'off'),scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR},scrollEffectStyle:{backgroundStyle:{backgroundColor:$r('app.color.immersive_title_scrolled'),maskExtraHeight:0,blurRadius:(this.immersiveLightMode !== 'off') ? 18 : 0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}},originalStyle:{backgroundStyle:{backgroundColor:Color.Transparent,maskExtraHeight:0,blurRadius:(this.immersiveLightMode !== 'off') ? 18 : 0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}}},content:{title:{mainTitle:this.uiText('pm_select_section_c87be634')},backIcon:{action:() => this.onAction('back','',false)}}})
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), {avoidLayoutSafeArea:true,enableComponentSafeArea:false,style:{blurStrategy:(this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,thermoCtrl:(this.immersiveLightMode !== 'off'),systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode),scrollEffectOpts:{enableScrollEffect:(this.immersiveLightMode !== 'off'),scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR},scrollEffectStyle:{backgroundStyle:{backgroundColor:$r('app.color.immersive_title_scrolled'),maskExtraHeight:0,blurRadius:(this.immersiveLightMode !== 'off') ? 18 : 0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}},originalStyle:{backgroundStyle:{backgroundColor:Color.Transparent,maskExtraHeight:0,blurRadius:(this.immersiveLightMode !== 'off') ? 18 : 0},contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')}}}},content:{title:{mainTitle:this.uiText('pm_select_section_c87be634')},backIcon:{action:() => this.onAction('back','',false)}}}, this.hdsDarkMode))
       .onBackPressed(() => {this.onAction('back','',false);return true;})
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
@@ -131,8 +133,8 @@ export struct PinmonyPublishBoardPage {
     if (this.state.phase === 'create') {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
         .bindSheet($$this.createVisible, this.createSheet(), {
-          radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-          onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPublishBoardPage.createVisible radius=four-corners-32vp'); },
+          radius: LengthMetrics.vp(32),
+          onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPublishBoardPage.createVisible radius=uniform-32vp'); },
           height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
           backgroundColor: $r('app.color.page_background'),
           onWillDismiss: (action: DismissSheetAction) => {

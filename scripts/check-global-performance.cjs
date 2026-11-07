@@ -61,11 +61,18 @@ assert.equal((search.match(/LazyForEach\(this.resultRows/g) || []).length, 3);
 
 let densityReads = 0;
 const smart = read('common_ui/src/main/ets/components/SmartImage.ets');
-const { ImageHost } = compile(smart.slice(0, smart.indexOf('@Component')) + 'export class ImageHost {' + method(smart, 'resetImage') + '}',
+const { ImageHost, pickCoverImageTier } = compile(smart.slice(0, smart.indexOf('@Component')) + 'export class ImageHost {' + method(smart, 'resetImage') + method(smart, 'displayHeightPx') + '}',
   () => ({ display:{ getDefaultDisplaySync(){ densityReads++; return {densityPixels:2}; } } }));
 const imageHost = new ImageHost(); Object.assign(imageHost, { images:{'474x':{url:'image'}}, widthVp:200, imageRevision:0 });
 imageHost.resetImage(); assert.equal(densityReads, 1, 'one source selection reads density once');
 const imageRevision = imageHost.imageRevision; imageHost.resetImage(); assert.equal(imageHost.imageRevision, imageRevision);
+const beforeTarget=densityReads,audits=[];
+const targeted=new ImageHost();Object.assign(targeted,{images:{'474x':{url:'small'},'736x':{url:'large'}},widthVp:200,heightVp:220,targetPx:400,imageRevision:0,onAudit:(...args)=>audits.push(args)});
+targeted.resetImage();assert.equal(targeted.sourceTier,'474x');assert.equal(audits[0][1],400);assert.equal(audits[0][2],440);
+targeted.targetPx=600;targeted.resetImage();assert.equal(targeted.sourceTier,'736x','density changes select a sufficiently sharp source');
+const targetRevision=targeted.imageRevision;targeted.resetImage();assert.equal(targeted.imageRevision,targetRevision);
+assert.equal(densityReads,beforeTarget,'provided pixel targets avoid synchronous display reads, including diagnostics');
+assert.equal(pickCoverImageTier({'474x':{url:'image'}},200,NaN),'474x','invalid target keeps the legacy density fallback');
 
 const storage = new Map(), levels = { MEMORY_LEVEL_MODERATE:0, MEMORY_LEVEL_LOW:1, MEMORY_LEVEL_CRITICAL:2, MEMORY_LEVEL_UI_HIDDEN:3 };
 const { Ability } = compile('export class Ability {' + method(read('entry/src/main/ets/entryability/EntryAbility.ets'), 'onMemoryLevel') + '}', () => ({}),

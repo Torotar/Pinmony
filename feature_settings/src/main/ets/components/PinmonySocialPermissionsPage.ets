@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { BlurStrategy, HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -6,6 +7,7 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { SocialBlockedUser, SocialMessageGroup, SocialMessageChoice } from '../models/PinmonySocialPermissions';
 @Component
 export struct PinmonySocialPermissionsPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -348,11 +350,11 @@ export struct PinmonySocialPermissionsPage {
         }, (screen: string): string => screen)
         if (this.store.loading || this.store.busy) { LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None) }
       }.width('100%').height('100%')
-    }.titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
-      content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } })
+      content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } }, this.hdsDarkMode))
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .onBackPressed(() => { if (this.onBack) this.onBack(); return true; })

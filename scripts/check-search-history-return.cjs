@@ -10,7 +10,17 @@ const history = destination.indexOf("this.searchMaterialContent('history')");
 assert(discovery >= 0 && discovery < history && results < history);
 assert(destination.slice(results, history).includes('.zIndex(this.historyExitToRoot ? 0 : 2)'), 'results must remain above history when returning to history, and below it on the way to root');
 assert(destination.slice(history).includes('.zIndex(1)'), 'history exits above the root destination');
-assert.match(destination.slice(history), /TransitionEffect\.translate\(\{ x: '100%' \}\)\.animation\(\{ duration: 150, curve: Curve\.EaseIn \}\)/);
+assert.match(destination.slice(history), /TransitionEffect\.translate\(\{ x: '100%' \}\)\.animation\(\{ duration: 180, curve: Curve\.EaseOut \}\)/);
+assert(destination.includes('if (this.inputEditing || this.historyRetained)'), 'history stays mounted beneath submitted results and subsequent child pages');
+assert(destination.slice(history).includes('.hitTestBehavior(this.active && this.inputEditing ? HitTestMode.Default : HitTestMode.None)'));
+assert(destination.slice(history).includes(".accessibilityLevel(this.active && this.inputEditing ? 'auto' : 'no-hide-descendants')"));
+const historyVisibility=destination.slice(history).match(/\.visibility\(([^\n]+)\)/)[1];
+const visible=vm.runInNewContext('(function(){return '+historyVisibility+';})',{Visibility:{Visible:1,Hidden:0}});
+assert.equal(visible.call({inputEditing:false,committedQuery:()=>''}),0,'failed or cancelled root submission cannot leave a disabled history over discovery');
+assert.equal(visible.call({inputEditing:false,committedQuery:()=>'term'}),1,'history remains visible and stationary beneath results');
+assert.equal(visible.call({inputEditing:true,committedQuery:()=>''}),1,'root history remains visible while editing');
+assert.equal((destination.slice(results,history).match(/duration: 180, curve: Curve.EaseOut/g)||[]).length,2,
+  'new results enter and return using matching timing');
 assert(!destination.slice(history, destination.indexOf('.hideTitleBar(true)')).includes('this.historyExitToRoot ?'),
   'history exit must be installed while visible, not selected in the removal update');
 assert(destination.slice(0, discovery).includes('if (!this.committedQuery())'), 'keep the discovery root mounted below history');
@@ -65,9 +75,17 @@ Object.assign(input,{snapshot:{pageKey:'https://www.pinterest.com/search/pins/?q
   onInputFocusChange(focused,stop){if(focused)stopEditing=stop;}});
 for(const enter of [()=>input.onInputFocus(true),()=>input.openSearchHistory()]){
   enter();assert.equal(input.historyExitToRoot,false);assert.equal(input.inputEditing,true);
+  assert.equal(input.historyRetained,true,'editing mounts the history layer');
   stopEditing();assert.equal(input.historyExitToRoot,true,'host system back uses root-return layering');
+  assert.equal(input.historyRetained,false,'explicit root return releases the history layer');
   assert.equal(input.inputEditing,false,'host callback closes history without recursive parent navigation');
 }
 input.onInputFocus(true);input.closeInputPanel(false);
 assert.equal(input.historyExitToRoot,false,'submitting a search retains the results entrance layering');
+assert.equal(input.historyRetained,true,'submission cannot remove the old history and play its exit');
+assert.equal(input.inputEditing,false);
+input.onInputFocus(false);
+assert.equal(input.historyRetained,true,'blur while opening a child must not remove history');
+input.openSearchHistory();input.closeInputPanel(true);
+assert.equal(input.historyRetained,false,'closing unsubmitted root history releases it');
 console.log('search history return checks passed');

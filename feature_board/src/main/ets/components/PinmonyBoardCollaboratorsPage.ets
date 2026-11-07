@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -58,6 +59,7 @@ export struct PinmonyBoardCollaboratorsPage {
 
 @Component
 struct PinmonyBoardCollaboratorsSurface {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -179,7 +181,7 @@ struct PinmonyBoardCollaboratorsSurface {
               .hitTestBehavior(HitTestMode.None)
           }
         }.width('100%').height('100%')
-      }.titleBar(this.titleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
+      }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleOptions(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
         .onBackPressed(() => { this.back(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .backgroundColor($r('app.color.page_background'))

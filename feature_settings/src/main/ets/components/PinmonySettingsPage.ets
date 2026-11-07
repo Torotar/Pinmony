@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyBoardRecoveryPage } from './PinmonyBoardRecoveryPage';
@@ -17,6 +18,7 @@ import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNav
 
 @Component
 export struct PinmonySettingsPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @StorageLink('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
@@ -225,7 +227,7 @@ export struct PinmonySettingsPage {
       }
       }.width('100%').height('100%')
     }
-    .titleBar(this.titleBarOptions())
+    .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleBarOptions(), this.hdsDarkMode))
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideBackButton(false)
     .bindToScrollable([this.contentScroller])

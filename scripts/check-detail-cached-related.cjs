@@ -16,6 +16,7 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class N
   selectDetailEntryMotion() {}
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}
+  ${method('restoreDetailSearchPresentation')}
 } globalThis.Native = Native;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 async function main() {
   const n = new context.Native(), loads = [], reads = [], origins = [], marks = [];
@@ -88,6 +89,7 @@ async function main() {
       display:{getDefaultDisplaySync:()=>({width:360,height:800})}});
   const back = new Back();
   Object.assign(back,{activeSheetKind:'',showNativeSheet:false,pageHistory:{isPending:()=>false},
+    inboxNewsPinSlide:()=>false,
     pinStore:{shareBackHandledUntil:0,detail:{pinUrl:target},detailOrigin:()=>parent},
     pinIdentity:n.pinIdentity,homeEntryPhoto:{pinUrl:target,imageUrl:card.imageUrl},homeEntryBackCommitted:false,
     homeEntryClosing:false,homeEntryCardId:'pinmony-related-photo-'+parent+'-'+target,relatedEntryParent:{pinUrl:parent},

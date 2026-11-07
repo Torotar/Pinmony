@@ -129,7 +129,7 @@ const all = profile.board({type:'story',story_type:'all_pins',id:'all',title:{te
 assert.equal(all.title, '所有 Pin 图', 'Website all-Pins title must stay verbatim');
 const InboxReader = nativeLoader.loadFile('entry/src/main/ets/app/PinmonyInboxMessagesNativeReads.ets').PinmonyInboxMessagesNativeReads;
 const inbox = Object.create(InboxReader.prototype);
-Object.assign(inbox, { owned:()=>true, store:{}, rows:[{title:'InspiFol',subtitle:'很好'}], contacts:[], listReady:false });
+Object.assign(inbox, { owned:()=>true, store:{}, rows:[{id:'conversation:100',title:'InspiFol',subtitle:'很好'}], contacts:[], activity:{rows:[],loading:false,error:''}, listReady:false });
 inbox.apply(); const snapshot = inbox.store.inbox;
 for (const [key,expected] of [['updateLabel','Updates'],['inboxLabel','Inbox'],['composeLabel','New message'],['messagesLabel','Messages'],['contactsLabel','Contacts']]) {
   assert.equal(f.api.render(snapshot[key], 'en'), expected, key);

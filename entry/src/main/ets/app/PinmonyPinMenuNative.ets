@@ -2,17 +2,19 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, MoreSheetOption, PIN_EDIT_API_ENABLED, PIN_POST_API_ENABLED } from 'feature_pin';
 import { PinmonyHomeMenuState } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNativeNetwork, PinmonyNetworkJob, PIN_BUSINESS_PIN_READ_ENABLED, acceptsMediaFileUrl } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 // Per-feature manual rollout; the transport safety gate is still mandatory.
 const PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_PIN_MENUS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED && PIN_POST_API_ENABLED;
 interface Image { url?: string; }
-interface PinmonyMenuCarouselSlot { images?: Record<string,Image>; videos?: Object; }
+interface PinmonyMenuVideoFile { url?: string; width?: number; height?: number; }
+interface PinmonyMenuVideos { video_list?: Record<string, PinmonyMenuVideoFile>; }
+interface PinmonyMenuCarouselSlot { images?: Record<string,Image>; videos?: PinmonyMenuVideos; is_video?: boolean; }
 interface PinmonyMenuCarousel { carousel_slots?: PinmonyMenuCarouselSlot[]; }
 interface User { id?: string; }
 interface Topic { name?: string; }
-interface Pin { title?: string; is_video?: boolean; videos?: Object; carousel_data?: PinmonyMenuCarousel; favorited_by_me?: boolean; id: string; pinner?: User; is_repin?: boolean; images?: Record<string,Image>; ai_disclosures?: number[]; gen_ai_topics?: Topic[];
+interface Pin { title?: string; is_video?: boolean; videos?: PinmonyMenuVideos; carousel_data?: PinmonyMenuCarousel; favorited_by_me?: boolean; id: string; pinner?: User; is_repin?: boolean; images?: Record<string,Image>; ai_disclosures?: number[]; gen_ai_topics?: Topic[];
   client_tracking_params?: string; tracking_params?: string; through_id?: string; rec_reason_type?: number; source?: number; }
 interface Resource { status: string; code?: number; endpoint_name?: string; error?: Object; data?: Pin; }
 interface Response { resource_response: Resource; client_context?: Client; }
@@ -83,7 +85,7 @@ export class PinmonyPinMenuNative {
   shareLinkOnly(pin: string): boolean {
     return pin === this.pin && this.current(this.revision) && !!this.raw &&
       (this.raw.is_video === true || !!this.raw.videos ||
-        this.raw.carousel_data?.carousel_slots?.some((slot: PinmonyMenuCarouselSlot): boolean => !!slot?.videos) === true);
+        this.raw.carousel_data?.carousel_slots?.some((slot: PinmonyMenuCarouselSlot): boolean => !!slot?.videos || slot?.is_video === true) === true);
   }
   shareImageSources(pin: string): string[] {
     if (pin !== this.pin || !this.current(this.revision) || !this.raw || this.shareLinkOnly(pin)) return [];
@@ -95,6 +97,39 @@ export class PinmonyPinMenuNative {
       const images: Record<string,Image> | undefined = slot?.images;
       const source: string = (images?.['orig'] || images?.['1200x'] || images?.['736x'] || images?.['474x'])?.url || '';
       if (source.length > 2048 || !/^https:\/\/i\.pinimg\.com\//.test(source)) return [];
+      sources.push(source);
+    }
+    return sources;
+  }
+  private shareVideoSource(videos: PinmonyMenuVideos | undefined): string {
+    let source: string = '';
+    let area: number = -1;
+    const list: Record<string, PinmonyMenuVideoFile> | undefined = videos?.video_list;
+    if (!list) return '';
+    for (const key of Object.keys(list)) {
+      const candidate: PinmonyMenuVideoFile = list[key];
+      if (!candidate || typeof candidate.url !== 'string') continue;
+      const size: number = (candidate.width || 0) * (candidate.height || 0);
+      if (candidate.url && acceptsMediaFileUrl(candidate.url) && size > area) { source = candidate.url; area = size; }
+    }
+    return source;
+  }
+  shareMediaSources(pin: string): string[] {
+    if (pin !== this.pin || !this.current(this.revision) || !this.raw) return [];
+    if (!this.shareLinkOnly(pin)) return this.shareImageSources(pin);
+    if (!this.raw.carousel_data) {
+      const video: string = this.shareVideoSource(this.raw.videos);
+      return video ? [video] : [];
+    }
+    const slots: PinmonyMenuCarouselSlot[] | undefined = this.raw.carousel_data.carousel_slots;
+    if (!slots?.length || slots.length > 100) return [];
+    const sources: string[] = [];
+    for (const slot of slots) {
+      if (!slot) return [];
+      const images: Record<string, Image> | undefined = slot.images;
+      const source: string = slot.videos || slot.is_video ? this.shareVideoSource(slot.videos) :
+        (images?.['orig'] || images?.['1200x'] || images?.['736x'] || images?.['474x'])?.url || '';
+      if (!source) return [];
       sources.push(source);
     }
     return sources;

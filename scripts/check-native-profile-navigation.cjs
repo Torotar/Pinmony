@@ -3,6 +3,37 @@ const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 assert(index.includes(".zIndex(this.detailProfileTransition && (this.detailProfileReturning || !!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)"), 'profile must stay above detail during return but not cover its child panels');
 assert(index.includes("Column() { this.buildProfileContent() }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))"), 'profile transition must have an opaque page surface');
 assert(index.includes("this.profileStore.panel || this.retainedProfilePanel") && index.includes(".zIndex(2).transition(DETAIL_PROFILE_TRANSITION)"), 'list underlay must remain mounted beneath an independently animated profile');
+// Execute the actual profile transition expression with both entry and popped
+// origin states: returning to search must retain the same exit transition.
+const profileTransition = index.match(/\.transition\((this\.detailProfileTransition \? DETAIL_PROFILE_TRANSITION[\s\S]*?)\)\s*\n\s*\}/);
+assert(profileTransition,'profile transition binding');
+const transitionContext = {NATIVE_PAGE_TRANSITION:{kind:'native'},DETAIL_PROFILE_TRANSITION:{kind:'detail'},
+  TransitionEffect:{IDENTITY:{kind:'identity'},asymmetric:(enter,exit)=>({enter,exit}),
+    translate:()=>({animation:()=>({kind:'settings-exit'})})},Curve:{EaseIn:'easeIn'}};
+const selectTransition = vm.runInNewContext('(function(){ return '+profileTransition[1]+'; })',transitionContext);
+for(const origins of [[{tab:1}],[]]) {
+  assert.equal(selectTransition.call({activeTab:1,profileStore:{origins},settingsProfileDepth:-1}),
+    transitionContext.NATIVE_PAGE_TRANSITION,'search profile entry and exit use the shared slide');
+}
+for(const section of ['activity','messages','contacts']) for(const origins of [[{tab:2}],[]]) {
+  assert.equal(selectTransition.call({activeTab:2,profileStore:{origins},inboxStore:{listSection:section},settingsProfileDepth:-1}),
+    transitionContext.NATIVE_PAGE_TRANSITION,section+' list profile entry and exit use matching native slides');
+}
+assert.equal(selectTransition.call({activeTab:1,detailProfileTransition:true,settingsProfileDepth:-1}),
+  transitionContext.DETAIL_PROFILE_TRANSITION,'detail profile handoff keeps its existing transition');
+const nativeTransition=index.slice(index.indexOf('const NATIVE_PAGE_TRANSITION:'),index.indexOf('const DETAIL_PROFILE_TRANSITION:'));
+assert.equal((nativeTransition.match(/translate\(\{ x: '100%' \}\)\.animation\(\{ duration: 180, curve: Curve\.EaseOut \}\)/g)||[]).length,2,
+  'entry and exit slide right with matching duration and curve');
+const searchRoot=fs.readFileSync('entry/src/main/ets/components/PinmonySearchRootContent.ets','utf8');
+assert(index.includes('profileCovered: this.activeTab === 1 && this.profileStore.origins.length > 0'),
+  'search profile keeps its existing search underlay');
+const visibility=searchRoot.match(/\.visibility\(([^\n]+)\)/)[1];
+const visible=vm.runInNewContext('(function(view){return '+visibility+';})',{Visibility:{Visible:1,Hidden:0}});
+assert.equal(visible({nativeSearchPageVisible:()=>false,preparingDetailReturn:false,profileCovered:true}),1);
+assert.equal(visible({nativeSearchPageVisible:()=>false,preparingDetailReturn:false,profileCovered:false}),0);
+assert(searchRoot.includes('.hitTestBehavior(view.nativeSearchPageVisible() ? HitTestMode.Default : HitTestMode.None)') &&
+  searchRoot.includes(".accessibilityLevel(view.nativeSearchPageVisible() ? 'auto' : 'no-hide-descendants')"),
+  'retained search underlay cannot receive touches or accessibility focus');
 function method(name){const start=index.search(new RegExp('  private (?:async )?'+name+'\\(')),end=index.indexOf('\n  private ',start+1);assert(start>=0,name);return index.slice(start,end);}
 const {createArktsLoader}=require('./arkts-module-loader.cjs');
 const loader=createArktsLoader(ts,{'common_foundation':{PinmonyRuntimeLog:{info(){},warn(){}}},'common_network':{PIN_BUSINESS_PIN_READ_ENABLED:true},'common_session':{}});
@@ -34,6 +65,47 @@ return{h,requests,opens,menus};}
 const body=(data)=>JSON.stringify({resource_response:{status:'success',code:0,data,bookmark:'-end-'},client_context:{user:{id:'42'}}}),flush=()=>new Promise(setImmediate);
 async function settle(f,name='visitor'){f.requests.at(-1).resolve(body({id:'99',type:'user',username:name,full_name:name,explicitly_followed_by_me:false}));await flush();f.requests.at(-1).resolve(body([]));await flush();}
 async function main(){
+for(const section of ['activity','messages','contacts']) {
+  const f=fixture(),h=f.h,searchBack=()=>true;
+  h.activeTab=2;h.inboxStore.listSection=section;h.inboxStore.listSearchBack=searchBack;
+  h.inboxStore.inboxScrollOffset=188;h.nativeDisplayAddress=()=>origin+'/inbox/';
+  h.openUserProfile(page);await settle(f);h.backFromUserProfile();
+  assert.equal(h.profileStore.origins.length,0);
+  assert.equal(h.activeTab,2);assert.equal(h.inboxStore.listSection,section);
+  assert.equal(h.inboxStore.listSearchBack,searchBack,'retain mounted list search and navigation state');
+  assert.equal(h.inboxStore.inboxScrollOffset,188);
+}
+for (const parentChat of [false, true]) {
+  const f=fixture(),h=f.h,flow={screen:'chat',pageUrl:origin+'/inbox/',conversationId:'synthetic-chat'};
+  h.inboxMessagesNativeReads.ownsFlow=()=>true;
+  h.activeTab=parentChat?3:2; h.profileChatActive=parentChat;
+  if(parentChat){h.openUserProfile(page);await settle(f);h.profileStore.profileScrollOffset=155;h.profileChatActive=true;}
+  h.inboxStore.inboxFlow=flow;h.inboxStore.chatScrollOffset=240;
+  const depth=h.profileStore.origins.length;
+  h.openUserProfile(parentChat?page:own,false,true);
+  assert(h.chatProfileTransition && h.chatProfileVisible,'chat avatar mounts animated profile independently of root route');
+  assert.equal(h.chatProfileDepth,depth+1);assert.equal(h.profileChatActive,false);
+  assert.equal(h.inboxStore.inboxFlow,flow);assert.equal(h.inboxStore.chatReturnConversation,flow.conversationId);
+  h.openUserProfile(page,false,true);assert.equal(h.profileStore.origins.length,depth+1,'duplicate tap cannot push another profile');
+  await settle(f,parentChat?'visitor':'sample');
+  h.backFromUserProfile();assert.equal(h.chatProfileVisible,false);
+  assert.equal(h.profileStore.origins.length,depth+1,'keep profile state until exit animation completes');
+  h.backFromUserProfile();await new Promise(resolve=>setTimeout(resolve,210));
+  assert.equal(h.profileStore.origins.length,depth);assert.equal(h.chatProfileTransition,false);
+  assert.equal(h.profileChatActive,parentChat);assert.equal(h.inboxStore.inboxFlow,flow);
+  assert.equal(h.inboxStore.chatScrollOffset,240,'avatar navigation preserves chat scroll');
+  if(parentChat)assert.equal(h.profileStore.profileScrollOffset,155,'restore parent profile below its chat');
+}
+assert(index.includes('onUser: (url: string) => this.openUserProfile(url, false, true)'));
+assert(index.includes('if (this.chatProfileTransition && this.chatProfileVisible &&'));
+assert(index.includes(".accessibilityLevel(this.chatProfileTransition ? 'no-hide-descendants' : 'auto')"));
+const staleChat=fixture();staleChat.h.activeTab=2;
+staleChat.h.inboxStore.inboxFlow={screen:'chat',pageUrl:origin+'/inbox/',conversationId:'synthetic-stale'};
+staleChat.h.inboxMessagesNativeReads.ownsFlow=()=>true;
+staleChat.h.openUserProfile(page,false,true);await settle(staleChat);
+staleChat.h.backFromUserProfile();staleChat.h.nativeBusinessSessionContext().generation++;
+await new Promise(resolve=>setTimeout(resolve,210));
+assert.equal(staleChat.h.profileStore.origins.length,1,'old account generation cannot pop a new session navigation');
 const chatProfile=fixture();chatProfile.h.activeTab=2;chatProfile.h.inboxStore.inboxFlow={screen:'chat'};const selfPage=chatProfile.h.authenticatedProfileUrl;assert(selfPage);chatProfile.h.openUserProfile(selfPage);assert.equal(chatProfile.h.profileStore.origins.length,1,'own profile shared in chat must open as a child');assert.equal(chatProfile.requests.length,1);await settle(chatProfile,selfPage.split('/')[3]);
 const f=fixture(),h=f.h;h.openUserProfile(page);assert.equal(h.profileStore.origins[0].page,home);assert.equal(h.currentProfileUrl(),page);assert.equal(f.requests.length,1);await settle(f);assert.equal(h.profileStore.profile.displayName,'visitor');
 h.profileStore.profileScrollOffset=170;h.openUserProfile(origin+'/second/');await settle(f,'second');h.backFromUserProfile();await flush();assert.equal(h.currentProfileUrl(),page);assert.equal(h.profileStore.profile.displayName,'visitor');assert.equal(h.profileStore.profileScrollOffset,170);assert.equal(f.requests.length,4,'native back reuses the verified visitor route');

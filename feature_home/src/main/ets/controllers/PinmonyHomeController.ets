@@ -220,7 +220,7 @@ export class PinmonyHomeController {
         !!pin.id && !!this.ports.pinIdentity(pin.pinUrl) && /^https:\/\//i.test(pin.imageUrl))
         .map((pin: PinmonyHomePin): PinmonyHomePin => {
           return { id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
-            imageWidth: pin.imageWidth, imageHeight: pin.imageHeight, video: pin.video,
+            imageWidth: pin.imageWidth, imageHeight: pin.imageHeight, video: pin.video, isVideo: pin.isVideo === true || !!pin.video,
             title: this.ports.knownPinTitle(this.ports.pinIdentity(pin.pinUrl)) || pin.title || '', hasMore: pin.hasMore,
             saved: this.ports.isSaved(this.ports.pinIdentity(pin.pinUrl)) };
         });
@@ -518,7 +518,7 @@ export class PinmonyHomeController {
     if (!saved || saved.dataSource === 'api') return;
     const pins: PinmonyHomePin[] = saved.pins.map((pin: PinmonyHomePin): PinmonyHomePin => {
       return { id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
-        imageWidth: pin.imageWidth, imageHeight: pin.imageHeight, video: pin.video,
+        imageWidth: pin.imageWidth, imageHeight: pin.imageHeight, video: pin.video, isVideo: pin.isVideo === true || !!pin.video,
         title: this.ports.pinIdentity(pin.pinUrl) === identity ? title : pin.title, hasMore: pin.hasMore, saved: pin.saved };
     });
     this.homeStore.cachedHome = { kind: saved.kind, session: saved.session, pageKey: saved.pageKey,

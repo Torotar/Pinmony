@@ -6,7 +6,7 @@ import { PinmonySearchPorts } from '../models/PinmonySearchPorts';
 import { PinmonySearchStore } from '../stores/PinmonySearchStore';
 import { PIN_SEARCH_UI_API_ENABLED } from '../services/PinmonySearchUiApiScript';
 import { findSearchResult, mergeSearchFeedResults } from '../services/PinmonySearchRetention';
-import { searchPinLinkIdentity, searchShortPinLink } from '../services/PinmonySearchPinLink';
+import { searchPinLinkIdentity, searchShortPinLink, searchProfileLink } from '../services/PinmonySearchPinLink';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 
 // Owns search business state; product navigation/session capabilities are injected.
@@ -607,16 +607,18 @@ export class PinmonySearchController {
     if (typeof value !== 'string' || !value.trim()) return;
     this.cancelSubmittedLink();
     let submittedPin: string = searchPinLinkIdentity(value);
+    let submittedProfile: string = searchProfileLink(value);
     const shortLink: string = searchShortPinLink(value);
-    if (!submittedPin && value.length > 300) return;
+    if (!submittedPin && !submittedProfile && value.length > 300) return;
     this.searchStore.searchQueryClearPage = '';
     const intent: number = ++this.searchStore.searchIntentToken;
     this.searchStore.searchQueryToken++;
     if (!(this.ports.nativeSearch?.() || await this.ports.ensureContext(false)) || intent !== this.searchStore.searchIntentToken) return;
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
     if (!search || !(this.searchStore.searchNativeInputReady || this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
-    if (submittedPin || shortLink) {
-      if (!this.ports.isActive() || this.ports.sheetKind() || !this.ports.openSubmittedPin) return;
+    if (submittedPin || submittedProfile || shortLink) {
+      if (!this.ports.isActive() || this.ports.sheetKind() || !this.ports.openSubmittedPin ||
+          (submittedProfile && !this.ports.openSubmittedProfile)) return;
       PinmonyRuntimeLog.info('PinLinkTrace: submit kind=' + (shortLink ? 'short' : 'complete'));
       this.searchStore.searchCache.put(search, this.searchStore.searchScrollOffset);
       this.invalidatePending();
@@ -631,20 +633,22 @@ export class PinmonySearchController {
           this.ports.isActive() && !this.ports.sheetKind() && search.pageKey === this.ports.currentPageKey();
         try {
           if (!this.ports.resolveSubmittedPin) throw new Error('pin-link-unavailable');
-          this.ports.showMessage(PinmonyI18n.message('pm_loading_please_wait_b6aaac70'));
           submittedPin = await this.ports.resolveSubmittedPin(shortLink, current);
           if (!current()) return;
-          if (!/^[0-9]{1,30}$/.test(submittedPin)) throw new Error('pin-link-unresolved');
+          submittedProfile = searchProfileLink(submittedPin);
+          if (!/^[0-9]{1,30}$/.test(submittedPin) && !submittedProfile) throw new Error('pin-link-unresolved');
+          if (submittedProfile && !this.ports.openSubmittedProfile) throw new Error('profile-link-unavailable');
         } catch (_) {
           PinmonyRuntimeLog.info('PinLinkTrace: submit-result current=' + current().toString() + ' outcome=not-opened');
-          if (current()) this.ports.showMessage(PinmonyI18n.message('pm_unable_to_open_pin_please_retry_1260c20b'));
+          if (current()) this.ports.showMessage(PinmonyI18n.message('pm_unable_to_open_link_please_retry_99322633'));
           return;
         } finally {
           if (generation === this.submittedLinkGeneration) this.searchStore.submittedPinLoading = false;
         }
       }
       PinmonyRuntimeLog.info('PinLinkTrace: submit-result outcome=open-requested');
-      this.ports.openSubmittedPin(submittedPin, search.pageKey);
+      if (submittedProfile) this.ports.openSubmittedProfile?.(submittedProfile, search.pageKey);
+      else this.ports.openSubmittedPin(submittedPin, search.pageKey);
       return;
     }
     if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();

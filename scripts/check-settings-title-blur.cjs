@@ -19,7 +19,7 @@ function objectAt(source, offset) {
 for (const [file, profile] of pages) {
   const source = fs.readFileSync(file, 'utf8');
   assert(!source.includes('immersiveLightEnabled'), file + ': avoid omitted struct getters');
-  const offset = source.includes('private options()') ? source.indexOf('return {', source.indexOf('private options()')) : source.indexOf('.titleBar({');
+  const offset = source.includes('private options()') ? source.indexOf('return {', source.indexOf('private options()')) : source.indexOf('.titleBar(');
   assert(offset >= 0, file);
   const expression = objectAt(source, offset);
   const evaluate = vm.runInNewContext(ts.transpileModule('function options() { return ' + expression + '; } options;',

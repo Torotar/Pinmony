@@ -22,6 +22,8 @@ function fixture() {
   return { native, timers, logs };
 }
 let f = fixture(); now += 16; f.timers.shift()();
+assert(f.logs.some(x => x.includes('event=state-ready') && x.includes('elapsedMs=0')),
+  'retained data readiness is measured before callback delay');
 assert(f.logs.some(x => x.includes('event=cache-visible')));
 assert(f.logs.some(x => x.includes('event=content-ready') && x.includes('elapsedMs=16')), 'normal empty retained content also counts');
 for (const change of [n => n.tabRequestToken++, n => n.authStatus = 'unauthenticated', n => n.activeTab = 1,

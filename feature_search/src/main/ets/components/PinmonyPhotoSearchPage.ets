@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyImageSearchView, PinmonyImageSearchResult, PinmonyImageCrop, PinmonyImageSearchOrigin } from 'common_ui';
@@ -5,6 +6,7 @@ import { PinmonyPhotoHistoryOrigin } from '../models/PinmonyPhotoHistory';
 
 @Component
 export struct PinmonyPhotoSearchPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
@@ -69,7 +71,7 @@ export struct PinmonyPhotoSearchPage {
     .mode(NavDestinationMode.STANDARD)
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideTitleBar(false)
-    .titleBar(this.photoSearchTitleBarOptions())
+    .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.photoSearchTitleBarOptions(), this.hdsDarkMode))
     .bindToScrollable([])
     .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
       { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })

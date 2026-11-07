@@ -40,7 +40,19 @@ loading.phase=()=>'';loading.isDiscoveryBoard=()=>false;assert.equal(loading.ini
 loading.snapshot={loading:true,ready:true};assert.equal(loading.initialBoardLoading(),true,'metadata readiness must not move the spinner before the initial feed finishes');
 loading.boardRefreshActive=true;assert.equal(loading.initialBoardLoading(),false,'gesture refresh stays below the title');loading.boardRefreshActive=false;
 assert(source.includes('!this.initialBoardLoading() && !this.snapshot.postOperationLoading'),'initial discovery loading is not duplicated beneath the header');
-assert.match(source,/else if \(this.initialBoardLoading\(\)\) \{\s*Stack\(\{ alignContent: Alignment.Center \}\) \{\s*LoadingProgress\(\)[\s\S]*?\.width\('100%'\)\.height\('100%'\)\.hitTestBehavior\(HitTestMode.None\)/,'indicator uses a full-page non-scrolling overlay');
+assert.match(source,/else if \(this.initialBoardLoading\(\)\) \{\s*Stack\(\{ alignContent: Alignment.Center \}\) \{\s*LoadingProgress\(\)[\s\S]*?\.width\('100%'\)\.height\('100%'\)/,'indicator uses a full-page non-scrolling overlay');
+const maskStart=source.indexOf('  private discoveryLoadingMask('),maskEnd=source.indexOf('\n  private ',maskStart+1);
+const Mask=vm.runInNewContext(ts.transpileModule('class Mask {'+source.slice(maskStart,maskEnd)+'} Mask;',
+  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const mask=new Mask();mask.isDiscoveryBoard=()=>true;mask.initialBoardLoading=()=>loading.initialBoardLoading();
+loading.snapshot={loading:true,ready:false};assert.equal(mask.discoveryLoadingMask(),true);
+loading.snapshot={loading:false,ready:true};assert.equal(mask.discoveryLoadingMask(),false,'success removes mask');
+loading.snapshot={loading:false,ready:false,error:'unavailable'};assert.equal(mask.discoveryLoadingMask(),false,'failure does not cover retry');
+loading.snapshot={loading:true,refreshing:true};assert.equal(mask.discoveryLoadingMask(),false,'refresh keeps its own indicator');
+loading.snapshot={loading:true};mask.isDiscoveryBoard=()=>false;assert.equal(mask.discoveryLoadingMask(),false,'ordinary board unchanged');
+assert(source.includes(".backgroundColor(this.discoveryLoadingMask() ? '#66808080' : Color.Transparent)"));
+assert(source.includes('.hitTestBehavior(this.discoveryLoadingMask() ? HitTestMode.Block : HitTestMode.None)'));
+assert(source.includes("this.snapshot.postOperationLoading || this.discoveryLoadingMask() ? 'no-hide-descendants' : 'auto'"));
 for (const ready of [false, true]) {
   host.snapshot = { pageKey: 'https://www.pinterest.com/example/pins/', ready, editable: false, canFollow: true };
   assert.equal(host.boardTitleMenu().length, 0, 'all Pins collection has no title actions even during loading');

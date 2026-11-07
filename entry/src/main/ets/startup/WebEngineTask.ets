@@ -1,11 +1,14 @@
 import { StartupTask, common } from '@kit.AbilityKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { webview } from '@kit.ArkWeb';
+import lazy { webview } from '@kit.ArkWeb';
+
+PinmonyRuntimeLog.info('StartupBoundary: webengine-module-evaluated');
 
 @Sendable
 export default class WebEngineTask extends StartupTask {
   async init(context: common.AbilityStageContext): Promise<string> {
     const startedAt: number = Date.now();
+    PinmonyRuntimeLog.info('StartupBoundary: webengine-init-enter');
     try {
       webview.WebviewController.setWebDebuggingAccess(false);
     } catch (_) { PinmonyRuntimeLog.warn('Web: debug configuration unavailable'); }

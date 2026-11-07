@@ -20,6 +20,7 @@ function fixture() {
     nativeRootTabsVisible() { return this.visible; },
     pagePerformance: { mark() {} }, markRootPerformance() {},
     businessSession: { confirm() { confirms++; } },
+    inboxUnreadNativeReads: { poll() {} }, pollVisibleInbox() {},
     coordinatorTasks: { timeout(callback, delay) { tasks.push({ callback, delay }); } },
     homeNativeReads: { demand() { reads++; } } });
   return { host, tasks, reads: () => reads, confirms: () => confirms };
@@ -27,14 +28,14 @@ function fixture() {
 for (const entry of ['auth', 'visible']) {
   const f = fixture();
   if (entry === 'auth') f.host.confirmBusinessSession(); else f.host.onRootPageVisible(0, true);
-  assert.equal(f.tasks.length, 1); assert.equal(f.tasks[0].delay, 0);
+  assert.equal(f.tasks.length, entry === 'auth' ? 1 : 2); assert(f.tasks.every(task => task.delay === 0));
   assert.equal(f.reads(), 0, 'read remains asynchronous');
   if (entry === 'auth') assert.equal(f.confirms(), 1, 'session confirmed before scheduling');
-  f.tasks[0].callback(); assert.equal(f.reads(), 1);
+  f.tasks.forEach(task => task.callback()); assert.equal(f.reads(), 1);
 }
 for (const mutate of [h => { h.activeTab = 1; }, h => { h.tabRequestToken++; }, h => { h.visible = false; }]) {
   const f = fixture(); f.host.onRootPageVisible(0, true); mutate(f.host);
-  f.tasks[0].callback(); assert.equal(f.reads(), 0);
+  f.tasks.forEach(task => task.callback()); assert.equal(f.reads(), 0);
 }
 const unauthenticated = fixture(); unauthenticated.host.authStatus = 'checking';
 unauthenticated.host.confirmBusinessSession(); assert.equal(unauthenticated.tasks.length, 0);

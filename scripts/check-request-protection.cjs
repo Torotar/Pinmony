@@ -4,9 +4,9 @@ const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 const logs = [];
 const foundation = { PinmonyRuntimeLog: { info: x => logs.push(x), warn: x => logs.push(x) } };
-function compiled(file, requireFn) {
+function compiled(file, requireFn, source) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+  vm.runInNewContext(ts.transpileModule(source ?? fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   }).outputText, { exports, require: requireFn, Promise, setTimeout, clearTimeout, console });
   return exports;
@@ -152,9 +152,13 @@ function modeChecks() {
   for (const debug of [true, false]) {
     const mode = compiled('common_foundation/src/main/ets/services/PinmonyRequestMode.ets', name =>
       name.includes('BuildProfile') ? {default: {DEBUG: debug}} : foundation);
-    assert.equal(mode.allowsSpeculativeReads(), !debug);
+    assert.equal(mode.allowsSpeculativeReads(), true, 'normal builds retain bounded prefetch');
+    const override = compiled('common_foundation/src/main/ets/services/PinmonyRequestMode.ets', name =>
+      name.includes('BuildProfile') ? {default: {DEBUG: debug}} : foundation,
+      fs.readFileSync('common_foundation/src/main/ets/services/PinmonyRequestMode.ets', 'utf8').replace('PIN_TEST_REQUEST_MODE_ENABLED: boolean = false', 'PIN_TEST_REQUEST_MODE_ENABLED: boolean = true'));
+    assert.equal(override.allowsSpeculativeReads(), !debug, 'explicit debug override remains available; release ignores it');
   }
-  const source = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
+  const source = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
   function method(name) {
     const start = source.indexOf('  private ' + name + '(');
     const end = source.indexOf('\n  private ', start + 1);
@@ -169,6 +173,7 @@ function modeChecks() {
     }).outputText, ctx);
     const home = new ctx.Home(); let pages = 0;
     Object.assign(home, {home: {dataSource: 'api', pins: [{id: 'synthetic'}], session: 1, selectedTab: 'all'},
+      paneMounted: true, paneActive: true, paginationWindow: { reserve: () => 12 },
       paginationTrace(){},paginationReady:true,feedActive: true, actionsReady: true, visibleFirst: 0, visibleLast: 0, prefetchNotBefore: 0,
       onLoadMore: () => pages++});
     home.prefetchNextScreen();

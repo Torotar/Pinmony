@@ -1,5 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
 import { display } from '@kit.ArkUI';
+import { image } from '@kit.ImageKit';
+import { PinmonyJpegDecode, PinmonyJpegLease, acceptsSoftwareJpeg } from 'common_network';
 
 /** A Pinterest image candidate keyed by the size name returned by Pinterest. */
 export interface PinImageSource {
@@ -108,8 +110,10 @@ export function pickCoverImageUrl(images: PinImageSources | undefined, cardWidth
 }
 
 /** Returns the selected source key for diagnostics without exposing a URL. */
-export function pickCoverImageTier(images: PinImageSources | undefined, cardWidthVp: number): string {
-  const targetPx: number = Math.max(0, cardWidthVp) * currentDensityPixels();
+export function pickCoverImageTier(images: PinImageSources | undefined, cardWidthVp: number,
+  requestedTargetPx: number = 0): string {
+  const targetPx: number = Number.isFinite(requestedTargetPx) && requestedTargetPx > 0 ?
+    requestedTargetPx : Math.max(0, cardWidthVp) * currentDensityPixels();
   let largestKey: string = '';
   let largestWidth: number = -1;
   for (const tier of FINITE_COVER_TIERS) {
@@ -122,6 +126,20 @@ export function pickCoverImageTier(images: PinImageSources | undefined, cardWidt
   }
   if (validImageTier(images, 'orig')) return 'orig';
   return largestKey;
+}
+
+// Use only an existing smaller rendition, once, after Image reports a final
+// failure. Hardware warnings followed by a successful decode never enter here.
+function pickCoverRecoveryTier(images: PinImageSources, currentTier: string, failedUrl: string): string {
+  const current: ImageTier | undefined = FINITE_COVER_TIERS.find((tier: ImageTier): boolean => tier.key === currentTier);
+  if (!current && currentTier !== 'orig') return '';
+  const limit: number = current ? current.width : Number.POSITIVE_INFINITY;
+  for (let index: number = FINITE_COVER_TIERS.length - 1; index >= 0; index--) {
+    const tier: ImageTier = FINITE_COVER_TIERS[index];
+    const candidate: string = validImageUrl(images, tier.key);
+    if (tier.width < limit && candidate.length > 0 && candidate !== failedUrl) return tier.key;
+  }
+  return '';
 }
 
 export interface SmartImageOptions {
@@ -140,11 +158,18 @@ export struct SmartImage {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('resetImage') url: string = '';
+  @Prop @Watch('decodeModeChanged') useSharedDecode: boolean = true;
   @Prop @Watch('resetImage') images: PinImageSources = {};
   @Prop @Watch('resetImage') widthVp: number = 0;
   @Prop heightVp: number = 0;
-  @Prop targetPx: number = 0;
+  @Prop @Watch('resetImage') targetPx: number = 0;
   @Prop borderRadiusVp: number = RECOMMEND_CARD_RADIUS_VP;
+  @Prop @Watch('loadingChanged') loadingActive: boolean = true;
+  @Prop @Watch('loadingChanged') viewportOnly: boolean = false;
+  @Prop loadPriority: number = 1;
+  private inViewport: boolean = false;
+  @State private loadAllowed: boolean = true;
+  @State private nativeSourceAdmitted: boolean = false;
   onLoaded?: () => void;
   onError?: (code: number) => void;
   onAudit?: (tier: string, targetPx: number, sourceHeightPx: number) => void;
@@ -155,6 +180,12 @@ export struct SmartImage {
   @State private imageRevision: number = 0;
   private imageVisible: boolean = false;
   private imageStartedAt: number = 0;
+  private requestedSourceUrl: string = '';
+  private recoveryAttempted: boolean = false;
+  @State private decodedBitmap: image.PixelMap | undefined = undefined;
+  @State private softwarePending: boolean = false;
+  private decodeLease: PinmonyJpegLease | undefined = undefined;
+  private softwareAttemptedRevision: number = -1;
 
   aboutToAppear(): void {
     this.imageVisible = true;
@@ -163,21 +194,85 @@ export struct SmartImage {
 
   aboutToDisappear(): void {
     this.imageVisible = false;
+    this.releaseDecode();
+    this.softwareAttemptedRevision = -1;
+  }
+
+  private releaseDecode(): void {
+    this.nativeSourceAdmitted = false;
+    this.decodedBitmap = undefined;
+    this.decodeLease?.release();
+    this.decodeLease = undefined;
+    this.softwarePending = false;
+  }
+
+  private decodeModeChanged(): void {
+    if (!this.imageVisible) return;
+    this.releaseDecode();
+    this.softwareAttemptedRevision = -1;
+    this.imageRevision++;
+    this.loadDecodedImage();
+  }
+
+  private loadDecodedImage(): void {
+    if (!this.imageVisible || this.softwareAttemptedRevision === this.imageRevision) return;
+    this.loadAllowed = this.loadingActive !== false && (this.viewportOnly !== true || this.inViewport);
+    this.releaseDecode();
+    this.softwareAttemptedRevision = this.imageRevision;
+    this.nativeSourceAdmitted = this.useSharedDecode === false && this.loadAllowed;
+    if (this.useSharedDecode === false || !acceptsSoftwareJpeg(this.sourceUrl)) return;
+    const revision: number = this.imageRevision;
+    const lease: PinmonyJpegLease = PinmonyJpegDecode.acquire(this.sourceUrl, this.loadAllowed, this.loadPriority ?? 1);
+    this.decodeLease = lease;
+    if (lease.taskId > 0) this.traceImage('pipeline-task-' + lease.taskId.toString());
+    this.decodedBitmap = lease.bitmap;
+    this.softwarePending = !this.decodedBitmap;
+    lease.ready.then((bitmap: image.PixelMap): void => {
+      if (!this.imageVisible || revision !== this.imageRevision || this.decodeLease !== lease) return;
+      this.decodedBitmap = bitmap;
+      this.softwarePending = false;
+      this.traceImage('software-ready');
+    }).catch((): void => {
+      if (!this.imageVisible || revision !== this.imageRevision || this.decodeLease !== lease) return;
+      this.releaseDecode();
+      // A failed download or unsupported payload still uses the existing native
+      // Image error/recovery path. Never issue an unbounded same-URL retry loop.
+      this.traceImage('native-fallback');
+    });
+  }
+
+  private loadingChanged(): void {
+    this.loadAllowed = this.loadingActive !== false && (this.viewportOnly !== true || this.inViewport);
+    if (this.imageVisible && this.useSharedDecode === false && this.loadAllowed) this.nativeSourceAdmitted = true;
+    this.decodeLease?.setActive?.(this.imageVisible && this.loadAllowed);
+  }
+  private canRenderImage(): boolean {
+    return this.sourceUrl.length > 0 && !this.softwarePending &&
+      (this.loadAllowed || this.nativeSourceAdmitted || !!this.decodedBitmap);
   }
 
   private resetImage(): void {
-    const nextTier: string = pickCoverImageTier(this.images, this.widthVp);
+    // The owner already supplies the window's pixel target. Reuse it rather
+    // than doing synchronous display queries while lazy cards are created.
+    const target: number = Number.isFinite(this.targetPx) && this.targetPx > 0 ? this.targetPx : 0;
+    const nextTier: string = pickCoverImageTier(this.images, this.widthVp, target);
     const nextUrl: string = validImageUrl(this.images, nextTier) || this.url;
     // Snapshot object identity and layout updates do not invalidate a decoded source.
-    if (this.imageRevision > 0 && nextUrl === this.sourceUrl) return;
+    if (this.imageRevision > 0 && nextUrl === this.requestedSourceUrl) {
+      if (this.imageVisible && !this.decodeLease && this.phase !== 'failed') this.loadDecodedImage();
+      return;
+    }
+    this.requestedSourceUrl = nextUrl;
+    this.recoveryAttempted = false;
     this.imageRevision++;
     this.imageStartedAt = Date.now();
     this.phase = 'loading';
     this.sourceTier = nextTier;
     this.sourceUrl = nextUrl;
+    this.loadDecodedImage();
     if (this.sourceTier.length === 0 && this.sourceUrl.length > 0) this.sourceTier = 'fallback';
     if (this.onAudit && this.sourceUrl.length > 0) {
-      this.onAudit(this.sourceTier, this.widthVp * currentDensityPixels(), this.displayHeightPx());
+      this.onAudit(this.sourceTier, target || this.widthVp * currentDensityPixels(), this.displayHeightPx());
     }
   }
 
@@ -195,20 +290,32 @@ export struct SmartImage {
 
   private failImage(revision: number, code: number): void {
     if (!this.imageVisible || revision !== this.imageRevision || this.phase === 'loaded' || this.phase === 'failed') return;
+    const recoveryTier: string = this.recoveryAttempted ? '' : pickCoverRecoveryTier(this.images, this.sourceTier, this.sourceUrl);
+    if (recoveryTier.length > 0) {
+      this.recoveryAttempted = true;
+      this.imageRevision++;
+      this.sourceTier = recoveryTier;
+      this.sourceUrl = validImageUrl(this.images, recoveryTier);
+      this.loadDecodedImage();
+      this.traceImage('fallback');
+      return;
+    }
     this.phase = 'failed';
     this.traceImage('failed');
     if (this.onError) this.onError(Number.isFinite(code) ? code : 0);
   }
 
   private displayHeightPx(): number {
-    return Math.max(1, this.heightVp * currentDensityPixels());
+    const density: number = this.widthVp > 0 && Number.isFinite(this.targetPx) && this.targetPx > 0 ?
+      this.targetPx / this.widthVp : currentDensityPixels();
+    return Math.max(1, this.heightVp * density);
   }
 
   @Builder
   private imageBody(revision: number) {
     Stack({ alignContent: Alignment.Center }) {
-      if (this.sourceUrl.length > 0) {
-        Image(this.sourceUrl)
+      if (this.canRenderImage()) {
+        Image(this.decodedBitmap || this.sourceUrl)
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
@@ -231,6 +338,10 @@ export struct SmartImage {
     .backgroundColor('#F0F0F0')
     .borderRadius(this.borderRadiusVp)
     .clip(true)
+    .onVisibleAreaChange([0, 0.01], (visible: boolean, ratio: number) => {
+      this.inViewport = visible && ratio > 0;
+      this.loadingChanged();
+    })
   }
 
   build() {

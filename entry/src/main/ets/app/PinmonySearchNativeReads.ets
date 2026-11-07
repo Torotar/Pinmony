@@ -351,7 +351,14 @@ export class PinmonySearchNativeReads {
           if (append && feed?.snapshot.results.some((pin: PinmonySearchResult): boolean => pin.id === value.id)) return;
           if (!incoming.some((pin: PinmonySearchResult): boolean => pin.id === value.id)) incoming.push(value);
         });
-        if (resource.data.results.some((item: Item): boolean => !this.promoted(item)) && mappedCount === 0) {
+        // Terminal video feeds can contain non-Pin presentation records. Their type
+        // is not restricted to "message". Never discard malformed business objects.
+        const videoEmpty: boolean = options.scope === 'videos' && mappedCount === 0 &&
+          (!resource.bookmark || resource.bookmark === '-end-') && resource.data.results.length > 0 &&
+          resource.data.results.every((item: Item): boolean => !!item && typeof item.type === 'string' &&
+            item.type !== 'pin' && item.type !== 'board' && item.type !== 'user' &&
+            !item.images && !item.videos);
+        if (!videoEmpty && resource.data.results.some((item: Item): boolean => !this.promoted(item)) && mappedCount === 0) {
           PinmonyRuntimeLog.info('SearchNativeTrace: phase=unmapped count=' + resource.data.results.length.toString() + ' pins=' + resource.data.results.filter((item: Item): boolean => item?.type === 'pin').length.toString());
           throw new Error('unknown-search-items');
         }

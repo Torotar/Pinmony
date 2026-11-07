@@ -8,7 +8,9 @@ const Host = vm.runInNewContext(ts.transpileModule('class Host {' + method + '} 
 { Date: { now: () => now }, PinmonyRuntimeLog: { info: s => logs.push(s) } });
 const host = new Host();
 Object.assign(host, { paneActive: false, home: { pins: [] }, visibleFirst: 0, visibleLast: -1,
-  paginationTraceAt: 0, paginationTraceKey: '' });
+  paginationTraceAt: 0, paginationTraceKey: '', paginationWindow: {
+    reserve: () => 12, diagnostic: () => ' readMs=1800 pinsPerSecond=0.0'
+  } });
 host.paginationTrace('speculative-disabled'); assert.equal(logs.length, 0);
 host.home.pins = [1]; host.paginationTrace('speculative-disabled'); assert.equal(logs.length, 0);
 host.paneActive = true; host.paginationTrace('speculative-disabled'); assert.equal(logs.length, 1);
@@ -18,4 +20,5 @@ host.visibleLast = 1; host.paginationTrace('speculative-disabled'); assert.equal
 now += 1001; host.paginationTrace('speculative-disabled'); assert.equal(logs.length, 3);
 host.paneActive = false; now += 1001; host.paginationTrace('request-failed');
 assert(logs.at(-1).includes('request-failed'), 'non-speculative diagnostics remain available');
+assert.match(logs.at(-1), /remaining=0 reserve=12 nearEndReserve=12 readMs=1800 pinsPerSecond=0.0/);
 console.log('Home pagination diagnostics: inactive/empty panes stay quiet, unchanged state is deduplicated, changes are throttled and other reasons remain observable');

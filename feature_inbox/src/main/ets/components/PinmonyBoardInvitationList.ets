@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -8,6 +9,7 @@ import { PinmonyBoardInvitation, PinmonyBoardInvitations } from '../models/Pinmo
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 @Component
 export struct PinmonyBoardInvitationList {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -80,7 +82,7 @@ export struct PinmonyBoardInvitationList {
             Column() { this.content() }.width('100%').padding({top:this.titleContentInset()})
           }.width('100%').height('100%').align(Alignment.Top)
             .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
-        }.titleBar(this.titleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
+        }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleOptions(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
           .onBackPressed(() => { this.onBack(); return true; })
           .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))

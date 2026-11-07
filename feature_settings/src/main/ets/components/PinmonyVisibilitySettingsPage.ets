@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { HdsSnackBar } from '@kit.UIDesignKit';
@@ -10,6 +11,7 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyVisibilitySettingsPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -137,12 +139,12 @@ export struct PinmonyVisibilitySettingsPage {
         LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
-    }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
       .bindToScrollable([this.scroller]).onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.store.confirmOpen, this.privacySheet(), {
-        radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisibilitySettingsPage.store.confirmOpen radius=four-corners-32vp'); },
+        radius: LengthMetrics.vp(32),
+        onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisibilitySettingsPage.store.confirmOpen radius=uniform-32vp'); },
         height: Math.min(380, this.viewportHeight * 0.8), showClose: true, dragBar: false,
         backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
         onWillDismiss: (action: DismissSheetAction) => { if (this.store.busy) return; this.store.confirmOpen = false; action.dismiss(); }

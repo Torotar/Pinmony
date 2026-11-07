@@ -1,4 +1,5 @@
 import { PINMONY_BUILD_IDENTITY } from '../app/PinmonyBuildIdentity';
+import { PinmonyInboxNoticeTap } from '../app/PinmonyInboxNoticeTap';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
@@ -6,7 +7,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import lazy { window } from '@kit.ArkUI';
 import lazy { deviceInfo } from '@kit.BasicServicesKit';
 import lazy { webview } from '@kit.ArkWeb';
-import lazy { NetworkManager } from 'common_network';
+import lazy { NetworkManager, PinmonyJpegDecode } from 'common_network';
 
 const DOMAIN = 0x0000;
 const MODULE_EVALUATED_AT: number = Date.now();
@@ -20,7 +21,10 @@ export default class EntryAbility extends UIAbility {
     const stageReadyAt: number = AppStorage.get<number>('pinmonyAbilityStageReadyAt') || 0;
     PinmonyRuntimeLog.info('StartupBoundary: ability-constructed sinceStageMs=' +
       (stageReadyAt > 0 ? Date.now() - stageReadyAt : -1).toString() +
-      ' sinceModuleMs=' + (Date.now() - MODULE_EVALUATED_AT).toString());
+      ' sinceModuleMs=' + (Date.now() - MODULE_EVALUATED_AT).toString() +
+      ' sinceTasksMs=' + (AppStorage.get<number>('pinmonyStartupTasksCompletedAt') ?
+        Date.now() - AppStorage.get<number>('pinmonyStartupTasksCompletedAt')! : -1).toString() +
+      ' stageTimingScope=stage-lifetime userLaunchDuration=false');
   }
   private mainWindow: window.Window | undefined = undefined;
   private lifecycleSequence: number = 0;
@@ -72,6 +76,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    PinmonyInboxNoticeTap.receive(want);
     AppStorage.setOrCreate<number>('pinmonyAbilityCreatedAt', Date.now());
     PinmonyRuntimeLog.info('StartupBoundary: ability-onCreate sinceModuleMs=' +
       (Date.now() - MODULE_EVALUATED_AT).toString() + ' launchReason=' + launchParam.launchReason.toString());
@@ -98,6 +103,7 @@ export default class EntryAbility extends UIAbility {
     this.logLifecycle('destroy-start', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString());
     NetworkManager.destroy();
+      PinmonyJpegDecode.clear();
     try {
       errorManager.off('globalErrorOccurred', this.errorObserver);
       errorManager.off('globalUnhandledRejectionDetected', this.rejectionObserver);
@@ -110,6 +116,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
+    PinmonyI18n.syncResourceColorMode(this.context);
     PinmonyI18n.syncSystemLanguage();
     this.logLifecycle('configuration-update', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString() + ' colorMode=' +
@@ -209,15 +216,27 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
+  private lastColorModeTrace: string = '';
   private syncSystemColorMode(colorMode?: ConfigurationConstant.ColorMode): void {
     try {
+      const preference: string = AppStorage.get<string>('themePreference') || 'system';
       let currentMode: number | undefined = colorMode;
-      if (currentMode === undefined || currentMode === ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET) {
+      if (preference === 'system' &&
+        (currentMode === undefined || currentMode === ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET)) {
         currentMode = this.context.resourceManager.getConfigurationSync().colorMode;
       }
-      const preference: string = AppStorage.get<string>('themePreference') || 'system';
-      const isDark: boolean = preference === 'dark' || preference === 'system' && currentMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
-      AppStorage.setOrCreate<boolean>('systemDarkMode', isDark);
+      const knownMode: boolean = currentMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK ||
+        currentMode === ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT;
+      const isDark: boolean = preference === 'dark' || preference === 'system' &&
+        (knownMode ? currentMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK :
+          AppStorage.get<boolean>('systemDarkMode') === true);
+      if (AppStorage.get<boolean>('systemDarkMode') !== isDark) AppStorage.setOrCreate<boolean>('systemDarkMode', isDark);
+      const trace: string = 'preference=' + preference + ' configuration=' +
+        (currentMode === undefined ? 'unset' : currentMode.toString()) + ' effectiveDark=' + isDark.toString();
+      if (trace !== this.lastColorModeTrace) {
+        this.lastColorModeTrace = trace;
+        PinmonyRuntimeLog.info('ThemeTrace: ' + trace);
+      }
       if (!this.mainWindow) {
         return;
       }
@@ -233,6 +252,10 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    PinmonyInboxNoticeTap.receive(want);
+  }
+
   onForeground(): void {
     // Ability has brought to foreground
     this.logLifecycle('foreground', 'windowStage=' + this.windowStageReady.toString() +
@@ -243,6 +266,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onMemoryLevel(level: AbilityConstant.MemoryLevel): void {
+    PinmonyJpegDecode.clearUnused();
     if (level !== AbilityConstant.MemoryLevel.MEMORY_LEVEL_LOW &&
       level !== AbilityConstant.MemoryLevel.MEMORY_LEVEL_CRITICAL) return;
     const sequence: number = AppStorage.get<number>('pinmonyMemoryPressureSequence') || 0;

@@ -12,7 +12,7 @@ vm.runInNewContext(ts.transpileModule('class Viewer {' + methods + '} globalThis
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, scope);
 const changes = [], view = new scope.Viewer();
 let closed = 0;
-Object.assign(view, { scaleValue: 1, dx: 0, dy: 0, viewportWidth: 360, viewportHeight: 720,
+Object.assign(view, { active: true, transitioning: false, paging: false, scaleValue: 1, dx: 0, dy: 0, viewportWidth: 360, viewportHeight: 720,
   detail: { imageWidth: 360, imageHeight: 720 }, controls: true, onControlsChange: visible => changes.push(visible) });
 view.motionVersion = 0;
 view.onClose = () => closed++;
@@ -88,6 +88,10 @@ view.multiTouch = true; const count = animations.length; view.startInertia(1000,
 view.multiTouch = false; view.scaleValue = 1; view.startInertia(1000, 0); assert.equal(animations.length, count);
 view.scaleValue = 3; view.startInertia(1000, 0); const background = animations.at(-1); view.active = false;
 const previous = view.dx; background.onFrame(0.2); assert.equal(view.dx, previous); view.stopInertia(); assert(background.cancelled);
+Object.assign(view, { naturalWidth: 800, naturalHeight: 400, scaleValue: 2 });
+view.moveImage(1000, 1000); assert.equal(view.dx, 180); assert.equal(view.dy, 0, 'selected landscape photo cannot pan into vertical whitespace');
+Object.assign(view, { naturalWidth: 400, naturalHeight: 800 });
+view.moveImage(1000, 1000); assert.equal(view.dx, 180); assert.equal(view.dy, 360, 'selected portrait photo restores its own vertical pan range');
 assert.match(source, /GestureGroup\(GestureMode.Exclusive,\s*TapGesture\(\{ count: 2 \}\)/);
 assert(source.includes('PinchGesture()') && source.includes('PanGesture()'));
 const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');

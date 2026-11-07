@@ -3,6 +3,10 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('common_ui/src/main/ets/components/SmartImage.ets', 'utf8');
+const recovery = vm.runInNewContext(ts.transpileModule(source.slice(0, source.indexOf('export interface SmartImageOptions'))
+  .replace(/^import[^\n]*\n/gm, '') + '\npickCoverRecoveryTier;', {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
+}).outputText, { exports: {} });
 const methods = ['completeImage', 'failImage', 'traceImage', 'resetImage', 'displayHeightPx'].map(name => {
   const match = source.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'));
   assert(match); return match[0];
@@ -10,9 +14,12 @@ const methods = ['completeImage', 'failImage', 'traceImage', 'resetImage', 'disp
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + methods.join('\n') + '} Host;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText, { pickCoverImageTier: images => images.tier,
-  pickCoverImageUrl: images => images.url, currentDensityPixels: () => 3 });
+  validImageUrl: (images, key) => images[key]?.url || images.url,
+  pickCoverImageUrl: images => images.url, currentDensityPixels: () => 3,
+  pickCoverRecoveryTier: recovery });
 let loaded = 0, errors = [];
 const image = new Host();
+image.loadDecodedImage = () => {};
 Object.assign(image, { imageVisible: true, imageRevision: 1, phase: 'loading',
   onLoaded: () => loaded++, onError: code => errors.push(code) });
 image.completeImage(1, 0);
@@ -40,8 +47,28 @@ assert.equal(image.phase, 'loaded');
 image.images = { tier: '736x', url: 'synthetic-b' }; image.resetImage();
 assert.equal(image.imageRevision, firstRevision + 1, 'a changed selected source creates a new generation');
 assert.equal(image.phase, 'loading');
-const home = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets', 'utf8');
-assert.match(home, /event\?\.loadingStatus !== 1/);
+// Exercise the real rendition selector and callbacks, including stale failures
+// and unchanged snapshots arriving during/after recovery.
+const candidates = { tier: '564x', url: 'full', '564x': {url:'full'}, '474x': {url:'smaller'}, '236x': {url:'smallest'} };
+Object.assign(image, { images:candidates, sourceUrl:'full', requestedSourceUrl:'full', sourceTier:'564x',
+  imageRevision:10, phase:'loading', recoveryAttempted:false });
+const beforeErrors=errors.length, beforeLoaded=loaded;
+image.failImage(10, 123);
+assert.equal(image.sourceUrl,'smaller');assert.equal(image.imageRevision,11);
+assert.equal(image.phase,'loading');assert.equal(errors.length,beforeErrors);
+image.failImage(10, 123);assert.equal(image.imageRevision,11,'old source error cannot consume recovery');
+image.resetImage();assert.equal(image.imageRevision,11,'snapshot refresh cannot restart the failed source');
+image.completeImage(11,1);assert.equal(loaded,beforeLoaded+1);
+image.resetImage();assert.equal(image.sourceUrl,'smaller','successful recovery survives equivalent snapshots');
+Object.assign(image,{phase:'loading',imageRevision:12,recoveryAttempted:true});
+image.failImage(12,456);image.failImage(12,456);
+assert.equal(image.phase,'failed');assert.equal(errors.length,beforeErrors+1,'only terminal failure is reported once');
+assert.equal(recovery(candidates,'564x','full'),'474x');
+assert.equal(recovery({'474x':{url:'full'}},'564x','full'),'','same URL is never replayed');
+assert.equal(recovery(candidates,'fallback','full'),'','unknown source is not rewritten');
+const home = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
+assert.match(home, /PinmonyCdnImage\(\{[\s\S]*?onDecoded: \(\) =>/);
+assert.match(fs.readFileSync('common_ui/src/main/ets/components/PinmonyCdnImage.ets', 'utf8'), /event\?\.loadingStatus === 1/);
 assert.match(home, /session !== this\.home\.session \|\| pageKey !== this\.home\.pageKey/);
 const prefetch = home.match(/  private uniquePrefetchImages\([\s\S]*?\r?\n  \}/)[0];
 const Prefetch = vm.runInNewContext(ts.transpileModule('class Prefetch {' + prefetch + '} Prefetch;', {

@@ -7,6 +7,8 @@ import { PinmonyVideoFileLease } from 'common_ui';
 import { common } from '@kit.AbilityKit';
 import { connection } from '@kit.NetworkKit';
 
+let nextPinmonyVideoSurfaceId: number = 0;
+
 @Component
 export struct PinmonyVideoPlayer {
   @Prop @Watch('autoplayChanged') autoplayWifi: boolean = false;
@@ -15,6 +17,7 @@ export struct PinmonyVideoPlayer {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('sourceChanged') video: PinmonyVideo = {} as PinmonyVideo;
   @Prop poster: string = '';
+  @Prop entryPreview: string = '';
   @Prop openId: number = 0;
   @Prop @Watch('activeChanged') active: boolean = true;
   @Prop @Watch('sourceChanged') mediaOwner: string = '';
@@ -39,6 +42,7 @@ export struct PinmonyVideoPlayer {
   private autoplayStarted: boolean = false;
   private manualPlayback: boolean = false;
   private readonly surfaceController: XComponentController = new XComponentController();
+  private readonly surfaceNodeId: string = 'pin-video-surface-' + (++nextPinmonyVideoSurfaceId).toString();
   private readonly mediaFile: PinmonyMediaFile = new PinmonyMediaFile((event: string) =>
     PinmonyRuntimeLog.info('VideoFileTrace: openId=' + this.openId.toString() + ' ' + event));
   private readonly playback: PinmonyVideoPlayback = new PinmonyVideoPlayback((state: PinmonyPlaybackState) => {
@@ -153,11 +157,17 @@ export struct PinmonyVideoPlayer {
   build() {
     Column() {
       Stack({ alignContent: Alignment.Center }) {
-        XComponent({ id: 'pin-video-surface', type: XComponentType.SURFACE, controller: this.surfaceController })
+        XComponent({ id: this.surfaceNodeId, type: XComponentType.SURFACE, controller: this.surfaceController })
           .width('100%').height('100%')
           .onLoad(() => this.playback.setSurface(this.surfaceController.getXComponentSurfaceId()))
           .accessibilityLevel('no')
         if (!this.state.rendered) {
+          // Reuse the decoded entry cover while the video's own poster loads.
+          // Keep this inside the poster layer, below controls and above the surface.
+          if (this.entryPreview) {
+            Image(this.entryPreview).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
+              .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+          }
           this.posterImage(this.poster)
         }
         if (this.state.phase === 'playing') {
@@ -218,7 +228,7 @@ export struct PinmonyVideoPlayer {
   @Builder
   private posterImage(url: string) {
     Image(url).width('100%').height('100%').objectFit(ImageFit.Contain).accessibilityLevel('no')
-      .onComplete(() => { if (url === this.poster && this.onPosterSettled) this.onPosterSettled(false); })
+      .onComplete((event) => { if (event?.loadingStatus === 1 && url === this.poster && this.onPosterSettled) this.onPosterSettled(false); })
       .onError(() => { if (url === this.poster && this.onPosterSettled) this.onPosterSettled(true); })
   }
 }

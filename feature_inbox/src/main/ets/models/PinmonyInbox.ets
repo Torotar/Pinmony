@@ -2,6 +2,10 @@ export interface PinmonyInboxItem {
   id: string;
   title: string;
   subtitle: string;
+  activityUserId?: string;
+  activityFollowed?: boolean;
+  activityBusy?: boolean;
+  activityUncertain?: boolean;
   outgoing?: boolean;
   usernames?: string[];
   imageUrl: string;
@@ -10,6 +14,7 @@ export interface PinmonyInboxItem {
   timeLabel?: string;
   updatedAt?: string;
   unread?: boolean;
+  unreadCount?: number;
   moreId?: string;
   subdued?: boolean;
 }
@@ -31,6 +36,9 @@ export interface PinmonyInboxSnapshot {
   contactsLabel: string;
   items: PinmonyInboxItem[];
   contacts: PinmonyInboxItem[];
+  activities?: PinmonyInboxItem[];
+  activityLoading?: boolean;
+  activityError?: string;
   dataSource?: string;
   hasMore?: boolean;
   moreLoading?: boolean;

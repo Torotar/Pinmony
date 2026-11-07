@@ -9,7 +9,7 @@ import { PinmonyProfileStore } from 'feature_profile';
 import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonyHomeController } from 'feature_home';
 import { PinmonyHomeStore } from 'feature_home';
-import { PinmonyNativeNetwork } from 'common_network';
+import { PinmonyNativeNetwork, PinmonyJpegDecode } from 'common_network';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyAuthMessage, PinmonyAuthStatus, acceptsAuthMessage, isPinterestAuthRoute } from 'common_session';
@@ -294,6 +294,7 @@ resetAuthenticatedContent(): void {
     this.pinStore.detailPresentationOnly = false;
     this.pinStore.detailPreparing = false;
     this.ports.detailReadCache().clear();
+    PinmonyJpegDecode.clear();
     this.ports.detailReturnJourney()?.close();
     this.ports.setDetailClickedAt(0);
     this.ports.setRetainedHomeAwaitingAuth(false);

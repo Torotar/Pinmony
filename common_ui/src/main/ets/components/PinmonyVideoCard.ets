@@ -1,6 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideo } from '../models/PinmonyVideo';
 import { PinmonyPlaybackState, PinmonyVideoPlayback } from '../services/PinmonyVideoPlayback';
+import { PinmonyCdnImage } from './PinmonyCdnImage';
 
 @Component
 export struct PinmonyVideoCard {
@@ -8,6 +9,7 @@ export struct PinmonyVideoCard {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('sourceChanged') video: PinmonyVideo = { pinId: '', sources: [], width: 0, height: 0, duration: 0 };
   @Prop poster: string = '';
+  @Prop loadingActive: boolean = true;
   @Prop @Watch('activeChanged') active: boolean = false;
   @State private rendered: boolean = false;
   private visible: boolean = false;
@@ -51,13 +53,12 @@ export struct PinmonyVideoCard {
         .width('100%').height('100%').accessibilityLevel('no').hitTestBehavior(HitTestMode.None)
         .onLoad(() => this.playback.setSurface(this.surface.getXComponentSurfaceId()))
       if (!this.rendered) {
-        Image(this.poster).width('100%').height('100%').objectFit(ImageFit.Cover).accessibilityLevel('no')
+        PinmonyCdnImage({ url: this.poster, fit: ImageFit.Cover, loadingActive: this.loadingActive,
+          useSharedDecode: false, viewportOnly: false }).width('100%').height('100%').accessibilityLevel('no')
       }
-      if (this.video.duration > 0) {
-        Text(this.durationText()).fontSize(14).fontWeight(FontWeight.Medium).fontColor('#111111')
+      Text(this.video.duration > 0 ? this.durationText() : this.uiText('pm_videos_c20f7618')).fontSize(14).fontWeight(FontWeight.Medium).fontColor('#111111')
           .padding({ left: 6, right: 6, top: 2, bottom: 2 }).backgroundColor('#EFFFFFFF')
-          .borderRadius(7).margin({ left: 5, top: 5 }).accessibilityText(this.uiText("pm_video_duration_9d94bbe8") + this.durationText())
-      }
+          .borderRadius(7).margin({ left: 5, top: 5 }).accessibilityText(this.video.duration > 0 ? this.uiText("pm_video_duration_9d94bbe8") + this.durationText() : this.uiText('pm_videos_c20f7618'))
     }.width('100%').height('100%').borderRadius(18).clip(true)
       .backgroundColor($r('app.color.surface_muted'))
       .onVisibleAreaChange([0, 0.6], (visible: boolean, ratio: number) => {

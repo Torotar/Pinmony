@@ -1,10 +1,11 @@
-import { PinmonyActionNotice, PinmonyListDataSource } from 'common_ui';
+import { PinmonyActionNotice, PinmonyListDataSource, PinmonyCdnImage, PinmonyVideoSource } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideoCard } from 'common_ui';
 import { connection } from '@kit.NetworkKit';
 import { allowsSpeculativeReads, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
 import { PinmonyHomeSkeleton } from './PinmonyHomeSkeleton';
+import { PinmonyHomePaginationWindow } from '../services/PinmonyHomePaginationWindow';
 
 interface PinmonyHomeFeedRow {
   pin?: PinmonyHomePin;
@@ -18,7 +19,9 @@ export struct PinmonyHomeFeedPane {
   private syncFeedRows(): void {
     const rows: PinmonyHomeFeedRow[] = (this.home.pins || []).map((pin: PinmonyHomePin): PinmonyHomeFeedRow => ({
       pin: pin, footer: false,
-      key: this.home.pageKey + ':' + this.categoryId + ':' + pin.id + ':' + pin.imageUrl + ':' + pin.title + ':' + (this.recoveredRevisions[pin.imageUrl] || 0)
+      key: this.home.pageKey + ':' + this.categoryId + ':' + pin.id + ':' + pin.imageUrl + ':' + pin.title + ':' + (pin.isVideo === true || !!pin.video) + ':' +
+        (pin.video?.sources.map((source: PinmonyVideoSource): string => source.url).join('|') || '') + ':' + (pin.video?.duration || 0) + ':' +
+        this.uiLanguage + ':' + (this.recoveredRevisions[pin.imageUrl] || 0)
     }));
     rows.push({ key: 'feed-footer', footer: true });
     rows.push({ key: 'feed-spacer', footer: false });
@@ -43,7 +46,7 @@ export struct PinmonyHomeFeedPane {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private homeTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx); }
   @State private refreshGestureState: RefreshStatus = RefreshStatus.Inactive;
-  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('pinmonyLanguage') @Watch('syncFeedRows') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
   @Prop @Watch('onImageRecovery') imageRecovery: PinmonyHomeImageRecovery | undefined = undefined;
@@ -130,6 +133,7 @@ export struct PinmonyHomeFeedPane {
   @Prop @Watch('onHomeChanged') home: PinmonyHomeSnapshot = {} as PinmonyHomeSnapshot;
   @Prop pendingTabId: string = '';
   @Prop mediaActive: boolean = false;
+  @Prop imageLoadingActive: boolean = true;
   @Prop prefetchedImageUrls: string[] = [];
   @Prop @Watch('onPrefetchAvailabilityChanged') feedActive: boolean = false;
   @Prop @Watch('onPrefetchAvailabilityChanged') loading: boolean = false;
@@ -174,6 +178,8 @@ export struct PinmonyHomeFeedPane {
   private visibleFirst: number = 0;
   private visibleLast: number = -1;
   private prefetchKey: string = '';
+  private readonly paginationWindow: PinmonyHomePaginationWindow = new PinmonyHomePaginationWindow();
+  private paginationWasActive: boolean = false;
   private pendingEnd: boolean = false;
   private viewportFillKey: string = '';
   private viewportHeight: number = 0;
@@ -209,12 +215,16 @@ export struct PinmonyHomeFeedPane {
     this.paginationTraceAt = now;
     this.paginationTraceKey = key;
     PinmonyRuntimeLog.info('HomePaginationTrace: phase=ui reason=' + reason +
-      ' count=' + this.home.pins.length + ' first=' + this.visibleFirst + ' last=' + this.visibleLast);
+      ' count=' + this.home.pins.length + ' first=' + this.visibleFirst + ' last=' + this.visibleLast +
+      ' remaining=' + Math.max(0, this.home.pins.length - this.visibleLast - 1).toString() +
+      ' reserve=' + this.paginationWindow.reserve(this.visibleLast - this.visibleFirst + 1, 12, now).toString() +
+      ' nearEndReserve=' + this.paginationWindow.reserve(this.visibleLast - this.visibleFirst + 1, 8, now).toString() +
+      this.paginationWindow.diagnostic(now));
   }
   onTab?: (id: string) => void;
   onBoard?: (id: string) => void;
   onPrefetchMore?: () => void;
-  onPin?: (id: string) => void;
+  onPin?: (id: string, imageUrl?: string) => void;
   onMore?: (id: string) => void;
   onLoadMore?: () => void;
   onRetry?: () => void;
@@ -252,10 +262,15 @@ export struct PinmonyHomeFeedPane {
     }
     if (this.onScrollerReady) this.onScrollerReady(undefined, this.presentationEpoch);
     this.paneMounted = false;
+    this.paginationWasActive = false;
+    this.paginationWindow.pause();
     if (this.restoreTimer !== -1) clearTimeout(this.restoreTimer);
     if (this.prefetchTimer !== -1) clearTimeout(this.prefetchTimer);
+    this.prefetchTimer = -1;
     if (this.detailPrefetchTimer !== -1) clearTimeout(this.detailPrefetchTimer);
     if (this.viewportFillTimer !== -1) clearTimeout(this.viewportFillTimer);
+    this.detailPrefetchTimer = -1;
+    this.viewportFillTimer = -1;
     this.imageNetworkVisible = false;
     this.imageRecoveryPending = false;
     const monitor: connection.NetConnection | undefined = this.imageNetwork;
@@ -286,8 +301,8 @@ export struct PinmonyHomeFeedPane {
         this.restoreScrollPosition();
       }
       this.notifyChromeChanged();
-      this.onPrefetchAvailabilityChanged();
     }
+    this.onPrefetchAvailabilityChanged();
   }
 
   // Restore only a newly mounted WaterFlow. Activation of a retained pane
@@ -428,10 +443,12 @@ export struct PinmonyHomeFeedPane {
     if (!this.restoreDone) this.restoreScrollPosition();
     this.onImageRecovery();
     this.syncFeedRows();
-    setTimeout(() => { this.resumePendingEnd(); this.scheduleViewportFill(); this.scheduleDetailPrefetch(); this.prefetchNextScreen(); }, 0);
+    this.onPrefetchAvailabilityChanged();
+    this.scheduleViewportFill();
   }
 
   private prefetchNextScreen(): void {
+    if (!this.paneMounted || !this.paneActive || !this.feedActive) return;
     if (!allowsSpeculativeReads()) { this.paginationTrace('speculative-disabled'); return; }
     if (this.prefetchNotBefore > Date.now()) {
       if (this.prefetchTimer === -1) {
@@ -443,12 +460,12 @@ export struct PinmonyHomeFeedPane {
       }
       return;
     }
-    if (this.home.dataSource !== 'api' || !this.feedActive || !this.actionsReady || this.loading || this.refreshing ||
+    if (this.home.dataSource !== 'api' || !this.feedActive || !this.actionsReady || !this.paginationReady || this.loading || this.refreshing ||
         this.pendingTabId || this.home.loadingMore || this.home.refreshing || this.home.endReached ||
         this.home.sourceError || this.visibleLast < 0 || !this.onLoadMore) return;
     const count: number = this.home.pins.length;
     // Leave two screens for the network to finish, with a bounded lookahead.
-    const reserve: number = Math.min(36, Math.max(12, (this.visibleLast - this.visibleFirst + 1) * 2));
+    const reserve: number = this.paginationWindow.reserve(this.visibleLast - this.visibleFirst + 1, 12, Date.now());
     if (count - 1 - this.visibleLast > reserve) return;
     const key: string = this.home.session.toString() + ':' + this.home.selectedTab + ':' +
       count.toString() + ':' + (this.home.pins[0]?.id || '');
@@ -460,13 +477,25 @@ export struct PinmonyHomeFeedPane {
   }
 
   private onPrefetchAvailabilityChanged(): void {
+    const active: boolean = this.paneMounted && this.paneActive && this.feedActive;
+    if (active !== this.paginationWasActive) {
+      this.paginationWasActive = active;
+      // A cancelled page must be eligible again when the retained pane returns.
+      this.prefetchKey = ''; this.nearEndKey = ''; this.viewportFillKey = '';
+      this.paginationWindow.pause();
+      if (this.prefetchTimer !== -1) clearTimeout(this.prefetchTimer);
+      this.prefetchTimer = -1;
+    }
+    if (!active) return;
+    this.paginationWindow.observe(this.home.pageKey + ':' + this.home.session.toString() + ':' + this.home.selectedTab,
+      this.home.pins.length, !!this.home.loadingMore, !!this.home.sourceError, Date.now());
     this.retryRecoveredImages();
     if (this.refreshing) this.viewportFillKey = '';
-    setTimeout(() => { this.resumePendingEnd(); this.scheduleDetailPrefetch(); this.prefetchNextScreen(); }, 0);
+    setTimeout(() => { this.resumePendingEnd(); this.scheduleViewportFill(); this.scheduleDetailPrefetch(); this.prefetchNextScreen(); }, 0);
   }
 
   private fillShortViewport(): void {
-    if (this.viewportHeight <= 0 || this.offlinePreview || !this.feedActive || !this.paginationReady ||
+    if (!this.paneMounted || !this.paneActive || this.viewportHeight <= 0 || this.offlinePreview || !this.feedActive || !this.paginationReady ||
       this.loading || this.refreshing || this.pendingTabId || this.home.loadingMore || this.home.refreshing ||
       this.home.endReached || !this.home.pins.length ||
       (this.error || this.home.sourceError) && !this.home.categorySourceFailure) return;
@@ -482,6 +511,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private scheduleViewportFill(): void {
+    if (!this.paneMounted || !this.paneActive || !this.feedActive) return;
     if (this.viewportFillTimer !== -1) return;
     this.viewportFillTimer = setTimeout((): void => {
       this.viewportFillTimer = -1;
@@ -490,6 +520,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private scheduleDetailPrefetch(): void {
+    if (!this.paneMounted || !this.paneActive || !this.feedActive) return;
     if (this.detailPrefetchTimer !== -1) return;
     this.detailPrefetchTimer = setTimeout((): void => {
       this.detailPrefetchTimer = -1;
@@ -498,7 +529,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private resumePendingEnd(): void {
-    if (!this.pendingEnd || !this.feedActive || !this.paginationReady || this.loading || this.refreshing ||
+    if (!this.paneMounted || !this.paneActive || !this.pendingEnd || !this.feedActive || !this.paginationReady || this.loading || this.refreshing ||
         this.pendingTabId || this.home.loadingMore || this.home.refreshing) return;
     this.pendingEnd = false;
     try { if (this.feedScroller.isAtEnd()) this.loadNextPageAtEnd(); } catch (_) {}
@@ -506,10 +537,10 @@ export struct PinmonyHomeFeedPane {
 
   private nearEndKey: string = '';
   private loadNearEnd(): void {
-    if (!this.restoreDone || this.restoringScroll || this.visibleFirst < 0 || this.visibleLast < 0 ||
+    if (!this.paneMounted || !this.paneActive || !this.restoreDone || this.restoringScroll || this.visibleFirst < 0 || this.visibleLast < 0 ||
         !this.feedActive || !this.paginationReady || this.loading || this.refreshing || this.pendingTabId ||
         this.home.loadingMore || this.home.refreshing) return;
-    const reserve: number = Math.min(24, Math.max(8, (this.visibleLast - this.visibleFirst + 1) * 2));
+    const reserve: number = this.paginationWindow.reserve(this.visibleLast - this.visibleFirst + 1, 8, Date.now());
     if (this.home.pins.length - this.visibleLast - 1 > reserve) return;
     if (this.home.dataSource !== 'api' || this.home.endReached ||
         (this.home.sourceError || this.error) && !this.home.categorySourceFailure) return;
@@ -521,6 +552,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private loadNextPageAtEnd(): void {
+    if (!this.paneMounted || !this.paneActive) return;
     this.paginationTrace(this.home.loadingMore ? 'end-busy' : !this.paginationReady ? 'end-session-pending' :
       this.home.endReached ? 'end-finished' : this.home.sourceError && !this.home.categorySourceFailure ? 'end-error' :
       !this.feedActive || this.loading || this.refreshing || !!this.pendingTabId ? 'end-inactive' : 'end-dispatch');
@@ -534,6 +566,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private prefetchVisibleDetails(): void {
+    if (!this.paneMounted || !this.paneActive) return;
     if (!allowsSpeculativeReads()) return;
     if (!this.feedActive || !this.actionsReady || this.loading || this.refreshing || this.pendingTabId ||
       this.home.refreshing || this.visibleLast < 0 || !this.onPrefetchPins) return;
@@ -662,7 +695,8 @@ export struct PinmonyHomeFeedPane {
   private pinCard(pin: PinmonyHomePin, imageRevision: number = 0, session: number = 0, pageKey: string = '') {
     Column({ space: 8 }) {
       if (pin.video) {
-        PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady })
+        PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady,
+          loadingActive: this.imageLoadingActive && this.paneActive })
           .width('100%').height(this.imageHeight(pin))
           .id(this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id)
           .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id); })
@@ -684,34 +718,36 @@ export struct PinmonyHomeFeedPane {
         .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id); })
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
-          Image(this.recoveredSources[pin.imageUrl] || pin.imageUrl)
-            .onComplete((event) => {
-              if (event?.loadingStatus !== 1 ||
-                session !== this.home.session || pageKey !== this.home.pageKey ||
+          PinmonyCdnImage({ url: this.recoveredSources[pin.imageUrl] || pin.imageUrl, fit: ImageFit.Cover,
+            loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false,
+            onDecoded: () => {
+              if (session !== this.home.session || pageKey !== this.home.pageKey ||
                 imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
               if (this.imageTraceCount++ < 40) PinmonyRuntimeLog.info('HomeImageTrace: phase=complete index=' +
                 this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
                 ' sincePageMs=' + (Date.now() - this.imageTraceStartedAt));
-            })
-            .width('100%')
-            .height(this.imageHeight(pin))
-            .objectFit(ImageFit.Cover)
-            .borderRadius(18)
-            .clip(true)
-            .accessibilityLevel('no')
-            .onError((event) => {
+            },
+            onFailure: (code: number) => {
               if (session !== this.home.session || pageKey !== this.home.pageKey) return;
               if (imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
               if (this.failedImages.indexOf(pin.imageUrl) < 0) {
                 PinmonyRuntimeLog.warn('HomeImageError: revision=' + imageRevision.toString() +
                   ' index=' + this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
-                  ' code=' + (event?.error?.code || 0).toString());
+                  ' code=' + code.toString());
                 this.failedImages = [...this.failedImages, pin.imageUrl];
                 this.onImageRecovery();
                 this.retryRecoveredImages();
               }
-            })
-            .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id); })
+            } })
+            .width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
+            .accessibilityLevel('no')
+            .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id, this.recoveredSources[pin.imageUrl] || pin.imageUrl); })
+          if (pin.isVideo === true) {
+            Text(this.uiText('pm_videos_c20f7618')).fontSize(14).fontWeight(FontWeight.Medium)
+              .fontColor('#111111').padding({ left: 6, right: 6, top: 2, bottom: 2 })
+              .backgroundColor('#EFFFFFFF').borderRadius(7).margin({ left: 5, top: 5 })
+              .hitTestBehavior(HitTestMode.None)
+          }
           if (pin.saved === true) {
             Column() {
               Text(this.uiText("pm_saved_471dd4d7")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
@@ -732,7 +768,7 @@ export struct PinmonyHomeFeedPane {
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
-            .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id); })
+            .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id, this.recoveredSources[pin.imageUrl] || pin.imageUrl); })
         } else {
           Blank()
         }
@@ -806,11 +842,11 @@ export struct PinmonyHomeFeedPane {
   private feedContent() {
     Column() {
       if (this.feedActive) {
-        // Load detail-sized image resources through ArkUI's existing image cache.
+        // Share detail-sized decodes with the eventual hero and entry motion.
         // This zero-height container has no input or accessibility semantics.
         Row() {
           ForEach(this.uniquePrefetchImages(), (url: string) => {
-            Image(url).width(1).height(1).opacity(0).accessibilityLevel('no')
+            PinmonyCdnImage({ url: url, loadPriority: 0 }).width(1).height(1).opacity(0).accessibilityLevel('no')
           }, (url: string) => url)
         }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }
@@ -896,6 +932,7 @@ export struct PinmonyHomeFeedPane {
             .onScrollIndex((first: number, last: number) => {
               this.visibleFirst = Math.max(0, first);
               this.visibleLast = Math.min(last, this.home.pins.length - 1);
+              if (this.paneActive && this.feedActive) this.paginationWindow.viewport(this.visibleLast, Date.now());
               if (this.onVisiblePins) this.onVisiblePins(first, last);
               this.retryRecoveredImages();
               this.scheduleDetailPrefetch();

@@ -5,7 +5,7 @@ export function acceptsImageDownloadUrl(value: string): boolean {return typeof v
 export class PinmonyImageDownload {
   private generation: number = 0;private cancelTransfer: (() => void) | undefined = undefined;
   cancel(): void {this.generation++;this.cancelTransfer?.();this.cancelTransfer = undefined;}
-  async read(source: string,current: () => boolean): Promise<PinmonyDownloadedImage> {
+  async read(source: string,current: () => boolean, priority: Priority = Priority.NORMAL): Promise<PinmonyDownloadedImage> {
     this.cancel();if(!acceptsImageDownloadUrl(source) || !current())throw new Error('image-url');
     const generation: number = this.generation,live = (): boolean => generation === this.generation && current();
     let session: rcp.Session;
@@ -19,7 +19,7 @@ export class PinmonyImageDownload {
     const interruption: Promise<rcp.Response> = new Promise<rcp.Response>((_resolve,reject) => {cancelled = (): void => {try {session.cancel(request);}catch (_) {}reject(new Error('image-cancelled'));};timer = setTimeout((): void => {cancelled?.();},30000);});
     this.cancelTransfer = cancelled;
     try {
-      const response: rcp.Response = await Promise.race([NetworkManager.enqueue(Priority.NORMAL,async (): Promise<rcp.Response> => {if(!live())throw new Error('image-cancelled');return session.fetch(request);}),interruption]);
+      const response: rcp.Response = await Promise.race([NetworkManager.enqueue(priority,async (): Promise<rcp.Response> => {if(!live())throw new Error('image-cancelled');return session.fetch(request);}),interruption]);
       if(!live() || response.statusCode !== 200 || !size)throw new Error('image-response');
       const data: Uint8Array = new Uint8Array(size);let offset: number = 0;chunks.forEach((chunk: Uint8Array): void => {data.set(chunk,offset);offset += chunk.length;});
       let extension: string = '';

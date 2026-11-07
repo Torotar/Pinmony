@@ -15,6 +15,7 @@ export struct PinmonyHomePage {
   @Prop @Watch('onHomeChanged') home: PinmonyHomeSnapshot = {} as PinmonyHomeSnapshot;
   @Prop @Watch('onPendingTabChanged') pendingTabId: string = '';
   @Prop mediaActive: boolean = false;
+  @Prop imageLoadingActive: boolean = true;
   @Prop prefetchedImageUrls: string[] = [];
   @Prop feedActive: boolean = false;
   @Prop loading: boolean = false;
@@ -48,7 +49,7 @@ export struct PinmonyHomePage {
   onTab?: (id: string) => void;
   onBoard?: (id: string) => void;
   onPrefetchMore?: () => void;
-  onPin?: (id: string) => void;
+  onPin?: (id: string, imageUrl?: string) => void;
   onMore?: (id: string) => void;
   onLoadMore?: () => void;
   onRetry?: () => void;
@@ -332,6 +333,7 @@ export struct PinmonyHomePage {
           paneActive: this.activePane(tab.id), suppressPinClick: this.suppressSwipeClick,
           imageRecovery: this.imageRecovery,
           mediaActive: this.mediaActive && this.activePane(tab.id),
+          imageLoadingActive: this.imageLoadingActive && this.activePane(tab.id),
           prefetchedImageUrls: this.activePane(tab.id) ? this.prefetchedImageUrls : [],
           feedActive: this.feedActive && this.activePane(tab.id),
           loading: this.snapshotFor(tab.id).kind === 'loading' || this.loading && this.activePane(tab.id),

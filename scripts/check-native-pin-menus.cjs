@@ -1,7 +1,7 @@
 const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
-const {PinmonyPinMenuNative:Menu,PIN_NATIVE_PIN_MENUS_ENABLED}=load('entry/src/main/ets/app/PinmonyPinMenuNative.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='feature_pin'?{PIN_EDIT_API_ENABLED:true,PIN_POST_API_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
+const {PinmonyPinMenuNative:Menu,PIN_NATIVE_PIN_MENUS_ENABLED}=load('entry/src/main/ets/app/PinmonyPinMenuNative.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true,acceptsMediaFileUrl:url=>/^https:\/\/v1\.pinimg\.com\/videos\/[^?#]+\.mp4$/.test(url)}:n==='feature_pin'?{PIN_EDIT_API_ENABLED:true,PIN_POST_API_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',pin=origin+'/pin/11/',image='https://i.pinimg.com/menu-original.jpg';
 const raw={id:'11',is_repin:false,pinner:{id:'42'},images:{orig:{url:image}},ai_disclosures:[1],tracking_params:'synthetic-track',through_id:'11',rec_reason_type:4,source:9};
@@ -59,7 +59,7 @@ async function productionMenus(){
   const f=fixture(),h=new out.Host(),effects=[],frames=[];let route=origin+'/',web=0;
   h.getUIContext=()=>({postFrameCallback:callback=>frames.push(callback)});
   Object.assign(h,{nativeBusinessRoutesEnabled:true,pinStore:f.store,homeStore:{customHomeMenuToken:0},inboxStore:{},boardStore:{},authStatus:'authenticated',businessSuspended:false,activeSheetKind:'',showNativeSheet:false,nativeNetwork:f.network,
-    nativeBusinessSessionContext:f.getSession,nativeDisplayAddress:()=>route,isCurrentMorePin:p=>p===pin && (route===pin || h.homeStore.homeMenuPin===p),pinIdentity:p=>p.match(/\/pin\/(\d+)/)?.[1]||'',currentPinUrl:()=>pin,currentProfileUrl:()=>'',currentBoardUrl:()=>route,currentHomePageKey:()=>origin+'/',currentInboxUrl:()=>origin+'/conversation/1/',
+    authEpoch:1,nativeBusinessSessionContext:f.getSession,nativeDisplayAddress:()=>route,isCurrentMorePin:p=>p===pin && (route===pin || h.homeStore.homeMenuPin===p),pinIdentity:p=>p.match(/\/pin\/(\d+)/)?.[1]||'',currentPinUrl:()=>pin,currentProfileUrl:()=>'',currentBoardUrl:()=>route,currentHomePageKey:()=>origin+'/',currentInboxUrl:()=>origin+'/conversation/1/',
     isCurrentBoardMenuPin:(p,page)=>page===route&&!!h.boardStore.boardDetail,isCurrentSearchMenuPin:()=>false,cancelledBoardPins:new Set(),dismissPostSnack(){},lastRootBackAt:0,rootContextCoordinator:{notify(){}},
     shareNativeFlow:{pause(){},close(){},open:async(mode,p)=>effects.push(['contacts',mode,p])},systemActions:{openLink:async u=>effects.push(['help',u]),copyText:async()=>{},downloadImage:async u=>effects.push(['download',u]),shareImages:async(sources,title,current)=>{assert(current());effects.push(['image-share',sources[0]]);}},
     sharePinUrl:async u=>effects.push(['system-share',u]),openEditPin:async p=>effects.push(['edit',p]),showMessage:m=>effects.push(['message',m]),showUndoSnack(){},
@@ -110,6 +110,9 @@ async function productionMenus(){
   h.notifyDetailSystemShareClosed();await pending;assert.equal(effects.filter(e=>e[0]==='board-flow').length,flows+1);
   h.boardStore.boardDetail=undefined;route=pin;pending=h.openApiDetailMore();f.jobs.at(-1).resolve(body(raw));await pending;assert(h.pinStore.moreOptions.some(o=>o.id==='detail-see-more'));assert(!h.pinStore.moreOptions.some(o=>o.id==='detail-share'));
   h.pinStore.detail.isVideo=true;
+  const video='https://v1.pinimg.com/videos/synthetic.mp4';
+  h.pinStore.detail.video={sources:[{kind:'mp4',url:video}]};
+  h.systemActions.shareMedia=async(sources,title,current)=>{assert(current());assert.deepEqual(Array.from(sources),[video]);effects.push(['system-share',video]);};
   const shareCount=effects.filter(e=>e[0]==='system-share').length;
   h.dismissMoreSheet();h.activeSheetKind='share';h.showNativeSheet=true;pending=h.shareDetailPinAfterMenu(pin,'',true);
   assert.equal(h.activeSheetKind,'share');assert.equal(h.showNativeSheet,false);
@@ -118,7 +121,7 @@ async function productionMenus(){
   h.notifyDetailSystemShareClosed();await flush();assert.equal(h.activeSheetKind,'');
   assert.equal(effects.filter(e=>e[0]==='system-share').length,shareCount,'wait for idle frame after Sheet teardown');
   frames.shift().onIdle();await pending;
-  assert.deepEqual(effects.at(-1),['system-share',pin]);assert.equal(web,0);
+  assert.deepEqual(effects.at(-1),['system-share',video]);assert.equal(web,0);
   const completed=effects.filter(e=>e[0]==='system-share').length;
   h.notifyDetailSystemShareClosed();assert.equal(effects.filter(e=>e[0]==='system-share').length,completed,'duplicate disappearance cannot reopen share');
   h.showNativeSheet=true;h.activeSheetKind='share';pending=h.shareDetailPinAfterMenu(pin,'',true);
@@ -178,7 +181,8 @@ async function cardShareImageContract(){
   assert.equal(f.menu.shareImageSource(origin+'/pin/99/'),'','another Pin cannot reuse menu media');
   f.setSession({...f.getSession(),generation:2});assert.equal(f.menu.shareImageSource(pin),'','stale account cannot expose media');
   for(const media of [{is_video:true},{videos:{video_list:{}}},{carousel_data:{carousel_slots:[{videos:{}}]}}]){
-    const other=fixture();await open(other,{...raw,...media});assert.equal(other.menu.shareImageSource(pin),'','video and carousel keep link sharing');
+    const other=fixture();await open(other,{...raw,...media});assert.equal(other.menu.shareImageSource(pin),'','video must not share its cover as a photo');
+    assert.equal(other.menu.shareMediaSources(pin).length,0,'missing video file cannot fall back to a link or cover');
     assert.equal(other.menu.shareLinkOnly(pin),true);other.setSession({...other.getSession(),generation:2});assert.equal(other.menu.shareLinkOnly(pin),false);
   }
   const multi=fixture();await open(multi,{...raw,carousel_data:{carousel_slots:[{images:{orig:{url:image}}},{images:{orig:{url:image+'?second'}}}]}});
@@ -186,5 +190,15 @@ async function cardShareImageContract(){
   assert.equal(multi.menu.shareLinkOnly(pin),false,'image carousel no longer shares a link');
   const missing=fixture();await open(missing,{...raw,carousel_data:{carousel_slots:[{images:{orig:{url:image}}},{}]}});
   assert.equal(missing.menu.shareImageSources(pin).length,0,'incomplete carousel cannot silently share a subset');
+  const video='https://v1.pinimg.com/videos/synthetic.mp4',small='https://v1.pinimg.com/videos/small.mp4';
+  const videos={video_list:{small:{url:small,width:100,height:100},large:{url:video,width:500,height:500},hls:{url:'https://v1.pinimg.com/videos/stream.m3u8',width:1000,height:1000}}};
+  const single=fixture();await open(single,{...raw,is_video:true,videos});
+  assert.deepEqual(Array.from(single.menu.shareMediaSources(pin)),[video],'select highest resolution supported MP4');
+  assert.equal(single.menu.shareMediaSources(origin+'/pin/99/').length,0);
+  single.setSession({...single.getSession(),generation:2});assert.equal(single.menu.shareMediaSources(pin).length,0);
+  const mixed=fixture();await open(mixed,{...raw,carousel_data:{carousel_slots:[{videos,is_video:true},{images:{orig:{url:image}}}]}});
+  assert.deepEqual(Array.from(mixed.menu.shareMediaSources(pin)),[video,image],'preserve mixed carousel order');
+  const incomplete=fixture();await open(incomplete,{...raw,carousel_data:{carousel_slots:[{videos,is_video:true},{videos:{video_list:{}}}]}});
+  assert.equal(incomplete.menu.shareMediaSources(pin).length,0,'never share a partial video group');
 }
 cardShareImageContract().catch(e=>{console.error(e);process.exitCode=1;});

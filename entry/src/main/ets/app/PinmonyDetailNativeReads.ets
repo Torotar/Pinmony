@@ -1,7 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyRelatedPin, readRelatedPresentation, RelatedPresentation, PinmonyComment, PinmonyCommentResult } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, Priority } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyRouteParser } from './PinmonyRouteParser';
 import { readProductPresentation, ProductPresentation, PinmonyCarouselItem } from 'feature_pin';
@@ -10,6 +10,17 @@ import { readProductPresentation, ProductPresentation, PinmonyCarouselItem } fro
 const PIN_NATIVE_DETAIL_READS_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_DETAIL_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_DETAIL_READS_ROLLOUT_ENABLED;
 interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
+interface EarlyRelatedRead {
+  pin: string;
+  opening: number;
+  owner: string;
+  id: string;
+  cancelled: boolean;
+  timer: number;
+  release?: () => void;
+  reply?: Promise<PinmonyNetworkReply>;
+  presentation?: RelatedPresentation;
+}
 interface CommentClient { user?: CommentUser; }
 interface RetainedRelatedRead {
   at: number;
@@ -27,6 +38,13 @@ interface BaseResponse { resource_response: BaseResource; client_context?: Comme
 interface AutoplayResponse { resource_response?: AutoplayResource; client_context?: CommentClient; }
 interface AutoplayResource { status: string; code: number; error?: Object; data?: AutoplaySettings; }
 interface AutoplaySettings { id: string; autoplay_videos_on_wifi_enabled?: boolean; autoplay_videos_on_cellular_enabled?: boolean; }
+interface PinmonyRetainedAutoplay {
+  owner: string;
+  viewer: string;
+  at: number;
+  wifi: boolean;
+  cellular: boolean;
+}
 interface BaseResource { status: string; data: BasePin; }
 interface AggregatePinData { id?: string; comment_count?: number; }
 interface BaseReaction { reaction_by_me?: number; reaction_counts?: Record<string, number>; }
@@ -65,6 +83,7 @@ export interface PinmonyDetailNativeReadsPorts {
   rootOnly: () => boolean;
   backTarget: () => string;
   mark: (event: string) => void;
+  openedAt?: () => number;
 }
 
 // Owns native read fields only. Action IDs and mutation permissions still belong
@@ -98,22 +117,124 @@ export class PinmonyDetailNativeReads {
   private readonly requests: Set<string> = new Set<string>();
   private secondaryTimer: number = -1;
   private releaseSecondary: (() => void) | undefined = undefined;
+  private earlyRelated: EarlyRelatedRead | undefined = undefined;
+  cancelEarlyRelated(pin?: string, opening?: number): void {
+    const early: EarlyRelatedRead | undefined = this.earlyRelated;
+    if (pin !== undefined && (early?.pin !== pin || early?.opening !== opening)) return;
+    this.earlyRelated = undefined;
+    if (!early) return;
+    early.cancelled = true;
+    if (early.timer >= 0) clearTimeout(early.timer);
+    early.release?.(); early.release = undefined;
+    this.ports.network().cancel(early.id);
+  }
+  warmRelated(pin: string, opening: number): void {
+    this.cancelEarlyRelated();
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    const match: RegExpMatchArray | null = pin.match(/^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/(\d+)\/$/);
+    if (!PIN_NATIVE_DETAIL_READS_ENABLED || !session.authenticated || !session.accountId || !match ||
+        !pin.startsWith(session.origin + '/pin/')) return;
+    const cached: RetainedRelatedRead | undefined = this.retainedRelated.get(pin);
+    if (this.retainedOwner === session.accountId + ':' + session.generation.toString() &&
+        cached && Date.now() - cached.at < 300000) return;
+    const early: EarlyRelatedRead = { pin: pin, opening: opening, owner: this.autoplayOwner(),
+      id: 'native_related_early_' + (++this.sequence).toString(), cancelled: false, timer: -1 };
+    this.earlyRelated = early;
+    const current = (): boolean => !early.cancelled && early.owner === this.autoplayOwner() &&
+      this.ports.foreground() && !this.ports.rootOnly() && !this.ports.backTarget() &&
+      opening === this.store.detailOpeningToken && (this.store.detailPin === pin || this.store.detailOpeningPin === pin);
+    early.reply = this.readEarlyRelated(early, session, match[1], current);
+  }
+  private async readEarlyRelated(early: EarlyRelatedRead, session: PinmonyBusinessSessionContext,
+    pinId: string, current: () => boolean): Promise<PinmonyNetworkReply> {
+    const cancelled: PinmonyNetworkReply = { id: early.id, epoch: session.generation, page: early.pin,
+      status: 0, body: '', url: '', error: 'cancelled', headers: {} };
+    const openedAt: number = this.ports.openedAt?.() || Date.now();
+    const delay: number = Math.max(0, 280 - Math.max(0, Date.now() - openedAt));
+    await new Promise<void>((resolve: () => void): void => {
+      early.release = resolve;
+      early.timer = setTimeout((): void => { early.timer = -1; early.release = undefined; resolve(); }, delay);
+    });
+    if (!current()) return cancelled;
+    const options: RelatedOptions = { pin_id: pinId, page_size: 12, context_pin_ids: [], homefeed_source_sig: false,
+      search_query: '', source: 'feed_home', top_level_source: 'feed_home', top_level_source_depth: 1,
+      is_pdp: false, additional_fields: ['pin.gen_ai_topics'] };
+    const source: string = '/pin/' + pinId + '/';
+    const envelope: ReadEnvelope = { options: options, context: {} };
+    const headers: Record<string, string> = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
+      'X-Pinterest-Pws-Handler': 'www/pin/[id].js', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Source-Url': source };
+    if (session.appVersion) headers['X-App-Version'] = session.appVersion;
+    const job: PinmonyNetworkJob = { id: early.id, epoch: session.generation, page: early.pin,
+      method: 'GET', body: '', headers: headers, priority: Priority.HIGH,
+      url: session.origin + '/resource/RelatedModulesResource/get/?source_url=' + encodeURIComponent(source) +
+        '&data=' + encodeURIComponent(JSON.stringify(envelope)) };
+    this.ports.mark('related.native.early.request');
+    try {
+      const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessPinRead(job,
+        (): PinmonyBusinessSessionContext => this.ports.session(), early.pin, current,
+        (): PinmonyNetworkContext => this.ports.legacyContext(), '');
+      if (!current()) return cancelled;
+      this.ports.mark('related.native.early.response');
+      const mapped: RelatedPresentation | undefined = !reply.error && reply.status === 200 ?
+        readRelatedPresentation(reply.body, early.pin) : undefined;
+      if (mapped) {
+        early.presentation = mapped;
+        this.publishEarlyRelated(early, current);
+      }
+      return reply;
+    } catch (_) { return { id: early.id, epoch: session.generation, page: early.pin,
+      status: 0, body: '', url: '', error: 'network-unavailable', headers: {} }; }
+  }
+  private publishEarlyRelated(early: EarlyRelatedRead, current: () => boolean): void {
+    const mapped: RelatedPresentation | undefined = early.presentation;
+    const detail: PinmonyDetailSnapshot | undefined = this.store.detail;
+    // Transport and business response are validated independently of PinResource.
+    // This is display-only: never grant actions, pagination or cache ownership.
+    if (!mapped || !current() || this.store.detailNativeReadsReady || !detail || detail.pinUrl !== early.pin) return;
+    const next: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
+    next.related = mapped.pins.slice();
+    next.relatedLoading = false; next.relatedError = ''; next.relatedEnded = mapped.ended;
+    next.relatedRetained = true; next.relatedPreview = true;
+    this.store.detail = next;
+    this.ports.mark('related.native.preview.presented');
+  }
   private async waitForEntryBudget(): Promise<void> {
+    const openedAt: number = this.ports.openedAt?.() || 0;
+    // Base data may already have consumed the entry budget. Never add another
+    // fixed delay after a slow network response; keep a bounded wait for hits.
+    const delay: number = openedAt > 0 ? Math.max(0, 280 - Math.max(0, Date.now() - openedAt)) : 280;
+    PinmonyRuntimeLog.info('DetailLoadTrace: phase=secondary-budget waitMs=' + delay.toString());
+    if (delay === 0) return;
     await new Promise<void>((resolve: () => void): void => {
       this.releaseSecondary = resolve;
       this.secondaryTimer = setTimeout((): void => {
         this.secondaryTimer = -1; this.releaseSecondary = undefined; resolve();
-      }, 280);
+      }, delay);
     });
   }
   private autoplayWifi: boolean | undefined = undefined;
   private autoplayCellular: boolean | undefined = undefined;
+  private retainedAutoplay: PinmonyRetainedAutoplay | undefined = undefined;
+  private autoplayCacheRevision: number = 0;
+  private autoplayPendingRevision: number = -1;
+  invalidateAutoplay(): void {
+    this.retainedAutoplay = undefined;
+    this.autoplayCacheRevision++;
+    this.autoplayPendingRevision = -1;
+    this.autoplayWifi = undefined; this.autoplayCellular = undefined;
+  }
+  private autoplayOwner(): string {
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    return session.authenticated ? session.origin + ':' + session.accountId + ':' + session.generation.toString() : '';
+  }
   constructor(ports: PinmonyDetailNativeReadsPorts) { this.ports = ports; this.store = ports.pinStore(); }
 
   pause(): void {
+    this.cancelEarlyRelated();
     if (this.secondaryTimer >= 0) clearTimeout(this.secondaryTimer);
     this.secondaryTimer = -1; this.releaseSecondary?.(); this.releaseSecondary = undefined;
     const session: PinmonyBusinessSessionContext = this.ports.session();
+    if (!session.authenticated || !this.ports.foreground() || this.retainedAutoplay?.owner !== this.autoplayOwner()) this.invalidateAutoplay();
     if (!session.authenticated || this.retainedOwner !== session.accountId + ':' + session.generation.toString()) {
       this.retainedRelated.clear(); this.retainedOwner = '';
     }
@@ -159,20 +280,30 @@ export class PinmonyDetailNativeReads {
     next.commentEmpty = this.previewEmpty; next.commentError = this.previewError; next.commentsAvailable = this.previewAvailable;
     next.commentsRetained = this.previewLoading && !!this.previewText; next.related = this.related.slice(); next.relatedLoading = this.relatedLoading;
     next.relatedEnded = this.relatedEnded; next.relatedError = this.relatedError; next.relatedRetained = false;
+    next.relatedPreview = false;
     this.store.detail = next;
     this.store.detailCache.put(this.pin.split('/pin/')[1].split('/')[0], next, this.store.detailScrollOffset);
   }
   async start(pin: string, opening: number, body: string): Promise<PinmonyNetworkReply> {
+    const early: EarlyRelatedRead | undefined = this.earlyRelated;
+    const matching: boolean = !!early && early.pin === pin && early.opening === opening &&
+      early.owner === this.autoplayOwner() && !early.cancelled;
+    if (matching) this.earlyRelated = undefined;
     this.pause();
+    if (matching) this.earlyRelated = early;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     const owner: string = session.authenticated ? session.accountId + ':' + session.generation.toString() : '';
     if (!owner || owner !== this.retainedOwner) this.retainedRelated.clear();
     this.retainedOwner = owner;
-    const response: BaseResponse = JSON.parse(body) as BaseResponse;
+    let response: BaseResponse;
+    try { response = JSON.parse(body) as BaseResponse; }
+    catch (_) { this.cancelEarlyRelated(); throw new Error('invalid-native-base'); }
     const resource: BaseResource = response.resource_response;
     this.commentViewer = /^\d{1,30}$/.test(response.client_context?.user?.id || '') ? response.client_context!.user!.id! : '';
-    if (!session.authenticated || resource?.status !== 'success' || String(resource.data?.id) !== pin.split('/pin/')[1]?.split('/')[0])
+    if (!session.authenticated || resource?.status !== 'success' || String(resource.data?.id) !== pin.split('/pin/')[1]?.split('/')[0]) {
+      this.cancelEarlyRelated();
       throw new Error('invalid-native-base');
+    }
     this.pin = pin; this.opening = opening; this.sessionGeneration = session.generation;
     // Both shapes belong to the verified current PinResource response. The
     // website currently returns the nested shape; never substitute the Pin ID.
@@ -213,8 +344,8 @@ export class PinmonyDetailNativeReads {
       (!!presentation?.actions.some((item): boolean => item.kind === 'source')).toString());
     const revision: number = this.revision;
     this.readAutoplay();
-    // Leave the entry transition a frame budget before unrelated reads compete
-    // with the main image. pause() releases the wait and retires its generation.
+    // Only the remaining entry budget protects the main image. pause() releases
+    // the wait and retires its generation without dispatching stale reads.
     await this.waitForEntryBudget();
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
     this.readProduct();
@@ -222,8 +353,8 @@ export class PinmonyDetailNativeReads {
     // depend on the validated Pin, not on the preview response.
     this.readPreview().catch((): void => { PinmonyRuntimeLog.warn('DetailTrace: preview publication failed'); });
     if (revision !== this.revision || !this.owned()) throw new Error('stale-native-read');
-    if (retained) { this.ports.mark('related.native.retained'); return retained.reply; }
-    return this.readRelated(false);
+    if (retained) { this.cancelEarlyRelated(); this.ports.mark('related.native.retained'); return retained.reply; }
+    return this.readRelated(false, matching ? early?.reply : undefined);
   }
   private async readProduct(): Promise<void> {
     if (!this.owned() || !this.store.detail?.priceText && !this.store.detail?.affiliateDisclosure) return;
@@ -478,13 +609,24 @@ export class PinmonyDetailNativeReads {
   }
   private async readAutoplay(): Promise<void> {
     const revision: number = this.revision, viewer: string = this.commentViewer;
+    if (!this.owned() || this.autoplayPendingRevision === revision) return;
+    const owner: string = this.autoplayOwner();
+    const retained: PinmonyRetainedAutoplay | undefined = this.retainedAutoplay;
+    const age: number = retained ? Date.now() - retained.at : -1;
+    if (retained && retained.owner === owner && age >= 0 && age < 60000 && (!viewer || viewer === retained.viewer)) {
+      this.autoplayWifi = retained.wifi; this.autoplayCellular = retained.cellular;
+      PinmonyRuntimeLog.info('VideoAutoplayTrace: preferences=retained'); this.apply(); return;
+    }
+    this.retainedAutoplay = undefined;
+    const cacheRevision: number = this.autoplayCacheRevision;
+    this.autoplayPendingRevision = revision;
     try {
       if (!this.owned()) return;
       // Settings are a current-session self read. PinResource may omit its
       // viewer; use the settings response's own matching identity evidence.
       const options: Record<string,string> = {};
       const reply: PinmonyNetworkReply = await this.request('UserSettingsResource',options,'native_autoplay_');
-      if (revision !== this.revision || !this.owned() || reply.error || reply.status !== 200) return;
+      if (revision !== this.revision || cacheRevision !== this.autoplayCacheRevision || owner !== this.autoplayOwner() || !this.owned() || reply.error || reply.status !== 200) return;
       const body: AutoplayResponse = JSON.parse(reply.body || '') as AutoplayResponse, r: AutoplayResource | undefined = body.resource_response;
       const settingsViewer: string = r?.data?.id || '';
       if (!r || !r.data || r.status !== 'success' || r.code !== 0 || r.error || !/^\d{1,30}$/.test(settingsViewer) ||
@@ -493,9 +635,13 @@ export class PinmonyDetailNativeReads {
       }
       this.autoplayWifi = typeof r.data.autoplay_videos_on_wifi_enabled === 'boolean' ? r.data.autoplay_videos_on_wifi_enabled : undefined;
       this.autoplayCellular = typeof r.data.autoplay_videos_on_cellular_enabled === 'boolean' ? r.data.autoplay_videos_on_cellular_enabled : undefined;
+      if (typeof this.autoplayWifi === 'boolean' && typeof this.autoplayCellular === 'boolean') {
+        this.retainedAutoplay = { owner: owner, viewer: settingsViewer, at: Date.now(), wifi: this.autoplayWifi, cellular: this.autoplayCellular };
+      }
       PinmonyRuntimeLog.info('VideoAutoplayTrace: preferences=confirmed wifi=' + this.autoplayWifi + ' cellular=' + this.autoplayCellular);
       this.apply();
     } catch (_) { PinmonyRuntimeLog.warn('VideoAutoplayTrace: preferences=unavailable'); }
+    finally { if (revision === this.autoplayPendingRevision && cacheRevision === this.autoplayCacheRevision) this.autoplayPendingRevision = -1; }
   }
   private async request(resource: string, options: Object, prefix: string, extraCurrent: () => boolean = (): boolean => true, commentId: string = '', translationLanguage: string = ''): Promise<PinmonyNetworkReply> {
     const session: PinmonyBusinessSessionContext = this.ports.session();
@@ -512,6 +658,9 @@ export class PinmonyDetailNativeReads {
     const job: PinmonyNetworkJob = { id: id, epoch: session.generation, page: pin, method: 'GET', body: '', headers: headers,
       url: session.origin + '/resource/' + resource + '/get/?source_url=' + encodeURIComponent(source) +
         '&data=' + encodeURIComponent(JSON.stringify(envelope)) };
+    // Only the visible recommendation first page gets foreground priority.
+    // Comment reads, settings and subsequent pages retain their normal budget.
+    if (resource === 'RelatedModulesResource' && !(options as RelatedOptions).bookmarks) job.priority = Priority.HIGH;
     this.requests.add(id);
     try { return await this.ports.network().requestBusinessPinRead(job, (): PinmonyBusinessSessionContext => this.ports.session(), pin,
       (): boolean => revision === this.revision && this.owned() && extraCurrent(), (): PinmonyNetworkContext => this.ports.legacyContext(), this.aggregate, commentId); }
@@ -550,7 +699,7 @@ export class PinmonyDetailNativeReads {
       this.apply();
     } }
   }
-  private async readRelated(append: boolean): Promise<PinmonyNetworkReply> {
+  private async readRelated(append: boolean, earlyReply?: Promise<PinmonyNetworkReply>): Promise<PinmonyNetworkReply> {
     const revision: number = this.revision;
     const previous: string = this.bookmark;
     this.relatedLoading = true; this.relatedError = ''; this.apply(); this.ports.mark('related.native.request');
@@ -560,7 +709,7 @@ export class PinmonyDetailNativeReads {
     if (append) options.bookmarks = [previous];
     let reply: PinmonyNetworkReply = { id: '', epoch: this.sessionGeneration, page: this.pin, status: 0, body: '', url: '', error: 'cancelled', headers: {} };
     try {
-      reply = await this.request('RelatedModulesResource', options, 'native_related_');
+      reply = await (earlyReply || this.request('RelatedModulesResource', options, 'native_related_'));
       if (revision !== this.revision || !this.owned()) return reply;
       const mapped: RelatedPresentation | undefined = !reply.error && reply.status === 200 ? readRelatedPresentation(reply.body, this.pin) : undefined;
       if (!mapped) throw new Error('related-unavailable');
@@ -578,7 +727,10 @@ export class PinmonyDetailNativeReads {
       if (this.retainedRelated.size > 12) this.retainedRelated.delete(this.retainedRelated.keys().next().value);
       this.ports.mark('related.native.committed');
     } catch (_) { if (revision === this.revision && this.owned()) { this.relatedError = PinmonyI18n.message("pm_unable_to_load_recommendations_please_retry_87984c87"); reply.error = reply.error || 'invalid-response'; } }
-    finally { if (revision === this.revision && this.owned()) { this.relatedLoading = false; this.apply(); } }
+    finally {
+      if (earlyReply && this.earlyRelated?.reply === earlyReply) this.earlyRelated = undefined;
+      if (revision === this.revision && this.owned()) { this.relatedLoading = false; this.apply(); }
+    }
     PinmonyRuntimeLog.info('DetailTrace: native-read-chain settled');
     return reply;
   }

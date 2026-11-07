@@ -26,6 +26,8 @@ export {
 } from './src/main/ets/components/SmartImage';
 
 export { PinmonyImmersiveLight } from './src/main/ets/services/PinmonyImmersiveLight';
+export { PinmonyHdsTitleBar } from './src/main/ets/services/PinmonyHdsTitleBar';
+export { PinmonyCdnImage } from './src/main/ets/components/PinmonyCdnImage';
 export { PinmonyImageSearchView } from './src/main/ets/components/PinmonyImageSearchView';
 export { PinmonyImageSearchSelection } from './src/main/ets/components/PinmonyImageSearchSelection';
 export { PinmonyVisualResult as PinmonyImageSearchResult } from './src/main/ets/models/PinmonyImageSearch';

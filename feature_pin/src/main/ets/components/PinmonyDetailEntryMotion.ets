@@ -1,5 +1,6 @@
 import { ImageFlightRect, PinmonyDetailEntryPhoto, imageContainRect } from '../services/PinmonyImageTransition';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyCdnImage } from 'common_ui';
 
 @Component
 export struct PinmonyDetailEntryMotion {
@@ -25,9 +26,23 @@ export struct PinmonyDetailEntryMotion {
   private version: number = 0;
   private timer: number = -1;
   private layoutAttempts: number = 0;
+  private preparationTimer: number = -1;
+  private preparationExpired: boolean = false;
 
-  aboutToAppear(): void { this.alive = true; }
-  aboutToDisappear(): void { this.alive = false; this.version++; clearTimeout(this.timer); }
+  aboutToAppear(): void {
+    this.alive = true;
+    // A cold preview must not keep the entire detail transparent on network IO.
+    this.preparationTimer = setTimeout(() => this.openWithoutPhoto(), 80);
+  }
+  aboutToDisappear(): void {
+    this.alive = false; this.version++; clearTimeout(this.timer); clearTimeout(this.preparationTimer);
+  }
+  private openWithoutPhoto(): void {
+    if (!this.alive || this.closing || this.started) return;
+    this.preparationExpired = true;
+    PinmonyRuntimeLog.info('DetailMotionTrace: event=preview-wait-ended');
+    this.begin();
+  }
   private target(): ImageFlightRect | undefined {
     try {
       const ui = this.getUIContext();
@@ -57,7 +72,10 @@ export struct PinmonyDetailEntryMotion {
     } catch (_) { return false; }
   }
   private begin(): void {
-    if (!this.alive || this.started || !this.decoded || !this.measured) return;
+    if (!this.alive || this.started || !this.measured) return;
+    const pageOnly: boolean = this.photo.returnPageOnly === true || !this.closing &&
+      (this.restoredOffset > 0 || this.preparationExpired);
+    if (!pageOnly && !this.decoded) return;
     const target: ImageFlightRect | undefined = this.target();
     if (!target) {
       if (++this.layoutAttempts < 12) {
@@ -65,23 +83,25 @@ export struct PinmonyDetailEntryMotion {
         this.timer = setTimeout(() => this.begin(), 16);
       } else {
         this.started = true;
+        clearTimeout(this.preparationTimer);
         PinmonyRuntimeLog.info('DetailMotionTrace: event=layout-unavailable');
         if (this.closing) this.move(true); else this.onOpened?.();
       }
       return;
     }
     this.frame = this.closing ? target : this.source;
-    this.showing = !this.photo.returnPageOnly && (this.closing ? this.heroVisible() : this.restoredOffset <= 0 && this.heroVisible());
+    this.showing = !pageOnly && this.heroVisible();
     // Data readiness may arrive before this Image has a drawable frame. Make
     // the photo visible at its source first, then wait for its render callback.
     // Page-only transitions do not display this Image and need no render wait.
     if (this.showing && !this.rendered) return;
     this.started = true;
+    clearTimeout(this.preparationTimer);
     // Commit the source frame before starting the destination animation.
     this.timer = setTimeout(() => { if (this.alive) this.move(this.closing); }, 32);
   }
   private imageComplete(status: number): void {
-    if (!this.alive || status !== 0 && status !== 1) return;
+    if (!this.alive || this.started || status !== 0 && status !== 1) return;
     this.decoded = true;
     if (status === 1) this.rendered = true;
     PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (status === 1 ? 'photo-rendered' : 'photo-data-ready'));
@@ -90,6 +110,7 @@ export struct PinmonyDetailEntryMotion {
   private closeChanged(): void {
     if (!this.closing || !this.alive) return;
     clearTimeout(this.timer);
+    clearTimeout(this.preparationTimer);
     if (!this.started || !this.decoded) { this.onClosed?.(); return; }
     this.move(true);
   }
@@ -98,7 +119,8 @@ export struct PinmonyDetailEntryMotion {
     if (!measuredTarget && !closing) { this.onOpened?.(); return; }
     const target: ImageFlightRect = measuredTarget || this.frame;
     const version: number = ++this.version;
-    const pageExit: boolean = !measuredTarget || this.photo.returnPageOnly === true || !this.heroVisible() || !closing && this.restoredOffset > 0;
+    const pageExit: boolean = !measuredTarget || this.photo.returnPageOnly === true || !this.heroVisible() ||
+      !this.rendered || !closing && (this.restoredOffset > 0 || this.preparationExpired);
     if (!this.showing) this.frame = target;
     this.showing = !pageExit;
     PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (closing ? 'close-start' : 'open-start'));
@@ -115,11 +137,14 @@ export struct PinmonyDetailEntryMotion {
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Image(this.photo.imageUrl).width(this.frame.width).height(this.frame.height).objectFit(ImageFit.Cover)
+      PinmonyCdnImage({ url: this.photo.imageUrl, fit: ImageFit.Cover, useSharedDecode: false,
+        onDataReady: () => this.imageComplete(0),
+        onDecoded: () => this.imageComplete(1),
+        onFailure: (_code: number) => { if (!this.alive || this.started) return;
+          if (this.closing) this.onClosed?.(); else this.openWithoutPhoto(); } })
+        .width(this.frame.width).height(this.frame.height)
         .borderRadius(18).clip(true).position({ x: this.frame.x, y: this.frame.y })
         .opacity(this.showing ? 1 : 0).accessibilityLevel('no')
-        .onComplete((event) => this.imageComplete(event?.loadingStatus ?? -1))
-        .onError(() => { if (this.closing) this.onClosed?.(); else this.onOpened?.(); })
     }.width('100%').height('100%').clip(true).hitTestBehavior(HitTestMode.None)
       .onAreaChange(() => { this.measured = true; this.begin(); })
   }

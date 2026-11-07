@@ -12,8 +12,10 @@ export struct PinmonyCarouselView {
   @Prop contentWidth: number = 324;
   @Prop mediaHeightVp: number = 0;
   @Prop sourceId: string = '';
+  @Prop previewUrl: string = '';
   @Prop imageHidden: boolean = false;
   @Prop hiddenImageUrl: string = '';
+  @Prop @Watch('viewerPhotoChanged') viewerImageUrl: string = '';
   @Prop productOffset: number = 0;
   onProductOffset?: (offset: number) => void;
   private productScroller: Scroller = new Scroller();
@@ -27,20 +29,52 @@ export struct PinmonyCarouselView {
   @State private page: number = 0;
   @State private failed: string[] = [];
   @State private revision: number = 0;
+  @State private firstRenderedKey: string = '';
   onImageTap?: (imageUrl: string) => void;
   onFirstImageSettled?: (failed: boolean) => void;
   private identity: string = '';
+  private alive: boolean = false;
   private controller: SwiperController = new SwiperController();
   private indicatorController: IndicatorComponentController = new IndicatorComponentController();
 
-  aboutToAppear(): void { this.identity = this.carousel.pinId; }
+  aboutToAppear(): void { this.alive = true; this.identity = this.carousel.pinId; }
+  aboutToDisappear(): void { this.alive = false; }
+
+  private firstImageKey(item: PinmonyCarouselItem): string {
+    return this.carousel.pinId + ':' + item.id + ':' + item.imageUrl + ':' + this.revision.toString();
+  }
+
+  private settleFirstImage(item: PinmonyCarouselItem, index: number, status: number, failed: boolean = false): void {
+    if (!this.alive || index !== 0 || this.identity !== this.carousel.pinId ||
+        this.carousel.items[0]?.id !== item.id || this.carousel.items[0]?.imageUrl !== item.imageUrl ||
+        !failed && status !== 1) return;
+    if (!failed) this.firstRenderedKey = this.firstImageKey(item);
+    this.onFirstImageSettled?.(failed);
+  }
 
   private onCarouselChanged(): void {
     if (this.identity === this.carousel.pinId) return;
     this.identity = this.carousel.pinId;
     this.page = 0;
     this.failed = [];
+    this.firstRenderedKey = '';
     this.controller.changeIndex(0, false);
+  }
+
+  private viewerPhotoChanged(): void {
+    if (!this.alive || !this.viewerImageUrl) return;
+    const index: number = this.carousel.items.findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.viewerImageUrl);
+    if (index < 0) return;
+    if (this.carousel.freeScroll) {
+      const stride: number = this.contentWidth * 0.82 + 6;
+      const maximum: number = Math.max(0, this.carousel.items.length * stride - 6 - this.contentWidth);
+      const target: number = Math.min(maximum, index * stride);
+      this.productScroller.scrollTo({ xOffset: target, yOffset: 0, animation: false });
+      this.onProductOffset?.(target);
+    } else {
+      this.page = index;
+      this.controller.changeIndex(index, false);
+    }
   }
 
   private mediaHeight(): number {
@@ -51,6 +85,12 @@ export struct PinmonyCarouselView {
     if (this.mediaHeightVp > 0) return this.mediaHeightVp;
     const item: PinmonyCarouselItem = this.carousel.items[0];
     return Math.max(220, Math.min(620, this.contentWidth * item.imageHeight / item.imageWidth));
+  }
+
+  private videoSlotMounted(index: number): boolean {
+    // Keep both sides of an ordinary swipe mounted before they become visible.
+    // Only the selected slot is active; bound retained surfaces to three slots.
+    return index >= 0 && index < this.carousel.items.length && Math.abs(index - this.page) <= 1;
   }
 
   build() {
@@ -69,9 +109,11 @@ export struct PinmonyCarouselView {
                   }
                 } else {
                   Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
-                    .onComplete(() => { if (index === 0) this.onFirstImageSettled?.(false); })
+                    .onComplete((event) => this.settleFirstImage(item, index, event?.loadingStatus ?? -1))
                     .onError(() => {
-                      if (index === 0) this.onFirstImageSettled?.(true);
+                      if (!this.alive || this.carousel.items[index]?.id !== item.id ||
+                          this.carousel.items[index]?.imageUrl !== item.imageUrl) return;
+                      this.settleFirstImage(item, index, -1, true);
                       if (!this.failed.includes(item.id)) this.failed = this.failed.concat(item.id);
                     })
                     .onClick(() => this.onImageTap?.(item.imageUrl))
@@ -80,7 +122,7 @@ export struct PinmonyCarouselView {
               }.width(this.contentWidth * 0.82).height(this.mediaHeight()).borderRadius(18).clip(true)
                 .id(this.sourceId + '-' + index.toString())
                 .opacity(this.imageHidden && item.imageUrl === this.hiddenImageUrl ? 0 : 1)
-            }, (item: PinmonyCarouselItem): string => this.carousel.pinId + ':' + item.id + ':' + this.uiLanguage)
+            }, (item: PinmonyCarouselItem): string => this.carousel.pinId + ':' + item.id + ':' + item.imageUrl + ':' + this.revision.toString() + ':' + this.uiLanguage)
           }.height(this.mediaHeight())
         }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
           .width('100%').height(this.mediaHeight())
@@ -97,13 +139,21 @@ export struct PinmonyCarouselView {
       Swiper(this.controller) {
         ForEach(this.carousel.items, (item: PinmonyCarouselItem, index: number) => {
           Stack({ alignContent: Alignment.Center }) {
-            if (item.video && index === this.page) {
+            // Keep the already decoded entry cover under the first slot until
+            // the actual carousel image has produced a drawable frame.
+            if (index === 0 && !item.video && !this.failed.includes(item.id) && this.previewUrl &&
+                this.firstRenderedKey !== this.firstImageKey(item)) {
+              Image(this.previewUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
+                .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+            }
+            if (item.video && this.videoSlotMounted(index)) {
               PinmonyVideoPlayer({ video: item.video, poster: item.imageUrl,
+                entryPreview: index === 0 ? this.previewUrl : '',
                 active: this.active && index === this.page, sessionReady: this.sessionReady,
                 mediaOwner: this.mediaOwner + ':' + item.id, openId: this.openId,
                 autoplayWifi: this.autoplayWifi, autoplayCellular: this.autoplayCellular,
                 onPosterSettled: (failed: boolean) => {
-                  if (index === 0 && this.carousel.items[0]?.id === item.id) this.onFirstImageSettled?.(failed);
+                  this.settleFirstImage(item, index, 1, failed);
                 } }).width('100%').height('100%')
             } else if (this.failed.includes(item.id)) {
               Column({ space: 12 }) {
@@ -113,21 +163,19 @@ export struct PinmonyCarouselView {
                 } })
               }
             } else {
-              Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).borderRadius(18).clip(true)
-                .onComplete(() => {
-                  if (index === 0 && this.carousel.items[0]?.id === item.id &&
-                      this.carousel.items[0]?.imageUrl === item.imageUrl && this.onFirstImageSettled) this.onFirstImageSettled(false);
-                })
+              Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(index === 0).borderRadius(18).clip(true)
+                .onComplete((event) => this.settleFirstImage(item, index, event?.loadingStatus ?? -1))
                 .onError(() => {
-                  if (index === 0 && this.carousel.items[0]?.id === item.id &&
-                      this.carousel.items[0]?.imageUrl === item.imageUrl && this.onFirstImageSettled) this.onFirstImageSettled(true);
+                  if (!this.alive || this.carousel.items[index]?.id !== item.id ||
+                      this.carousel.items[index]?.imageUrl !== item.imageUrl) return;
+                  this.settleFirstImage(item, index, -1, true);
                   if (!this.failed.includes(item.id)) this.failed = this.failed.concat(item.id);
                 })
                 .onClick(() => { if (!item.video && this.onImageTap) this.onImageTap(item.imageUrl); })
                 .accessibilityText(this.uiFormat("pm_image_value_of_value_value_66dd48e8", [index + 1, this.carousel.items.length, item.title]))
             }
           }.width('100%').height('100%')
-        }, (item: PinmonyCarouselItem): string => (`${this.carousel.pinId}:${item.id}:${this.revision}`) + ':' + this.uiLanguage)
+        }, (item: PinmonyCarouselItem): string => (`${this.carousel.pinId}:${item.id}:${item.imageUrl}:${this.revision}`) + ':' + this.uiLanguage)
       }
       .width('100%').height(this.mediaHeight()).loop(false).autoPlay(false)
       .indicator(this.indicatorController)

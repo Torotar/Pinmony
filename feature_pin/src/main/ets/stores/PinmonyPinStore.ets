@@ -12,6 +12,12 @@ interface DetailOrigin {
   origin: string;
 }
 
+// Deliberately not @Observed: live scroll bookkeeping must not invalidate
+// every UI consumer of the page store on each scroll frame.
+interface PinmonyDetailScrollPosition {
+  offset: number;
+}
+
 @Observed
 export class PinmonyPinStore {
   detailNativeReadsReady: boolean = false;
@@ -60,7 +66,12 @@ export class PinmonyPinStore {
   detailPin: string = '';
   detailImageFailedPin: string = '';
   readonly detailCache: PinmonyDetailCache = new PinmonyDetailCache();
-  detailScrollOffset: number = 0;
+  private readonly detailScrollPosition: PinmonyDetailScrollPosition = { offset: 0 };
+  get detailScrollOffset(): number { return this.detailScrollPosition.offset; }
+  set detailScrollOffset(offset: number) { this.recordDetailScrollOffset(offset); }
+  recordDetailScrollOffset(offset: number): void {
+    if (Number.isFinite(offset)) this.detailScrollPosition.offset = Math.max(0, offset);
+  }
   shareOptions: ShareSheetOption[] = [];
   shareActions: ShareSheetOption[] = [];
   shareContacts: ShareSheetOption[] = [];

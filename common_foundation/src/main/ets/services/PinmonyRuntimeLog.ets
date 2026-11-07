@@ -68,6 +68,7 @@ export class PinmonyRuntimeLog {
         (Date.now() - PinmonyRuntimeLog.sessionStartedAt).toString());
     }).catch((): void => {});
     PinmonyRuntimeLog.info('Runtime: application started');
+    PinmonyRuntimeLog.info('StartupBoundary: diagnostics-initialized scope=stage-lifetime userLaunch=false');
     return PinmonyRuntimeLog.restoration;
   }
 

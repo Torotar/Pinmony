@@ -297,6 +297,14 @@ export class PinmonyInboxReadController {
           }) :
           message.contacts.filter((item: PinmonyInboxItem): boolean => !!item.id && !!item.title)
       };
+      if (message.kind === 'state' && message.section === 'updates') {
+        this.store.inboxUpdatesUnreadCount = this.store.inbox.items.filter((item: PinmonyInboxItem): boolean => item.unread === true && item.enabled && this.store.isUnseenUpdate(item.id, item.updatedAt || '')).length;
+        this.store.inboxUpdatesUnread = this.store.inboxUpdatesUnreadCount > 0;
+      }
+      if (message.kind === 'state' && message.section === 'messages') {
+        this.store.inboxMessagesUnreadCount = this.store.inbox.items.reduce((total: number, item: PinmonyInboxItem): number => Math.min(Number.MAX_SAFE_INTEGER, total + (typeof item.unreadCount === 'number' && Number.isSafeInteger(item.unreadCount) && item.unreadCount >= 0 ? item.unreadCount : item.unread === true ? 1 : 0)), 0);
+        this.store.inboxMessagesUnread = this.store.inboxMessagesUnreadCount > 0;
+      }
       this.store.inboxActionsReady = message.kind === 'state';
       if (message.kind !== 'apiPending') { this.refreshAwaiting = false; this.refreshTasks.invalidate(); }
       if (this.store.inboxLoading) this.armLoading();
@@ -323,6 +331,7 @@ export class PinmonyInboxReadController {
     if (!this.allowed() || this.ports.activeTab() !== 2) return;
     const preparation: number = ++this.preparation;
     if (section !== 'updates' && section !== 'messages') return;
+    if (section === 'messages') this.store.acknowledgeInboxUpdates();
     if(await this.ports.nativeUpdatesSelect?.(section)) return;
     if (!await this.ports.prepareContext() || preparation !== this.preparation || !this.allowed() || this.ports.activeTab() !== 2) return;
     const generation: number = this.generation;

@@ -9,6 +9,10 @@ export class PinmonySnackBarLifecycle {
   private static current: HdsSnackBar | undefined = undefined;
   private static expiresAt: number = 0;
 
+  static isCurrent(snack: HdsSnackBar): boolean {
+    return PinmonySnackBarLifecycle.current === snack && Date.now() < PinmonySnackBarLifecycle.expiresAt;
+  }
+
   private static release(snack: HdsSnackBar): void {
     if (PinmonySnackBarLifecycle.current !== snack) return;
     PinmonySnackBarLifecycle.current = undefined;
@@ -20,7 +24,8 @@ export class PinmonySnackBarLifecycle {
     const previous: HdsSnackBar | undefined = PinmonySnackBarLifecycle.current;
     if (previous) PinmonySnackBarLifecycle.dismiss(previous);
     PinmonySnackBarLifecycle.current = snack;
-    PinmonySnackBarLifecycle.expiresAt = Date.now() + (style.duration ?? 4000);
+    const duration: number = style.duration ?? 4000;
+    PinmonySnackBarLifecycle.expiresAt = duration <= 0 ? Number.POSITIVE_INFINITY : Date.now() + duration;
     const back: (() => void) | undefined = style.pressBackCallback;
     const close: (() => void) | undefined = operation.onCloseButtonClick;
     const content: (() => void) | undefined = operation.onContentClick;

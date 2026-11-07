@@ -5,11 +5,13 @@ import { webview } from '@kit.ArkWeb';
 import { common } from '@kit.AbilityKit';
 import { picker, fileUri, fileIo } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
-import { pasteboard } from '@kit.BasicServicesKit';
+import { pasteboard, BusinessError } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
-import { PinmonyImageDownload, PinmonyDownloadedImage, acceptsImageDownloadUrl } from 'common_network';
+import { PinmonyImageDownload, PinmonyDownloadedImage, acceptsImageDownloadUrl, PinmonyMediaFile, PinmonyMediaFileLease, acceptsMediaFileUrl } from 'common_network';
+
+export class PinmonyMediaSharePreparationError extends Error {}
 
 interface PinmonySharedImageFile {
   path: string;
@@ -21,10 +23,12 @@ interface PinmonySharedImageFile {
 export class PinmonySystemActions {
   private readonly imageDownload: PinmonyImageDownload = new PinmonyImageDownload();
   private readonly shareImageDownload: PinmonyImageDownload = new PinmonyImageDownload();
+  private shareVideoDownload: PinmonyMediaFile | undefined = undefined;
   private imageShareBusy: boolean = false;
   private imageShareSequence: number = 0;
   private readonly sharedImageFiles: Map<string, PinmonySharedImageFile> = new Map<string, PinmonySharedImageFile>();
   private sharedImageScope: string = '';
+  private readonly imageShareControllers: Map<systemShare.ShareController, () => void> = new Map<systemShare.ShareController, () => void>();
   private imageDownloadBusy: boolean = false;private imageDownloadSequence: number = 0;
   private readonly downloadDelegate: webview.WebDownloadDelegate = new webview.WebDownloadDelegate();
   private active: boolean = true;
@@ -33,17 +37,27 @@ export class PinmonySystemActions {
   private readonly cancelledDownloads: Set<string> = new Set<string>();
   private readonly context: () => common.UIAbilityContext;
   private readonly showMessage: (message: string) => void;
-  constructor(context: () => common.UIAbilityContext, showMessage: (message: string) => void) {
+  private readonly showShareLoading: (() => (() => void)) | undefined;
+  private dismissShareLoading: (() => void) | undefined = undefined;
+  constructor(context: () => common.UIAbilityContext, showMessage: (message: string) => void,
+    showShareLoading?: () => (() => void)) {
     this.context = context;
     this.showMessage = showMessage;
+    this.showShareLoading = showShareLoading;
   }
 
   activate(): void { this.active = true; }
 
   dispose(): void {
+    this.dismissShareLoading?.(); this.dismissShareLoading = undefined;
     this.active = false; this.generation++;this.imageDownload.cancel();this.imageDownloadBusy = false;
     this.shareImageDownload.cancel(); this.imageShareBusy = false;
+    this.shareVideoDownload?.cancel();
     this.sharedImageFiles.clear();
+    this.imageShareControllers.forEach((dismiss: () => void, controller: systemShare.ShareController): void => {
+      try { controller.off('dismiss', dismiss); controller.off('shareCompleted'); } catch (_) {}
+    });
+    this.imageShareControllers.clear();
     this.selectingDownloads.forEach((item: webview.WebDownloadItem): void => {
       try { this.cancelDownload(item); } catch (_) { PinmonyRuntimeLog.warn('PhotoDownload: cancellation unavailable'); }
     });
@@ -68,13 +82,19 @@ export class PinmonySystemActions {
   }
 
   async shareImages(sources: string[], title: string, current: () => boolean, scope: string = ''): Promise<void> {
+    if (!sources.every((source: string): boolean => acceptsImageDownloadUrl(source)))
+      throw new Error(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+    await this.shareMedia(sources, title, current, scope);
+  }
+
+  async shareMedia(sources: string[], title: string, current: () => boolean, scope: string = ''): Promise<void> {
     if (!this.active || this.imageShareBusy || !current()) return;
     if (scope !== this.sharedImageScope) {
       this.sharedImageFiles.clear();
       this.sharedImageScope = scope;
     }
-    if (!sources.length || sources.length > 100 || !sources.every((source: string): boolean => acceptsImageDownloadUrl(source)))
-      throw new Error(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+    if (!sources.length || sources.length > 100 || !sources.every((source: string): boolean => acceptsImageDownloadUrl(source) || acceptsMediaFileUrl(source)))
+      throw new PinmonyMediaSharePreparationError(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
     const generation: number = this.generation;
     const sequence: number = ++this.imageShareSequence;
     const live = (): boolean => this.active && generation === this.generation && current();
@@ -82,6 +102,14 @@ export class PinmonySystemActions {
     const outputs: string[] = [];
     const prepared: Map<string, PinmonySharedImageFile> = new Map<string, PinmonySharedImageFile>();
     let presented: boolean = false;
+    let stage: string = 'prepare';
+    let sharing: systemShare.ShareController | undefined = undefined;
+    let closeLoading: (() => void) | undefined = undefined;
+    const finishLoading = (): void => {
+      closeLoading?.();
+      if (this.dismissShareLoading === closeLoading) this.dismissShareLoading = undefined;
+      closeLoading = undefined;
+    };
     try {
       let loadingShown: boolean = false;
       const context: common.UIAbilityContext = this.context();
@@ -91,7 +119,7 @@ export class PinmonySystemActions {
       // for a day and prune only our own expired cache entries on the next share.
       const files: string[] = await fileIo.listFile(directory);
       for (const name of files) {
-        const match: RegExpMatchArray | null = name.match(/^pin-([0-9]{13})-[0-9]+\.(jpg|png|gif|webp|avif)$/);
+        const match: RegExpMatchArray | null = name.match(/^pin-([0-9]{13})-[0-9]+\.(jpg|png|gif|webp|avif|mp4)$/);
         if (match && Date.now() - Number(match[1]) > 86400000) {
           try { await fileIo.unlink(directory + '/' + name); } catch (_) {}
         }
@@ -104,7 +132,10 @@ export class PinmonySystemActions {
       let cached: PinmonySharedImageFile | undefined = prepared.get(source) || this.sharedImageFiles.get(source);
       if (cached) {
         let available: boolean = false;
-        try { available = Date.now() - cached.createdAt < 86400000 && await fileIo.access(cached.path); } catch (_) {}
+        try {
+          available = Date.now() - cached.createdAt < 86400000 && await fileIo.access(cached.path) &&
+            (await fileIo.stat(cached.path)).size === cached.bytes;
+        } catch (_) {}
         if (!live()) return;
         if (!available) { this.sharedImageFiles.delete(source); cached = undefined; }
       }
@@ -117,9 +148,31 @@ export class PinmonySystemActions {
         PinmonyRuntimeLog.info('SystemShareTrace: phase=image-cache-hit');
       } else {
       if (!loadingShown) {
-        this.showMessage(PinmonyI18n.message('pm_loading_please_wait_b6aaac70'));
+        if (this.showShareLoading) {
+          closeLoading = this.showShareLoading();
+          this.dismissShareLoading = closeLoading;
+        } else this.showMessage(PinmonyI18n.message('pm_loading_please_wait_b6aaac70'));
         loadingShown = true;
       }
+      stage = 'download';
+      if (acceptsMediaFileUrl(source)) {
+        if (!this.shareVideoDownload) this.shareVideoDownload = new PinmonyMediaFile(
+          (_event: string): void => {});
+        const lease: PinmonyMediaFileLease = await this.shareVideoDownload.read(source, context.cacheDir, live);
+        try {
+          if (!live()) return;
+          totalBytes += lease.size;
+          if (totalBytes > 32 * 1024 * 1024) throw new Error('media-share-size');
+          type = utd.getUniformDataTypeByFilenameExtension('.mp4', utd.UniformDataType.VIDEO);
+          if (!type) throw new Error('media-share-type');
+          output = directory + '/pin-' + Date.now().toString() + '-' + (sequence * 100 + index).toString() + '.mp4';
+          outputs.push(output);
+          stage = 'write';
+          await fileIo.copyFile(lease.fd, output);
+          if ((await fileIo.stat(output)).size !== lease.size) throw new Error('media-share-file-size');
+          prepared.set(source, { path: output, type: type, bytes: lease.size, createdAt: Date.now() });
+        } finally { lease.release(); }
+      } else {
       const result: PinmonyDownloadedImage = await this.shareImageDownload.read(sources[index], live);
       if (!live()) return;
       totalBytes += result.data.byteLength;
@@ -128,6 +181,7 @@ export class PinmonySystemActions {
       if (!type) throw new Error('image-share-type');
       output = directory + '/pin-' + Date.now().toString() + '-' + (sequence * 100 + index).toString() + '.' + result.extension;
       outputs.push(output);
+      stage = 'write';
       const file: fileIo.File = await fileIo.open(output, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
       try {
         let offset: number = 0;
@@ -137,22 +191,45 @@ export class PinmonySystemActions {
           offset += written;
         }
       } finally { await fileIo.close(file); }
+      if ((await fileIo.stat(output)).size !== result.data.byteLength) throw new Error('image-share-file-size');
       prepared.set(source, { path: output, type: type, bytes: result.data.byteLength, createdAt: Date.now() });
+      }
       }
       if (totalBytes > 32 * 1024 * 1024) throw new Error('image-share-size');
       if (!live()) return;
       const uri: string = fileUri.getUriFromPath(output);
-      const record: systemShare.SharedRecord = { utd: type, uri: uri, thumbnailUri: uri, title: title.slice(0, 300) };
+      const record: systemShare.SharedRecord = acceptsMediaFileUrl(source) ?
+        { utd: type, uri: uri, title: title.slice(0, 300) } :
+        { utd: type, uri: uri, thumbnailUri: uri, title: title.slice(0, 300) };
       if (data) data.addRecord(record);
       else data = new systemShare.SharedData(record);
       }
       if (!data || !live()) return;
       const controller: systemShare.ShareController = new systemShare.ShareController(data);
+      sharing = controller;
+      stage = 'panel';
+      controller.on('shareCompleted', (result: systemShare.ShareOperationResult): void => {
+        // This callback identifies the system target; it is not proof that the
+        // receiving device saved every file. Never log target-provided strings.
+        PinmonyRuntimeLog.info('SystemShareTrace: phase=target-returned harmonyShare=' +
+          (result.targetAbilityInfo?.name === systemShare.ShareAbilityName.HARMONYSHARE).toString());
+      });
+      const onDismiss = (): void => {
+        PinmonyRuntimeLog.info('SystemShareTrace: phase=panel-dismissed');
+        this.imageShareControllers.delete(controller);
+        try { controller.off('dismiss', onDismiss); controller.off('shareCompleted'); } catch (_) {}
+      };
+      controller.on('dismiss', onDismiss);
+      this.imageShareControllers.set(controller, onDismiss);
+      PinmonyRuntimeLog.info('SystemShareTrace: phase=panel-requested images=' + sources.length.toString() +
+        ' bytes=' + totalBytes.toString());
       await controller.show(context, {
         selectionMode: sources.length > 1 ? systemShare.SelectionMode.BATCH : systemShare.SelectionMode.SINGLE,
         previewMode: systemShare.SharePreviewMode.DETAIL
       });
       presented = true;
+      finishLoading();
+      PinmonyRuntimeLog.info('SystemShareTrace: phase=panel-presented');
       if (this.active && generation === this.generation && scope === this.sharedImageScope) {
         prepared.forEach((cached: PinmonySharedImageFile, source: string): void => {
           this.sharedImageFiles.delete(source);
@@ -163,9 +240,21 @@ export class PinmonySystemActions {
         this.sharedImageFiles.forEach((_cached: PinmonySharedImageFile, source: string): void => { keys.push(source); });
         for (let index: number = 0; index < keys.length - 100; index++) this.sharedImageFiles.delete(keys[index]);
       }
-    } catch (_) {
-      if (live()) throw new Error(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+    } catch (error) {
+      const code: number | undefined = (error as BusinessError)?.code;
+      PinmonyRuntimeLog.warn('SystemShareTrace: phase=failed stage=' + stage + ' code=' +
+        (typeof code === 'number' && Number.isSafeInteger(code) ? code.toString() : 'unavailable'));
+      if (sharing) {
+        const dismiss: (() => void) | undefined = this.imageShareControllers.get(sharing);
+        try { if (dismiss) sharing.off('dismiss', dismiss); sharing.off('shareCompleted'); } catch (_) {}
+        this.imageShareControllers.delete(sharing);
+      }
+      if (live()) {
+        if (stage !== 'panel') throw new PinmonyMediaSharePreparationError(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+        throw new Error(PinmonyI18n.message('pm_sharing_incomplete_please_retry_2a3623dc'));
+      }
     } finally {
+      finishLoading();
       if (!presented) for (const output of outputs) { try { await fileIo.unlink(output); } catch (_) {} }
       if (generation === this.generation && sequence === this.imageShareSequence) this.imageShareBusy = false;
     }

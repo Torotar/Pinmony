@@ -1,9 +1,15 @@
 import { ImageFlightRect, imageContainRect } from '../services/PinmonyImageTransition';
 import { curves } from '@kit.ArkUI';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyDetailSnapshot, PinmonyDetailAction } from '../models/PinmonyDetail';
+import { PinmonyDetailSnapshot, PinmonyDetailAction, PinmonyCarouselItem } from '../models/PinmonyDetail';
+import { PinmonyActionNotice } from 'common_ui';
+import { PinmonyI18n } from 'common_foundation';
 import { AnimatorResult } from '@kit.ArkUI';
 import { imagePanBounds, imageFling, imageFlingDistance } from '../services/PinmonyImageMotion';
+
+interface PinmonyViewerPhoto extends PinmonyCarouselItem {
+  revision: number;
+}
 
 @Component
 export struct PinmonyImageViewer {
@@ -31,8 +37,73 @@ export struct PinmonyImageViewer {
   private originalDecoded: boolean = false;
   private previewRendered: boolean = false;
   @State private originalDataReady: boolean = false;
+  @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @State private photos: PinmonyViewerPhoto[] = [];
+  @State private photoIndex: number = 0;
+  @State private loadedPhotos: string[] = [];
+  @State private failedPhotos: string[] = [];
+  private paging: boolean = false;
+  onImageChange?: (url: string) => void;
+
+  private initializePhotos(): void {
+    this.photos = (this.detail.carousel?.items || [])
+      .filter((item: PinmonyCarouselItem): boolean => !item.video && !!item.imageUrl)
+      .map((item: PinmonyCarouselItem): PinmonyViewerPhoto => ({ id: item.id, imageUrl: item.imageUrl,
+        imageWidth: item.imageWidth, imageHeight: item.imageHeight, title: item.title, revision: 0 }));
+    const selected: number = this.photos.findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.imageUrl);
+    this.photoIndex = Math.max(0, selected);
+    if (selected >= 0) {
+      this.naturalWidth = this.photos[selected].imageWidth; this.naturalHeight = this.photos[selected].imageHeight;
+    }
+  }
+
+  private selectPhoto(index: number): void {
+    if (!this.mounted || !this.active || this.closing || this.transitioning || index === this.photoIndex ||
+        index < 0 || index >= this.photos.length) return;
+    this.stopInertia();
+    this.photoIndex = index;
+    const photo: PinmonyCarouselItem = this.photos[index];
+    this.naturalWidth = photo.imageWidth; this.naturalHeight = photo.imageHeight;
+    this.scaleValue = 1; this.dx = 0; this.dy = 0;
+    this.originalDecoded = this.loadedPhotos.includes(photo.imageUrl);
+    this.originalDataReady = this.originalDecoded;
+    this.originalReady = this.originalDecoded;
+    this.previewReady = false; this.previewRendered = false;
+    this.setFrame(this.containRect());
+    this.onImageChange?.(photo.imageUrl);
+  }
+
+  private transitionPhotos(): PinmonyCarouselItem[] {
+    if (this.photos.length > 1) return [this.photos[this.photoIndex]];
+    return [{ id: 'single', imageUrl: this.imageUrl || this.detail.imageUrl,
+      imageWidth: this.detail.imageWidth, imageHeight: this.detail.imageHeight, title: '' }];
+  }
+
+  private retryPhoto(photo: PinmonyViewerPhoto): void {
+    if (!this.active || this.closing || this.transitioning) return;
+    this.failedPhotos = this.failedPhotos.filter((url: string): boolean => url !== photo.imageUrl);
+    this.photos = this.photos.map((item: PinmonyViewerPhoto): PinmonyViewerPhoto => item.id === photo.id ?
+      { id: item.id, imageUrl: item.imageUrl, imageWidth: item.imageWidth, imageHeight: item.imageHeight,
+        title: item.title, revision: item.revision + 1 } : item);
+  }
+
+  private photoSettled(photo: PinmonyViewerPhoto, status: number, failed: boolean = false): void {
+    if (!this.mounted || !this.photos.some((item: PinmonyViewerPhoto): boolean =>
+      item.id === photo.id && item.imageUrl === photo.imageUrl && item.revision === photo.revision)) return;
+    if (failed) {
+      if (!this.failedPhotos.includes(photo.imageUrl)) this.failedPhotos = this.failedPhotos.concat(photo.imageUrl);
+    } else if (status === 1) {
+      if (!this.loadedPhotos.includes(photo.imageUrl)) this.loadedPhotos = this.loadedPhotos.concat(photo.imageUrl);
+      // A hidden preloaded page cannot release the source image during entry.
+      if (this.transitionStarted && !this.transitioning && this.photos[this.photoIndex]?.imageUrl === photo.imageUrl) {
+        this.imageDecoded(1, true, photo.imageWidth, photo.imageHeight);
+      }
+    }
+  }
+
   aboutToAppear(): void {
     this.mounted = true;
+    this.initializePhotos();
     this.setFrame(this.origin.width > 0 && this.origin.height > 0 ? this.origin : this.containRect());
   }
   private imageDecoded(status: number, original: boolean, width: number = 0, height: number = 0): void {
@@ -85,12 +156,13 @@ export struct PinmonyImageViewer {
   private transitionChanged(): void {
     if (!this.mounted) return;
     clearTimeout(this.transitionTimer);
-    if (!this.previewReady && !this.originalReady) {
+    if (!this.previewReady && !this.originalReady && !this.transitionStarted) {
       if (this.closing) this.onClosed?.();
       return;
     }
     const version: number = ++this.transitionVersion;
     this.transitioning = true;
+    this.paging = false;
     this.stopInertia();
     const closing: boolean = this.closing;
     const target: ImageFlightRect = closing ? this.sourceRect() : this.containRect();
@@ -122,14 +194,14 @@ export struct PinmonyImageViewer {
   private startScale: number = 1;
   private startX: number = 0;
   private startY: number = 0;
-  private multiTouch: boolean = false;
+  @State private multiTouch: boolean = false;
   private touchMoved: boolean = false;
   private touchStartX: number = 0;
   private touchStartY: number = 0;
   private inertia: AnimatorResult | undefined = undefined;
   private motionVersion: number = 0;
   @Prop @Watch('activeChanged') active: boolean = true;
-  private activeChanged(): void { if (!this.active) this.stopInertia(); }
+  private activeChanged(): void { if (!this.active) { this.paging = false; this.stopInertia(); } }
   aboutToDisappear(): void { this.mounted = false; this.transitionVersion++; clearTimeout(this.transitionTimer); this.stopInertia(); }
   onControlsChange?: (visible: boolean) => void;
   onClose?: () => void;
@@ -142,13 +214,13 @@ export struct PinmonyImageViewer {
   }
 
   private closeViewer(): void {
-    if (this.multiTouch || this.touchMoved) return;
+    if (!this.active || this.transitioning || this.paging || this.multiTouch || this.touchMoved) return;
     this.stopInertia();
     if (this.onClose) this.onClose();
   }
 
   private toggleZoom(x: number = this.viewportWidth / 2, y: number = this.viewportHeight / 2): void {
-    if (this.multiTouch || this.touchMoved) return;
+    if (!this.active || this.transitioning || this.paging || this.multiTouch || this.touchMoved) return;
     this.stopInertia();
     const target: number = this.scaleValue > 1 ? 1 : 2.4;
     const ratio: number = target / this.scaleValue;
@@ -185,7 +257,7 @@ export struct PinmonyImageViewer {
 
   private moveImage(x: number, y: number): void {
     const bounds = imagePanBounds(this.viewportWidth, this.viewportHeight,
-      this.detail.imageWidth, this.detail.imageHeight, this.scaleValue);
+      this.naturalWidth || this.detail.imageWidth, this.naturalHeight || this.detail.imageHeight, this.scaleValue);
     this.dx = Math.max(-bounds.x, Math.min(bounds.x, x));
     this.dy = Math.max(-bounds.y, Math.min(bounds.y, y));
   }
@@ -214,38 +286,75 @@ export struct PinmonyImageViewer {
   @Builder
   private imageContent() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Column().width('100%').height('100%').backgroundColor($r('app.color.page_background')).opacity(this.previewReady || this.originalReady ? this.backdrop : 0)
+      Column().width('100%').height('100%').backgroundColor($r('app.color.page_background')).opacity(this.previewReady || this.originalReady || this.transitionStarted ? this.backdrop : 0)
         .hitTestBehavior(HitTestMode.None)
+      ForEach(this.transitionPhotos(), (photo: PinmonyCarouselItem) => {
       Stack() {
-      Image(this.previewUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Cover).syncLoad(true)
+      Image(this.photos.length > 1 ? photo.imageUrl : this.previewUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Cover).syncLoad(true)
         .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
         .opacity(this.previewReady && !this.originalReady ? 1 : 0)
-        .onComplete((event) => this.imageDecoded(event?.loadingStatus ?? -1, false, event?.width || 0, event?.height || 0))
-      Image(this.imageUrl || this.detail.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain)
+        .onComplete((event) => { if (this.transitionPhotos()[0].imageUrl === photo.imageUrl) this.imageDecoded(event?.loadingStatus ?? -1, false, event?.width || 0, event?.height || 0); })
+      Image(photo.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain)
         .scale({ x: this.scaleValue, y: this.scaleValue }).translate({ x: this.dx, y: this.dy })
         // Keep the rendered preview underneath until the full image renders.
         .opacity(this.originalReady || this.originalDataReady && (!this.transitioning || !this.previewReady) ? 1 : 0)
-        .onComplete((event) => this.imageDecoded(event?.loadingStatus ?? -1, true, event?.width || 0, event?.height || 0))
+        .onComplete((event) => { if (this.transitionPhotos()[0].imageUrl === photo.imageUrl) this.imageDecoded(event?.loadingStatus ?? -1, true, event?.width || 0, event?.height || 0); })
       }.width(this.frameWidth).height(this.frameHeight).position({ x: this.frameX, y: this.frameY })
         .borderRadius(this.frameRadius).clip(this.transitioning)
+        .opacity(this.photos.length > 1 && !this.transitioning && !this.closing ? 0 : 1)
+        .hitTestBehavior(HitTestMode.None)
+      }, (photo: PinmonyCarouselItem): string => photo.id + ':' + photo.imageUrl)
+      if (this.photos.length > 1) {
+        Swiper() {
+          ForEach(this.photos, (photo: PinmonyViewerPhoto, index: number) => {
+            Stack() {
+              if (this.failedPhotos.includes(photo.imageUrl)) {
+                PinmonyActionNotice({ active: this.active && !this.transitioning && !this.closing && index === this.photoIndex,
+                  scope: photo.id + ':' + photo.revision,
+                  message: PinmonyI18n.text('pm_image_failed_to_load_572993f5', this.uiLanguage),
+                  actionText: PinmonyI18n.text('pm_retry_b8784c8d', this.uiLanguage),
+                  onAction: () => this.retryPhoto(photo) })
+              } else {
+                if (!this.loadedPhotos.includes(photo.imageUrl)) {
+                  LoadingProgress().width(32).height(32).color($r('app.color.primary_text')).hitTestBehavior(HitTestMode.None)
+                }
+                Image(photo.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)
+                  .scale({ x: index === this.photoIndex ? this.scaleValue : 1, y: index === this.photoIndex ? this.scaleValue : 1 })
+                  .translate({ x: index === this.photoIndex ? this.dx : 0, y: index === this.photoIndex ? this.dy : 0 })
+                  .onComplete((event) => this.photoSettled(photo, event?.loadingStatus ?? -1))
+                  .onError(() => this.photoSettled(photo, -1, true))
+                  .accessibilityText(PinmonyI18n.format('pm_image_value_of_value_value_66dd48e8', [index + 1, this.photos.length, photo.title], this.uiLanguage))
+              }
+            }.width('100%').height('100%').clip(true)
+          }, (photo: PinmonyViewerPhoto): string => photo.id + ':' + photo.imageUrl + ':' + photo.revision + ':' + this.uiLanguage)
+        }.width('100%').height('100%').index(this.photoIndex).loop(false).autoPlay(false).indicator(false)
+          .disableSwipe(!this.active || this.transitioning || this.closing || this.scaleValue > 1 || this.multiTouch)
+          .onChange((index: number) => this.selectPhoto(index))
+          .onAnimationStart(() => { if (this.mounted && this.active && !this.closing && !this.transitioning) { this.paging = true; this.touchMoved = true; } })
+          .onAnimationEnd(() => { this.paging = false; })
+          .opacity(!this.transitioning && !this.closing ? 1 : 0)
+          .hitTestBehavior(!this.transitioning && !this.closing && this.active ? HitTestMode.Default : HitTestMode.None)
+          .accessibilityLevel(!this.transitioning && !this.closing && this.active ? 'auto' : 'no-hide-descendants')
+      }
     }.width('100%').height('100%').clip(true)
       // Keep gesture coordinates in the untransformed viewport, independent of image scale.
-      .gesture(GestureGroup(GestureMode.Parallel,
-          GestureGroup(GestureMode.Exclusive,
+      .gesture(GestureGroup(GestureMode.Exclusive,
             TapGesture({ count: 2 }).onAction((e: GestureEvent) => {
               if (e.fingerList.length > 0) this.toggleZoom(e.fingerList[0].localX, e.fingerList[0].localY);
             }),
             TapGesture({ count: 1 }).onAction(() => this.closeViewer())
-          ),
+          ))
+      .parallelGesture(GestureGroup(GestureMode.Parallel,
           PinchGesture().onActionStart(() => { this.stopInertia(); this.multiTouch = true; this.startScale = this.scaleValue; })
             .onActionUpdate((e: GestureEvent) => {
+              if (!this.active || this.transitioning || this.closing || this.paging) return;
               this.scaleValue = Math.max(1, Math.min(8, this.startScale * e.scale));
               if (this.scaleValue === 1) { this.dx = 0; this.dy = 0; }
               else this.moveImage(this.dx, this.dy);
             }),
           PanGesture().onActionStart(() => { this.stopInertia(); this.touchMoved = true; this.startX = this.dx; this.startY = this.dy; })
             .onActionUpdate((e: GestureEvent) => {
-              if (this.scaleValue > 1) this.moveImage(this.startX + e.offsetX, this.startY + e.offsetY);
+              if (this.active && !this.transitioning && !this.closing && this.scaleValue > 1) this.moveImage(this.startX + e.offsetX, this.startY + e.offsetY);
             })
             .onActionEnd((e: GestureEvent) => this.startInertia(e.velocityX, e.velocityY))
             .onActionCancel(() => this.stopInertia())

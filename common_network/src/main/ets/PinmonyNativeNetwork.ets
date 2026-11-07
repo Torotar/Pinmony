@@ -1852,6 +1852,35 @@ export class PinmonyNativeNetwork {
     }catch (_) {}
     return this.request(job, (): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});
   }
+  async requestBusinessInboxActivity(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    target: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    try {
+      const write: boolean = !!target;
+      const encoded: string = write ? job.body : job.url.slice(job.url.indexOf('?') + 1);
+      const match: RegExpMatchArray | null = encoded.match(/^source_url=([^&]+)&data=([^&]+)$/);
+      const envelope: NativeSearchEnvelope = JSON.parse(decodeURIComponent(match ? match[2] : '')) as NativeSearchEnvelope;
+      const o: Record<string,Object | null> = envelope.options;
+      const data: Record<string,Object> = o['data'] as Record<string,Object>;
+      const fields: string[] = o['field_sets'] as string[];
+      const expected: string[] = ['socialrelationship.user()','socialrelationship.relationship_type','socialrelationship.last_action_time','socialrelationship.followed_by_me','user.id','user.full_name','user.image_large_url','user.username'];
+      const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && ownerCurrent() && captured.authenticated && !!captured.accountId &&
+        /^https:\/\/(?:www|uk)\.pinterest\.com$/.test(captured.origin) && job.page === captured.origin + '/inbox/' &&
+        job.id.startsWith('native_inbox_activity_') && job.epoch === captured.generation && !!match && decodeURIComponent(match[1]) === '/inbox/' &&
+        Object.keys(envelope).length === 2 && !!envelope.context && !Array.isArray(envelope.context) && Object.keys(envelope.context).length === 0 &&
+        !!o && !Array.isArray(o) && !!data && !Array.isArray(data) &&
+        job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['X-Pinterest-Pws-Handler'] === 'www/inbox.js' && job.headers['X-Pinterest-Source-Url'] === '/inbox/';
+      permitted = basic && (write ? /^\d{1,40}$/.test(target) && job.method === 'POST' &&
+        job.url === captured.origin + '/resource/ApiResource/update/' && job.headers['Content-Type'] === 'application/x-www-form-urlencoded' &&
+        Object.keys(o).length === 2 && o['url'] === '/v3/users/' + target + '/follow/' && Object.keys(data).length === 0 :
+        job.method === 'GET' && job.body === '' && job.url === captured.origin + '/resource/ApiResource/get/?' + encoded &&
+        Object.keys(o).length === 3 && o['url'] === '/v3/social_relationships/inbox/' && Object.keys(data).length === 1 && data['page_size'] === 20 &&
+        Array.isArray(fields) && fields.length === expected.length && expected.every((field: string,index: number): boolean => field === fields[index]));
+    } catch (_) {}
+    return this.request(job, (): PinmonyNetworkContext => { const actual: PinmonyBusinessSessionContext = session(); return {
+      authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,
+      epoch:captured.generation,page:job.page,userAgent:actual.userAgent}; });
+  }
   async requestBusinessInboxMessagesRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
     ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;

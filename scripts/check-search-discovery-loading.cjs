@@ -21,4 +21,25 @@ assert.equal(h.discoveryInitialLoading(), false, 'failure remains retryable');
 reset(); h.loading = true; h.snapshot.heroes = [{}];
 assert.equal(h.discoveryInitialLoading(), false, 'refresh keeps existing carousel visible');
 assert(source.includes('if (this.discoveryInitialLoading())'));
+const loadingBuilder = source.slice(source.indexOf('  private searchLoadingState()'), source.indexOf('  private discoveryContent()'));
+assert.match(loadingBuilder, /if \(!this\.searchPullIndicatorVisible\(\)\)\s*\{\s*LoadingProgress\(\)/,
+  'the shared central spinner is omitted during pull refresh for discovery and search results');
+assert.match(loadingBuilder, /if \(!this\.searchPullIndicatorVisible\(\)\)[\s\S]*Text\(this\.uiText/,
+  'central loading copy is suppressed with the spinner');
+const pullBuilder = source.slice(source.indexOf('  private searchRefreshIndicator()'), source.indexOf('  @State private searchRefreshState'));
+assert.match(pullBuilder, /LoadingProgress\(\)[\s\S]*\.visibility\(this\.searchPullIndicatorVisible\(\)/,
+  'the pull refresh spinner remains visible while refreshing');
+const pullMethodStart = source.indexOf('  private searchPullIndicatorVisible(');
+const pullMethod = source.slice(pullMethodStart, source.indexOf('\n  @Builder', pullMethodStart));
+const RefreshStatus = { Inactive: 0, Drag: 1, OverDrag: 2, Refresh: 3, Done: 4 };
+const PullHost = vm.runInNewContext(ts.transpileModule('class PullHost {' + pullMethod + '\n} PullHost;',
+  { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, { RefreshStatus });
+const pull = new PullHost();
+for (const refreshing of [false, true]) {
+  for (const state of Object.values(RefreshStatus)) {
+    Object.assign(pull, { refreshing, searchRefreshState: state });
+    const visible = pull.searchPullIndicatorVisible();
+    assert.equal(visible, refreshing || [RefreshStatus.Drag, RefreshStatus.OverDrag, RefreshStatus.Refresh].includes(state));
+  }
+}
 console.log('Search discovery loading: placeholder, pending read, confirmed empty, failure and retained content passed');

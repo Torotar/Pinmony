@@ -13,7 +13,7 @@ export default class PinmonyAbilityStage extends AbilityStage {
     const probe = (): void => {
       if (AppStorage.get<boolean>('pinmonyStartupAbilityConstructed')) return;
       const scheduledAt: number = Date.now();
-      const delay: number = delays[sample];
+      const delay: number = Math.max(0, readyAt + delays[sample] - scheduledAt);
       setTimeout((): void => {
         const now: number = Date.now();
         PinmonyRuntimeLog.info('StartupBoundary: stage-loop-probe sample=' + sample.toString() +

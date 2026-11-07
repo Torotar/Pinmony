@@ -16,6 +16,7 @@ export class PinmonyI18n {
   private static korean: resourceManager.ResourceManager | undefined = undefined;
   private static russian: resourceManager.ResourceManager | undefined = undefined;
   private static brazilianPortuguese: resourceManager.ResourceManager | undefined = undefined;
+  private static resourceColorMode: number = -2;
   static resolve(preference: string, systemLanguage: string): string {
     if (preference === 'zh' || preference === 'zh_TW' || preference === 'en' || preference === 'en_GB' || preference === 'ja' || preference === 'ko' || preference === 'ru' || preference === 'pt_BR') return preference;
     if (/^zh[-_]TW(?:[-_]|$)/i.test(systemLanguage)) return 'zh_TW';
@@ -41,6 +42,7 @@ export class PinmonyI18n {
   }
 
   static initialize(context: common.Context): void {
+    PinmonyI18n.resourceColorMode = -2;
     const chineseConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
     chineseConfig.locale = 'zh-CN';
     const traditionalChineseConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
@@ -81,6 +83,27 @@ export class PinmonyI18n {
     const preference: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'system';
     const language: string = PinmonyI18n.resolve(preference, i18n.System.getSystemLanguage());
     AppStorage.setOrCreate('pinmonyLanguage', language);
+  }
+
+  // Locale overrides copy the full Configuration, including its color mode.
+  // Keep those long-lived snapshots in sync when the application mode changes.
+  static syncResourceColorMode(context: common.Context): void {
+    try {
+      const mode: number = context.resourceManager.getConfigurationSync().colorMode;
+      if (mode !== resourceManager.ColorMode.DARK && mode !== resourceManager.ColorMode.LIGHT) return;
+      if (mode === PinmonyI18n.resourceColorMode) return;
+      const managers: (resourceManager.ResourceManager | undefined)[] = [PinmonyI18n.chinese,
+        PinmonyI18n.traditionalChinese, PinmonyI18n.english, PinmonyI18n.englishUk,
+        PinmonyI18n.japanese, PinmonyI18n.korean, PinmonyI18n.russian, PinmonyI18n.brazilianPortuguese];
+      const locales: string[] = ['zh-CN', 'zh-TW', 'en-US', 'en-GB', 'ja-JP', 'ko-KR', 'ru-RU', 'pt-BR'];
+      managers.forEach((manager: resourceManager.ResourceManager | undefined, index: number): void => {
+        if (!manager) return;
+        const configuration: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
+        configuration.locale = locales[index];
+        manager.updateOverrideConfiguration(configuration);
+      });
+      PinmonyI18n.resourceColorMode = mode;
+    } catch (_) { console.warn('LanguagePreference: resource configuration sync unavailable'); }
   }
 
   static select(preference: string): void {

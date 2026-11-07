@@ -32,6 +32,14 @@ function harness() {
     } };
 }
 async function main() {
+  for (const items of [[], [{ type: 'message', message: 'No results' }], [{type:'presentation',id:'fixture-empty'}]]) {
+    const video = harness(); video.setPage('https://www.pinterest.com/search/videos/?q=fixture'); video.read();
+    await video.respond(0, items);
+    assert.equal(video.read().error, ''); assert.equal(video.read().active, true);
+    assert.equal(video.read().ended, true); assert.equal(video.read().results.length, 0);
+  }
+  const failedVideo = harness(); failedVideo.setPage('https://www.pinterest.com/search/videos/?q=fixture'); failedVideo.read();
+  await failedVideo.respond(0, [{type:'pin',id:'123'}]); assert(failedVideo.read().error);
   const advertising = harness(); advertising.read();
   await advertising.respond(0, [fixture, { ...fixture, id: '456', is_promoted: true },
     { ...fixture, id: '789', ad_data: { grid_click_type: 1 } },

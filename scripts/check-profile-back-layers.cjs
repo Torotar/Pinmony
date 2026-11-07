@@ -37,6 +37,8 @@ function destinationBack(source, state) {
 async function main() {
   const h = new Harness(); let nativeBacks = 0, parentBacks = 0;
   Object.assign(h, {
+    noticeChats: [],
+    searchController: { cancelSubmittedPin: () => false }, nativeBoardVisible: () => false, restoreInboxNewsSearchParent: () => false,
     profileChatActive: true, nativeChildBackUntil: 0, profileStore: { origins: [{}] }, pinStore: {}, inboxStore: { inboxFlow: { screen: 'settings' } },
     inboxMessagesNativeReads: { async action(action) {
       assert.equal(action, 'back'); nativeBacks++;
@@ -58,6 +60,7 @@ async function main() {
   assert(binding.includes('backActive: !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible'));
   assert(index.includes('pageActive: _identity === this.detailRootIdentity() && !this.profileChatActive &&'));
   for (const file of ['feature_profile/src/main/ets/components/PinmonyProfilePage.ets',
+    'feature_inbox/src/main/ets/components/PinmonyInboxListPage.ets',
     'feature_inbox/src/main/ets/components/PinmonyInboxFlowPage.ets',
     'feature_pin/src/main/ets/components/PinmonyDetailPage.ets',
     'feature_profile/src/main/ets/components/PinmonyProfilePanelPage.ets']) {
@@ -70,6 +73,12 @@ async function main() {
     assert.equal(defaultPops, 0, file + ': HDS must not pop retained root into an empty navigation');
   }
   const inbox = fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxFlowPage.ets', 'utf8');
+  const inboxList = fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxListPage.ets', 'utf8');
+  let listCoveredBacks=0;
+  const coveredList=destinationBack(inboxList.slice(0,inboxList.indexOf('private searchDestination()')), {
+    backActive:false,onCoveredBack(){listCoveredBacks++;return true;},onBack(){throw Error('covered list must stay mounted');}
+  });
+  assert.equal(coveredList.fire(),true);assert.equal(listCoveredBacks,1,'covered full list forwards back without closing itself');
   h.profileChatActive = true; h.nativeChildBackUntil = 0; h.inboxStore.inboxFlow = { screen: 'chat' };
   const covered = destinationBack(profile, { backActive: false, onCoveredBack: () => h.onBackPress() });
   assert.equal(covered.fire(), true); await new Promise(resolve => setImmediate(resolve));

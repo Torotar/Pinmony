@@ -1,6 +1,34 @@
 {
   "string": [
     {
+      "name": "pm_remove_chat_window",
+      "value": "チャットを削除"
+    },
+    {
+      "name": "pm_chat_list_save_failed",
+      "value": "チャット一覧を保存できません。再試行してください。"
+    },
+    {
+      "name": "pm_inbox_unread_message_count",
+      "value": "未読メッセージ：{0}"
+    },
+    {
+      "name": "pm_inbox_unread_counts",
+      "value": "未読の更新：{0}、未読メッセージ：{1}"
+    },
+    {
+      "name": "pm_inbox_messages_unread",
+      "value": "未読のメッセージがあります"
+    },
+    {
+      "name": "pm_inbox_both_unread",
+      "value": "未読の更新とメッセージがあります"
+    },
+    {
+      "name": "pm_inbox_updates_unread",
+      "value": "未読の更新があります"
+    },
+    {
       "name": "pm_photo_history_save_unconfirmed",
       "value": "検索は完了しましたが、写真履歴の保存は確認できませんでした。"
     },
@@ -1062,23 +1090,23 @@
     },
     {
       "name": "pm_m_bd957bc4",
-      "value": "m"
+      "value": "分"
     },
     {
       "name": "pm_h_3b6fefc5",
-      "value": "h"
+      "value": "時間"
     },
     {
       "name": "pm_d_49da61ce",
-      "value": "d"
+      "value": "日"
     },
     {
       "name": "pm_mo_e5afd16c",
-      "value": "mo"
+      "value": "か月"
     },
     {
       "name": "pm_y_62ef900a",
-      "value": "y"
+      "value": "年"
     },
     {
       "name": "pm_translating_07f81963",
@@ -5855,6 +5883,78 @@
     {
       "name": "pm_news_start",
       "value": "始める"
+    },
+    {
+      "name": "pm_activity_title",
+      "value": "アクティビティ"
+    },
+    {
+      "name": "pm_activity_followed_you",
+      "value": "あなたをフォローしました"
+    },
+    {
+      "name": "pm_activity_follow_back",
+      "value": "フォローバック"
+    },
+    {
+      "name": "pm_activity_say_hello",
+      "value": "あいさつする"
+    },
+    {
+      "name": "pm_activity_empty",
+      "value": "フォロワーのアクティビティはまだありません"
+    },
+    {
+      "name": "pm_activity_load_error",
+      "value": "フォロワーのアクティビティを読み込めませんでした。もう一度お試しください。"
+    },
+    {
+      "name": "pm_activity_follow_success",
+      "value": "フォローしました！このユーザーが作成したピンがホームフィードに表示されます。"
+    },
+    {
+      "name": "pm_activity_follow_uncertain",
+      "value": "フォロー結果を確認できませんでした。アクティビティを更新して状態を確認してください。"
+    },
+    {
+      "name": "pm_activity_check_status",
+      "value": "状態を確認"
+    },
+    {
+      "name": "pm_activity_now",
+      "value": "たった今"
+    },
+    {
+      "name": "pm_activity_minutes",
+      "value": "{0}分前"
+    },
+    {
+      "name": "pm_activity_hours",
+      "value": "{0}時間前"
+    },
+    {
+      "name": "pm_activity_days",
+      "value": "{0}日前"
+    },
+    {
+      "name": "pm_video_share_prepare_failed_link_copied",
+      "value": "動画を準備できませんでした。Pin のリンクをコピーしました。"
+    },
+    {
+      "name": "pm_video_share_prepare_failed_copy_failed",
+      "value": "動画を準備できませんでした。Pin のリンクをコピーできません。もう一度お試しください。"
+    },
+    {
+      "name": "pm_search_empty_query_prefix",
+      "value": "申し訳ありませんが、"
+    },
+    {
+      "name": "pm_search_empty_query_suffix",
+      "value": "に関連するピンが見つかりませんでした。"
+    },
+    {
+      "name": "pm_search_empty_try_again",
+      "value": "もう一度検索してください。"
     }
   ]
 }

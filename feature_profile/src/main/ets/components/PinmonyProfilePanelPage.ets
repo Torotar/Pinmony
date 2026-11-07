@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -9,6 +10,7 @@ import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyP
 import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyProfilePanelPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private editTitleInset(): number { return this.snapshot.mode === 'edit' ? this.getUIContext().px2vp(this.statusBarHeightPx) + 56 : 0; }
   private contentTopInset(): number { return this.snapshot.mode === 'following' ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -367,7 +369,7 @@ export struct PinmonyProfilePanelPage {
         }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
-    }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .onBackPressed(() => {
         if (!this.active) { this.onCoveredBack?.(); return true; }
         if (this.followerSearching) this.closeFollowerSearch();
@@ -426,7 +428,7 @@ export struct PinmonyProfilePanelPage {
           .onAppear(() => { if (this.searchRestorePending) this.restoreScrollOffsets(); })
           .scrollBarMargin({ start: LengthMetrics.vp(this.getUIContext().px2vp(this.statusBarHeightPx) + 56 + this.searchHeaderHeight) })
       }.width('100%').height('100%')
-    }.titleBar(this.searchOptions())
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.searchOptions(), this.hdsDarkMode))
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.searchScroller])
       .translate({ x: this.searchMotionOffset })
       .onBackPressed(() => { if (!this.active) { this.onCoveredBack?.(); return true; } this.closeFollowerSearch(); return true; })

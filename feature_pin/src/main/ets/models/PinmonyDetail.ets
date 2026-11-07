@@ -86,6 +86,8 @@ export interface PinmonyDetailSnapshot {
   actionsRetained?: boolean;
   commentsRetained?: boolean;
   relatedRetained?: boolean;
+  // Current opening's validated recommendation response, before base readiness.
+  relatedPreview?: boolean;
   kind: string;
   session: number;
   pinUrl: string;

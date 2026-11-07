@@ -106,6 +106,10 @@ async function main() {
   require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Feed { ' + pageMethods + '} globalThis.Feed = Feed;', { target: ts.ScriptTarget.ES2020 }), pageCtx);
   const feed = new pageCtx.Feed(), ranges = [];
   Object.assign(feed, { activeSession: 1, activePageKey: home, activeTab: 'all', visibleFirst: 10, visibleLast: 15,
+    paneMounted: true, paneActive: true, paginationWasActive: false, prefetchTimer: -1,
+    paginationWindow: { pause() {}, observe() {} }, retryRecoveredImages() {},
+    setHomeChromeCollapsed() {},
+    scheduleViewportFill() {}, scheduleDetailPrefetch() { this.prefetchVisibleDetails(); },
     home: { session: 2, pageKey: home, selectedTab: 'all', pins: Array.from({ length: 30 }) }, feedActive: true, actionsReady: true,
     restoreDone:true, restoreScrollPosition(){},syncFeedRows(){},resumePendingEnd(){},fillShortViewport(){},uiText:require('./local-message-test-fixture.cjs').rawLocalMessages.text,onImageRecovery() {}, updateCategories() {}, prefetchNextScreen() {}, onPrefetchPins: (first, last) => ranges.push([first, last]) });
   feed.onHomeChanged();

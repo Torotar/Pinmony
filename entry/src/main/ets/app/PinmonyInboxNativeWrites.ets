@@ -22,6 +22,7 @@ interface WriteResource { status: string; code?: number; error?: InboxWriteFailu
 interface WriteResponse { resource_response: WriteResource; client_context?: WriteContext; }
 interface WriteContext { user?: WriteUser; }
 export interface PinmonyInboxNativeWritePorts {
+  requestPrefix?: string;
   state: () => PinmonyInboxFlowSnapshot | undefined;
   identity: () => PinmonyInboxWriteIdentity | undefined;
   session: () => PinmonyBusinessSessionContext; network: () => PinmonyNativeNetwork;
@@ -91,7 +92,7 @@ export class PinmonyInboxNativeWrites {
         JSON.stringify(actual.contacts) === JSON.stringify(identity.contacts) && this.ports.state() === this.displayed;
     };
     const envelope: WriteEnvelope = {options:options,context:{}}, source: string = identity.page.slice(session.origin.length);
-    const job: PinmonyNetworkJob = {id:'native_inbox_write_' + (++this.sequence).toString(),epoch:session.generation,page:identity.page,
+    const job: PinmonyNetworkJob = {id:'native_inbox_write_' + (this.ports.requestPrefix || '') + (++this.sequence).toString(),epoch:session.generation,page:identity.page,
       url:session.origin + '/resource/' + name + '/' + verb + '/',method:'POST',body:'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope)),
       headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-Pinterest-AppState':'active','X-Pinterest-Source-Url':source,'X-Pinterest-Pws-Handler':'www/index.js'}};
     state.writeAction = action;state.writeTarget = target;state.error = '';state.sendError = '';state.writeUncertain = false;

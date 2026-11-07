@@ -1,3 +1,5 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
+import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -15,6 +17,7 @@ interface PinmonyProfileBoardGroupArgs {
 
 @Component
 export struct PinmonyProfilePage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('pinmonyRootScrollTop3') @Watch('onRootScrollTop') private rootScrollTop: number = 0;
   private onRootScrollTop(): void {
     if (!this.interactionReady || this.profile.isOwn === false || this.modern() && !this.hubPane) return;
@@ -951,7 +954,7 @@ export struct PinmonyProfilePage {
   @Builder
   private profileDestination(_name?: string, _param?: Object) {
     HdsNavDestination() { this.profileBody() }
-      .titleBar(this.profileTitleOptions()).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.profileTitleOptions(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .onBackPressed(() => {
         if (!this.backActive) { this.onCoveredBack?.(); return true; }
         this.requestProfileBack(); return true;
@@ -971,7 +974,7 @@ export struct PinmonyProfilePage {
       HdsNavigation() { this.profileBody() }
         .width('100%').height('100%')
         .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
-        .titleBar(this.hubTitleBarOptions())
+        .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.hubTitleBarOptions(), this.hdsDarkMode))
         .bindToScrollable(this.hubScrollBinding())
         .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
           { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
@@ -989,6 +992,7 @@ export struct PinmonyProfilePage {
       }
         .width('100%').height('100%')
         .bindSheet($$this.sortVisible, this.boardSortSheet(), {
+      radius: LengthMetrics.vp(32),
       height: SheetSize.FIT_CONTENT, showClose: true, backgroundColor: $r('app.color.page_background'),
       onWillAppear: () => { PinmonyRuntimeLog.info('ProfileSortTrace: phase=panel-appear hasSort=' + (!!this.profile.boardSort).toString() + ' busy=' + (!!this.profile.boardSortBusy).toString()); },
       onDisappear: () => {
@@ -1035,7 +1039,7 @@ export struct PinmonyProfilePage {
     HdsNavigation() { this.profileBody() }
       .width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
-      .titleBar(this.rootTitleBarOptions())
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.rootTitleBarOptions(), this.hdsDarkMode))
       .bindToScrollable([this.scroller])
       .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
         { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
@@ -1292,7 +1296,7 @@ export struct PinmonyProfilePage {
             .accessibilityText(this.uiText('pm_profile_layout_heading'))
             .enabled(this.interactionReady && !this.profile.suggestionWriting)
             .onClick(() => {this.pinViewPage=this.profile.profileUrl;this.pinViewSession=this.profile.session;this.draftPinDensity=this.pinDensity;this.pinViewOpen=true;})
-            .bindSheet($$this.pinViewOpen,this.pinViewSheet(),{height:SheetSize.FIT_CONTENT,showClose:true,
+            .bindSheet($$this.pinViewOpen,this.pinViewSheet(),{radius:LengthMetrics.vp(32),height:SheetSize.FIT_CONTENT,showClose:true,
               title:{title:this.uiText('pm_profile_layout_heading')},backgroundColor:$r('app.color.page_background'),
               onDisappear:()=>{this.closePinView();}})
           this.hubStateButton('pm_profile_hub_favorites','favorite')
@@ -1356,7 +1360,7 @@ export struct PinmonyProfilePage {
             Button({type:ButtonType.Normal, stateEffect:false}) {
               Column({space:12}) {
                 Text(this.uiText('pm_profile_hub_' + tab)).fontSize(this.hubTab === tab ? 20 : 18).fontWeight(FontWeight.Bold)
-                  .fontColor(this.hubTab === tab ? $r('app.color.detail_save_accent') : $r('app.color.primary_text'))
+                  .fontColor($r('app.color.primary_text'))
                 Row().height(2).width('100%').backgroundColor(Color.Transparent)
               }.padding({top:12,bottom:12})
             }.layoutWeight(1).height(64).backgroundColor(Color.Transparent).hoverEffect(HoverEffect.None)
@@ -1509,8 +1513,8 @@ export struct PinmonyProfilePage {
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
     .bindSheet($$this.aboutVisible, this.aboutSheet(), {
-      radius: { topLeft: 32, topRight: 32, bottomLeft: 32, bottomRight: 32 },
-      onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyProfilePage.aboutVisible radius=four-corners-32vp'); },
+      radius: LengthMetrics.vp(32),
+      onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyProfilePage.aboutVisible radius=uniform-32vp'); },
       height: '75%', showClose: true, backgroundColor: $r('app.color.page_background') })
       if(this.modern() && this.hubPane) {
         Column({space:0}) {

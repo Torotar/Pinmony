@@ -15,7 +15,7 @@ const { PinmonyDetailCache } = load('feature_pin/src/main/ets/services/PinmonyDe
 const translationEvents = [];
 let translationLanguage = 'zh-CN,zh;q=0.9';
 const { PinmonyDetailNativeReads } = load('entry/src/main/ets/app/PinmonyDetailNativeReads.ets', name =>
-  name === 'feature_pin' ? { readRelatedPresentation } : name === 'common_network' ? { PIN_BUSINESS_PIN_READ_ENABLED: true } :
+  name === 'feature_pin' ? { readRelatedPresentation } : name === 'common_network' ? { PIN_BUSINESS_PIN_READ_ENABLED: true, Priority: { HIGH: 0 } } :
     name === 'common_foundation' ? { PinmonyI18n: { ...require('./local-message-test-fixture.cjs').rawLocalMessages, translationAcceptLanguage: () => translationLanguage }, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); }, warn() {} } } : {});
 const pinUrl = id => 'https://www.pinterest.com/pin/' + id + '/';
 const related = (ids, bookmark) => JSON.stringify({ resource_response: { status: 'success', data: ids.map(id => ({
@@ -55,6 +55,71 @@ function fixture() {
     setForeground(value) { foreground = value; }, setRoot(value) { root = value; } };
 }
 async function main() {
+  const fastBase = fixture(); fastBase.controller.warmRelated(pinUrl(1), 1);
+  const fastRead = fastBase.controller.start(pinUrl(1), 1, base(1));
+  assert.equal(fastBase.requests.length, 0);
+  await advanceSecondary();
+  assert.equal(fastBase.requests.length, 2, 'fast base retains the original budget timer and coalesces reads');
+  fastBase.requests.find(r => r.job.id.startsWith('native_related_')).resolve(related([2], 'next'));
+  await fastRead;
+  fastBase.requests.find(r => r.job.id.startsWith('native_preview_')).resolve(preview('preview'));
+  await flush(); fastBase.controller.pause();
+  // Early recommendations are display-only; PinResource remains the readiness gate.
+  for (const completeBeforeBase of [false, true]) {
+    const early = fixture();
+    early.controller.warmRelated(pinUrl(1), 1);
+    assert.equal(early.requests.length, 0, 'main image budget precedes the early read');
+    await advanceSecondary();
+    assert.equal(early.requests.length, 1);
+    assert(early.requests[0].job.id.startsWith('native_related_early_'));
+    assert.equal(early.requests[0].job.priority, 0);
+    if (completeBeforeBase) { early.requests[0].resolve(related([2], 'next')); await flush(); }
+    assert.equal(early.store.detail.related.length, completeBeforeBase ? 1 : 0, 'validated early response may present before base validation');
+    if (completeBeforeBase) {
+      assert.equal(early.store.detail.relatedPreview, true);
+      assert.equal(early.store.detail.relatedRetained, true, 'preview retains the existing read-only interaction gate');
+      assert.equal(early.store.detailActionsReady, false);
+    }
+    assert.equal(early.store.detailNativeReadsReady, undefined, 'early read does not authorize actions');
+    const pending = early.controller.start(pinUrl(1), 1, base(1));
+    await advanceSecondary();
+    assert.equal(early.requests.length, 2, 'validated start adds preview and reuses the early recommendation');
+    if (!completeBeforeBase) early.requests[0].resolve(related([2], 'next'));
+    await pending;
+    assert.equal(early.store.detail.related.length, 1);
+    assert.equal(early.store.detail.relatedPreview, false, 'base adoption promotes the existing presentation');
+    assert.equal(early.controller.earlyRelated, undefined, 'consumed response is released');
+    early.requests[1].resolve(preview('preview')); await flush();
+    early.controller.pause();
+  }
+  for (const revoke of [f => f.controller.pause(), f => f.setSession({...f.getSession(),generation:2}),
+    f => f.setSession({...f.getSession(),accountId:'another'}), f => f.setSession({...f.getSession(),authenticated:false}),
+    f => f.store.detailOpeningToken++, f => { f.store.detailPin = pinUrl(2); f.store.detailOpeningPin = pinUrl(2); },
+    f => f.setForeground(false), f => f.setRoot(true)]) {
+    const early = fixture(); early.controller.warmRelated(pinUrl(1), 1);
+    revoke(early); await advanceSecondary();
+    assert.equal(early.requests.length, 0, 'retired early reads never dispatch'); early.controller.pause();
+    const inflight = fixture(); inflight.controller.warmRelated(pinUrl(1), 1); await advanceSecondary();
+    revoke(inflight); inflight.requests[0].resolve(related([2], 'next')); await flush();
+    assert.equal(inflight.store.detail.related.length, 0, 'late early response never publishes'); inflight.controller.pause();
+  }
+  const invalidBase = fixture(); invalidBase.controller.warmRelated(pinUrl(1), 1);
+  await advanceSecondary();
+  await assert.rejects(invalidBase.controller.start(pinUrl(1), 1, base(2)), /invalid-native-base/);
+  assert(invalidBase.canceled.includes(invalidBase.requests[0].job.id));
+  invalidBase.requests[0].resolve(related([2], 'next')); await flush();
+  assert.equal(invalidBase.controller.earlyRelated, undefined);
+  const failedEarly = fixture(); failedEarly.controller.warmRelated(pinUrl(1), 1); await advanceSecondary();
+  failedEarly.requests[0].resolve('{}'); await flush();
+  const failedRead = failedEarly.controller.start(pinUrl(1), 1, base(1)); await advanceSecondary(); await failedRead;
+  assert.equal(failedEarly.requests.length, 2, 'failed early read is not silently replayed');
+  assert(failedEarly.store.detail.relatedError);
+  failedEarly.requests[1].resolve(preview('preview')); await flush(); failedEarly.controller.pause();
+  const scopedCancel = fixture(); scopedCancel.controller.warmRelated(pinUrl(1), 1);
+  scopedCancel.controller.cancelEarlyRelated(pinUrl(2), 2);
+  assert(scopedCancel.controller.earlyRelated, 'old opening failure cannot cancel another opening');
+  scopedCancel.controller.pause(); await flush();
+  assert.equal(secondaryTimers.size, 0);
   for (const revoke of [f => f.controller.pause(), f => f.setSession({...f.getSession(),generation:2}), f => f.store.detailOpeningToken++]) {
     const waiting=fixture();const pending=waiting.controller.start(pinUrl(1),1,base(1)).catch(()=> 'cancelled');
     assert.equal(waiting.requests.length,0);revoke(waiting);await advanceSecondary();
@@ -81,7 +146,7 @@ async function main() {
   retained.controller.pause();
   assert.equal(retained.controller.resume(pinUrl(1), 1), true);
   await flush();
-  assert.equal(retained.autoplayRequests.length, 2, 'native back reloads preferences cleared on pause');
+  assert.equal(retained.autoplayRequests.length, 1, 'native back reuses current-session confirmed preferences');
   assert.equal(retained.store.detail.autoplayWifi, true, 'self settings work without PinResource viewer');
   assert.equal(retained.requests.length, 2, 'native back resumes without base, preview or recommendation reads');
   assert.equal(retained.store.detail.commentPreview, 'preview');
@@ -402,7 +467,7 @@ async function main() {
   assert.equal(evaluate(readyExpression), false, 'unconfirmed cached media cannot play');
   mediaView.traceId++; assert.notEqual(evaluate(ownerExpression), owner, 'new detail opening invalidates the previous player');
   assert(page.includes('if ((this.actionsReady || this.readsReady) && !this.detail.relatedError && this.onLoadMore)'));
-  console.log('Native detail reads: parallel preview/related in either completion order, metadata, pagination, dedupe, publication, errors/retry and cancellation passed');
+  console.log('Native detail reads: early read coalescing, validated publication, timeout/cancellation isolation, parallel preview, metadata, pagination, errors/retry passed');
 }
 const deadline = setTimeout(() => { console.error('Native detail reads did not settle'); process.exit(1); }, 10000);
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(deadline));

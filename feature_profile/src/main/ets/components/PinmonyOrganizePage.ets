@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -11,6 +12,7 @@ import { PinmonyBoardPlaceholder, PinmonyLoadingOverlay, PinmonyBoardPickerRow, 
 
 @Component
 export struct PinmonyOrganizePage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   @State private organizeHeaderHeight: number = 0;
   private titleContentInset(): number { return (this.state.phase === 'boards') ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -253,7 +255,7 @@ export struct PinmonyOrganizePage {
     HdsNavDestination() {
       this.organizeContent()
     }
-    .titleBar(this.titleBarOptions())
+    .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleBarOptions(), this.hdsDarkMode))
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideBackButton(false)
     .bindToScrollable([this.contentScroller])

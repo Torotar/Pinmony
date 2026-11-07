@@ -53,7 +53,9 @@ async function main(){
  assert.equal(mixedCarousel.store.detail.carousel.items[0].video.sources.find(s=>s.kind==='mp4').url,video.videos.video_list.V_720P.url);
  assert.equal(mixedCarousel.requests.length,0,'mixed carousel is complete in the validated PinResource response');
  const carouselView=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets','utf8');
- assert(carouselView.includes('item.video && index === this.page'),'only the current video item mounts a player');
+ assert(carouselView.includes('item.video && this.videoSlotMounted(index)'),'current and adjacent video presentation nodes remain mounted across an ordinary swipe');
+ assert(carouselView.includes('active: this.active && index === this.page'),'selected video uses the existing foreground/session playback gate');
+ assert(!carouselView.includes('videoReadyKey') && !carouselView.includes('switchingPage'),'poster readiness or animation completion must not block mounting the selected player');
  assert(carouselView.includes("mediaOwner: this.mediaOwner + ':' + item.id"),'each slot owns a distinct player session');
  const returned=fixture();
  returned.store.detail.dataSource='api';returned.store.detail.imageUrl=raw.images.orig.url;

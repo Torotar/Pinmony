@@ -29,12 +29,15 @@ for (const file of files) {
   if (file.endsWith('PinmonyDetailPage.ets')) {
     assert(source.includes(".bindToScrollable(this.imageLayer === 'search' ? [] : [this.detailScroller])"));
     assert(source.includes('top: this.titleContentInset() + 8'));
-    assert.equal((source.match(/enableComponentSafeArea:\s*true/g) || []).length, 1, 'only specialized image search keeps its component safe area');
+    assert.equal((source.match(/enableComponentSafeArea:\s*true/g) || []).length, 0, 'detail owns its scrolling title inset without adding a second component inset');
+    assert.match(source, /if \(this\.imageLayer === 'search'\)[\s\S]*?avoidLayoutSafeArea: true, enableComponentSafeArea: false/,
+      'specialized image search retains its existing title inset ownership');
   } else assert(!/enableComponentSafeArea:\s*true/.test(source), file + ': scrolling must reach title backdrop');
   assert(source.includes('scrollBarMargin'), file + ': scrollbar avoids title');
   const matches = [...source.matchAll(/style:\s*\{\s*blurStrategy:/g)];
   assert(matches.length > 0, file);
   for (const match of matches) {
+    const imageSearch = file.endsWith('PinmonyDetailPage.ets') && match === matches[0];
     const expression = objectAt(source, match.index);
     const evaluate = vm.runInNewContext(ts.transpileModule('function style() { return ' + expression + '; } style;',
       { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, {
@@ -43,9 +46,10 @@ for (const file of files) {
     });
     for (const mode of ['immersive', 'gentle', 'exquisite', 'off']) {
       const style = evaluate.call({ immersiveLightMode: mode, state: { phase: 'select' }, snapshot: { screen: 'chat' } });
-      assert.equal(style.blurStrategy, mode === 'off' ? 0 : 1, file);
-      assert.equal(style.scrollEffectOpts.enableScrollEffect, mode !== 'off', file);
-      assert.equal(style.scrollEffectOpts.scrollEffectType, 3, file);
+      assert.equal(style.blurStrategy, imageSearch || mode === 'off' ? 0 : 1, file);
+      assert.equal(style.scrollEffectOpts.enableScrollEffect, !imageSearch && mode !== 'off', file);
+      if (imageSearch) assert.equal(style.originalStyle.backgroundStyle.blurRadius, 0, 'image search keeps its plain title bar');
+      else assert.equal(style.scrollEffectOpts.scrollEffectType, 3, file);
     }
     if (file.endsWith('PinmonyOrganizePage.ets')) {
       for (const phase of ['boards', 'create']) {
@@ -83,5 +87,5 @@ assert(editor.includes("phase === 'products' || phase === 'productSearch' ? [thi
 const inbox = fs.readFileSync(files[6], 'utf8');
 assert(inbox.includes('this.titleContentInset() + this.flowHeaderHeight'), 'chat/compose header inset remains in scrolling content');
 const history = fs.readFileSync(files[8], 'utf8');
-assert(history.includes('margin:{top:this.titleContentInset() + 72}'), 'history waterfall section clears fixed delete action');
+assert(history.includes('margin:{top:this.titleContentInset() + 16}'), 'history waterfall retains its existing title inset and section gap');
 console.log('Flow title blur: ' + files.length + ' components, ' + count + ' title styles, four modes, fixed controls and scrollbar margins passed');

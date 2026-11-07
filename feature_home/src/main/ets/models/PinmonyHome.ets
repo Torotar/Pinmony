@@ -20,6 +20,7 @@ export interface PinmonyHomePin {
   pinUrl: string;
   imageUrl: string;
   video?: PinmonyVideo;
+  isVideo?: boolean;
   imageWidth: number;
   imageHeight: number;
   title: string;

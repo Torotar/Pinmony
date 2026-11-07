@@ -25,6 +25,7 @@ export function retainDetailPresentation(current: PinmonyDetailSnapshot,
   if (current.related.length === 0 && !current.relatedEnded && previous.related.length > 0) {
     current.related = previous.related;
     current.relatedRetained = true;
+    current.relatedPreview = previous.relatedPreview;
   }
   return current;
 }

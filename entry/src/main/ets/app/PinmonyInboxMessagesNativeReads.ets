@@ -1,3 +1,6 @@
+import { PinmonyInboxActivityNativeReads } from './PinmonyInboxActivityNativeReads';
+import { PinmonyInboxHiddenConversations } from 'feature_inbox';
+import { PinmonyInboxNoticeConversation } from './PinmonyInboxMessageNotice';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxStore, PinmonyInboxSnapshot, PinmonyInboxItem, PinmonyInboxFlowSnapshot, InboxFlowUser, InboxFlowMessage, InboxFlowBoard } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -12,7 +15,7 @@ interface RawImage { url?: string; width?: number; height?: number; }
 interface RawPin { id?: string; images?: Record<string,RawImage>; }
 interface RawBoard { id?: string; name?: string; url?: string; cover_images?: Record<string,RawImage>; pin_thumbnail_urls?: string[]; image_cover_hd_url?: string; image_cover_url?: string; image_thumbnail_url?: string; pin_count?: number; section_count?: number; }
 interface RawMessage { user?: RawUser; id: string; text?: string; sender?: RawUser; created_at?: string; pin?: RawPin; board?: RawBoard; deleted_by?: Object; reactions?: Record<string,string>[]; }
-interface RawConversation { id: string; name?: string; users: RawUser[]; last_message?: RawMessage; unread?: boolean; }
+interface RawConversation { id: string; name?: string; users: RawUser[]; last_message?: RawMessage; unread?: boolean | number; }
 interface ReadOptions { field_set_key?: string | string[]; hide_group_conversations?: boolean; count?: number; term?: string; pin_scope?: string; url?: string; data?: ReadFields; conversation_id?: string; page_size?: number; refresh?: boolean; hide_sys_msg?: boolean; bookmarks?: string[]; }
 interface ReadFields { fields: string[]; }
 interface ReadEnvelope { options: ReadOptions; context: Record<string,string>; }
@@ -22,6 +25,8 @@ interface InboxClientContext { user?: RawUser; }
 interface TypeaheadData { items: RawUser[]; }
 interface NativeContact extends PinmonyInboxItem { userId: string; username: string; }
 export interface PinmonyInboxMessagesNativeReadsPorts {
+  requestPrefix?: string;
+  messagesObserved?: (rows: PinmonyInboxNoticeConversation[]) => void;
   feedback?: (message: string) => void;
   username?: () => string;
   store: () => PinmonyInboxStore;
@@ -48,6 +53,7 @@ export class PinmonyInboxMessagesNativeReads {
   private contactsBusy: boolean = false;
   private flowBusy: boolean = false;
   private listReady: boolean = false;
+  private listNeedsRefresh: boolean = false;
   private contactsReady: boolean = false;
   private listError: string = '';
   private contactsError: string = '';
@@ -59,9 +65,12 @@ export class PinmonyInboxMessagesNativeReads {
   private cursor: string = '';
   private query: string = '';
   private readonly jobs: Map<string,string> = new Map<string,string>();
+  private readonly activity: PinmonyInboxActivityNativeReads;
   private readonly writes: PinmonyInboxNativeWrites;
   private writePreparing: boolean = false;
   private profileContactEntry: boolean = false;
+  private publishedFlow: PinmonyInboxFlowSnapshot | undefined = undefined;
+  private publishedFlowSignature: string = '';
   private blockSequence: number = 0;
   private readonly knownBlocks: Map<string,boolean> = new Map<string,boolean>();
   private readonly uncertainBlocks: Set<string> = new Set<string>();
@@ -80,7 +89,11 @@ export class PinmonyInboxMessagesNativeReads {
   }
   constructor(ports: PinmonyInboxMessagesNativeReadsPorts) {
     this.ports = ports;this.store = ports.store();
+    this.activity = new PinmonyInboxActivityNativeReads({session:(): PinmonyBusinessSessionContext => this.ports.session(),
+      network:(): PinmonyNativeNetwork => this.ports.network(),current:(): boolean => this.owned() && !this.flow,
+      changed:(): void => this.apply(),feedback:(message: string): void => this.ports.feedback?.(message)});
     this.writes = new PinmonyInboxNativeWrites({
+      requestPrefix: this.ports.requestPrefix,
       state: (): PinmonyInboxFlowSnapshot | undefined => this.flow,
       identity: (): PinmonyInboxWriteIdentity | undefined => this.ownsFlow() && this.flow && /^\d{1,40}$/.test(this.viewer) ?
         {page:this.page,viewerId:this.viewer,token:this.flow.nativeToken || 0,screen:this.flow.screen,conversationId:this.flow.conversationId || '',
@@ -116,19 +129,20 @@ export class PinmonyInboxMessagesNativeReads {
       this.reset(); this.section = 'messages'; this.account = s.accountId; this.origin = s.origin; this.generation = s.generation; this.page = this.ports.page();
     }
     if(this.flow && !this.store.inboxFlow && !this.store.retainedChat) {
-      this.flowRevision++; this.cancel('flow'); this.flow = undefined; this.chat = undefined; this.flowBusy = false; this.cursor = '';
+      this.listNeedsRefresh = true; this.flowRevision++; this.cancel('flow'); this.flow = undefined; this.chat = undefined; this.flowBusy = false; this.cursor = '';
     }
     return true;
   }
   private cancel(kind: string): void { const id: string = this.jobs.get(kind) || ''; if(id) this.ports.network().cancel(id); this.jobs.delete(kind); }
   pause(): void {
+    this.activity.pause();
     this.writes.pause();this.writePreparing = false;this.revision++; this.flowRevision++; this.jobs.forEach((id: string): void => this.ports.network().cancel(id)); this.jobs.clear();
     this.listBusy = false; this.contactsBusy = false; this.flowBusy = false; this.store.inboxNativeMessagesReady = false;
     if(this.flow?.loading) { this.flow.loading = false; this.flow.error = PinmonyI18n.message("pm_loading_paused_please_retry_a1928a5f"); this.publish(); }
   }
   reset(): void {
-    this.pause(); if(this.account) { this.store.inboxCache.clear(); if(this.store.inbox?.section === 'messages')this.store.inbox = undefined; if(this.flow?.nativeToken === this.store.inboxFlow?.nativeToken)this.store.inboxFlow = undefined; }
-    this.section = ''; this.account = ''; this.viewer = ''; this.origin = ''; this.generation = -1; this.page = ''; this.listReady = false; this.contactsReady = false;
+    this.pause(); this.activity.reset(); this.publishedFlow = undefined; this.publishedFlowSignature = ''; this.store.inboxMessagesUnread = false; if(this.account) { this.store.inboxCache.clear(); if(this.store.inbox?.section === 'messages')this.store.inbox = undefined; if(this.flow?.nativeToken === this.store.inboxFlow?.nativeToken)this.store.inboxFlow = undefined; }
+    this.section = ''; this.account = ''; this.viewer = ''; this.origin = ''; this.generation = -1; this.page = ''; this.listReady = false; this.listNeedsRefresh = false; this.contactsReady = false;
     this.blockSequence = 0;this.knownBlocks.clear();this.uncertainBlocks.clear();this.uncertainCreations.clear();this.rows = []; this.contacts = []; this.conversations = []; this.flow = undefined; this.chat = undefined; this.cursor = ''; this.query = ''; this.listError = ''; this.contactsError = '';
   }
   async select(section: string): Promise<boolean> {
@@ -137,17 +151,28 @@ export class PinmonyInboxMessagesNativeReads {
     if(this.store.inbox && this.store.inbox.section !== section)this.store.inboxCache.put(this.store.inbox,this.store.inboxScrollOffset);
     this.section = section; if(!this.bind())return true;
     this.store.inboxScrollOffset = this.store.inboxCache.get(this.page,section)?.scrollOffset || 0;
-    this.apply(); await this.demand(); return true;
+    this.apply(); await this.resume(); return true;
   }
   apply(): void {
     if(!this.owned())return;
-    const snapshot: PinmonyInboxSnapshot = {kind:'state',session:this.store.inboxSession,pageUrl:this.page,section:'messages',updateLabel:PinmonyI18n.message("pm_updates_3055a035"),inboxLabel:PinmonyI18n.message("pm_inbox_63a5e7b7"),messagesLabel:PinmonyI18n.message("pm_messages_4da199fa"),readLabel:PinmonyI18n.message("pm_read_efdd1a47"),unreadLabel:PinmonyI18n.message("pm_unread_4d0680f9"),emptyTitle:this.listReady && !this.rows.length ? PinmonyI18n.message("pm_start_a_conversation_54f04e75") : '',emptyDescription:this.listReady && !this.rows.length ? PinmonyI18n.message("pm_your_conversations_will_appear_here_2f066d17") : '',homeLabel:'',homeId:'',composeLabel:PinmonyI18n.message("pm_new_message_3fc957bf"),composeId:'compose',contactsLabel:PinmonyI18n.message("pm_contacts_3303b569"),items:this.rows,contacts:this.contacts,dataSource:'api',contactsDataSource:'api',contactsLoading:this.contactsBusy && !this.contactsReady,contactsError:this.contactsError,apiError:this.listError,hasMore:false};
+    const visibleRows: PinmonyInboxItem[] = this.rows.filter((row: PinmonyInboxItem): boolean =>
+      !PinmonyInboxHiddenConversations.hidden(this.origin,this.account,row.id.slice('conversation:'.length)));
+    if(this.listReady)this.store.inboxMessagesUnreadCount = visibleRows.reduce((total: number,row: PinmonyInboxItem): number => Math.min(Number.MAX_SAFE_INTEGER,total + (row.unreadCount || 0)),0);
+    const snapshot: PinmonyInboxSnapshot = {kind:'state',session:this.store.inboxSession,pageUrl:this.page,section:'messages',updateLabel:PinmonyI18n.message("pm_updates_3055a035"),inboxLabel:PinmonyI18n.message("pm_inbox_63a5e7b7"),messagesLabel:PinmonyI18n.message("pm_messages_4da199fa"),readLabel:PinmonyI18n.message("pm_read_efdd1a47"),unreadLabel:PinmonyI18n.message("pm_unread_4d0680f9"),emptyTitle:this.listReady && !visibleRows.length ? PinmonyI18n.message("pm_start_a_conversation_54f04e75") : '',emptyDescription:this.listReady && !visibleRows.length ? PinmonyI18n.message("pm_your_conversations_will_appear_here_2f066d17") : '',homeLabel:'',homeId:'',composeLabel:PinmonyI18n.message("pm_new_message_3fc957bf"),composeId:'compose',contactsLabel:PinmonyI18n.message("pm_contacts_3303b569"),items:visibleRows,contacts:this.contacts,activities:this.activity.rows,activityLoading:this.activity.loading,activityError:this.activity.error,dataSource:'api',contactsDataSource:'api',contactsLoading:this.contactsBusy && !this.contactsReady,contactsError:this.contactsError,apiError:this.listError,hasMore:false};
+
     this.store.inbox = snapshot; this.store.inboxUrl = this.page; this.store.inboxSectionReady = true; this.store.inboxNativeMessagesReady = this.listReady;
     this.store.inboxLoading = !this.listReady && this.listBusy; this.store.inboxError = this.listError; this.store.inboxWebFlow = false; this.store.pendingInboxSection = ''; this.store.restoringInboxSection = '';
     if(this.listReady && !this.listBusy && !this.listError)this.store.inboxCache.put(snapshot,this.store.inboxScrollOffset);
   }
-  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.flow){ if(this.ownsFlow() && !this.flow.directContact && this.flow.error && !this.flow.recipientRestricted && !this.flow.writeUncertain && !this.flow.sending && !this.flow.messageBusy)await this.action('retry',''); return; } await Promise.all([this.listReady || this.listBusy ? Promise.resolve() : this.readList(false),this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
-  async refresh(): Promise<void> { if(this.bind() && !this.flow)await Promise.all([this.listBusy ? Promise.resolve() : this.readList(false),this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
+  async demand(): Promise<void> { if(!this.bind())return; this.apply(); if(this.flow){ if(this.ownsFlow() && !this.flow.directContact && this.flow.error && !this.flow.recipientRestricted && !this.flow.writeUncertain && !this.flow.sending && !this.flow.messageBusy)await this.action('retry',''); return; } await Promise.all([this.activity.load(),this.listReady && !this.listNeedsRefresh || this.listBusy ? Promise.resolve() : this.readList(this.listReady),this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
+  async resume(): Promise<void> {
+    if(!this.bind())return;
+    if(this.flow){await this.demand();return;}
+    this.apply();
+    await Promise.all([this.activity.load(true),this.listBusy ? Promise.resolve() : this.readList(this.listReady),
+      this.contactsReady || this.contactsBusy ? Promise.resolve() : this.readContacts()]);
+  }
+  async refresh(): Promise<void> { if(this.bind() && !this.flow)await Promise.all([this.activity.load(true),this.listBusy ? Promise.resolve() : this.readList(false),this.contactsBusy ? Promise.resolve() : this.readContacts()]); }
   async refreshContacts(): Promise<void> { if(this.bind() && !this.contactsBusy && !this.flow)await this.readContacts(); }
   async poll(): Promise<void> { if(!this.bind())return; if(this.flow){if(this.ownsFlow() && this.flow.screen === 'chat' && !this.flowBusy && !this.flow.sending && !this.flow.messageBusy && !this.flow.sendError && !this.flow.error && !this.flow.writeUncertain)await this.readMessages(false,true);}else if(this.listReady && !this.listBusy)await this.readList(true); }
   private clean(value: string | undefined): string { return typeof value === 'string' ? value.trim().slice(0,500) : ''; }
@@ -191,7 +216,7 @@ export class PinmonyInboxMessagesNativeReads {
     return {id:raw.id,text:typeof raw.text === 'string' ? raw.text.trim().slice(0,2000) : '',image:this.image(img?.url),imageWidth:img && Number.isFinite(img.width) && (img.width || 0) > 0 ? img.width : undefined,imageHeight:img && Number.isFinite(img.height) && (img.height || 0) > 0 ? img.height : undefined,pinUrl:/^\d{1,40}$/.test(raw.pin?.id || '') ? this.origin + '/pin/' + raw.pin?.id + '/' : '',createdAt:this.clean(raw.created_at),own:this.self(raw.sender),sender:raw.sender ? this.user(raw.sender) : undefined,profile:!deleted && raw.user ? this.user(raw.user) : undefined,profileImages:deleted ? [] : this.profilePreview(raw.user),board:deleted ? undefined : this.board(raw.board),deleted:deleted,reactions:reactions};
   }
   private async request(kind: string,name: string,options: ReadOptions,endpoint: string,current: () => boolean): Promise<ReadResource> {
-    const id: string = 'native_inbox_messages_' + (++this.sequence).toString(); this.cancel(kind); this.jobs.set(kind,id);
+    const id: string = 'native_inbox_messages_' + (this.ports.requestPrefix || '') + (++this.sequence).toString(); this.cancel(kind); this.jobs.set(kind,id);
     const envelope: ReadEnvelope = {options:options,context:{}};
     const job: PinmonyNetworkJob = {id:id,epoch:this.generation,page:this.page,url:this.origin + '/resource/' + name + '/get/?source_url=' + encodeURIComponent(this.page.slice(this.origin.length)) + '&data=' + encodeURIComponent(JSON.stringify(envelope)),method:'GET',body:'',headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-Pinterest-AppState':'active','X-Pinterest-Source-Url':this.page.slice(this.origin.length),'X-Pinterest-Pws-Handler':'www/index.js'}};
     try {
@@ -212,11 +237,17 @@ export class PinmonyInboxMessagesNativeReads {
       const ids: Set<string> = new Set<string>(); const rows: PinmonyInboxItem[] = []; const conversations: RawConversation[] = [];
       data.forEach((c: RawConversation): void => {
         if(!c || typeof c.id !== 'string' || !/^\d{1,40}$/.test(c.id) || !Array.isArray(c.users) || c.users.length > 1000)throw new Error('conversation-format');
+        if(c.unread !== undefined && typeof c.unread !== 'boolean' && (typeof c.unread !== 'number' || !Number.isSafeInteger(c.unread) || c.unread < 0))throw new Error('conversation-unread-format');
         const users: InboxFlowUser[] = c.users.map((u: RawUser): InboxFlowUser => this.user(u)).filter((u: InboxFlowUser): boolean => !u.self);
         if(ids.has(c.id))return; ids.add(c.id); conversations.push(c); const last: RawMessage | undefined = c.last_message; const date: Date = new Date(last?.created_at || '');
-        rows.push({id:'conversation:' + c.id,usernames:c.users.filter((u: RawUser): boolean => !this.self(u)).map((u: RawUser): string => this.clean(u.username)).filter((name: string): boolean => !!name),title:(users.length === 1 ? users[0].name : this.clean(c.name)) || users.map((u: InboxFlowUser): string => u.name).join('、') || PinmonyI18n.message('pm_messages_4da199fa'),outgoing:this.self(last?.sender),subtitle:this.clean(last?.text) || (last?.user ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_profile_d437aeb2') : PinmonyI18n.message('pm_sent_a_profile_e003c0d2')) : last?.board ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_board_9a08dbbf') : PinmonyI18n.message('pm_sent_a_board_8870ec6d')) : last?.pin ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_pin_4788181d') : PinmonyI18n.message('pm_sent_a_pin_b874b586')) : ''),profileUrl:users.length === 1 ? users[0].profileUrl : '',imageUrl:users[0]?.avatar || '',enabled:true,unread:!!c.unread,timeLabel:this.conversationTime(date)});
+        rows.push({id:'conversation:' + c.id,usernames:c.users.filter((u: RawUser): boolean => !this.self(u)).map((u: RawUser): string => this.clean(u.username)).filter((name: string): boolean => !!name),title:(users.length === 1 ? users[0].name : this.clean(c.name)) || users.map((u: InboxFlowUser): string => u.name).join('、') || PinmonyI18n.message('pm_messages_4da199fa'),outgoing:this.self(last?.sender),subtitle:this.clean(last?.text) || (last?.user ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_profile_d437aeb2') : PinmonyI18n.message('pm_sent_a_profile_e003c0d2')) : last?.board ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_board_9a08dbbf') : PinmonyI18n.message('pm_sent_a_board_8870ec6d')) : last?.pin ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_pin_4788181d') : PinmonyI18n.message('pm_sent_a_pin_b874b586')) : ''),profileUrl:users.length === 1 ? users[0].profileUrl : '',imageUrl:users[0]?.avatar || '',enabled:true,unreadCount:typeof c.unread === 'number' ? c.unread : c.unread === true ? 1 : 0,unread:c.unread === true || typeof c.unread === 'number' && Number.isSafeInteger(c.unread) && c.unread > 0,timeLabel:this.conversationTime(date)});
       });
-      if(!live())return; this.rows = rows; this.conversations = conversations; this.listReady = true; this.listError = '';
+      if(!live())return; this.rows = rows; this.conversations = conversations; this.listReady = true; this.listNeedsRefresh = false; this.listError = '';
+      this.store.inboxMessagesUnreadCount = rows.filter((row: PinmonyInboxItem): boolean =>
+        !PinmonyInboxHiddenConversations.hidden(this.origin,this.account,row.id.slice('conversation:'.length)))
+        .reduce((total: number, row: PinmonyInboxItem): number => Math.min(Number.MAX_SAFE_INTEGER, total + (row.unreadCount || 0)), 0);
+      this.store.inboxMessagesUnread = this.store.inboxMessagesUnreadCount > 0;
+      this.ports.messagesObserved?.(conversations);
       PinmonyRuntimeLog.info('InboxMessagesNativeTrace: list committed count=' + rows.length.toString());
     } catch (_) { if(live() && !quiet)this.listError = PinmonyI18n.message("pm_unable_to_load_messages_please_retry_c314c819"); }
     finally { if(revision === this.revision){this.listBusy = false; if(live())this.apply(); if(!this.listBusy && !this.contactsBusy)this.ports.settled();} }
@@ -234,7 +265,9 @@ export class PinmonyInboxMessagesNativeReads {
     finally { if(revision === this.revision){this.contactsBusy = false; if(live())this.apply(); this.ports.settled();} }
   }
   private newFlow(screen: string,conversation: string = '',deferPublish: boolean = false): PinmonyInboxFlowSnapshot {
-    this.writes.pause();this.writePreparing = false;this.cancel('identity');this.flowRevision++; this.cancel('flow'); this.flowBusy = false; if(screen !== 'settings')this.cursor = ''; this.store.flowDismissed = false;
+    if(screen === 'chat' && conversation && !PinmonyInboxHiddenConversations.setHidden(this.origin,this.account,conversation,false))
+      this.ports.feedback?.(PinmonyI18n.message('pm_chat_list_save_failed'));
+    this.activity.pause();this.writes.pause();this.writePreparing = false;this.cancel('identity');this.flowRevision++; this.cancel('flow'); this.flowBusy = false; if(screen !== 'settings')this.cursor = ''; this.store.flowDismissed = false;
     const flow: PinmonyInboxFlowSnapshot = {kind:'nativeFlow',nativeToken:this.flowRevision,session:this.store.inboxSession,pageUrl:this.page,screen:screen,title:screen === 'compose' ? PinmonyI18n.message("pm_new_message_3fc957bf") : '',loading:true,error:'',users:[],messages:[],selectedIds:[],hasMore:false,conversationId:conversation};
     this.flow = flow; if(!deferPublish)this.publish(); return flow;
   }
@@ -243,20 +276,47 @@ export class PinmonyInboxMessagesNativeReads {
     const retained: boolean = allowInactive && session.authenticated && session.accountId === this.account && session.generation === this.generation && session.origin === this.origin && this.store.inboxFlow?.nativeToken === this.flow?.nativeToken;
     if(!this.flow || this.store.flowDismissed || !this.owned() && !retained)return;
     const flow: PinmonyInboxFlowSnapshot = this.flow;
-    this.store.inboxFlow = {directContact:flow.directContact,nativeAccountGeneration:this.generation,kind:flow.kind,pageUrl:flow.pageUrl,session:this.store.inboxSession,contextEpoch:flow.contextEpoch,
+    const snapshot: PinmonyInboxFlowSnapshot = {directContact:flow.directContact,nativeAccountGeneration:this.generation,kind:flow.kind,pageUrl:flow.pageUrl,session:this.store.inboxSession,contextEpoch:flow.contextEpoch,
       writeUncertain:flow.writeUncertain,writeAction:flow.writeAction,writeTarget:flow.writeTarget,nativeToken:flow.nativeToken,nativeRead:flow.nativeRead,screen:flow.screen,title:flow.title,loading:flow.loading,error:flow.error,
       users:flow.users,messages:flow.messages,selectedIds:flow.selectedIds,hasMore:flow.hasMore,conversationId:flow.conversationId,
       sending:flow.sending,sentRevision:flow.sentRevision,sendError:flow.sendError,recipientRestricted:flow.recipientRestricted,messageBusy:flow.messageBusy,
       blocked:flow.blocked,blockedUserId:flow.blockedUserId,blockRevision:flow.blockRevision};
+    const signature: string = JSON.stringify(snapshot);
+    if(this.store.inboxFlow === this.publishedFlow && signature === this.publishedFlowSignature)return;
+    this.publishedFlow = snapshot; this.publishedFlowSignature = signature;
+    this.store.inboxFlow = snapshot;
   }
   async open(id: string): Promise<boolean> {
-    if(!PIN_NATIVE_INBOX_MESSAGES_ENABLED || !this.selected() || !/^(?:compose$|conversation:\d+$|contact:\d+$)/.test(id))return false;
+    if(/^conversation-remove:\d{1,40}$/.test(id)) {
+      if(!PIN_NATIVE_INBOX_MESSAGES_ENABLED || !this.selected())return true;
+      if(!this.bind() || this.flow)return true;
+      const conversation: string = id.slice('conversation-remove:'.length);
+      if(!this.rows.some((row: PinmonyInboxItem): boolean => row.enabled && row.id === 'conversation:' + conversation))return true;
+      if(!PinmonyInboxHiddenConversations.setHidden(this.origin,this.account,conversation,true)) {
+        this.ports.feedback?.(PinmonyI18n.message('pm_chat_list_save_failed'));return true;
+      }
+      if(this.store.retainedChat?.conversationId === conversation)this.store.retainedChat = undefined;
+      if(this.store.chatReturnConversation === conversation){this.store.chatReturnConversation = '';this.store.chatScrollOffset = 0;}
+      this.apply();return true;
+    }
+    if(id === 'activity-retry' || /^activity-follow:\d{1,40}$/.test(id)) {
+      if(!PIN_NATIVE_INBOX_MESSAGES_ENABLED || !this.selected())return false;
+      if(!this.bind() || this.flow)return true;
+      if(id === 'activity-retry')await this.activity.load(true); else await this.activity.follow(id.slice('activity-follow:'.length));
+      return true;
+    }
+    if(!PIN_NATIVE_INBOX_MESSAGES_ENABLED || !this.selected() || !/^(?:compose$|conversation:\d+$|contact:\d+$|activity-chat:\d{1,40}$)/.test(id))return false;
     if(!this.bind())return true;
-    this.writes.pause();this.cancel('identity');this.writePreparing = false;
+    this.activity.pause();this.writes.pause();this.cancel('identity');this.writePreparing = false;
     this.cancel('list'); this.cancel('contacts'); this.revision++; this.listBusy = false; this.contactsBusy = false;
     if(id === 'compose') { this.chat = undefined; this.newFlow('compose'); await this.readCompose(''); return true; }
-    if(id.startsWith('contact:')) {
-      const contact: NativeContact | undefined = this.contacts.find((row: NativeContact): boolean => row.id === id); if(!contact)return true;
+    if(id.startsWith('contact:') || id.startsWith('activity-chat:')) {
+      const activity: PinmonyInboxItem | undefined = id.startsWith('activity-chat:') ? this.activity.rows.find((row: PinmonyInboxItem): boolean =>
+        row.enabled && row.activityUserId === id.slice('activity-chat:'.length)) : undefined;
+      const contact: NativeContact | undefined = activity ? {id:activity.id,userId:activity.activityUserId || '',username:activity.usernames?.[0] || '',
+        title:activity.title,subtitle:activity.subtitle,imageUrl:activity.imageUrl,profileUrl:activity.profileUrl,enabled:activity.enabled} :
+        id.startsWith('contact:') ? this.contacts.find((row: NativeContact): boolean => row.id === id) : undefined;
+      if(!contact)return true;
       const existing: RawConversation | undefined = this.conversations.find((c: RawConversation): boolean => c.users.length <= 2 && c.users.some((u: RawUser): boolean => u.id === contact.userId));
       if(existing) {this.newFlow('chat',existing.id); await this.readChat();}
       else {const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose','',true); flow.directContact = true;flow.users = [{id:contact.userId,name:contact.title,avatar:contact.imageUrl,profileUrl:contact.profileUrl,self:false}]; flow.selectedIds = [contact.userId]; flow.loading = false; this.publish(); await this.action('next','');}
@@ -264,6 +324,11 @@ export class PinmonyInboxMessagesNativeReads {
     }
     const c: RawConversation | undefined = this.conversations.find((row: RawConversation): boolean => id === 'conversation:' + row.id); if(!c)return true;
     this.chat = undefined; this.newFlow('chat',c.id); await this.readChat(); return true;
+  }
+  async openNoticeConversation(conversation: string): Promise<boolean> {
+    if(!/^\d{1,40}$/.test(conversation) || !this.bind())return false;
+    this.activity.pause(); this.writes.pause(); this.chat = undefined;
+    this.newFlow('chat',conversation); await this.readChat(); return true;
   }
   async direct(id: string,name: string,avatar: string,username: string): Promise<boolean> {
     if(!this.bind() || !/^\d{1,40}$/.test(id) || id === this.account)return false;
@@ -287,14 +352,14 @@ export class PinmonyInboxMessagesNativeReads {
     if(action === 'back' && typeof this.store.inboxFlow?.nativeToken === 'number' && !this.ownsFlow()) {
       this.writes.pause();this.cancel('identity');this.writePreparing = false;this.flowRevision++; this.cancel('flow'); this.flowBusy = false;
       if(this.store.inboxFlow.screen === 'settings' && this.chat) { this.flow = this.chat; this.chat = undefined; this.flow.nativeToken = this.flowRevision; this.store.inboxFlow = this.flow; }
-      else { this.flow = undefined; this.chat = undefined; this.store.flowDismissed = true; this.store.inboxFlow = undefined; this.store.retainedChat = undefined; this.store.chatReturnConversation = ''; this.store.chatScrollOffset = 0; }
+      else { this.listNeedsRefresh = true; this.flow = undefined; this.chat = undefined; this.store.flowDismissed = true; this.store.inboxFlow = undefined; this.store.retainedChat = undefined; this.store.chatReturnConversation = ''; this.store.chatScrollOffset = 0; this.resume(); }
       return true;
     }
     if(!this.ownsFlow() || !this.flow)return PIN_NATIVE_INBOX_MESSAGES_ENABLED && typeof this.store.inboxFlow?.nativeToken === 'number'; const flow: PinmonyInboxFlowSnapshot = this.flow;
     if(action === 'back') {
       this.writes.pause();this.cancel('identity');this.writePreparing = false;this.flowRevision++; this.cancel('flow'); this.flowBusy = false;
       if(flow.screen === 'settings' && this.chat){this.flow = this.chat; this.chat = undefined; this.flow.nativeToken = this.flowRevision; this.publish();}
-      else {this.flow = undefined; this.chat = undefined; this.store.flowDismissed = true; this.store.inboxFlow = undefined; this.store.retainedChat = undefined; this.store.chatReturnConversation = ''; this.store.chatScrollOffset = 0; this.apply();}
+      else {this.listNeedsRefresh = flow.screen === 'chat'; this.flow = undefined; this.chat = undefined; this.store.flowDismissed = true; this.store.inboxFlow = undefined; this.store.retainedChat = undefined; this.store.chatReturnConversation = ''; this.store.chatScrollOffset = 0; this.apply(); if(flow.screen === 'chat')this.resume();}
       return true;
     }
     if(flow.sending || flow.messageBusy || this.writePreparing || this.writes.busy())return true;

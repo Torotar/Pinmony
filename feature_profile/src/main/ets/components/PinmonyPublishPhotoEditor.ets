@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyImmersiveLight, PinmonyActionNotice } from 'common_ui';
 import { PinmonyLoadingOverlay } from 'common_ui';
@@ -26,6 +27,7 @@ export class PinmonyPublishPhotoViewState {
 
 @Component
 export struct PinmonyPublishPhotoEditor {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   @State private productHeaderHeight: number = 0;
   @State private productSearchHeaderHeight: number = 0;
@@ -491,7 +493,7 @@ export struct PinmonyPublishPhotoEditor {
         .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())})
         .initialOffset({yOffset:this.viewState.editorOffset}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .onDidScroll((): void => { this.viewState.editorOffset = Math.max(0,this.scroller.currentOffset().yOffset); }) }
-    }.titleBar(this.titleBar(phase)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable(phase === 'productImages' ? [this.productImageScroller] : phase === 'productConfirm' ? [this.productConfirmScroller] : phase === 'products' || phase === 'productSearch' ? [this.productScroller,this.productLinkScroller] : [phase === 'topics' ? this.topicScroller : phase === 'advanced' ? this.advancedScroller : this.scroller])
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleBar(phase), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable(phase === 'productImages' ? [this.productImageScroller] : phase === 'productConfirm' ? [this.productConfirmScroller] : phase === 'products' || phase === 'productSearch' ? [this.productScroller,this.productLinkScroller] : [phase === 'topics' ? this.topicScroller : phase === 'advanced' ? this.advancedScroller : this.scroller])
       .onBackPressed(() => { this.back(phase); return true; })
       .onShown((): void => this.startProducts(phase))
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))

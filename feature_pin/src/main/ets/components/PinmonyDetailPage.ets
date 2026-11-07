@@ -1,3 +1,5 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
+import { PinmonyCdnImage } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyImageSearchSelection } from 'common_ui';
@@ -20,7 +22,6 @@ import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
 import { PinmonyDetailHero, DetailHeroSource } from './PinmonyDetailHero';
 import { PinmonyDetailEntryPhoto } from '../services/PinmonyImageTransition';
 import { PinmonyDetailEntryMotion } from './PinmonyDetailEntryMotion';
-import { display } from '@kit.ArkUI';
 import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { SmartImage, getRecommendCardWidth, getRecommendColumnCount, RECOMMEND_CARD_RADIUS_VP,
   RECOMMEND_PHONE_GAP_VP, RECOMMEND_WIDE_GAP_VP } from 'common_ui';
@@ -35,10 +36,23 @@ interface PinmonyDetailFlowRow {
 }
 
 class PinmonyDetailFlowSource implements IDataSource {
+  private readonly trace: ((message: string) => void) | undefined;
+  constructor(trace: ((message: string) => void) | undefined = undefined) { this.trace = trace; }
+  private generation: number = 0;
+  private keyTraceCount: number = 0;
   private rows: PinmonyDetailFlowRow[] = [];
   private listeners: DataChangeListener[] = [];
   totalCount(): number { return this.rows.length; }
   getData(index: number): PinmonyDetailFlowRow { return this.rows[index]; }
+  renderKey(row: PinmonyDetailFlowRow, index: number): string {
+    if (this.trace && this.keyTraceCount < 16) {
+      this.keyTraceCount++;
+      this.trace('phase=key generation=' + this.generation.toString() + ' index=' + index.toString() +
+        ' total=' + this.rows.length.toString() + ' matches=' + (this.rows[index]?.key === row.key).toString() +
+        ' firstIndex=' + this.rows.findIndex((item: PinmonyDetailFlowRow): boolean => item.key === row.key).toString());
+    }
+    return row.key;
+  }
   registerDataChangeListener(listener: DataChangeListener): void {
     if (!this.listeners.includes(listener)) this.listeners.push(listener);
   }
@@ -48,28 +62,58 @@ class PinmonyDetailFlowSource implements IDataSource {
   }
   update(rows: PinmonyDetailFlowRow[]): void {
     const previous: PinmonyDetailFlowRow[] = this.rows;
+    if (previous.length === rows.length && previous.every((row: PinmonyDetailFlowRow, index: number): boolean =>
+      row.key === rows[index].key && row.fingerprint === rows[index].fingerprint)) {
+      this.rows = rows;
+      return;
+    }
+    this.generation++;
+    this.keyTraceCount = 0;
     let prefix: number = 0;
     while (prefix < previous.length && prefix < rows.length && previous[prefix].key === rows[prefix].key) prefix++;
     let suffix: number = 0;
     while (suffix < previous.length - prefix && suffix < rows.length - prefix &&
       previous[previous.length - 1 - suffix].key === rows[rows.length - 1 - suffix].key) suffix++;
-    this.rows = rows;
+    if (this.trace) this.trace('phase=update generation=' + this.generation.toString() +
+      ' previous=' + previous.length.toString() + ' total=' + rows.length.toString() +
+      ' prefix=' + prefix.toString() + ' suffix=' + suffix.toString() +
+      ' listeners=' + this.listeners.length.toString());
+    // One LazyForEach must use a single notification family for its lifetime.
+    // Capability detection cannot make onDatasetChange safe after legacy calls.
+    // Keep the legacy family for inserts, removals, content changes and reloads;
+    // each callback below observes the corresponding intermediate snapshot.
     if (prefix + suffix === previous.length && rows.length > previous.length) {
-      for (let i: number = prefix; i < rows.length - suffix; i++) this.listeners.forEach((listener: DataChangeListener): void => listener.onDataAdd(i));
+      this.rows = previous.slice();
+      for (let i: number = prefix; i < rows.length - suffix; i++) {
+        this.rows.splice(i, 0, rows[i]);
+        this.listeners.forEach((listener: DataChangeListener): void => listener.onDataAdd(i));
+      }
     } else if (prefix + suffix === rows.length && previous.length > rows.length) {
-      for (let i: number = previous.length - suffix - 1; i >= prefix; i--) this.listeners.forEach((listener: DataChangeListener): void => listener.onDataDelete(i));
+      this.rows = previous.slice();
+      for (let i: number = previous.length - suffix - 1; i >= prefix; i--) {
+        this.rows.splice(i, 1);
+        this.listeners.forEach((listener: DataChangeListener): void => listener.onDataDelete(i));
+      }
     } else if (prefix !== previous.length || prefix !== rows.length) {
+      this.rows = rows;
       this.listeners.forEach((listener: DataChangeListener): void => listener.onDataReloaded());
       return;
     }
+    this.rows = rows;
     for (let i: number = 0; i < prefix; i++) {
       if (previous[i].fingerprint !== rows[i].fingerprint) this.listeners.forEach((listener: DataChangeListener): void => listener.onDataChange(i));
+    }
+    for (let i: number = 0; i < suffix; i++) {
+      const nextIndex: number = rows.length - suffix + i;
+      if (previous[previous.length - suffix + i].fingerprint !== rows[nextIndex].fingerprint)
+        this.listeners.forEach((listener: DataChangeListener): void => listener.onDataChange(nextIndex));
     }
   }
 }
 
 @Component
 export struct PinmonyDetailPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -516,24 +560,25 @@ export struct PinmonyDetailPage {
   @State private viewportWidth: number = 360;
   @State private viewportHeight: number = 800;
   private readonly detailScroller: Scroller = new Scroller();
-  private readonly detailRows: PinmonyDetailFlowSource = new PinmonyDetailFlowSource();
+  private readonly detailRows: PinmonyDetailFlowSource = new PinmonyDetailFlowSource((message: string): void => {
+    PinmonyRuntimeLog.info('DetailListTrace: openId=' + this.traceId.toString() + ' ' + message);
+  });
   private readonly detailSections: WaterFlowSections = new WaterFlowSections();
   private detailFlowShape: string = '';
 
   private syncDetailFlow(): void {
     const detail: PinmonyDetailSnapshot = this.displayedDetail();
-    const pins: PinmonyRelatedPin[] = this.isRecommendReady() ? detail.related : [];
-    // Async media and collage reads update the retained header independently
-    // of actions. Related pagination must not invalidate that header.
-    const header: PinmonyDetailSnapshot = JSON.parse(JSON.stringify(detail)) as PinmonyDetailSnapshot;
-    header.related = [];
-    header.relatedLoading = false;
-    header.relatedError = '';
-    header.relatedEnded = false;
-    header.relatedRetained = false;
-    const rows: PinmonyDetailFlowRow[] = [{ key: 'header:' + detail.pinUrl, kind: 'header', fingerprint: JSON.stringify(header) }];
+    const pins: PinmonyRelatedPin[] = [];
+    const seen: Set<string> = new Set<string>();
+    if (this.isRecommendReady()) detail.related.forEach((pin: PinmonyRelatedPin): void => {
+      const key: string = (pin.kind || 'pin') + ':' + (pin.pinUrl || pin.id);
+      if (!seen.has(key)) { seen.add(key); pins.push(pin); }
+    });
+    // The header is a retained FlowItem, outside LazyForEach. Observable
+    // detail props update its controls without recycling the hero and masks.
+    const rows: PinmonyDetailFlowRow[] = [];
     pins.forEach((pin: PinmonyRelatedPin): void => {
-      rows.push({ key: 'related:' + (pin.pinUrl || pin.id), kind: 'related', pin: pin,
+      rows.push({ key: 'related:' + (pin.kind || 'pin') + ':' + (pin.pinUrl || pin.id), kind: 'related', pin: pin,
         fingerprint: JSON.stringify(pin) });
     });
     rows.push({ key: 'footer:' + detail.pinUrl, kind: 'footer', fingerprint: '' });
@@ -813,7 +858,9 @@ export struct PinmonyDetailPage {
 
   private recommendDensity(): number {
     try {
-      const value: number = Number(display.getDefaultDisplaySync().densityPixels);
+      // Card creation runs during scrolling. Use this window's conversion
+      // rather than synchronously querying the physical display per card.
+      const value: number = this.getUIContext().vp2px(1);
       return value > 0 && isFinite(value) ? value : 1;
     } catch (_) {
       return 1;
@@ -831,7 +878,8 @@ export struct PinmonyDetailPage {
     PinmonyRuntimeLog.info('RecommendAudit: gate reason=' + reason + ' main=' +
       (this.isMainImageReady() ? 'ready' : 'pending') + ' interactions=' +
       (this.isCommentsReady() ? 'ready' : 'pending') + ' ready=' + (ready ? 'ready' : 'blocked') +
-      ' presentation=' + (this.displayedDetail().kind === 'cached' || this.displayedDetail().relatedRetained ? 'cached' : 'current') +
+      ' presentation=' + (this.displayedDetail().relatedPreview ? 'preview' :
+        this.displayedDetail().kind === 'cached' || this.displayedDetail().relatedRetained ? 'cached' : 'current') +
       ' columns=' + columns.toString() + ' cardWidthVp=' + width.toFixed(2));
   }
 
@@ -867,9 +915,9 @@ export struct PinmonyDetailPage {
   private measureTextOverflow(): void {
     const utils = this.getUIContext().getMeasureUtils();
     const width: string = this.detailPaneWidth().toString() + 'vp';
-    const title = utils.measureTextSize({ textContent: this.displayedDetail().title, fontSize: '26fp',
+    const title = utils.measureTextSize({ textContent: this.displayedDetail().title, fontSize: '22fp',
       fontWeight: FontWeight.Bold, constraintWidth: width });
-    const shortTitle = utils.measureTextSize({ textContent: this.displayedDetail().title, fontSize: '26fp',
+    const shortTitle = utils.measureTextSize({ textContent: this.displayedDetail().title, fontSize: '22fp',
       fontWeight: FontWeight.Bold, constraintWidth: width, maxLines: 2 });
     const description = utils.measureTextSize({ textContent: this.displayedDetail().description, fontSize: '16fp',
       lineHeight: '24vp', constraintWidth: width });
@@ -963,6 +1011,7 @@ export struct PinmonyDetailPage {
     Button({ type: ButtonType.Normal }) {
       Column({ space: 8 }) {
         SmartImage({ images: pin.images || {}, url: pin.imageUrl, widthVp: this.recommendCardWidth(),
+          loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false, loadPriority: 2,
           heightVp: this.recommendCardHeight(this.recommendCardWidth(), pin),
           targetPx: this.recommendCardWidth() * this.recommendDensity(), borderRadiusVp: RECOMMEND_CARD_RADIUS_VP,
           onLoaded: () => {
@@ -1037,6 +1086,7 @@ export struct PinmonyDetailPage {
         Button({ type: ButtonType.Normal }) {
           Stack() {
             SmartImage({ url: topic.imageUrl, images: {}, widthVp: this.recommendCardWidth(),
+              loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false, loadPriority: 2,
               heightVp: 96, targetPx: this.recommendCardWidth() * this.recommendDensity(), borderRadiusVp: 16 })
               .width('100%').height(96)
             Column().width('100%').height(96).backgroundColor('#66000000')
@@ -1081,11 +1131,13 @@ export struct PinmonyDetailPage {
     Column() {
           if (this.displayedDetail().carousel) {
             PinmonyCarouselView({ carousel: this.displayedDetail().carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
+              previewUrl: this.displayedDetail().imageUrl,
               productOffset: this.productGalleryOffset,
               onProductOffset: (offset: number) => { this.productGalleryOffset = offset; },
               sourceId: 'pinmony-photo-source-' + this.traceId.toString(),
               imageHidden: this.viewerMounted && this.viewerImageReady || this.searchMounted && this.searchImageReady,
               hiddenImageUrl: this.zoomImageUrl,
+              viewerImageUrl: this.zoomImageUrl,
               active: this.videoActive && !this.imageLayer,
               sessionReady: this.actionsReady || this.readsReady,
               mediaOwner: this.displayedDetail().pinUrl + '|' + this.traceId.toString(), openId: this.traceId,
@@ -1113,6 +1165,7 @@ export struct PinmonyDetailPage {
             }
           } else if (this.displayedDetail().video && this.displayedDetail().isVideo) {
             PinmonyVideoPlayer({ video: this.displayedDetail().video, poster: this.displayedDetail().imageUrl, active: this.videoActive, openId: this.traceId,
+              entryPreview: this.displayedDetail().imageUrl,
               autoplayWifi: this.displayedDetail().autoplayWifi === true, autoplayCellular: this.displayedDetail().autoplayCellular === true,
               mediaOwner: this.displayedDetail().pinUrl + '|' + this.traceId.toString(),
               sessionReady: this.actionsReady || this.readsReady,
@@ -1281,7 +1334,7 @@ export struct PinmonyDetailPage {
                 .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
                 .copyOption(CopyOptions.LocalDevice)
                 .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
-                .fontSize(26)
+                .fontSize(22)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.primary_text'))
                 .maxLines(this.expanded ? undefined : 2)
@@ -1435,7 +1488,7 @@ export struct PinmonyDetailPage {
     Stack() {
     // Keep the decoded hero mounted when late collage metadata arrives.
     if (this.displayedDetail().imageUrl) {
-      Image(this.displayedDetail().imageUrl).width('100%').height(this.heroHeight()).objectFit(ImageFit.Cover)
+      PinmonyCdnImage({ url: this.displayedDetail().imageUrl, useSharedDecode: false }).width('100%').height(this.heroHeight())
         .blur(28).opacity(0.72).hitTestBehavior(HitTestMode.None)
     }
     ForEach(this.heroImageSources(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl), (source: DetailHeroSource) => {
@@ -1444,9 +1497,7 @@ export struct PinmonyDetailPage {
         stageReady: this.displayedDetail().imageStageReady === true, confirmedLoaded: this.displayedDetail().imageLoaded === true,
         previewAvailable: this.decodedHeroSource?.pinUrl === this.displayedDetail().pinUrl,
         onLoaded: (pin: string, image: string) => {
-          if (!this.heroVisible || source.key !== this.heroRenderKey(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl) ||
-              pin !== this.displayedDetail().pinUrl || image !== this.displayedDetail().imageUrl) return;
-          this.notifyImageLoaded(pin, image);
+          this.completeHeroSource(source, pin, image);
         },
         onFailed: (pin: string) => {
           if (!this.heroVisible || source.key !== this.heroRenderKey(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl)) return;
@@ -1470,8 +1521,28 @@ export struct PinmonyDetailPage {
 
   private heroImageSources(url: string, pinUrl: string): DetailHeroSource[] {
     const next: DetailHeroSource = { key: this.heroRenderKey(url, pinUrl), url: url, pinUrl: pinUrl, revision: this.heroRenderRevision };
-    return this.decodedHeroSource?.pinUrl === pinUrl && this.decodedHeroSource.key !== next.key ?
-      [this.decodedHeroSource, next] : [next];
+    if (this.decodedHeroSource?.pinUrl === pinUrl) {
+      return this.decodedHeroSource.key !== next.key ? [this.decodedHeroSource, next] : [next];
+    }
+    // The base response can upgrade the source before the card preview draws.
+    // Keep that native preview mounted even when it has not reported ready yet.
+    if (this.entryPhoto?.pinUrl === pinUrl && this.entryPhoto.imageUrl && this.entryPhoto.imageUrl !== url) {
+      return [{ key: this.heroRenderKey(this.entryPhoto.imageUrl, pinUrl), url: this.entryPhoto.imageUrl,
+        pinUrl: pinUrl, revision: this.heroRenderRevision }, next];
+    }
+    return [next];
+  }
+
+  private completeHeroSource(source: DetailHeroSource, pinUrl: string, imageUrl: string): void {
+    if (!this.heroVisible || pinUrl !== this.displayedDetail().pinUrl || source.pinUrl !== pinUrl ||
+      source.url !== imageUrl || source.key !== this.heroRenderKey(imageUrl, pinUrl)) return;
+    const currentKey: string = this.heroRenderKey(this.displayedDetail().imageUrl, pinUrl);
+    if (source.key === currentKey) {
+      this.notifyImageLoaded(pinUrl, imageUrl);
+    } else if (this.entryPhoto?.pinUrl === pinUrl && this.entryPhoto.imageUrl === imageUrl &&
+      this.decodedHeroSource?.key !== currentKey) {
+      this.decodedHeroSource = source;
+    }
   }
 
   private heroRenderKey(url: string, pinUrl: string): string {
@@ -1623,34 +1694,39 @@ export struct PinmonyDetailPage {
     Stack() {
     Column() {
       WaterFlow({ scroller: this.detailScroller, sections: this.detailSections }) {
+        // Keep the media subtree alive when scrolling into recommendations.
+        // It still scrolls as the first section, using the same Scroller.
+        FlowItem() {
+          Column({ space: 18 }) {
+            this.detailHeader()
+            if (this.displayedDetail().dataSource === 'api' && !this.isRecommendReady()) {
+              Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
+              this.recommendationSkeleton()
+            } else if (this.displayedDetail().related.length > 0 && this.isRecommendReady()) {
+              Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
+            }
+          }.width('100%').padding({ top: this.titleContentInset() + 8, bottom: 18 })
+        }.width('100%')
         LazyForEach(this.detailRows, (row: PinmonyDetailFlowRow) => {
           FlowItem() {
-            if (row.kind === 'header') {
-              Column({ space: 18 }) {
-                this.detailHeader()
-                if (this.displayedDetail().dataSource === 'api' && !this.isRecommendReady()) {
-                  Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
-                    .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
-                  this.recommendationSkeleton()
-                } else if (this.displayedDetail().related.length > 0 && this.isRecommendReady()) {
-                  Text(this.uiText("pm_more_to_explore_f7cba896")).fontSize(23).fontWeight(FontWeight.Bold)
-                    .fontColor($r('app.color.primary_text')).width('100%').margin({ top: 4 })
-                }
-              }.width('100%').padding({ top: this.titleContentInset() + 8, bottom: 18 })
-            } else if (row.kind === 'footer') {
+            if (row.kind === 'footer') {
               this.detailFooter()
             } else if (row.pin) {
               if (row.pin.kind === 'topics') this.relatedTopicModule(row.pin)
               else this.relatedCard(row.pin)
             }
           }.width('100%')
-        }, (row: PinmonyDetailFlowRow): string => row.key)
+        }, (row: PinmonyDetailFlowRow, index: number): string => this.detailRows.renderKey(row, index))
       }
       .layoutWeight(1)
       .width('100%')
       .scrollBar(BarState.Off)
       .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
       .padding({ left: 18, right: 18 })
+      // Draw nearby cached items so native Image can prepare them before entry.
+      // Keep the stateful header and stable recommendation keys retained.
       .cachedCount(12, true)
       .edgeEffect(EdgeEffect.Spring)
       .onAreaChange((_oldArea: Area, newArea: Area) => {
@@ -1747,7 +1823,7 @@ export struct PinmonyDetailPage {
       }
       }.width('100%').height('100%')
     }
-    .titleBar(this.titleBarOptions())
+    .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleBarOptions(), this.hdsDarkMode))
     .bindToScrollable(this.imageLayer === 'search' ? [] : [this.detailScroller])
     .titleMode(HdsNavDestinationTitleMode.MINI)
     .hideBackButton(false)
@@ -1810,7 +1886,8 @@ export struct PinmonyDetailPage {
           rootId: 'pinmony-photo-root-' + this.traceId.toString(),
           imageWidth: this.displayedDetail().imageWidth, imageHeight: this.displayedDetail().imageHeight,
           restoredOffset: this.initialScrollOffset,
-          bottomInset: this.displayedDetail().carousel ? 28 : 0, closing: this.entryClosing,
+          bottomInset: !this.displayedDetail().carousel?.freeScroll &&
+            (this.displayedDetail().mediaKind === 'carousel' || !!this.displayedDetail().carousel) ? 28 : 0, closing: this.entryClosing,
           onReveal: (closing: boolean, pageExit: boolean) => {
             this.entryPhotoHidden = !pageExit;
             this.getUIContext().animateTo({ duration: closing ? 200 : 240, curve: Curve.EaseOut }, () => {
@@ -1825,6 +1902,7 @@ export struct PinmonyDetailPage {
       if (this.viewerMounted) {
         PinmonyImageViewer({ detail: this.displayedDetail(), imageUrl: this.zoomImageUrl || this.displayedDetail().originalImageUrl || this.displayedDetail().imageUrl,
           previewUrl: this.zoomImageUrl || this.displayedDetail().imageUrl,
+          onImageChange: (url: string) => { this.zoomImageUrl = url; },
           origin: this.viewerOrigin, closing: this.viewerClosing,
           onReady: () => { this.viewerImageReady = true; },
           onClosed: () => {
@@ -1854,4 +1932,5 @@ export struct PinmonyDetailPage {
         }
       }).backgroundColor(this.entryPhoto ? Color.Transparent : $r('app.color.page_background'))
   }
+
 }

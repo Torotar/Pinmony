@@ -3,6 +3,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const pages = [
+  ['feature_inbox', 'PinmonyInboxPage', ['inboxTitleBarOptions']],
   ['feature_settings', 'PinmonySettingsPage', ['titleBarOptions']],
   ['feature_home', 'PinmonyHomePage', ['homeTitleBarOptions']],
   ['feature_search', 'PinmonySearchPage', ['searchTitleBarOptions']],
@@ -30,10 +31,23 @@ for (const [module, page, methods] of pages) {
   });
   for (const mode of ['immersive', 'gentle', 'exquisite', 'off']) {
     const host = new Host();
-    Object.assign(host, { immersiveLightMode: mode, inputEditing: false, visibleCategories: () => ['pins'], uiText: name => name });
+    Object.assign(host, { immersiveLightMode: mode, inputEditing: false, visibleCategories: () => ['pins'], uiText: name => name,
+      inboxSegmentsBuilder: () => {} });
     for (const method of methods) {
       const options = host[method]();
       const style = options.style;
+      if (page === 'PinmonyInboxPage') {
+        assert.equal(options.avoidLayoutSafeArea, true);
+        assert.equal(options.enableComponentSafeArea, false, 'inbox body must continue behind the title material');
+        assert.equal(style.scrollEffectOpts.scrollEffectType, 3);
+        assert(source.includes('.bindToScrollable([this.updatesScroller, this.scroller])'), 'both stable controllers bind without observing content or selection');
+        assert(source.includes('.padding({ top: this.inboxTopInset() })'), 'initial title inset belongs to the scrolling body');
+        assert(!source.includes('.contentStartOffset('), 'restoring scrollTo(0) must not consume the title inset');
+        assert.equal(style.originalStyle.backgroundStyle.blurRadius, mode === 'off' ? 0 : 18);
+        assert.equal(style.scrollEffectStyle.backgroundStyle.blurRadius, mode === 'off' ? 0 : 18);
+        assert.equal(typeof options.content.stackBuilder, 'function', 'segments remain in the HDS title bar');
+        assert.equal(options.content.stackBuilder, host.inboxSegmentsBuilder, 'title updates preserve the segment builder');
+      }
       if (page === 'PinmonySettingsPage') {
         assert.equal(options.enableComponentSafeArea, false, 'settings list must scroll behind the title bar');
         assert(source.includes("Row().width('100%').height(this.getUIContext().px2vp(this.statusBarHeightPx) + 56)"),
@@ -75,4 +89,4 @@ inset.onBack=()=>{};assert.equal(inset.profileBodyTopInset(),80,'secondary profi
 inset.onBack=undefined;inset.modern=()=>true;assert.equal(inset.profileBodyTopInset(),216,'modern profile geometry stays unchanged');
 const indexSource = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert(indexSource.includes('this.activeTab === 3 && !!this.profileStore.profile'), 'Index yields the legacy root safe area to HDS too');
-console.log('Root title blur: home/search/profile configuration gates, profile radius and optional compiled-output checks passed');
+console.log('Root title blur: inbox body inset and material gates, home/search/profile configuration, profile radius and optional compiled-output checks passed');

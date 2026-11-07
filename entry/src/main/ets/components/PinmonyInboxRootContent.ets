@@ -29,7 +29,7 @@ export interface PinmonyInboxRootView {
 export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
           if ((view.inboxStore.inbox || view.inboxStore.inboxLoading || view.inboxStore.inboxError) && !view.inboxStore.inboxWebFlow &&
               !view.pinStore.detail && !view.activeSheetKind && !view.loadFailed) {
-            PinmonyInboxPage({ onUser: (url: string) => view.openUserProfile(url),
+            PinmonyInboxPage({ updatesUnread: view.inboxStore.inboxUpdatesUnread, messagesUnread: view.inboxStore.inboxMessagesUnread, updatesUnreadCount: view.inboxStore.inboxUpdatesUnreadCount, messagesUnreadCount: view.inboxStore.inboxMessagesUnreadCount, onUser: (url: string) => view.openUserProfile(url),
               interactionReady: view.activeTab === 2 && view.authStatus === 'authenticated' && !view.inboxStore.inboxFlow && !view.inboxStore.listSection,
               onScrollAvailability: (scrollable: boolean) => view.updateInboxScrollAvailability(scrollable),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),

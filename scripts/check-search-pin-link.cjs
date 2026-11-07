@@ -34,6 +34,56 @@ function fixture(overrides = {}) {
   return { h, calls };
 }
 async function main() {
+  const profile = 'https://www.pinterest.com/sample_user/';
+  for (const url of [profile, 'https://uk.pinterest.com/sample_user/_saved/?sender=example',
+    ' http://m.pinterest.com/sample_user/#top ']) {
+    assert.equal(linkModule.searchProfileLink(url), profile);
+  }
+  for (const url of ['https://evil.test/sample_user/', 'https://user@pinterest.com/sample_user/',
+    'https://pinterest.com.evil.test/sample_user/', 'https://pinterest.com/sample_user/board/',
+    'https://pinterest.com/%73ample_user/', 'https://pinterest.com/sample_user/extra',
+    'https://pinterest.com/sample_user/?x=one\nsecond', ...['pin','search','notifications','updates',
+    'login','settings','business','users','oauth','_saved'].map(name=>'https://pinterest.com/'+name+'/')]) {
+    assert.equal(linkModule.searchProfileLink(url), '', url);
+  }
+  const profileCalls = [];
+  const profiles = fixture({openSubmittedProfile:(...args)=>profileCalls.push(args),
+    resolveSubmittedPin:async()=>profile});
+  await profiles.h.controller.submitSearch('https://pin.it/Example');
+  await profiles.h.controller.submitSearch(profile + '?tracking=example');
+  assert.deepEqual(profileCalls, [[profile,page],[profile,page]]);
+  assert.equal(profiles.calls.length, 0);
+  assert.equal(profiles.h.store.searchScrollOffset, 93);
+  assert.equal(profiles.h.store.submittedPinLoading, false);
+  assert.equal(profiles.h.events.filter(e=>e[0]==='search').length,0);
+  let finishProfile;
+  const cancelledProfiles = [];
+  const cancelledProfile = fixture({openSubmittedProfile:(...args)=>cancelledProfiles.push(args),
+    resolveSubmittedPin:()=>new Promise(resolve=>finishProfile=resolve)});
+  const pendingProfile = cancelledProfile.h.controller.submitSearch('https://pin.it/Example');
+  cancelledProfile.h.controller.cancelSubmittedPin();
+  finishProfile(profile); await pendingProfile;
+  assert.equal(cancelledProfiles.length,0,'profile resolution respects cancellation');
+  for (const action of ['edit','submit','page','inactive','invalidate']) {
+    let finish; const opened = [];
+    const f = fixture({openSubmittedProfile:(...args)=>opened.push(args),
+      resolveSubmittedPin:()=>new Promise(resolve=>finish=resolve)});
+    const waiting = f.h.controller.submitSearch('https://pin.it/Example');
+    if(action==='edit') await f.h.controller.updateSearchQuery('edited');
+    if(action==='submit') await f.h.controller.submitSearch('new query');
+    if(action==='page') f.h.setPage(page+'&changed=1');
+    if(action==='inactive') f.h.setActive(false);
+    if(action==='invalidate') f.h.controller.invalidatePending();
+    finish(profile); await waiting;
+    assert.equal(opened.length,0,'stale profile: '+action);
+    assert.equal(f.h.store.submittedPinLoading,false);
+  }
+  const unsupported = fixture({openSubmittedProfile:()=>assert.fail('unsupported target opened'),
+    resolveSubmittedPin:async()=>'https://pinterest.com/settings/'});
+  await unsupported.h.controller.submitSearch('https://pin.it/Example');
+  assert.equal(unsupported.h.store.submittedPinLoading,false);
+  assert.equal(unsupported.calls.length,0);
+  assert.equal(unsupported.h.events.filter(e=>e[0]==='notice').length,1,'only actual failure is reported');
   // Run the actual Search callback: closing the editing layer can emit a
   // programmatic value restoration after submission has started resolving.
   const ui = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
@@ -61,6 +111,13 @@ async function main() {
   const mask = maskSource.slice(maskSource.indexOf('        if (this.searchStore.submittedPinLoading'));
   assert(mask.includes(".backgroundColor('#66808080').hitTestBehavior(HitTestMode.Block).zIndex(100)"),
     'pending link mask is grey, intercepts touches and covers sibling overlays');
+  assert(mask.includes("Text(this.uiText('pm_loading_please_wait_b6aaac70')).fontSize(14).fontColor($r('app.color.detail_on_accent'))"),
+    'the text beneath the loading indicator uses the white foreground');
+  for (const theme of ['base','dark']) {
+    const colors=JSON.parse(fs.readFileSync('common_ui/src/main/resources/'+theme+'/element/color.json','utf8'));
+    assert.equal(colors.color.find(item=>item.name==='detail_on_accent').value.toUpperCase(),'#FFFFFF',theme);
+  }
+  assert.equal(restored.h.events.filter(e=>e[0]==='notice').length,0,'loading and success do not display a duplicate snackbar');
   assert.deepEqual(restored.calls,[['456',page]],'restored input still opens resolved detail');
   view.inputEditing=true; onChange.call(view,'edited');
   assert.equal(edits,1,'active user edits still reach the controller');
@@ -101,6 +158,7 @@ async function main() {
   const backType=vm.runInNewContext(ts.transpileModule('class Host {'+hostSource.slice(backStart,backEnd)+'} Host;',
     {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
   const busyHost=new backType();
+  busyHost.noticeChats=[];
   busyHost.searchController={cancelSubmittedPin:()=>true};
   assert.equal(busyHost.onBackPress(),true,'host consumes pending-link back before underlying navigation');
   for(const action of ['edit','submit','page','inactive','invalidate']) {
@@ -119,7 +177,7 @@ async function main() {
   const failure=fixture({resolveSubmittedPin:async()=>{throw Error('network');}});
   await failure.h.controller.submitSearch('https://pin.it/Example');
   assert.equal(failure.h.store.submittedPinLoading,false,'failure releases loading mask');
-  assert.equal(failure.calls.length,0);assert.equal(failure.h.events.filter(e=>e[0]==='notice').length,2,'loading and actual failure');
+  assert.equal(failure.calls.length,0);assert.equal(failure.h.events.filter(e=>e[0]==='notice').length,1,'only actual failure retains a snackbar');
   for (const block of ['inactive', 'sheet', 'stale', 'unready']) {
     const f = fixture();
     if (block === 'inactive') f.h.setActive(false);
@@ -139,19 +197,29 @@ async function main() {
   const host = {authStatus: 'authenticated', activeTab: 1, activeSheetKind: '', businessSuspended: false,
     currentSearchPageKey: () => page, nativeBusinessSessionContext: () => ({origin: 'https://uk.pinterest.com'}),
     pageHistory: { visit: () => {} }, beginDetailOpening: (...args) => opened.push(args)};
-  const binding = vm.runInNewContext(code, {PIN_NATIVE_DETAIL_READS_ENABLED: true}).call(host);
+  const profileOpened = [];
+  host.openUserProfile = url => profileOpened.push(url);
+  const binding = vm.runInNewContext(code, {PIN_NATIVE_DETAIL_READS_ENABLED: true,
+    PIN_NATIVE_PROFILE_READS_ENABLED: true, searchProfileLink:linkModule.searchProfileLink}).call(host);
+  binding.openSubmittedProfile(profile, page);
+  assert.deepEqual(profileOpened,['https://uk.pinterest.com/sample_user/']);
+  binding.openSubmittedProfile('https://pinterest.com/settings/',page);
+  binding.openSubmittedProfile(profile,page+'&stale=1');
+  assert.equal(profileOpened.length,1);
   binding.openSubmittedPin('123', page);
   assert.deepEqual(opened, [['https://uk.pinterest.com/pin/123/', page]]);
   for (const patch of [{authStatus: 'unknown'}, {businessSuspended: true}, {activeTab: 0}, {activeSheetKind: 'save'}]) {
     const old = {...host}; Object.assign(host, patch); binding.openSubmittedPin('123', page); Object.assign(host, old);
+    Object.assign(host,patch); binding.openSubmittedProfile(profile,page); Object.assign(host,old);
   }
   binding.openSubmittedPin('../settings', page);
   binding.openSubmittedPin('123', page + '&stale=1');
   assert.equal(opened.length, 1, 'product rejects unauthorized or obsolete entry');
+  assert.equal(profileOpened.length,1,'profile entry rejects unauthorized or obsolete entry');
   let checked;
   let session = {origin:'https://uk.pinterest.com',authenticated:true,accountId:'synthetic-account',generation:1};
   Object.assign(host,{authEpoch:1,nativeSearchPageVisible:()=>true,nativeBusinessSessionContext:()=>session,
-    submittedPinResolver:{resolve:async(link,current)=>{checked=current;return '123';},cancel(){}}});
+    submittedPinResolver:{resolveTarget:async(link,current)=>{checked=current;return '123';},cancel(){}}});
   await binding.resolveSubmittedPin('https://pin.it/Example',()=>true);assert(checked());
   session={...session,accountId:'other-account'};assert.equal(checked(),false,'old account cannot open a short link');
   session={...session,accountId:'synthetic-account',generation:2};assert.equal(checked(),false,'old session cannot open a short link');

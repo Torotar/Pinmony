@@ -1,6 +1,7 @@
 import { PinmonyRuntimeLog } from './PinmonyRuntimeLog';
 
-export type PinmonyPageStage = 'visible' | 'cache-visible' | 'document-ready' | 'content-ready';
+export type PinmonyPageStage = 'state-ready' | 'visible' | 'cache-visible' | 'document-ready' | 'content-ready';
+export type PinmonyPageEvidence = 'state-check' | 'visible-area' | 'deferred-check';
 export type PinmonyPageCounter = 'read' | 'cancel';
 export type PinmonySecondaryPage = 'detail' | 'board' | 'chat' | 'share';
 export type PinmonySecondaryStage = 'content-ready' | 'image-ready' | 'component-ready';
@@ -42,12 +43,13 @@ export class PinmonyPagePerformance {
     this.active = new PageSample(tab, ++this.sequence, this.now(), reason);
     this.log('PagePerf: event=begin tab=' + tab + ' sequence=' + this.sequence + ' reason=' + reason);
   }
-  mark(tab: number, stage: PinmonyPageStage): void {
+  mark(tab: number, stage: PinmonyPageStage, evidence: PinmonyPageEvidence = 'state-check'): void {
     const sample: PageSample | undefined = this.active;
     if (!sample || sample.tab !== tab || sample.stages.has(stage) || sample.cacheRestored && stage === 'document-ready') return;
     sample.stages.add(stage);
     const elapsed: number = Math.max(0, this.now() - sample.started);
-    const key: string = tab + ':' + stage;
+    // Tab changes and detail returns have different lifecycles and budgets.
+    const key: string = sample.reason + ':' + tab + ':' + stage;
     let history: number[] | undefined = this.durations.get(key);
     if (!history) { history = []; this.durations.set(key, history); }
     if (history.length >= 64) history.shift();
@@ -55,17 +57,18 @@ export class PinmonyPagePerformance {
     const ordered: number[] = history.slice().sort((a: number, b: number): number => a - b);
     this.log('PagePerf: event=' + stage + ' tab=' + tab + ' sequence=' + sample.sequence + ' elapsedMs=' + elapsed +
       ' samples=' + ordered.length + ' p50Ms=' + ordered[Math.ceil(ordered.length * 0.5) - 1] +
-      ' p95Ms=' + ordered[Math.ceil(ordered.length * 0.95) - 1]);
+      ' p95Ms=' + ordered[Math.ceil(ordered.length * 0.95) - 1] +
+      ' reason=' + sample.reason + ' evidence=' + evidence + ' frameConfirmed=false');
     // Cached content already satisfies this visit. Later pagination/refresh must
     // not become its first-content measurement.
-    if (stage === 'cache-visible') this.mark(tab, 'content-ready');
+    if (stage === 'cache-visible') this.mark(tab, 'content-ready', evidence);
   }
   restoreHome(): boolean {
     if (!this.active || this.active.tab !== 0 || this.active.reason !== 'return' || this.active.stages.has('content-ready')) return false;
     this.active.cacheRestored = true;
-    this.mark(0, 'visible');
-    this.mark(0, 'cache-visible');
-    this.mark(0, 'content-ready');
+    this.mark(0, 'visible', 'deferred-check');
+    this.mark(0, 'cache-visible', 'deferred-check');
+    this.mark(0, 'content-ready', 'deferred-check');
     return true;
   }
   count(tab: number, event: PinmonyPageCounter, count: number = 1): void {

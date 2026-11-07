@@ -1,4 +1,4 @@
-import { PinmonyActionNotice } from 'common_ui';
+import { PinmonyActionNotice, PinmonyCdnImage } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
@@ -96,10 +96,10 @@ export struct PinmonyDetailHero {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       // State feedback never removes the Image while its source is still current.
-      Image(this.source.url).width('100%').height(this.heightVp).objectFit(ImageFit.Contain).borderRadius(18).clip(true)
+      PinmonyCdnImage({ url: this.source.url, fit: ImageFit.Contain, useSharedDecode: false,
+        onDecoded: () => this.completeImage(1), onFailure: (code: number) => this.failImage(code) })
+        .width('100%').height(this.heightVp).borderRadius(18).clip(true)
         .opacity(this.previewAvailable && this.imageState !== 'loaded' ? 0 : 1)
-        .onComplete((event) => this.completeImage(event?.loadingStatus ?? -1))
-        .onError((event) => this.failImage(event?.error?.code || 0))
         .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); })
         .accessibilityText(this.label || this.uiText("pm_pin_image_c269651e"))
       if (!this.blocked && !this.previewAvailable && this.imageState === 'loading') {

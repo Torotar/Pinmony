@@ -13,11 +13,26 @@ for (let i = 0; i < tables.length; i++) {
   const values = new Map(tables[i].map(row => [row.name, row.value]));
   for (const row of tables[0]) {
     assert.equal(typeof values.get(row.name), 'string');
-    assert.deepEqual((values.get(row.name).match(/\{\d+\}/g) || []).sort(), (row.value.match(/\{\d+\}/g) || []).sort(), `Placeholder mismatch: ${row.name}`);
+    assert(values.get(row.name).trim().length > 0, `Empty translation: ${locales[i]}:${row.name}`);
+    assert.deepEqual((values.get(row.name).match(/\{(?:\d+|[A-Za-z_]\w*)\}/g) || []).sort(), (row.value.match(/\{(?:\d+|[A-Za-z_]\w*)\}/g) || []).sort(), `Placeholder mismatch: ${locales[i]}:${row.name}`);
   }
 }
 for (const localeIndex of [3, 4]) {
   for (const row of tables[localeIndex]) assert(!/[\u3400-\u9fff]/.test(row.value), `Chinese in English resource: ${locales[localeIndex]}:${row.name}`);
+}
+// Intentional shared terminology is allowed; untranslated English copy is not.
+const sharedEnglishKeys = new Set([
+  'pm_sms_81a4ceb7', 'pm_pins_0a89904f', 'pm_photos_7b50017a',
+  'pm_value_pins_d1922567', 'pm_pin_234ff540', 'pm_notify_push',
+  'pm_profile_hub_pins', 'pm_publish_link'
+]);
+const english = new Map(tables[3].map(row => [row.name, row.value]));
+for (const locale of ['ja', 'ko', 'ru', 'pt_BR']) {
+  for (const row of tables[locales.indexOf(locale)]) {
+    const portugueseTimeUnit = locale === 'pt_BR' && ['pm_h_3b6fefc5', 'pm_d_49da61ce'].includes(row.name);
+    assert(!(/[A-Za-z]/.test(row.value) && row.value === english.get(row.name)) || sharedEnglishKeys.has(row.name) || portugueseTimeUnit,
+      `Untranslated English copy: ${locale}:${row.name}`);
+  }
 }
 const known = new Set(names), errors = [];
 function walk(dir) {

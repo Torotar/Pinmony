@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -10,6 +11,7 @@ import { PinmonySettingsStore, PinmonyRecoverableBoard } from '../stores/Pinmony
 
 @Component
 export struct PinmonyBoardRecoveryPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private titleContentInset(): number { return this.panelMode ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -101,7 +103,7 @@ export struct PinmonyBoardRecoveryPage {
         }.width('100%').height('100%')
         this.recoveryLoading()
       }.width('100%').height('100%')
-    }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false).bindToScrollable([this.scroller])
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false).bindToScrollable([this.scroller])
       .onBackPressed(() => {if(!this.store.busy)this.onBack?.();return true;})
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }

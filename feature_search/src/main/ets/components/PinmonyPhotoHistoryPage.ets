@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics, SymbolGlyphModifier } from '@kit.ArkUI';
 import { BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
@@ -8,6 +9,7 @@ import { HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit'
 import { PinmonyPhotoHistoryItem, PinmonyPhotoHistoryPage, PinmonyPhotoHistoryOrigin } from '../models/PinmonyPhotoHistory';
 @Component
 export struct PinmonyPhotoHistoryView {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') @Watch('syncSections') private statusBarHeightPx: number = 0;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -269,7 +271,7 @@ export struct PinmonyPhotoHistoryView {
       .titleMode(HdsNavDestinationTitleMode.MINI)
       .hideTitleBar(false)
       .systemBarStyle({ statusBarContentColor: this.dark ? '#F7F8FA' : '#1B1E25' }, { statusBarContentColor: this.dark ? '#F7F8FA' : '#1B1E25' })
-      .titleBar({ avoidLayoutSafeArea: true, enableComponentSafeArea: false,
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
         style: { blurStrategy:this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,thermoCtrl:this.immersiveLightMode !== 'off',systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode),scrollEffectOpts:{enableScrollEffect:this.immersiveLightMode !== 'off',scrollEffectType:ScrollEffectType.IMMERSIVE_GRADIENT_BLUR},originalStyle:{contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')},menuStyle:{iconColor:$r('app.color.primary_text'),textColor:$r('app.color.primary_text')}},backgroundStyle:{backgroundColor:Color.Transparent,maskExtraHeight:0,blurRadius:this.immersiveLightMode !== 'off' ? 18 : 0}},scrollEffectStyle:{contentStyle:{titleStyle:{mainTitleColor:$r('app.color.primary_text')},backIconStyle:{iconColor:$r('app.color.primary_text')},menuStyle:{iconColor:$r('app.color.primary_text'),textColor:$r('app.color.primary_text')}},backgroundStyle:{backgroundColor:$r('app.color.immersive_title_scrolled'),maskExtraHeight:0,blurRadius:this.immersiveLightMode !== 'off' ? 18 : 0}} },
         content: { title: { mainTitle: this.text(this.managing ? 'pm_photo_history_manage' : 'pm_photo_history') }, backIcon: { action: () => this.back() },
           menu: { value: [{ content: {
@@ -280,7 +282,7 @@ export struct PinmonyPhotoHistoryView {
               !!this.onDelete && this.uncertainIds.length === 0,
             action: () => { if (this.managing) this.confirmDeleteAll(); else this.enterManagement(); }
           } }] }
-        } })
+        } }, this.hdsDarkMode))
       .bindToScrollable([this.managing ? this.managementScroller : this.scroller])
       .onBackPressed(() => this.handleSystemBack())
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])

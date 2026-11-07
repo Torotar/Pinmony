@@ -1,9 +1,11 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyActionNotice, PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyInboxFlowSnapshot, PinmonyInboxNewsCard } from '../models/PinmonyInboxFlow';
 @Component
 export struct PinmonyInboxNewsPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
@@ -100,7 +102,7 @@ export struct PinmonyInboxNewsPage {
           }
         }.width('100%').height('100%')
       }.titleMode(HdsNavDestinationTitleMode.MINI).hideTitleBar(false).hideBackButton(false)
-        .titleBar(this.titleOptions()).bindToScrollable([this.scroller])
+        .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleOptions(), this.hdsDarkMode)).bindToScrollable([this.scroller])
         .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP])
         .backgroundColor($r('app.color.page_background'))
         .onBackPressed(() => {if(!this.active){this.onCoveredBack?.();return true;}this.act('back');return true;})

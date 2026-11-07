@@ -15,6 +15,14 @@ export function redirectedPinIdentity(value: string): string {
   return match ? match[1] : '';
 }
 
+export function redirectedProfileUrl(value: string): string {
+  if (value.length > 2048) return '';
+  const match: RegExpMatchArray | null = value.match(
+    /^https:\/\/(?:(?:www|uk|m)\.)?pinterest\.com\/([a-z0-9_]{1,64})(?:\/(?:_(?:saved|created)\/?)?)?(?:[?#][^\s\\]*)?$/i);
+  if (!match || /^(pin|search|messages|inbox|updates|notifications|login|logout|signup|ideas|today|settings|edit|business|explore|users|help|about|privacy|terms|resource|resources|oauth|api|_.*)$/i.test(match[1])) return '';
+  return 'https://www.pinterest.com/' + match[1] + '/';
+}
+
 // Public redirect resolution is isolated from authenticated website resources.
 // No ArkWeb cookies, CSRF, sender/invite parameters, response HTML or tracking
 // URLs are forwarded to a business request, logged, or persisted.
@@ -30,6 +38,13 @@ export class PinmonyPinLinkResolver {
   }
 
   async resolve(value: string, current: () => boolean): Promise<string> {
+    const target: string = await this.resolveTarget(value, current);
+    if (!/^[0-9]{1,30}$/.test(target)) throw new Error('pin-link-target');
+    return target;
+  }
+
+  // Returns a Pin identity or a canonical profile URL, never a tracking URL.
+  async resolveTarget(value: string, current: () => boolean): Promise<string> {
     this.cancel();
     const token: string = shortPinToken(value);
     if (!token || !current()) throw new Error('pin-link-invalid');
@@ -73,6 +88,8 @@ export class PinmonyPinLinkResolver {
         if (typeof header !== 'string') throw new Error('pin-link-location');
         const pin: string = redirectedPinIdentity(header);
         if (pin) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready'); return pin; }
+        const profile: string = redirectedProfileUrl(header);
+        if (profile) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready kind=profile'); return profile; }
         // This exact intermediate path was observed for Pinterest shared links.
         // Never follow arbitrary hosts, relative links, query strings or redirects.
         const intermediate: string = 'https://api.pinterest.com/url_shortener/' + token + '/redirect/';

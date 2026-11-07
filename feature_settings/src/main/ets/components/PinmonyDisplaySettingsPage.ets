@@ -1,3 +1,4 @@
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -11,6 +12,7 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyDisplaySettingsPage {
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -76,8 +78,9 @@ export struct PinmonyDisplaySettingsPage {
     const previous: string = this.themePreference;
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      this.themePreference = value;
+      // Publish the preference only after native configuration accepts it.
       context.getApplicationContext().setColorMode(value === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : value === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
+      this.themePreference = value;
     } catch (_) {
       this.themePreference = previous;
       try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_theme_please_retry_e0cd6314"), duration: 3000 }); }
@@ -285,7 +288,7 @@ export struct PinmonyDisplaySettingsPage {
         LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
-    }.titleBar(this.options()).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
+    }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
       .bindToScrollable([this.scroller]).onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }

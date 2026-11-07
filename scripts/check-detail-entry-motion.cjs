@@ -2,13 +2,13 @@ const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/
 const ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailEntryMotion.ets','utf8');
 const sf=ts.createSourceFile('motion.ts',source.replace(/\bstruct\b/g,'class'),99,true), methods=[];
-const names=['aboutToAppear','aboutToDisappear','target','heroVisible','begin','imageComplete','closeChanged','move'];
+const names=['aboutToAppear','aboutToDisappear','openWithoutPhoto','target','heroVisible','begin','imageComplete','closeChanged','move'];
 function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(sf)))methods.push(n.getText(sf));ts.forEachChild(n,visit);} visit(sf);
 const geometry=fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets','utf8').replace(/export /g,'');
 const imageContainRect=vm.runInNewContext(ts.transpileModule(geometry+';imageContainRect;',{compilerOptions:{target:99}}).outputText);
-const timers=[],animations=[];
+const timers=[],animations=[],preparationTimers=[];
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:99}}).outputText,
- {imageContainRect,PinmonyRuntimeLog:{info:()=>{}},Curve:{EaseOut:0},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{}});
+ {imageContainRect,PinmonyRuntimeLog:{info:()=>{}},Curve:{EaseOut:0},setTimeout:(fn,delay)=>{if(delay===80){preparationTimers.push(fn);return -1000-preparationTimers.length;}timers.push(fn);return timers.length;},clearTimeout:()=>{}});
 let opened=0,closed=0,revealed=0;
 function fixture(){const x=new Host(); Object.assign(x,{photo:{x:20,y:130,width:160,height:200},targetId:'target',rootId:'root',imageWidth:400,imageHeight:500,bottomInset:28,restoredOffset:0,
   decoded:false,rendered:true,measured:true,started:false,version:0,closing:false,showing:false,layoutAttempts:0,
@@ -47,7 +47,7 @@ owner.businessSuspended=true;owner.capturePinEntryPhoto('pin','image','old',800,
 console.log('Board/search entry capture: exact source ownership, dimensions, window conversion and suspended guard passed');
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
 assert(page.includes('this.entryPhoto && (!this.entryMotionComplete || this.entryClosing)'), 'finished entry overlay must leave the hit-test tree');
-assert.match(page,/Image\(this\.displayedDetail\(\)\.imageUrl\)[\s\S]{0,180}\.blur\(28\)[\s\S]{0,100}HitTestMode\.None/,'photo detail places a non-interactive blurred cover under the clear image');
+assert.match(page,/PinmonyCdnImage\(\{ url: this\.displayedDetail\(\)\.imageUrl, useSharedDecode: false \}\)[\s\S]{0,180}\.blur\(28\)[\s\S]{0,100}HitTestMode\.None/,'photo detail places a non-interactive native blurred cover under the clear image');
 assert(page.includes('@Prop disableImageZoom: boolean = false;'),'detail exposes source-specific zoom suppression');
 assert.match(page,/onImageTap: \(url: string\) => \{ if \(!this\.disableImageZoom && !this\.displayedDetail\(\)\.shuffleId\)/,'collage detail suppresses carousel zoom without changing normal Pin behavior');
 assert.match(page,/onTap: \(\) => \{ if \(!this\.disableImageZoom && !this\.displayedDetail\(\)\.shuffleId\)/,'collage detail suppresses hero zoom without changing normal Pin behavior');
@@ -136,7 +136,8 @@ assert(page.includes("'pinmony-related-photo-' + this.displayedDetail().pinUrl +
 assert(indexSource.includes("'pinmony-related-photo-' + parent + '-' + target"), 'geometry lookup matches the retained image node');
 console.log('Related entry capture, stable card identity and header anchor compensation passed');
 
-assert.match(source,/\.onComplete\(\(event\) => this.imageComplete\(event\?\.loadingStatus \?\? -1\)\)/);
+assert.match(source,/onDataReady: \(\) => this.imageComplete\(0\)/);
+assert.match(source,/onDecoded: \(\) => this.imageComplete\(1\)/);
 const hidden=fixture();hidden.rendered=false;
 const beforeReady=animations.length;
 hidden.imageComplete(0);

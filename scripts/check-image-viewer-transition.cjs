@@ -4,7 +4,7 @@ const imageContainRect=vm.runInNewContext(ts.transpileModule(geometry+';imageCon
 const wide=imageContainRect(360,720,800,400);assert.equal(wide.width,360);assert.equal(wide.height,180);assert.equal(wide.y,270);
 const tall=imageContainRect(720,360,400,800);assert.equal(tall.width,180);assert.equal(tall.x,270);
 const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyImageViewer.ets','utf8');const sf=ts.createSourceFile('viewer.ts',source.replace(/\bstruct\b/g,'class'),99,true);
-const names=['aboutToAppear','aboutToDisappear','imageDecoded','beginTransition','containRect','sourceRect','sourceRadius','setFrame','transitionChanged'];const methods=[];
+const names=['initializePhotos','aboutToAppear','aboutToDisappear','imageDecoded','beginTransition','containRect','sourceRect','sourceRadius','setFrame','transitionChanged'];const methods=[];
 function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(sf)))methods.push(n.getText(sf));ts.forEachChild(n,visit);}visit(sf);
 const timers=[],delays=[];const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;', {compilerOptions:{target:99}}).outputText,{imageContainRect,PinmonyRuntimeLog:{info(){}},curves:{springMotion:()=>0},setTimeout:(fn,delay)=>{timers.push(fn);delays.push(delay);return timers.length;},clearTimeout:()=>{}});
 const x=new Host(),animations=[];let closed=0,ready=0;

@@ -4,7 +4,7 @@ import { mapPrefetchedDetail, readRelatedPresentation, RelatedPresentation } fro
 import { PinmonyPinStore } from 'feature_pin';
 import { PinmonyDetailTrace, PinmonyDetailReadCache } from 'feature_pin';
 import { PinmonyHomeStore } from 'feature_home';
-import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED } from 'common_network';
+import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED, Priority } from 'common_network';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyAuthStatus, PinmonyBusinessSessionContext } from 'common_session';
 import { allowsSpeculativeReads } from 'common_foundation';
@@ -32,6 +32,8 @@ export interface PinmonyDetailOpeningCoordinatorPorts {
   nativeNetworkContext: () => PinmonyNetworkContext;
   nativeBusinessSessionContext: () => PinmonyBusinessSessionContext;
   startNativeReads: (pin: string, token: number, body: string) => Promise<PinmonyNetworkReply>;
+  warmRelated?: (pin: string, token: number) => void;
+  cancelEarlyRelated?: (pin: string, token: number) => void;
   openingRelated: () => Promise<PinmonyNetworkReply> | undefined;
   setOpeningRelated: (value: Promise<PinmonyNetworkReply> | undefined) => Promise<PinmonyNetworkReply> | undefined;
   openingRelatedToken: () => number;
@@ -84,17 +86,24 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
     const captured: PinmonyBusinessSessionContext = this.ports.nativeBusinessSessionContext();
     const current = (): boolean => captured.authenticated && this.ports.nativeBusinessSessionContext().generation === captured.generation && this.ports.authStatus() === 'authenticated' && this.pinStore.videoForeground &&
         token === this.pinStore.detailOpeningToken && (this.pinStore.detailOpeningPin === pinUrl || this.pinStore.detailPin === pinUrl) && !this.ports.nativeBackTarget();
+    if (current()) this.ports.warmRelated?.(pinUrl, token);
     this.ports.coordinatorTasks().timeout(() => {
-        if (current() && !this.pinStore.detailActionsReady && !this.pinStore.detailNativeReadsReady)
+        if (current() && !this.pinStore.detailActionsReady && !this.pinStore.detailNativeReadsReady) {
+            this.ports.cancelEarlyRelated?.(pinUrl, token);
             this.pinStore.detailApiError = PinmonyI18n.message("pm_pin_loading_timed_out_please_retry_b940342e");
+        }
     }, 12000);
     this.pinStore.detailPrefetch.open(pinUrl, async (url: string, id: string, ownerCurrent: () => boolean): Promise<string> => {
         this.ports.detailRequestOwners().set(id, this.ports.detailJourney().current());
-        const job: PinmonyNetworkJob = { id: id, epoch: captured.generation, page: pinUrl, url: url,
+        const job: PinmonyNetworkJob = { id: id, epoch: captured.generation, page: pinUrl, url: url, priority: Priority.HIGH,
             method: 'GET', body: '', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
                 'X-Pinterest-Pws-Handler': 'www/pin/[id].js' } };
-        const reply: PinmonyNetworkReply = await this.ports.detailReadNetwork().requestBusinessPinRead(job, (): PinmonyBusinessSessionContext => this.ports.nativeBusinessSessionContext(), pinUrl, ownerCurrent, (): PinmonyNetworkContext => this.ports.nativeNetworkContext());
-        this.ports.detailRequestOwners().delete(id);
+        if (current() && ownerCurrent()) this.ports.detailJourney().mark('base.network.request');
+        let reply: PinmonyNetworkReply;
+        try {
+            reply = await this.ports.detailReadNetwork().requestBusinessPinRead(job, (): PinmonyBusinessSessionContext => this.ports.nativeBusinessSessionContext(), pinUrl, ownerCurrent, (): PinmonyNetworkContext => this.ports.nativeNetworkContext());
+        } finally { this.ports.detailRequestOwners().delete(id); }
+        if (current() && ownerCurrent()) this.ports.detailJourney().mark('base.network.response');
         if (!ownerCurrent() || reply.error || reply.status !== 200) {
             const failure: Error = new Error(reply.error === 'network-unavailable' ? 'network-unavailable' : 'detail-unavailable');
             if (reply.error === 'cancelled' || reply.error === 'stale' || !ownerCurrent()) failure.name = 'AbortError';
@@ -185,6 +194,7 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
         }));
         PinmonyRuntimeLog.info('DetailTrace: base ready openId=' + token.toString() + ' elapsedMs=' + (Date.now() - this.ports.detailOpenedAt()).toString());
     }).catch((error: Error) => {
+        this.ports.cancelEarlyRelated?.(pinUrl, token);
         if (error.name === 'AbortError') {
             if (current()) this.ports.detailJourney().mark('base.cancelled.await-document');
             return;

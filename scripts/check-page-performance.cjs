@@ -13,6 +13,7 @@ perf.cancel(); const count = logs.length; perf.mark(3, 'document-ready'); assert
 perf.begin(0, 'return'); now += 16; assert.equal(perf.restoreHome(), true);
 const restored = logs.filter(s => s.includes('event=content-ready tab=0')).at(-1);
 assert(restored.includes('elapsedMs=16'));
+assert(restored.includes('evidence=deferred-check') && restored.includes('frameConfirmed=false'));
 now += 12000; assert.equal(perf.restoreHome(), false); perf.mark(0, 'content-ready');
 const completed = logs.length; perf.mark(0, 'document-ready'); assert.equal(logs.length, completed, 'later document callbacks do not become cached return durations');
 assert.equal(logs.filter(s => s.includes('event=content-ready tab=0')).at(-1), restored, 'later pagination cannot stretch a completed return sample');
@@ -23,6 +24,14 @@ assert(cachedVisit.includes('elapsedMs=64'));
 now += 5000; perf.mark(1, 'content-ready');
 assert.equal(logs.filter(s => s.includes('event=content-ready tab=1')).at(-1), cachedVisit, 'pagination cannot become first content after cached presentation');
 perf.begin(0, 'tab'); assert.equal(perf.restoreHome(), false, 'restored home timings only apply to actual returns');
+const isolatedLogs = []; let clock = 1000;
+const isolated = new exportsObject.PinmonyPagePerformance(() => clock, message => isolatedLogs.push(message));
+isolated.begin(0, 'tab'); clock += 900; isolated.mark(0, 'visible', 'visible-area');
+isolated.begin(0, 'return'); isolated.mark(0, 'state-ready'); clock += 16; isolated.restoreHome();
+const isolatedReturn = isolatedLogs.filter(s => s.includes('event=visible')).at(-1);
+assert(isolatedReturn.includes('samples=1') && isolatedReturn.includes('p50Ms=16'), 'tab durations never pollute return percentiles');
+assert(isolatedReturn.includes('reason=return') && isolatedReturn.includes('frameConfirmed=false'));
+assert(isolatedLogs.some(s => s.includes('event=state-ready') && s.includes('elapsedMs=0')));
 for (let i = 0; i < 90; i++) { perf.begin(3, 'tab'); now += i; perf.mark(3, 'visible'); }
 assert(logs.at(-1).includes('samples=64')); assert(!logs.some(s => /https:|cookie|account_id/.test(s)));
 for (const page of ['detail','board','chat','share']) {
@@ -37,7 +46,8 @@ for(let i=0;i<90;i++){perf.beginSecondary('detail','synthetic');now+=i;perf.mark
 assert(logs.at(-1).includes('samples=64'));assert.equal(perf.secondary.size,1);assert(perf.durations.size<=28);
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert(fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets','utf8').includes("this.ports.pagePerformance().begin(performanceRoot, 'return')"));
-assert(source.includes("this.pagePerformance.mark(index, 'visible')"));
+assert(source.includes("this.pagePerformance.mark(index, 'visible', 'visible-area')"));
+assert(source.includes("this.pagePerformance.mark(index, 'visible', 'deferred-check')"));
 for(const page of ['detail','board','chat','share']) {
   assert(source.includes("beginSecondary('"+page+"'"),'Product begins '+page);
   assert(source.includes("this.pagePerformance.markSecondary('"+page+"'"),'Index marks '+page);

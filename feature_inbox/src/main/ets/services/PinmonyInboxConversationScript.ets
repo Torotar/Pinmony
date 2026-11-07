@@ -226,7 +226,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
               last && last.pin ? (last.sender && last.sender.id === selfId ? '你发送了一张 Pin 图' : '发送了一张 Pin 图') : '');
             var date = last && new Date(last.created_at);
             return { id: 'conversation:' + c.id, title: clean(c.name) || users.map(function (u) { return u.name; }).join('、'),
-              outgoing: !!(last && last.sender && last.sender.id === selfId), subtitle: text, profileUrl: users.length === 1 ? users[0].profileUrl || '' : '', imageUrl: users[0] && users[0].avatar || '', enabled: true, unread: !!c.unread,
+              outgoing: !!(last && last.sender && last.sender.id === selfId), subtitle: text, profileUrl: users.length === 1 ? users[0].profileUrl || '' : '', imageUrl: users[0] && users[0].avatar || '', enabled: true, unreadCount: typeof c.unread === 'number' && Number.isSafeInteger(c.unread) && c.unread >= 0 ? c.unread : c.unread === true ? 1 : 0, unread: c.unread === true || typeof c.unread === 'number' && Number.isSafeInteger(c.unread) && c.unread > 0,
               timeLabel: date && !isNaN(date.getTime()) ? String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0') : '' };
           }); pending.kind = 'ready'; list = pending; changed();
         }).catch(function (e) { if (current() && token === listGeneration) {
