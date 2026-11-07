@@ -175,14 +175,17 @@ export struct PinmonySocialPermissionsPage {
   }
   @Builder
   private link(title: string, detail: string, target: string, requiresReady: boolean = false) {
-    Button() {
+    Column() {
       Column({ space: 6 }) {
         Row() { Text(this.uiText(title)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
         }.width('100%')
         if (detail) { Text(PinmonyI18n.render(detail, this.uiLanguage)).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%') }
       }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:12,bottom:12 })
-    }.width('100%').backgroundColor(Color.Transparent).padding(0).enabled(!this.store.busy && !this.store.loading && !this.confirming && (!requiresReady || this.store.social.ready)).onClick(() => this.open(target))
+    }.width('100%').backgroundColor(Color.Transparent).padding(0)
+      .focusable(true).accessibilityGroup(true).accessibilityRole(AccessibilityRoleType.BUTTON)
+      .accessibilityText(this.uiText(title) + (detail ? ' ' + PinmonyI18n.render(detail, this.uiLanguage) : ''))
+      .enabled(!this.store.busy && !this.store.loading && !this.confirming && (!requiresReady || this.store.social.ready)).onClick(() => this.open(target))
   }
   @Builder
   private selection(label: string, value: number, selected: number, messageOption: boolean = false) {
@@ -345,6 +348,7 @@ export struct PinmonySocialPermissionsPage {
           .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) }).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         }
         }.width('100%').height('100%')
+          .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
           .transition(this.store.screen === 'social' ? TransitionEffect.IDENTITY : TransitionEffect.asymmetric(
             TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
             TransitionEffect.IDENTITY))

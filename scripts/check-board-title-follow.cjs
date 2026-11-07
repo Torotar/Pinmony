@@ -32,6 +32,10 @@ async function main(){
  f=fixture();p=f.flow.submit(f.item,'22',f.owner);f.switchAccount();await p;f.calls[0].resolve(reply(f.calls[0]));await Promise.resolve();assert.equal(f.confirmed.length,0);
  f=fixture();await f.flow.submit({...f.item,following:undefined},'22',f.owner);await f.flow.submit(f.item,'',f.owner);assert.equal(f.calls.length,0);
  const page=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');assert(page.includes("this.act('followToggle')"));assert(page.includes('return [share, follow]'));
- console.log('Board title follow: existing transport contract, follow/unfollow confirmation, double click, unknown locks, rejection, cancellation, account change and UI wiring passed');
+ const followIcon=page.match(/icon: new SymbolGlyphModifier\(this\.snapshot\.following[^;]+?\.fontColor\([^\n]+/)[0];
+ assert(followIcon.includes("this.snapshot.following ? $r('sys.symbol.star_fill') : $r('sys.symbol.star')"),'follow state selects filled or outline star');
+ assert(followIcon.includes('.fontSize(24)'),'follow star matches the title bar symbol size');
+ assert(!followIcon.includes('heart'),'title follow no longer uses a heart');
+ console.log('Board title follow: transport contract, confirmation, guards, cancellation, account change, outline/filled star and title icon size passed');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

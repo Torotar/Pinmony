@@ -50,6 +50,21 @@ export struct PinmonyNotificationsPage {
     });
   }
   @Builder
+  private loadingContent() {
+    Column({ space: 16 }) {
+      ForEach(['pm_notify_category_published_comments', 'pm_notify_category_saved_pin_comments',
+        'pm_notify_category_messages', 'pm_notify_category_followers', 'pm_notify_category_pins_picked_for_you'], (key: string) => {
+        Column({ space: 12 }) {
+          Row() {
+            Text(this.uiText(key)).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
+            SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+          }.width('100%')
+          Row().width('55%').height(14).borderRadius(7).backgroundColor($r('app.color.surface_muted'))
+        }.width('100%').padding(16).alignItems(HorizontalAlign.Start)
+      }, (key: string): string => key + ':' + this.uiLanguage)
+    }.width('100%').accessibilityLevel('no-hide-descendants').hitTestBehavior(HitTestMode.None)
+  }
+  @Builder
   private destination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
@@ -58,6 +73,7 @@ export struct PinmonyNotificationsPage {
           if (this.store.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.store.busy && !this.store.loading })
           }
+          if (this.store.loading && !this.store.notifications.length) { this.loadingContent() }
           ForEach(this.store.notifications, (group: NotificationGroup) => {
             Text(PinmonyNotificationCopy.group(group, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
             Column() {
@@ -75,9 +91,8 @@ export struct PinmonyNotificationsPage {
                   ForEach(category.channels, (channel: NotificationChannel) => {
                     Row() {
                       Text(PinmonyNotificationCopy.channel(channel, this.uiLanguage)).fontColor($r('app.color.primary_text')).layoutWeight(1)
-                      Checkbox().select(channel.value).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
+                      Toggle({ type: ToggleType.Switch, isOn: channel.value })
+                        .selectedColor($r('app.color.accent')).margin({ left: 12, right: 12, top: 8, bottom: 8 })
                         .enabled(channel.editable === true && !this.confirmationOpen && !this.store.busy && !this.store.loading && !this.store.writeUncertain)
                         .accessibilityText(PinmonyNotificationCopy.category(category, this.uiLanguage) + ' ' + PinmonyNotificationCopy.channel(channel, this.uiLanguage))
                         .onChange((value: boolean) => {
@@ -95,6 +110,7 @@ export struct PinmonyNotificationsPage {
           if (!this.store.loading && !this.store.error && !this.store.notifications.length) { Text(this.uiText("pm_no_notification_settings_available_b02ac445")).fontColor($r('app.color.secondary_text')) }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: this.titleContentInset(), bottom: 28 })
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {

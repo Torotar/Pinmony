@@ -38,7 +38,7 @@ export struct PinmonyInboxActivityRow {
     Row({space:12}) {
       Button({type:ButtonType.Normal}) {
         PinmonyUserAvatar({profileUrl:this.item.profileUrl || '',image:this.item.imageUrl,colorIndex:this.item.avatarColorIndex || 0,name:this.item.title,avatarSize:48})
-      }.padding(0).borderRadius(24).backgroundColor(Color.Transparent)
+      }.padding(0).borderRadius(24).backgroundColor(Color.Transparent).stateEffect(false)
         .enabled(!!this.item.profileUrl).accessibilityText(this.item.title).onClick(() => this.openProfile())
       Button({type:ButtonType.Normal}) {
         Column({space:4}) {
@@ -47,7 +47,7 @@ export struct PinmonyInboxActivityRow {
           Text(this.text('pm_activity_followed_you')).fontSize(15)
             .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis})
         }.width('100%').alignItems(HorizontalAlign.Start)
-      }.layoutWeight(1).padding(0).backgroundColor(Color.Transparent)
+      }.layoutWeight(1).padding(0).backgroundColor(Color.Transparent).stateEffect(false)
         .accessibilityText(this.item.title + ' ' + this.text('pm_activity_followed_you')).onClick(() => this.openChat())
       Button({type:ButtonType.Normal}) {
         if(this.item.activityBusy) {

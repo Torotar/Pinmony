@@ -42,6 +42,8 @@ export struct PinmonyInboxFlowPage {
   private scroller: Scroller = new Scroller();
   private readonly chatPosition: PinmonyChatScrollPosition = new PinmonyChatScrollPosition();
   private viewportHeight: number = 0;
+  private measuredMessageCount: number = -1;
+  @State private chatLayoutReady: boolean = false;
   private presentedConversation: string = '';
   private visible: boolean = false;
   @State private query: string = '';
@@ -145,6 +147,9 @@ export struct PinmonyInboxFlowPage {
     if (this.snapshot.screen !== 'chat' || !this.snapshot.conversationId) return;
     if (this.presentedConversation !== this.snapshot.conversationId) {
       this.presentedConversation = this.snapshot.conversationId;
+      this.chatLayoutReady = false;
+      this.measuredMessageCount = -1;
+      this.contentHeight = 0;
       // A retained sentRevision is history, not a newly completed send.
       this.sentRevision = this.snapshot.sentRevision || 0;
       this.chatPosition.begin(this.snapshot.conversationId, this.restoreOffset);
@@ -152,11 +157,14 @@ export struct PinmonyInboxFlowPage {
   }
 
   private positionChat(): void {
-    if (!this.visible || !this.active || this.snapshot.screen !== 'chat' || !this.snapshot.messages.length) return;
+    if (!this.visible || !this.active || this.snapshot.screen !== 'chat' || !this.snapshot.messages.length ||
+        this.measuredMessageCount !== this.snapshot.messages.length) return;
     const offset: number | undefined = this.chatPosition.layout(this.contentHeight, this.viewportHeight);
     if (offset !== undefined && Math.abs(this.scroller.currentOffset().yOffset - offset) > 0.5) {
-      this.scroller.scrollTo({ xOffset: 0, yOffset: offset });
+      this.scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
     }
+    if (!this.snapshot.loading && this.contentHeight > 0 && this.viewportHeight > 0 &&
+        (offset === undefined || Math.abs(this.scroller.currentOffset().yOffset - offset) <= 0.5)) this.chatLayoutReady = true;
   }
 
   private captureChatOffset(): void {
@@ -177,7 +185,7 @@ export struct PinmonyInboxFlowPage {
         this.snapshot.screen !== (this.messageMenuKind === 'block' ? 'settings' : 'chat'))) this.closeMessageMenu();
     this.prepareChatPosition();
     if (this.previousScreen === 'settings' && this.snapshot.screen === 'chat' && this.settingsReturnOffset >= 0) {
-      this.chatPosition.restore(this.settingsReturnOffset); this.contentHeight = 0; this.settingsReturnOffset = -1;
+      this.chatPosition.restore(this.settingsReturnOffset); this.chatLayoutReady = false; this.measuredMessageCount = -1; this.contentHeight = 0; this.settingsReturnOffset = -1;
     }
     this.previousScreen = this.snapshot.screen;
     if (this.snapshot.screen === 'updatesMenu' && !this.snapshot.newsUndoing && this.snapshot.newsId &&
@@ -670,7 +678,7 @@ export struct PinmonyInboxFlowPage {
           } else if (this.snapshot.screen === 'compose' || this.snapshot.screen === 'settings') {
             ForEach(this.snapshot.users, (user: InboxFlowUser) => { this.userRow(user) }, (user: InboxFlowUser) => user.id)
           } else {
-            if (this.snapshot.users.length > 0) {
+            if (!this.snapshot.loading && this.snapshot.messages.length === 0 && this.snapshot.users.length > 0) {
               Column({ space: 16 }) {
                 Row({ space: 4 }) {
                   ForEach(this.snapshot.users.slice(0, 2), (user: InboxFlowUser) => { this.avatar(user, 72) },
@@ -688,6 +696,7 @@ export struct PinmonyInboxFlowPage {
           .padding({ top:this.titleContentInset() + this.flowHeaderHeight, bottom: this.snapshot.screen === 'settings' ? 120 : 20 })
           .onAreaChange((_old: Area, area: Area) => {
             this.contentHeight = Number(area.height);
+            this.measuredMessageCount = this.snapshot.messages.length;
             if (this.historyPending && !this.snapshot.loading && this.contentHeight > this.historyHeight) {
               this.historyPending = false;
               this.scroller.scrollTo({ xOffset: 0, yOffset: this.historyOffset + this.contentHeight - this.historyHeight });
@@ -695,6 +704,9 @@ export struct PinmonyInboxFlowPage {
             this.positionChat();
           })
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .opacity(this.snapshot.screen === 'chat' && !this.chatLayoutReady && this.snapshot.messages.length > 0 ? 0 : 1)
+        .hitTestBehavior(this.snapshot.screen === 'chat' && !this.chatLayoutReady ? HitTestMode.None : HitTestMode.Default)
+        .accessibilityLevel(this.snapshot.screen === 'chat' && !this.chatLayoutReady ? 'no-hide-descendants' : 'auto')
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: this.snapshot.screen === 'settings' || this.snapshot.screen === 'compose' })
         .onScrollStop(() => {
@@ -708,7 +720,10 @@ export struct PinmonyInboxFlowPage {
         .onAreaChange((_old: Area, area: Area) => { this.viewportHeight = Number(area.height); this.positionChat(); })
         .onDidScroll((_x: number, _y: number, state: ScrollState) => {
           const offset: number = this.scroller.currentOffset().yOffset;
-          if (this.visible && this.active && this.snapshot.screen === 'chat') this.chatPosition.record(offset, state === ScrollState.Scroll);
+          if (this.visible && this.active && this.snapshot.screen === 'chat') {
+            this.chatPosition.record(offset, this.chatLayoutReady && state === ScrollState.Scroll);
+            if (!this.chatLayoutReady) this.positionChat();
+          }
         })
       }.width('100%').layoutWeight(1)
       if (this.snapshot.screen === 'chat') {
@@ -750,7 +765,7 @@ export struct PinmonyInboxFlowPage {
         onWillDisappear: (): void => { this.messageMenuClosing = true; },
         onDisappear: (): void => this.messageMenuDisappeared()
       })
-    if (this.snapshot.loading && this.snapshot.screen === 'chat' || this.snapshot.directContact && !this.snapshot.error) {
+    if (this.snapshot.screen === 'chat' && (this.snapshot.loading || !this.chatLayoutReady && this.snapshot.messages.length > 0 && !this.snapshot.error) || this.snapshot.directContact && !this.snapshot.error) {
       LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
     }
     }.width('100%').height('100%')

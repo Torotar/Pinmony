@@ -112,7 +112,7 @@ export struct PinmonyInboxListPage {
     Row({ space: 14 }) {
       Button({ type: ButtonType.Normal }) {
         PinmonyUserAvatar({ profileUrl: item.profileUrl || '', image: item.imageUrl, colorIndex: item.avatarColorIndex || 0, name: item.title, avatarSize: 48 })
-      }.padding(0).borderRadius(24).backgroundColor(Color.Transparent).enabled(!!item.profileUrl)
+      }.padding(0).borderRadius(24).backgroundColor(Color.Transparent).stateEffect(false).enabled(!!item.profileUrl)
         .accessibilityText(item.title).onClick(() => this.openItemAvatar(item))
       Button({ type: ButtonType.Normal }) {
       Row({ space: 14 }) {
@@ -137,7 +137,7 @@ export struct PinmonyInboxListPage {
           SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
         }
       }.width('100%').alignItems(VerticalAlign.Center)
-      }.layoutWeight(1).padding(0).backgroundColor(Color.Transparent)
+      }.layoutWeight(1).padding(0).backgroundColor(Color.Transparent).stateEffect(false)
         .accessibilityText(item.title + ' ' + item.subtitle).onClick(() => this.onAction(item.id))
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
       .backgroundColor(Color.Transparent).enabled(this.actionsReady && item.enabled)

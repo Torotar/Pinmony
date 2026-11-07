@@ -1,5 +1,14 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
+for (const [file, bindings] of [
+  ['PinmonyDisplaySettingsPage.ets', ['value === true', 'this.collapseEnabled', 'this.legacyProfile', 'this.avatarRight']],
+  ['PinmonyVisibilitySettingsPage.ets', ['this.store.data?.privateProfile || false', 'this.store.data?.searchPrivacy || false']],
+  ['PinmonyRecommendationSettingsPage.ets', ['topic.enabled', 'this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled) || false']]
+]) {
+  const source = fs.readFileSync('feature_settings/src/main/ets/components/' + file, 'utf8');
+  assert(!source.includes('Checkbox()'), file + ' uses switches instead of checkmarks');
+  for (const binding of bindings) assert(source.includes('Toggle({ type: ToggleType.Switch, isOn: ' + binding + ' })'), file + ' retains switch state: ' + binding);
+}
 function moduleFrom(file) { const exports = {}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, { exports, require: () => ({}) }); return exports; }
 const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets');
 const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinmonyNativeNetwork.ets');

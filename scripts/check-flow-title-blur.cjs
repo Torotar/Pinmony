@@ -59,7 +59,18 @@ for (const file of files) {
         if (phase === 'boards') {
           assert.equal(style.originalStyle.backgroundStyle.blurRadius, 0);
           assert.equal(style.originalStyle.backgroundStyle.backgroundColor, 'app.color.page_background');
-          assert.equal(style.systemMaterialEffect, undefined);
+          assert.equal(style.systemMaterialEffect, 'immersive', 'organize picker buttons follow the shared material preference');
+        }
+      }
+    }
+    if (file.endsWith('PinmonyOrganizePage.ets')) {
+      for (const mode of ['immersive','gentle','exquisite','off']) {
+        const style = evaluate.call({immersiveLightMode:mode,state:{phase:'boards'}});
+        assert.equal(style.systemMaterialEffect,mode,'picker material updates in all four modes');
+        for(const content of [style.originalStyle.contentStyle,style.scrollEffectStyle.contentStyle]) {
+          assert.equal(content.backIconStyle.backgroundColor,mode==='off'||mode==='gentle'?'transparent':undefined);
+          assert.equal(content.menuStyle.backgroundColor,mode==='off'||mode==='gentle'?'transparent':undefined);
+          assert.equal(content.backIconStyle.iconColor,'app.color.primary_text');
         }
       }
     }

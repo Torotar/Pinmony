@@ -1046,8 +1046,7 @@ export struct PinmonyDetailPage {
     .padding(0)
     .width('100%')
     .backgroundColor(Color.Transparent)
-    // Session preparation gates the action, not the colors of cached photographs.
-    .stateEffect(((this.readsReady || this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().relatedRetained) || this.deferredActions))
+    .stateEffect(false)
     .onClick(() => {
       if (((this.readsReady || this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().relatedRetained) || this.deferredActions) && this.onRelated)
         this.onRelated(pin.pinUrl);

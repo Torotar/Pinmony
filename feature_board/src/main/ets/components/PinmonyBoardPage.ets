@@ -527,8 +527,8 @@ struct PinmonyBoardSurface {
     if (this.snapshot.ready && this.snapshot.editable !== true &&
       (this.snapshot.canFollow === true || this.snapshot.followBusy === true)) {
       const follow: BoardTitleMenuItem = { content: {
-        icon: new SymbolGlyphModifier(this.snapshot.following ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
-          .fontSize(28)
+        icon: new SymbolGlyphModifier(this.snapshot.following ? $r('sys.symbol.star_fill') : $r('sys.symbol.star'))
+          .fontSize(24)
           .fontColor([this.snapshot.following ? $r('app.color.accent') : $r('app.color.primary_text')]),
         label: this.snapshot.followBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.following ? this.uiText("pm_unfollow_dc89d336") : this.uiText("pm_follow_eb137dee"),
         isEnabled: this.snapshot.ready && this.snapshot.canFollow === true && !this.snapshot.followBusy,

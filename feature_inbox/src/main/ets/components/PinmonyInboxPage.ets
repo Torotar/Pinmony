@@ -191,6 +191,11 @@ export struct PinmonyInboxPage {
     const page: string = this.snapshot.pageUrl;
     const scroller: Scroller = this.activeContentScroller();
     const offset: number = Math.max(0, this.initialScrollOffset);
+    // Retained lists can restore before the first return frame; the deferred pass handles a new mount.
+    try {
+      const current = scroller.offset();
+      if (current && Math.abs(current.yOffset - offset) > 0.5) scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
+    } catch (_) { console.warn('Pinmony: inbox immediate restoration unavailable'); }
     setTimeout(() => {
       if (generation !== this.scrollRestoreGeneration || section !== this.snapshot.section || page !== this.snapshot.pageUrl) return;
       try { scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false }); }
@@ -223,7 +228,7 @@ export struct PinmonyInboxPage {
   }
 
   private reportScroll(force: boolean = false): void {
-    if (this.restoringScroll) return;
+    if (this.restoringScroll || this.interactionReady === false) return;
     try {
       const position = this.activeContentScroller().offset();
       if (!position) return;

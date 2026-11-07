@@ -243,7 +243,7 @@ export struct PinmonyProfilePanelPage {
       Text(this.uiText(label)).fontSize(14).fontColor($r('app.color.secondary_text'))
       TextInput({ text: value, placeholder: placeholder }).width('100%').height(40).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0).fontSize(17)
         .placeholderColor($r('app.color.secondary_text')).fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent)
-        .enabled(!this.saving)
+        .enabled(!this.saving && !this.snapshot.loading)
         .onChange((text: string) => { if (label === '用户名') this.usernameDraft = text; else if (label === '名字') this.firstNameDraft = text; else if (label === '姓氏') this.lastNameDraft = text; else if (label === '网站') this.websiteDraft = text; })
         .onFocus(() => { if (label === '用户名') { this.usernameFocused = true; this.revealUsernameUrl(); } })
         .onBlur(() => { if (label === '用户名') this.usernameFocused = false; })
@@ -282,17 +282,17 @@ export struct PinmonyProfilePanelPage {
         Column({ space: 20 }) {
           Column({ space: 20 }) {
           if (!this.snapshot.loading && this.snapshot.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
-          else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
+          else if (this.snapshot.mode === 'edit') {
             PinmonyUserAvatar({ profileUrl: this.snapshot.page, image: this.snapshot.avatarPreview || this.snapshot.avatar, colorIndex: this.snapshot.avatarColorIndex || 0, name: this.firstNameDraft + ' ' + this.lastNameDraft, avatarSize: 120 })
             Button(this.snapshot.avatarBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.avatarAction === 'refresh' ? this.uiText("pm_refresh_profile_picture_96fa37f1") : this.snapshot.avatarAction === 'check' ? this.uiText("pm_check_status_7c5569c3") : this.uiText("pm_change_6b01fce4")).type(ButtonType.Normal).borderRadius(16).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
-              .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
+              .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
             if (this.snapshot.avatarError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage) }) }
             this.field('名字', this.firstNameDraft)
             this.field('姓氏', this.lastNameDraft)
             Column({ space: 8 }) {
               Text(this.uiText("pm_about_52d25a9e")).fontSize(14).fontColor($r('app.color.secondary_text'))
               TextArea({ text: this.aboutDraft, placeholder: this.uiText("pm_tell_your_story_42ba0e47") }).width('100%').height(64).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0)
-                .enabled(!this.saving).onChange((text: string) => { this.aboutDraft = text; })
+                .enabled(!this.saving && !this.snapshot.loading).onChange((text: string) => { this.aboutDraft = text; })
                 .fontSize(17).fontColor($r('app.color.primary_text')).placeholderColor($r('app.color.secondary_text'))
                 .backgroundColor(Color.Transparent)
             }.width('100%').constraintSize({ minHeight: 128 }).padding(18).alignItems(HorizontalAlign.Start)
@@ -351,6 +351,8 @@ export struct PinmonyProfilePanelPage {
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
         }.width('100%').padding({ left: 24, right: 24, top: this.contentTopInset() + 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').layoutWeight(1).align(Alignment.Top).clip(true)
+        .opacity(this.snapshot.mode === 'edit' && this.snapshot.loading ? 0.4 : 1)
+        .enabled(this.snapshot.mode !== 'edit' || !this.snapshot.loading)
         .onScrollEdge((side: Edge) => { if (side === Edge.Bottom) this.loadNextPage(); })
         .onReachEnd(() => this.loadNextPage())
         .onAppear(() => { if (this.rootRestorePending) this.restoreScrollOffsets(); })

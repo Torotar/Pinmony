@@ -46,7 +46,7 @@ async function main() {
     assert.equal(typed.api.read().businessAccount,typeof value==='boolean'?value:undefined);
   }
   const ui=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','utf8');
-  assert.match(ui,/if \(this\.store\.data\.businessAccount === false\) \{\s*this\.row\(this\.uiText\("pm_convert_to_a_business_account/);
+  assert.match(ui,/if \(this\.store\.data\?\.businessAccount === false\) \{\s*this\.row\(this\.uiText\("pm_convert_to_a_business_account/);
 
   const h = harness();
   await h.api.start(page, 1, 'read', '');

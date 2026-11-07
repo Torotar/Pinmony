@@ -178,9 +178,9 @@ export struct PinmonyRecommendationSettingsPage {
   private aiTopic(topic: PinmonyAiTopic) {
     Row() {
       Text(topic.text).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Checkbox().select(topic.enabled).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(this.available())
+      Toggle({ type: ToggleType.Switch, isOn: topic.enabled })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).enabled(this.available())
         .onChange((enabled: boolean) => { if (this.available() && topic.enabled !== enabled) this.request('aiTopic', JSON.stringify({ key: topic.key, enabled })); })
         .accessibilityText(topic.text)
     }.width('100%').constraintSize({ minHeight: 52 })
@@ -237,9 +237,9 @@ export struct PinmonyRecommendationSettingsPage {
           Text(this.uiText("pm_show_ai_content_409fe4d8")).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           Text(this.uiText("pm_turn_off_to_see_less_ai_content_in_product_feeds_b51424cd")).fontSize(14).fontColor($r('app.color.secondary_text'))
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        Checkbox().select(this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled) || false).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
+        Toggle({ type: ToggleType.Switch, isOn: this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled) || false })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 })
           .enabled(this.available() && !!this.store.data?.topics.length)
           .onChange((enabled: boolean) => { if (this.available() && enabled !== this.store.data?.topics.some((t: PinmonyAiTopic) => t.enabled)) this.request('aiAll', enabled.toString()); })
           .accessibilityText(this.uiText("pm_show_ai_content_409fe4d8"))
@@ -286,6 +286,7 @@ export struct PinmonyRecommendationSettingsPage {
           this.recommend()
         }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {

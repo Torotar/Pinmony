@@ -115,20 +115,20 @@ export struct PinmonyAccountPage {
           if (this.store.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_reload_df7392cc"), onAction: () => { this.request(this.store.screen === 'country' ? 'countries' : 'read'); }, actionEnabled: !this.store.loading && !this.store.busy })
           }
-          if (this.store.data?.ready && !this.store.loading) {
+          if (this.store.data?.ready || (this.store.loading && (this.retainedAccount || this.store.screen === 'account'))) {
             if ((this.retainedAccount || this.store.screen === 'account')) {
               Text(this.uiText("pm_your_account_d80b3d08")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
               this.row(this.uiText("pm_personal_information_640803d8"), '', 'personal')
-              this.row(this.uiText("pm_email_1b2714b8"), this.store.data.email)
+              this.row(this.uiText("pm_email_1b2714b8"), this.store.data?.email || '')
               this.row(this.uiText("pm_password_a621ab60"), this.uiText("pm_change_password_946e28f6"))
               this.row(this.uiText("pm_phone_number_8e87c0dd"), this.uiText("pm_add_number_9d820e33"))
-              if (this.store.data.businessAccount === false) {
+              if (this.store.data?.businessAccount === false) {
                 this.row(this.uiText("pm_convert_to_a_business_account_4935be59"), '', '', this.uiText("pm_a_business_account_gives_you_tools_such_as_ads_and_analytics_to__50598c20"))
               }
               Text(this.uiText("pm_deactivation_and_deletion_75be0aea")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
               this.row(this.uiText("pm_deactivate_your_account_06052a52"), '', '', this.uiText("pm_temporarily_hide_your_profile_pins_and_boards_a6d31140"))
               this.row(this.uiText("pm_delete_your_data_and_account_ff4cef48"), '', '', this.uiText("pm_permanently_delete_your_data_and_everything_associated_with_your_2cb85273"))
-            } else if (this.store.screen === 'personal') {
+            } else if (this.store.data?.ready && this.store.screen === 'personal') {
               if (this.birthday()) { this.row(this.uiText("pm_date_of_birth_1c54caca"), this.birthday()) }
               this.row(this.uiText("pm_gender_a752a7d8"), this.gender())
               this.row(this.uiText("pm_country_region_45e22a8a"), this.store.data.country)
@@ -141,7 +141,7 @@ export struct PinmonyAccountPage {
                 this.dateField('month', this.month)
                 this.dateField('day', this.day)
               }.width('100%').margin({ top: 28 })
-            } else if (this.store.screen === 'gender') {
+            } else if (this.store.data?.ready && this.store.screen === 'gender') {
               this.genderRow(this.uiText("pm_female_0ab4610b"), 'female')
               this.genderRow(this.uiText("pm_male_4e79758a"), 'male')
               this.genderRow(this.uiText("pm_custom_4eafa9e9"), 'unspecified')
@@ -151,7 +151,7 @@ export struct PinmonyAccountPage {
                   .onChange((v: string) => { this.custom = v; })
                 Text(this.custom.length.toString() + '/500').width('100%').textAlign(TextAlign.End).fontSize(12).fontColor($r('app.color.secondary_text'))
               }
-            } else if (this.store.screen === 'country') {
+            } else if (this.store.data?.ready && this.store.screen === 'country') {
               TextInput({ text: this.query, placeholder: this.uiText("pm_search_countries_regions_79d74e48") }).fontColor($r('app.color.primary_text'))
                 .placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted')).onChange((v: string) => { this.query = v; })
               ForEach(this.store.data.countries.filter((c: PinmonyCountry) => (c.name + c.key).toLowerCase().includes(this.query.toLowerCase())).sort((a: PinmonyCountry, b: PinmonyCountry) => a.key === this.store.data?.country ? -1 : b.key === this.store.data?.country ? 1 : 0), (c: PinmonyCountry) => {
@@ -168,6 +168,7 @@ export struct PinmonyAccountPage {
           }
         }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {

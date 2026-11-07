@@ -63,9 +63,9 @@ export struct PinmonyDisplaySettingsPage {
   private autoplayOption(action: string, label: string, value: boolean | undefined) {
     Row({ space: 16 }) {
       Text(this.uiText(label)).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Checkbox().select(value === true).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12)
+      Toggle({ type: ToggleType.Switch, isOn: value === true })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 })
         .enabled(this.available() && !this.store.writeUncertain && typeof value === 'boolean')
         .accessibilityText(this.uiText(label))
         .onChange((next: boolean) => { if (this.available() && !this.store.writeUncertain && typeof value === 'boolean' && next !== value) this.request(action, String(next)); })
@@ -206,9 +206,9 @@ export struct PinmonyDisplaySettingsPage {
       Column({ space: 6 }) {
         Text(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564")).fontSize(17).fontColor($r('app.color.primary_text'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Checkbox().select(this.collapseEnabled).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).onChange((value: boolean) => { this.collapseEnabled = value; })
+      Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).onChange((value: boolean) => { this.collapseEnabled = value; })
         .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
     }.width('100%').constraintSize({ minHeight: 64 }).padding({ left: 16, right: 16, top: 8, bottom: 8 })
 
@@ -239,9 +239,9 @@ export struct PinmonyDisplaySettingsPage {
     Column() {
     Row({ space: 16 }) {
       Text(this.uiText('pm_profile_legacy_layout')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Checkbox().select(this.legacyProfile).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).onChange((value: boolean) => { PinmonyProfileLayoutPreference.saveLegacyLayout(value); })
+      Toggle({ type: ToggleType.Switch, isOn: this.legacyProfile })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).onChange((value: boolean) => { PinmonyProfileLayoutPreference.saveLegacyLayout(value); })
         .accessibilityText(this.uiText('pm_profile_legacy_layout'))
     }.width('100%').constraintSize({ minHeight: 64 }).padding({left:16,right:16,top:8,bottom:8})
     if (!this.legacyProfile) {
@@ -282,6 +282,7 @@ export struct PinmonyDisplaySettingsPage {
           if (this.store.screen === 'theme') { this.theme() } else { this.display() }
         }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {

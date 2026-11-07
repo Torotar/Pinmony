@@ -84,9 +84,9 @@ export struct PinmonyVisibilitySettingsPage {
   private visibilityContent() {
     Row() {
       Text(this.uiText("pm_private_profile_b16cc2bf")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Checkbox().select(this.store.data?.privateProfile || false).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(this.available() && this.store.data?.canChangePrivacy)
+      Toggle({ type: ToggleType.Switch, isOn: this.store.data?.privateProfile || false })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).enabled(this.available() && this.store.data?.canChangePrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.privateProfile) { this.store.pendingPrivate = value; this.store.confirmOpen = true; } })
         .accessibilityText(this.uiText("pm_private_profile_b16cc2bf"))
     }.width('100%')
@@ -94,9 +94,9 @@ export struct PinmonyVisibilitySettingsPage {
       .fontSize(15).fontColor($r('app.color.secondary_text')).margin({ bottom: 24 })
     Row() {
       Text(this.uiText("pm_search_privacy_d041067d")).fontSize(19).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Checkbox().select(this.store.data?.searchPrivacy || false).shape(CheckBoxShape.CIRCLE)
-          .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
-          .mark({ strokeColor: Color.White }).width(24).height(24).margin(12).enabled(this.available() && this.store.data?.canEditSearchPrivacy)
+      Toggle({ type: ToggleType.Switch, isOn: this.store.data?.searchPrivacy || false })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).enabled(this.available() && this.store.data?.canEditSearchPrivacy)
         .onChange((value: boolean) => { if (this.available() && value !== this.store.data?.searchPrivacy) this.request('searchPrivacy', value.toString()); })
         .accessibilityText(this.uiText("pm_search_privacy_d041067d"))
     }.width('100%')
@@ -130,9 +130,10 @@ export struct PinmonyVisibilitySettingsPage {
       Stack({ alignContent: Alignment.Center }) {
       Scroll(this.scroller) {
         Column({ space: 8 }) {
-          if (this.store.data?.ready) { this.visibilityContent() }
+          if (this.store.data?.ready || this.store.loading) { this.visibilityContent() }
         }.width('100%').padding({ left: 20, right: 20, top: this.titleContentInset() + 16, bottom: 32 }).alignItems(HorizontalAlign.Start)
       }.width('100%').height('100%').align(Alignment.TopStart)
+        .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {

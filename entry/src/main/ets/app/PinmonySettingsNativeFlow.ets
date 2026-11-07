@@ -301,50 +301,72 @@ export class PinmonySettingsNativeFlow {
         }
     }
     private async socialRead(revision: number): Promise<void> {
-        const data: Record<string, string> = {};
-        const options: Api = { url: '/v3/users/settings/', data: data };
-        const socialSource: string = this.screen === 'socialMentions' ? '/settings/edit/mentions/' : ['social','socialComments'].includes(this.screen) ? '/settings/permissions/' : '/settings/messages/';
-        const response: ProfileSettingsResponse = await this.request('ApiResource', 'get', options, socialSource, revision);
-        const raw: SocialSettingsResponse = response.resource_response!.data as SocialSettingsResponse;
-        if (response.resource_response?.endpoint_name !== 'v3_get_user_settings' || raw?.id !== this.client.viewer || !Array.isArray(raw.messaging_permissions) || raw.messaging_permissions.length > 10 || ![0,1,2].includes(raw.allow_mentions!)) throw new Error('social');
-        const groups: SocialMessageGroup[] = raw.messaging_permissions.map((g: SocialMessageResponse): SocialMessageGroup => {
-            if (!g || !socialMessagePath(g.group_id) || !Array.isArray(g.eligible_levels) || !g.eligible_levels.length || g.eligible_levels.length > 3 || g.eligible_levels.some((v: number, i: number): boolean => !socialMessageLevel(g.group_id, v) || g.eligible_levels.indexOf(v) !== i) || !g.eligible_levels.includes(g.selected_level)) throw new Error('social-group');
-            return { id: g.group_id, levels: g.eligible_levels.slice(), selected: g.selected_level };
-        });
-        if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
-        if (!this.current(revision)) return;
-        if (raw.is_partner === true && !this.store.social.business) this.store.socialMessageGroup = -1;
-        if (raw.is_partner === false && ![0,1,2,4].includes(this.store.socialMessageGroup)) this.store.socialMessageGroup = 0;
-        let filterMine: boolean | undefined = undefined;
-        let filterOthers: boolean | undefined = undefined;
-        let filterMinePhrases: string[] | undefined = undefined;
-        let filterOthersPhrases: string[] | undefined = undefined;
-        if (['social','socialComments'].includes(this.screen)) {
-            const filterReadData: SocialFilterApiData = { user: this.client.viewer };
-            const filterReadOptions: Api = { url: '/v3/aggregated_comments/features/', data: filterReadData as Object };
-            const filterResponse: ProfileSettingsResponse = await this.request('ApiResource', 'get', filterReadOptions, '/settings/permissions/', revision);
-            const filterData: SocialCommentFilterResponse | null = filterResponse.resource_response?.data as SocialCommentFilterResponse | null;
-            if (filterResponse.resource_response?.endpoint_name !== 'v3_get_aggregated_comment_features' || !filterData || typeof filterData.comments_phrase_filter_list_enabled !== 'boolean' || typeof filterData.pinner_comments_phrase_filter_list_enabled !== 'boolean') throw new Error('social-filters');
-            filterMine = filterData.comments_phrase_filter_list_enabled;
-            filterOthers = filterData.pinner_comments_phrase_filter_list_enabled;
-            filterMinePhrases = normalizeSocialPhrases(filterData.comments_phrase_filter_list);
-            filterOthersPhrases = normalizeSocialPhrases(filterData.pinner_comments_phrase_filter_list);
-            if (![1, 2].includes(raw.comments_disabled as number) || typeof raw.shopping_rec_disabled !== 'boolean' || typeof raw.allow_idea_pin_downloads !== 'boolean') throw new Error('social-setting-shape');
+        const screen: string = ['social', 'socialComments', 'socialMentions', 'socialMessages', 'socialFriends', 'socialFollowers', 'socialFollowing', 'socialOthers'].includes(this.screen) ? this.screen : 'other';
+        const trace: string = 'SocialReadTrace: revision=' + revision.toString() + ' screen=' + screen;
+        let phase: string = 'settings-request';
+        PinmonyRuntimeLog.info(trace + ' phase=started');
+        try {
+            const data: Record<string, string> = {};
+            const options: Api = { url: '/v3/users/settings/', data: data };
+            const socialSource: string = this.screen === 'socialMentions' ? '/settings/edit/mentions/' : ['social','socialComments'].includes(this.screen) ? '/settings/permissions/' : '/settings/messages/';
+            const response: ProfileSettingsResponse = await this.request('ApiResource', 'get', options, socialSource, revision);
+            phase = 'settings-validation';
+            const raw: SocialSettingsResponse = response.resource_response!.data as SocialSettingsResponse;
+            if (response.resource_response?.endpoint_name !== 'v3_get_user_settings' || raw?.id !== this.client.viewer || !Array.isArray(raw.messaging_permissions) || raw.messaging_permissions.length > 10 || ![0,1,2].includes(raw.allow_mentions!)) throw new Error('social');
+            phase = 'message-groups';
+            const groups: SocialMessageGroup[] = raw.messaging_permissions.map((g: SocialMessageResponse): SocialMessageGroup => {
+                if (!g || !socialMessagePath(g.group_id) || !Array.isArray(g.eligible_levels) || !g.eligible_levels.length || g.eligible_levels.length > 3 || g.eligible_levels.some((v: number, i: number): boolean => !socialMessageLevel(g.group_id, v) || g.eligible_levels.indexOf(v) !== i) || !g.eligible_levels.includes(g.selected_level)) throw new Error('social-group');
+                return { id: g.group_id, levels: g.eligible_levels.slice(), selected: g.selected_level };
+            });
+            if (groups.some((g: SocialMessageGroup, i: number): boolean => groups.findIndex((other: SocialMessageGroup): boolean => other.id === g.id) !== i)) throw new Error('duplicate-group');
+            if (!this.current(revision)) {
+                PinmonyRuntimeLog.info(trace + ' phase=discarded');
+                return;
+            }
+            if (raw.is_partner === true && !this.store.social.business) this.store.socialMessageGroup = -1;
+            if (raw.is_partner === false && ![0,1,2,4].includes(this.store.socialMessageGroup)) this.store.socialMessageGroup = 0;
+            let filterMine: boolean | undefined = undefined;
+            let filterOthers: boolean | undefined = undefined;
+            let filterMinePhrases: string[] | undefined = undefined;
+            let filterOthersPhrases: string[] | undefined = undefined;
+            if (['social','socialComments'].includes(this.screen)) {
+                const filterReadData: SocialFilterApiData = { user: this.client.viewer };
+                const filterReadOptions: Api = { url: '/v3/aggregated_comments/features/', data: filterReadData as Object };
+                phase = 'filters-request';
+                const filterResponse: ProfileSettingsResponse = await this.request('ApiResource', 'get', filterReadOptions, '/settings/permissions/', revision);
+                phase = 'filters-validation';
+                const filterData: SocialCommentFilterResponse | null = filterResponse.resource_response?.data as SocialCommentFilterResponse | null;
+                if (filterResponse.resource_response?.endpoint_name !== 'v3_get_aggregated_comment_features' || !filterData || typeof filterData.comments_phrase_filter_list_enabled !== 'boolean' || typeof filterData.pinner_comments_phrase_filter_list_enabled !== 'boolean') throw new Error('social-filters');
+                filterMine = filterData.comments_phrase_filter_list_enabled;
+                filterOthers = filterData.pinner_comments_phrase_filter_list_enabled;
+                phase = 'filter-phrases';
+                filterMinePhrases = normalizeSocialPhrases(filterData.comments_phrase_filter_list);
+                filterOthersPhrases = normalizeSocialPhrases(filterData.pinner_comments_phrase_filter_list);
+                phase = 'comment-settings';
+                if (![1, 2].includes(raw.comments_disabled as number) || typeof raw.shopping_rec_disabled !== 'boolean' || typeof raw.allow_idea_pin_downloads !== 'boolean') throw new Error('social-setting-shape');
+            }
+            phase = 'commit';
+            const snapshot: SocialPermissions = { business: raw.is_partner === true, personal: raw.is_partner === false, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, blockedComplete: this.store.social.blockedComplete, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false,
+                commentsEnabled: raw.comments_disabled === 1, shoppingRecommendationsEnabled: raw.shopping_rec_disabled === false, ideaPinDownloadsEnabled: raw.allow_idea_pin_downloads === true, myCommentFilterEnabled: filterMine, otherCommentFilterEnabled: filterOthers, myCommentFilterPhrases: filterMinePhrases, otherCommentFilterPhrases: filterOthersPhrases };
+            this.store.social = snapshot;
+            if (this.uncertain.has('social:socialComments') && String(snapshot.commentsEnabled) === this.uncertain.get('social:socialComments')) this.uncertain.delete('social:socialComments');
+            if (this.uncertain.has('social:socialShopping') && String(snapshot.shoppingRecommendationsEnabled) === this.uncertain.get('social:socialShopping')) this.uncertain.delete('social:socialShopping');
+            if (this.uncertain.has('social:socialIdeaDownloads') && String(snapshot.ideaPinDownloadsEnabled) === this.uncertain.get('social:socialIdeaDownloads')) this.uncertain.delete('social:socialIdeaDownloads');
+            if (this.uncertain.has('social:filter:mine') && String(snapshot.myCommentFilterEnabled) === this.uncertain.get('social:filter:mine')) this.uncertain.delete('social:filter:mine');
+            if (this.uncertain.has('social:filter:others') && String(snapshot.otherCommentFilterEnabled) === this.uncertain.get('social:filter:others')) this.uncertain.delete('social:filter:others');
+            if (this.uncertain.has('social:filter:mine:phrases') && JSON.stringify(snapshot.myCommentFilterPhrases || []) === this.uncertain.get('social:filter:mine:phrases')) this.uncertain.delete('social:filter:mine:phrases');
+            if (this.uncertain.has('social:filter:others:phrases') && JSON.stringify(snapshot.otherCommentFilterPhrases || []) === this.uncertain.get('social:filter:others:phrases')) this.uncertain.delete('social:filter:others:phrases');
+            if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
+            groups.forEach((g: SocialMessageGroup): void => { if (this.uncertain.get('social:message:' + g.id) === String(g.selected)) this.uncertain.delete('social:message:' + g.id); });
+            this.store.writeUncertain = this.uncertain.size > 0;
+            if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
+            PinmonyRuntimeLog.info(trace + ' phase=committed');
+        } catch (error) {
+            const reason: string = error instanceof Error && ['request', 'business', 'identity', 'social', 'social-group', 'duplicate-group', 'social-filters', 'social-phrases', 'social-phrase', 'social-phrase-duplicate', 'social-setting-shape', 'stale'].includes(error.message) ? error.message : 'other';
+            PinmonyRuntimeLog.warn(trace + ' phase=failed stage=' + phase + ' reason=' + reason + ' current=' + this.current(revision).toString());
+            if (error instanceof Error) throw error;
+            throw new Error('social-read');
         }
-        const snapshot: SocialPermissions = { business: raw.is_partner === true, personal: raw.is_partner === false, mentions: raw.allow_mentions, groups: groups, blocked: this.store.social.blocked, blockedReady: this.store.social.blockedReady, blockedComplete: this.store.social.blockedComplete, ready: true, protected: raw.is_parental_control_passcode_enabled !== false || raw.is_parental_control_passcode_verification_pending !== false,
-            commentsEnabled: raw.comments_disabled === 1, shoppingRecommendationsEnabled: raw.shopping_rec_disabled === false, ideaPinDownloadsEnabled: raw.allow_idea_pin_downloads === true, myCommentFilterEnabled: filterMine, otherCommentFilterEnabled: filterOthers, myCommentFilterPhrases: filterMinePhrases, otherCommentFilterPhrases: filterOthersPhrases };
-        this.store.social = snapshot;
-        if (this.uncertain.has('social:socialComments') && String(snapshot.commentsEnabled) === this.uncertain.get('social:socialComments')) this.uncertain.delete('social:socialComments');
-        if (this.uncertain.has('social:socialShopping') && String(snapshot.shoppingRecommendationsEnabled) === this.uncertain.get('social:socialShopping')) this.uncertain.delete('social:socialShopping');
-        if (this.uncertain.has('social:socialIdeaDownloads') && String(snapshot.ideaPinDownloadsEnabled) === this.uncertain.get('social:socialIdeaDownloads')) this.uncertain.delete('social:socialIdeaDownloads');
-        if (this.uncertain.has('social:filter:mine') && String(snapshot.myCommentFilterEnabled) === this.uncertain.get('social:filter:mine')) this.uncertain.delete('social:filter:mine');
-        if (this.uncertain.has('social:filter:others') && String(snapshot.otherCommentFilterEnabled) === this.uncertain.get('social:filter:others')) this.uncertain.delete('social:filter:others');
-        if (this.uncertain.has('social:filter:mine:phrases') && JSON.stringify(snapshot.myCommentFilterPhrases || []) === this.uncertain.get('social:filter:mine:phrases')) this.uncertain.delete('social:filter:mine:phrases');
-        if (this.uncertain.has('social:filter:others:phrases') && JSON.stringify(snapshot.otherCommentFilterPhrases || []) === this.uncertain.get('social:filter:others:phrases')) this.uncertain.delete('social:filter:others:phrases');
-        if (this.uncertain.get('social:mentions') === String(raw.allow_mentions)) this.uncertain.delete('social:mentions');
-        groups.forEach((g: SocialMessageGroup): void => { if (this.uncertain.get('social:message:' + g.id) === String(g.selected)) this.uncertain.delete('social:message:' + g.id); });
-        this.store.writeUncertain = this.uncertain.size > 0;
-        if (this.store.writeUncertain) this.store.error = PinmonyI18n.message('pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92');
     }
     private async socialBlocked(revision: number): Promise<void> {
         const query: BlockedQuery = { q: '' }, options: Api = { url: '/v3/users/blocked', data: query };
@@ -651,6 +673,7 @@ export class PinmonySettingsNativeFlow {
         this.store.loading = !write;
         this.store.error = '';
         try {
+            if (action === 'socialRead') PinmonyRuntimeLog.info('SocialReadTrace: revision=' + revision.toString() + ' phase=action-start stage=identity-request');
             this.client.user = '';
             this.client.viewer = '';
             this.client.permissions = [];
@@ -878,6 +901,10 @@ export class PinmonySettingsNativeFlow {
             this.commit(revision);
         }
         catch (error) {
+            if (action === 'socialRead') {
+                const reason: string = error instanceof Error && ['request', 'business', 'identity', 'stale'].includes(error.message) ? error.message : 'read-validation';
+                PinmonyRuntimeLog.warn('SocialReadTrace: revision=' + revision.toString() + ' phase=action-failed reason=' + reason + ' current=' + this.current(revision).toString());
+            }
             if (action === 'socialBlocked' || action === 'socialUnblock') {
                 const reason: string = error instanceof Error && ['request','business','identity','blocked','blocked-bookmark','blocked-user','duplicate-blocked','stale'].includes(error.message) ? error.message : 'other';
                 PinmonyRuntimeLog.warn('SocialBlockedTrace: phase=failed reason=' + reason + ' current=' + this.current(revision));

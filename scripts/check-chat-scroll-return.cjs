@@ -120,3 +120,36 @@ async function reply(endpoint, data, bookmark = '-end-') {
  assert(h.completeNativeBack(target));assert.equal(h.activeTab,2);assert.equal(h.inboxStore.inboxFlow,chat);assert.equal(h.inboxStore.retainedChat,undefined);assert.equal(h.nativeRootOnly,false);assert(calls.includes('chat-return'));assert(calls.includes('demand'));
  console.log('Chat Pin return: explicit inbox history target, active tab and native flow restoration passed');
 }
+
+// A conversation remains behind its loading indicator until its real message layout reaches the target.
+const positionStart = ui.indexOf('  private positionChat(');
+const positionEnd = ui.indexOf('\n  private ', positionStart + 1);
+const PositionHost = vm.runInNewContext(ts.transpileModule('class PositionHost {' +
+  ui.slice(positionStart, positionEnd) + '} PositionHost;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
+let actualOffset = 0, requestedOffset = -1;
+const positioning = Object.assign(new PositionHost(), { visible: true, active: true,
+  snapshot: {screen:'chat', loading:false, messages:Array.from({length:32},(_,i)=>({id:String(i)}))},
+  measuredMessageCount:0, contentHeight:200, viewportHeight:500, chatLayoutReady:false,
+  chatPosition:{layout:(height,viewport)=>Math.max(0,height-viewport)},
+  scroller:{currentOffset:()=>({yOffset:actualOffset}),scrollTo:options=>{assert.equal(options.animation,false);requestedOffset=options.yOffset;}} });
+positioning.positionChat(); assert.equal(requestedOffset,-1); assert.equal(positioning.chatLayoutReady,false,'loading layout cannot reveal newly fetched long history');
+positioning.measuredMessageCount=32;positioning.contentHeight=5000;
+positioning.positionChat();assert.equal(requestedOffset,4500);assert.equal(positioning.chatLayoutReady,false,'scroll request alone is not completion');
+actualOffset=4500;positioning.positionChat();assert.equal(positioning.chatLayoutReady,true,'show only the positioned message frame');
+positioning.chatLayoutReady=false;positioning.active=false;actualOffset=0;positioning.positionChat();assert.equal(positioning.chatLayoutReady,false,'covered callbacks cannot reveal chat');
+assert(ui.includes('!this.snapshot.loading && this.snapshot.messages.length === 0 && this.snapshot.users.length > 0'),'intro is only for confirmed empty conversations');
+assert(ui.includes(".opacity(this.snapshot.screen === 'chat' && !this.chatLayoutReady"));
+const inboxUi=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxPage.ets','utf8');
+function inboxMethod(name){const start=inboxUi.indexOf('  private '+name+'(');return inboxUi.slice(start,inboxUi.indexOf('\n  private ',start+1));}
+const returnTimers=[];
+const ReturnHost=vm.runInNewContext(ts.transpileModule('class ReturnHost {'+['restoreScroll','reportScroll'].map(inboxMethod).join('\n')+'} ReturnHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{setTimeout:callback=>returnTimers.push(callback),console});
+let rootOffset=0,rootReports=0;
+const rootScroller={offset:()=>({yOffset:rootOffset}),scrollTo:options=>{rootOffset=options.yOffset;}};
+const returning=Object.assign(new ReturnHost(),{snapshot:{section:'messages',pageUrl:'synthetic'},initialScrollOffset:64,scrollRestoreGeneration:0,activeContentScroller:()=>rootScroller,reportScrollAvailability(){},interactionReady:false,onScrollPosition(){rootReports++;}});
+returning.reportScroll(true);assert.equal(rootReports,0,'covered root cannot save temporary offsets');
+returning.restoreScroll();assert.equal(rootOffset,64,'retained root restores before any timer or return frame');
+returnTimers.splice(0).forEach(callback=>callback());returning.interactionReady=true;returning.reportScroll(true);assert.equal(rootReports,1);
+console.log('Chat entry/return: loading intro hidden, measured-history gate, nonanimated completed positioning, covered root guards and immediate retained offset passed');positioning.active=true;positioning.contentHeight=200;positioning.viewportHeight=500;actualOffset=0;
+positioning.positionChat();assert.equal(positioning.chatLayoutReady,true,'short chat is revealed at zero without waiting for a scroll event');
+assert(ui.includes(".hitTestBehavior(this.snapshot.screen === 'chat' && !this.chatLayoutReady ? HitTestMode.None"),'unpositioned messages cannot receive touch');
+assert(ui.includes(".accessibilityLevel(this.snapshot.screen === 'chat' && !this.chatLayoutReady ? 'no-hide-descendants'"),'unpositioned messages are hidden from accessibility');
