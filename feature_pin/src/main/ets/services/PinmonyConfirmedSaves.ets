@@ -38,7 +38,7 @@ export class PinmonyConfirmedSaves {
       priceText: detail.priceText, richDescription: detail.richDescription,
       affiliateDisclosure: detail.affiliateDisclosure, sourceName: detail.sourceName,
       creatorVerified: detail.creatorVerified,
-      creatorAvatar: detail.creatorAvatar, creatorUrl: detail.creatorUrl,
+      creatorAvatar: detail.creatorAvatar, creatorAvatarColorIndex: detail.creatorAvatarColorIndex, creatorUrl: detail.creatorUrl,
       sourceLabel: detail.sourceLabel, sourceUrl: detail.sourceUrl,
       actions: this.actions(identity, detail.actions), related: detail.related, dataSource: detail.dataSource,
       relatedLoading: detail.relatedLoading, relatedError: detail.relatedError, relatedEnded: detail.relatedEnded,

@@ -25,6 +25,13 @@ function harness() {
 const comment = (id, text = 'hello', user = '77') => ({ id, type: 'aggregatedcomment', text, user: { id: user, full_name: 'Reader' } });
 const options = request => JSON.parse(new URLSearchParams(request.options.body).get('data')).options;
 async function main() {
+  const eligibility = harness();
+  eligibility.api.commentsStart(pin);
+  await eligibility.reply(0, [true, false, undefined, null, 'true', 1].map((flag, index) => ({
+    ...comment(String(900 + index)), is_translatable: flag
+  })));
+  assert.deepEqual(Array.from(eligibility.api.commentsRead(pin).items, item => item.canTranslate),
+    [true, false, false, false, false, false], 'bridge mapping honors only the explicit server translation flag');
   const h = harness(); h.api.commentsStart(pin); await h.reply(0, [comment('301'), comment('302', 'other', '88')]);
   assert.equal(h.api.commentsRead(pin).items[0].canEdit, true);
   assert.equal(h.api.commentsRead(pin).items[1].canDelete, false);

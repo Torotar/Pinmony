@@ -31,7 +31,7 @@ export class PinmonyBoardInvitationController {
   clearPreview(): void {
     this.pause(); this.store.boardInvitationToken++; this.store.boardInvitationPreview = undefined;
     this.store.invitationReadPage = ''; this.store.invitationBannerVisible = false;
-    this.store.invitationBusy = false; this.store.joinedBoardAvatar = '';
+    this.store.invitationBusy = false; this.store.joinedBoardAvatar = ''; this.store.joinedBoardName = ''; this.store.joinedBoardUsername = ''; this.store.joinedBoardAvatarColorIndex = 0;
   }
   reset(): void { this.clearPreview(); this.store.boardInvitations = undefined; this.store.invitationAllVisible = false; }
   preparePreview(item: PinmonyBoardInvitation): boolean {
@@ -101,7 +101,7 @@ export class PinmonyBoardInvitationController {
           this.store.invitationBusy = state.loading || state.busy || state.uncertain || !!state.error;
           if (item.status === 'accepted' && expected.status !== 'accepted') {
             this.store.boardInvitationPreview = item; this.store.invitationBannerVisible = false;
-            this.store.joinedBoardAvatar = item.invitedAvatar || this.ports.avatar();
+            this.store.joinedBoardName = item.invitedName || '';this.store.joinedBoardUsername = item.invitedUsername || ''; this.store.joinedBoardAvatarColorIndex = item.invitedAvatarColorIndex || 0; this.store.joinedBoardAvatar = item.invitedAvatar || this.ports.avatar();
             if (state.feedback) this.ports.feedback(state.feedback);
           }
           if (state.error) { this.ports.feedback(state.error); return; }

@@ -7,7 +7,7 @@ import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n, PinmonyProfileLayoutPreference } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsNavigation, HdsNavigationTitleMode, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
-import { PinmonyBoard, PinmonyCreatedPin, PinmonyProfileAction, PinmonyProfileSnapshot } from '../models/PinmonyProfile';
+import { PinmonyProfileCollaborator, PinmonyBoard, PinmonyCreatedPin, PinmonyProfileAction, PinmonyProfileSnapshot } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 import { PinmonyBoardCoverImage } from './PinmonyBoardCoverImage';
 
@@ -501,7 +501,7 @@ export struct PinmonyProfilePage {
     Column({ space: 9 }) {
       if (this.profile.business || this.profile.isOwn === false) {
         Row({ space: 16 }) {
-          PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 72 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
+          PinmonyUserAvatar({ profileUrl: this.profile.profileUrl, image: this.profile.avatarUrl, colorIndex: this.profile.avatarColorIndex || 0, websiteFallback: true, name: this.profile.displayName || this.profile.handle, avatarSize: 72 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
           Column({ space: 4 }) {
             Row({ space: 4 }) {
               Text(this.profile.displayName || this.profile.handle).fontSize(this.profile.isOwn === false ? 20 : 24).fontWeight(FontWeight.Bold)
@@ -514,7 +514,7 @@ export struct PinmonyProfilePage {
           }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         }.width('100%').onAreaChange((_old: Area, area: Area) => this.measureProfileName(area))
       } else {
-      PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 108 })
+      PinmonyUserAvatar({ profileUrl: this.profile.profileUrl, image: this.profile.avatarUrl, colorIndex: this.profile.avatarColorIndex || 0, websiteFallback: true, name: this.profile.displayName || this.profile.handle, avatarSize: 108 })
       .width(108)
       .height(108)
       .accessibilityText(this.uiText("pm_profile_picture_5c814f4f")).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
@@ -724,11 +724,11 @@ export struct PinmonyProfilePage {
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
-        if (board.collaboratorAvatars?.length) {
+        if (board.collaboratorUsers?.length || board.collaboratorAvatars?.length) {
           Row() {
-            ForEach(board.collaboratorAvatars || [], (avatar: string, index: number) => {
-              Image(avatar).width(18).height(18).borderRadius(9).margin({ left: index > 0 ? -6 : 0 })
-            }, (avatar: string) => avatar)
+            ForEach(board.collaboratorUsers || (board.collaboratorAvatars || []).map((avatar: string): PinmonyProfileCollaborator => ({ id: avatar, name: '', avatar: avatar })), (avatar: PinmonyProfileCollaborator, index: number) => {
+              PinmonyUserAvatar({ username: avatar.username || '', userId: avatar.id, image: avatar.avatar, name: avatar.name, colorIndex: avatar.avatarColorIndex || 0, avatarSize: 18 }).margin({ left: index > 0 ? -6 : 0 })
+            }, (avatar: PinmonyProfileCollaborator) => avatar.id)
           }.constraintSize({ maxWidth: 54 }).clip(true).flexShrink(0)
         }
       }.width('100%')
@@ -816,11 +816,17 @@ export struct PinmonyProfilePage {
     return this.modern() && this.hubPane && this.hubTab === 'pins';
   }
 
+  private automaticFollowingBoardPaging(): boolean {
+    return this.modern() && this.hubPane && this.hubTab === 'boards' &&
+      this.boardFilter === 'following' && this.profile.hubMode === 'following';
+  }
+
   private loadMoreAtEnd(): void {
-    if(this.automaticPhotoPaging()) {
+    if(this.automaticPhotoPaging() || this.automaticFollowingBoardPaging()) {
+      const hasItems: boolean = this.automaticFollowingBoardPaging() ? this.profile.boards.length > 0 : this.profile.createdPins.length > 0;
       if(!this.interactionReady || this.restoringScroll || !(this.readsReady || this.actionsReady) ||
         this.loading || this.refreshing || this.profile.contentLoading || this.profile.contentLoadingMore ||
-        this.profile.contentError || this.syncError || !this.profile.contentHasMore || !this.profile.createdPins.length)return;
+        this.profile.contentError || this.syncError || !this.profile.contentHasMore || !hasItems)return;
       this.onLoadMore?.();
       return;
     }
@@ -834,7 +840,7 @@ export struct PinmonyProfilePage {
         PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.syncError || this.profile.contentError || '', this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onRetry) this.onRetry(); } })
       }.width('100%').margin({ bottom: 16 })
     }
-    if (this.loading || this.profile.contentLoading) {
+    if ((this.loading || this.profile.contentLoading) && !this.refreshing) {
       Column({ space: 10 }) {
         LoadingProgress().color($r('app.color.accent')).width(32).height(32)
       }
@@ -892,7 +898,7 @@ export struct PinmonyProfilePage {
       Text(PinmonyI18n.format('pm_profile_hub_result_count',[this.profile.createdPins.length.toString(),String(Number(this.favoriteFilter) + Number(this.createdFilter))],this.uiLanguage))
         .fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).margin({top:28,bottom:28})
     }
-    if(!this.loading && !this.profile.contentLoading && this.modern() && !this.automaticPhotoPaging() && this.profile.contentHasMore && !this.profile.contentLoadingMore) {
+    if(!this.loading && !this.profile.contentLoading && this.modern() && !this.automaticPhotoPaging() && !this.automaticFollowingBoardPaging() && this.profile.contentHasMore && !this.profile.contentLoadingMore) {
       Button(this.uiText('pm_load_more_af90a08f')).onClick(() => {if(this.onLoadMore)this.onLoadMore();})
     }
     if(!this.loading && !this.profile.contentLoading && this.automaticPhotoPaging() && this.profile.createdPins.length > 0) {
@@ -943,7 +949,7 @@ export struct PinmonyProfilePage {
   private compactTitle() {
     if (this.compactHeader) {
       Row({ space: 10 }) {
-        PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 32 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
+        PinmonyUserAvatar({ profileUrl: this.profile.profileUrl, image: this.profile.avatarUrl, colorIndex: this.profile.avatarColorIndex || 0, websiteFallback: true, name: this.profile.displayName || this.profile.handle, avatarSize: 32 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
         Text(this.profile.displayName || this.profile.handle).fontSize(18).fontWeight(FontWeight.Bold)
           .maxFontSize(18).minFontSize(12).heightAdaptivePolicy(TextHeightAdaptivePolicy.LAYOUT_CONSTRAINT_FIRST)
           .fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1026,7 +1032,7 @@ export struct PinmonyProfilePage {
   private rootCompactTitle() {
     if (this.compactHeader) {
       Row({ space: 10 }) {
-        PinmonyUserAvatar({ image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 32 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
+        PinmonyUserAvatar({ profileUrl: this.profile.profileUrl, image: this.profile.avatarUrl, colorIndex: this.profile.avatarColorIndex || 0, websiteFallback: true, name: this.profile.displayName || this.profile.handle, avatarSize: 32 }).onClick(() => { if (this.onUser) this.onUser(this.profile.profileUrl); })
         Text(this.profile.displayName || this.profile.handle)
           .fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
@@ -1342,7 +1348,7 @@ export struct PinmonyProfilePage {
   private hubAvatar() {
     Badge({ value: '', position: BadgePosition.RightTop,
       style: { badgeSize: this.updateUnread ? 8 : 0, fontSize: 0, badgeColor: $r('app.color.detail_save_accent') } }) {
-      Image(this.profile.avatarUrl).width(44).height(44).borderRadius(22).objectFit(ImageFit.Cover)
+      PinmonyUserAvatar({ profileUrl: this.profile.profileUrl, image: this.profile.avatarUrl, name: this.profile.displayName || this.profile.handle, avatarSize: 44, colorIndex: this.profile.avatarColorIndex || 0, websiteFallback: true })
         .accessibilityLevel('no')
     }.width(44).height(44).accessibilityGroup(true)
       .accessibilityText(this.uiText('pm_settings_df3d58c7') +
@@ -1556,7 +1562,7 @@ export struct PinmonyProfilePage {
             }, (column: number) => column.toString())
           }.width('100%').alignItems(VerticalAlign.Top)
         }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
-        if (this.profile.unorganizedLoading) {
+        if (this.profile.unorganizedLoading && !this.refreshing) {
           Row() {
             LoadingProgress().color($r('app.color.accent')).width(28).height(28)
           }.width('100%').justifyContent(FlexAlign.Center)

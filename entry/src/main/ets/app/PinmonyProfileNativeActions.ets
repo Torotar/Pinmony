@@ -25,6 +25,7 @@ interface Row {
     full_name?: string;
     name?: string;
     image_medium_url?: string;
+    avatar_color_index?: number;
     image_cover_url?: string;
     images?: Record<string, Image[]>;
     url?: string;
@@ -73,6 +74,7 @@ interface FollowUser {
     username?: string;
     fullName?: string;
     imageMediumUrl?: string;
+    avatarColorIndex?: number;
     explicitlyFollowedByMe?: boolean;
     blockedByMe?: boolean;
     __typename?: string;
@@ -368,6 +370,7 @@ export class PinmonyProfileNativeActions {
                 panel.website = (d.website_url || '').slice(0, 2000);
                 panel.username = d.username;
                 panel.avatar = (d.profile_image_url || '').slice(0, 2000);
+                panel.avatarColorIndex = this.store.profile?.avatarColorIndex;
                 panel.avatarAction = this.avatarAction();
                 if (panel.avatarAction) panel.avatarError = panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : PinmonyI18n.message("pm_profile_picture_processing_not_confirmed_check_status_without_up_f4547bd7");
                 if (this.saveUnknown && this.saveUnknown.username === panel.username && this.saveUnknown.firstName === panel.firstName && this.saveUnknown.lastName === panel.lastName && this.saveUnknown.about === panel.about && this.saveUnknown.websiteUrl === panel.website)
@@ -386,7 +389,7 @@ export class PinmonyProfileNativeActions {
                         throw new Error('user');
                     if (this.followUnknown.get(u.entityId!) === u.explicitlyFollowedByMe)
                         this.followUnknown.delete(u.entityId!);
-                    return { followStateKnown: typeof u.explicitlyFollowedByMe === 'boolean', blocked: u.blockedByMe === true, privateProfile: u.isPrivateProfile === true, followerCount: typeof u.followerCount === 'number' && u.followerCount >= 0 ? u.followerCount : undefined, id: u.entityId!, username: u.username, name: (u.fullName || u.username || '').slice(0, 300), avatar: /^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '', profileUrl: this.origin + '/' + u.username + '/', following: u.explicitlyFollowedByMe === true, canFollow: typeof u.explicitlyFollowedByMe === 'boolean' && !u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!) };
+                    return { followStateKnown: typeof u.explicitlyFollowedByMe === 'boolean', blocked: u.blockedByMe === true, privateProfile: u.isPrivateProfile === true, followerCount: typeof u.followerCount === 'number' && u.followerCount >= 0 ? u.followerCount : undefined, id: u.entityId!, username: u.username, name: (u.fullName || u.username || '').slice(0, 300), avatarColorIndex: Number.isInteger(u.avatarColorIndex) && u.avatarColorIndex! >= 1 && u.avatarColorIndex! <= 10 ? u.avatarColorIndex : undefined, avatar: /^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '', profileUrl: this.origin + '/' + u.username + '/', following: u.explicitlyFollowedByMe === true, canFollow: typeof u.explicitlyFollowedByMe === 'boolean' && !u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!) };
                 });
                 this.followersCursor = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 8192 ? connection.pageInfo.endCursor : '';
                 panel.nextCursor = this.followersCursor;
@@ -408,7 +411,7 @@ export class PinmonyProfileNativeActions {
                     const target: string = r.url?.startsWith('/') ? this.origin + r.url : r.url || '', following: boolean = section === 'boards' ? r.followed_by_me === true : r.explicitly_followed_by_me === true;
                     if (this.followUnknown.get(r.id) === following)
                         this.followUnknown.delete(r.id);
-                    return { followStateKnown: typeof (section === 'boards' ? r.followed_by_me : r.explicitly_followed_by_me) === 'boolean', blocked: r.blocked_by_me === true, privateProfile: r.is_private_profile === true, followerCount: typeof r.follower_count === 'number' && r.follower_count >= 0 ? r.follower_count : undefined, id: r.id, username: r.username, name: (r.full_name || r.name || r.username || '').slice(0, 300), avatar: /^https:\/\//.test(image) ? image : '', covers: covers, targetUrl: target.startsWith(this.origin + '/') && !/[?#\s]/.test(target) ? target : '', pinCount: typeof r.pin_count === 'number' ? r.pin_count.toString() + PinmonyI18n.message('pm_pins_0a89904f') : '', updated: this.updated(r.board_order_modified_at), profileUrl: /^[A-Za-z0-9_]+$/.test(r.username || '') ? this.origin + '/' + r.username + '/' : '', following: following, canFollow: section === 'boards' ? typeof r.followed_by_me === 'boolean' && !this.boardFollowUnknown.has(r.id) : r.blocked_by_me !== true && r.id !== this.client.viewer && typeof r.explicitly_followed_by_me === 'boolean' && !this.followUnknown.has(r.id) };
+                    return { followStateKnown: typeof (section === 'boards' ? r.followed_by_me : r.explicitly_followed_by_me) === 'boolean', blocked: r.blocked_by_me === true, privateProfile: r.is_private_profile === true, followerCount: typeof r.follower_count === 'number' && r.follower_count >= 0 ? r.follower_count : undefined, id: r.id, username: r.username, name: (r.full_name || r.name || r.username || '').slice(0, 300), avatarColorIndex: Number.isInteger(r.avatar_color_index) && r.avatar_color_index! >= 1 && r.avatar_color_index! <= 10 ? r.avatar_color_index : undefined, avatar: /^https:\/\//.test(image) ? image : '', covers: covers, targetUrl: target.startsWith(this.origin + '/') && !/[?#\s]/.test(target) ? target : '', pinCount: typeof r.pin_count === 'number' ? r.pin_count.toString() + PinmonyI18n.message('pm_pins_0a89904f') : '', updated: this.updated(r.board_order_modified_at), profileUrl: /^[A-Za-z0-9_]+$/.test(r.username || '') ? this.origin + '/' + r.username + '/' : '', following: following, canFollow: section === 'boards' ? typeof r.followed_by_me === 'boolean' && !this.boardFollowUnknown.has(r.id) : r.blocked_by_me !== true && r.id !== this.client.viewer && typeof r.explicitly_followed_by_me === 'boolean' && !this.followUnknown.has(r.id) };
                 });
             }
         }
@@ -484,7 +487,7 @@ export class PinmonyProfileNativeActions {
             const incoming: PinmonyProfilePanelItem[] = rows.map((row: Row): PinmonyProfilePanelItem => {
                 if (!row || !/^\d{1,40}$/.test(row.id) || !/^[A-Za-z0-9_]+$/.test(row.username || '')) throw new Error('user');
                 return { followStateKnown: typeof row.explicitly_followed_by_me === 'boolean', blocked: row.blocked_by_me === true, id: row.id, username: row.username, name: (row.full_name || row.username || '').slice(0,300),
-                    avatar: /^https:\/\//.test(row.image_medium_url || '') ? row.image_medium_url! : '',
+                    avatarColorIndex: Number.isInteger(row.avatar_color_index) && row.avatar_color_index! >= 1 && row.avatar_color_index! <= 10 ? row.avatar_color_index : undefined, avatar: /^https:\/\//.test(row.image_medium_url || '') ? row.image_medium_url! : '',
                     profileUrl: this.origin + '/' + row.username + '/', privateProfile: row.is_private_profile === true,
                     followerCount: typeof row.follower_count === 'number' && row.follower_count >= 0 ? row.follower_count : undefined,
                     following: row.explicitly_followed_by_me === true,
@@ -515,7 +518,7 @@ export class PinmonyProfileNativeActions {
             const incoming: PinmonyProfilePanelItem[] = connection.edges.map((edge: Edge): PinmonyProfilePanelItem => {
                 const u: FollowUser = edge.node;
                 if (!u || !/^\d{1,40}$/.test(u.entityId || '') || !/^[A-Za-z0-9_]+$/.test(u.username || '')) throw new Error('user');
-                return {followStateKnown:typeof u.explicitlyFollowedByMe === 'boolean',blocked:u.blockedByMe === true,privateProfile:u.isPrivateProfile === true,followerCount:typeof u.followerCount === 'number' && u.followerCount >= 0 ? u.followerCount : undefined,id:u.entityId!,username:u.username,name:(u.fullName || u.username || '').slice(0,300),avatar:/^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '',
+                return {followStateKnown:typeof u.explicitlyFollowedByMe === 'boolean',blocked:u.blockedByMe === true,privateProfile:u.isPrivateProfile === true,followerCount:typeof u.followerCount === 'number' && u.followerCount >= 0 ? u.followerCount : undefined,id:u.entityId!,username:u.username,name:(u.fullName || u.username || '').slice(0,300),avatarColorIndex: Number.isInteger(u.avatarColorIndex) && u.avatarColorIndex! >= 1 && u.avatarColorIndex! <= 10 ? u.avatarColorIndex : undefined, avatar: /^https:\/\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl! : '',
                     profileUrl:this.origin + '/' + u.username + '/',following:u.explicitlyFollowedByMe === true,canFollow:typeof u.explicitlyFollowedByMe === 'boolean' && !u.blockedByMe && u.entityId !== this.client.viewer && !this.followUnknown.has(u.entityId!)};
             });
             const current: PinmonyProfilePanel = this.store.panel;

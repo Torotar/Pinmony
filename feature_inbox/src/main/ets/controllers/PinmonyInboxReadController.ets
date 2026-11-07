@@ -293,7 +293,7 @@ export class PinmonyInboxReadController {
           message.items.filter((item: PinmonyInboxItem): boolean => !!item.id && !!item.title),
         contacts: (message.contactsLoading || message.contactsError) && cachedInbox ?
           cachedInbox.snapshot.contacts.map((item: PinmonyInboxItem): PinmonyInboxItem => {
-            return { id: item.id, title: item.title, subtitle: item.subtitle, imageUrl: item.imageUrl, enabled: false };
+            return { id: item.id, title: item.title, subtitle: item.subtitle, avatarColorIndex: item.avatarColorIndex, imageUrl: item.imageUrl, enabled: false };
           }) :
           message.contacts.filter((item: PinmonyInboxItem): boolean => !!item.id && !!item.title)
       };

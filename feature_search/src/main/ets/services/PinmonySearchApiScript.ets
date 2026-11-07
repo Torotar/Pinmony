@@ -47,7 +47,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
       seen[pin.id] = true;
         mapped.push({ id: 'api-' + pin.type + '-' + pin.id, kind: pin.type, title: pin.name || pin.full_name || pin.username,
           subtitle: pin.type === 'board' ? (typeof pin.pin_count === 'number' ? String(pin.pin_count) + ' 个 Pin 图' : '') : pin.username,
-          targetUrl: target.href, imageUrl: /^https:\\/\\//.test(imageUrl || '') ? imageUrl : '', imageWidth: 236, imageHeight: 236, enabled: true });
+          avatarColorIndex: pin.type === 'user' ? (Number.isInteger(pin.avatar_color_index) && pin.avatar_color_index >= 1 && pin.avatar_color_index <= 10 ? pin.avatar_color_index : undefined) : undefined, targetUrl: target.href, imageUrl: /^https:\\/\\//.test(imageUrl || '') ? imageUrl : '', imageWidth: 236, imageHeight: 236, enabled: true });
         return;
       }
       if (pin.type !== 'pin' || !/^\\d+$/.test(String(pin.id))) return;

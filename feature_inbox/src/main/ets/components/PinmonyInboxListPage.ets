@@ -111,7 +111,7 @@ export struct PinmonyInboxListPage {
     } else {
     Row({ space: 14 }) {
       Button({ type: ButtonType.Normal }) {
-        PinmonyUserAvatar({ image: item.imageUrl, name: item.title, avatarSize: 48 })
+        PinmonyUserAvatar({ profileUrl: item.profileUrl || '', image: item.imageUrl, colorIndex: item.avatarColorIndex || 0, name: item.title, avatarSize: 48 })
       }.padding(0).borderRadius(24).backgroundColor(Color.Transparent).enabled(!!item.profileUrl)
         .accessibilityText(item.title).onClick(() => this.openItemAvatar(item))
       Button({ type: ButtonType.Normal }) {

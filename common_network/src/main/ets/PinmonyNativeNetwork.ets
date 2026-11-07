@@ -21,6 +21,8 @@ export function buildPinmonyStoryMultipart(fields: Record<string,string>, mime: 
   for (let index: number = 0; index < tail.length; index++) result[head.length + bytes.byteLength + index] = tail.charCodeAt(index);
   return result.buffer as ArrayBuffer;
 }
+interface NativeUserAvatarReadOptions { username: string; field_set_key: string; }
+interface NativeUserAvatarReadEnvelope { options: NativeUserAvatarReadOptions; context: Record<string,string>; }
 interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
 export interface PinmonySearchProductRoute {
   domains: string | null;
@@ -1765,6 +1767,28 @@ export class PinmonyNativeNetwork {
     } catch (_) {}
     return this.request(job,(): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});
   }
+  async requestBusinessUserAvatarRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
+    profileUrl: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    const path: string = profileUrl.slice(captured.origin.length), match: RegExpMatchArray | null = path.match(/^\/[A-Za-z0-9_]+\/$/);
+    if (match) {
+      const username: string = path.slice(1,-1);
+      const envelope: NativeUserAvatarReadEnvelope = {options:{username:username,field_set_key:'profile'},context:{}};
+      const expected: string = captured.origin + '/resource/UserResource/get/?source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
+      permitted = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
+        profileUrl === captured.origin + path && job.url === expected && /^native_avatar_\d+$/.test(job.id) &&
+        job.epoch === captured.generation && job.method === 'GET' && job.body === '' &&
+        job.page.startsWith(captured.origin + '/') && job.page.length <= 8192 && !/[\r\n#]/.test(job.page) &&
+        !['pin','settings','inbox','messages','search','login','signup','business','ideas','today','news_hub','notifications','updates'].includes(username.toLowerCase()) &&
+        job.headers['Accept'] === 'application/json' && job.headers['X-Pinterest-AppState'] === 'active' &&
+        job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['X-Pinterest-Pws-Handler'] === 'www/index.js' && job.headers['X-Pinterest-Source-Url'] === path;
+    }
+    return this.request(job, (): PinmonyNetworkContext => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,
+        epoch:captured.generation,page:job.page,userAgent:actual.userAgent};
+    });
+  }
   async requestBusinessProfileRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
     profileUrl: string, userId: string, ownerCurrent: () => boolean, viewerId: string = '', visitor: boolean = false): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
@@ -1909,7 +1933,7 @@ export class PinmonyNativeNetwork {
           (bookmarks === undefined || Array.isArray(bookmarks) && bookmarks.length === 1 && typeof bookmarks[0] === 'string' && bookmarks[0].length > 0 && bookmarks[0].length <= 4096);
       } else if(job.url.startsWith(captured.origin + '/resource/ApiResource/get/?')) {
         const api: NativeSearchApiOptions = o as Object as NativeSearchApiOptions;
-        const fields: string[] = api.data['fields'] as string[]; const expected: string[] = ['conversation.id','conversation.name','conversation.users()','conversation.read_times_ms','user.id','user.username','user.full_name','user.image_medium_url','user.type'];
+        const fields: string[] = api.data['fields'] as string[]; const expected: string[] = ['conversation.id','conversation.name','conversation.users()','conversation.read_times_ms','user.id','user.username','user.full_name','user.image_medium_url','user.avatar_color_index','user.type'];
         permitted = basic && keys.length === 2 && keys.includes('url') && keys.includes('data') && /^\/v3\/conversations\/\d{1,40}\/$/.test(api.url) &&
           !Array.isArray(api.data) && Object.keys(api.data).length === 1 && Array.isArray(fields) && fields.length === expected.length && expected.every((field: string,index: number): boolean => fields[index] === field);
       }
@@ -2677,6 +2701,11 @@ export class PinmonyNativeNetwork {
         'x-pinterest-source-url', 'x-pinterest-appstate', 'x-app-version'];
       Object.keys(job.headers).forEach((key: string) => {
         const value: string = job.headers[key];
+        if (job.method === 'GET' && job.id.startsWith('native_translation_') &&
+            /\/resource\/ApiResource\/get\//.test(job.url) && value === 'no-cache') {
+          if (key.toLowerCase() === 'cache-control') headers['Cache-Control'] = value;
+          if (key.toLowerCase() === 'pragma') headers['Pragma'] = value;
+        }
         if (key.toLowerCase() === 'accept-language' && job.id.startsWith('native_translation_') &&
             /\/resource\/ApiResource\/get\//.test(job.url) &&
             /^(?:zh-CN,zh|zh-TW,zh|en-US,en|en-GB,en|ja-JP,ja|ko-KR,ko|ru-RU,ru|pt-BR,pt);q=0\.9$/.test(value)) {
@@ -2689,6 +2718,40 @@ export class PinmonyNativeNetwork {
       headers['Referer'] = job.page;
       headers['Origin'] = job.url.slice(0, job.url.indexOf('/', 8));
       headers['User-Agent'] = context().userAgent;
+      // Keep translation and its eligibility reads in the same desktop-compatible
+      // context. The mobile service can disable is_translatable for every comment.
+      const translationContextRead: boolean = job.method === 'GET' &&
+        (job.id.startsWith('native_translation_') && /\/resource\/ApiResource\/get\//.test(job.url) ||
+         job.id.startsWith('native_comments_') && /\/resource\/UnifiedCommentsResource\/get\//.test(job.url) ||
+         job.id.startsWith('native_replies_') && /\/resource\/AggregatedCommentReplyFeedResource\/get\//.test(job.url));
+      if (translationContextRead &&
+          /\bArkWeb\/[0-9.]+/.test(headers['User-Agent'])) {
+        const webkit: RegExpMatchArray | null = headers['User-Agent'].match(/\bAppleWebKit\/([0-9.]+)/);
+        const chrome: RegExpMatchArray | null = headers['User-Agent'].match(/\bChrome\/([0-9.]+)/);
+        const safari: RegExpMatchArray | null = headers['User-Agent'].match(/\bSafari\/([0-9.]+)/);
+        if (webkit && chrome && safari) {
+          headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/' +
+            webkit[1] + ' (KHTML, like Gecko) Chrome/' + chrome[1] + ' Safari/' + safari[1];
+        }
+      }
+      // Web resource wrapper seeds its platform browser id from the current _b
+      // cookie when no refreshed pid is available. Keep this credential native,
+      // per request, and restricted to the captured comment translation GET.
+      if (job.method === 'GET' && job.id.startsWith('native_translation_') &&
+          /\/resource\/ApiResource\/get\//.test(job.url)) {
+        const browserCookie: RegExpMatchArray | null = cookie.match(/(?:^|;\s*)_b=([^;]*)/);
+        const browserId: string = browserCookie ? browserCookie[1].replace(/"/g, '') : '';
+        if (browserId.length > 0 && browserId.length <= 4096 && !/[^\x21-\x7e]/.test(browserId))
+          headers['X-Pinterest-Platform-Bid'] = browserId;
+      }
+      if (job.id.startsWith('native_translation_')) {
+        PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=transport language=' +
+          (headers['Accept-Language'] || 'absent') + ' noCache=' +
+          (headers['Cache-Control'] === 'no-cache' && headers['Pragma'] === 'no-cache').toString() +
+          ' nonce=' + /[?&]_=\d+(?:&|$)/.test(job.url).toString() +
+          ' platformBid=' + (headers['X-Pinterest-Platform-Bid'] ? 'current-cookie' : 'absent') +
+          ' ua=' + (headers['User-Agent'] !== context().userAgent ? 'desktop-compatible' : 'current'));
+      }
       const csrf: RegExpMatchArray | null = cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
       if (job.method === 'POST' && !csrf) throw new Error('missing-session');
       if (csrf) headers['X-CSRFToken'] = decodeURIComponent(csrf[1]);

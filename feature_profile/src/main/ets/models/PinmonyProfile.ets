@@ -1,3 +1,4 @@
+export interface PinmonyProfileCollaborator { username?: string; id: string; name: string; avatar: string; avatarColorIndex?: number; }
 export interface PinmonyProfileAction {
   id: string;
   kind: string;
@@ -16,6 +17,7 @@ export interface PinmonyBoard {
   covers: string[];
   coverAlternatives?: string[];
   collaboratorAvatars?: string[];
+  collaboratorUsers?: PinmonyProfileCollaborator[];
   pinCount: string;
   updated: string;
 }
@@ -81,6 +83,7 @@ export interface PinmonyProfileSnapshot {
   displayName: string;
   handle: string;
   avatarUrl: string;
+  avatarColorIndex?: number;
   coverUrl?: string;
   business?: boolean;
   isOwn?: boolean;

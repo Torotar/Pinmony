@@ -11,6 +11,7 @@ export interface InboxFlowUser {
   id: string;
   name: string;
   avatar: string;
+  avatarColorIndex?: number;
   profileUrl?: string;
   self?: boolean;
 }

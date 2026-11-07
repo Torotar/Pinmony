@@ -34,7 +34,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
   function user(u) {
     if (!u || typeof u.id !== 'string' || !/^\\d+$/.test(u.id)) throw new Error('用户返回格式无效');
     return { profileUrl: /^[a-zA-Z0-9_]+$/.test(u.username || '') ? location.origin + '/' + u.username + '/' : '', id: u.id, self: !!(selfId && u.id === selfId), name: clean(u.full_name) || clean(u.username),
-      avatar: /^https:\\/\\//.test(u.image_medium_url || u.image_large_url || '') ? u.image_medium_url || u.image_large_url : '' };
+      avatarColorIndex: Number.isInteger(u.avatar_color_index) && u.avatar_color_index >= 1 && u.avatar_color_index <= 10 ? u.avatar_color_index : undefined, avatar: /^https:\\/\\//.test(u.image_medium_url || u.image_large_url || '') ? u.image_medium_url || u.image_large_url : '' };
   }
   function valid(s) { return root() && flow === s && s.pageUrl === page(); }
   function publish() {
@@ -197,7 +197,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
       var existing = list.conversations.find(function (c) { return c.users.some(function (u) { return u.id === peer.id; }) && c.users.length <= 2; });
       stack = [];
       if (existing) openChat(existing.id, session, []);
-      else { var s = newFlow('compose', session); s.loading = false; s.directContact = true; s.users = [{ profileUrl: /^[a-zA-Z0-9_]+$/.test(peer.username || '') ? location.origin + '/' + peer.username + '/' : '', id: peer.id, name: peer.name, avatar: peer.avatar || '' }]; s.selectedIds = [peer.id]; publish(); this.action('next', '', session); }
+      else { var s = newFlow('compose', session); s.loading = false; s.directContact = true; s.users = [{ profileUrl: /^[a-zA-Z0-9_]+$/.test(peer.username || '') ? location.origin + '/' + peer.username + '/' : '', id: peer.id, name: peer.name, avatar: peer.avatar || '', avatarColorIndex: peer.avatarColorIndex }]; s.selectedIds = [peer.id]; publish(); this.action('next', '', session); }
       return true;
     },
     pollChat: function (session) {
@@ -259,7 +259,7 @@ export const PIN_INBOX_CONVERSATION_SCRIPT: string = `
         else {
           var s = newFlow('compose', session); s.loading = false;
           s.directContact = true;
-          s.users = [{ profileUrl: /^[a-zA-Z0-9_]+$/.test(contact.username || '') ? location.origin + '/' + contact.username + '/' : '', id: contact.userId, name: contact.title, avatar: contact.imageUrl }];
+          s.users = [{ profileUrl: /^[a-zA-Z0-9_]+$/.test(contact.username || '') ? location.origin + '/' + contact.username + '/' : '', id: contact.userId, name: contact.title, avatar: contact.imageUrl, avatarColorIndex: contact.avatarColorIndex }];
           s.selectedIds = [contact.userId]; publish(); this.action('next','',session);
         }
         return true;

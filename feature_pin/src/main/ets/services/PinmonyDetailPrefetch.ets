@@ -2,7 +2,7 @@ import { PinmonyDetailSnapshot, PinmonyVideo, PinmonyVideoSource } from '../mode
 import { PinmonyRuntimeLog } from 'common_foundation';
 
 interface PrefetchImage { url: string; width: number; height: number; }
-interface PrefetchCreator { full_name?: string; username?: string; image_medium_url?: string; is_verified_merchant?: boolean; }
+interface PrefetchCreator { avatar_color_index?: number; full_name?: string; username?: string; image_medium_url?: string; is_verified_merchant?: boolean; }
 interface PrefetchOfferSummary { price?: string; }
 interface PrefetchProduct { offer_summary?: PrefetchOfferSummary; }
 interface PrefetchRichMetadata { description?: string; site_name?: string; url?: string; products?: PrefetchProduct[]; }
@@ -156,6 +156,7 @@ export function mapPrefetchedDetail(body: string, pinUrl: string, allowPendingMe
       sourceName: clean(pin.rich_metadata?.site_name || pin.rich_summary?.site_name, 180),
       creatorVerified: creator.is_verified_merchant === true,
       creator: clean(creator.full_name || creator.username, 180),
+      creatorAvatarColorIndex: Number.isInteger(creator.avatar_color_index) && creator.avatar_color_index! >= 1 && creator.avatar_color_index! <= 10 ? creator.avatar_color_index : undefined,
       creatorAvatar: /^https:\/\/[^\s]+$/i.test(creator.image_medium_url || '') ? clean(creator.image_medium_url, 2000) : '',
       creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? pinUrl.slice(0, pinUrl.indexOf('/', 8)) + '/' + creator.username + '/' : '',
       sourceLabel: detailSourceUrl(pin) ? (clean(pin.link_domain, 180) || clean(pin.domain, 180) || clean(pin.rich_metadata?.site_name, 180) || clean(pin.rich_summary?.site_name, 180) || detailSourceUrl(pin).split('/')[2]) : '',

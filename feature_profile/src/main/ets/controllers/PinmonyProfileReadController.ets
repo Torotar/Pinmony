@@ -162,7 +162,7 @@ export class PinmonyProfileReadController {
       this.store.profile = {
         kind: 'state', session: message.session, profileUrl: message.profileUrl, section: message.section,
         displayName: message.displayName || '', handle: message.handle || '',
-        avatarUrl: message.avatarUrl || '', followers: message.followers || '',
+        avatarUrl: message.avatarUrl || '', avatarColorIndex: Number.isInteger(message.avatarColorIndex) && message.avatarColorIndex! >= 1 && message.avatarColorIndex! <= 10 ? message.avatarColorIndex : undefined, followers: message.followers || '',
         monthlyViews: typeof message.monthlyViews === 'number' && Number.isSafeInteger(message.monthlyViews) &&
           message.monthlyViews >= 0 ? message.monthlyViews : undefined,
         following: message.following || '', actions: actions,

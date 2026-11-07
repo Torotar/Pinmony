@@ -14,6 +14,9 @@ function createArktsLoader(ts, mocks = {}, globals = {}) {
         return key === 'PinmonyI18n' ? (value ?? rawLocalMessages) : value;
       }
     }) : mocks[name];
+    // Hvigor resolves this virtual HAP module; Node has no generated build profile.
+    // Existing explicit mocks take precedence. Source-only tests default to diagnostics off.
+    if (name === 'BuildProfile') return { default: { DEBUG: false } };
     if (name.startsWith('@')) throw Error('Missing native kit mock: ' + name);
     if (packages.has(name)) return packages.get(name);
     const barrel = path.join(root, name, 'Index.ets');

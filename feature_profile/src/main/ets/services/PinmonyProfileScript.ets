@@ -114,7 +114,7 @@ export const PIN_PROFILE_BRIDGE_SCRIPT: string = `
       apiInfo && apiInfo.isOwn === false && typeof apiInfo.followingUser === 'boolean' && !apiInfo.blocked ?
       [{ id: 'api-follow-user', kind: 'follow', label: apiInfo.followingUser ? '关注中' : '关注', enabled: true }] : [];
     notify('profile', { kind: 'state', session: session, profileUrl: profile, section: section,
-      displayName: info.name, handle: info.handle, avatarUrl: info.avatar,
+      displayName: info.name, handle: info.handle, avatarUrl: info.avatar, avatarColorIndex: apiInfo ? apiInfo.avatarColorIndex : undefined,
       followers: info.followers, following: info.following, actions: actions,
       business: !!(apiInfo && apiInfo.business), isOwn: apiInfo ? apiInfo.isOwn : undefined,
       about: apiInfo ? apiInfo.about : "", website: apiInfo ? apiInfo.website : "",

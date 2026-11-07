@@ -20,7 +20,7 @@ export const PIN_INBOX_CONTACTS_API_SCRIPT: string = `
       return { id: 'inbox-contact-api-' + g + '-' + row.id, userId: row.id,
         username: clean(row.username, 100), title: clean(row.full_name, 160) || clean(row.username, 100),
         subtitle: '@' + clean(row.username, 100),
-        imageUrl: [row.image_medium_url, row.image_large_url, row.image_small_url].filter(function (v) {
+        avatarColorIndex: Number.isInteger(row.avatar_color_index) && row.avatar_color_index >= 1 && row.avatar_color_index <= 10 ? row.avatar_color_index : undefined, imageUrl: [row.image_medium_url, row.image_large_url, row.image_small_url].filter(function (v) {
           return typeof v === 'string' && /^https:\\/\\//i.test(v);
         })[0] || '', enabled: false };
     }).filter(function (row) { if (seen[row.userId]) return false; seen[row.userId] = true; return true; });

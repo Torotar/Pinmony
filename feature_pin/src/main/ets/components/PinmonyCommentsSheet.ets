@@ -79,7 +79,7 @@ export struct PinmonyCommentsSheet {
   @Builder
   private commentRow(item: PinmonyComment, reply: boolean = false) {
     Row({ space: 10 }) {
-      PinmonyUserAvatar({ image: item.avatar, name: item.name, avatarSize: reply ? 28 : 32 })
+      PinmonyUserAvatar({ profileUrl: item.profileUrl || '', image: item.avatar, name: item.name, colorIndex: item.avatarColorIndex || 0, avatarSize: reply ? 28 : 32 })
         .onClick(() => { if (item.profileUrl && this.onUser) this.onUser(item.profileUrl); })
       Column({ space: 4 }) {
         Row({ space: 4 }) {

@@ -4,7 +4,12 @@ export interface PinmonyBoardInvitation {
   boardName: string;
   imageUrl: string;
   inviter: string;
+  inviterUsername?: string;
+  invitedUsername?: string;
   inviterAvatar: string;
+  inviterAvatarColorIndex?: number;
+  invitedName?: string;
+  invitedAvatarColorIndex?: number;
   invitedUser: string;
   invitedAvatar: string;
   createdAt: string;

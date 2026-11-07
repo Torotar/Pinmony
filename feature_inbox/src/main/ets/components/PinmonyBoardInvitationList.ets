@@ -57,7 +57,7 @@ export struct PinmonyBoardInvitationList {
         Row({ space: 12 }) {
           Stack({ alignContent: Alignment.BottomEnd }) {
             Image(item.imageUrl).width(52).height(52).borderRadius(10).objectFit(ImageFit.Cover)
-            PinmonyUserAvatar({ image: item.inviterAvatar, name: item.inviter, avatarSize: 24 })
+            PinmonyUserAvatar({ username: item.inviterUsername || '', image: item.inviterAvatar, name: item.inviter, colorIndex: item.inviterAvatarColorIndex || 0, avatarSize: 24 })
           }
           Column({ space: 8 }) {
             Text(this.all ? item.inviter : this.uiText("pm_board_invitations_c4c41664")).fontSize(16).fontColor($r('app.color.primary_text'))

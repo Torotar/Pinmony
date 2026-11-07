@@ -1,6 +1,9 @@
+import { PinmonyUserAvatarReads } from '../app/PinmonyUserAvatarReads';
 import { PinmonyInboxUnreadNativeReads, PIN_INBOX_MESSAGES_POLL_MS, PIN_INBOX_UPDATES_POLL_MS, PIN_INBOX_CHAT_POLL_MS } from '../app/PinmonyInboxUnreadNativeReads';
 import { PinmonyInboxMessageNotice, PinmonyInboxNoticeConversation } from '../app/PinmonyInboxMessageNotice';
 import { PinmonyInboxNoticeChatSession } from '../app/PinmonyInboxNoticeChatSession';
+import { PinmonyInboxBackgroundSync } from '../app/PinmonyInboxBackgroundSync';
+import { PinmonyInboxBackgroundLifecycle } from '../app/PinmonyInboxBackgroundLifecycle';
 import { PinmonyInboxNoticeChatPage } from '../components/PinmonyInboxNoticeChatPage';
 import { PinmonyInboxNewsNativeReads } from '../app/PinmonyInboxNewsNativeReads';
 import { PinmonyLogoutCoordinator, PinmonyLogoutPorts } from '../app/PinmonyLogoutCoordinator';
@@ -103,6 +106,8 @@ import { PinmonyHomeController, PinmonyHomePorts, readHomeCache, writeHomeCache,
 import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply,
   PIN_NATIVE_NETWORK_ENABLED, useNativeTransport } from 'common_network';
 import { PinmonyBuildLoginPage } from '../components/PinmonyLoginPage';
+import { PinmonyTranslationDiagnosticHost } from '../components/PinmonyTranslationDiagnosticHost';
+import { PINMONY_TRANSLATION_DIAGNOSTIC_ENABLED } from '../app/PinmonyTranslationDiagnosticConfig';
 import { PinmonyShareBridge } from '../app/PinmonyShareBridge';
 
 import { webview } from '@kit.ArkWeb';
@@ -196,6 +201,13 @@ struct Index {
   // Native presentation and routing are product invariants, independent of request rollout gates.
   private readonly nativeBusinessRoutesEnabled: boolean = true;
   private readonly nativeNetwork: PinmonyNativeNetwork = new PinmonyNativeNetwork();
+  private readonly userAvatarReads: PinmonyUserAvatarReads = new PinmonyUserAvatarReads({
+    session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
+    network: (): PinmonyNativeNetwork => this.nativeNetwork,
+    page: (): string => this.nativeNetworkContext().page || this.authenticatedProfileUrl,
+    viewerProfile: (): string => this.authenticatedProfileUrl,
+    foreground: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended
+  });
   private readonly submittedPinResolver: PinmonyPinLinkResolver = new PinmonyPinLinkResolver();
   private readonly photoSearchFlow: PinmonyPhotoSearchFlow = new PinmonyPhotoSearchFlow({
     jpeg: (bytes: ArrayBuffer) => this.systemActions.jpegFromBytes(bytes),
@@ -313,7 +325,7 @@ struct Index {
     nativeNetworkContext: (): PinmonyNetworkContext => this.nativeNetworkContext(),
     controller: (): webview.WebviewController => this.controller,
     businessSuspended: (): boolean => this.businessSuspended,
-    setBusinessSuspended: (value: boolean): void => { this.businessSuspended = value; if(value){ this.inboxUnreadNativeReads.pause(); this.inboxMessageNotice.pause(); this.pauseNoticeChats(); } else this.coordinatorTasks.timeout((): void => this.pollVisibleInbox(),0); },
+    setBusinessSuspended: (value: boolean): void => { this.businessSuspended = value; if(value){ this.userAvatarReads.pause(); this.inboxUnreadNativeReads.pause(); if(!this.inboxBackgroundSync.active())this.inboxMessageNotice.pause(); this.pauseNoticeChats(); } else { this.userAvatarReads.resume(); this.coordinatorTasks.timeout((): void => this.pollVisibleInbox(),0); } },
     extractPinUrl: (value: string): string => this.extractPinUrl(value),
     pinStore: (): PinmonyPinStore => this.pinStore,
     nativeBackTarget: (): string => this.nativeBackTarget,
@@ -341,7 +353,7 @@ struct Index {
     nativeRootOnly: (): boolean => this.nativeRootOnly,
     logoutAwaitingLogin: (): boolean => this.logoutAwaitingLogin,
     authStatus: (): PinmonyAuthStatus => this.authStatus,
-    setAuthStatus: (value: PinmonyAuthStatus): void => { if (value !== 'authenticated') this.businessSession.reset(); this.authStatus = value; },
+    setAuthStatus: (value: PinmonyAuthStatus): void => { if (value !== 'authenticated') this.resetNativeBusinessSession(); this.authStatus = value; },
     staleRootDocumentTarget: (): number => this.staleRootDocumentTarget(),
     extractPinUrl: (value: string): string => this.extractPinUrl(value),
     pinStore: (): PinmonyPinStore => this.pinStore,
@@ -386,7 +398,7 @@ struct Index {
     expectHome: (): void => this.expectHome(),
     controller: (): webview.WebviewController => this.controller,
     businessSuspended: (): boolean => this.businessSuspended,
-    setBusinessSuspended: (value: boolean): void => { this.businessSuspended = value; if(value){ this.inboxUnreadNativeReads.pause(); this.inboxMessageNotice.pause(); this.pauseNoticeChats(); } else this.coordinatorTasks.timeout((): void => this.pollVisibleInbox(),0); },
+    setBusinessSuspended: (value: boolean): void => { this.businessSuspended = value; if(value){ this.userAvatarReads.pause(); this.inboxUnreadNativeReads.pause(); if(!this.inboxBackgroundSync.active())this.inboxMessageNotice.pause(); this.pauseNoticeChats(); } else { this.userAvatarReads.resume(); this.coordinatorTasks.timeout((): void => this.pollVisibleInbox(),0); } },
     showNetworkNotice: (message: string = PinmonyI18n.message("pm_connection_unstable_retrying_d0b9af7d")): void => this.showNetworkNotice(message),
     webPageLoading: (): boolean => this.webPageLoading,
     setWebPageLoading: (value: boolean): void => { this.webPageLoading = value; },
@@ -951,7 +963,7 @@ struct Index {
     setAuthCheckTimer: (value: number): number => { this.authCheckTimer = value; return value; },
     authEpoch: (): number => this.authEpoch,
     authStatus: (): PinmonyAuthStatus => this.authStatus,
-    setAuthStatus: (value: PinmonyAuthStatus): PinmonyAuthStatus => { if (value !== 'authenticated') this.businessSession.reset(); this.authStatus = value; return value; },
+    setAuthStatus: (value: PinmonyAuthStatus): PinmonyAuthStatus => { if (value !== 'authenticated') this.resetNativeBusinessSession(); this.authStatus = value; return value; },
     authWebVisible: (): boolean => this.authWebVisible(),
     authenticatedProfileUrl: (): string => this.authenticatedProfileUrl,
     setAuthenticatedProfileUrl: (value: string): string => { this.authenticatedProfileUrl = value; return value; },
@@ -981,7 +993,7 @@ struct Index {
     failureDetails: (): string => this.failureDetails,
     setFailureDetails: (value: string): string => { this.failureDetails = value; return value; },
     homeCacheAccountId: (): string => this.homeCacheAccountId,
-    setHomeCacheAccountId: (value: string): string => { if (value !== this.homeCacheAccountId) { this.businessSession.reset(); this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchDiscoveryNativeReads.reset(); this.searchNativeReads.reset(); this.homeNativeReads.reset(); } this.homeCacheAccountId = value; return value; },
+    setHomeCacheAccountId: (value: string): string => { if (value !== this.homeCacheAccountId) { this.resetNativeBusinessSession(); this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchDiscoveryNativeReads.reset(); this.searchNativeReads.reset(); this.homeNativeReads.reset(); } this.homeCacheAccountId = value; return value; },
     homeCacheAccountIdFromProfileUrl: (profileUrl: string): string => this.homeCacheAccountIdFromProfileUrl(profileUrl),
     homeCacheIdentityEpoch: (): number => this.homeCacheIdentityEpoch,
     setHomeCacheIdentityEpoch: (value: number): number => { this.homeCacheIdentityEpoch = value; return value; },
@@ -1209,7 +1221,7 @@ struct Index {
     authEpoch: (): number => this.authEpoch,
     setAuthEpoch: (value: number): number => { this.authEpoch = value; return value; },
     authStatus: (): PinmonyAuthStatus => this.authStatus,
-    setAuthStatus: (value: PinmonyAuthStatus): PinmonyAuthStatus => { if (value !== 'authenticated') this.businessSession.reset(); this.authStatus = value; return value; },
+    setAuthStatus: (value: PinmonyAuthStatus): PinmonyAuthStatus => { if (value !== 'authenticated') this.resetNativeBusinessSession(); this.authStatus = value; return value; },
     beginDetailOpening: (pinUrl: string, returnUrl?: string): void => this.beginDetailOpening(pinUrl, returnUrl),
     bindCurrentDetailDocument: (url: string): void => this.bindCurrentDetailDocument(url),
     businessSuspended: (): boolean => this.businessSuspended,
@@ -1395,6 +1407,8 @@ struct Index {
   private businessSuspended: boolean = false;
 
   onPageShow(): void {
+    this.inboxBackgroundSync.stop();
+    this.inboxMessageNotice.dismissForeground();
     this.logPageLifecycle('page-show');
     if (!this.pinStore.videoForeground) this.homeRecoveryAttempted = false;
     this.pinStore.videoForeground = true;
@@ -1403,6 +1417,7 @@ struct Index {
       this.bottomBarCoordinator.resumeAfterForeground();
       const readNeeded: boolean = this.nativeNetwork.setForeground(true);
       const detailReadNeeded: boolean = this.detailReadNetwork.setForeground(true);
+      this.userAvatarReads.resume();
       this.runSessionScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(true)').catch(() => {});
       this.controllerLifecycle().resume();
       if (this.authStatus === 'checking' || this.authStatus === 'authenticated' && !this.authenticatedProfileUrl) this.syncAuthentication();
@@ -1429,7 +1444,7 @@ struct Index {
     this.searchController.invalidatePending();
     this.pinStore.videoForeground = false;
     this.businessSuspended = true;
-    this.nativeNetwork.setForeground(false); this.detailReadNetwork.setForeground(false);
+    this.nativeNetwork.setForeground(false); this.detailReadNetwork.setForeground(false); this.userAvatarReads.pause();
     this.tabRequestToken++; this.rootReadToken = -1; this.pendingWebTab = -1;
     this.runSessionScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(false)').catch(() => {});
     PinmonyRuntimeLog.info('BusinessLifecycle: suspended reads-cancelled=true writes-replay=false');
@@ -2147,15 +2162,35 @@ struct Index {
   private resetNoticeChats(): void {
     this.noticeChats.forEach((scene: PinmonyInboxNoticeChatSession): void => scene.reset()); this.noticeChats = [];
   }
+  private visibleInboxNoticeConversation(viewed: boolean = false): string {
+    if(this.authStatus !== 'authenticated' || this.businessSuspended || PinmonyInboxBackgroundLifecycle.isBackground())return '';
+    let flow: PinmonyInboxFlowSnapshot | undefined;
+    if(this.noticeChats.length)flow = this.noticeChats[this.noticeChats.length - 1].store.inboxFlow;
+    else {
+      if(!this.inboxMessagesNativeReads.ownsFlow() || this.pinStore.detail || this.pinStore.detailOpeningPin ||
+        this.nativeBoardVisible() || this.activeSheetKind || this.profileSettingsVisible || this.boardRecoveryVisible ||
+        this.chatProfileTransition || !this.profileChatActive && (this.activeTab !== 2 || this.profileStore.origins.length > 0))return '';
+      flow = this.inboxStore.inboxFlow;
+      if(flow?.pageUrl !== this.currentInboxUrl())return '';
+    }
+    if(flow?.screen !== 'chat' || viewed && (flow.loading || !!flow.error || !flow.messages.length))return '';
+    return flow.conversationId || '';
+  }
   private readonly inboxMessageNotice: PinmonyInboxMessageNotice = new PinmonyInboxMessageNotice({
     openChat:(conversation: string): boolean => this.openNoticeChat(conversation),
     session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
-    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended,
+    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && !PinmonyInboxBackgroundLifecycle.isBackground(),
+    deliveryActive: (): boolean => this.inboxBackgroundSync.active(),
     username: (): string => this.authenticatedProfileUrl.match(/\/([A-Za-z0-9_]+)\/$/)?.[1] || '',
-    visibleConversation: (): string => this.noticeChats.length ? this.noticeChats[this.noticeChats.length - 1].conversation : this.inboxMessagesNativeReads.ownsFlow() && !this.pinStore.detail &&
-      !this.boardStore.boardDetail && !this.activeSheetKind && this.inboxStore.inboxFlow?.screen === 'chat' ?
-      this.inboxStore.inboxFlow.conversationId || '' : '',
+    visibleConversation: (): string => this.visibleInboxNoticeConversation(),
+    viewedConversation: (): string => this.visibleInboxNoticeConversation(true),
     context: (): common.UIAbilityContext => this.getUIContext().getHostContext() as common.UIAbilityContext
+  });
+  private readonly inboxBackgroundSync: PinmonyInboxBackgroundSync = new PinmonyInboxBackgroundSync({
+    session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
+    store: (): PinmonyInboxStore => this.inboxStore,
+    observed: (rows: PinmonyInboxNoticeConversation[]): void => this.inboxMessageNotice.observe(rows),
+    stopped: (): void => this.inboxMessageNotice.pause()
   });
   private readonly inboxUnreadNativeReads: PinmonyInboxUnreadNativeReads = new PinmonyInboxUnreadNativeReads({
     messagesObserved: (rows: PinmonyInboxNoticeConversation[]): void => this.inboxMessageNotice.observe(rows),
@@ -2178,6 +2213,7 @@ struct Index {
   private pollVisibleInbox(): void {
     if(this.businessSuspended || this.authStatus !== 'authenticated') { this.inboxPagePollMode = ''; this.inboxUnreadNativeReads.pause(); return; }
     this.inboxMessageNotice.consumeTap();
+    this.inboxMessageNotice.dismissViewed();
     if(this.noticeChats.length) { this.noticeChats[this.noticeChats.length - 1].poll(); this.inboxUnreadNativeReads.pollMessages(); return; }
     if(this.activeTab !== 2 && !this.profileChatActive) { this.inboxPagePollMode = ''; this.inboxUnreadNativeReads.poll(); return; }
     if(!this.inboxMessagesNativeReads.owned() || !!this.inboxStore.inboxFlow)this.inboxUnreadNativeReads.pollMessages();
@@ -2227,6 +2263,8 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    this.inboxBackgroundSync.install();
+    this.userAvatarReads.install();
     this.inboxStore.onUnreadChange = (updates: boolean, messages: boolean, updatesCount: number, messagesCount: number): void => {
       this.inboxBadgeUpdatesCount = updatesCount; this.inboxBadgeMessagesCount = messagesCount;
       this.inboxBadgeUpdatesUnread = updates; this.inboxBadgeMessagesUnread = messages;
@@ -2405,6 +2443,8 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.inboxBackgroundSync.dispose();
+    this.userAvatarReads.dispose();
     this.sessionVerification?.cancel('destroy');
     if(this.nativeLoginEnabled){this.nativeSessionEpoch++;this.nativeVerificationPending = false;}
     if (this.inboxPollTimer >= 0) clearInterval(this.inboxPollTimer);
@@ -2598,12 +2638,14 @@ struct Index {
     if (PinmonyI18n.isText(this.networkNotice, "该登录方式暂不可用")) this.clearNetworkNotice();
     const userAgent: string = this.sessionEnvironment?.userAgent() || '';
     this.businessSession.confirm(this.homeCacheAccountId, this.authenticatedProfileUrl, userAgent, appVersion);
+    this.userAvatarReads.sessionChanged();
     this.inboxUnreadNativeReads.poll();
     if (PIN_NATIVE_HOME_READS_ENABLED) this.coordinatorTasks.timeout((): void => { this.homeNativeReads.demand(); }, 0);
     if (PIN_NATIVE_SEARCH_DISCOVERY_ENABLED) this.coordinatorTasks.timeout((): void => { this.boardNativeReads.demand(); this.profileNativeReads.demand(); this.searchDiscoveryNativeReads.demand(); this.searchNativeReads.demand(); this.inboxUpdatesNativeReads.demand(); this.inboxMessagesNativeReads.demand(); }, 80);
   }
 
 
+  private resetNativeBusinessSession(): void { this.inboxBackgroundSync.stop(); this.businessSession.reset(); this.userAvatarReads.reset(); }
   private nativeBusinessSessionContext(): PinmonyBusinessSessionContext {
     return this.businessSession.context(this.authStatus);
   }
@@ -2655,7 +2697,7 @@ struct Index {
 
   private cancelNativeNetwork(id: string): void { return this.networkBridgeCoordinator.cancelNativeNetwork(id); }
 
-  private resetAuthenticatedContent(): void { this.chatProfileTransition = false; this.chatProfileVisible = false; this.chatProfileDepth = -1; this.chatProfileParentActive = false; this.profileChatActive = false; this.profileChatOpening = false; this.retainedProfilePanel = undefined; this.panelProfileVisible = false; this.panelProfileDepth = -1; this.detailEntryPhotos.clear(); this.detailEntryCards.clear(); this.detailSearchParents = []; this.homeEntryResumed = false; this.boardRecoveryVisible = false; this.controllerLifecycle().resetHost(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
+  private resetAuthenticatedContent(): void { this.inboxBackgroundSync.stop(); this.chatProfileTransition = false; this.chatProfileVisible = false; this.chatProfileDepth = -1; this.chatProfileParentActive = false; this.profileChatActive = false; this.profileChatOpening = false; this.retainedProfilePanel = undefined; this.panelProfileVisible = false; this.panelProfileDepth = -1; this.detailEntryPhotos.clear(); this.detailEntryCards.clear(); this.detailSearchParents = []; this.homeEntryResumed = false; this.boardRecoveryVisible = false; this.controllerLifecycle().resetHost(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
 
   private updateAuthState(value: string): void {
     if(this.nativeLoginEnabled && !this.loginHostMounted)return;
@@ -4870,7 +4912,7 @@ struct Index {
     this.selectNativeRootTab(2);
     if(PIN_NATIVE_INBOX_MESSAGES_ENABLED) {
       await this.selectInboxSection('messages');
-      if(!await this.inboxMessagesNativeReads.direct(peer.id,peer.name,peer.avatar,peer.username || ''))this.showMessage(PinmonyI18n.message("pm_chat_unavailable_please_retry_fcee3c6e"));
+      if(!await this.inboxMessagesNativeReads.direct(peer.id,peer.name,peer.avatar,peer.username || '',peer.avatarColorIndex))this.showMessage(PinmonyI18n.message("pm_chat_unavailable_please_retry_fcee3c6e"));
       return;
     }
     if (!await this.ensureRootActionContext(2)) return;
@@ -5241,6 +5283,7 @@ struct Index {
   @State private settingsProfileReturning: boolean = false;
   @State private settingsProfileName: string = '';
   @State private settingsProfileAvatar: string = '';
+  @State private settingsProfileAvatarColorIndex: number = 0;
   private openUserProfile(url: string, fromSettings: boolean = false, fromChat: boolean = false): void {
     this.detailProfileReturning = false;
     const rootOnly: boolean = this.nativeRootOnly;
@@ -5255,7 +5298,8 @@ struct Index {
     const chatSource: PinmonyInboxFlowSnapshot | undefined = fromChat ? this.inboxStore.inboxFlow : undefined;
     if(fromChat && (!chatSource || chatSource.screen !== 'chat' || this.chatProfileTransition || this.businessSuspended ||
       !this.inboxMessagesNativeReads.ownsFlow()))return;
-    if(fromSettings){this.settingsProfileName = this.profileStore.profile?.displayName || '';this.settingsProfileAvatar = this.profileStore.profile?.avatarUrl || '';this.settingsProfileReturning = false;this.settingsProfileDepth = this.profileStore.origins.length;this.profileSettingsVisible = false;}
+    if(fromSettings){this.settingsProfileName = this.profileStore.profile?.displayName || this.profileStore.profile?.handle || '';this.settingsProfileAvatar = this.profileStore.profile?.avatarUrl || '';
+      this.settingsProfileAvatarColorIndex = this.profileStore.profile?.avatarColorIndex || 0;this.settingsProfileReturning = false;this.settingsProfileDepth = this.profileStore.origins.length;this.profileSettingsVisible = false;}
     const searchSource: string = this.activeTab === 1 && !this.pinStore.detail && !this.boardStore.boardDetail && !this.profileStore.origins.length ? this.currentSearchPageKey() : '';
     this.clearRootTabGuard('profile-open');
     let source: string;
@@ -5534,7 +5578,7 @@ struct Index {
       if (!this.profileChatActive || !current.authenticated || current.accountId !== session.accountId ||
           current.generation !== session.generation || current.origin !== session.origin || this.currentProfileUrl() !== target.page ||
           this.profileNativeReads.contactTarget()?.id !== target.id) { this.profileChatActive = false; return; }
-      if (!await this.inboxMessagesNativeReads.directProfile(target.id, target.name, target.avatar, target.username)) {
+      if (!await this.inboxMessagesNativeReads.directProfile(target.id, target.name, target.avatar, target.username, target.avatarColorIndex)) {
         this.profileChatActive = false; this.showMessage(PinmonyI18n.message('pm_chat_unavailable_please_retry_fcee3c6e'));
       }
       if (!this.inboxStore.inboxFlow) this.profileChatActive = false;
@@ -6004,7 +6048,7 @@ struct Index {
       priceText: detail.priceText, richDescription: detail.richDescription,
       affiliateDisclosure: detail.affiliateDisclosure, sourceName: detail.sourceName,
       creatorVerified: detail.creatorVerified,
-      creatorAvatar: detail.creatorAvatar, creatorUrl: detail.creatorUrl, sourceLabel: detail.sourceLabel, sourceUrl: detail.sourceUrl,
+      creatorAvatar: detail.creatorAvatar, creatorAvatarColorIndex: detail.creatorAvatarColorIndex, creatorUrl: detail.creatorUrl, sourceLabel: detail.sourceLabel, sourceUrl: detail.sourceUrl,
       actions: actions, related: detail.related, dataSource: detail.dataSource,
       relatedLoading: detail.relatedLoading, relatedError: detail.relatedError,
       relatedEnded: detail.relatedEnded, commentPreview: detail.commentPreview,
@@ -7399,6 +7443,9 @@ struct Index {
   private buildMainScene() {
     Column() {
       Stack({ alignContent: Alignment.Bottom }) {
+        if (PINMONY_TRANSLATION_DIAGNOSTIC_ENABLED && this.authStatus === 'authenticated') {
+          PinmonyTranslationDiagnosticHost()
+        }
         if (!this.nativeLoginEnabled || this.loginHostMounted) {
         PinmonyBuildLoginPage({
           controller: this.controller, bridge: this.shareBridge, scripts: this.nativeLoginEnabled ? this.loginScripts : this.documentStartScripts,
@@ -7428,7 +7475,7 @@ struct Index {
               onWillDismiss:(action:DismissSheetAction): void => { if (!this.settingsStore.busy) action.dismiss(); },
               onDisappear:(): void => this.closeBoardRecovery() })
           if (this.profileSettingsVisible || this.settingsProfileDepth >= 0) {
-            PinmonySettingsPage({ store: this.settingsStore, profileName:this.settingsProfileDepth >= 0 ? this.settingsProfileName : this.profileStore.profile?.displayName || '',profileAvatar:this.settingsProfileDepth >= 0 ? this.settingsProfileAvatar : this.profileStore.profile?.avatarUrl || '',onViewProfile:() => {const page: string = this.profileStore.profile?.profileUrl || '';if(page)this.openUserProfile(page,true);}, onPin: (id: string): void => {
+            PinmonySettingsPage({ store: this.settingsStore, profileName:this.settingsProfileDepth >= 0 ? this.settingsProfileName : this.profileStore.profile?.displayName || this.profileStore.profile?.handle || '',profileUrl:this.authenticatedProfileUrl,profileAvatarColorIndex:this.settingsProfileDepth >= 0 ? this.settingsProfileAvatarColorIndex : this.profileStore.profile?.avatarColorIndex || 0,profileAvatar:this.settingsProfileDepth >= 0 ? this.settingsProfileAvatar : this.profileStore.profile?.avatarUrl || '',onViewProfile:() => {const page: string = this.profileStore.profile?.profileUrl || '';if(page)this.openUserProfile(page,true);}, onPin: (id: string): void => {
               if (this.authStatus !== 'authenticated' || this.businessSuspended || this.settingsStore.busy || this.settingsStore.loading || !this.settingsStore.data?.activities.some((pin): boolean => pin.id === id)) return;
               this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + id + '/', this.nativeBusinessSessionContext().origin + '/edit/activity/');
             }, onOpenExternalLink: (url: string): Promise<void> => this.systemActions.openLink(url), onRequest: (action: string, value: string) => this.requestAccountSettings(action, value), onBack: () => this.closeProfileSettings(), onEditProfile: () => this.openProfilePanel('edit') })
@@ -7605,9 +7652,9 @@ struct Index {
                 this.homeStore.homeMenuPin = pin.pinUrl;this.homeStore.homeMenuPage = board.pageKey;
                 await this.pinMenuNative.toggleFavorite(pin.pinUrl);
               }, onCollaborators: () => this.openBoardCollaborators(),
-              invitationName: this.inboxStore.boardInvitationPreview?.inviter || '', invitationAvatar: this.inboxStore.boardInvitationPreview?.inviterAvatar || '',
+              invitationUsername: this.inboxStore.boardInvitationPreview?.inviterUsername || '', invitationAvatarColorIndex: this.inboxStore.boardInvitationPreview?.inviterAvatarColorIndex || 0, invitationName: this.inboxStore.boardInvitationPreview?.inviter || '', invitationAvatar: this.inboxStore.boardInvitationPreview?.inviterAvatar || '',
               invitationVisible: this.inboxStore.invitationBannerVisible && this.inboxStore.boardInvitationPreview?.boardUrl === this.boardStore.boardDetail.pageKey,
-              invitationBusy: this.inboxStore.invitationBusy, joinedAvatar: this.inboxStore.joinedBoardAvatar,
+              invitationBusy: this.inboxStore.invitationBusy, joinedAvatar: this.inboxStore.joinedBoardAvatar, joinedUsername: this.inboxStore.joinedBoardUsername, joinedName: this.inboxStore.joinedBoardName, joinedAvatarColorIndex: this.inboxStore.joinedBoardAvatarColorIndex,
               onAcceptInvitation: () => this.acceptBoardInvitation(), onDismissInvitation: () => { this.inboxStore.invitationBannerVisible = false; },
               onShare: () => this.shareCurrentBoard(), onPublish: () => this.openProfilePublish(),
               onLoadMore: () => this.boardOperation('more'), onRetry: () => this.boardOperation('retry'),
@@ -7753,7 +7800,7 @@ struct Index {
                         sourceName: current.sourceName,
                         creatorVerified: current.creatorVerified,
                         creator: current.creator,
-                        creatorAvatar: current.creatorAvatar,
+                        creatorAvatar: current.creatorAvatar, creatorAvatarColorIndex: current.creatorAvatarColorIndex,
                         creatorUrl: current.creatorUrl,
                         sourceLabel: current.sourceLabel,
                         sourceUrl: current.sourceUrl,

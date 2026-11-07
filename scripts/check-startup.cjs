@@ -9,6 +9,7 @@ const logs = [];
 const context = { filesDir: '/private', getApplicationContext: () => ({ setColorMode: mode => events.push('theme:' + mode) }) };
 let languageFails = false;
 const modules = {
+  '../app/PinmonyTranslationDiagnosticConfig': { PINMONY_TRANSLATION_DIAGNOSTIC_ENABLED: false },
   feature_inbox: { PinmonyInboxHiddenConversations: { initialize: () => events.push('inbox-local') } },
   '@kit.ArkData': { preferences: { getPreferencesSync: () => ({ getSync: () => '[]' }) } },
   common_session: { PinmonySessionHistory: { initialize: () => state.set('pinmonySessionConfirmed', false) } },

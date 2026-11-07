@@ -12,9 +12,10 @@ const home = 'https://www.pinterest.com/', login = home + 'login/';
 const auth = {};
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync('common_session/src/main/ets/models/PinmonyAuth.ets', 'utf8'),
   { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, { exports: auth });
+const warnings = [];
 const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: login,
-  PinmonyRuntimeLog: { info() {}, warn() {} }, clearTimeout() {} };
-require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure', 'enterAuthenticatedRoot', 'nativeRootTabsVisible', 'confirmBusinessSession', 'usesNativeProfileReads'].map(method).join('\n') +
+  PinmonyRuntimeLog: { info() {}, warn(message) { warnings.push(message); } }, clearTimeout() {} };
+require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure', 'enterAuthenticatedRoot', 'nativeRootTabsVisible', 'confirmBusinessSession', 'resetNativeBusinessSession', 'usesNativeProfileReads'].map(method).join('\n') +
   '} globalThis.Native=Native;', { target: ts.ScriptTarget.ES2020 }), context);
 function harness() {
   const native = new context.Native(), loads = [], scripts = [], effects = [];
@@ -23,6 +24,10 @@ function harness() {
     navigationAddress: '', controller: { getUrl: () => current, getUserAgent: () => 'synthetic', loadUrl: url => loads.push(url),
       runJavaScript: script => { scripts.push(script); return Promise.resolve(true); } },
     pageHistory: { reset() {} }, tabsController: { changeIndex() {} },
+    userAvatarReads: { sessionChanged() { effects.push('avatar-session'); }, reset() { effects.push('avatar-reset'); } },
+    inboxUnreadNativeReads: { poll() { effects.push('unread-poll'); }, reset() {} },
+    inboxMessageNotice: { reset() {} }, resetNoticeChats() {},
+    inboxBackgroundSync: { stop() { effects.push('background-stop'); } },
     isHomeRootAddress: url => url === home, profileUrlFromAddress: () => '',
     homeCacheAccountIdFromProfileUrl: () => '', homePageKeyFromAddress: url => url === home ? home : '',
     tryRestoreAuthenticatedHome() {},
@@ -50,6 +55,8 @@ existing.emit('authenticated');
 assert.equal(existing.native.authStatus, 'authenticated');
 assert.deepEqual(existing.loads, [], 'current authenticated home needs no second navigation');
 assert.ok(existing.effects.includes('home')); assert.ok(existing.effects.includes('bind'));
+assert.equal(existing.effects.filter(effect => effect === 'avatar-session').length, 1, 'confirmed evidence updates the avatar session');
+assert.equal(existing.effects.filter(effect => effect === 'unread-poll').length, 1, 'confirmed evidence reaches unread polling');
 existing.emit('authenticated');
 assert.deepEqual(existing.loads, [], 'duplicate confirmation cannot reopen login or home');
 assert.equal(existing.scripts.filter(script => script.includes('PinmonyHomeRefresh')).length, 1, 'first native home sync is not repeated');
@@ -109,3 +116,9 @@ assert.equal(relogin.native.nativeRootTabsVisible(), true, 'relogin restores the
 const resets = relogin.effects.filter(x => x === 'bar-reset').length;
 relogin.emit('authenticated'); assert.equal(relogin.effects.filter(x => x === 'bar-reset').length, resets, 'repeated evidence preserves scroll preferences and current presentation');
 console.log('Relogin: current native root, visible bottom bar, stale evidence and duplicate confirmation passed');
+const reset = harness();
+reset.native.resetNativeBusinessSession();
+assert(reset.effects.includes('background-stop'), 'session reset stops background synchronization');
+assert(reset.effects.includes('avatar-reset'), 'the real reset hook invalidates avatar reads');
+assert.equal(reset.native.businessSession.context('authenticated').authenticated, false, 'reset invalidates native business authorization');
+assert(!warnings.includes('Pinmony: invalid authentication state'), 'coordinator must not silently swallow a missing fixture dependency');

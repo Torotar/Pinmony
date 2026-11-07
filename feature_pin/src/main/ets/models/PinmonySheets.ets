@@ -1,4 +1,6 @@
 export interface ShareSheetOption {
+  username?: string;
+  avatarColorIndex?: number;
   id: string;
   label: string;
   icon: string;

@@ -9,13 +9,28 @@ function method(name) {
 const appearStart = source.indexOf('  aboutToAppear(): void');
 const appear = source.slice(appearStart, source.indexOf('\n  }', appearStart) + 4);
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + appear + '\n' +
-  ['syncSegmentItems', 'onSnapshotChanged', 'selectSection', 'swipeSection', 'inboxTitleBarOptions'].map(method).join('\n') +
+  ['segmentBackgroundColor', 'syncSegmentItems', 'onSnapshotChanged', 'selectSection', 'swipeSection', 'inboxTitleBarOptions'].map(method).join('\n') +
   '} Host;', {compilerOptions: {target: ts.ScriptTarget.ES2021}}).outputText, {
+  $r: key => key,
+  ColorMetrics: {resourceColor: key => {
+    assert.equal(key, 'app.color.surface_muted');
+    if (colorReadError) throw new Error('resource unavailable');
+    return segmentColor;
+  }},
   PinmonyI18n: {render: (text, lang) => lang + ':' + text, message: key => key},
   BlurStrategy: {ENABLE: 1, DISABLE: 0}, ScrollEffectType: {IMMERSIVE_GRADIENT_BLUR: 1},
   PinmonyImmersiveLight: {effect: mode => mode}, Curve: {EaseOut: 0}
 });
+let colorReadError = false, segmentColor = {theme: 'light'};
 const h = new Host(); let index = 0, selectedWrites = 0, labelWrites = 0;
+assert(source.includes('buttonBackgroundColor: this.segmentBackgroundColor()'));
+assert.equal(h.segmentBackgroundColor(), segmentColor);
+segmentColor = {theme: 'dark'};
+assert.equal(h.segmentBackgroundColor(), segmentColor, 'theme changes read the current resource without caching');
+colorReadError = true;
+assert.equal(h.segmentBackgroundColor(), undefined, 'missing resources fall back to the component theme default');
+colorReadError = false;
+assert.equal(h.segmentBackgroundColor(), segmentColor, 'resource reads recover after a transient failure');
 Object.defineProperty(h, 'segmentSelectedIndex', {get: () => index, set: value => {index = value; selectedWrites++;}});
 const items = [0, 1].map(() => Object.defineProperty({}, 'text', {set() {labelWrites++;}}));
 Object.assign(h, {snapshot: {section: 'messages', updateLabel: 'updates', inboxLabel: 'inbox'}, uiLanguage: 'zh',

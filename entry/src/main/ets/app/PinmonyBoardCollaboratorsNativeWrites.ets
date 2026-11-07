@@ -39,7 +39,7 @@ export class PinmonyBoardCollaboratorsNativeWrites {
   constructor(ports: PinmonyBoardCollaboratorsWritePorts) { this.ports = ports; }
 
   private cloneUser(user: PinmonyBoardCollaborator): PinmonyBoardCollaborator {
-    return {id:user.id,name:user.name,username:user.username,avatar:user.avatar,status:user.status};
+    return {id:user.id,name:user.name,username:user.username,avatar:user.avatar,avatarColorIndex:user.avatarColorIndex,status:user.status};
   }
   private clone(state: PinmonyBoardCollaborators): PinmonyBoardCollaborators {
     return {owner:state.owner,canInvite:state.canInvite,token:state.token,page:state.page,phase:state.phase,

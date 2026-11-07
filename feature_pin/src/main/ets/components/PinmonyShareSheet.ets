@@ -54,7 +54,7 @@ export struct PinmonyShareSheet {
   @Builder
   private buildShareContactRow(contact: ShareSheetOption) {
     Row({ space: 12 }) {
-      PinmonyUserAvatar({ image: contact.icon || '', name: contact.label, avatarSize: 42 })
+      PinmonyUserAvatar({ username: contact.username || '', image: contact.icon || '', name: contact.label, colorIndex: contact.avatarColorIndex || 0, avatarSize: 42 })
       Text(PinmonyI18n.render(contact.label, this.uiLanguage))
         .fontSize(16)
         .fontColor($r('app.color.primary_text'))

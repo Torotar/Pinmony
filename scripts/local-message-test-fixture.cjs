@@ -14,6 +14,10 @@ const rawLocalMessages = {
 };
 function withLocalMessages(requireDependency) {
   return name => {
+    if (name === './PinmonyUserAvatarMetadata') {
+      const { createArktsLoader } = require('./arkts-module-loader.cjs');
+      return createArktsLoader(require(process.argv[2] || 'typescript'), {}).loadFile('entry/src/main/ets/app/PinmonyUserAvatarMetadata.ets');
+    }
     const dependency = requireDependency(name);
     if (name !== 'common_foundation') return dependency;
     const { createArktsLoader } = require('./arkts-module-loader.cjs');

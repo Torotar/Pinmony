@@ -7,6 +7,14 @@ let f=fixture();f.v.loadMoreAtEnd();assert.equal(f.calls(),1,'photo end loads ev
 for(const change of [v=>v.interactionReady=false,v=>v.restoringScroll=true,v=>v.readsReady=false,v=>v.loading=true,v=>v.refreshing=true,v=>v.profile.contentLoading=true,v=>v.profile.contentLoadingMore=true,v=>v.profile.contentError='failure',v=>v.syncError='failure',v=>v.profile.contentHasMore=false,v=>v.profile.createdPins=[]]){f=fixture();change(f.v);f.v.loadMoreAtEnd();assert.equal(f.calls(),0);}
 for(const tab of ['boards','collages']){f=fixture();f.v.hubTab=tab;f.v.loadMoreAtEnd();assert.equal(f.calls(),0,'other tabs retain manual policy');f.v.automaticLoadingEnabled=true;f.v.loadMoreAtEnd();assert.equal(f.calls(),1);}
 assert(source.includes('.onReachEnd(() => this.loadMoreAtEnd())'));
-assert(source.includes('!this.automaticPhotoPaging() && this.profile.contentHasMore'));
+assert(source.includes('!this.automaticPhotoPaging() && !this.automaticFollowingBoardPaging() && this.profile.contentHasMore'));
 assert(source.includes("Text(this.uiText('pm_profile_pins_end'))"));assert(source.includes("Text(this.uiText('pm_loading_4927a53b'))"));
+function following(){const f=fixture();Object.assign(f.v,{hubTab:'boards',boardFilter:'following'});Object.assign(f.v.profile,{hubMode:'following',boards:[{id:'board-1'}],createdPins:[]});return f;}
+f=following();f.v.loadMoreAtEnd();assert.equal(f.calls(),1,'followed boards load on reach-end even when manual paging preference is selected');
+for(const change of [v=>v.interactionReady=false,v=>v.restoringScroll=true,v=>v.readsReady=false,v=>v.loading=true,v=>v.refreshing=true,v=>v.profile.contentLoading=true,v=>v.profile.contentLoadingMore=true,v=>v.profile.contentError='failure',v=>v.syncError='failure',v=>v.profile.contentHasMore=false,v=>v.profile.boards=[],v=>v.profile.hubMode='boards',v=>v.boardFilter='secret',v=>v.hubPane=false]){f=following();change(f.v);f.v.loadMoreAtEnd();assert.equal(f.calls(),0,'followed board loading respects visible mode, readiness, busy/error/end and restoration guards');}
+const buttonLine=source.split('\n').find(line=>line.includes('if(')&&line.includes('!this.automaticPhotoPaging()')&&line.includes('contentHasMore'));
+const buttonVisible=vm.runInNewContext('(function(){return '+buttonLine.trim().slice(3,-3)+';})');
+f=following();assert.equal(buttonVisible.call(f.v),false,'followed boards never show manual load-more button');
+f.v.boardFilter='';f.v.profile.hubMode='boards';assert.equal(buttonVisible.call(f.v),true,'other board filters retain their existing button');
+assert(source.includes('else if (!this.loading && !this.profile.contentLoading && this.profile.contentLoadingMore)'),'board paging retains its footer spinner');
 console.log('Profile photo pagination: reach-end loading, active/read/loading/error/end guards, footer status and other-tab policy passed');

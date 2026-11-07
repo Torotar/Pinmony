@@ -1,6 +1,7 @@
 import { StartupTask, common } from '@kit.AbilityKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import lazy { webview } from '@kit.ArkWeb';
+import { PINMONY_TRANSLATION_DIAGNOSTIC_ENABLED } from '../app/PinmonyTranslationDiagnosticConfig';
 
 PinmonyRuntimeLog.info('StartupBoundary: webengine-module-evaluated');
 
@@ -11,6 +12,7 @@ export default class WebEngineTask extends StartupTask {
     PinmonyRuntimeLog.info('StartupBoundary: webengine-init-enter');
     try {
       webview.WebviewController.setWebDebuggingAccess(false);
+      if (PINMONY_TRANSLATION_DIAGNOSTIC_ENABLED) webview.WebviewController.setWebDebuggingAccess(true);
     } catch (_) { PinmonyRuntimeLog.warn('Web: debug configuration unavailable'); }
     try {
       const features: webview.BackForwardCacheSupportedFeatures = new webview.BackForwardCacheSupportedFeatures();

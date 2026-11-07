@@ -70,7 +70,7 @@ export class PinmonyDetailCache {
       affiliateDisclosure: detail.affiliateDisclosure, sourceName: detail.sourceName,
       creatorVerified: detail.creatorVerified,
       creator: detail.creator,
-      creatorAvatar: detail.creatorAvatar, creatorUrl: detail.creatorUrl,
+      creatorAvatar: detail.creatorAvatar, creatorAvatarColorIndex: detail.creatorAvatarColorIndex, creatorUrl: detail.creatorUrl,
       sourceLabel: detail.sourceLabel, sourceUrl: detail.sourceUrl,
       commentPreview: detail.commentPreview, commentsAvailable: detail.commentsAvailable,
       commentEmpty: detail.commentEmpty, commentLoading: false,

@@ -15,6 +15,7 @@ const { PinmonyDetailCache } = load('feature_pin/src/main/ets/services/PinmonyDe
 const translationEvents = [];
 let translationLanguage = 'zh-CN,zh;q=0.9';
 const { PinmonyDetailNativeReads } = load('entry/src/main/ets/app/PinmonyDetailNativeReads.ets', name =>
+  name === './PinmonyTranslationDiagnostics' ? { PinmonyTranslationDiagnostics: { begin: () => 0, finish() {} } } :
   name === 'feature_pin' ? { readRelatedPresentation } : name === 'common_network' ? { PIN_BUSINESS_PIN_READ_ENABLED: true, Priority: { HIGH: 0 } } :
     name === 'common_foundation' ? { PinmonyI18n: { ...require('./local-message-test-fixture.cjs').rawLocalMessages, translationAcceptLanguage: () => translationLanguage }, PinmonyRuntimeLog: { info(message) { translationEvents.push(message); }, warn() {} } } : {});
 const pinUrl = id => 'https://www.pinterest.com/pin/' + id + '/';
@@ -23,12 +24,13 @@ const related = (ids, bookmark) => JSON.stringify({ resource_response: { status:
 const preview = text => JSON.stringify({ resource_response: { status: 'success', data: text === null ? [] : [{ unified_comment: { text } }] } });
 const base = id => JSON.stringify({ resource_response: { status: 'success', data: { id: String(id), aggregated_pin_id: '777', reaction_data:{reaction_by_me:0,reaction_counts:{'1':12}},comment_count:3 } } });
 const flush = () => new Promise(resolve => setImmediate(resolve));
-function fixture() {
+function fixture(expectedAggregate = '777', initialPin = pinUrl(1)) {
   let session = { authenticated: true, generation: 1, accountId: 'fixture', origin: 'https://www.pinterest.com', userAgent: 'synthetic', appVersion: 'fixture.1' };
   let foreground = true, root = false;
   const store = { detailOpeningToken: 1, detailPin: pinUrl(1), detailOpeningPin: pinUrl(1), detailActionsReady: false,
     detailCache: new PinmonyDetailCache(), detailScrollOffset: 42,
     detail: { kind: 'cached', session: 0, pinUrl: pinUrl(1), imageUrl: 'https://i.pinimg.com/1.jpg', title: 'base', actions: [], related: [] } };
+  store.detailPin = initialPin; store.detailOpeningPin = initialPin; store.detail.pinUrl = initialPin;
   const published = []; let commentResult = { pin: '', loading: false, error: '', items: [] };
   Object.defineProperty(store, 'commentResult', { get: () => commentResult, set: value => {
     // ArkUI's parent observes a root property change; nested plain-object
@@ -38,7 +40,7 @@ function fixture() {
   } });
   const requests = [], autoplayRequests = [], canceled = [], marks = [];
   const network = { cancel(id) { canceled.push(id); }, requestBusinessPinRead(job, context, pin, current, legacy, aggregate) {
-    assert.equal(job.page, pin); assert(['', '777'].includes(aggregate)); assert(current());
+    assert.equal(job.page, pin); assert(['', expectedAggregate].includes(aggregate)); assert(current());
     if (job.id.startsWith('native_autoplay_')) {
       autoplayRequests.push(job);
       return Promise.resolve({ status: 200, error: '', body: JSON.stringify({ resource_response: {
@@ -54,7 +56,80 @@ function fixture() {
   return { controller, store, requests, autoplayRequests, canceled, marks, published, setSession(value) { session = value; }, getSession() { return session; },
     setForeground(value) { foreground = value; }, setRoot(value) { root = value; } };
 }
+async function checkCapturedTranslations(harPath) {
+  const entries = JSON.parse(fs.readFileSync(harPath, 'utf8')).log.entries;
+  const body = entry => {
+    const content = entry.response.content;
+    const text = content.encoding === 'base64' ? Buffer.from(content.text, 'base64').toString('utf8') : content.text;
+    return JSON.parse(text);
+  };
+  const records = [];
+  for (const entry of entries) {
+    const url = new URL(entry.request.url);
+    if (!['/resource/ApiResource/get/', '/resource/UnifiedCommentsResource/get/', '/resource/AggregatedCommentReplyFeedResource/get/'].includes(url.pathname)) continue;
+    try { records.push({ entry, url, options: JSON.parse(url.searchParams.get('data')).options, payload: body(entry) }); } catch {}
+  }
+  const translations = records.filter(record => /^\/v3\/aggregated_comments\/\d+\/translate\/$/.test(record.options?.url || '') &&
+    typeof record.payload.resource_response?.data === 'string');
+  assert(translations.length > 0, 'HAR must contain actual successful translation samples');
+  for (const capture of translations) {
+    const commentId = capture.options.url.match(/aggregated_comments\/(\d+)\//)[1];
+    const source = capture.url.searchParams.get('source_url');
+    assert(/^\/pin\/\d+\/$/.test(source), 'captured translation must have a Pin source');
+    const replies = records.find(record => record.url.pathname === '/resource/AggregatedCommentReplyFeedResource/get/' &&
+      record.url.origin === capture.url.origin && record.url.searchParams.get('source_url') === source &&
+      Array.isArray(record.payload.resource_response?.data) && record.payload.resource_response.data.some(item => item.id === commentId));
+    const parentId = replies?.options.objectId || commentId;
+    const comments = records.find(record => record.url.pathname === '/resource/UnifiedCommentsResource/get/' &&
+      record.url.origin === capture.url.origin && record.url.searchParams.get('source_url') === source &&
+      Array.isArray(record.payload.resource_response?.data) && record.payload.resource_response.data.some(item => item.id === parentId));
+    assert(comments, 'captured translation must match a captured comment in the same Pin');
+    const pin = capture.url.origin + source, aggregate = comments.options.aggregated_pin_id;
+    const f = fixture(aggregate, pin);
+    const initial = { resource_response: { status: 'success', data: { id: source.match(/\d+/)[0],
+      aggregated_pin_id: aggregate } }, client_context: comments.payload.client_context };
+    const begin = f.controller.start(pin, 1, JSON.stringify(initial));
+    await advanceSecondary();
+    f.requests[0].resolve(preview(null)); await flush(); f.requests[1].resolve(related([], '-end-')); await begin;
+    f.store.commentToken = 1;
+    const read = f.controller.readComments(false, () => true);
+    f.requests[2].resolve(JSON.stringify(comments.payload)); await read;
+    assert(!f.store.commentResult.error, 'actual captured comments must pass native mapping');
+    const parent = f.store.commentResult.items.find(value => value.id === parentId);
+    if (replies) {
+      const readingReplies = f.controller.readReplies(parentId, () => true);
+      f.requests.at(-1).resolve(JSON.stringify(replies.payload)); await readingReplies;
+      assert(!parent.repliesError, 'actual captured replies must pass native mapping');
+    }
+    const item = replies ? parent.replies.find(value => value.id === commentId) : parent;
+    assert(item?.canTranslate, 'captured target must retain translation eligibility');
+    const originalText = item.text;
+    const beforeTranslation = f.requests.length;
+    const translating = f.controller.translateComment(commentId, () => true);
+    assert(f.requests.length === beforeTranslation + 1, 'actual captured comment dispatches one native translation');
+    const requested = JSON.parse(new URL(f.requests.at(-1).job.url).searchParams.get('data'));
+    assert(requested.options.url === capture.options.url, 'native route must match the captured route exactly');
+    f.requests.at(-1).resolve(JSON.stringify(capture.payload)); await translating;
+    assert(item.translatedText === capture.payload.resource_response.data.trim(), 'captured translation must be preserved');
+    assert(item.translationVisible && !item.translationLoading && !item.translationError, 'captured result must be visible and settled');
+    assert(item.text === originalText, 'captured original remains intact');
+    assert(f.published.at(-1).items.some(value => value.id === commentId && value.translationVisible ||
+      value.replies?.some(reply => reply.id === commentId && reply.translationVisible)), 'actual result reaches presentation snapshot');
+    f.controller.pause();
+  }
+  console.log('Captured HAR translation: ' + translations.length + ' actual comment mapping, exact route, response parsing and visible snapshot cases passed; no online request performed');
+}
 async function main() {
+  const eligibility = fixture();
+  for (const flag of [true, false, undefined, null, 'true', 1]) {
+    const raw = { id: '21', type: 'aggregatedcomment', text: 'sample', is_translatable: flag };
+    assert.equal(eligibility.controller.mapComment(raw).canTranslate, flag === true,
+      'only an explicit server true enables translation, without local language guessing');
+  }
+  for (const raw of [{ id: '21', type: 'aggregatedcomment', text: '  ', is_translatable: true },
+    { id: '21', type: 'userdiditdata', details: 'photo', is_translatable: true }]) {
+    assert.equal(eligibility.controller.mapComment(raw).canTranslate, false);
+  }
   const fastBase = fixture(); fastBase.controller.warmRelated(pinUrl(1), 1);
   const fastRead = fastBase.controller.start(pinUrl(1), 1, base(1));
   assert.equal(fastBase.requests.length, 0);
@@ -327,15 +402,25 @@ async function main() {
   const wrong = fixture(); await assert.rejects(wrong.controller.start(pinUrl(1), 1, base(2)));
   assert.equal(wrong.requests.length, 0);
   const t = fixture();
-  const begin = t.controller.start(pinUrl(1), 1, base(1));
+  const translationBase = JSON.parse(base(1));
+  translationBase.client_context = { user: { id: '7' } };
+  const begin = t.controller.start(pinUrl(1), 1, JSON.stringify(translationBase));
   await advanceSecondary();
   t.requests[0].resolve(preview(null)); await flush(); t.requests[1].resolve(related([], '-end-')); await begin;
   const original = { id: '21', type: 'aggregatedcomment', text: 'Bonjour', canTranslate: true, replies: [] };
   t.store.commentToken = 1;
   t.store.commentResult = { pin: pinUrl(1), loading: false, error: '', items: [original] };
-  const translation = data => JSON.stringify({ resource_response: { status: 'success', code: 0, endpoint_name: 'v3_get_translation', data } });
+  const translation = (data, context, http_status) => JSON.stringify({ resource_response: { status: 'success', code: 0, endpoint_name: 'v3_get_translation', data, http_status }, client_context: context });
   await t.controller.translateComment('99', () => true);
   assert.equal(t.requests.length, 2, 'unowned comments do not dispatch translation');
+  original.canTranslate = false;
+  await t.controller.translateComment('21', () => true);
+  assert.equal(t.requests.length, 2, 'ineligible comments do not dispatch even through a direct action');
+  const blockedReply = { id: '22', type: 'aggregatedcomment', text: 'reply', canTranslate: false };
+  original.replies.push(blockedReply);
+  await t.controller.translateComment('22', () => true);
+  assert.equal(t.requests.length, 2, 'ineligible nested replies do not dispatch');
+  original.canTranslate = true;
   const pending = t.controller.translateComment('21', () => true);
   assert.equal(original.translationLoading, true);
   await t.controller.translateComment('21', () => true);
@@ -343,18 +428,34 @@ async function main() {
   const options = JSON.parse(decodeURIComponent(t.requests[2].job.url.match(/[?&]data=([^&]+)/)[1])).options;
   assert.deepEqual(options, { url: '/v3/aggregated_comments/21/translate/' });
   assert.equal(t.requests[2].job.method, 'GET');
+  assert.equal(t.requests[2].job.headers['Accept'], 'application/json, text/javascript, */*, q=0.01');
+  assert.equal(t.requests[0].job.headers['Accept'], 'application/json', 'AJAX Accept is scoped to translation');
   assert.equal(t.requests[2].job.headers['Accept-Language'], 'zh-CN,zh;q=0.9');
+  assert.equal(t.requests[2].job.headers['Cache-Control'], 'no-cache');
+  assert.equal(t.requests[2].job.headers['Pragma'], 'no-cache');
+  const firstNonce = new URL(t.requests[2].job.url).searchParams.get('_');
+  assert.match(firstNonce, /^\d+$/);
+  assert.equal(t.requests[0].job.headers['Cache-Control'], undefined);
+  assert.equal(t.requests[0].job.headers['Pragma'], undefined);
+  assert.equal(new URL(t.requests[0].job.url).searchParams.has('_'), false);
   assert.equal(t.requests[0].job.headers['Accept-Language'], undefined, 'unrelated reads do not gain a translation language');
-  t.requests[2].resolve(translation(null)); await pending;
+  t.requests[2].resolve(translation(null, { locale: 'en-US', is_authenticated: true,
+    user: { id: '7', locale: 'zh-CN' } }, 200)); await pending;
+  assert.notEqual(t.getSession().accountId, '7', 'business cache identity is distinct from website viewer id');
+  assert(translationEvents.some(message => /phase=context task=\d+ authenticated=true account=match locale=en-US userLocale=zh-CN upstreamStatus=200$/.test(message)));
   assert.equal(original.translationError, '暂无可用译文');
   assert(translationEvents.includes('CommentsTranslationTrace: phase=response shape=null textLength=0'));
   assert(translationEvents.includes('CommentsTranslationTrace: phase=empty'));
   assert.equal(t.published.at(-1).items[0].translationLoading, false); assert.equal(t.published.at(-1).items[0].translationError, '暂无可用译文');
   assert.equal(original.translatedText, ''); assert.equal(original.translationLoading, false);
   const retry = t.controller.translateComment('21', () => true);
+  assert.notEqual(new URL(t.requests[3].job.url).searchParams.get('_'), firstNonce, 'manual retry has a fresh cache nonce');
   t.store.commentResult = { ...t.store.commentResult, items: [original, { id: '22', text: 'other' }] };
   // A plain-text success is synthetic branch coverage, not a captured online result.
-  t.requests[3].resolve(translation('你好')); await retry;
+  t.requests[3].resolve(translation('你好', { locale: 'untrusted-locale-marker', is_authenticated: false,
+    user: { id: 'untrusted-account-marker', locale: 'untrusted-user-locale-marker' } })); await retry;
+  assert(translationEvents.some(message => message.includes('authenticated=false account=mismatch locale=other userLocale=other upstreamStatus=unknown')));
+  assert(!translationEvents.some(message => message.includes('untrusted-')), 'context diagnostics never log raw unknown locale or account values');
   assert.equal(original.translatedText, '你好');
   assert(translationEvents.includes('CommentsTranslationTrace: phase=committed'));
   assert(!translationEvents.some(message => message.includes('Bonjour') || message.includes('你好')), 'translation diagnostics exclude original and translated text'); assert.equal(original.translationVisible, true);
@@ -369,6 +470,7 @@ async function main() {
   assert.equal(original.translatedText, '', 'changing language cannot reuse the previous translation');
   assert.equal(original.translationLanguage, translationLanguage);
   t.requests[4].resolve(translation({ text: 'unconfirmed object format' })); await unconfirmed;
+  assert(translationEvents.some(message => message.includes('authenticated=unknown account=unknown locale=absent userLocale=absent upstreamStatus=unknown')));
   assert.equal(original.translationError, '暂无法识别译文格式');
   const closed = t.controller.translateComment('21', () => true);
   t.controller.cancelComments(); assert.equal(original.translationLoading, false);
@@ -468,6 +570,7 @@ async function main() {
   mediaView.traceId++; assert.notEqual(evaluate(ownerExpression), owner, 'new detail opening invalidates the previous player');
   assert(page.includes('if ((this.actionsReady || this.readsReady) && !this.detail.relatedError && this.onLoadMore)'));
   console.log('Native detail reads: early read coalescing, validated publication, timeout/cancellation isolation, parallel preview, metadata, pagination, errors/retry passed');
+  if (process.argv[3]) await checkCapturedTranslations(process.argv[3]);
 }
 const deadline = setTimeout(() => { console.error('Native detail reads did not settle'); process.exit(1); }, 10000);
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(deadline));

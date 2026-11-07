@@ -72,6 +72,15 @@ export struct PinmonyInboxPage {
     { text: this.uiText("pm_updates_3055a035") }, { text: this.uiText("pm_inbox_63a5e7b7") }
   ]);
 
+  private segmentBackgroundColor(): ColorMetrics | undefined {
+    try {
+      return ColorMetrics.resourceColor($r('app.color.surface_muted'));
+    } catch (_) {
+      // Let the segment use its theme default if the color resource is unavailable.
+      return undefined;
+    }
+  }
+
   private syncSegmentItems(): void {
     const selectedIndex: number = this.snapshot.section === 'messages' ? 1 : 0;
     if (this.segmentSelectedIndex !== selectedIndex) this.segmentSelectedIndex = selectedIndex;
@@ -322,7 +331,7 @@ export struct PinmonyInboxPage {
         }.width(48).height(48)
           .onClick(() => this.openItemAvatar(item, contact))
       } else {
-        PinmonyUserAvatar({ image: item.imageUrl, name: item.title, avatarSize: 48 })
+        PinmonyUserAvatar({ profileUrl: item.profileUrl || '', image: item.imageUrl, colorIndex: item.avatarColorIndex || 0, name: item.title, avatarSize: 48 })
           .onClick(() => this.openItemAvatar(item, contact))
       }
       Column({ space: 4 }) {
@@ -460,7 +469,7 @@ export struct PinmonyInboxPage {
         Stack({ alignContent: Alignment.Start }) {
           CapsuleSegmentButtonV2({
             items: this.segmentItems,
-            buttonBackgroundColor: ColorMetrics.resourceColor($r('app.color.surface_muted')),
+            buttonBackgroundColor: this.segmentBackgroundColor(),
             buttonBackgroundBlurStyle: BlurStyle.NONE,
             enableStateAnimation: true,
             selectedIndex: this.segmentSelectedIndex,

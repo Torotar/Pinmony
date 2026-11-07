@@ -3,6 +3,7 @@ export interface PinmonyComment {
   text: string;
   name: string;
   avatar: string;
+  avatarColorIndex?: number;
   profileUrl?: string;
   createdAt: string;
   type?: string;

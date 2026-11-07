@@ -481,6 +481,7 @@ export const PIN_DETAIL_BRIDGE_SCRIPT: string = `
       sourceName: sourceName, creatorVerified: creator.is_verified_merchant === true,
       creator: clean(creator.full_name) || clean(creator.username),
       creatorUrl: /^[a-zA-Z0-9_]+$/.test(creator.username || '') ? location.origin + '/' + creator.username + '/' : '',
+      creatorAvatarColorIndex: Number.isInteger(creator.avatar_color_index) && creator.avatar_color_index >= 1 && creator.avatar_color_index <= 10 ? creator.avatar_color_index : undefined,
       creatorAvatar: /^https:\\/\\//i.test(creator.image_medium_url || '') ? creator.image_medium_url : '',
       sourceLabel: sourceLabel, sourceUrl: sourceUrl, actions: availableActions,
       related: api.related || [], relatedLoading: api.relatedBusy,

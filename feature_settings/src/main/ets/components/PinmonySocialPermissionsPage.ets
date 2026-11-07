@@ -1,3 +1,4 @@
+import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { BlurStrategy, HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
@@ -310,7 +311,7 @@ export struct PinmonySocialPermissionsPage {
         Search({ value: this.query, placeholder: this.uiText('pm_social_search') }).onChange((value: string) => { this.query = value; }).width('100%')
         ForEach(this.blocked(), (user: SocialBlockedUser) => {
           Row({ space:12 }) {
-            if (user.image) { Image(user.image).width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover) }
+            PinmonyUserAvatar({ username: user.username, userId: user.id, image: user.image, name: user.name || user.username, colorIndex: user.avatarColorIndex || 0, avatarSize: 48 })
             Column({ space:4 }) { Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontColor($r('app.color.primary_text')); Text('@' + user.username).fontColor($r('app.color.secondary_text')) }.layoutWeight(1).alignItems(HorizontalAlign.Start)
             Button(this.uiText('pm_social_unblock')).enabled(this.available()).onClick(() => this.unblock(user))
           }.width('100%').padding({ top:12,bottom:12 })

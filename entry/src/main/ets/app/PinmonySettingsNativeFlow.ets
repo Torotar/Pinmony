@@ -81,7 +81,7 @@ interface SocialCommentSettings { comments_phrase_filter_list_enabled?: boolean;
 interface SocialFeatureMap { comments_phrase_filter_list?: string[]; comments_phrase_filter_list_enabled?: boolean; pinner_comments_phrase_filter_list?: string[]; pinner_comments_phrase_filter_list_enabled?: boolean; }
 interface SocialFilterApiData { user: string; feature_map?: SocialFeatureMap; user_confirm_skip_passcode?: boolean; }
 interface SocialUpdate { user_id?: string; surface_tag: string; user_confirm_skip_passcode: boolean; allow_mentions?: number; messaging_permissions?: Record<string, number>; comments_disabled?: boolean; shopping_rec_disabled?: boolean; allow_idea_pin_downloads?: boolean; commentSettings?: SocialCommentSettings; }
-interface BlockedUserResponse { id: string; type?: string; username: string; full_name?: string; image_medium_url?: string; image_large_url?: string; }
+interface BlockedUserResponse { avatar_color_index?: number; id: string; type?: string; username: string; full_name?: string; image_medium_url?: string; image_large_url?: string; }
 interface BlockedQuery { q: string; }
 interface Api {
     url: string;
@@ -362,7 +362,7 @@ export class PinmonySettingsNativeFlow {
                 throw new Error('blocked-user');
             }
             const image: string = u.image_medium_url || u.image_large_url || '';
-            return { id: u.id, username: u.username, name: (u.full_name || u.username).slice(0,200), image: /^https:\/\//.test(image) ? image.slice(0,2000) : '' };
+            return { avatarColorIndex: Number.isInteger(u.avatar_color_index) && u.avatar_color_index! >= 1 && u.avatar_color_index! <= 10 ? u.avatar_color_index : undefined, id: u.id, username: u.username, name: (u.full_name || u.username).slice(0,200), image: /^https:\/\//.test(image) ? image.slice(0,2000) : '' };
         });
         if (rows.some((u: SocialBlockedUser, i: number): boolean => rows.findIndex((other: SocialBlockedUser): boolean => other.id === u.id) !== i)) throw new Error('duplicate-blocked');
         if (!this.current(revision)) return;

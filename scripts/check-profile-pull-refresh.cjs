@@ -29,4 +29,11 @@ assert(source.includes('.pullToRefresh(this.canPullProfileRefresh())'));
 assert(source.includes('.onRefreshing(() => this.requestProfileRefresh())'));
 assert(source.includes('.visibility(this.showProfileRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)'));
 assert(source.includes('.offset({ y: this.hubContentInset() })'),'indicator stays below profile header and filters');
+const primary=source.match(/if \(\(this.loading \|\| this.profile.contentLoading\) && !this.refreshing\)/);
+assert(primary,'refresh suppresses the duplicate primary content spinner');
+const primaryVisible=vm.runInNewContext('(function(){return (this.loading || this.profile.contentLoading) && !this.refreshing;})');
+for(const refreshing of [true,false])for(const loading of [true,false])for(const contentLoading of [true,false]){
+ assert.equal(primaryVisible.call({refreshing,loading,profile:{contentLoading}}),!refreshing&&(loading||contentLoading));
+}
+assert(source.includes('if (this.profile.unorganizedLoading && !this.refreshing)'),'refresh suppresses auxiliary content spinner');
 console.log('Profile pull refresh: short pull/rebound hidden, threshold and actual refresh visible, busy/restore/inactive guards and Refresh wiring passed');

@@ -3,7 +3,7 @@ import { PinmonyInboxItem } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
 
-interface PinmonyActivityUser { id: string; username: string; full_name?: string; image_large_url?: string; }
+interface PinmonyActivityUser { avatar_color_index?: number; id: string; username: string; full_name?: string; image_large_url?: string; }
 interface PinmonyActivityRelationship { relationship_type: number; followed_by_me: boolean; last_action_time: string; user: PinmonyActivityUser; }
 interface PinmonyActivityResource { status: string; code?: number; endpoint_name: string; error?: Object; data: Object; }
 interface PinmonyActivityBody { resource_response: PinmonyActivityResource; }
@@ -29,7 +29,7 @@ export class PinmonyInboxActivityNativeReads {
   private readonly ports: PinmonyInboxActivityPorts;
   constructor(ports: PinmonyInboxActivityPorts) { this.ports = ports; }
   private state(row: PinmonyInboxItem,busy: boolean,followed: boolean,uncertain: boolean): PinmonyInboxItem {
-    return {id:row.id,title:row.title,subtitle:row.subtitle,imageUrl:row.imageUrl,profileUrl:row.profileUrl,
+    return {id:row.id,title:row.title,subtitle:row.subtitle,avatarColorIndex:row.avatarColorIndex,imageUrl:row.imageUrl,profileUrl:row.profileUrl,
       usernames:row.usernames,enabled:row.enabled,updatedAt:row.updatedAt,activityUserId:row.activityUserId,
       activityBusy:busy,activityFollowed:followed,activityUncertain:uncertain};
   }
@@ -83,7 +83,7 @@ export class PinmonyInboxActivityNativeReads {
         if(seen.has(user.id))continue; seen.add(user.id);
         rows.push({id:'activity:' + user.id,activityUserId:user.id,title:typeof user.full_name === 'string' ? user.full_name.slice(0,500) || user.username : user.username,
           subtitle:PinmonyI18n.message('pm_activity_followed_you'),usernames:[user.username],
-          imageUrl:typeof user.image_large_url === 'string' && user.image_large_url.length <= 2048 && /^https:\/\/(?:[A-Za-z0-9-]+\.)*pinimg\.com\//.test(user.image_large_url) ? user.image_large_url : '',
+          avatarColorIndex:Number.isInteger(user.avatar_color_index) && user.avatar_color_index! >= 1 && user.avatar_color_index! <= 10 ? user.avatar_color_index : undefined,imageUrl:typeof user.image_large_url === 'string' && user.image_large_url.length <= 2048 && /^https:\/\/(?:[A-Za-z0-9-]+\.)*pinimg\.com\//.test(user.image_large_url) ? user.image_large_url : '',
           profileUrl:this.ports.session().origin + '/' + user.username + '/',enabled:true,updatedAt:relationship.last_action_time,
           activityFollowed:relationship.followed_by_me,activityUncertain:false});
       }

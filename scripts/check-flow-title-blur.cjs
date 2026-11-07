@@ -70,7 +70,13 @@ for (const file of files) {
         assert.equal(style.scrollEffectOpts.enableScrollEffect, false);
         assert.equal(style.originalStyle.backgroundStyle.backgroundColor, 'app.color.page_background');
         assert.equal(style.scrollEffectStyle.backgroundStyle.blurRadius, 0);
-        assert.equal(style.systemMaterialEffect, undefined);
+        assert.equal(style.systemMaterialEffect, mode, 'compose buttons reuse the shared material preference');
+        for (const content of [style.originalStyle.contentStyle, style.scrollEffectStyle.contentStyle]) {
+          const transparent = mode === 'off' || mode === 'gentle' ? 'transparent' : undefined;
+          assert.equal(content.backIconStyle.backgroundColor, transparent, 'back button retains material surface');
+          assert.equal(content.menuStyle.backgroundColor, transparent, 'next button retains material surface');
+          assert.equal(content.menuStyle.iconColor, 'app.color.primary_text');
+        }
       }
     }
     count++;

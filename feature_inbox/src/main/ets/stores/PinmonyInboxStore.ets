@@ -52,6 +52,9 @@ export class PinmonyInboxStore {
   invitationAllVisible: boolean = false;
   invitationBusy: boolean = false;
   joinedBoardAvatar: string = '';
+  joinedBoardName: string = '';
+  joinedBoardUsername: string = '';
+  joinedBoardAvatarColorIndex: number = 0;
   boardInvitationToken: number = 0;
   invitationReadPage: string = '';
   onNavigationChange: (() => void) | undefined = undefined;

@@ -1,4 +1,4 @@
-import { PinmonyHdsTitleBar } from 'common_ui';
+import { PinmonyUserAvatar, PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyBoardRecoveryPage } from './PinmonyBoardRecoveryPage';
@@ -38,7 +38,9 @@ export struct PinmonySettingsPage {
   onEditProfile?: () => void;
   onViewProfile?: () => void;
   @Prop profileName: string = '';
+  @Prop profileUrl: string = '';
   @Prop profileAvatar: string = '';
+  @Prop profileAvatarColorIndex: number = 0;
   @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
   onBack?: () => void;
   onPin?: (id: string) => void;
@@ -161,7 +163,7 @@ export struct PinmonySettingsPage {
           ListItem() {
             Button({type:ButtonType.Normal}) {
               Row({space:16}) {
-                Image(this.profileAvatar).width(48).height(48).borderRadius(24).objectFit(ImageFit.Cover)
+                PinmonyUserAvatar({ profileUrl: this.profileUrl, image: this.profileAvatar, name: this.profileName, colorIndex: this.profileAvatarColorIndex, avatarSize: 48 })
                 Column({space:4}) {
                   Text(this.profileName).fontSize(20).fontColor($r('app.color.primary_text'))
                   Text(this.uiText('pm_settings_view_profile')).fontSize(16).fontColor($r('app.color.secondary_text'))

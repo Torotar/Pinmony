@@ -41,6 +41,10 @@ export interface PinmonyBoardDetail {
   chatPeer?: PinmonyBoardChatPeer;
   canContribute?: boolean;
   collaboratorAvatars?: string[];
+  collaboratorUsers?: PinmonyBoardCreator[];
+  memberName?: string;
+  memberAvatarColorIndex?: number;
+  ownerAvatarColorIndex?: number;
   memberAvatar?: string;
   nextPage?: string;
   revision?: number;
@@ -127,7 +131,7 @@ export interface PinmonyBoardCoverState {
   error: string;
 }
 
-export interface PinmonyBoardChatPeer { id: string; name: string; avatar: string; username: string; }
-export interface PinmonyBoardCreator { id: string; name: string; avatar: string; url: string; verified: boolean; }
+export interface PinmonyBoardChatPeer { id: string; name: string; avatar: string; avatarColorIndex?: number; username: string; }
+export interface PinmonyBoardCreator { id: string; name: string; avatar: string; avatarColorIndex?: number; url: string; verified: boolean; }
 
 export interface PinmonyBoardSection { id: string; title: string; pinCount?: number; images: string[]; pins?: PinmonyBoardPin[]; }

@@ -1,3 +1,4 @@
+import { inheritUserAvatarColor, PinmonyAvatarUserMetadata } from './PinmonyUserAvatarMetadata';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardCoverNativeFlow, PinmonyBoardCoverIdentity } from './PinmonyBoardCoverNativeFlow';
 import { PinmonyBoardSectionNativeWrites, BoardSectionWriteIdentity } from './PinmonyBoardSectionNativeWrites';
@@ -16,7 +17,7 @@ const PIN_NATIVE_BOARD_READS_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_BOARD_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_BOARD_READS_ROLLOUT_ENABLED;
 interface PrivacyEditValues { name: string; description: string; privacy: string; recommend: boolean; invites: boolean; requests: boolean; }
 interface PrivacyEditAction { action: string; value: PrivacyEditValues; }
-interface BoardUser { type?: string; id: string; username: string; full_name?: string; pin_count?: number;
+interface BoardUser extends PinmonyAvatarUserMetadata { avatar_color_index?: number; type?: string; id: string; username: string; full_name?: string; pin_count?: number;
   image_medium_url?: string; image_small_url?: string; image_large_url?: string; verified_identity?: BoardVerified; }
 interface BoardVerified { verified: boolean; }
 interface BoardFeatured { curator?: BoardUser; board_tag?: string | number; is_sponsored_content?: boolean; board_subtitle?: string; }
@@ -205,16 +206,16 @@ export class PinmonyBoardNativeReads {
     const peer: BoardUser | undefined = members.length === 2 && members.some((u: BoardUser): boolean => u.id === this.viewer) ? members.find((u: BoardUser): boolean => u.id !== this.viewer) : undefined;
     const count: number | undefined = this.count(b?.pin_count), tag: string | number | undefined = b?.featured_board_metadata?.board_tag;
     const creators: PinmonyBoardCreator[] = b?.featured_board_metadata && !curator && b.should_show_board_collaborators === true ?
-      (owner ? [owner] : []).concat(b.collaborating_users || []).filter((u: BoardUser, i: number, all: BoardUser[]): boolean => !!u && this.digits(u.id) && !!this.clean(u.full_name || u.username) && all.findIndex((v: BoardUser): boolean => !!v && v.id === u.id) === i).slice(0, 6).map((u: BoardUser): PinmonyBoardCreator => ({ id:u.id, name:this.clean(u.full_name || u.username), avatar:this.image(u.image_medium_url || u.image_small_url), url:/^[A-Za-z0-9_]+$/.test(u.username) ? this.origin + '/' + u.username + '/' : '', verified:u.verified_identity?.verified === true })) : [];
+      (owner ? [owner] : []).concat(b.collaborating_users || []).filter((u: BoardUser, i: number, all: BoardUser[]): boolean => !!u && this.digits(u.id) && !!this.clean(u.full_name || u.username) && all.findIndex((v: BoardUser): boolean => !!v && v.id === u.id) === i).slice(0, 6).map((u: BoardUser): PinmonyBoardCreator => ({ id:u.id, name:this.clean(u.full_name || u.username), avatarColorIndex:Number.isInteger(u.avatar_color_index) && u.avatar_color_index! >= 1 && u.avatar_color_index! <= 10 ? u.avatar_color_index : undefined,avatar:this.image(u.image_medium_url || u.image_small_url), url:/^[A-Za-z0-9_]+$/.test(u.username) ? this.origin + '/' + u.username + '/' : '', verified:u.verified_identity?.verified === true })) : [];
     const snapshot: PinmonyBoardDetail = {kind:'state',nativeWriteIntent:this.flowEpoch,nativeAccountGeneration:this.generation,nativeVersion:this.version,nativeRecoveryVersion:this.recoveryVersion,nativeReadsReady:this.verified && this.ready,
       session:existing?.session || 0,pageKey:this.page,boardId:b?.id || '',title:this.clean(b?.name) || existing?.title || '图板',
       pinCount:count === undefined ? existing?.pinCount || '' : count.toString() + PinmonyI18n.message("pm_pins_0a89904f"),
       privacy:!this.collection() && ['public','secret'].includes(b?.privacy || '') ? b?.privacy : undefined,
-      ownerName:curator || showOwner ? this.clean(display?.full_name || display?.username) : '',ownerAvatar:curator || showOwner ? this.image(display?.image_medium_url || display?.image_small_url) : '',
+      ownerAvatarColorIndex:curator || showOwner ? (Number.isInteger(display?.avatar_color_index) && display?.avatar_color_index! >= 1 && display?.avatar_color_index! <= 10 ? display?.avatar_color_index : undefined) : undefined,ownerName:curator || showOwner ? this.clean(display?.full_name || display?.username) : '',ownerAvatar:curator || showOwner ? this.image(display?.image_medium_url || display?.image_small_url) : '',
       ownerUrl:display && /^[A-Za-z0-9_]+$/.test(display.username) ? this.origin + '/' + display.username + '/' : '',
-      memberAvatar:this.image(owner?.image_medium_url || owner?.image_small_url),collaboratorAvatars:members.slice(0,6).map((u: BoardUser): string => this.image(u.image_medium_url || u.image_small_url)).filter((url: string): boolean => !!url),
+      memberName:this.clean(owner?.full_name || owner?.username),memberAvatarColorIndex:Number.isInteger(owner?.avatar_color_index) && owner?.avatar_color_index! >= 1 && owner?.avatar_color_index! <= 10 ? owner?.avatar_color_index : undefined,collaboratorUsers:members.slice(0,6).map((u: BoardUser): PinmonyBoardCreator => ({id:u.id,name:this.clean(u.full_name || u.username),avatar:this.image(u.image_medium_url || u.image_small_url),avatarColorIndex:Number.isInteger(u.avatar_color_index) && u.avatar_color_index! >= 1 && u.avatar_color_index! <= 10 ? u.avatar_color_index : undefined,url:/^[A-Za-z0-9_]+$/.test(u.username) ? this.origin + '/' + u.username + '/' : '',verified:false})),memberAvatar:this.image(owner?.image_medium_url || owner?.image_small_url),collaboratorAvatars:members.slice(0,6).map((u: BoardUser): string => this.image(u.image_medium_url || u.image_small_url)).filter((url: string): boolean => !!url),
       chatMemberCount:Math.max(members.length,this.count(b?.collaborator_count) === undefined ? 0 : (b?.collaborator_count || 0) + 1),
-      chatPeer:peer ? {id:peer.id,name:this.clean(peer.full_name || peer.username),avatar:this.image(peer.image_medium_url || peer.image_small_url),username:this.clean(peer.username)} : undefined,
+      chatPeer:peer ? {id:peer.id,name:this.clean(peer.full_name || peer.username),avatarColorIndex:Number.isInteger(peer.avatar_color_index) && peer.avatar_color_index! >= 1 && peer.avatar_color_index! <= 10 ? peer.avatar_color_index : undefined,avatar:this.image(peer.image_medium_url || peer.image_small_url),username:this.clean(peer.username)} : undefined,
       following:typeof b?.followed_by_me === 'boolean' ? b.followed_by_me : undefined,followBusy:this.followWrites.busy(b?.id || ''),
       canFollow:this.verified && this.ready && !own && !this.collection() && typeof b?.followed_by_me === 'boolean' && !this.followWrites.pending() && !this.followWrites.locked(b.id),
       editable:this.postOperationLoading && !this.verified ? existing?.editable === true : this.verified && own && !this.collection(),collaborator:member,canContribute:this.verified && !this.collection() && (own || member && !!b?.access?.includes('write')),
@@ -424,7 +425,7 @@ export class PinmonyBoardNativeReads {
     if(action === 'editSave') {
       const b: BoardData = JSON.parse(raw) as BoardData;
       b.owner = {id:b.owner.id,username:b.owner.username || old.owner.username,full_name:b.owner.full_name || old.owner.full_name,
-        image_medium_url:b.owner.image_medium_url || old.owner.image_medium_url,image_small_url:b.owner.image_small_url || old.owner.image_small_url,image_large_url:b.owner.image_large_url || old.owner.image_large_url};
+        avatar_color_index:b.owner.avatar_color_index ?? old.owner.avatar_color_index,image_medium_url:b.owner.image_medium_url || old.owner.image_medium_url,image_small_url:b.owner.image_small_url || old.owner.image_small_url,image_large_url:b.owner.image_large_url || old.owner.image_large_url};
       if(b.collaborated_by_me === undefined)b.collaborated_by_me = old.collaborated_by_me;
       if(b.is_collaborative === undefined)b.is_collaborative = old.is_collaborative;
       if(b.collaborating_users === undefined)b.collaborating_users = old.collaborating_users;
@@ -626,7 +627,7 @@ export class PinmonyBoardNativeReads {
         const b: BoardData = body.resource_response.data as BoardData;this.validateAuxiliaryBoard(b,true);
         if(!['public','secret'].includes(b.privacy || ''))throw new Error('privacy');
         // Read/edit field sets omit role fields; retain only fields already verified for this board.
-        b.owner = {id:b.owner.id,username:b.owner.username || board.owner.username,full_name:b.owner.full_name || board.owner.full_name,image_medium_url:b.owner.image_medium_url || board.owner.image_medium_url,image_small_url:b.owner.image_small_url || board.owner.image_small_url,image_large_url:b.owner.image_large_url || board.owner.image_large_url};
+        b.owner = {id:b.owner.id,username:b.owner.username || board.owner.username,full_name:b.owner.full_name || board.owner.full_name,avatar_color_index:b.owner.avatar_color_index ?? board.owner.avatar_color_index,image_medium_url:b.owner.image_medium_url || board.owner.image_medium_url,image_small_url:b.owner.image_small_url || board.owner.image_small_url,image_large_url:b.owner.image_large_url || board.owner.image_large_url};
         if(typeof b.collaborated_by_me !== 'boolean')b.collaborated_by_me = board.collaborated_by_me;
         if(typeof b.is_collaborative !== 'boolean')b.is_collaborative = board.is_collaborative;
         if(!Array.isArray(b.collaborating_users))b.collaborating_users = board.collaborating_users;
@@ -724,7 +725,7 @@ export class PinmonyBoardNativeReads {
     this.store.collaborators = {token:token,page:this.page,phase:'members',loading:true,busy:false,uncertain:false,error:'',feedback:'',permission:1,invites:false,users:[],suggestions:[]};await this.readCollaborators();
   }
   private cancelCollaborators(): void {this.collabEpoch++;this.collabRequests.forEach((id: string): void => this.ports.network().cancel(id));this.collabRequests.clear();}
-  private collaborator(user: BoardUser, status: string): PinmonyBoardCollaborator {if(!user || !this.digits(user.id) || typeof user.username === 'string' && !/^[A-Za-z0-9_]*$/.test(user.username))throw new Error('collaborator');return {id:user.id,name:this.clean(user.full_name || user.username),username:this.clean(user.username),avatar:this.image(user.image_medium_url || user.image_small_url || user.image_large_url),status:status};}
+  private collaborator(user: BoardUser, status: string): PinmonyBoardCollaborator {if(!user || !this.digits(user.id) || typeof user.username === 'string' && !/^[A-Za-z0-9_]*$/.test(user.username))throw new Error('collaborator');return {id:user.id,name:this.clean(user.full_name || user.username),username:this.clean(user.username),avatarColorIndex:Number.isInteger(user.avatar_color_index) && user.avatar_color_index! >= 1 && user.avatar_color_index! <= 10 ? user.avatar_color_index : undefined,avatar:this.image(user.image_medium_url || user.image_small_url || user.image_large_url),status:status};}
   private async readCollaborators(): Promise<void> {
     if(!this.current() || !this.board || !this.participates())return;this.cancelCollaborators();const epoch: number = this.collabEpoch, revision: number = this.revision, state: PinmonyBoardCollaborators | undefined = this.store.collaborators;if(!state || state.busy)return;
     state.loading = true;state.error = '';const live = (): boolean => this.current() && revision === this.revision && epoch === this.collabEpoch && this.store.collaborators === state && state.token === this.store.collaboratorsToken;
@@ -737,9 +738,9 @@ export class PinmonyBoardNativeReads {
       if(b.owner.id !== this.viewer && !member || b.collaborator_permissions_setting !== 0 && b.collaborator_permissions_setting !== 1)throw new Error('permissions');
       const invites: BoardInviteData[] = values[1].resource_response.data as BoardInviteData[], suggested: BoardUser[] = values[2].resource_response.data as BoardUser[];
       if(!Array.isArray(invites) || invites.length > 500 || !Array.isArray(suggested) || suggested.length > 500)throw new Error('users');
-      const owner: PinmonyBoardCollaborator = this.collaborator(b.owner,'owner');[this.board.owner,values[0].client_context?.user].forEach((u: BoardUser | undefined): void => {if(u?.id === owner.id){const known: PinmonyBoardCollaborator = this.collaborator(u,'owner');owner.name = owner.name || known.name;owner.username = owner.username || known.username;owner.avatar = owner.avatar || known.avatar;}});
-      const users: PinmonyBoardCollaborator[] = [owner];invites.forEach((i: BoardInviteData): void => {if(!i || i.board?.id !== this.board?.id || !['new','accepted','contact_request_not_approved','pending_approval'].includes(i.status))throw new Error('invite');const user: PinmonyBoardCollaborator = this.collaborator(i.invited_user,i.status);if(!users.some((u: PinmonyBoardCollaborator): boolean => u.id === user.id))users.push(user);});
-      const suggestions: PinmonyBoardCollaborator[] = [];suggested.slice(0,100).forEach((u: BoardUser): void => {const user: PinmonyBoardCollaborator = this.collaborator(u,users.find((v: PinmonyBoardCollaborator): boolean => v.id === u.id)?.status || '');if(user.id !== this.viewer && !suggestions.some((v: PinmonyBoardCollaborator): boolean => v.id === user.id))suggestions.push(user);});
+      const owner: PinmonyBoardCollaborator = this.collaborator(b.owner,'owner');[this.board.owner,values[0].client_context?.user].forEach((u: BoardUser | undefined): void => {if(u?.id === owner.id){const known: PinmonyBoardCollaborator = this.collaborator(u,'owner');owner.name = owner.name || known.name;owner.username = owner.username || known.username;owner.avatar = owner.avatar || known.avatar;if(b.owner.avatar_color_index === undefined && owner.avatarColorIndex === undefined)owner.avatarColorIndex = known.avatarColorIndex;}});
+      const users: PinmonyBoardCollaborator[] = [owner];invites.forEach((i: BoardInviteData): void => {if(!i || i.board?.id !== this.board?.id || !['new','accepted','contact_request_not_approved','pending_approval'].includes(i.status))throw new Error('invite');inheritUserAvatarColor(i.invited_user,[values[1].client_context?.user,b.owner,this.board?.owner]);const user: PinmonyBoardCollaborator = this.collaborator(i.invited_user,i.status);if(!users.some((u: PinmonyBoardCollaborator): boolean => u.id === user.id))users.push(user);});
+      const suggestions: PinmonyBoardCollaborator[] = [];suggested.slice(0,100).forEach((u: BoardUser): void => {inheritUserAvatarColor(u,[values[2].client_context?.user,b.owner,this.board?.owner]);const user: PinmonyBoardCollaborator = this.collaborator(u,users.find((v: PinmonyBoardCollaborator): boolean => v.id === u.id)?.status || '');if(user.id !== this.viewer && !suggestions.some((v: PinmonyBoardCollaborator): boolean => v.id === user.id))suggestions.push(user);});
       state.owner = b.owner.id === this.viewer;state.permission = b.collaborator_permissions_setting;state.invites = b.collaborator_invites_enabled === true;state.canInvite = state.owner || member && state.invites;state.users = users.slice(0,500);state.suggestions = suggestions;
     }catch (_) {if(live()){state.error = PinmonyI18n.message("pm_unable_to_load_collaborators_please_retry_b78a9b74");this.collabRequests.forEach((id: string): void => this.ports.network().cancel(id));this.collabRequests.clear();}}
     finally {if(live()){state.loading = false;this.syncAuxiliary();}}
@@ -778,6 +779,13 @@ export class PinmonyBoardNativeReads {
     if(!r || r.status !== 'success' || r.error || r.code !== undefined && r.code !== 0)throw new Error('response');
     const viewer: string | undefined = payload.client_context?.user?.id;
     if(viewer !== undefined && (!this.digits(viewer) || this.viewer && viewer !== this.viewer))throw new Error('viewer');
+    if (name === 'BoardResource') {
+      const board: BoardData = r.data as BoardData;
+      inheritUserAvatarColor(board?.owner,[payload.client_context?.user,this.board?.owner]);
+      if (Array.isArray(board?.collaborating_users)) board.collaborating_users.forEach((user: BoardUser): void => {
+        inheritUserAvatarColor(user,[payload.client_context?.user,this.board?.owner]);
+      });
+    }
     return payload;
   }
   private next(body: BoardResponse): string { const next: string | undefined = body.resource_response.bookmark || body.resource?.options?.bookmarks?.[0]; if(next !== undefined && (typeof next !== 'string' || next.length > 4096))throw new Error('bookmark'); return next || ''; }

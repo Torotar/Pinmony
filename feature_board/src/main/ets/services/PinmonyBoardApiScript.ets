@@ -90,14 +90,14 @@ export const PIN_BOARD_API_SCRIPT: string = `
       headerImage: board && board.header ? image(board.header.large_image_url || board.header.small_image_url) : '',
       privacy: !collection() && board && ['public', 'secret'].indexOf(board.privacy) >= 0 ? board.privacy : undefined,
       ownerUrl: /^[a-zA-Z0-9_]+$/.test(displayOwner.username || '') ? location.origin + '/' + displayOwner.username + '/' : '',
-      ownerName: curator || showOwner ? clean(displayOwner.full_name || displayOwner.username) : '', ownerAvatar: curator || showOwner ? image(displayOwner.image_medium_url || displayOwner.image_small_url) : '',
+      ownerAvatarColorIndex: curator || showOwner ? (Number.isInteger(displayOwner.avatar_color_index) && displayOwner.avatar_color_index >= 1 && displayOwner.avatar_color_index <= 10 ? displayOwner.avatar_color_index : undefined) : undefined, ownerName: curator || showOwner ? clean(displayOwner.full_name || displayOwner.username) : '', ownerAvatar: curator || showOwner ? image(displayOwner.image_medium_url || displayOwner.image_small_url) : '',
       loading: !ready && (boardBusy || feedBusy || !attempted), loadingMore: ready && feedBusy && !refreshing,
       refreshing: refreshing,
       ready: ready, error: error, hasMore: !ended, pins: pins, flow: flow,
       chatMemberCount: Math.max(members.length, board && typeof board.collaborator_count === 'number' ? board.collaborator_count + 1 : 0),
-      chatPeer: peer ? { id: String(peer.id), name: clean(peer.full_name || peer.username), avatar: image(peer.image_medium_url || peer.image_small_url), username: clean(peer.username) } : undefined,
+      chatPeer: peer ? { id: String(peer.id), name: clean(peer.full_name || peer.username), avatarColorIndex: Number.isInteger(peer.avatar_color_index) && peer.avatar_color_index >= 1 && peer.avatar_color_index <= 10 ? peer.avatar_color_index : undefined, avatar: image(peer.image_medium_url || peer.image_small_url), username: clean(peer.username) } : undefined,
       collaborator: !!member, canContribute: !!contributes(), collaboratorAvatars: avatars,
-      memberAvatar: image(owner.image_medium_url || owner.image_small_url), nextPage: nextPage, revision: revision,
+      memberName: clean(owner.full_name || owner.username), memberAvatarColorIndex: Number.isInteger(owner.avatar_color_index) && owner.avatar_color_index >= 1 && owner.avatar_color_index <= 10 ? owner.avatar_color_index : undefined, collaboratorUsers: members.slice(0,6).map(function(u) { return { id:String(u.id), name:clean(u.full_name || u.username), avatar:image(u.image_medium_url || u.image_small_url), avatarColorIndex:Number.isInteger(u.avatar_color_index) && u.avatar_color_index >= 1 && u.avatar_color_index <= 10 ? u.avatar_color_index : undefined, url:'', verified:false }; }), memberAvatar: image(owner.image_medium_url || owner.image_small_url), nextPage: nextPage, revision: revision,
       editable: !!own && !collection() && !recoveryRequired && !boardBusy });
     if (value === lastMessage) return;
     try { var bridge = window.PinmonyShareBridge; if (!bridge || !bridge.boardState) return; bridge.boardState(value); lastMessage = value; } catch (_) { console.warn('BridgeTrace: board unavailable'); }
@@ -463,7 +463,7 @@ export const PIN_BOARD_API_SCRIPT: string = `
   function collabUser(user, status) {
     if (!user || !digits(String(user.id))) throw new Error('invalid-user');
     return { id: String(user.id), name: clean(user.full_name || user.username), username: clean(user.username),
-      avatar: image(user.image_medium_url) || image(user.image_small_url) || image(user.image_large_url), status: status || '' };
+      avatarColorIndex: Number.isInteger(user.avatar_color_index) && user.avatar_color_index >= 1 && user.avatar_color_index <= 10 ? user.avatar_color_index : undefined, avatar: image(user.image_medium_url) || image(user.image_small_url) || image(user.image_large_url), status: status || '' };
   }
   async function collabLoad(state) {
     if(nativeAuxiliary())return;
@@ -526,7 +526,7 @@ export const PIN_BOARD_API_SCRIPT: string = `
         if (!response.ok || payload.errors || !payload.data || !payload.data.v3InviteBoardCollaboratorsMutation ||
             payload.data.v3InviteBoardCollaboratorsMutation.__typename !== 'V3InviteBoardCollaborators') throw new Error('unconfirmed-invite');
         user.status = 'new'; state.users.push(collabUser({ id: user.id, full_name: user.name, username: user.username,
-          image_medium_url: user.avatar }, 'new')); state.feedback = '已发送 1 个邀请！';
+          image_medium_url: user.avatar, avatar_color_index: user.avatarColorIndex }, 'new')); state.feedback = '已发送 1 个邀请！';
       } else {
         if (!value || [0, 1].indexOf(value.permission) < 0 || typeof value.invites !== 'boolean') throw new Error('unsupported-permission');
         sent = true;

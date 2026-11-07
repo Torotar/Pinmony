@@ -10,6 +10,7 @@ interface User {
     full_name?: string;
     label?: string;
     image_medium_url?: string;
+    avatar_color_index?: number;
     send_pin_image?: string;
     image?: string;
 }
@@ -133,7 +134,7 @@ export class PinmonyShareNativeFlow {
     constructor(ports: PinmonyShareNativePorts) { this.ports = ports; this.store = ports.store(); this.client = new PinmonySharePublishClient(ports); this.contactsClient = new PinmonySharePublishClient(ports); }
     private key(target: string): string { return JSON.stringify([this.mode, this.id, target]); }
     private current(revision: number): boolean { if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) return false; const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.visible() && this.store.shareSession === this.session && this.ports.current(this.mode, this.page, this.id); }
-    private contacts(): void { this.store.shareContacts = this.users.map((u: User): ShareSheetOption => ({ id: 'native-contact:' + u.id, label: ((u.full_name || u.label || u.username || '') + (u.username ? ' @' + u.username : '')).slice(0, 300), icon: /^https:\/\//.test(u.send_pin_image || u.image_medium_url || u.image || '') ? (u.send_pin_image || u.image_medium_url || u.image || '').slice(0, 4096) : '', enabled: !this.busy && !this.unknown.has(this.key(u.id)) && !this.sent.has(u.id) })); if (this.users.some((u: User): boolean => this.unknown.has(this.key(u.id))))
+    private contacts(): void { this.store.shareContacts = this.users.map((u: User): ShareSheetOption => ({ username:/^[A-Za-z0-9_]+$/.test(u.username || '') ? u.username : undefined, avatarColorIndex: Number.isInteger(u.avatar_color_index) && u.avatar_color_index! >= 1 && u.avatar_color_index! <= 10 ? u.avatar_color_index : undefined, id: 'native-contact:' + u.id, label: ((u.full_name || u.label || u.username || '') + (u.username ? ' @' + u.username : '')).slice(0, 300), icon: /^https:\/\//.test(u.send_pin_image || u.image_medium_url || u.image || '') ? (u.send_pin_image || u.image_medium_url || u.image || '').slice(0, 4096) : '', enabled: !this.busy && !this.unknown.has(this.key(u.id)) && !this.sent.has(u.id) })); if (this.users.some((u: User): boolean => this.unknown.has(this.key(u.id))))
         this.store.shareError = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238"); }
     // Cancelling a transport cannot prove that an already sent mutation was undone.
     pause(): void { if (this.busy && this.pending) {

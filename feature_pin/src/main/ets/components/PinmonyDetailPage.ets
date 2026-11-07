@@ -1310,7 +1310,7 @@ export struct PinmonyDetailPage {
           Column({ space: 6 }) {
             if (this.displayedDetail().creator.length > 0) {
               Row({ space: 10 }) {
-                PinmonyUserAvatar({ image: this.displayedDetail().creatorAvatar, name: this.displayedDetail().creator, avatarSize: 32 })
+                PinmonyUserAvatar({ profileUrl: this.displayedDetail().creatorUrl || '', image: this.displayedDetail().creatorAvatar, name: this.displayedDetail().creator, colorIndex: this.displayedDetail().creatorAvatarColorIndex || 0, avatarSize: 32 })
                 Text(this.displayedDetail().creator)
                   .fontSize(this.creatorFontSize())
                   .constraintSize({ maxWidth: '80%' })

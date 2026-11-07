@@ -7,7 +7,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.Modu
 let now = Date.parse('2026-11-07T08:00:00Z');
 class TestDate extends Date { static now() { return now; } }
 function fixture() {
-  let active = true, visible = '', enabled = true, language = 'zh', permissionCalls = 0, failPublish = false;
+  let active = true, background = false, visible = '', viewed = '', enabled = true, language = 'zh', permissionCalls = 0, failPublish = false, failCancel = false;
   let session = { authenticated: true, accountId: 'self', generation: 1, origin: 'https://www.pinterest.com' };
   let permissionGate, wantGate, publishGate;
   let avatarResult, avatarGate, canOpen = true;
@@ -17,17 +17,18 @@ function fixture() {
   const published = [], cancelled = [], exports = {};
   const manager = {
     SlotType: { SOCIAL_COMMUNICATION: 1 }, ContentType: { NOTIFICATION_CONTENT_BASIC_TEXT: 0 },
-    cancel: async id => { cancelled.push(id); }, isNotificationEnabled: async () => enabled,
+    cancel: async id => { cancelled.push(id); if(failCancel)throw Error('synthetic cancellation'); }, isNotificationEnabled: async () => enabled,
     requestEnableNotification: async () => { permissionCalls++; if (permissionGate) await permissionGate; },
     publish: async request => { if (failPublish) throw Error('synthetic'); published.push({...request}); if (publishGate) await publishGate; }
   };
   vm.runInNewContext(compiled, { exports, Date: TestDate, require: name => name === './PinmonyInboxNoticeAvatar' ? { PinmonyInboxNoticeAvatar: class { cancel() {} async read(url) { if(!url)return;avatarReads.push(url); if(avatarGate)await avatarGate;return avatarResult; } } } : name === './PinmonyInboxNoticeTap' ? tapExports : name === '@kit.NotificationKit' ? { notificationManager: manager } : name === '@kit.AbilityKit' ? {
     wantAgent: { getWantAgent: async info => { if (wantGate) await wantGate; return info; }, OperationType: { START_ABILITY: 0 }, WantAgentFlags: { UPDATE_PRESENT_FLAG: 0 } }
   } : name === 'common_foundation' ? { PinmonyRuntimeLog: { info() {}, warn() {} }, PinmonyI18n: { message: () => language === 'zh' ? '新消息' : 'New message' } } : {} });
-  const notice = new exports.PinmonyInboxMessageNotice({ session: () => session, active: () => active, username: () => 'self', visibleConversation: () => visible, context: () => ({ applicationInfo: { name: 'com.synthetic.pinmony' } }),openChat:id=>{if(!canOpen)return false;opened.push(id);return true;} });
+  const notice = new exports.PinmonyInboxMessageNotice({ session: () => session, active: () => active, deliveryActive: () => background, username: () => 'self', visibleConversation: () => visible, viewedConversation:()=>viewed, context: () => ({ applicationInfo: { name: 'com.synthetic.pinmony' } }),openChat:id=>{if(!canOpen)return false;opened.push(id);return true;} });
   return { notice, published, cancelled, setActive: v => active = v, setVisible: v => visible = v, setEnabled: v => enabled = v,
-    setSession: v => session = v, setLanguage: v => language = v, permissionCalls: () => permissionCalls,
+    setSession: v => session = v, setLanguage: v => language = v, setBackground: v => background = v, permissionCalls: () => permissionCalls,
     setPermissionGate: v => permissionGate = v, setWantGate: v => wantGate = v, setPublishGate: v => publishGate = v, failPublish: v => failPublish = v,
+    setViewed:v=>viewed=v,failCancel:v=>failCancel=v,
     opened,avatarReads,receive:want=>tapExports.PinmonyInboxNoticeTap.receive(want),setCanOpen:v=>canOpen=v,setAvatar:(pixels,gate)=>{avatarResult=pixels;avatarGate=gate;} };
 }
 const row = (id, message, extra = {}) => ({ id, unread: 1, users: [{ id: '2', full_name: '发送者原文' }], last_message: {
@@ -86,9 +87,49 @@ async function main() {
   clicked.notice.observe([]);now+=10000;clicked.notice.observe([row('100','31',{sender:{id:'2',full_name:'头像用户',image_small_url:'https://i.pinimg.com/avatar.jpg'}})]);await turn();
   clicked.receive({parameters:clicked.published[0].wantAgent.wants[0].parameters});clicked.notice.consumeTap();finishAvatar();await turn();await settle(clicked);
   assert.equal(clicked.published.length,1,'a late avatar cannot resurrect a clicked notification');assert.equal(lateReleases,1);
+  const hidden=fixture();assert.equal(hidden.notice.readyForBackground(),false);hidden.notice.observe([]);assert.equal(hidden.notice.readyForBackground(),true);
+  hidden.setActive(false);hidden.setBackground(true);hidden.setVisible('100');now+=10000;hidden.notice.observe([row('100','40')]);await settle(hidden);
+  assert.equal(hidden.published.length,1,'a chat left underneath the background is no longer visible and must notify');
+  hidden.receive({parameters:hidden.published[0].wantAgent.wants[0].parameters});assert.equal(hidden.opened.length,0,'a live background reader cannot navigate while hidden');
+  hidden.setActive(true);hidden.setBackground(false);hidden.notice.consumeTap();assert.equal(hidden.opened[0],'100','foreground resumes the exact tapped chat');
+  const hiddenDenied=fixture();hiddenDenied.notice.observe([]);hiddenDenied.setActive(false);hiddenDenied.setBackground(true);hiddenDenied.setEnabled(false);now+=10000;hiddenDenied.notice.observe([row('100','41')]);await settle(hiddenDenied);
+  assert.equal(hiddenDenied.permissionCalls(),0,'background cannot open a permission dialog');assert.equal(hiddenDenied.published.length,0);
+  let finishHidden;const expiry=fixture();expiry.notice.observe([]);expiry.setActive(false);expiry.setBackground(true);expiry.setWantGate(new Promise(resolve=>finishHidden=resolve));now+=10000;expiry.notice.observe([row('100','42')]);await turn();expiry.setBackground(false);expiry.notice.pause();finishHidden();await settle(expiry);assert.equal(expiry.published.length,0,'stopped background work cannot publish late');
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+  const foreground=fixture();foreground.notice.observe([]);await settle(foreground);now+=10000;foreground.notice.observe([row('100','70')]);await settle(foreground);const beforeForeground=foreground.cancelled.length;
+  foreground.notice.dismissForeground();await settle(foreground);assert.equal(foreground.cancelled.length,beforeForeground+1,'opening the app clears its notice without entering a chat');assert.equal(foreground.notice.publishedConversation,'');
+  const foregroundRace=fixture();foregroundRace.notice.observe([]);await settle(foregroundRace);let finishForeground;foregroundRace.setPublishGate(new Promise(resolve=>finishForeground=resolve));now+=10000;foregroundRace.notice.observe([row('100','71')]);await turn();foregroundRace.notice.dismissForeground();finishForeground();await settle(foregroundRace);assert.equal(foregroundRace.notice.publishedConversation,'','foreground invalidates a background SDK publication already in flight');
+  const foregroundTap=fixture();foregroundTap.notice.observe([]);await settle(foregroundTap);now+=10000;foregroundTap.notice.observe([row('100','72')]);await settle(foregroundTap);foregroundTap.setActive(false);foregroundTap.receive({parameters:foregroundTap.published[0].wantAgent.wants[0].parameters});foregroundTap.notice.dismissForeground();await settle(foregroundTap);foregroundTap.setActive(true);foregroundTap.notice.consumeTap();assert.equal(foregroundTap.opened[0],'100','clearing on app entry preserves the already clicked chat target');
+  const coldBackground=fixture();coldBackground.setActive(false);coldBackground.setBackground(true);coldBackground.notice.observe([row('100','73')]);await settle(coldBackground);assert.equal(coldBackground.published.length,0,'first background read establishes a silent baseline');now+=10000;coldBackground.notice.observe([row('100','74')]);await settle(coldBackground);assert.equal(coldBackground.published.length,1,'later background arrivals notify without any foreground list read');
+  assert.match(index,/onPageShow\(\): void \{\s*this.inboxBackgroundSync.stop\(\);\s*this.inboxMessageNotice.dismissForeground\(\)/);
+  const viewed=fixture();viewed.notice.observe([]);await settle(viewed);now+=10000;viewed.notice.observe([row('100','50')]);await settle(viewed);
+  const initialCancels=viewed.cancelled.length;
+  viewed.setVisible('100');viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.cancelled.length,initialCancels,'visible but unloaded chat does not clear');
+  viewed.setViewed('200');viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.cancelled.length,initialCancels,'viewing another chat preserves current notice');
+  viewed.setViewed('100');viewed.setActive(false);viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.cancelled.length,initialCancels,'background retained chat is not viewed');
+  viewed.setActive(true);viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.cancelled.length,initialCancels+1);assert.equal(viewed.notice.publishedConversation,'');
+  viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.cancelled.length,initialCancels+1,'dismissal is idempotent');
+  viewed.setVisible('');viewed.setViewed('');now+=10000;viewed.notice.observe([row('100','51')]);await settle(viewed);assert.equal(viewed.published.length,2,'later messages can notify after leaving');
+  viewed.failCancel(true);viewed.setViewed('100');viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.notice.publishedConversation,'100','failure retains retry ownership');
+  viewed.failCancel(false);viewed.notice.dismissViewed();await settle(viewed);assert.equal(viewed.notice.publishedConversation,'','later host tick retries failed cancellation');
+  const queued=fixture();queued.notice.observe([]);await settle(queued);now+=10000;queued.notice.observe([row('100','52')]);queued.setViewed('100');queued.notice.dismissViewed();queued.setViewed('');await settle(queued);assert.equal(queued.published.length,0,'viewing then leaving invalidates queued delivery');
+  const flight=fixture();flight.notice.observe([]);await settle(flight);let finishPublish;flight.setPublishGate(new Promise(resolve=>finishPublish=resolve));now+=10000;flight.notice.observe([row('100','53')]);await turn();flight.setViewed('100');flight.notice.dismissViewed();flight.setViewed('');finishPublish();await settle(flight);assert.equal(flight.notice.publishedConversation,'','viewing during SDK publication clears late notification');
+  const replacement=fixture();replacement.notice.observe([]);await settle(replacement);now+=10000;replacement.notice.observe([row('100','54')]);await settle(replacement);let finishReplacement;replacement.setPublishGate(new Promise(resolve=>finishReplacement=resolve));now+=10000;replacement.notice.observe([row('200','55')]);await turn();const cancelBefore=replacement.cancelled.length;replacement.setViewed('100');replacement.notice.dismissViewed();finishReplacement();await settle(replacement);assert.equal(replacement.notice.publishedConversation,'200');assert.equal(replacement.cancelled.length,cancelBefore,'queued old dismissal cannot clear newer conversation');
+  const late=fixture();let finishLate,releasedLate=0;late.setAvatar({release:async()=>releasedLate++},new Promise(resolve=>finishLate=resolve));late.notice.observe([]);await settle(late);now+=10000;late.notice.observe([row('100','56',{sender:{id:'2',image_small_url:'https://i.pinimg.com/avatar.jpg'}})]);await turn();late.setViewed('100');late.notice.dismissViewed();await settle(late);late.setViewed('');finishLate();await turn();await settle(late);assert.equal(late.published.length,1,'late avatar cannot resurrect viewed notification');assert.equal(releasedLate,1);
+  const helper=index.slice(index.indexOf('  private visibleInboxNoticeConversation('),index.indexOf('  private readonly inboxMessageNotice:'));
+  assert(helper.includes('viewed && (flow.loading || !!flow.error || !flow.messages.length)'));
+  const helperExports={};let helperBackground=false;
+  vm.runInNewContext(ts.transpileModule('export class Host { '+helper+' }',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:helperExports,PinmonyInboxBackgroundLifecycle:{isBackground:()=>helperBackground}});
+  const host=new helperExports.Host();Object.assign(host,{authStatus:'authenticated',businessSuspended:false,noticeChats:[],inboxMessagesNativeReads:{ownsFlow:()=>true},pinStore:{},nativeBoardVisible:()=>false,activeSheetKind:'',profileSettingsVisible:false,boardRecoveryVisible:false,chatProfileTransition:false,profileChatActive:false,activeTab:2,profileStore:{origins:[]},currentInboxUrl:()=>'/chat',inboxStore:{inboxFlow:{screen:'chat',pageUrl:'/chat',conversationId:'100',messages:[{}],loading:false,error:''}}});
+  assert.equal(host.visibleInboxNoticeConversation(true),'100');
+  for(const patch of [{loading:true},{error:'failed'},{messages:[]},{screen:'settings'}]){const saved={...host.inboxStore.inboxFlow};Object.assign(host.inboxStore.inboxFlow,patch);assert.equal(host.visibleInboxNoticeConversation(true),'');host.inboxStore.inboxFlow=saved;}
+  host.activeTab=0;assert.equal(host.visibleInboxNoticeConversation(true),'');host.profileChatActive=true;assert.equal(host.visibleInboxNoticeConversation(true),'100');host.profileChatActive=false;host.activeTab=2;
+  for(const key of ['businessSuspended','profileSettingsVisible','boardRecoveryVisible','chatProfileTransition','activeSheetKind']){host[key]=true;assert.equal(host.visibleInboxNoticeConversation(true),'');host[key]=false;}
+  host.noticeChats=[{store:{inboxFlow:{screen:'chat',conversationId:'200',messages:[{}]}}}];assert.equal(host.visibleInboxNoticeConversation(true),'200','only top notification chat is viewed');host.noticeChats[0].store.inboxFlow.screen='settings';assert.equal(host.visibleInboxNoticeConversation(true),'');helperBackground=true;assert.equal(host.visibleInboxNoticeConversation(true),'');
+  assert(index.includes('this.inboxMessageNotice.consumeTap();\n    this.inboxMessageNotice.dismissViewed();')||index.includes('this.inboxMessageNotice.consumeTap();\r\n    this.inboxMessageNotice.dismissViewed();'));
   assert.equal((index.match(/messagesObserved: \(rows: PinmonyInboxNoticeConversation\[\]\): void => this.inboxMessageNotice.observe\(rows\)/g) || []).length, 2);
-  assert.equal((index.match(/this.inboxMessageNotice.pause\(\)/g) || []).length, 2, 'both lifecycle adapters invalidate pending work');
+  assert.equal((index.match(/this.inboxMessageNotice.pause\(\)/g) || []).length, 3, 'both lifecycle adapters and background shutdown invalidate pending work');
+  assert.equal((index.match(/if\(!this.inboxBackgroundSync.active\(\)\)this.inboxMessageNotice.pause\(\)/g)||[]).length,2,'only the active background owner can retain notification delivery during page suspension');
   assert(index.includes('this.inboxMessageNotice.reset();')); assert(index.includes('this.inboxUnreadNativeReads.pollMessages();'));
   console.log('Inbox message notice: sender/body/time, silent baseline, new ID deduplication, chat/outgoing suppression, locale, account/background races and platform failures passed');
 }

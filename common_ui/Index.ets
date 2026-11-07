@@ -37,3 +37,5 @@ export { PinmonyImageSearchOrigin } from './src/main/ets/models/PinmonyImageSear
 
 export { PinmonyDraggablePublishButton } from './src/main/ets/components/PinmonyDraggablePublishButton';
 export { PinmonySnackBarLifecycle } from './src/main/ets/services/PinmonySnackBarLifecycle';
+
+export { PinmonyAvatarColorSource, PinmonyAvatarColorIdentity, PinmonyAvatarColorListener, PinmonyAvatarColorResolver } from './src/main/ets/PinmonyAvatarColorSource';

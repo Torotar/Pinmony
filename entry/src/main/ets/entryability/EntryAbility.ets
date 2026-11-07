@@ -1,5 +1,6 @@
 import { PINMONY_BUILD_IDENTITY } from '../app/PinmonyBuildIdentity';
 import { PinmonyInboxNoticeTap } from '../app/PinmonyInboxNoticeTap';
+import { PinmonyInboxBackgroundLifecycle } from '../app/PinmonyInboxBackgroundLifecycle';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
@@ -100,6 +101,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    PinmonyInboxBackgroundLifecycle.change(false);
     this.logLifecycle('destroy-start', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString());
     NetworkManager.destroy();
@@ -257,6 +259,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    PinmonyInboxBackgroundLifecycle.change(false);
     // Ability has brought to foreground
     this.logLifecycle('foreground', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString());
@@ -275,6 +278,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onBackground(): void {
+    PinmonyInboxBackgroundLifecycle.change(true);
     // Ability has back to background
     this.logLifecycle('background', 'windowStage=' + this.windowStageReady.toString() +
       ' content=' + this.contentLoaded.toString());

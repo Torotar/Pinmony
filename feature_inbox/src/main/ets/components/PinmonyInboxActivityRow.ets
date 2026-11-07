@@ -37,7 +37,7 @@ export struct PinmonyInboxActivityRow {
   build() {
     Row({space:12}) {
       Button({type:ButtonType.Normal}) {
-        PinmonyUserAvatar({image:this.item.imageUrl,name:this.item.title,avatarSize:48})
+        PinmonyUserAvatar({profileUrl:this.item.profileUrl || '',image:this.item.imageUrl,colorIndex:this.item.avatarColorIndex || 0,name:this.item.title,avatarSize:48})
       }.padding(0).borderRadius(24).backgroundColor(Color.Transparent)
         .enabled(!!this.item.profileUrl).accessibilityText(this.item.title).onClick(() => this.openProfile())
       Button({type:ButtonType.Normal}) {

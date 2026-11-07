@@ -3,6 +3,7 @@ export interface PinmonyBoardCollaborator {
   name: string;
   username: string;
   avatar: string;
+  avatarColorIndex?: number;
   status: string;
 }
 export interface PinmonyBoardCollaborators {

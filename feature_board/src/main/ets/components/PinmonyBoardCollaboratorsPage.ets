@@ -111,7 +111,7 @@ struct PinmonyBoardCollaboratorsSurface {
   }
   @Builder private userRow(user: PinmonyBoardCollaborator, invite: boolean) {
     Row({ space: 12 }) {
-      PinmonyUserAvatar({ image: user.avatar, name: user.name || user.username, avatarSize: 44 })
+      PinmonyUserAvatar({ username: user.username, userId: user.id, image: user.avatar, colorIndex: user.avatarColorIndex || 0, name: user.name || user.username, avatarSize: 44 })
       Column({ space: 2 }) {
         Text(PinmonyI18n.render(user.name, this.uiLanguage)).fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
         if (invite) { Text(user.username).fontSize(13).fontColor($r('app.color.secondary_text')) }

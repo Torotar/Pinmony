@@ -1209,7 +1209,7 @@ export struct PinmonySearchPage {
   private resultRow(result: PinmonySearchResult) {
     Row({ space: 14 }) {
       if (result.kind === 'profile' || result.kind === 'user') {
-        PinmonyUserAvatar({ image: result.imageUrl, name: result.title, avatarSize: 58 }).accessibilityLevel('no')
+        PinmonyUserAvatar({ profileUrl: result.targetUrl, userId: result.userId || '', image: result.imageUrl, colorIndex: result.avatarColorIndex || 0, name: result.title, avatarSize: 58 }).accessibilityLevel('no')
       } else if (result.imageUrl && this.failedImages.indexOf(result.imageUrl) < 0) {
         Image(result.imageUrl)
           .width((result.kind === 'profile' || result.kind === 'user') ? 58 : 74)

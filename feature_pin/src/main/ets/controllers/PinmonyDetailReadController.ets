@@ -177,7 +177,7 @@ export class PinmonyDetailReadController {
         affiliateDisclosure: typeof message.affiliateDisclosure === 'string' ? message.affiliateDisclosure.slice(0, 300) : '',
         sourceName: typeof message.sourceName === 'string' ? message.sourceName.slice(0, 180) : '',
         creatorVerified: message.creatorVerified === true,
-        creatorAvatar: message.creatorAvatar || '', creatorUrl: this.ports.profileUrlFromAddress(message.creatorUrl || ''),
+        creatorAvatar: message.creatorAvatar || '', creatorAvatarColorIndex: Number.isInteger(message.creatorAvatarColorIndex) && message.creatorAvatarColorIndex! >= 1 && message.creatorAvatarColorIndex! <= 10 ? message.creatorAvatarColorIndex : undefined, creatorUrl: this.ports.profileUrlFromAddress(message.creatorUrl || ''),
         sourceLabel: sourceUrl ? (message.sourceLabel || '') : '', sourceUrl: sourceUrl || undefined,
         actions: actions, related: related, dataSource: message.dataSource,
         relatedLoading: message.relatedLoading, relatedError: message.relatedError,

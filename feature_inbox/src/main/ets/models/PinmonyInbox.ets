@@ -9,6 +9,7 @@ export interface PinmonyInboxItem {
   outgoing?: boolean;
   usernames?: string[];
   imageUrl: string;
+  avatarColorIndex?: number;
   profileUrl?: string;
   enabled: boolean;
   timeLabel?: string;

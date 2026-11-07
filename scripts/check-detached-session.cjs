@@ -40,7 +40,7 @@ const globals = { connection: {hasDefaultNetSync: () => online}, webview: { Webv
   AppStorage: { get: key => storage.get(key), setOrCreate: (key, value) => storage.set(key, value) } };
 const names = ['sessionDocumentUrl','runSessionScript','loadSessionDocument','startNativeVerification',
   'openNativeLogin','releaseNativeLogin','handleNativeSessionExpired','updateAuthState','syncAuthentication',
-  'retryLogin','confirmBusinessSession','nativeBusinessSessionContext','enterAuthenticatedRoot'];
+  'retryLogin','confirmBusinessSession','resetNativeBusinessSession','nativeBusinessSessionContext','enterAuthenticatedRoot'];
 globals.PinmonyI18n = require('./local-message-test-fixture.cjs').rawLocalMessages;
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + names.map(method).join('\n') + '} Host;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
@@ -58,24 +58,28 @@ const sessionPorts = productionPorts('sessionCoordinator','PinmonySessionCoordin
 const verificationPorts = productionPorts('sessionVerification','PinmonySessionVerification');
 function fixture() {
   storage.set('pinmonySessionConfirmed', true);
-  const host = new Host(), jobs = [], timers = [];
+  const host = new Host(), jobs = [], timers = [], effects = [];
   const stores = ['home','profile','inbox','pin','board','settings'];
   for (const name of stores) host[name + 'Store'] = {};
   for (const name of ['boardNativeReads','profileNativeReads','inboxUpdatesNativeReads','inboxMessagesNativeReads',
     'searchNativeReads','searchDiscoveryNativeReads','homeNativeReads']) host[name] = { reset() {} };
   Object.assign(host, { nativeLoginEnabled: true, nativeBusinessRoutesEnabled: true, loginHostMounted: false,
+    inboxBackgroundSync: { stop() { effects.push('background-stop'); } },
     authStatus: 'checking', authEpoch: 0, nativeSessionEpoch: 0, nativeVerificationPending: false,
     nativeLoginEvidenceKey: '', nativeSessionOrigin: 'https://www.pinterest.com', businessSuspended: false,
     controller: new Controller(), sessionEnvironment: new PinmonySessionEnvironment(), businessSession: new PinmonyBusinessSession(),
     homeCacheAccountId: '', authenticatedProfileUrl: '', authCheckTimer: -1, rootTabAddresses: new Map(),
     coordinatorTasks: { timeout(fn, delay) { timers.push({ fn, delay }); } }, pageTasks: { cancelTimeout() {} },
     tabsController: { changeIndex() {} }, pageHistory: { reset() {} }, bottomBarCoordinator: { resetForSession() {} },
+    userAvatarReads: { sessionChanged() { effects.push('avatar-session'); }, reset() { effects.push('avatar-reset'); } },
+    inboxUnreadNativeReads: { poll() { effects.push('unread-poll'); }, reset() { effects.push('unread-reset'); } },
+    inboxMessageNotice: { reset() { effects.push('notice-reset'); } }, resetNoticeChats() { effects.push('notice-chats-reset'); },
     syncFloatingTabsMotion() {}, homePageKeyFromAddress: u => /^https:\/\/(?:www|uk)\.pinterest\.com\/$/.test(u) ? u : '',
     homeCacheAccountIdFromProfileUrl: u => u ? 'synthetic-account' : '', tryRestoreAuthenticatedHome() {},
     profileUrlFromAddress: u => /^https:\/\/(?:www|uk)\.pinterest\.com\/[A-Za-z0-9_]+\/$/.test(u) ? u : '',
     isHomeRootAddress: u => u === home, configureDocumentRetention() { throw Error('Web retention forbidden'); },
     bindNativeNetwork() { throw Error('document transport forbidden'); },
-    resetAuthenticatedContent() { this.businessSession.reset(); this.authenticatedProfileUrl = ''; },
+    resetAuthenticatedContent() { this.resetNativeBusinessSession(); this.authenticatedProfileUrl = ''; },
     nativeNetwork: { cancel() {}, verifySession(origin, ua, epoch, id, owner) {
       assert.equal(ua, 'fixture-agent'); assert(owner());
       return new Promise(resolve => jobs.push({ origin, epoch, owner, resolve }));
@@ -83,7 +87,7 @@ function fixture() {
   host.sessionEnvironment.capture('fixture-agent');
   host.sessionCoordinator = new PinmonySessionCoordinator(sessionPorts.call(host));
   host.sessionVerification = new PinmonySessionVerification(verificationPorts.call(host));
-  return { host, jobs, timers };
+  return { host, jobs, timers, effects };
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function reply(status = 'authenticated') {
@@ -111,6 +115,8 @@ async function main() {
   assert.equal(f.host.nativeRootOnly, true, JSON.stringify(events)); assert.equal(f.host.navigationAddress, home);
   assert.equal(rawCalls.length, 0, 'cold-start confirmation never reads or navigates a Web document');
   assert.equal(f.host.businessSession.context('authenticated').appVersion, 'fixture.2');
+  assert(f.effects.includes('avatar-session'), 'native confirmation updates avatar session identity');
+  assert(f.effects.includes('unread-poll'), 'native confirmation reaches unread polling');
   assert(events.includes('NativeSession: cookie store saved'));
   assert.equal(storage.get('pinmonySessionConfirmed'),true,'only current validated identity and saved cookies establish startup reuse');
   f.host.updateAuthState(JSON.stringify({ status: 'unauthenticated', pageUrl: home, epoch: f.host.authEpoch }));
@@ -133,6 +139,8 @@ async function main() {
   f.timers.filter(t => t.delay === 0).forEach(t => t.fn()); assert.equal(f.host.loginHostMounted, true);
   assert.notEqual(f.host.controller, firstController, 'each login gets a distinct controller to reject retired host callbacks');
   assert.equal(storage.get('pinmonySessionConfirmed'),false,'explicit expiry returns future launches to login');
+  assert(f.effects.includes('avatar-reset'), 'expiry invalidates avatar subscriptions through the real reset hook');
+  assert.equal(f.host.nativeBusinessSessionContext().authenticated, false, 'expired business session cannot authorize requests');
   f = fixture(); f.host.startNativeVerification(); f.jobs[0].resolve({ status: 0, error: 'network-unavailable', body: '' }); await flush();
   assert.equal(f.host.authStatus, 'error'); assert.equal(f.host.loginHostMounted, false, 'network failure is not logout or automatic Web fallback');
   f.host.retryLogin(); assert.equal(f.jobs.length, 2); f.jobs[1].resolve(reply()); await flush(); assert.equal(f.host.authStatus, 'authenticated');
@@ -157,6 +165,30 @@ async function main() {
   assert(f.host.failureDetails.includes('无网络'));
   online = true; f.host.retryLogin(); assert.equal(f.jobs.length,1); f.jobs[0].resolve(reply()); await flush();
   assert.equal(f.host.authStatus,'authenticated','manual retry after reconnect uses the existing Cookie store');
+  for (const invalidReply of [
+    {status: 200, error: '', body: '{'},
+    {...reply(), status: 503},
+    {...reply(), body: reply().body.replace('"type":"user_settings"', '"type":"user"')},
+    {...reply(), body: reply().body.replace('"data":{"id":"123"', '"data":{"id":"456"')}
+  ]) {
+    const invalid = fixture();
+    storage.set('pinmonySessionConfirmed', false);
+    invalid.host.loginHostMounted = true;
+    invalid.host.startNativeVerification();
+    invalid.jobs[0].resolve(invalidReply); await flush();
+    assert.equal(invalid.host.authStatus, 'error', 'unverified responses remain retryable verification errors');
+    assert.equal(invalid.host.loginHostMounted, true, 'invalid evidence cannot release the current login host');
+    assert.equal(storage.get('pinmonySessionConfirmed'), false, 'invalid evidence cannot enable saved-session reuse');
+    assert(!invalid.effects.includes('avatar-session'), 'invalid identity cannot authorize avatar reads');
+    assert(!invalid.effects.includes('unread-poll'), 'invalid identity cannot start business polling');
+  }
+  const superseded = fixture();
+  superseded.host.startNativeVerification();
+  superseded.host.nativeSessionEpoch++;
+  superseded.jobs[0].resolve(reply()); await flush();
+  assert.equal(superseded.host.authStatus, 'checking', 'a superseded native verification cannot authenticate');
+  assert(!superseded.effects.includes('avatar-session'), 'superseded evidence cannot update avatar identity');
+  assert(!events.includes('Pinmony: invalid authentication state'), 'coordinator must not swallow missing fixture dependencies');
   console.log('Detached session: native startup, no Web calls, separate attempt epoch, login confirmation/release, missing cookies, network retry, expiry, persistence, offline and timeout passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

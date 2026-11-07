@@ -1,3 +1,4 @@
+import { inheritUserAvatarColor, PinmonyAvatarUserMetadata } from './PinmonyUserAvatarMetadata';
 import { PinmonyInboxActivityNativeReads } from './PinmonyInboxActivityNativeReads';
 import { PinmonyInboxHiddenConversations } from 'feature_inbox';
 import { PinmonyInboxNoticeConversation } from './PinmonyInboxMessageNotice';
@@ -10,7 +11,7 @@ import { PinmonyInboxNativeWrites, PinmonyInboxWriteIdentity, PinmonyInboxWriteM
 // Per-feature manual rollout; the transport safety gate is still mandatory.
 const PIN_NATIVE_INBOX_MESSAGES_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_INBOX_MESSAGES_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_INBOX_MESSAGES_ROLLOUT_ENABLED;
-interface RawUser { id: string; username?: string; full_name?: string; image_medium_url?: string; image_large_url?: string; image_small_url?: string; type?: string; pin_thumbnail_urls?: string[]; recent_pin_images?: Record<string,RawImage[]>; }
+interface RawUser extends PinmonyAvatarUserMetadata { avatar_color_index?: number; id: string; username?: string; full_name?: string; image_medium_url?: string; image_large_url?: string; image_small_url?: string; type?: string; pin_thumbnail_urls?: string[]; recent_pin_images?: Record<string,RawImage[]>; }
 interface RawImage { url?: string; width?: number; height?: number; }
 interface RawPin { id?: string; images?: Record<string,RawImage>; }
 interface RawBoard { id?: string; name?: string; url?: string; cover_images?: Record<string,RawImage>; pin_thumbnail_urls?: string[]; image_cover_hd_url?: string; image_cover_url?: string; image_thumbnail_url?: string; pin_count?: number; section_count?: number; }
@@ -43,6 +44,7 @@ export class PinmonyInboxMessagesNativeReads {
   private section: string = '';
   private account: string = '';
   private viewer: string = '';
+  private viewerUser: RawUser | undefined = undefined;
   private origin: string = '';
   private generation: number = -1;
   private page: string = '';
@@ -142,7 +144,7 @@ export class PinmonyInboxMessagesNativeReads {
   }
   reset(): void {
     this.pause(); this.activity.reset(); this.publishedFlow = undefined; this.publishedFlowSignature = ''; this.store.inboxMessagesUnread = false; if(this.account) { this.store.inboxCache.clear(); if(this.store.inbox?.section === 'messages')this.store.inbox = undefined; if(this.flow?.nativeToken === this.store.inboxFlow?.nativeToken)this.store.inboxFlow = undefined; }
-    this.section = ''; this.account = ''; this.viewer = ''; this.origin = ''; this.generation = -1; this.page = ''; this.listReady = false; this.listNeedsRefresh = false; this.contactsReady = false;
+    this.section = ''; this.account = ''; this.viewer = ''; this.viewerUser = undefined; this.origin = ''; this.generation = -1; this.page = ''; this.listReady = false; this.listNeedsRefresh = false; this.contactsReady = false;
     this.blockSequence = 0;this.knownBlocks.clear();this.uncertainBlocks.clear();this.uncertainCreations.clear();this.rows = []; this.contacts = []; this.conversations = []; this.flow = undefined; this.chat = undefined; this.cursor = ''; this.query = ''; this.listError = ''; this.contactsError = '';
   }
   async select(section: string): Promise<boolean> {
@@ -182,13 +184,18 @@ export class PinmonyInboxMessagesNativeReads {
     const username: string = this.ports.username?.() || '';
     const matches: boolean = username ? this.clean(raw.username).toLowerCase() === username.toLowerCase() : raw.id === this.account;
     if(matches && /^\d{1,40}$/.test(raw.id))this.viewer = raw.id;
+    if ((matches || !!this.viewer && raw.id === this.viewer) && /^\d{1,40}$/.test(raw.id)) {
+      inheritUserAvatarColor(raw,[this.viewerUser]); this.viewerUser = raw;
+    }
     return matches || !!this.viewer && raw.id === this.viewer;
   }
   private user(raw: RawUser): InboxFlowUser {
     if(!raw || typeof raw.id !== 'string' || !/^\d{1,40}$/.test(raw.id))throw new Error('user-format');
+    inheritUserAvatarColor(raw,[this.viewerUser]);
     const known: RawUser | undefined = this.conversations.flatMap((conversation: RawConversation): RawUser[] => conversation.users).find((user: RawUser): boolean => user.id === raw.id && !!user.username);
     const username: string = this.clean(raw.username) || this.clean(known?.username);
-    return {id:raw.id,self:this.self(raw),name:this.clean(raw.full_name) || username,avatar:this.image(raw.image_medium_url || raw.image_large_url || raw.image_small_url),profileUrl:/^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : ''};
+    const color: number | undefined = raw.avatar_color_index === undefined ? known?.avatar_color_index : raw.avatar_color_index;
+    return {avatarColorIndex:Number.isInteger(color) && color! >= 1 && color! <= 10 ? color : undefined,id:raw.id,self:this.self(raw),name:this.clean(raw.full_name) || this.clean(known?.full_name) || username,avatar:this.image(raw.image_medium_url || raw.image_large_url || raw.image_small_url || known?.image_medium_url || known?.image_large_url || known?.image_small_url),profileUrl:/^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : ''};
   }
   private board(raw: RawBoard | undefined): InboxFlowBoard | undefined {
     if(!raw || typeof raw.id !== 'string' || !/^\d{1,40}$/.test(raw.id))return undefined;
@@ -240,7 +247,7 @@ export class PinmonyInboxMessagesNativeReads {
         if(c.unread !== undefined && typeof c.unread !== 'boolean' && (typeof c.unread !== 'number' || !Number.isSafeInteger(c.unread) || c.unread < 0))throw new Error('conversation-unread-format');
         const users: InboxFlowUser[] = c.users.map((u: RawUser): InboxFlowUser => this.user(u)).filter((u: InboxFlowUser): boolean => !u.self);
         if(ids.has(c.id))return; ids.add(c.id); conversations.push(c); const last: RawMessage | undefined = c.last_message; const date: Date = new Date(last?.created_at || '');
-        rows.push({id:'conversation:' + c.id,usernames:c.users.filter((u: RawUser): boolean => !this.self(u)).map((u: RawUser): string => this.clean(u.username)).filter((name: string): boolean => !!name),title:(users.length === 1 ? users[0].name : this.clean(c.name)) || users.map((u: InboxFlowUser): string => u.name).join('、') || PinmonyI18n.message('pm_messages_4da199fa'),outgoing:this.self(last?.sender),subtitle:this.clean(last?.text) || (last?.user ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_profile_d437aeb2') : PinmonyI18n.message('pm_sent_a_profile_e003c0d2')) : last?.board ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_board_9a08dbbf') : PinmonyI18n.message('pm_sent_a_board_8870ec6d')) : last?.pin ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_pin_4788181d') : PinmonyI18n.message('pm_sent_a_pin_b874b586')) : ''),profileUrl:users.length === 1 ? users[0].profileUrl : '',imageUrl:users[0]?.avatar || '',enabled:true,unreadCount:typeof c.unread === 'number' ? c.unread : c.unread === true ? 1 : 0,unread:c.unread === true || typeof c.unread === 'number' && Number.isSafeInteger(c.unread) && c.unread > 0,timeLabel:this.conversationTime(date)});
+        rows.push({id:'conversation:' + c.id,usernames:c.users.filter((u: RawUser): boolean => !this.self(u)).map((u: RawUser): string => this.clean(u.username)).filter((name: string): boolean => !!name),title:(users.length === 1 ? users[0].name : this.clean(c.name)) || users.map((u: InboxFlowUser): string => u.name).join('、') || PinmonyI18n.message('pm_messages_4da199fa'),outgoing:this.self(last?.sender),subtitle:this.clean(last?.text) || (last?.user ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_profile_d437aeb2') : PinmonyI18n.message('pm_sent_a_profile_e003c0d2')) : last?.board ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_board_9a08dbbf') : PinmonyI18n.message('pm_sent_a_board_8870ec6d')) : last?.pin ? (this.self(last.sender) ? PinmonyI18n.message('pm_you_sent_a_pin_4788181d') : PinmonyI18n.message('pm_sent_a_pin_b874b586')) : ''),profileUrl:users.length === 1 ? users[0].profileUrl : '',avatarColorIndex:users[0]?.avatarColorIndex,imageUrl:users[0]?.avatar || '',enabled:true,unreadCount:typeof c.unread === 'number' ? c.unread : c.unread === true ? 1 : 0,unread:c.unread === true || typeof c.unread === 'number' && Number.isSafeInteger(c.unread) && c.unread > 0,timeLabel:this.conversationTime(date)});
       });
       if(!live())return; this.rows = rows; this.conversations = conversations; this.listReady = true; this.listNeedsRefresh = false; this.listError = '';
       this.store.inboxMessagesUnreadCount = rows.filter((row: PinmonyInboxItem): boolean =>
@@ -259,7 +266,7 @@ export class PinmonyInboxMessagesNativeReads {
       const resource: ReadResource = await this.request('contacts','ShareSuggestionsResource',{field_set_key:'default',hide_group_conversations:true},'v3_user_contacts_suggestion',live);
       const data: RawUser[] = resource.data as RawUser[]; if(!Array.isArray(data) || data.length > 1000)throw new Error('contacts-format');
       const ids: Set<string> = new Set<string>(); const rows: NativeContact[] = [];
-      data.forEach((u: RawUser): void => { const user: InboxFlowUser = this.user(u); const username: string = this.clean(u.username); if(u.type !== 'user_share_suggestion' || !username)throw new Error('contact-format'); if(ids.has(u.id) || user.self)return; ids.add(u.id); rows.push({id:'contact:' + u.id,userId:u.id,username:username,title:user.name,subtitle:'@' + username,imageUrl:user.avatar,profileUrl:user.profileUrl,enabled:true}); });
+      data.forEach((u: RawUser): void => { const user: InboxFlowUser = this.user(u); const username: string = this.clean(u.username); if(u.type !== 'user_share_suggestion' || !username)throw new Error('contact-format'); if(ids.has(u.id) || user.self)return; ids.add(u.id); rows.push({id:'contact:' + u.id,userId:u.id,username:username,title:user.name,subtitle:'@' + username,avatarColorIndex:user.avatarColorIndex,imageUrl:user.avatar,profileUrl:user.profileUrl,enabled:true}); });
       if(!live())return; this.contacts = rows; this.contactsReady = true;
     } catch (_) { if(live())this.contactsError = PinmonyI18n.message("pm_unable_to_load_contacts_please_retry_9942b99b"); }
     finally { if(revision === this.revision){this.contactsBusy = false; if(live())this.apply(); this.ports.settled();} }
@@ -314,12 +321,12 @@ export class PinmonyInboxMessagesNativeReads {
       const activity: PinmonyInboxItem | undefined = id.startsWith('activity-chat:') ? this.activity.rows.find((row: PinmonyInboxItem): boolean =>
         row.enabled && row.activityUserId === id.slice('activity-chat:'.length)) : undefined;
       const contact: NativeContact | undefined = activity ? {id:activity.id,userId:activity.activityUserId || '',username:activity.usernames?.[0] || '',
-        title:activity.title,subtitle:activity.subtitle,imageUrl:activity.imageUrl,profileUrl:activity.profileUrl,enabled:activity.enabled} :
+        title:activity.title,subtitle:activity.subtitle,avatarColorIndex:activity.avatarColorIndex,imageUrl:activity.imageUrl,profileUrl:activity.profileUrl,enabled:activity.enabled} :
         id.startsWith('contact:') ? this.contacts.find((row: NativeContact): boolean => row.id === id) : undefined;
       if(!contact)return true;
       const existing: RawConversation | undefined = this.conversations.find((c: RawConversation): boolean => c.users.length <= 2 && c.users.some((u: RawUser): boolean => u.id === contact.userId));
       if(existing) {this.newFlow('chat',existing.id); await this.readChat();}
-      else {const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose','',true); flow.directContact = true;flow.users = [{id:contact.userId,name:contact.title,avatar:contact.imageUrl,profileUrl:contact.profileUrl,self:false}]; flow.selectedIds = [contact.userId]; flow.loading = false; this.publish(); await this.action('next','');}
+      else {const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose','',true); flow.directContact = true;flow.users = [{id:contact.userId,name:contact.title,avatar:contact.imageUrl,avatarColorIndex:contact.avatarColorIndex,profileUrl:contact.profileUrl,self:false}]; flow.selectedIds = [contact.userId]; flow.loading = false; this.publish(); await this.action('next','');}
       return true;
     }
     const c: RawConversation | undefined = this.conversations.find((row: RawConversation): boolean => id === 'conversation:' + row.id); if(!c)return true;
@@ -330,18 +337,18 @@ export class PinmonyInboxMessagesNativeReads {
     this.activity.pause(); this.writes.pause(); this.chat = undefined;
     this.newFlow('chat',conversation); await this.readChat(); return true;
   }
-  async direct(id: string,name: string,avatar: string,username: string): Promise<boolean> {
+  async direct(id: string,name: string,avatar: string,username: string, avatarColorIndex?: number): Promise<boolean> {
     if(!this.bind() || !/^\d{1,40}$/.test(id) || id === this.account)return false;
     const existing: RawConversation | undefined = this.conversations.find((c: RawConversation): boolean => c.users.length <= 2 && c.users.some((u: RawUser): boolean => u.id === id));
     if(existing)return this.open('conversation:' + existing.id);
-    const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose'); flow.users = [{id:id,name:this.clean(name),avatar:this.image(avatar),self:false,profileUrl:/^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : ''}]; flow.selectedIds = [id]; flow.loading = false; this.publish(); return true;
+    const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose'); flow.users = [{id:id,name:this.clean(name),avatar:this.image(avatar),avatarColorIndex:Number.isInteger(avatarColorIndex) && avatarColorIndex! >= 1 && avatarColorIndex! <= 10 ? avatarColorIndex : undefined,self:false,profileUrl:/^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : ''}]; flow.selectedIds = [id]; flow.loading = false; this.publish(); return true;
   }
-  async directProfile(id: string, name: string, avatar: string, username: string): Promise<boolean> {
+  async directProfile(id: string, name: string, avatar: string, username: string, avatarColorIndex?: number): Promise<boolean> {
     if (!this.bind() || !/^\d{1,40}$/.test(id) || id === this.account || this.flow) return false;
     this.profileContactEntry = true;
     const flow: PinmonyInboxFlowSnapshot = this.newFlow('compose', '', true);
     flow.directContact = true;
-    flow.users = [{ id: id, name: this.clean(name), avatar: this.image(avatar), self: false,
+    flow.users = [{ id: id, name: this.clean(name), avatar: this.image(avatar), avatarColorIndex: Number.isInteger(avatarColorIndex) && avatarColorIndex! >= 1 && avatarColorIndex! <= 10 ? avatarColorIndex : undefined, self: false,
       profileUrl: /^[a-zA-Z0-9_]+$/.test(username) ? this.origin + '/' + username + '/' : '' }];
     flow.selectedIds = [id]; flow.loading = false; this.publish();
     await this.action('next', '');
@@ -524,4 +531,4 @@ export class PinmonyInboxMessagesNativeReads {
     return 'window.PinmonyInboxConversations && window.PinmonyInboxConversations.installNative && window.PinmonyInboxConversations.installNative(' + JSON.stringify(this.page) + ',' + JSON.stringify(this.flow) + ',' + JSON.stringify(this.viewer) + ');';
   }
 }
-export const CONVERSATION_FIELDS: string[] = ['conversation.id','conversation.name','conversation.users()','conversation.read_times_ms','user.id','user.username','user.full_name','user.image_medium_url','user.type'];
+export const CONVERSATION_FIELDS: string[] = ['conversation.id','conversation.name','conversation.users()','conversation.read_times_ms','user.id','user.username','user.full_name','user.image_medium_url','user.avatar_color_index','user.type'];

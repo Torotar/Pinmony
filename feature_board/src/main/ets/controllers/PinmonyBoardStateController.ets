@@ -1,7 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyBoardStore } from '../stores/PinmonyBoardStore';
-import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardSection } from '../models/PinmonyBoardDetail';
+import { PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardSection, PinmonyBoardCreator } from '../models/PinmonyBoardDetail';
 
 export interface PinmonyBoardStatePorts {
   authenticated: () => boolean;
@@ -101,7 +101,7 @@ export class PinmonyBoardStateController {
         const board: PinmonyBoardDetail = this.store.boardDetail;
         this.store.boardDetail = { kind: board.kind, session: board.session, pageKey: board.pageKey,
           boardId: board.boardId, title: board.title, pinCount: board.pinCount,
-          ownerName: board.ownerName, ownerAvatar: board.ownerAvatar, ownerUrl: board.ownerUrl, loading: false,
+          ownerName: board.ownerName, ownerAvatar: board.ownerAvatar, ownerAvatarColorIndex: board.ownerAvatarColorIndex, ownerUrl: board.ownerUrl, loading: false,
           loadingMore: board.loadingMore, ready: board.ready, error: PinmonyI18n.message("pm_board_service_not_ready_please_retry_c1a3998b"),
           hasMore: board.hasMore, pins: board.pins };
       }, 20000);
@@ -174,7 +174,7 @@ export class PinmonyBoardStateController {
       this.store.boardDetail = { kind: message.kind, session: message.session, nativeVersion: message.nativeVersion, nativeRecoveryVersion: message.nativeRecoveryVersion, nativeReadsReady: message.nativeReadsReady,
         pageKey: message.pageKey, boardId: message.boardId, title: message.title || existingTitle,
         pinCount: !message.ready && !message.pinCount && this.store.boardDetail?.pageKey === message.pageKey ? this.store.boardDetail.pinCount : message.pinCount,
-        privacy: message.privacy, ownerName: message.ownerName, ownerAvatar: message.ownerAvatar, ownerUrl: this.ports.profileAddress(message.ownerUrl || ''),
+        privacy: message.privacy, ownerName: message.ownerName, ownerAvatar: message.ownerAvatar, ownerAvatarColorIndex: Number.isInteger(message.ownerAvatarColorIndex) && message.ownerAvatarColorIndex! >= 1 && message.ownerAvatarColorIndex! <= 10 ? message.ownerAvatarColorIndex : undefined, ownerUrl: this.ports.profileAddress(message.ownerUrl || ''),
         loading: message.loading, loadingMore: message.loadingMore, refreshing: message.refreshing,
         ready: message.ready, error: message.error, hasMore: message.hasMore, pins: message.pins,
         chatMemberCount: Number.isInteger(message.chatMemberCount) ? message.chatMemberCount : 0,
@@ -193,6 +193,8 @@ export class PinmonyBoardStateController {
         description: typeof message.description === 'string' ? message.description.slice(0, 2000) : '',
         headerImage: typeof message.headerImage === 'string' && /^https:\/\/i\.pinimg\.com\//.test(message.headerImage) ? message.headerImage.slice(0, 2048) : '',
         editable: message.editable, canContribute: message.canContribute === true, collaborator: message.collaborator === true,
+        memberName: typeof message.memberName === 'string' ? message.memberName.slice(0,300) : '', memberAvatarColorIndex: Number.isInteger(message.memberAvatarColorIndex) && message.memberAvatarColorIndex! >= 1 && message.memberAvatarColorIndex! <= 10 ? message.memberAvatarColorIndex : undefined,
+        collaboratorUsers: Array.isArray(message.collaboratorUsers) ? message.collaboratorUsers.filter((user: PinmonyBoardCreator): boolean => !!user && /^\d+$/.test(user.id) && typeof user.name === 'string' && user.name.length <= 300 && typeof user.avatar === 'string' && user.avatar.length <= 2048 && (!user.avatar || user.avatar.startsWith('https://'))).slice(0,6).map((user: PinmonyBoardCreator): PinmonyBoardCreator => ({id:user.id,name:user.name,avatar:user.avatar,avatarColorIndex:Number.isInteger(user.avatarColorIndex) && user.avatarColorIndex! >= 1 && user.avatarColorIndex! <= 10 ? user.avatarColorIndex : undefined,url:'',verified:false})) : undefined,
         collaboratorAvatars: Array.isArray(message.collaboratorAvatars) ? message.collaboratorAvatars.filter((url: string): boolean => typeof url === 'string' && url.length <= 2048 && /^https:\/\//i.test(url)).slice(0, 6) : [], flow: message.flow, memberAvatar: message.memberAvatar, revision: message.revision };
       this.store.presentationOnly = !message.ready;
       if (message.ready) this.ports.confirmInvitation(message.pageKey);

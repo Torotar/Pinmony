@@ -98,6 +98,7 @@ export interface PinmonyDetailSnapshot {
   description: string;
   creator: string;
   creatorAvatar: string;
+  creatorAvatarColorIndex?: number;
   creatorUrl?: string;
   sourceLabel: string;
   sourceUrl?: string;

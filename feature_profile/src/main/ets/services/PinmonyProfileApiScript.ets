@@ -50,7 +50,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
     }
     return { monthlyViews: count(user.profile_reach), name: clean(user.full_name, 160), handle: clean(user.username, 100),
       followingUser: typeof user.explicitly_followed_by_me === 'boolean' ? user.explicitly_followed_by_me : null, blocked: user.blocked_by_me === true, business: user.is_partner === true, about: clean(user.about, 2000), website: clean(user.website_url, 2000),
-      avatar: avatar.slice(0, 2000), followers: count(user.follower_count), following: count(user.following_count) };
+      avatarColorIndex: Number.isInteger(user.avatar_color_index) && user.avatar_color_index >= 1 && user.avatar_color_index <= 10 ? user.avatar_color_index : undefined, avatar: avatar.slice(0, 2000), followers: count(user.follower_count), following: count(user.following_count) };
   }
   async function request(profile, changed, current) {
     var token = generation, requestAbort = new AbortController();
@@ -138,6 +138,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
         var covers = (item.images && item.images['236x'] || []).map(function (img) { return image(img.url); }).filter(Boolean);
         if (!covers.length && image(item.image_cover_hd_url || item.image_cover_url)) covers.push(item.image_cover_hd_url || item.image_cover_url);
         card = { secret: item.privacy === 'secret', protectedBoard: item.privacy === 'protected', title: clean(item.name, 300), covers: covers.slice(0, 3),
+          collaboratorUsers: item.is_collaborative === true ? [item.owner].concat(item.collaborating_users || []).filter(function(u,i,all) { return u && all.findIndex(function(v) {return v && String(v.id) === String(u.id);}) === i; }).slice(0,6).map(function(u) {return {username:/^[A-Za-z0-9_]+$/.test(u.username || '') ? u.username : undefined,id:String(u.id),name:clean(u.full_name || u.username),avatar:image(u.image_small_url || u.image_medium_url),avatarColorIndex:Number.isInteger(u.avatar_color_index) && u.avatar_color_index >= 1 && u.avatar_color_index <= 10 ? u.avatar_color_index : undefined};}) : [],
           collaboratorAvatars: item.is_collaborative === true ? [item.owner].concat(item.collaborating_users || []).filter(function (u, i, all) { return u && all.findIndex(function (v) { return v && String(v.id) === String(u.id); }) === i; }).slice(0, 6).map(function (u) { return image(u.image_small_url || u.image_medium_url); }).filter(Boolean) : [],
           pinCount: (typeof item.pin_count === 'number' && isFinite(item.pin_count) && item.pin_count >= 0 ? item.pin_count + ' 张 Pin 图' : '') +
             (Number.isInteger(item.section_count) && item.section_count > 0 ?

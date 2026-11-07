@@ -28,8 +28,8 @@ export const PIN_BOARD_INVITATION_SCRIPT: string = String.raw`
     var url = new URL(b.url, location.origin);
     if (url.origin !== location.origin || !/^\/[^/]+\/[^/]+\/$/.test(url.pathname)) throw new Error('invalid-board');
     return { boardId: String(b.id), boardUrl: url.href, boardName: text(b.name), imageUrl: image(b.image_thumbnail_url || b.image_cover_url),
-      inviter: text(from.full_name || from.username), inviterAvatar: image(from.image_medium_url || from.image_large_url),
-      invitedUser: String(to.id), invitedAvatar: image(to.image_medium_url), createdAt: text(item.created_at), status: text(item.status) };
+      inviterUsername:/^[A-Za-z0-9_]+$/.test(from.username || '') ? from.username : undefined,invitedUsername:/^[A-Za-z0-9_]+$/.test(to.username || '') ? to.username : undefined,inviter: text(from.full_name || from.username), inviterAvatarColorIndex: Number.isInteger(from.avatar_color_index) && from.avatar_color_index >= 1 && from.avatar_color_index <= 10 ? from.avatar_color_index : undefined, inviterAvatar: image(from.image_medium_url || from.image_large_url),
+      invitedUser: String(to.id), invitedName:text(to.full_name || to.username), invitedAvatarColorIndex:Number.isInteger(to.avatar_color_index) && to.avatar_color_index >= 1 && to.avatar_color_index <= 10 ? to.avatar_color_index : undefined, invitedAvatar: image(to.image_medium_url), createdAt: text(item.created_at), status: text(item.status) };
   }
   window.PinmonyBoardInvitations = {
     open: function (token, preview, username) {
@@ -44,7 +44,7 @@ export const PIN_BOARD_INVITATION_SCRIPT: string = String.raw`
               String(r.data.invited_user.id) !== preview.invitedUser || !viewer || String(viewer.id) !== preview.invitedUser)
             throw new Error('wrong-invite');
           preview.status = text(r.data.status); s.items = [preview];
-          preview.invitedAvatar = image(viewer.image_medium_url || viewer.image_small_url) || preview.invitedAvatar;
+          preview.invitedUsername = /^[A-Za-z0-9_]+$/.test(viewer.username || '') ? viewer.username : preview.invitedUsername;preview.invitedName = text(viewer.full_name || viewer.username) || preview.invitedName; preview.invitedAvatarColorIndex = Number.isInteger(viewer.avatar_color_index) && viewer.avatar_color_index >= 1 && viewer.avatar_color_index <= 10 ? viewer.avatar_color_index : undefined; preview.invitedAvatar = image(viewer.image_medium_url || viewer.image_small_url) || preview.invitedAvatar;
           if (!preview.invitedAvatar && (viewer.username || username)) {
             var profile = await request(s, 'UserResource', { username: viewer.username || username });
             if (profile.resource_response.data && String(profile.resource_response.data.id) === preview.invitedUser)

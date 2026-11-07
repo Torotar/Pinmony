@@ -63,10 +63,15 @@ export struct PinmonyBoardPage {
   @Prop singlePinMove: boolean = false;
   @Prop snapshot: PinmonyBoardDetail;
   @Prop invitationName: string = '';
+  @Prop invitationUsername: string = '';
   @Prop invitationAvatar: string = '';
+  @Prop invitationAvatarColorIndex: number = 0;
   @Prop invitationVisible: boolean = false;
   @Prop invitationBusy: boolean = false;
   @Prop joinedAvatar: string = '';
+  @Prop joinedName: string = '';
+  @Prop joinedUsername: string = '';
+  @Prop joinedAvatarColorIndex: number = 0;
   @State private retainedBoard: PinmonyBoardDetail | undefined = undefined;
   @State private retainedSelection: PinmonyBoardDetail | undefined = undefined;
   @State private retainedEdit: PinmonyBoardDetail | undefined = undefined;
@@ -136,8 +141,8 @@ export struct PinmonyBoardPage {
   private boardSurface($$: BoardSurfaceParams) {
     PinmonyBoardSurface({ snapshot: $$.board, profileBoard: this.profileBoard, discoveryBoard: this.discoveryBoard,
       initialSelectedIds: $$.board.flow?.phase === 'targets' ? this.targetSelectedIds : [],
-      singlePinMove: this.singlePinMove, invitationName: this.invitationName, invitationAvatar: this.invitationAvatar,
-      invitationVisible: this.invitationVisible, invitationBusy: this.invitationBusy, joinedAvatar: this.joinedAvatar,
+      singlePinMove: this.singlePinMove, invitationName: this.invitationName, invitationAvatar: this.invitationAvatar, invitationAvatarColorIndex: this.invitationAvatarColorIndex,
+      invitationUsername: this.invitationUsername, invitationVisible: this.invitationVisible, invitationBusy: this.invitationBusy, joinedAvatar: this.joinedAvatar, joinedUsername: this.joinedUsername, joinedName: this.joinedName, joinedAvatarColorIndex: this.joinedAvatarColorIndex,
       onAction: (value: string): void => this.dispatch(value), onUser: this.onUser, onBack: this.onBack,
       onPin: this.onPin, onMore: this.onMore, onFavorite: this.onFavorite, onCollaborators: this.onCollaborators,
       onMessage: this.onMessage, onAcceptInvitation: this.onAcceptInvitation, onDismissInvitation: this.onDismissInvitation,
@@ -240,10 +245,15 @@ struct PinmonyBoardSurface {
   onCollaborators?: () => void;
   onMessage?: () => void;
   @Prop invitationName: string = '';
+  @Prop invitationUsername: string = '';
   @Prop invitationAvatar: string = '';
+  @Prop invitationAvatarColorIndex: number = 0;
   @Prop invitationVisible: boolean = false;
   @Prop invitationBusy: boolean = false;
   @Prop joinedAvatar: string = '';
+  @Prop joinedName: string = '';
+  @Prop joinedUsername: string = '';
+  @Prop joinedAvatarColorIndex: number = 0;
   onAcceptInvitation: () => void = () => {};
   onDismissInvitation: () => void = () => {};
   onShare?: () => void;
@@ -958,14 +968,14 @@ struct PinmonyBoardSurface {
       Column({ space: 10 }) {
         this.editLabel(this.uiText("pm_collaborator_59fa99bc"))
         Row() {
-          if (this.snapshot.collaboratorAvatars?.length) {
+          if ((this.snapshot.collaboratorUsers?.length || this.snapshot.collaboratorAvatars?.length)) {
             Row() {
-              ForEach(this.snapshot.collaboratorAvatars || [], (avatar: string, index: number) => {
-                Image(avatar).width(48).height(48).borderRadius(24).margin({ left: index > 0 ? -16 : 0 })
-              }, (avatar: string) => avatar)
+              ForEach(this.snapshot.collaboratorUsers || (this.snapshot.collaboratorAvatars || []).map((avatar: string): PinmonyBoardCreator => ({ id: avatar, name: '', avatar: avatar, url: '', verified: false })), (avatar: PinmonyBoardCreator, index: number) => {
+                PinmonyUserAvatar({ profileUrl: avatar.url, userId: avatar.id, image: avatar.avatar, name: avatar.name, colorIndex: avatar.avatarColorIndex || 0, avatarSize: 48 }).margin({ left: index > 0 ? -16 : 0 })
+              }, (avatar: PinmonyBoardCreator) => avatar.id)
             }
           } else {
-            PinmonyUserAvatar({ image: this.snapshot.memberAvatar || this.snapshot.ownerAvatar, name: this.snapshot.ownerName, avatarSize: 48 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
+            PinmonyUserAvatar({ profileUrl: this.snapshot.ownerUrl || '', image: this.snapshot.memberAvatar || this.snapshot.ownerAvatar, name: this.snapshot.memberName || this.snapshot.ownerName, colorIndex: this.snapshot.memberAvatar ? this.snapshot.memberAvatarColorIndex || 0 : this.snapshot.ownerAvatarColorIndex || 0, avatarSize: 48 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
           }
           Blank()
           Button('+', { type: ButtonType.Normal }).fontSize(26).width(48).height(48).borderRadius(16)
@@ -1383,7 +1393,7 @@ struct PinmonyBoardSurface {
           }
           if (!this.phase() && this.invitationVisible) {
             Row({ space: 12 }) {
-              PinmonyUserAvatar({ image: this.invitationAvatar, name: this.invitationName, avatarSize: 44 })
+              PinmonyUserAvatar({ username: this.invitationUsername, image: this.invitationAvatar, name: this.invitationName, colorIndex: this.invitationAvatarColorIndex, avatarSize: 44 })
               Column({ space: 12 }) {
                 Text(this.invitationName + this.uiText("pm_invited_you_to_collaborate_on_this_board_261f393f")).fontSize(16).fontColor($r('app.color.primary_text'))
                 Row({ space: 8 }) {
@@ -1449,7 +1459,7 @@ struct PinmonyBoardSurface {
           if (!this.phase() && this.snapshot.featuredCreators?.length) {
             Row({ space: 6 }) {
               ForEach(this.snapshot.featuredCreators || [], (creator: PinmonyBoardCreator, index: number) => {
-                PinmonyUserAvatar({ image: creator.avatar, name: creator.name, avatarSize: 30 }).margin({ left: index > 0 ? -12 : 0 })
+                PinmonyUserAvatar({ profileUrl: creator.url, userId: creator.id, image: creator.avatar, name: creator.name, colorIndex: creator.avatarColorIndex || 0, avatarSize: 30 }).margin({ left: index > 0 ? -12 : 0 })
               }, (creator: PinmonyBoardCreator) => creator.id)
               Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
               Text(this.uiText("pm_from_df6e36f7")).fontSize(15).lineHeight(22).fontColor($r('app.color.primary_text'))
@@ -1470,7 +1480,7 @@ struct PinmonyBoardSurface {
           if (!this.phase() && !this.snapshot.featuredCreators?.length && this.snapshot.ownerName && !this.joinedAvatar) {
             Row({ space: 8 }) {
               if (this.snapshot.ownerName) {
-                PinmonyUserAvatar({ image: this.snapshot.ownerAvatar, name: this.snapshot.ownerName, avatarSize: 32 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
+                PinmonyUserAvatar({ profileUrl: this.snapshot.ownerUrl || '', image: this.snapshot.ownerAvatar, name: this.snapshot.ownerName, colorIndex: this.snapshot.ownerAvatarColorIndex || 0, avatarSize: 32 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
               }
               Column({ space: 4 }) {
                 if (this.isDiscoveryBoard() && this.snapshot.sponsored) {
@@ -1491,15 +1501,15 @@ struct PinmonyBoardSurface {
           }
           if (!this.phase() && this.joinedAvatar) {
             Row({ space: 8 }) {
-              PinmonyUserAvatar({ image: this.snapshot.memberAvatar || this.snapshot.ownerAvatar, name: this.snapshot.ownerName, avatarSize: 36 })
-              Image(this.joinedAvatar).width(36).height(36).borderRadius(18)
+              PinmonyUserAvatar({ profileUrl: this.snapshot.ownerUrl || '', image: this.snapshot.memberAvatar || this.snapshot.ownerAvatar, name: this.snapshot.memberName || this.snapshot.ownerName, colorIndex: this.snapshot.memberAvatar ? this.snapshot.memberAvatarColorIndex || 0 : this.snapshot.ownerAvatarColorIndex || 0, avatarSize: 36 })
+              PinmonyUserAvatar({ username: this.joinedUsername, image: this.joinedAvatar, name: this.joinedName, colorIndex: this.joinedAvatarColorIndex, avatarSize: 36 })
             }.width('100%')
           }
           if (!this.phase() && this.snapshot.collaborator && !this.snapshot.editable) {
             Row() {
-              ForEach(this.snapshot.collaboratorAvatars || [], (avatar: string, index: number) => {
-                Image(avatar).width(36).height(36).borderRadius(18).margin({ left: index > 0 ? -12 : 0 })
-              }, (avatar: string) => avatar)
+              ForEach(this.snapshot.collaboratorUsers || (this.snapshot.collaboratorAvatars || []).map((avatar: string): PinmonyBoardCreator => ({ id: avatar, name: '', avatar: avatar, url: '', verified: false })), (avatar: PinmonyBoardCreator, index: number) => {
+                PinmonyUserAvatar({ profileUrl: avatar.url, userId: avatar.id, image: avatar.avatar, name: avatar.name, colorIndex: avatar.avatarColorIndex || 0, avatarSize: 36 }).margin({ left: index > 0 ? -12 : 0 })
+              }, (avatar: PinmonyBoardCreator) => avatar.id)
               Button({ type: ButtonType.Circle }) { Image($r('app.media.lucide_user_round_plus')).width(20).height(20) }
                 .width(36).height(36).backgroundColor($r('app.color.surface_muted')).onClick(() => { if (this.onCollaborators) this.onCollaborators(); })
             }.width('100%')
@@ -1515,14 +1525,14 @@ struct PinmonyBoardSurface {
           }
           if (!this.phase() && this.snapshot.editable) {
             Row({ space: 8 }) {
-              if (this.snapshot.collaboratorAvatars?.length) {
+              if ((this.snapshot.collaboratorUsers?.length || this.snapshot.collaboratorAvatars?.length)) {
                 Row() {
-                  ForEach(this.snapshot.collaboratorAvatars || [], (avatar: string, index: number) => {
-                    Image(avatar).width(36).height(36).borderRadius(18).margin({ left: index > 0 ? -12 : 0 })
-                  }, (avatar: string) => avatar)
+                  ForEach(this.snapshot.collaboratorUsers || (this.snapshot.collaboratorAvatars || []).map((avatar: string): PinmonyBoardCreator => ({ id: avatar, name: '', avatar: avatar, url: '', verified: false })), (avatar: PinmonyBoardCreator, index: number) => {
+                    PinmonyUserAvatar({ profileUrl: avatar.url, userId: avatar.id, image: avatar.avatar, name: avatar.name, colorIndex: avatar.avatarColorIndex || 0, avatarSize: 36 }).margin({ left: index > 0 ? -12 : 0 })
+                  }, (avatar: PinmonyBoardCreator) => avatar.id)
                 }
               } else {
-                PinmonyUserAvatar({ image: this.snapshot.memberAvatar, name: this.snapshot.ownerName, avatarSize: 36 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
+                PinmonyUserAvatar({ profileUrl: this.snapshot.ownerUrl || '', image: this.snapshot.memberAvatar, name: this.snapshot.memberName || this.snapshot.ownerName, colorIndex: this.snapshot.memberAvatarColorIndex || 0, avatarSize: 36 }).onClick(() => { if (this.snapshot.ownerUrl && this.onUser) this.onUser(this.snapshot.ownerUrl); })
               }
               Button({ type: ButtonType.Circle }) {
                 Image($r('app.media.lucide_user_round_plus')).width(20).height(20)

@@ -2,6 +2,7 @@ export interface PinmonyProfilePanelItem {
   id: string;
   name: string;
   avatar: string;
+  avatarColorIndex?: number;
   privateProfile?: boolean;
   followerCount?: number;
   profileUrl?: string;
@@ -38,6 +39,7 @@ export interface PinmonyProfilePanel {
   website: string;
   username: string;
   avatar: string;
+  avatarColorIndex?: number;
   avatarPreview?: string;
   avatarError?: string;
   avatarBusy?: boolean;

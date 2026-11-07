@@ -478,17 +478,88 @@ async function main() {
   }
   const languageNetwork = new PinmonyNativeNetwork();
   const languageContext = { ...state, page: base.page };
+  const beforePlatformCookieReader = readCookie;
+  readCookie = async () => 'session=synthetic; csrftoken=synthetic; _b="synthetic-browser-one"';
   response = { statusCode: 200, headers: {}, toString: () => '{}' };
-  const languageJob = { ...base, id: 'native_translation_language', headers: { 'Accept-Language': 'zh-CN,zh;q=0.9' },
+  const languageJob = { ...base, id: 'native_translation_language', headers: { 'Accept': 'application/json, text/javascript, */*, q=0.01', 'Accept-Language': 'zh-CN,zh;q=0.9', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
     url: 'https://www.pinterest.com/resource/ApiResource/get/?data=' + encodeURIComponent(JSON.stringify({ options: { url: '/v3/aggregated_comments/21/translate/' }, context: {} })) };
   assert.equal((await languageNetwork.request(languageJob, () => languageContext)).status, 200);
   assert.equal(requests.at(-1).headers['Accept-Language'], 'zh-CN,zh;q=0.9', 'translation language reaches RCP');
+  assert.equal(requests.at(-1).headers['Accept'], 'application/json, text/javascript, */*, q=0.01');
+  assert.equal(requests.at(-1).headers['Cache-Control'], 'no-cache');
+  assert.equal(requests.at(-1).headers['Pragma'], 'no-cache');
+  assert.equal(requests.at(-1).headers['X-Pinterest-Platform-Bid'], 'synthetic-browser-one');
+  const mobileUa = 'Mozilla/5.0 (Phone; OpenHarmony 7.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 ArkWeb/7.0.0.111 Mobile';
+  const desktopUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36';
+  const uaContext = { ...languageContext, userAgent: mobileUa };
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_ua', headers: {
+    ...languageJob.headers, 'User-Agent': 'untrusted-bridge-agent' } }, () => uaContext);
+  assert.equal(requests.at(-1).headers['User-Agent'], desktopUa, 'translation uses runtime-derived desktop compatibility UA');
+  assert.equal(requests.at(-1).headers['Accept-Language'], languageJob.headers['Accept-Language']);
+  assert.equal(requests.at(-1).headers['Cookie'], 'session=synthetic; csrftoken=synthetic; _b="synthetic-browser-one"');
+  assert.equal(uaContext.userAgent, mobileUa, 'session UA remains unchanged');
+  const futureUa = mobileUa.replace('537.36', '538.42').replace('144.0.0.0', '151.2.3.4').replace('Safari/537.36', 'Safari/538.43');
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_future_ua' }, () => ({ ...uaContext, userAgent: futureUa }));
+  assert.equal(requests.at(-1).headers['User-Agent'], desktopUa.replace('537.36', '538.42').replace('144.0.0.0', '151.2.3.4').replace('Safari/537.36', 'Safari/538.43'));
+  for (const ua of [desktopUa, 'synthetic-agent', mobileUa.replace('Chrome/144.0.0.0 ', '')]) {
+    await languageNetwork.request({ ...languageJob, id: 'native_translation_preserve_ua' }, () => ({ ...uaContext, userAgent: ua }));
+    assert.equal(requests.at(-1).headers['User-Agent'], ua, 'desktop and unrecognized UAs are preserved');
+  }
+  for (const job of [{ ...base, id: 'unrelated_ua' }, { ...base, id: 'native_translation_other_resource' },
+    { ...languageJob, id: 'other_api_ua' }, { ...base, id: 'native_comments_wrong_resource' }]) {
+    await languageNetwork.request(job, () => uaContext);
+    assert.equal(requests.at(-1).headers['User-Agent'], mobileUa, 'other reads retain the original UA');
+  }
+  for (const [id, resource] of [['native_comments_ua', 'UnifiedCommentsResource'],
+    ['native_replies_ua', 'AggregatedCommentReplyFeedResource']]) {
+    await languageNetwork.request({ ...base, id,
+      url: 'https://www.pinterest.com/resource/' + resource + '/get/?data=synthetic' }, () => uaContext);
+    assert.equal(requests.at(-1).headers['User-Agent'], desktopUa, 'eligibility reads share the translation UA');
+    assert.equal(requests.at(-1).headers['X-Pinterest-Platform-Bid'], undefined, 'platform header remains translation-only');
+  }
+  readCookie = async () => 'session=synthetic; csrftoken=synthetic; _b="synthetic-browser-two"';
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_fresh_browser' }, () => languageContext);
+  assert.equal(requests.at(-1).headers['X-Pinterest-Platform-Bid'], 'synthetic-browser-two', 'platform identity is read anew, never retained');
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_bad_cache', headers: { 'Cache-Control': 'no-cache\r\nInjected: true', 'Pragma': 'private' } }, () => languageContext);
+  assert.equal(requests.at(-1).headers['Cache-Control'], undefined);
+  assert.equal(requests.at(-1).headers['Pragma'], undefined);
+  await languageNetwork.request({ ...base, id: 'unrelated_platform', headers: {
+    ...languageJob.headers, 'X-Pinterest-Platform-Bid': 'untrusted-bridge-value' } }, () => languageContext);
+  assert.equal(requests.at(-1).headers['X-Pinterest-Platform-Bid'], undefined, 'unrelated requests never gain platform identity');
+  readCookie = async () => 'session=synthetic; csrftoken=synthetic';
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_no_browser',
+    headers: { ...languageJob.headers, 'X-Pinterest-Platform-Bid': 'untrusted-bridge-value' } }, () => languageContext);
+  assert.equal(requests.at(-1).headers['X-Pinterest-Platform-Bid'], undefined, 'bridge cannot provide browser credentials');
+  readCookie = async () => 'session=synthetic; _b=' + 'x'.repeat(4097);
+  await languageNetwork.request({ ...languageJob, id: 'native_translation_long_browser' }, () => languageContext);
+  assert.equal(requests.at(-1).headers['X-Pinterest-Platform-Bid'], undefined, 'oversized platform cookie is not forwarded as a header');
+  readCookie = beforePlatformCookieReader;
   await languageNetwork.request({ ...languageJob, id: 'native_translation_english', headers: { 'accept-language': 'en-US,en;q=0.9' } }, () => languageContext);
   assert.equal(requests.at(-1).headers['Accept-Language'], 'en-US,en;q=0.9');
   await languageNetwork.request({ ...languageJob, id: 'native_translation_invalid', headers: { 'Accept-Language': 'zh-CN\r\nInjected: true' } }, () => languageContext);
   assert.equal(requests.at(-1).headers['Accept-Language'], undefined, 'invalid language headers are stripped');
   await languageNetwork.request({ ...base, id: 'unrelated_language', headers: languageJob.headers }, () => languageContext);
   assert.equal(requests.at(-1).headers['Accept-Language'], undefined, 'unrelated requests retain existing headers');
+  assert.equal(requests.at(-1).headers['Cache-Control'], undefined);
+  assert.equal(requests.at(-1).headers['Pragma'], undefined);
+  languageNetwork.invalidate();
+  const translationSession = { authenticated: true, accountId: 'synthetic', generation: 3,
+    origin: 'https://www.pinterest.com', userAgent: mobileUa, appVersion: 'synthetic-version' };
+  const translationPin = 'https://www.pinterest.com/pin/1/';
+  const admittedTranslation = { ...languageJob, id: 'native_translation_business', page: translationPin,
+    headers: { ...languageJob.headers, 'X-App-Version': translationSession.appVersion,
+      'X-Pinterest-Pws-Handler': 'www/pin/[id].js' }, url: languageJob.url + '&_=17940500000001' };
+  const admitted = await languageNetwork.requestBusinessPinRead(admittedTranslation,
+    () => translationSession, translationPin, () => true, undefined, '', '21');
+  assert.equal(admitted.status, 200, 'cache nonce survives business ownership and generic URL validation');
+  assert.equal(requests.at(-1).headers['User-Agent'], desktopUa, 'admitted business translation reaches RCP with compatibility UA');
+  assert.equal(requests.at(-1).url, admittedTranslation.url);
+  assert.equal(requests.at(-1).headers['Cache-Control'], 'no-cache');
+  assert.equal(requests.at(-1).headers['Pragma'], 'no-cache');
+  const countBeforeMismatch = requests.length;
+  await languageNetwork.requestBusinessPinRead({ ...admittedTranslation, id: 'native_translation_wrong_comment' },
+    () => translationSession, translationPin, () => true, undefined, '', '22');
+  assert.equal(requests.length, countBeforeMismatch, 'nonce does not bypass comment ownership');
   languageNetwork.invalidate();
   native.invalidate();
   console.log('Native transport, credential isolation, observers, cancellation, stale cookies and actual home/search/board sections mapping passed');

@@ -1,5 +1,5 @@
 export interface SocialMessageGroup { id: number; levels: number[]; selected: number; }
-export interface SocialBlockedUser { id: string; username: string; name: string; image: string; }
+export interface SocialBlockedUser { avatarColorIndex?: number; id: string; username: string; name: string; image: string; }
 export interface SocialPermissions { business: boolean; personal: boolean; mentions?: number; groups: SocialMessageGroup[]; blocked: SocialBlockedUser[]; ready: boolean; blockedReady: boolean; blockedComplete?: boolean; protected: boolean; commentsEnabled?: boolean; shoppingRecommendationsEnabled?: boolean; ideaPinDownloadsEnabled?: boolean; myCommentFilterEnabled?: boolean; otherCommentFilterEnabled?: boolean; myCommentFilterPhrases?: string[]; otherCommentFilterPhrases?: string[]; }
 export interface SocialMessageChoice { group: number; level: number; }
 export interface SocialSettingsResponse { id: string; is_partner?: boolean; allow_mentions?: number; messaging_permissions?: SocialMessageResponse[]; comments_disabled?: number; shopping_rec_disabled?: boolean; allow_idea_pin_downloads?: boolean; is_parental_control_passcode_enabled?: boolean; is_parental_control_passcode_verification_pending?: boolean; }

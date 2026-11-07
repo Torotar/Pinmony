@@ -1,9 +1,11 @@
+import { inheritUserAvatarColor, PinmonyAvatarUserMetadata } from './PinmonyUserAvatarMetadata';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyRelatedPin, readRelatedPresentation, RelatedPresentation, PinmonyComment, PinmonyCommentResult } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, Priority } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyRouteParser } from './PinmonyRouteParser';
+import { PinmonyTranslationDiagnostics } from './PinmonyTranslationDiagnostics';
 import { readProductPresentation, ProductPresentation, PinmonyCarouselItem } from 'feature_pin';
 
 // Per-feature manual rollout; the transport safety gate is still mandatory.
@@ -55,10 +57,11 @@ interface PreviewResource { status: string; code?: number; error?: Object; data:
 interface PreviewItem { unified_comment?: PreviewComment; aggregated_comment?: PreviewComment; user_did_it_data?: PreviewComment; }
 interface PreviewComment { text?: string; details?: string; }
 interface PreviewOptions { aggregated_pin_id: string; }
-interface CommentUser { id?: string; username?: string; full_name?: string; image_medium_url?: string; }
+interface CommentUser extends PinmonyAvatarUserMetadata { avatar_color_index?: number; id?: string; username?: string; full_name?: string; image_medium_url?: string; }
 interface CommentImage { originals?: CommentOriginal; }
 interface CommentOriginal { url?: string; }
 export interface NativeCommentData { id: string; type?: string; text?: string; details?: string; user?: CommentUser; created_at?: string;
+  is_translatable?: boolean;
   pin?: AggregatePinData; image_signatures?: string[]; done_at?: string; images?: CommentImage[]; like_count?: number; reaction_counts?: Record<string, number>;
   liked_by_me?: boolean; reaction_by_me?: number; comment_count?: number; }
 interface CommentsResponse { resource_response: CommentsResource; client_context?: CommentClient; }
@@ -67,8 +70,16 @@ interface CommentsOptions { aggregated_pin_id: string; comment_featured_ids: str
   redux_normalize_feed: boolean; is_reversed: boolean; bookmarks?: string[]; }
 interface RepliesOptions { isUnifiedComment: boolean; objectId: string; redux_normalize_feed: boolean; }
 interface TranslationOptions { url: string; }
-interface TranslationResponse { resource_response: TranslationResource; }
-interface TranslationResource { status: string; code?: number; error?: Object; endpoint_name: string; data: string | null; }
+interface TranslationResponse { resource_response: TranslationResource; client_context?: TranslationClientContext; }
+interface TranslationClientContext { locale?: string; is_authenticated?: boolean; user?: TranslationClientUser; }
+interface TranslationClientUser { id?: string; locale?: string; }
+interface TranslationResource { status: string; code?: number; error?: Object; endpoint_name: string; data: string | null; http_status?: number; }
+function translationDiagnosticLocale(locale: string | undefined): string {
+  if (locale === undefined) return 'absent';
+  const known: string[] = ['zh', 'zh-CN', 'zh_CN', 'zh-TW', 'zh_TW', 'en', 'en-US', 'en_US', 'en-GB', 'en_GB',
+    'ja', 'ja-JP', 'ja_JP', 'ko', 'ko-KR', 'ko_KR', 'ru', 'ru-RU', 'ru_RU', 'pt', 'pt-BR', 'pt_BR'];
+  return typeof locale === 'string' && known.includes(locale) ? locale : 'other';
+}
 interface ReadEnvelope { options: Object; context: Record<string, string>; }
 interface ProductQuery { queryHash: string; variables: ProductVariables; }
 interface RelatedOptions { pin_id: string; page_size: number; context_pin_ids: string[]; homefeed_source_sig: boolean;
@@ -480,7 +491,8 @@ export class PinmonyDetailNativeReads {
       const reply: PinmonyNetworkReply = await this.request('UnifiedCommentsResource', options, 'native_comments_', live);
       if (!live()) return;
       if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error(PinmonyI18n.message("pm_unable_to_load_comments_please_retry_eccfe65c"));
-      const data: CommentsResource = (JSON.parse(reply.body) as CommentsResponse).resource_response;
+      const response: CommentsResponse = JSON.parse(reply.body) as CommentsResponse;
+      const data: CommentsResource = response.resource_response;
       if (data?.status !== 'success' || data.error || data.code !== undefined && data.code !== 0 || !Array.isArray(data.data) || data.data.length > 2000)
         throw new Error(PinmonyI18n.message("pm_invalid_comment_response_please_retry_d0bf35c9"));
       const viewer: string | undefined = (JSON.parse(reply.body) as CommentsResponse).client_context?.user?.id;
@@ -488,13 +500,17 @@ export class PinmonyDetailNativeReads {
       if (!append) { result.items = []; this.commentAuthors.clear(); }
       let recognized: number = 0;
       data.data.forEach((item: NativeCommentData): void => {
+        inheritUserAvatarColor(item?.user,[response.client_context?.user]);
         const value: PinmonyComment | undefined = this.mapComment(item);
         if (value) recognized++;
         if (value && !result.items.some((old: PinmonyComment): boolean => old.id === value.id) && result.items.length < 2000) result.items.push(value);
       });
       if (data.data.length && !recognized) throw new Error(PinmonyI18n.message("pm_unsupported_comment_format_please_retry_25ae935c"));
       PinmonyRuntimeLog.info('CommentsTrace: list parsed incoming=' + data.data.length.toString() + ' recognized=' + recognized.toString() +
-        ' count=' + result.items.length.toString() + ' append=' + append.toString());
+        ' count=' + result.items.length.toString() + ' append=' + append.toString() +
+        ' translationTrue=' + data.data.filter((item: NativeCommentData): boolean => item.is_translatable === true).length.toString() +
+        ' translationFalse=' + data.data.filter((item: NativeCommentData): boolean => item.is_translatable === false).length.toString() +
+        ' translationUnknown=' + data.data.filter((item: NativeCommentData): boolean => typeof item.is_translatable !== 'boolean').length.toString());
       const cursor: string = typeof data.bookmark === 'string' && data.bookmark.length <= 4096 ? data.bookmark : '';
       this.commentsBookmark = cursor;
       result.ended = !cursor || cursor === '-end-' || !!previous && cursor === previous || data.data.length === 0 || result.items.length >= 2000;
@@ -515,12 +531,12 @@ export class PinmonyDetailNativeReads {
         const own: boolean = !!this.commentViewer && String(user.id || '') === this.commentViewer;
         const image = (url: string): string => /^https:\/\/(?:i|s)\.pinimg\.com\//.test(url) ? url : '';
     return { id: String(item.id), type: item.type, text: String((photo ? item.details : item.text) || '').trim().slice(0, 5000),
-          name: user.full_name || user.username || '', avatar: image(user.image_medium_url || ''),
+          name: user.full_name || user.username || '', avatar: image(user.image_medium_url || ''), avatarColorIndex: Number.isInteger(user.avatar_color_index) && user.avatar_color_index! >= 1 && user.avatar_color_index! <= 10 ? user.avatar_color_index : undefined,
           profileUrl: /^[A-Za-z0-9_]+$/.test(user.username || '') ? session.origin + '/' + user.username + '/' : '',
           createdAt: (photo ? item.done_at : item.created_at) || '', imageUrl: image(item.images?.[0]?.originals?.url || ''),
           likeCount: photo ? item.like_count || 0 : item.reaction_counts?.['1'] || 0, liked: photo ? item.liked_by_me === true : item.reaction_by_me === 1,
           canLike: photo || item.type === 'aggregatedcomment', canReply: photo || item.type === 'aggregatedcomment',
-          canTranslate: item.type === 'aggregatedcomment' && typeof item.text === 'string' && !!item.text.trim(),
+          canTranslate: item.type === 'aggregatedcomment' && item.is_translatable === true && typeof item.text === 'string' && !!item.text.trim(),
           canEdit: own && item.type === 'aggregatedcomment', canDelete: own && (photo || item.type === 'aggregatedcomment'),
           replyCount: item.comment_count || 0, replies: [], repliesOpen: false, repliesLoading: false, repliesError: '', busy: false };
 
@@ -547,13 +563,15 @@ export class PinmonyDetailNativeReads {
       this.ports.mark('comments.replies.response status=' + reply.status.toString() + ' parentType=' + (item.type || 'unknown'));
       if (reply.status === 404) throw new Error(PinmonyI18n.message("pm_replies_unavailable_http_404_ce396bf4"));
       if (reply.error || reply.status !== 200 || reply.body.length > 2000000) throw new Error(PinmonyI18n.message("pm_unable_to_load_replies_please_retry_81668953"));
-      const data: CommentsResource = (JSON.parse(reply.body) as CommentsResponse).resource_response;
+      const response: CommentsResponse = JSON.parse(reply.body) as CommentsResponse;
+      const data: CommentsResource = response.resource_response;
       if (data?.status !== 'success' || data.error || data.code !== undefined && data.code !== 0 || !Array.isArray(data.data) || data.data.length > 2000)
         throw new Error(PinmonyI18n.message("pm_invalid_reply_response_please_retry_7f846edb"));
       const endpoint: string = item.type === 'userdiditdata' ? 'v3_get_user_did_it_data_comments' : 'v3_get_aggregated_comment_replies';
       if (data.endpoint_name && data.endpoint_name !== endpoint) throw new Error(PinmonyI18n.message("pm_unexpected_reply_response_please_retry_37cf2c84"));
       const replies: PinmonyComment[] = [];
       data.data.forEach((raw: NativeCommentData): void => {
+        inheritUserAvatarColor(raw?.user,[response.client_context?.user]);
         const value: PinmonyComment | undefined = this.mapComment(raw);
         if (value && !replies.some((old: PinmonyComment): boolean => old.id === value.id)) replies.push(value);
       });
@@ -573,7 +591,7 @@ export class PinmonyDetailNativeReads {
       }
     }
     if (!this.owned() || !current() || result.pin !== this.pin || result.loading || result.busy || result.uncertain ||
-        !item || !/^\d+$/.test(commentId) || item.type !== 'aggregatedcomment' || typeof item.text !== 'string' || !item.text.trim() || item.translationLoading) return;
+        !item || !item.canTranslate || !/^\d+$/.test(commentId) || item.type !== 'aggregatedcomment' || typeof item.text !== 'string' || !item.text.trim() || item.translationLoading) return;
     const language: string = PinmonyI18n.translationAcceptLanguage();
     if (item.translatedText && item.translationLanguage === language) { item.translationVisible = !item.translationVisible; this.publishComments(result); return; }
     const selected: PinmonyComment = item;
@@ -584,6 +602,7 @@ export class PinmonyDetailNativeReads {
       (this.store.commentResult.items.includes(selected) || this.store.commentResult.items.some((parent: PinmonyComment): boolean => !!parent.replies?.includes(selected)));
     selected.translatedText = ''; selected.translationVisible = false; selected.translationLanguage = language;
     selected.translationLoading = true; selected.translationError = ''; this.publishComments(result);
+    const diagnosticTask: number = PinmonyTranslationDiagnostics.begin(this.pin, commentId, language);
     try {
       if (!this.ports.session().appVersion) throw new Error(PinmonyI18n.message("pm_translation_request_not_ready_please_retry_bfacc5b2"));
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request');
@@ -591,10 +610,25 @@ export class PinmonyDetailNativeReads {
       const reply: PinmonyNetworkReply = await this.request('ApiResource', options, 'native_translation_', live, commentId, language);
       if (!live()) return;
       if (reply.error || reply.status !== 200 || reply.body.length > 128000) { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=request-failed status=' + reply.status.toString()); throw new Error(PinmonyI18n.message('pm_comment_translation_request_failed_please_retry_9ff98b48')); }
-      const resource: TranslationResource = (JSON.parse(reply.body) as TranslationResponse).resource_response;
+      const payload: TranslationResponse = JSON.parse(reply.body) as TranslationResponse;
+      const resource: TranslationResource = payload.resource_response;
+      const context: TranslationClientContext | undefined = payload.client_context;
+      const authenticated: string = context?.is_authenticated === true ? 'true' : context?.is_authenticated === false ? 'false' : 'unknown';
+      const viewer: string | undefined = context?.user?.id;
+      // BusinessSession.accountId is a profile cache hash, not a website user id.
+      // Compare only with the viewer validated by this Pin/comment read chain.
+      const account: string = typeof viewer !== 'string' || !viewer || !this.commentViewer ? 'unknown' :
+        viewer === this.commentViewer ? 'match' : 'mismatch';
+      const upstream: number | undefined = resource?.http_status;
+      const upstreamStatus: string = typeof upstream === 'number' && Number.isInteger(upstream) && upstream >= 100 && upstream <= 599 ? upstream.toString() : 'unknown';
+      const task: string = /^native_translation_\d+$/.test(reply.id) ? reply.id.slice('native_translation_'.length) : 'unknown';
+      PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=context task=' + task + ' authenticated=' + authenticated +
+        ' account=' + account + ' locale=' + translationDiagnosticLocale(context?.locale) +
+        ' userLocale=' + translationDiagnosticLocale(context?.user?.locale) + ' upstreamStatus=' + upstreamStatus);
       if (resource?.status !== 'success' || resource.error || resource.code !== undefined && resource.code !== 0 ||
           resource.endpoint_name !== 'v3_get_translation') { PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=invalid-envelope'); throw new Error(PinmonyI18n.message('pm_invalid_comment_translation_response_please_retry_2f478594')); }
       const shape: string = resource.data === null ? 'null' : Array.isArray(resource.data) ? 'array' : typeof resource.data;
+      PinmonyTranslationDiagnostics.finish(diagnosticTask, shape);
       PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=response shape=' + shape + ' textLength=' + (typeof resource.data === 'string' ? resource.data.trim().length.toString() : '0'));
       if (resource.data === null || typeof resource.data === 'string' && !resource.data.trim()) {
         PinmonyRuntimeLog.info('CommentsTranslationTrace: phase=empty');
@@ -652,12 +686,18 @@ export class PinmonyDetailNativeReads {
     const headers: Record<string, string> = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
       'X-Pinterest-Pws-Handler': 'www/pin/[id].js', 'X-Pinterest-AppState': 'active', 'X-Pinterest-Source-Url': source };
     if (session.appVersion) headers['X-App-Version'] = session.appVersion;
-    if (prefix === 'native_translation_') headers['Accept-Language'] = translationLanguage;
+    if (prefix === 'native_translation_') {
+      headers['Accept'] = 'application/json, text/javascript, */*, q=0.01';
+      headers['Accept-Language'] = translationLanguage;
+      headers['Cache-Control'] = 'no-cache';
+      headers['Pragma'] = 'no-cache';
+    }
     if (prefix === 'native_autoplay_') headers['X-Pinterest-Pws-Handler'] = 'www/index.js';
     const envelope: ReadEnvelope = { options: options, context: {} };
     const job: PinmonyNetworkJob = { id: id, epoch: session.generation, page: pin, method: 'GET', body: '', headers: headers,
       url: session.origin + '/resource/' + resource + '/get/?source_url=' + encodeURIComponent(source) +
-        '&data=' + encodeURIComponent(JSON.stringify(envelope)) };
+        '&data=' + encodeURIComponent(JSON.stringify(envelope)) +
+        (prefix === 'native_translation_' ? '&_=' + Date.now().toString() + this.sequence.toString() : '') };
     // Only the visible recommendation first page gets foreground priority.
     // Comment reads, settings and subsequent pages retain their normal budget.
     if (resource === 'RelatedModulesResource' && !(options as RelatedOptions).bookmarks) job.priority = Priority.HIGH;

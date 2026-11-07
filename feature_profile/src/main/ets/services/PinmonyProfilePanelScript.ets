@@ -165,7 +165,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
           state.items = connection.edges.slice(0, 100).map(function (edge) {
             var u = edge.node;
             if (!u || !/^\\d+$/.test(u.entityId) || !/^[a-zA-Z0-9_]+$/.test(u.username) || typeof u.explicitlyFollowedByMe !== 'boolean') throw new Error('user');
-            return { id: u.entityId, name: String(u.fullName || u.username).slice(0,300), avatar: /^https:\\/\\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl : '',
+            return { id: u.entityId, name: String(u.fullName || u.username).slice(0,300), avatarColorIndex: Number.isInteger(u.avatarColorIndex) && u.avatarColorIndex >= 1 && u.avatarColorIndex <= 10 ? u.avatarColorIndex : undefined, avatar: /^https:\\/\\//.test(u.imageMediumUrl || '') ? u.imageMediumUrl : '',
               profileUrl: location.origin + '/' + u.username + '/', following: u.explicitlyFollowedByMe, canFollow: !u.blockedByMe && u.entityId !== info.viewerId };
           });
           state.hasMore = connection.pageInfo.hasNextPage === true;
@@ -207,7 +207,7 @@ export const PIN_PROFILE_PANEL_SCRIPT: string = `
             var updated = ''; var elapsed = Date.now() - Date.parse(item.board_order_modified_at || '');
             if (isFinite(elapsed) && elapsed >= 0) { var days = Math.floor(elapsed / 86400000); updated = days < 7 ? days + ' 天前' : days < 30 ? Math.floor(days / 7) + ' 周前' : days < 365 ? Math.floor(days / 30) + ' 个月前' : Math.floor(days / 365) + ' 年前'; }
             return { covers: covers, targetUrl: target, pinCount: typeof item.pin_count === 'number' ? item.pin_count + ' 张 Pin 图' : '', updated: updated, profileUrl: typeof item.username === 'string' && /^[a-zA-Z0-9_]+$/.test(item.username) ? location.origin + '/' + item.username + '/' : '', id: String(item.id), name: (item.full_name || item.name || item.username).slice(0,300),
-              avatar: /^https:\\/\\//.test(image) ? image : '', canFollow: item.blocked_by_me !== true && String(item.id) !== (window.PinmonyProfileApi.currentInfo(page) || {}).viewerId, following: section === 'boards' ? item.followed_by_me === true : item.explicitly_followed_by_me === true };
+              avatarColorIndex: Number.isInteger(item.avatar_color_index) && item.avatar_color_index >= 1 && item.avatar_color_index <= 10 ? item.avatar_color_index : undefined, avatar: /^https:\\/\\//.test(image) ? image : '', canFollow: item.blocked_by_me !== true && String(item.id) !== (window.PinmonyProfileApi.currentInfo(page) || {}).viewerId, following: section === 'boards' ? item.followed_by_me === true : item.explicitly_followed_by_me === true };
           });
         }
       } catch (_) { if (g === generation && location.href === address && current(page)) state.error = '读取失败，请重试'; }

@@ -111,6 +111,9 @@ async function main(){
    assert(diagnostic.store.profile.boardSortError);assert.equal(diagnostic.store.profile.boardSort,'');
    assert(sortTraces.some(line=>line.includes('phase=rejected write=false reason='+reason)),reason);
  }
+ const nullRead=diagnostic.reader.sortBoards('');diagnostic.requests.at(-1).resolve(sortBody(null));await nullRead;
+ assert.equal(diagnostic.store.profile.boardSort,'last_pinned_to','explicit null is the default latest-saved order');
+ assert.equal(diagnostic.store.profile.boardSortError,'');
  const diagnosticText=sortTraces.join('\n');
  for(const secret of ['private-value-never-log','private-endpoint-never-log','private-account-never-log'])assert(!diagnosticText.includes(secret));
  console.log('Profile sort diagnostics: rejected response stages and log redaction passed');

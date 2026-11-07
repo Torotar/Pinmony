@@ -283,7 +283,7 @@ export struct PinmonyProfilePanelPage {
           Column({ space: 20 }) {
           if (!this.snapshot.loading && this.snapshot.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
           else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
-            PinmonyUserAvatar({ image: this.snapshot.avatarPreview || this.snapshot.avatar, name: this.firstNameDraft + ' ' + this.lastNameDraft, avatarSize: 120 })
+            PinmonyUserAvatar({ profileUrl: this.snapshot.page, image: this.snapshot.avatarPreview || this.snapshot.avatar, colorIndex: this.snapshot.avatarColorIndex || 0, name: this.firstNameDraft + ' ' + this.lastNameDraft, avatarSize: 120 })
             Button(this.snapshot.avatarBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.avatarAction === 'refresh' ? this.uiText("pm_refresh_profile_picture_96fa37f1") : this.snapshot.avatarAction === 'check' ? this.uiText("pm_check_status_7c5569c3") : this.uiText("pm_change_6b01fce4")).type(ButtonType.Normal).borderRadius(16).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
               .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
             if (this.snapshot.avatarError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage) }) }
@@ -332,7 +332,7 @@ export struct PinmonyProfilePanelPage {
             } else {
             ForEach(this.snapshot.items, (item: PinmonyProfilePanelItem) => {
               Row({ space: 16 }) {
-                PinmonyUserAvatar({ image: item.avatar || '', name: item.name, avatarSize: 48 })
+                PinmonyUserAvatar({ profileUrl: this.snapshot.section === 'boards' ? '' : item.profileUrl || '', username: this.snapshot.section === 'boards' ? '' : item.username || '', userId: this.snapshot.section === 'boards' ? '' : item.id, image: item.avatar || '', name: item.name, colorIndex: item.avatarColorIndex || 0, websiteFallback: this.snapshot.section !== 'boards', avatarSize: 48 })
                   .onClick(() => { if (item.profileUrl && this.onUser) this.openPanelUser(item.profileUrl); })
                 Column({ space: 3 }) {
                   Row({ space: 4 }) {
@@ -395,7 +395,7 @@ export struct PinmonyProfilePanelPage {
           Column({ space: 20 }) {
             ForEach(this.visibleItems(), (item: PinmonyProfilePanelItem) => {
               Row({ space: 16 }) {
-                PinmonyUserAvatar({ image: this.snapshot.section === 'boards' ? (item.covers?.[0] || item.avatar || '') : (item.avatar || ''), name: item.name, avatarSize: 48 })
+                PinmonyUserAvatar({ profileUrl: this.snapshot.section === 'boards' ? '' : item.profileUrl || '', username: this.snapshot.section === 'boards' ? '' : item.username || '', userId: this.snapshot.section === 'boards' ? '' : item.id, image: this.snapshot.section === 'boards' ? (item.covers?.[0] || item.avatar || '') : (item.avatar || ''), name: item.name, colorIndex: this.snapshot.section === 'boards' ? 0 : item.avatarColorIndex || 0, websiteFallback: this.snapshot.section !== 'boards', avatarSize: 48 })
                   .onClick(() => { if (this.snapshot.section === 'boards' && item.targetUrl) this.onBoard?.(item.targetUrl); else if (item.profileUrl) this.openPanelUser(item.profileUrl); })
                 Text(item.name).fontColor($r('app.color.primary_text')).layoutWeight(1)
                   .onClick(() => { if (this.snapshot.section === 'boards' && item.targetUrl) this.onBoard?.(item.targetUrl); else if (item.profileUrl) this.openPanelUser(item.profileUrl); })

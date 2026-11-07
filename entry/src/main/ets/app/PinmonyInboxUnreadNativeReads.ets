@@ -15,6 +15,7 @@ interface PinmonyUnreadRow extends PinmonyInboxNoticeConversation { last_updated
 interface PinmonyUnreadResource { status: string; code?: number; error?: object; endpoint_name?: string; data: PinmonyUnreadRow[]; }
 interface PinmonyUnreadResponse { resource_response: PinmonyUnreadResource; }
 export interface PinmonyInboxUnreadPorts {
+  messagesPollMs?: number;
   messagesObserved?: (rows: PinmonyInboxNoticeConversation[]) => void;
   session: () => PinmonyBusinessSessionContext;
   active: () => boolean;
@@ -49,7 +50,7 @@ export class PinmonyInboxUnreadNativeReads {
   }
   private async readIfDue(updates: boolean, session: PinmonyBusinessSessionContext): Promise<void> {
     const kind: string = updates ? 'updates' : 'messages';
-    const interval: number = updates ? PIN_INBOX_UPDATES_POLL_MS : PIN_INBOX_MESSAGES_POLL_MS;
+    const interval: number = updates ? PIN_INBOX_UPDATES_POLL_MS : this.ports.messagesPollMs ?? PIN_INBOX_MESSAGES_POLL_MS;
     const previous: number | undefined = this.lastPoll.get(kind);
     if(this.jobs.has(kind) || previous !== undefined && Date.now() - previous < interval)return;
     this.lastPoll.set(kind,Date.now());

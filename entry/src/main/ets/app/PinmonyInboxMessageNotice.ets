@@ -14,17 +14,19 @@ interface PinmonyNoticeMessage {
 export interface PinmonyInboxNoticeConversation {
   id: string; unread?: boolean | number; name?: string; users?: PinmonyNoticeUser[]; last_message?: PinmonyNoticeMessage;
 }
-interface PinmonyNoticeSeen { id: string; time: number; recent: string[]; }
+interface PinmonyNoticeSeen { id: string; time: number; recent: string[]; viewRevision: number; }
 export interface PinmonyInboxMessageNoticePorts {
   openChat?: (conversation: string) => boolean;
   session: () => PinmonyBusinessSessionContext;
   active: () => boolean;
+  deliveryActive?: () => boolean;
   username: () => string;
   visibleConversation: () => string;
+  viewedConversation?: () => string;
   context: () => common.UIAbilityContext;
 }
 
-// Receives only already validated foreground reads. No polling, credentials or persistence.
+// Receives only validated reads owned by foreground or the live background session.
 export class PinmonyInboxMessageNotice {
   private readonly avatar: PinmonyInboxNoticeAvatar = new PinmonyInboxNoticeAvatar();
   private tapToken: string = '';
@@ -34,6 +36,10 @@ export class PinmonyInboxMessageNotice {
   private pendingConversation: string = '';
   private pendingIdentity: string = '';
   private delivery: number = 0;
+  private publishedConversation: string = '';
+  private publishedIdentity: string = '';
+  private publishedDelivery: number = 0;
+  private dismissal: number = -1;
   private readonly ports: PinmonyInboxMessageNoticePorts;
   private readonly seen: Map<string, PinmonyNoticeSeen> = new Map<string, PinmonyNoticeSeen>();
   private identity: string = '';
@@ -66,9 +72,57 @@ export class PinmonyInboxMessageNotice {
     }
   }
   pause(): void { this.revision++; this.avatar.cancel(); }
+  dismissForeground(): void {
+    // Invalidate background deliveries before cancelling the shared local slot.
+    // A previously tapped conversation remains pending for navigation.
+    this.pause();
+    this.tapToken = '';
+    this.queue = this.queue.then(async (): Promise<void> => {
+      try { await notificationManager.cancel(this.noticeId); this.clearPublished(); }
+      catch (_) { PinmonyRuntimeLog.warn('InboxNoticeTrace: foreground dismissal unavailable'); }
+    }).catch((): void => {});
+  }
+  dismissViewed(): void {
+    if(!this.ports.active())return;
+    const conversation: string = this.ports.viewedConversation?.() || '';
+    if(!/^\d{1,40}$/.test(conversation))return;
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    const identity: string = session.accountId + '|' + session.generation.toString() + '|' + session.origin;
+    if(!session.authenticated || !session.accountId || identity !== this.identity)return;
+    const seen: PinmonyNoticeSeen | undefined = this.seen.get(conversation);
+    if(seen)seen.viewRevision++;
+    if(this.publishedConversation !== conversation || this.publishedIdentity !== identity)return;
+    this.avatar.cancel();
+    if(this.tapConversation === conversation && this.tapIdentity === identity)this.tapToken = '';
+    const delivery: number = this.publishedDelivery;
+    if(this.dismissal === delivery)return;
+    this.dismissal = delivery;
+    this.queue = this.queue.then(async (): Promise<void> => {
+      try {
+        // The single notification slot may now belong to a different conversation.
+        if(this.publishedConversation !== conversation || this.publishedIdentity !== identity ||
+          this.publishedDelivery !== delivery)return;
+        await notificationManager.cancel(this.noticeId);
+        this.clearPublished();
+      } catch (_) { PinmonyRuntimeLog.warn('InboxNoticeTrace: viewed dismissal unavailable'); }
+      finally { if(this.dismissal === delivery)this.dismissal = -1; }
+    }).catch((): void => {});
+  }
+  private clearPublished(): void {
+    this.publishedConversation = ''; this.publishedIdentity = ''; this.publishedDelivery = 0;
+    this.tapToken = ''; this.tapConversation = ''; this.tapIdentity = '';
+  }
+  readyForBackground(): boolean {
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    return this.baseline && session.authenticated && !!session.accountId &&
+      this.identity === session.accountId + '|' + session.generation.toString() + '|' + session.origin;
+  }
+  private deliveryAllowed(): boolean { return this.ports.active() || this.ports.deliveryActive?.() === true; }
+  private visibleConversation(): string { return this.ports.active() ? this.ports.visibleConversation() : ''; }
   private clean(value: string | undefined): string { return typeof value === 'string' ? value.trim() : ''; }
 
   reset(): void {
+    this.clearPublished(); this.dismissal = -1;
     this.avatar.cancel(); this.delivery++; this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = '';
     this.tapToken = ''; this.tapConversation = ''; this.tapIdentity = '';
     this.revision++; this.identity = ''; this.baseline = false; this.baselineAt = 0; this.seen.clear();
@@ -79,12 +133,17 @@ export class PinmonyInboxMessageNotice {
   }
   private current(identity: string, revision: number): boolean {
     const session: PinmonyBusinessSessionContext = this.ports.session();
-    return this.ports.active() && session.authenticated && revision === this.revision &&
+    return this.deliveryAllowed() && session.authenticated && revision === this.revision &&
       identity === session.accountId + '|' + session.generation.toString() + '|' + session.origin;
   }
+  private currentDelivery(identity: string, revision: number, conversation: string, viewRevision: number): boolean {
+    return this.current(identity,revision) && (this.seen.get(conversation)?.viewRevision || 0) === viewRevision &&
+      conversation !== this.visibleConversation();
+  }
   observe(rows: PinmonyInboxNoticeConversation[]): void {
+    this.dismissViewed();
     const session: PinmonyBusinessSessionContext = this.ports.session();
-    if(!this.ports.active() || !session.authenticated || !session.accountId)return;
+    if(!this.deliveryAllowed() || !session.authenticated || !session.accountId)return;
     const identity: string = session.accountId + '|' + session.generation.toString() + '|' + session.origin;
     if(identity !== this.identity) { this.reset(); this.identity = identity; }
     const first: boolean = !this.baseline;
@@ -100,7 +159,8 @@ export class PinmonyInboxMessageNotice {
       const previous: PinmonyNoticeSeen | undefined = this.seen.get(row.id);
       if(previous && (previous.recent.includes(message.id) || time < previous.time))continue;
       if(!previous && this.seen.size >= 4000)continue;
-      this.seen.set(row.id, {id:message.id, time:time, recent:previous ? previous.recent.concat(message.id).slice(-16) : [message.id]});
+      const viewRevision: number = previous?.viewRevision || 0;
+      this.seen.set(row.id, {id:message.id, time:time, recent:previous ? previous.recent.concat(message.id).slice(-16) : [message.id],viewRevision:viewRevision});
       const sender: PinmonyNoticeUser | undefined = message.sender;
       if(!sender || typeof sender.id !== 'string' || !/^\d{1,40}$/.test(sender.id))continue;
       const known: PinmonyNoticeUser | undefined = Array.isArray(row.users) ? row.users.find((user: PinmonyNoticeUser): boolean => !!user && user.id === sender.id) : undefined;
@@ -108,7 +168,7 @@ export class PinmonyInboxMessageNotice {
         (this.clean(sender.username).toLowerCase() === username || this.clean(known?.username).toLowerCase() === username);
       if(first || !previous && time < this.baselineAt || own || message.deleted_by ||
         !(row.unread === true || typeof row.unread === 'number' && row.unread > 0) ||
-        row.id === this.ports.visibleConversation())continue;
+        row.id === this.visibleConversation())continue;
       const title: string = (this.clean(sender.full_name) || this.clean(known?.full_name) || this.clean(sender.username) || this.clean(known?.username)).slice(0,200);
       if(!title)continue;
       // Resolve app-owned fallback text when actually publishing, using the current language.
@@ -117,25 +177,25 @@ export class PinmonyInboxMessageNotice {
         message.pin ? 'pm_sent_a_pin_b874b586' : 'pm_new_message_3fc957bf';
       const avatarUrl: string = this.clean(sender.image_small_url) || this.clean(known?.image_small_url) ||
         this.clean(sender.image_medium_url) || this.clean(known?.image_medium_url) || this.clean(sender.image_large_url) || this.clean(known?.image_large_url);
-      this.queue = this.queue.then((): Promise<void> => this.publish(identity,revision,row.id,title,text,fallback,time,avatarUrl)).catch((): void => {
+      this.queue = this.queue.then((): Promise<void> => this.publish(identity,revision,row.id,title,text,fallback,time,avatarUrl,viewRevision)).catch((): void => {
         PinmonyRuntimeLog.warn('InboxNoticeTrace: delivery failed');
       });
     }
     if(first)this.baselineAt = Date.now();
     this.baseline = true;
   }
-  private async publish(identity: string, revision: number, conversation: string, title: string, text: string, fallback: string, time: number, avatarUrl: string): Promise<void> {
+  private async publish(identity: string, revision: number, conversation: string, title: string, text: string, fallback: string, time: number, avatarUrl: string, viewRevision: number): Promise<void> {
     try {
-      if(!this.current(identity,revision) || conversation === this.ports.visibleConversation())return;
+      if(!this.currentDelivery(identity,revision,conversation,viewRevision))return;
       const context: common.UIAbilityContext = this.ports.context();
       let enabled: boolean = await notificationManager.isNotificationEnabled();
-      if(!this.current(identity,revision))return;
-      if(!enabled && !this.permissionAttempted) {
+      if(!this.currentDelivery(identity,revision,conversation,viewRevision))return;
+      if(!enabled && !this.permissionAttempted && this.ports.active()) {
         this.permissionAttempted = true;
         try { await notificationManager.requestEnableNotification(context); } catch (_) { /* Respect denial. */ }
         enabled = await notificationManager.isNotificationEnabled();
       }
-      if(!enabled || !this.current(identity,revision))return;
+      if(!enabled || !this.currentDelivery(identity,revision,conversation,viewRevision))return;
       const token: string = Date.now().toString(36) + '-' + (++this.delivery).toString(36) + '-' + Math.random().toString(36).slice(2);
       const delivery: number = this.delivery;
       const agent: WantAgent = await wantAgent.getWantAgent({
@@ -143,7 +203,7 @@ export class PinmonyInboxMessageNotice {
         actionType:wantAgent.OperationType.START_ABILITY,requestCode:this.noticeId,
         actionFlags:[wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
       });
-      if(!this.current(identity,revision) || conversation === this.ports.visibleConversation())return;
+      if(!this.currentDelivery(identity,revision,conversation,viewRevision))return;
       const request: notificationManager.NotificationRequest = {
         id:this.noticeId, notificationSlotType:notificationManager.SlotType.SOCIAL_COMMUNICATION,
         deliveryTime:time, tapDismissed:true, wantAgent:agent,
@@ -151,17 +211,18 @@ export class PinmonyInboxMessageNotice {
           normal:{title:title,text:text || PinmonyI18n.message(fallback)}}
       };
       await notificationManager.publish(request);
-      if(!this.current(identity,revision)) {
-        try { await notificationManager.cancel(this.noticeId); } catch (_) { /* Already dismissed. */ }
+      this.publishedConversation = conversation; this.publishedIdentity = identity; this.publishedDelivery = delivery;
+      if(!this.currentDelivery(identity,revision,conversation,viewRevision)) {
+        try { await notificationManager.cancel(this.noticeId); this.clearPublished(); } catch (_) { /* Retain for a later dismissal. */ }
         return;
       }
       this.tapToken = token; this.tapConversation = conversation; this.tapIdentity = identity;
-      this.updateAvatar(avatarUrl,identity,revision,delivery,request).catch((): void => {});
+      this.updateAvatar(avatarUrl,identity,revision,delivery,request,conversation,viewRevision).catch((): void => {});
       PinmonyRuntimeLog.info('InboxNoticeTrace: published');
     } catch (_) { PinmonyRuntimeLog.warn('InboxNoticeTrace: delivery failed'); }
   }
-  private async updateAvatar(url: string, identity: string, revision: number, delivery: number, request: notificationManager.NotificationRequest): Promise<void> {
-    const current = (): boolean => this.current(identity,revision) && delivery === this.delivery;
+  private async updateAvatar(url: string, identity: string, revision: number, delivery: number, request: notificationManager.NotificationRequest, conversation: string, viewRevision: number): Promise<void> {
+    const current = (): boolean => this.currentDelivery(identity,revision,conversation,viewRevision) && delivery === this.delivery;
     const pixels: image.PixelMap | undefined = await this.avatar.read(url,current);
     if(!pixels)return;
     this.queue = this.queue.then(async (): Promise<void> => {

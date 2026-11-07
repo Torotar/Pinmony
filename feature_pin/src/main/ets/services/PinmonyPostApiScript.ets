@@ -612,7 +612,7 @@ export const PIN_POST_API_SCRIPT: string = `
         redux_normalize_feed: true, is_reversed: false }, function () { return comments === state; })
         .then(function (resource) { if (!Array.isArray(resource.data)) throw new Error('评论返回格式无效');
           state.items = resource.data.map(function (item) { var user = item.user || {}; return { id: String(item.id), text: item.text || '',
-            profileUrl: /^[a-zA-Z0-9_]+$/.test(user.username || '') ? location.origin + '/' + user.username + '/' : '', name: user.full_name || user.username || '', avatar: user.image_medium_url || '', createdAt: item.created_at || '' }; }); })
+            profileUrl: /^[a-zA-Z0-9_]+$/.test(user.username || '') ? location.origin + '/' + user.username + '/' : '', name: user.full_name || user.username || '', avatar: user.image_medium_url || '', avatarColorIndex: Number.isInteger(user.avatar_color_index) && user.avatar_color_index >= 1 && user.avatar_color_index <= 10 ? user.avatar_color_index : undefined, createdAt: item.created_at || '' }; }); })
         .catch(function (error) { if (comments === state) state.error = error.message; })
         .finally(function () { if (comments === state) state.loading = false; });
     },

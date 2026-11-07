@@ -1,4 +1,4 @@
-export { PinmonyProfileAction, PinmonyBoard, PinmonyCreatedPin, PinmonyOrganizeBoard, PinmonyOrganizeSnapshot, PinmonyProfileSnapshot, PinmonyPublishOption, PinmonyPublishSnapshot } from './src/main/ets/models/PinmonyProfile';
+export { PinmonyProfileCollaborator, PinmonyProfileAction, PinmonyBoard, PinmonyCreatedPin, PinmonyOrganizeBoard, PinmonyOrganizeSnapshot, PinmonyProfileSnapshot, PinmonyPublishOption, PinmonyPublishSnapshot } from './src/main/ets/models/PinmonyProfile';
 export { PinmonyProfilePage } from './src/main/ets/components/PinmonyProfilePage';
 export { PinmonyOrganizePage } from './src/main/ets/components/PinmonyOrganizePage';
 export { PinmonyPublishBoardPage } from './src/main/ets/components/PinmonyPublishBoardPage';

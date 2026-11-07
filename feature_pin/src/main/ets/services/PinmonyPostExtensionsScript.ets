@@ -34,12 +34,12 @@ export const PIN_POST_EXTENSIONS_SCRIPT: string = `
     var own = !!api.sessionUserId() && String(user.id) === api.sessionUserId();
     return { id: String(item.id), type: item.type, text: clean(photo ? item.details : item.text),
       profileUrl: /^[a-zA-Z0-9_]+$/.test(user.username || '') ? location.origin + '/' + user.username + '/' : '',
-      name: clean(user.full_name) || clean(user.username), avatar: image(user.image_medium_url),
+      name: clean(user.full_name) || clean(user.username), avatar: image(user.image_medium_url), avatarColorIndex: Number.isInteger(user.avatar_color_index) && user.avatar_color_index >= 1 && user.avatar_color_index <= 10 ? user.avatar_color_index : undefined,
       createdAt: clean(photo ? item.done_at : item.created_at), imageUrl: image(images[0] && images[0].originals && images[0].originals.url),
       likeCount: photo ? item.like_count || 0 : item.reaction_counts && item.reaction_counts['1'] || 0,
       liked: photo ? item.liked_by_me === true : item.reaction_by_me === 1,
       canLike: photo || item.type === 'aggregatedcomment', canEdit: own && item.type === 'aggregatedcomment',
-      canTranslate: item.type === 'aggregatedcomment' && typeof item.text === 'string' && !!item.text.trim(),
+      canTranslate: item.type === 'aggregatedcomment' && item.is_translatable === true && typeof item.text === 'string' && !!item.text.trim(),
       canDelete: own && (photo || item.type === 'aggregatedcomment'), canReply: photo || item.type === 'aggregatedcomment', replyCount: item.comment_count || 0,
       replies: [], repliesOpen: false, repliesLoading: false, repliesError: '', busy: false };
   }

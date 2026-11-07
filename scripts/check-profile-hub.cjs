@@ -24,10 +24,11 @@ async function first(f,boards=[board(1)],cursor='next',unorganized=[pin(3)]){con
 async function main(){
 
  const initialSortBody=(sort,viewer='42')=>JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_user_metdata_get',data:{most_recent_board_sort_order:sort}},client_context:{user:{id:viewer}}});
- for(const savedSort of ['alphabetical','custom','last_pinned_to']) {
+ for(const preference of ['alphabetical','custom','last_pinned_to',null]) {
+   const savedSort=preference===null?'last_pinned_to':preference;
    const cold=fixture();await first(cold);cold.reader.boardSort='';const before=cold.requests.length;let pending=cold.reader.select('hub:boards:0:0');
    assert(cold.requests.at(-1).job.id.startsWith('native_profile_sort_initial_'));assert.equal(cold.requests.at(-1).job.method,'GET');assert.equal(cold.requests.length,before+1);
-   cold.requests.at(-1).resolve(initialSortBody(savedSort));await flush();assert.equal(options(cold.requests.at(-1).job).sort,savedSort);assert.equal(endpoint(cold.requests.at(-1).job),'/resource/BoardsResource/get/');
+   cold.requests.at(-1).resolve(initialSortBody(preference));await flush();assert.equal(options(cold.requests.at(-1).job).sort,savedSort);assert.equal(endpoint(cold.requests.at(-1).job),'/resource/BoardsResource/get/');
    cold.requests.at(-1).resolve(body([{...board(2),name:'Alpha'},{...board(1),name:'Zebra'}],'cold-next'));await pending;assert.equal(cold.store.profile.boardSort,savedSort);assert.equal(cold.reader.hubFeed.sort,savedSort);assert.deepEqual(Array.from(cold.store.profile.boards,b=>b.title),['Alpha','Zebra']);
    pending=cold.reader.more();assert.equal(options(cold.requests.at(-1).job).sort,savedSort);assert.equal(options(cold.requests.at(-1).job).bookmarks[0],'cold-next');cold.requests.at(-1).resolve(body([board(3)]));await pending;
  }
