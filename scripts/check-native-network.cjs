@@ -127,6 +127,10 @@ async function main() {
   const inviteWrite = {...base, method:'POST', url:'https://www.pinterest.com/resource/BoardInviteResource/update/',
     body:inviteBody({board_id:'123',invited_user_id:'456'})};
   assert(acceptsNetworkJob(inviteWrite, state), 'documented acceptance with only the two IDs is admitted');
+  const declineWrite = {...inviteWrite,page:'https://www.pinterest.com/inbox/',url:inviteWrite.url.replace('/update/','/delete/'),body:inviteWrite.body.replace('source_url=%2F&','source_url=%2Finbox%2F&'),headers:{...inviteWrite.headers,'X-Pinterest-Pws-Handler':'www/inbox.js','X-Pinterest-Source-Url':'/inbox/'}};
+  assert(acceptsNetworkJob(declineWrite,{...state,page:declineWrite.page}),'captured decline two-ID body is admitted');
+  assert(!acceptsNetworkJob({...declineWrite,headers:{...declineWrite.headers,'X-Pinterest-Pws-Handler':'www/index.js'}},{...state,page:declineWrite.page}),'decline handler is exact');
+  assert(!acceptsNetworkJob({...inviteWrite,url:inviteWrite.url.replace('/update/','/delete/'),body:inviteBody({board_id:'123',invited_user_id:'456',ban:true})},state),'uncaptured decline fields remain denied');
   assert(!acceptsNetworkJob({...inviteWrite,body:inviteBody({board_id:'123',invited_user_id:'456',status:'declined'})},state));
   assert(!acceptsNetworkJob({...inviteWrite,body:inviteBody({board_id:'123'})},state));
   const scheduler = new RequestScheduler(1), order = [];

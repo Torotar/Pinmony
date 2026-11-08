@@ -10,7 +10,7 @@ function fixture() {
   let active = true, background = false, visible = '', viewed = '', enabled = true, language = 'zh', permissionCalls = 0, failPublish = false, failCancel = false;
   let session = { authenticated: true, accountId: 'self', generation: 1, origin: 'https://www.pinterest.com' };
   let permissionGate, wantGate, publishGate;
-  let avatarResult, avatarGate, canOpen = true;
+  let avatarResult, avatarGate, canOpen = true, visibleBoard = ''; const openedInvitations = [];
   const opened = [], avatarReads = [];
   const tapExports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/app/PinmonyInboxNoticeTap.ets','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText, {exports:tapExports,require:()=>({})});
@@ -23,13 +23,13 @@ function fixture() {
   };
   vm.runInNewContext(compiled, { exports, Date: TestDate, require: name => name === './PinmonyInboxNoticeAvatar' ? { PinmonyInboxNoticeAvatar: class { cancel() {} async read(url) { if(!url)return;avatarReads.push(url); if(avatarGate)await avatarGate;return avatarResult; } } } : name === './PinmonyInboxNoticeTap' ? tapExports : name === '@kit.NotificationKit' ? { notificationManager: manager } : name === '@kit.AbilityKit' ? {
     wantAgent: { getWantAgent: async info => { if (wantGate) await wantGate; return info; }, OperationType: { START_ABILITY: 0 }, WantAgentFlags: { UPDATE_PRESENT_FLAG: 0 } }
-  } : name === 'common_foundation' ? { PinmonyRuntimeLog: { info() {}, warn() {} }, PinmonyI18n: { message: () => language === 'zh' ? '新消息' : 'New message' } } : {} });
-  const notice = new exports.PinmonyInboxMessageNotice({ session: () => session, active: () => active, deliveryActive: () => background, username: () => 'self', visibleConversation: () => visible, viewedConversation:()=>viewed, context: () => ({ applicationInfo: { name: 'com.synthetic.pinmony' } }),openChat:id=>{if(!canOpen)return false;opened.push(id);return true;} });
+  } : name === 'common_foundation' ? { PinmonyRuntimeLog: { info() {}, warn() {} }, PinmonyI18n: { format: (key,args) => { assert.equal(key,'pm_board_invitation_notice_body'); assert.equal(args.length,1); return language === 'zh' ? '邀请你在'+args[0]+'上进行合作' : 'Invited you to collaborate on '+args[0]; }, message: () => language === 'zh' ? '新消息' : 'New message' } } : {} });
+  const notice = new exports.PinmonyInboxMessageNotice({ session: () => session, active: () => active, deliveryActive: () => background, username: () => 'self', visibleConversation: () => visible, viewedConversation:()=>viewed, context: () => ({ applicationInfo: { name: 'com.synthetic.pinmony' } }),visibleInvitationBoard:()=>visibleBoard,openInvitation:item=>{if(!canOpen)return false;openedInvitations.push(item);return true;},openChat:id=>{if(!canOpen)return false;opened.push(id);return true;} });
   return { notice, published, cancelled, setActive: v => active = v, setVisible: v => visible = v, setEnabled: v => enabled = v,
     setSession: v => session = v, setLanguage: v => language = v, setBackground: v => background = v, permissionCalls: () => permissionCalls,
     setPermissionGate: v => permissionGate = v, setWantGate: v => wantGate = v, setPublishGate: v => publishGate = v, failPublish: v => failPublish = v,
     setViewed:v=>viewed=v,failCancel:v=>failCancel=v,
-    opened,avatarReads,receive:want=>tapExports.PinmonyInboxNoticeTap.receive(want),setCanOpen:v=>canOpen=v,setAvatar:(pixels,gate)=>{avatarResult=pixels;avatarGate=gate;} };
+    openedInvitations,setVisibleBoard:v=>visibleBoard=v,opened,avatarReads,receive:want=>tapExports.PinmonyInboxNoticeTap.receive(want),setCanOpen:v=>canOpen=v,setAvatar:(pixels,gate)=>{avatarResult=pixels;avatarGate=gate;} };
 }
 const row = (id, message, extra = {}) => ({ id, unread: 1, users: [{ id: '2', full_name: '发送者原文' }], last_message: {
   id: message, created_at: new Date(now).toISOString(), sender: { id: '2', username: 'peer' }, text: '消息原文', ...extra
@@ -37,6 +37,18 @@ const row = (id, message, extra = {}) => ({ id, unread: 1, users: [{ id: '2', fu
 const settle = f => f.notice.queue;
 const turn = () => new Promise(resolve => setImmediate(resolve));
 async function main() {
+  const invitation = (id='81') => ({boardId:id,boardUrl:'https://www.pinterest.com/peer/art/',boardName:'原图板',inviter:'原用户',inviterAvatar:'https://i.pinimg.com/avatar.jpg',invitedUser:'41',createdAt:'',status:'new'});
+  const inv=fixture();inv.notice.observeInvitations([invitation()]);await settle(inv);
+  assert.equal(inv.published.length,1);assert.equal(inv.published[0].id,7201);assert.equal(inv.published[0].notificationSlotType,1);
+  assert.equal(inv.published[0].content.normal.title,'原用户');assert.equal(inv.published[0].content.normal.text,'邀请你在原图板上进行合作');
+  inv.notice.observeInvitations([invitation()]);await settle(inv);assert.equal(inv.published.length,1);
+  inv.setCanOpen(false);inv.receive({parameters:inv.published[0].wantAgent.wants[0].parameters});inv.notice.dismissForeground();await settle(inv);inv.setCanOpen(true);inv.notice.consumeTap();assert.equal(inv.openedInvitations[0].boardId,'81');assert.equal(inv.opened.length,0);
+  const removed=fixture();let releaseInvite;removed.setWantGate(new Promise(r=>releaseInvite=r));removed.notice.observeInvitations([invitation()]);await turn();removed.notice.observeInvitations([]);releaseInvite();await settle(removed);assert.equal(removed.published.length,0,'removed invitation cannot publish late');
+  const mixed=fixture();mixed.notice.observe([]);mixed.notice.observeInvitations([invitation()]);await settle(mixed);now+=10000;mixed.notice.observe([row('100','900')]);mixed.notice.observeInvitations([]);await settle(mixed);assert.equal(mixed.notice.publishedConversation,'100','removal cannot cancel newer chat');
+  const visibleInvite=fixture();visibleInvite.setVisibleBoard(invitation().boardUrl);visibleInvite.notice.observeInvitations([invitation()]);await settle(visibleInvite);assert.equal(visibleInvite.published.length,0);
+  const localeInvite=fixture();localeInvite.notice.observeInvitations([invitation()]);localeInvite.setLanguage('en');await settle(localeInvite);assert.equal(localeInvite.published[0].content.normal.text,'Invited you to collaborate on 原图板');
+  const avatarInvite=fixture();let avatarReleased=0;const pixelsInvite={release:async()=>avatarReleased++};avatarInvite.setAvatar(pixelsInvite);avatarInvite.notice.observeInvitations([invitation()]);await turn();await settle(avatarInvite);assert.equal(avatarInvite.published.length,2);assert.equal(avatarInvite.published[1].largeIcon,pixelsInvite);assert.equal(avatarInvite.published[1].isAlertOnce,true);assert.equal(avatarReleased,1);
+  const hiddenInvite=fixture();hiddenInvite.setActive(false);hiddenInvite.setBackground(true);hiddenInvite.notice.observeInvitations([invitation()]);await settle(hiddenInvite);assert.equal(hiddenInvite.published.length,0);
   const f = fixture(); f.notice.observe([row('100', '1')]); await settle(f); assert.equal(f.published.length, 0, 'old unread messages establish a silent baseline');
   now += 10000; f.notice.observe([row('100', '2')]); await settle(f); assert.equal(f.published.length, 1);
   const request = f.published[0]; assert.equal(request.content.normal.title, '发送者原文'); assert.equal(request.content.normal.text, '消息原文');

@@ -5,6 +5,7 @@ import { PinmonyInboxNoticeAvatar } from './PinmonyInboxNoticeAvatar';
 import { PinmonyInboxNoticeTap } from './PinmonyInboxNoticeTap';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyBoardInvitation } from 'feature_inbox';
 
 interface PinmonyNoticeUser { id: string; username?: string; full_name?: string; image_small_url?: string; image_medium_url?: string; image_large_url?: string; }
 interface PinmonyNoticeMessage {
@@ -17,6 +18,8 @@ export interface PinmonyInboxNoticeConversation {
 interface PinmonyNoticeSeen { id: string; time: number; recent: string[]; viewRevision: number; }
 export interface PinmonyInboxMessageNoticePorts {
   openChat?: (conversation: string) => boolean;
+  openInvitation?: (item: PinmonyBoardInvitation) => boolean;
+  visibleInvitationBoard?: () => string;
   session: () => PinmonyBusinessSessionContext;
   active: () => boolean;
   deliveryActive?: () => boolean;
@@ -35,6 +38,8 @@ export class PinmonyInboxMessageNotice {
   private pendingTap: boolean = false;
   private pendingConversation: string = '';
   private pendingIdentity: string = '';
+  private pendingInvitation: PinmonyBoardInvitation | undefined = undefined;
+  private readonly invitations: Map<string, PinmonyBoardInvitation> = new Map<string, PinmonyBoardInvitation>();
   private delivery: number = 0;
   private publishedConversation: string = '';
   private publishedIdentity: string = '';
@@ -54,6 +59,7 @@ export class PinmonyInboxMessageNotice {
     PinmonyInboxNoticeTap.bind((token: string): void => {
       if(token === this.tapToken && token.length > 0) {
         this.pendingTap = true; this.pendingConversation = this.tapConversation; this.pendingIdentity = this.tapIdentity;
+        this.pendingInvitation = this.invitations.get(this.tapConversation);
         this.tapToken = ''; this.avatar.cancel(); this.delivery++;
         this.consumeTap();
       }
@@ -66,9 +72,11 @@ export class PinmonyInboxMessageNotice {
     if(!this.pendingTap || !this.ports.active())return;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     const identity: string = session.accountId + '|' + session.generation.toString() + '|' + session.origin;
-    if(!session.authenticated || identity !== this.pendingIdentity) { this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = ''; return; }
-    if(this.ports.openChat?.(this.pendingConversation)) {
-      this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = '';
+    if(!session.authenticated || identity !== this.pendingIdentity) { this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = ''; this.pendingInvitation = undefined; return; }
+    const opened: boolean = this.pendingConversation.startsWith('invite:') ?
+      !!this.pendingInvitation && this.ports.openInvitation?.(this.pendingInvitation) === true : this.ports.openChat?.(this.pendingConversation) === true;
+    if(opened) {
+      this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = ''; this.pendingInvitation = undefined;
     }
   }
   pause(): void { this.revision++; this.avatar.cancel(); }
@@ -124,6 +132,7 @@ export class PinmonyInboxMessageNotice {
   reset(): void {
     this.clearPublished(); this.dismissal = -1;
     this.avatar.cancel(); this.delivery++; this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = '';
+    this.pendingInvitation = undefined; this.invitations.clear();
     this.tapToken = ''; this.tapConversation = ''; this.tapIdentity = '';
     this.revision++; this.identity = ''; this.baseline = false; this.baselineAt = 0; this.seen.clear();
     // Serialized with publishing so an old account cannot cancel a new account's notice.
@@ -137,8 +146,47 @@ export class PinmonyInboxMessageNotice {
       identity === session.accountId + '|' + session.generation.toString() + '|' + session.origin;
   }
   private currentDelivery(identity: string, revision: number, conversation: string, viewRevision: number): boolean {
+    if(conversation.startsWith('invite:')) {
+      const item: PinmonyBoardInvitation | undefined = this.invitations.get(conversation);
+      return this.current(identity,revision) && this.ports.active() && !!item &&
+        (this.seen.get(conversation)?.viewRevision || 0) === viewRevision && item.boardUrl !== this.ports.visibleInvitationBoard?.();
+    }
     return this.current(identity,revision) && (this.seen.get(conversation)?.viewRevision || 0) === viewRevision &&
       conversation !== this.visibleConversation();
+  }
+  observeInvitations(items: PinmonyBoardInvitation[]): void {
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    if(!this.ports.active() || !session.authenticated || !session.accountId)return;
+    const identity: string = session.accountId + '|' + session.generation.toString() + '|' + session.origin;
+    if(identity !== this.identity) { this.reset(); this.identity = identity; }
+    const keys: Set<string> = new Set<string>();
+    for(const item of items) {
+      if(!item || item.status !== 'new' || !/^\d{1,30}$/.test(item.boardId) || !/^\d{1,30}$/.test(item.invitedUser) ||
+        !item.boardUrl.startsWith(session.origin + '/') || !item.inviter)continue;
+      const key: string = 'invite:' + item.boardId + ':' + item.invitedUser + ':' + item.createdAt;
+      keys.add(key); this.invitations.set(key,item);
+      if(this.seen.has(key) || this.seen.size >= 4000)continue;
+      const parsedTime: number = Date.parse(item.createdAt);
+      const time: number = Number.isFinite(parsedTime) && parsedTime <= Date.now() + 60000 ? parsedTime : Date.now();
+      this.seen.set(key,{id:key,time:time,recent:[key],viewRevision:0});
+      const revision: number = this.revision;
+      this.queue = this.queue.then((): Promise<void> => this.publish(identity,revision,key,item.inviter,'','pm_board_invitation_notice_body',time,item.inviterAvatar,0))
+        .catch((): void => { PinmonyRuntimeLog.warn('InboxNoticeTrace: delivery failed'); });
+    }
+    this.invitations.forEach((_item: PinmonyBoardInvitation, key: string): void => {
+      if(keys.has(key))return;
+      this.invitations.delete(key);
+      const seen: PinmonyNoticeSeen | undefined = this.seen.get(key);
+      if(seen)seen.viewRevision++;
+      if(this.pendingConversation === key) { this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = ''; this.pendingInvitation = undefined; }
+      if(this.publishedConversation !== key)return;
+      const delivery: number = this.publishedDelivery;
+      this.queue = this.queue.then(async (): Promise<void> => {
+        if(this.publishedConversation !== key || this.publishedIdentity !== identity || this.publishedDelivery !== delivery)return;
+        try { await notificationManager.cancel(this.noticeId); this.clearPublished(); }
+        catch (_) { PinmonyRuntimeLog.warn('InboxNoticeTrace: invitation dismissal unavailable'); }
+      }).catch((): void => {});
+    });
   }
   observe(rows: PinmonyInboxNoticeConversation[]): void {
     this.dismissViewed();
@@ -208,7 +256,7 @@ export class PinmonyInboxMessageNotice {
         id:this.noticeId, notificationSlotType:notificationManager.SlotType.SOCIAL_COMMUNICATION,
         deliveryTime:time, tapDismissed:true, wantAgent:agent,
         content:{notificationContentType:notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
-          normal:{title:title,text:text || PinmonyI18n.message(fallback)}}
+          normal:{title:title,text:this.noticeText(conversation,text,fallback)}}
       };
       await notificationManager.publish(request);
       this.publishedConversation = conversation; this.publishedIdentity = identity; this.publishedDelivery = delivery;
@@ -220,6 +268,10 @@ export class PinmonyInboxMessageNotice {
       this.updateAvatar(avatarUrl,identity,revision,delivery,request,conversation,viewRevision).catch((): void => {});
       PinmonyRuntimeLog.info('InboxNoticeTrace: published');
     } catch (_) { PinmonyRuntimeLog.warn('InboxNoticeTrace: delivery failed'); }
+  }
+  private noticeText(target: string, text: string, fallback: string): string {
+    const item: PinmonyBoardInvitation | undefined = this.invitations.get(target);
+    return item ? PinmonyI18n.format('pm_board_invitation_notice_body',[item.boardName]) : text || PinmonyI18n.message(fallback);
   }
   private async updateAvatar(url: string, identity: string, revision: number, delivery: number, request: notificationManager.NotificationRequest, conversation: string, viewRevision: number): Promise<void> {
     const current = (): boolean => this.currentDelivery(identity,revision,conversation,viewRevision) && delivery === this.delivery;

@@ -852,9 +852,11 @@ export class PinmonyBoardNativeReads {
         let b: BoardData;
         if(this.collection()) {const u: BoardUser = body.resource_response.data as BoardUser; if(!u || u.type !== 'user' || !this.digits(u.id) || this.clean(u.username).toLowerCase() !== decodeURIComponent(parts[0]).toLowerCase())throw new Error('user'); b = {type:'board',id:u.id,url:this.page,name:PinmonyI18n.message("pm_all_pins_9a2e0270"),pin_count:u.pin_count,owner:u,isOwn:u.id === viewer};}
         else {b = body.resource_response.data as BoardData; if(!b || b.type !== 'board' || !this.digits(b.id) || !this.matchesBoardPage(b.url) || !b.owner || !this.digits(b.owner.id))throw new Error('board');}
+        const serverFollowing: boolean | undefined = b.followed_by_me;
         if(b.id === this.board?.id && viewer === this.viewer && b.followed_by_me === undefined)b.followed_by_me = this.board.followed_by_me;
         if (typeof b.followed_by_me === 'boolean') this.followWrites.reconcile(b.id,b.followed_by_me);
         b.followed_by_me = this.followWrites.readFollowing(b.id,b.followed_by_me);
+        PinmonyRuntimeLog.info('BoardFollowStateTrace: read=' + revision.toString() + ' server=' + String(serverFollowing) + ' displayed=' + String(b.followed_by_me));
         this.board = b; this.viewer = viewer!; this.verified = true; this.sectionsReady = false; this.sectionsError = ''; this.version++; this.apply();
       }
       stage = '图板内容';

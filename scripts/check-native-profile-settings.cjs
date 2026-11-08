@@ -56,6 +56,22 @@ async function notificationsWrites(){
  const choice={type:'push',section:'settings_push_v2',option:'messages',value:false};
  const f=fixture();f.st.screen='notifications';await f.settings.requestAction('notifications','');
  assert(f.st.notifications[0].categories[0].channels[0].editable);
+ const retained=f.st.notifications;
+ f.hang('ApiResource/get');let refresh=f.settings.requestAction('notifications','');await flush();
+ assert(f.st.loading);assert.strictEqual(f.st.notifications,retained,'refresh keeps the exact verified list while pending');
+ f.hold().resolve(f.response([], 'wrong'));await refresh;
+ assert(f.st.error);assert.strictEqual(f.st.notifications,retained,'failed refresh retains real content');
+ f.hang('');await f.settings.requestAction('notifications','');
+ assert.notStrictEqual(f.st.notifications,retained,'validated response replaces retained content');
+ const cancelled=f.st.notifications;f.hang('ApiResource/get');refresh=f.settings.requestAction('notifications','');await flush();
+ assert.strictEqual(f.st.notifications,cancelled);f.settings.pause();await refresh;
+ f.hold().resolve(f.response([], 'v3_get_settings_all_notifications'));await flush();
+ assert.strictEqual(f.st.notifications,cancelled,'late response after cancellation cannot clear retained content');
+ f.hang('');await f.settings.requestAction('notifications','');
+ const switched=fixture();switched.st.screen='notifications';await switched.settings.requestAction('notifications','');
+ switched.account();switched.hang('ApiResource/get');const changed=switched.settings.requestAction('notifications','');await flush();
+ assert.equal(switched.st.notifications.length,0,'account change still clears previous identity notifications');
+ switched.settings.pause();await changed;
  let count=f.req.length;await f.settings.requestAction('notificationSet',JSON.stringify({...choice,option:'NO_PUSH'}));
  assert(!f.req.slice(count).some(r=>r.job.method==='POST'),'unsupported option never writes');
  await f.settings.requestAction('notificationSet',JSON.stringify(choice));assert.equal(f.st.notifications[0].categories[0].channels[0].value,false);assert(!f.st.writeUncertain);
@@ -90,7 +106,7 @@ async function notificationSupplement(){
  }
  assert(!model.notificationWritable('push','settings_push_everything_biz','NO_PUSH'),'business alias unconfirmed');assert(!model.notificationWritable('web_push','settings_web_push_everything','NO_WEB_PUSH'));
  const ui=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyNotificationsPage.ets','utf8');assert(ui.includes("this.store.token === token"));assert(ui.includes('notificationGlobal(choice.type, choice.section, choice.option) || value'));assert(ui.includes('cancel: () => { this.confirmationOpen = false; }'));
- const method=ui.slice(ui.indexOf('  private change('),ui.indexOf('  @Builder'));
+ const method=ui.slice(ui.indexOf('  private channelEnabled('),ui.indexOf('  private retry('))+ui.slice(ui.indexOf('  private change('),ui.indexOf('  @Builder'));
  const js=ts.transpileModule('class NotificationInteraction {'+method+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
  const Interaction=vm.runInNewContext(js+';NotificationInteraction',{notificationGlobal:model.notificationGlobal,DialogAlignment:{Bottom:1},$r:v=>v});
  let dialog;const requests=[];const x=new Interaction();x.pageVisible=true;x.confirmationOpen=false;x.store={token:1,screen:'notifications',busy:false,loading:false,writeUncertain:false};x.uiText=s=>s;x.getUIContext=()=>({showAlertDialog:d=>dialog=d});x.onRequest=(a,v)=>requests.push([a,JSON.parse(v)]);

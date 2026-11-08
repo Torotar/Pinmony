@@ -85,6 +85,7 @@ export struct PinmonyBoardPage {
   onCollaborators?: () => void;
   onMessage?: () => void;
   onAcceptInvitation: () => void = () => {};
+  onDeclineInvitation: () => void = () => {};
   onDismissInvitation: () => void = () => {};
   onShare?: () => void;
   onPublish?: () => void;
@@ -145,7 +146,7 @@ export struct PinmonyBoardPage {
       invitationUsername: this.invitationUsername, invitationVisible: this.invitationVisible, invitationBusy: this.invitationBusy, joinedAvatar: this.joinedAvatar, joinedUsername: this.joinedUsername, joinedName: this.joinedName, joinedAvatarColorIndex: this.joinedAvatarColorIndex,
       onAction: (value: string): void => this.dispatch(value), onUser: this.onUser, onBack: this.onBack,
       onPin: this.onPin, onMore: this.onMore, onFavorite: this.onFavorite, onCollaborators: this.onCollaborators,
-      onMessage: this.onMessage, onAcceptInvitation: this.onAcceptInvitation, onDismissInvitation: this.onDismissInvitation,
+      onMessage: this.onMessage, onAcceptInvitation: this.onAcceptInvitation, onDeclineInvitation: this.onDeclineInvitation, onDismissInvitation: this.onDismissInvitation,
       onShare: this.onShare, onPublish: this.onPublish, onLoadMore: this.onLoadMore, onRetry: this.onRetry,
       onRefresh: this.onRefresh })
       .width('100%').height('100%')
@@ -255,6 +256,7 @@ struct PinmonyBoardSurface {
   @Prop joinedUsername: string = '';
   @Prop joinedAvatarColorIndex: number = 0;
   onAcceptInvitation: () => void = () => {};
+  onDeclineInvitation: () => void = () => {};
   onDismissInvitation: () => void = () => {};
   onShare?: () => void;
   onPublish?: () => void;
@@ -1395,15 +1397,18 @@ struct PinmonyBoardSurface {
             Row({ space: 12 }) {
               PinmonyUserAvatar({ username: this.invitationUsername, image: this.invitationAvatar, name: this.invitationName, colorIndex: this.invitationAvatarColorIndex, avatarSize: 44 })
               Column({ space: 12 }) {
-                Text(this.invitationName + this.uiText("pm_invited_you_to_collaborate_on_this_board_261f393f")).fontSize(16).fontColor($r('app.color.primary_text'))
+                Text(PinmonyI18n.format('pm_board_invitation_notice_text',[this.invitationName,this.snapshot.title],this.uiLanguage)).fontSize(16).fontColor($r('app.color.primary_text'))
                 Row({ space: 8 }) {
-                  Button(this.uiText("pm_decline_136de7a8")).backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text')).enabled(false)
-                  Button(this.uiText("pm_accept_329fcec6")).backgroundColor($r('app.color.accent')).fontColor(Color.White)
+                  Button(this.uiText("pm_decline_136de7a8"), { type: ButtonType.Normal }).borderRadius(16)
+                    .fontSize(14).fontWeight(FontWeight.Medium).padding({left:16,right:16,top:12,bottom:12})
+                    .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text')).enabled(!this.invitationBusy).onClick(() => this.onDeclineInvitation())
+                  Button(this.uiText("pm_accept_329fcec6"), { type: ButtonType.Normal }).borderRadius(16)
+                    .fontSize(14).fontWeight(FontWeight.Medium).padding({left:16,right:16,top:12,bottom:12})
+                    .backgroundColor($r('app.color.accent')).fontColor(Color.White)
                     .enabled(!this.invitationBusy).onClick(() => this.onAcceptInvitation())
                 }
               }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-            }.padding(16).width('100%').borderRadius(20).backgroundColor($r('app.color.surface_muted'))
-              .gesture(PanGesture({ direction: PanDirection.Up }).onActionEnd(() => { if (!this.invitationBusy) this.onDismissInvitation(); }))
+            }.padding(16).width('100%').borderRadius(24).backgroundColor($r('app.color.page_background')).shadow({radius:12,color:'#26000000',offsetY:3})
           }
           if (!this.phase() && (this.snapshot.featured || this.isDiscoveryBoard())) {
             if (this.snapshot.headerImage) {

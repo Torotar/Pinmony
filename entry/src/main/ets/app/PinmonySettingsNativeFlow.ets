@@ -709,7 +709,6 @@ export class PinmonySettingsNativeFlow {
                 return;
             }
             if (action === 'notifications') {
-                this.store.notifications = [];
                 await this.notify(revision);
                 return;
             }

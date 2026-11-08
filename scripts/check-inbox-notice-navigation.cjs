@@ -1,5 +1,13 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const ts=require(process.argv[2]||'typescript');
+let now=1000000,active=true,polls=0;
+class PollDate extends Date { static now(){return now;} }
+const currentSession={authenticated:true,accountId:'self',generation:1,origin:'https://www.pinterest.com'};
+const chatExports={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/app/PinmonyInboxNoticeChatSession.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:chatExports,Date:PollDate,require:name=>name==='feature_inbox'?{PinmonyInboxStore:class{}}:name.includes('UnreadNativeReads')?{PIN_INBOX_CHAT_POLL_MS:1000}:{PinmonyInboxMessagesNativeReads:class{poll(){polls++;}}}});
+const timedChat=new chatExports.PinmonyInboxNoticeChatSession('cadence','100',{session:()=>({...currentSession}),active:()=>active});
+timedChat.poll();assert.equal(polls,1);now+=999;timedChat.poll();assert.equal(polls,1,'notice chat waits until one second');now++;timedChat.poll();assert.equal(polls,2,'notice chat polls at one second');
+now+=1000;active=false;timedChat.poll();assert.equal(polls,2,'covered chat cannot poll');active=true;currentSession.generation++;timedChat.poll();assert.equal(polls,2,'old session cannot poll');
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 const start=index.indexOf('  private openNoticeChat('),end=index.indexOf('  private readonly inboxMessageNotice:',start);
 assert(start>0&&end>start);

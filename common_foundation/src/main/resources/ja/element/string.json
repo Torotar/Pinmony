@@ -5955,6 +5955,30 @@
     {
       "name": "pm_search_empty_try_again",
       "value": "もう一度検索してください。"
-    }
+    },
+    {
+      "name": "pm_system_notifications_off",
+      "value": "システム通知がオフになっています"
+    },
+    {
+      "name": "pm_system_notifications_enable_message",
+      "value": "システム設定で Pinmony の通知を許可してから、このページに戻り、アプリ内通知をもう一度オンにしてください。"
+    },
+    {
+      "name": "pm_system_notifications_open_settings",
+      "value": "通知設定を開く"
+    },
+    {
+      "name": "pm_system_notifications_check_failed",
+      "value": "システムの通知権限を確認できません。しばらくしてからもう一度お試しください。"
+    },
+    {
+      "name": "pm_system_notifications_open_failed",
+      "value": "通知設定を開けません。システム設定で Pinmony の通知を手動で有効にしてください。"
+    },
+    {"name":"pm_invitation_decline_failed","value":"招待を辞退できませんでした。もう一度お試しください。"},
+    {"name":"pm_invitation_decline_uncertain","value":"辞退の結果を確認できません。リクエスト一覧を更新して確認してください。自動で再送信はしません。"},
+    {"name":"pm_board_invitation_notice_text","value":"{0}さんから{1}での共同作業に招待されました"},
+    {"name":"pm_board_invitation_notice_body","value":"{0}での共同作業に招待されました"}
   ]
 }

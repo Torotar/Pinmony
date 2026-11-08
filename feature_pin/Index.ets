@@ -53,3 +53,5 @@ export { PinmonyMoreSheet } from './src/main/ets/components/PinmonyMoreSheet';
 export { readProductPresentation, ProductPresentation } from './src/main/ets/services/PinmonyProductPresentation';
 export { PinmonyShuffleEffect, PinmonyShuffleItem, PinmonyShuffleSnapshot } from './src/main/ets/models/PinmonyShuffle';
 export { readShufflePresentation } from './src/main/ets/services/PinmonyShufflePresentation';
+export { PinmonyImageViewerRequest, PinmonyImageViewerSession } from './src/main/ets/services/PinmonyImageViewerSession';
+export { PinmonyImageViewerHost } from './src/main/ets/components/PinmonyImageViewerHost';

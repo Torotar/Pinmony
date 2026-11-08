@@ -4,6 +4,10 @@ import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyComment, PinmonyCommentResult } from '../models/PinmonyComments';
+import { ImageFlightRect, imageContainRect } from '../services/PinmonyImageTransition';
+import { PinmonyImageViewerRequest } from '../services/PinmonyImageViewerSession';
+
+interface CommentPhotoSize { key: string; url: string; width: number; height: number; }
 
 @Component
 export struct PinmonyCommentsSheet {
@@ -21,6 +25,13 @@ export struct PinmonyCommentsSheet {
   @State private menuOpen: boolean = false;
   @State private deleteOpen: boolean = false;
   @State private choosing: boolean = false;
+  @State private photoSizes: CommentPhotoSize[] = [];
+  @State private hiddenPhotoId: string = '';
+  private photoId: string = '';
+  private photoUrl: string = '';
+  onViewerOpen?: (request: PinmonyImageViewerRequest) => boolean;
+  onViewerCancel?: (owner: string) => void;
+  private photoPin: string = '';
   private mutationVersion: number = 0;
   private draftPin: string = '';
   onUser?: (url: string) => void;
@@ -33,7 +44,57 @@ export struct PinmonyCommentsSheet {
   onLike?: (id: string) => void;
   onTranslate?: (id: string) => void;
 
+  private photoSourceId(item: PinmonyComment): string {
+    return 'pinmony-comment-photo-' + this.result.pin + ':' + item.id;
+  }
+  private commentPhotoFrame(item: PinmonyComment): ImageFlightRect {
+    const size: CommentPhotoSize | undefined = this.photoSizes.find((value: CommentPhotoSize): boolean =>
+      value.key === this.photoSourceId(item) && value.url === item.imageUrl);
+    return imageContainRect(82, 110, size?.width || 0, size?.height || 0);
+  }
+  private recordPhotoSize(item: PinmonyComment, width: number, height: number): void {
+    if (!item.imageUrl || width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    if (!this.result.items.some((value: PinmonyComment): boolean => value === item || !!value.replies?.includes(item))) return;
+    const key: string = this.photoSourceId(item);
+    const known: CommentPhotoSize | undefined = this.photoSizes.find((value: CommentPhotoSize): boolean => value.key === key);
+    if (known?.url === item.imageUrl && known.width === width && known.height === height) return;
+    this.photoSizes = this.photoSizes.filter((value: CommentPhotoSize): boolean => value.key !== key).slice(-1999)
+      .concat([{ key: key, url: item.imageUrl, width: width, height: height }]);
+  }
+  private currentPhoto(): PinmonyComment | undefined {
+    for (const item of this.result.items) {
+      if (item.id === this.photoId) return item;
+      const reply: PinmonyComment | undefined = item.replies?.find((value: PinmonyComment): boolean => value.id === this.photoId);
+      if (reply) return reply;
+    }
+    return undefined;
+  }
+  private releasePhoto(): void {
+    this.hiddenPhotoId = ''; this.photoId = ''; this.photoPin = ''; this.photoUrl = '';
+  }
+  private clearPhoto(): void { this.onViewerCancel?.('comments'); this.releasePhoto(); }
+  aboutToDisappear(): void { this.clearPhoto(); this.photoSizes = []; }
+  private openPhoto(item: PinmonyComment): void {
+    if (!item.imageUrl || this.photoId || !this.onViewerOpen) return;
+    this.photoId = item.id; this.photoPin = this.result.pin; this.photoUrl = item.imageUrl;
+    const accepted: boolean = this.onViewerOpen({ owner: 'comments',
+      detail: { kind: 'comment-photo', session: 0, pinUrl: this.result.pin, imageUrl: item.imageUrl,
+        imageWidth: 0, imageHeight: 0, title: '', description: '', creator: '', creatorAvatar: '',
+        sourceLabel: '', actions: [], related: [] },
+      imageUrl: item.imageUrl, previewUrl: item.imageUrl, sourceRadius: 10,
+      sourceId: () => this.photoSourceId(item),
+      isCurrent: () => this.photoPin === this.result.pin && this.photoId === item.id &&
+        this.currentPhoto()?.imageUrl === item.imageUrl,
+      onReady: () => { if (this.photoId === item.id) this.hiddenPhotoId = item.id; },
+      onClosed: () => this.releasePhoto() });
+    if (!accepted) this.releasePhoto();
+  }
   private resultChanged(): void {
+    if (this.draftPin !== this.result.pin) this.photoSizes = [];
+    if (this.photoId) {
+      const selected: PinmonyComment | undefined = this.currentPhoto();
+      if (this.photoPin !== this.result.pin || !selected || selected.imageUrl !== this.photoUrl) this.clearPhoto();
+    }
     if (this.draftPin !== this.result.pin || (this.result.mutationVersion || 0) > this.mutationVersion) {
       this.draft = ''; this.photoUri = ''; this.target = undefined; this.editing = false;
       this.menuOpen = false; this.deleteOpen = false;
@@ -98,7 +159,15 @@ export struct PinmonyCommentsSheet {
           PinmonyActionNotice({ message: PinmonyI18n.render(item.translationError, this.uiLanguage) })
         }
         if (item.imageUrl) {
-          Image(item.imageUrl).width(82).height(110).objectFit(ImageFit.Contain).borderRadius(10)
+          Stack() {
+          Image(item.imageUrl).width(this.commentPhotoFrame(item).width).height(this.commentPhotoFrame(item).height)
+            .objectFit(ImageFit.Contain).borderRadius(10).clip(true)
+            .id(this.photoSourceId(item))
+            .opacity(this.hiddenPhotoId === item.id ? 0 : 1)
+            .onClick(() => this.openPhoto(item))
+            .onComplete((event) => this.recordPhotoSize(item, event?.width || 0, event?.height || 0))
+            .accessibilityText(this.uiText('pm_preview_13d61fea'))
+          }.width(82).height(110)
         }
         Row({ space: 8 }) {
         if (item.canTranslate && this.onTranslate) {

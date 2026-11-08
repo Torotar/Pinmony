@@ -5,9 +5,10 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyInboxBackgroundLifecycle } from './PinmonyInboxBackgroundLifecycle';
-import { PinmonyInboxUnreadNativeReads, PIN_INBOX_MESSAGES_POLL_MS } from './PinmonyInboxUnreadNativeReads';
+import { PinmonyInboxUnreadNativeReads } from './PinmonyInboxUnreadNativeReads';
 import { PinmonyInboxNoticeConversation } from './PinmonyInboxMessageNotice';
 export const PIN_INBOX_BACKGROUND_MESSAGES_POLL_MS: number = 3000;
+const PIN_INBOX_BACKGROUND_STALE_MS: number = 30000;
 
 export interface PinmonyInboxBackgroundSyncPorts {
   session: () => PinmonyBusinessSessionContext;
@@ -72,7 +73,7 @@ export class PinmonyInboxBackgroundSync {
   active(): boolean {
     const elapsed: number = Date.now() - this.lastTick;
     // This bounds response freshness, not the lifetime of background checking.
-    return this.eligible() && elapsed >= 0 && elapsed < PIN_INBOX_MESSAGES_POLL_MS * 3;
+    return this.eligible() && elapsed >= 0 && elapsed < PIN_INBOX_BACKGROUND_STALE_MS;
   }
   private start(): void {
     if(!this.installed || this.running)return;
@@ -112,7 +113,7 @@ export class PinmonyInboxBackgroundSync {
   private async tick(): Promise<void> {
     if(!this.eligible()) { this.stop(); return; }
     const now: number = Date.now();
-    if(now < this.lastTick || now - this.lastTick >= PIN_INBOX_MESSAGES_POLL_MS * 3) {
+    if(now < this.lastTick || now - this.lastTick >= PIN_INBOX_BACKGROUND_STALE_MS) {
       // Timers may resume much later after suspension. Discard old work once;
       // the normal interval resumes without replaying every missed poll.
       this.revision++; this.checking = false;

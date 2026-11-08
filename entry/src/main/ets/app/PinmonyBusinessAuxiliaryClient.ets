@@ -18,7 +18,7 @@ export class PinmonyBusinessAuxiliaryClient {
     const fields: string = 'source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
     const get: boolean = verb === 'get';
     const job: PinmonyNetworkJob = {id:id,epoch:s.generation,page:page,url:s.origin + '/resource/' + resource + '/' + verb + '/' + (get ? '?' + fields : ''),
-      method:get ? 'GET' : 'POST',body:get ? '' : fields,headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':mode === 'quiz' ? 'www/search/[scope].js' : 'www/index.js','X-Pinterest-Source-Url':path}};
+      method:get ? 'GET' : 'POST',body:get ? '' : fields,headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':mode === 'quiz' ? 'www/search/[scope].js' : mode === 'invites' && verb === 'delete' ? 'www/inbox.js' : 'www/index.js','X-Pinterest-Source-Url':path}};
     this.requests.add(id);
     try {
       const reply = await this.ports.network().requestBusinessAuxiliary(job,(): PinmonyBusinessSessionContext => this.ports.session(),mode,target,(): boolean => !!account && account === this.key() && live());

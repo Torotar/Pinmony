@@ -17,6 +17,7 @@ export struct PinmonyImageViewer {
   @Prop imageUrl: string = '';
   @Prop previewUrl: string = '';
   @Prop origin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
+  @Prop originRadius: number = 18;
   @Prop @Watch('transitionChanged') closing: boolean = false;
   onClosed?: () => void;
   onReady?: () => void;
@@ -147,7 +148,7 @@ export struct PinmonyImageViewer {
     const image: ImageFlightRect = this.sourceRect();
     // Contain images with letterboxing do not reach the rounded container corners.
     return this.origin.width > 0 && this.origin.height > 0 &&
-      Math.abs(image.width - this.origin.width) < 0.5 && Math.abs(image.height - this.origin.height) < 0.5 ? 18 : 0;
+      Math.abs(image.width - this.origin.width) < 0.5 && Math.abs(image.height - this.origin.height) < 0.5 ? this.originRadius : 0;
   }
   private setFrame(rect: ImageFlightRect): void {
     this.frameX = rect.x; this.frameY = rect.y;

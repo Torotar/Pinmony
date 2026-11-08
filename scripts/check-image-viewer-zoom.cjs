@@ -95,7 +95,12 @@ view.moveImage(1000, 1000); assert.equal(view.dx, 180); assert.equal(view.dy, 36
 assert.match(source, /GestureGroup\(GestureMode.Exclusive,\s*TapGesture\(\{ count: 2 \}\)/);
 assert(source.includes('PinchGesture()') && source.includes('PanGesture()'));
 const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
-assert(page.indexOf('PinmonyImageViewer({') > page.indexOf('  build() {'), 'viewer overlays navigation without toggling its title layout');
+const host = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyImageViewerHost.ets', 'utf8');
+const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+assert(host.includes('PinmonyImageViewer({') && index.includes('PinmonyImageViewerHost({ session: this.imageViewer'),
+  'shared full-window host overlays the retained detail navigation without toggling its title layout');
+assert(!page.includes('PinmonyImageViewer({') && page.includes('this.onViewerOpen?.('),
+  'Pin entry must dispatch to the same host as comment photos');
 assert(!page.includes(".hideTitleBar(this.imageLayer === 'zoom')"));
 assert.match(page,/Column\(\) \{ this.detailContent\(\) \}.width\('100%'\).height\('100%'\)\s*\.hitTestBehavior\(this.searchMounted \? HitTestMode.None : HitTestMode.Default\)/, 'detail remains mounted beneath the viewer');
 assert(!page.includes(".visibility(this.imageLayer === 'zoom' ? Visibility.Hidden"), 'zoom must not hide the entire detail page');

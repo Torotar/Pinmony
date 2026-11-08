@@ -1,6 +1,12 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]||'typescript');
-const geometry=fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets','utf8').replace(/export /g,'');
+const geometry=fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export /g,'');
 const imageContainRect=vm.runInNewContext(ts.transpileModule(geometry+';imageContainRect;', {compilerOptions:{target:99}}).outputText);
+const measureImageFlightOrigin=vm.runInNewContext(ts.transpileModule(geometry+';measureImageFlightOrigin;', {compilerOptions:{target:99}}).outputText);
+const transformed=measureImageFlightOrigin({px2vp:n=>n/2,
+  getComponentUtils:()=>({getRectangleById:()=>({size:{width:164,height:220},windowOffset:{x:100,y:200}})}),
+  getFrameNodeById:id=>({getPositionToWindowWithTransform:()=>id==='source'?{x:50,y:280}:{x:0,y:48}})},'source','root');
+assert.equal(transformed.y,232,'sheet visual translation must be included rather than using layout windowOffset');
+assert.equal(transformed.width,82,'FrameNode positions are vp; component sizes are px');
 const wide=imageContainRect(360,720,800,400);assert.equal(wide.width,360);assert.equal(wide.height,180);assert.equal(wide.y,270);
 const tall=imageContainRect(720,360,400,800);assert.equal(tall.width,180);assert.equal(tall.x,270);
 const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyImageViewer.ets','utf8');const sf=ts.createSourceFile('viewer.ts',source.replace(/\bstruct\b/g,'class'),99,true);
@@ -13,7 +19,7 @@ x.aboutToAppear();assert.equal(x.frameY,90);x.beginTransition();assert.equal(rea
 x.imageDecoded(1,true,800,400);assert.equal(x.originalReady,false,'original waits for opening animation');animations.at(-1).onFinish();assert.equal(x.originalReady,true);
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');assert(!page.includes('opacity(this.viewerMounted ? 0 : 1)'), 'source image stays visible until decoded handoff');
 x.scaleValue=3;x.dx=100;x.closing=true;x.transitionChanged();const old=animations.at(-1);assert.equal(x.scaleValue,1);assert.equal(x.dx,0);assert.equal(x.frameY,206);assert.equal(x.frameHeight,168);assert.equal(x.frameRadius,0,'letterboxed image remains square during return');
-const originalOrigin=x.origin;x.origin={x:0,y:0,width:336,height:168};assert.equal(x.sourceRadius(),18,'filled rounded source retains its corners');x.origin=originalOrigin;
+const originalOrigin=x.origin;x.origin={x:0,y:0,width:336,height:168};x.originRadius=18;assert.equal(x.sourceRadius(),18,'filled rounded source retains its corners');x.originRadius=10;assert.equal(x.sourceRadius(),10,'comment source retains its actual corner radius');x.originRadius=18;x.origin=originalOrigin;
 assert.equal(x.frameY + x.frameHeight / 2, x.origin.y + x.origin.height / 2, 'close targets actual contained photo bounds rather than letterboxed frame');
 const carousel=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets','utf8');
 assert.match(carousel,/\.id\(this.sourceId\)\.opacity\(this.imageHidden \? 0 : 1\)/);

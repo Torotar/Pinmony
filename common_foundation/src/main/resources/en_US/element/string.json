@@ -5955,6 +5955,30 @@
     {
       "name": "pm_search_empty_try_again",
       "value": "Please try searching again."
-    }
+    },
+    {
+      "name": "pm_system_notifications_off",
+      "value": "System notifications are off"
+    },
+    {
+      "name": "pm_system_notifications_enable_message",
+      "value": "Allow notifications for Pinmony in system settings, then return here and turn on in-app notifications again."
+    },
+    {
+      "name": "pm_system_notifications_open_settings",
+      "value": "Open notification settings"
+    },
+    {
+      "name": "pm_system_notifications_check_failed",
+      "value": "Unable to check system notification permission. Please try again later."
+    },
+    {
+      "name": "pm_system_notifications_open_failed",
+      "value": "Unable to open notification settings. Please enable Pinmony notifications manually in system settings."
+    },
+    {"name":"pm_invitation_decline_failed","value":"Could not decline the invitation. Please try again."},
+    {"name":"pm_invitation_decline_uncertain","value":"The decline result is unconfirmed. Refresh the requests list to check. It will not be submitted again automatically."},
+    {"name":"pm_board_invitation_notice_text","value":"{0} invited you to collaborate on {1}"},
+    {"name":"pm_board_invitation_notice_body","value":"Invited you to collaborate on {0}"}
   ]
 }

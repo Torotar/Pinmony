@@ -10,6 +10,8 @@ interface BoardFollowOptions { url: string; }
 interface BoardFollowEnvelope { options: BoardFollowOptions; context: Record<string, string>; }
 interface BoardFollowData { id: string; type: string; followed_by_me: boolean; }
 interface User {
+    image_xlarge_url?: string;
+    image_large_url?: string;
     id: string;
     type: string;
     username: string;
@@ -369,7 +371,7 @@ export class PinmonyProfileNativeActions {
                 panel.about = (d.about || '').slice(0, 2000);
                 panel.website = (d.website_url || '').slice(0, 2000);
                 panel.username = d.username;
-                panel.avatar = (d.profile_image_url || '').slice(0, 2000);
+                panel.avatar = this.preferredAvatar(d.profile_image_url || '');
                 panel.avatarColorIndex = this.store.profile?.avatarColorIndex;
                 panel.avatarAction = this.avatarAction();
                 if (panel.avatarAction) panel.avatarError = panel.avatarAction === 'refresh' ? '上次上传缺少追踪信息，可刷新当前头像核对，暂不重复上传' : PinmonyI18n.message("pm_profile_picture_processing_not_confirmed_check_status_without_up_f4547bd7");
@@ -655,6 +657,10 @@ export class PinmonyProfileNativeActions {
         const key: string = account.origin + ':' + account.accountId + ':' + account.generation.toString();
         return this.avatarPending?.account === key ? this.avatarPending.tracking ? 'check' : 'refresh' : '';
     }
+    private preferredAvatar(fallback: string): string {
+        const candidates: string[] = [this.root?.image_xlarge_url || '', this.root?.image_large_url || '', fallback];
+        return candidates.find((url: string): boolean => url.length <= 2000 && /^https:\/\/(?:i|s)\.pinimg\.com\//.test(url)) || '';
+    }
     private async readCurrentAvatar(revision: number): Promise<string> {
         const options: Api = { url: '/v3/users/settings/', data: this.emptyOptions() };
         const reply: ProfileSettingsResponse = await this.request('ApiResource', 'get', options, revision);
@@ -663,7 +669,9 @@ export class PinmonyProfileNativeActions {
             data.id !== undefined && data.id !== this.client.viewer ||
             typeof data.profile_image_url !== 'string' || data.profile_image_url.length > 2000 ||
             !/^https:\/\/(?:i|s)\.pinimg\.com\//.test(data.profile_image_url)) throw new Error('avatar-readback');
-        return data.profile_image_url;
+        await this.identity(revision);
+        if (!this.current(revision) || this.root?.id !== this.client.viewer) throw new Error('avatar-readback');
+        return this.preferredAvatar(data.profile_image_url);
     }
     async changeAvatar(): Promise<void> {
         const panel: PinmonyProfilePanel | undefined = this.store.panel;

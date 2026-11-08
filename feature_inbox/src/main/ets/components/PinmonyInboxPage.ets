@@ -112,6 +112,9 @@ export struct PinmonyInboxPage {
   onContactsRetry?: () => void;
   @Prop invitations: PinmonyBoardInvitations | undefined = undefined;
   onInvitationPreview: (item: PinmonyBoardInvitation) => void = () => {};
+  onInvitationDecline: (item: PinmonyBoardInvitation) => void = () => {};
+  onInvitationAccept: (item: PinmonyBoardInvitation) => void = () => {};
+  onInvitationReload: () => void = () => {};
   onInvitationAll: () => void = () => {};
 
   aboutToAppear(): void {
@@ -597,9 +600,6 @@ export struct PinmonyInboxPage {
         List({ scroller: this.scroller }) {
           ListItem() {
             Column() {
-            if (this.snapshot.section === 'messages' && this.invitations && this.invitations.items.length > 0) {
-              PinmonyBoardInvitationList({ snapshot: this.invitations, onPreview: this.onInvitationPreview, onAll: this.onInvitationAll })
-            }
             if (this.snapshot.section === 'messages') {
               Row({ space: 12 }) {
                 Stack({ alignContent: Alignment.Center }) {
@@ -629,7 +629,12 @@ export struct PinmonyInboxPage {
             }
 
             if (this.snapshot.section === 'messages') {
-              this.listTitle(this.uiText('pm_activity_title'), 'activity')
+              if (this.invitations && (this.invitations.items.length > 0 || !this.invitations.loading && !!this.invitations.error)) {
+                PinmonyBoardInvitationList({ snapshot: this.invitations, interactionReady: this.interactionReady, onPreview: this.onInvitationPreview, onDecline: this.onInvitationDecline, onAccept: this.onInvitationAccept, refreshing: this.refreshing, onReload: this.onInvitationReload, onAll: this.onInvitationAll })
+              }
+              if ((this.snapshot.activities || []).length > 0) {
+                this.listTitle(this.uiText('pm_activity_title'), 'activity')
+              }
               if (this.snapshot.activityError) {
                 PinmonyActionNotice({ active:this.interactionReady,message:PinmonyI18n.render(this.snapshot.activityError,this.uiLanguage),
                   actionText:this.uiText('pm_retry_b8784c8d'),onAction:() => {if(this.interactionReady)this.onAction?.('activity-retry');} })
@@ -638,9 +643,6 @@ export struct PinmonyInboxPage {
                 PinmonyInboxActivityRow({item:item,interactionReady:this.interactionReady,
                   onAction:(id: string) => this.onAction?.(id),onUser:(url: string) => this.onUser?.(url)})
               }, (item: PinmonyInboxItem): string => this.updateRowKey(item) + ':' + item.updatedAt + ':' + item.activityFollowed + ':' + item.activityBusy + ':' + item.activityUncertain)
-              if (!this.snapshot.activityLoading && !this.snapshot.activityError && !(this.snapshot.activities || []).length) {
-                Text(this.uiText('pm_activity_empty')).fontColor($r('app.color.secondary_text')).padding(20)
-              }
             }
 
             if (this.snapshot.section === 'messages' && this.snapshot.items.length > 0) {
@@ -661,30 +663,17 @@ export struct PinmonyInboxPage {
           }
           ListItem() {
             Column() {
-            if (this.snapshot.items.length === 0 && PinmonyI18n.render(this.snapshot.emptyTitle, this.uiLanguage)) {
-              Column() { this.emptyState() }.width('100%').padding({ top: 24, bottom: 12 })
-            }
-            if (this.snapshot.section === 'messages' &&
-              (PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) || this.snapshot.contacts.length > 0)) {
+            if (this.snapshot.section === 'messages' && this.snapshot.contacts.length > 0) {
               this.listTitle(PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) ||
                 this.uiText("pm_contacts_3303b569"), 'contacts')
-              if (this.snapshot.contactsLoading) {
-                Row({ space: 12 }) {
-                  LoadingProgress().color($r('app.color.accent')).width(24).height(24)
-                  Text(this.uiText("pm_loading_contacts_54858f2d")).fontSize(14).fontColor($r('app.color.secondary_text'))
-                }.padding({ left: 20, top: 12, bottom: 12 })
-              } else if (this.snapshot.contactsError) {
+              ForEach(this.snapshot.contacts, (item: PinmonyInboxItem) => {
+                this.itemRow(item)
+              }, (item: PinmonyInboxItem) => this.updateRowKey(item))
+            }
+            if (this.snapshot.section === 'messages' && this.snapshot.contactsError) {
                 Column({ space: 8 }) {
                   PinmonyActionNotice({ active: this.interactionReady, message: PinmonyI18n.render(this.snapshot.contactsError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onContactsRetry) this.onContactsRetry(); } })
                 }.alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 12 })
-              } else if (this.snapshot.contacts.length > 0) {
-                ForEach(this.snapshot.contacts, (item: PinmonyInboxItem) => {
-                  this.itemRow(item)
-                }, (item: PinmonyInboxItem) => this.updateRowKey(item))
-              } else if (this.snapshot.contactsDataSource === 'api') {
-                Text(this.uiText("pm_no_suggested_contacts_03b9d232")).fontSize(14).fontColor($r('app.color.secondary_text'))
-                  .padding({ left: 20, top: 12, bottom: 12 })
-              }
             }
             }.width('100%').alignItems(HorizontalAlign.Start)
               .padding({ bottom: 120 })

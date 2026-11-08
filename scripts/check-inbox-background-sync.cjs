@@ -1,3 +1,6 @@
+const backgroundSource=require('node:fs').readFileSync('entry/src/main/ets/app/PinmonyInboxBackgroundSync.ets','utf8');
+require('node:assert/strict').match(backgroundSource,/PIN_INBOX_BACKGROUND_STALE_MS: number = 30000;/);
+require('node:assert/strict').equal(backgroundSource.includes('PIN_INBOX_MESSAGES_POLL_MS'),false,'list cadence must not change background freshness');
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const ts=require(process.argv[2]||'typescript');
 const base='entry/src/main/ets/app/';
@@ -5,7 +8,7 @@ const turn=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 function fixture(options={}) {
   let now=1000000,sequence=0,session={authenticated:true,accountId:'synthetic',generation:1,origin:'https://www.pinterest.com'},enabled=options.enabled!==false,readGate=options.readGate;
   const timers=new Map(),requests=[],observed=[],networks=[],leases=[],released=[],expiryCallbacks=[];let stops=0,permissionChecks=0,leaseSequence=0;
-  const store={inboxMessagesUnread:false,inboxMessagesUnreadCount:0,inboxFlow:{draft:'source'},inbox:{items:['retained']}};
+  const store={isUnseenConversation(){return true;},inboxMessagesUnread:false,inboxMessagesUnreadCount:0,inboxFlow:{draft:'source'},inbox:{items:['retained']}};
   class ClockDate extends Date {static now(){return now;}}
   const common={PinmonyRuntimeLog:{info(){},warn(){}},PinmonyI18n:{message:()=> 'New message'}};
   const schedule=(fn,ms,repeat)=>{const id=++sequence;timers.set(id,{fn,at:now+ms,repeat:repeat?ms:0});return id;};
@@ -74,11 +77,11 @@ async function main(){
   let expiredRead;const expiring=fixture({duration:15000,readGate:new Promise(resolve=>expiredRead=resolve)});expiring.service.install();expiring.state.change(true);await turn();await expiring.advance(15000);assert.equal(expiring.networks[0].cancelled.length,1);expiredRead();await turn();assert.equal(expiring.observed.length,0,'expiry revokes in-flight responses and notification submission');
   const releasing=fixture({releaseError:true});releasing.service.install();releasing.state.change(true);await turn();releasing.state.change(false);assert.equal(releasing.timers.size,0);assert.equal(releasing.service.active(),false,'release exception cannot retain reader authority');
   let finishSlow;const slow=fixture({readGate:new Promise(resolve=>finishSlow=resolve)});slow.service.install();slow.state.change(true);await turn();await slow.advance(9000);assert.equal(slow.requests.length,1,'three-second ticks do not overlap an unfinished request');slow.setReadGate(undefined);finishSlow();await turn();await slow.advance(3000);assert.equal(slow.requests.length,2);
-  const foreground=fixture();foreground.networks[0].setForeground(true);const foregroundReader=foreground.makeForegroundReader();await foregroundReader.pollMessages();await foreground.advance(3000);await foregroundReader.pollMessages();assert.equal(foreground.requests.length,1,'foreground reader retains ten-second throttle');await foreground.advance(6999);await foregroundReader.pollMessages();assert.equal(foreground.requests.length,1);await foreground.advance(1);await foregroundReader.pollMessages();assert.equal(foreground.requests.length,2);
+  const foreground=fixture();foreground.networks[0].setForeground(true);const foregroundReader=foreground.makeForegroundReader();await foregroundReader.pollMessages();await foreground.advance(3000);await foregroundReader.pollMessages();assert.equal(foreground.requests.length,1,'foreground reader uses five-second throttle');await foreground.advance(1999);await foregroundReader.pollMessages();assert.equal(foreground.requests.length,1);await foreground.advance(1);await foregroundReader.pollMessages();assert.equal(foreground.requests.length,2);
   let permissionReady;const jitter=fixture({permissionGate:new Promise(resolve=>permissionReady=resolve)});jitter.service.install();jitter.state.change(true);await jitter.advance(1);permissionReady();await turn();assert.equal(jitter.requests.length,1);await jitter.advance(2999);assert.equal(jitter.requests.length,2,'permission latency cannot turn a three-second tick into a six-second read');
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8'),ability=fs.readFileSync('entry/src/main/ets/entryability/EntryAbility.ets','utf8');
   assert(index.includes('this.inboxBackgroundSync.install()'));assert(index.includes('this.inboxBackgroundSync.dispose()'));
-  assert.match(index,/resetNativeBusinessSession\(\): void \{ this.inboxBackgroundSync.stop\(\)/);
+  assert.match(index,/resetNativeBusinessSession\(\): void \{[^}]*this\.inboxBackgroundSync\.stop\(\)/);
   assert.match(index,/resetAuthenticatedContent\(\): void \{ this.inboxBackgroundSync.stop\(\)/);
   assert.match(index,/onPageShow\(\): void \{\s*this.inboxBackgroundSync.stop\(\)/);
   assert.match(ability,/onBackground\(\): void \{\s*PinmonyInboxBackgroundLifecycle.change\(true\)/);
@@ -86,6 +89,6 @@ async function main(){
   assert.match(ability,/onDestroy\(\): void \{\s*PinmonyInboxBackgroundLifecycle.change\(false\)/);
   assert(fs.readFileSync(base+'PinmonyInboxBackgroundSync.ets','utf8').includes('requestSuspendDelay'));
   assert(!fs.readFileSync('entry/src/main/module.json5','utf8').includes('KEEP_BACKGROUND_RUNNING'),'no unrelated long-running mode');
-  console.log('Background inbox: granted transient lease, no artificial 60s cutoff, 3s background cadence, foreground defaults unchanged, permission/single flight, frozen recovery without catch-up, stale read isolation, retained pages, cancellation and lifecycle cleanup passed');
+  console.log('Background inbox: granted transient lease, no artificial 60s cutoff, 3s background cadence, 5s foreground unread cadence, permission/single flight, frozen recovery without catch-up, stale read isolation, retained pages, cancellation and lifecycle cleanup passed');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -14,7 +14,7 @@ function visit(node) {
 }
 visit(tree);
 assert.equal(methods.length, names.length);
-const geometry = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets', 'utf8').replace(/export /g, '');
+const geometry = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets', 'utf8').replace(/^import .*;\r?\n/gm, '').replace(/export /g, '');
 const contain = vm.runInNewContext(ts.transpileModule(geometry + '; imageContainRect;', {compilerOptions:{target:99}}).outputText);
 let timerId = 0;
 const timers = new Map();

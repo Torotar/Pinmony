@@ -395,7 +395,7 @@ export const PINMONY_LOCAL_COPY_KEYS: Record<string, string> = {
   "链接打开不可用": "pm_opening_links_unavailable_2fcda15e",
   "无法打开链接，请重试": "pm_unable_to_open_link_please_retry_99322633",
   "Pinmony 应用图标": "pm_pinmony_app_icon_66c94919",
-  "发现灵感，收藏喜欢。": "pm_find_inspiration_save_what_you_love_2499cd29",
+  "发现灵感，收藏喜欢": "pm_find_inspiration_save_what_you_love_2499cd29",
   "当前版本": "pm_current_version_837bc957",
   "发现新版本 ": "pm_new_version_available_596dd46c",
   "版本更新": "pm_app_updates_42e40f43",

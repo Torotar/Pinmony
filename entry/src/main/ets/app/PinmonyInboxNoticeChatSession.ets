@@ -2,6 +2,7 @@ import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNativeNetwork } from 'common_network';
 import { PinmonyInboxMessagesNativeReads } from './PinmonyInboxMessagesNativeReads';
+import { PIN_INBOX_CHAT_POLL_MS } from './PinmonyInboxUnreadNativeReads';
 
 export interface PinmonyInboxNoticeChatPorts {
   session: () => PinmonyBusinessSessionContext;
@@ -38,7 +39,7 @@ export class PinmonyInboxNoticeChatSession {
   open(): Promise<boolean> { return this.reader.openNoticeConversation(this.conversation); }
   action(action: string, value: string): Promise<boolean> { return this.reader.action(action,value); }
   poll(): void {
-    if(!this.current() || Date.now() - this.lastPoll < 2000)return;
+    if(!this.current() || Date.now() - this.lastPoll < PIN_INBOX_CHAT_POLL_MS)return;
     this.lastPoll = Date.now(); this.reader.poll();
   }
   pause(): void { this.reader.pause(); }

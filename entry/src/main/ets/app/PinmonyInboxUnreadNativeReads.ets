@@ -5,9 +5,10 @@ import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'co
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { INBOX_UPDATE_FIELDS, PIN_NATIVE_INBOX_UPDATES_ENABLED } from './PinmonyInboxUpdatesNativeReads';
 import { PIN_NATIVE_INBOX_MESSAGES_ENABLED } from './PinmonyInboxMessagesNativeReads';
-export const PIN_INBOX_MESSAGES_POLL_MS: number = 10000;
+export const PIN_INBOX_MESSAGES_POLL_MS: number = 2000;
+export const PIN_INBOX_UNREAD_MESSAGES_POLL_MS: number = 5000;
 export const PIN_INBOX_UPDATES_POLL_MS: number = 30 * 60 * 1000;
-export const PIN_INBOX_CHAT_POLL_MS: number = 2000;
+export const PIN_INBOX_CHAT_POLL_MS: number = 1000;
 interface PinmonyUnreadNewsData { field_set_key: string; }
 interface PinmonyUnreadOptions { url?: string; data?: PinmonyUnreadNewsData; redux_normalize_feed?: boolean; field_sets?: string[]; field_set_key?: string; }
 interface PinmonyUnreadEnvelope { options: PinmonyUnreadOptions; context: Record<string,string>; }
@@ -32,7 +33,7 @@ export class PinmonyInboxUnreadNativeReads {
   private readonly jobs: Map<string,string> = new Map<string,string>();
   constructor(ports: PinmonyInboxUnreadPorts) { this.ports = ports; }
   pause(): void { this.revision++; this.jobs.forEach((id: string): void => this.ports.network().cancel(id)); this.jobs.clear(); }
-  reset(): void { this.pause(); this.lastPoll.clear(); this.ports.store().clearViewedUpdates(); this.ports.store().inboxMessagesUnread = false; this.ports.store().inboxUpdatesUnread = false; }
+  reset(): void { this.pause(); this.lastPoll.clear(); this.ports.store().clearViewedUpdates(); this.ports.store().clearViewedConversations(); this.ports.store().inboxMessagesUnread = false; this.ports.store().inboxUpdatesUnread = false; }
   async pollMessages(): Promise<void> {
     const session: PinmonyBusinessSessionContext = this.ports.session();
     if(PIN_NATIVE_INBOX_MESSAGES_ENABLED && session.authenticated && session.accountId && this.ports.active())await this.readIfDue(false,session);
@@ -50,7 +51,7 @@ export class PinmonyInboxUnreadNativeReads {
   }
   private async readIfDue(updates: boolean, session: PinmonyBusinessSessionContext): Promise<void> {
     const kind: string = updates ? 'updates' : 'messages';
-    const interval: number = updates ? PIN_INBOX_UPDATES_POLL_MS : this.ports.messagesPollMs ?? PIN_INBOX_MESSAGES_POLL_MS;
+    const interval: number = updates ? PIN_INBOX_UPDATES_POLL_MS : this.ports.messagesPollMs ?? PIN_INBOX_UNREAD_MESSAGES_POLL_MS;
     const previous: number | undefined = this.lastPoll.get(kind);
     if(this.jobs.has(kind) || previous !== undefined && Date.now() - previous < interval)return;
     this.lastPoll.set(kind,Date.now());
@@ -77,7 +78,7 @@ export class PinmonyInboxUnreadNativeReads {
       if(response?.status !== 'success' || response.error || response.code !== undefined && response.code !== 0 || response.endpoint_name && response.endpoint_name !== (updates ? 'v3_get_news_hub_feed' : 'v3_get_conversations') || !Array.isArray(response.data) || response.data.length > (updates ? 500 : 2000) || response.data.some((row: PinmonyUnreadRow): boolean => !row || typeof row.id !== 'string' || !row.id || row.unread !== undefined && typeof row.unread !== 'boolean' && (updates || typeof row.unread !== 'number' || !Number.isSafeInteger(row.unread) || row.unread < 0)))throw new Error('unread-response');
       const visible: PinmonyUnreadRow[] = updates ? response.data.filter((row: PinmonyUnreadRow): boolean =>
         this.ports.store().isUnseenUpdate('inbox-news-api-' + captured.generation.toString() + '-' + row.id, typeof row.last_updated_at === 'string' ? row.last_updated_at.trim().slice(0,500) : '')) : response.data.filter((row: PinmonyUnreadRow): boolean =>
-        !PinmonyInboxHiddenConversations.hidden(captured.origin,captured.accountId,row.id));
+        !PinmonyInboxHiddenConversations.hidden(captured.origin,captured.accountId,row.id) && this.ports.store().isUnseenConversation(row.id, typeof row.last_message?.created_at === 'string' ? row.last_message.created_at.trim().slice(0,500) : ''));
       const unread: boolean = visible.some((row: PinmonyUnreadRow): boolean => row.unread === true || !updates && typeof row.unread === 'number' && row.unread > 0);
       const seen: Set<string> = new Set<string>();
       const count: number = visible.reduce((total: number, row: PinmonyUnreadRow): number => {

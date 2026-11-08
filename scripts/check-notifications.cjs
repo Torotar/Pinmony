@@ -1,8 +1,9 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const page=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyNotificationsPage.ets','utf8');
-assert(page.includes('Toggle({ type: ToggleType.Switch, isOn: channel.value })'),'notification channels use native switches bound to confirmed values');
+assert(page.includes('Toggle({ type: ToggleType.Switch, isOn: this.channelEnabled(channel) })'),'notification channels use confirmed website values');
+assert(page.includes('return channel.value;'), 'system permission must not mask or close website switches');
 assert(!page.includes('Checkbox()'),'notification channels no longer show checkmarks');
-assert(page.includes('.enabled(channel.editable === true && !this.confirmationOpen && !this.store.busy && !this.store.loading && !this.store.writeUncertain)'),'switch retains write and confirmation guards');
+assert(page.includes('.enabled(channel.editable === true && !this.confirmationOpen && !this.checkingSystemNotification && !this.store.busy && !this.store.loading && !this.store.writeUncertain)'),'switch retains write and confirmation guards and blocks concurrent system checks');
 assert(page.includes('this.change(channel, value);'),'switch retains the existing confirmation and request path');
 const source=fs.readFileSync('feature_settings/src/main/ets/services/PinmonyNotificationsScript.ets','utf8');const code=vm.runInNewContext(source.slice(source.indexOf('`'),source.lastIndexOf('`')+1));
 const window={},location={href:'https://www.pinterest.com/inbox/',pathname:'/inbox/'};let resolve,url;

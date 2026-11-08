@@ -5955,6 +5955,30 @@
     {
       "name": "pm_search_empty_try_again",
       "value": "請嘗試再次搜尋。"
-    }
+    },
+    {
+      "name": "pm_system_notifications_off",
+      "value": "系統通知未開啟"
+    },
+    {
+      "name": "pm_system_notifications_enable_message",
+      "value": "請在系統設定中允許 Pinmony 傳送通知，然後返回此頁面再次開啟「應用程式內」通知。"
+    },
+    {
+      "name": "pm_system_notifications_open_settings",
+      "value": "前往開啟通知"
+    },
+    {
+      "name": "pm_system_notifications_check_failed",
+      "value": "無法檢查系統通知權限，請稍後重試。"
+    },
+    {
+      "name": "pm_system_notifications_open_failed",
+      "value": "無法開啟系統通知設定，請在系統設定中手動開啟 Pinmony 的通知。"
+    },
+    {"name":"pm_invitation_decline_failed","value":"拒絕邀請失敗，請重試。"},
+    {"name":"pm_invitation_decline_uncertain","value":"拒絕結果尚未確認。請重新整理請求清單核對，不會自動重新提交。"},
+    {"name":"pm_board_invitation_notice_text","value":"{0}邀請你在{1}上進行合作"},
+    {"name":"pm_board_invitation_notice_body","value":"邀請你在{0}上進行合作"}
   ]
 }

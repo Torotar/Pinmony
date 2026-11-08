@@ -14,6 +14,9 @@ function fixture(){
 }
 function reply(call,desired=true,extra={}){return {...call.job,error:'',status:200,body:JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:desired?'v3_follow_board':'v3_unfollow_board',data:desired?{id:'123',type:'board',followed_by_me:true}:null,...extra},client_context:{user:{id:'22'}}})};}
 async function main(){
+ const native=fs.readFileSync('entry/src/main/ets/app/PinmonyBoardNativeReads.ets','utf8');
+ assert(native.includes("following:typeof b?.followed_by_me === 'boolean' ? b.followed_by_me : undefined"), 'title state projects only explicit board following field');
+ assert(native.includes('BoardFollowStateTrace: read='), 'current server field and displayed state can be distinguished without recording identity');
  let f=fixture(),p=f.flow.submit(f.item,'22',f.owner);assert.equal(f.calls.length,1);assert(f.flow.busy('123'));await f.flow.submit(f.item,'22',f.owner);assert.equal(f.calls.length,1);
  const job=f.calls[0].job;assert.equal(job.url,f.session().origin+'/resource/ApiResource/update/');assert.equal(job.headers['X-Pinterest-Pws-Handler'],'www/[username]/[slug].js');
  assert.deepEqual(JSON.parse(new URLSearchParams(job.body).get('data')),{options:{url:'/v3/boards/123/follow/'},context:{}});

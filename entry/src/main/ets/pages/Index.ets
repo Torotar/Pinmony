@@ -1,4 +1,5 @@
 import { PinmonyUserAvatarReads } from '../app/PinmonyUserAvatarReads';
+import { PinmonyBoardInvitationNotice } from '../app/PinmonyBoardInvitationNotice';
 import { PinmonyInboxUnreadNativeReads, PIN_INBOX_MESSAGES_POLL_MS, PIN_INBOX_UPDATES_POLL_MS, PIN_INBOX_CHAT_POLL_MS } from '../app/PinmonyInboxUnreadNativeReads';
 import { PinmonyInboxMessageNotice, PinmonyInboxNoticeConversation } from '../app/PinmonyInboxMessageNotice';
 import { PinmonyInboxNoticeChatSession } from '../app/PinmonyInboxNoticeChatSession';
@@ -67,7 +68,8 @@ import { PinmonyMoreSheet, PinmonyShareSheet, PinmonySharePanelsController, Pinm
   PinmonyDetailImageStagePorts, PinmonyDetailDocumentBinding, PinmonyDetailDocumentBindingPorts,
   PinmonyPostResult, ShareSheetOption, PinmonyDetailPage, PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyCarouselItem, PinmonyRelatedPin, PinmonyShuffleItem,
   PIN_DETAIL_API_ENABLED, PIN_POST_API_ENABLED, PIN_POST_EXTENSIONS_ENABLED, PinmonyEditPinSheet,
-  PinmonySaveSheet, PinmonyCommentsSheet, PinmonyDetailEntryPhoto } from 'feature_pin';
+  PinmonySaveSheet, PinmonyCommentsSheet, PinmonyDetailEntryPhoto,
+  PinmonyImageViewerRequest, PinmonyImageViewerSession, PinmonyImageViewerHost } from 'feature_pin';
 
 import { PinmonyBoardOperationsController, PinmonyBoardOperationsPorts, PinmonyBoardStateController,
   PinmonyBoardStatePorts, PinmonyBoardCollaboratorsController, PinmonyBoardCollaboratorsPorts,
@@ -310,6 +312,7 @@ struct Index {
     markJourney: (event: string): void => this.detailJourney.mark(event)
   } as PinmonyDetailReadCachePorts);
   @State private pinStore: PinmonyPinStore = new PinmonyPinStore();
+  @State private imageViewer: PinmonyImageViewerSession = new PinmonyImageViewerSession();
   @State private boardStore: PinmonyBoardStore = new PinmonyBoardStore();
   @State private settingsStore: PinmonySettingsStore = new PinmonySettingsStore();
   @State private chatSettingsUnderlay: PinmonyInboxFlowSnapshot | undefined = undefined;
@@ -1357,7 +1360,9 @@ struct Index {
         { name: 'inbox-menu', pause: (): void => this.inboxMenuNative.pause(),
           reset: (): void => this.inboxMenuNative.pause() },
         { name: 'board-invitation-native', pause: (): void => this.boardInvitationNative.pause(),
-          reset: (): void => this.boardInvitationNative.pause() }
+          reset: (): void => this.boardInvitationNative.pause() },
+        { name: 'board-invitation-notice', pause: (): void => this.boardInvitationNotice.pause(),
+          reset: (): void => this.boardInvitationNotice.reset() }
       ]);
     }
     return this.lifecycleRegistry;
@@ -2178,6 +2183,8 @@ struct Index {
   }
   private readonly inboxMessageNotice: PinmonyInboxMessageNotice = new PinmonyInboxMessageNotice({
     openChat:(conversation: string): boolean => this.openNoticeChat(conversation),
+    openInvitation:(item: PinmonyBoardInvitation): boolean => this.openBoardInvitationNotice(item),
+    visibleInvitationBoard:(): string => this.nativeBoardVisible() ? this.boardStore.boardDetail?.pageKey || '' : '',
     session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
     active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && !PinmonyInboxBackgroundLifecycle.isBackground(),
     deliveryActive: (): boolean => this.inboxBackgroundSync.active(),
@@ -2199,6 +2206,13 @@ struct Index {
     store: (): PinmonyInboxStore => this.inboxStore,
     network: (): PinmonyNativeNetwork => this.nativeNetwork
   });
+  private readonly boardInvitationNotice: PinmonyBoardInvitationNotice = new PinmonyBoardInvitationNotice({
+    session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
+    network: (): PinmonyNativeNetwork => this.nativeNetwork,
+    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && !PinmonyInboxBackgroundLifecycle.isBackground(),
+    username: (): string => this.authenticatedProfileUrl.match(/\/([A-Za-z0-9_]+)\/$/)?.[1] || '',
+    observed: (items: PinmonyBoardInvitation[]): void => this.inboxMessageNotice.observeInvitations(items)
+  });
   private inboxPollTimer: number = -1;
   private inboxPollPending: boolean = false;
   private inboxPagePollAt: number = 0;
@@ -2211,6 +2225,7 @@ struct Index {
   }
 
   private pollVisibleInbox(): void {
+    this.boardInvitationNotice.poll();
     if(this.businessSuspended || this.authStatus !== 'authenticated') { this.inboxPagePollMode = ''; this.inboxUnreadNativeReads.pause(); return; }
     this.inboxMessageNotice.consumeTap();
     this.inboxMessageNotice.dismissViewed();
@@ -2443,6 +2458,7 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.imageViewer.cancel();
     this.inboxBackgroundSync.dispose();
     this.userAvatarReads.dispose();
     this.sessionVerification?.cancel('destroy');
@@ -2645,7 +2661,7 @@ struct Index {
   }
 
 
-  private resetNativeBusinessSession(): void { this.inboxBackgroundSync.stop(); this.businessSession.reset(); this.userAvatarReads.reset(); }
+  private resetNativeBusinessSession(): void { this.boardInvitationNotice.reset(); this.imageViewer.cancel(); this.inboxBackgroundSync.stop(); this.businessSession.reset(); this.userAvatarReads.reset(); }
   private nativeBusinessSessionContext(): PinmonyBusinessSessionContext {
     return this.businessSession.context(this.authStatus);
   }
@@ -3541,7 +3557,9 @@ struct Index {
   }
 
   private async loadMoreInbox(): Promise<void> { await this.inboxReadController.loadMore(); }
-  private async retryInbox(): Promise<void> { await this.inboxReadController.refresh(); }
+  private async retryInbox(): Promise<void> {
+    await Promise.all([this.inboxReadController.refresh(), this.readBoardInvitations()]);
+  }
   private async retryInboxContacts(): Promise<void> { await this.inboxReadController.refreshContacts(); }
   private nativeSnapshotPageKey(index: number): string {
     if (index === 0) {
@@ -3696,7 +3714,7 @@ struct Index {
       this.markRootPerformance(index);
     }
     const token: number = this.tabRequestToken;
-    if(index === 2 && PIN_NATIVE_INBOX_UPDATES_ENABLED)this.coordinatorTasks.timeout((): void => {if(this.activeTab === 2 && token === this.tabRequestToken && this.nativeRootTabsVisible() && this.inboxStore.invitationReadPage !== this.currentInboxUrl())this.readBoardInvitations();},100);
+    if(index === 2 && PIN_NATIVE_INBOX_UPDATES_ENABLED)this.coordinatorTasks.timeout((): void => {if(this.activeTab === 2 && token === this.tabRequestToken && this.nativeRootTabsVisible())this.readBoardInvitations();},100);
     // Defer outside the visibility callback without adding first-load latency.
     if(index === 3 && this.usesNativeProfileReads()) {this.coordinatorTasks.timeout((): void => {if(this.activeTab === 3 && token === this.tabRequestToken && this.nativeRootTabsVisible())this.profileNativeReads.demand();},0); return;}
     if(index === 2 && this.inboxMessagesNativeReads.selected()){this.coordinatorTasks.timeout((): void => {if(this.activeTab === 2 && token === this.tabRequestToken && this.nativeRootTabsVisible())this.inboxMessagesNativeReads.resume();},80); return;}
@@ -4957,15 +4975,16 @@ struct Index {
 
   private pollBoardInvitations(token: number, preview: boolean): void { this.boardInvitationController.poll(token, preview); }
 
-  private previewBoardInvitation(item: PinmonyBoardInvitation): void {
+  private previewBoardInvitation(item: PinmonyBoardInvitation, notice: boolean = false): void {
     if (!this.boardInvitationController.preparePreview(item)) return;
     this.clearRootTabGuard('invitation-preview');
-    this.boardStore.boardReturnUrl = this.currentInboxUrl(); this.boardStore.boardReturnPage = item.boardUrl;
-    this.boardStore.pendingBoardSource = this.currentInboxUrl(); this.boardStore.pendingBoardUrl = item.boardUrl;
+    const source: string = notice ? this.rootPresentationAddress(this.activeTab) : this.currentInboxUrl();
+    this.boardStore.boardReturnUrl = source; this.boardStore.boardReturnPage = item.boardUrl;
+    this.boardStore.pendingBoardSource = source; this.boardStore.pendingBoardUrl = item.boardUrl;
     this.boardStore.presentationPage = item.boardUrl;
     this.boardStore.boardDetail = { kind: 'state', session: 0, pageKey: item.boardUrl, boardId: item.boardId, title: item.boardName,
       pinCount: '', ownerName: '', ownerAvatar: '', loading: true, loadingMore: false, ready: false, error: '', hasMore: false, pins: [] };
-    if(PIN_NATIVE_BOARD_READS_ENABLED){this.boardStore.rootTab = 2;this.nativeRootOnly = false;this.nativeBackTarget = item.boardUrl;this.navigationAddress = item.boardUrl;this.pageHistory.visit(item.boardUrl,'push');this.boardNativeReads.demand();this.readBoardInvitations(true);return;}
+    if(PIN_NATIVE_BOARD_READS_ENABLED){this.boardStore.rootTab = notice ? this.activeTab : 2;this.nativeRootOnly = false;this.nativeBackTarget = item.boardUrl;this.navigationAddress = item.boardUrl;this.pageHistory.visit(item.boardUrl,'push');this.boardNativeReads.demand();this.readBoardInvitations(true);return;}
     try { this.loadSessionDocument(item.boardUrl); }
     catch (_) {
       this.boardStore.pendingBoardSource = ''; this.boardStore.pendingBoardUrl = '';
@@ -4975,6 +4994,14 @@ struct Index {
     }
   }
 
+  private declineBoardInvitation(item: PinmonyBoardInvitation): void { this.boardInvitationNative.decline(item); }
+  private acceptBoardInvitationItem(item: PinmonyBoardInvitation): void { this.boardInvitationNative.acceptFromList(item); }
+
+  private openBoardInvitationNotice(item: PinmonyBoardInvitation): boolean {
+    if(this.authStatus !== 'authenticated' || this.businessSuspended || this.activeSheetKind || this.boardStore.collaborators || this.nativeBoardVisible() || this.pinStore.detail || this.pinStore.detailOpeningPin)return false;
+    this.previewBoardInvitation(item,true); return true;
+  }
+  private declineBoardInvitationPreview(): void { this.boardInvitationNative.declinePreview(); }
   private acceptBoardInvitation(): void { this.boardInvitationController.accept(); }
 
   private isCurrentSearchMenuPin(pinUrl: string, pageKey: string): boolean {
@@ -6976,6 +7003,7 @@ struct Index {
   private rootExitBackAt: number = 0;
   private rootExitBackHandled: boolean = false;
   onBackPress(): boolean {
+    if (this.imageViewer.visible) { this.imageViewer.close(); return true; }
     if(this.noticeChats.length) { this.noticeChatAction(this.noticeChats[this.noticeChats.length - 1],'back'); return true; }
     if (this.searchController.cancelSubmittedPin()) return true;
     if(!this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.activeSheetKind && !this.profileStore.panel && !this.nativeBoardVisible() && this.restoreInboxNewsSearchParent())return true;
@@ -7078,6 +7106,8 @@ struct Index {
         onCreatingChange: (creating: boolean) => { this.pinStore.saveCreating = creating; } })
     } else if (this.activeSheetKind === 'comments') {
       PinmonyCommentsSheet({ onUser: (url: string) => this.openUserProfile(url), result: this.pinStore.commentResult, onRetry: () => this.openApiComments(),
+        onViewerOpen: (request: PinmonyImageViewerRequest): boolean => this.imageViewer.open(request),
+        onViewerCancel: (owner: string): void => this.imageViewer.cancel(owner),
         onMore: () => this.commentApiAction('commentsMore'),
         onReplies: (id: string) => this.commentApiAction('commentReplies', id),
         onTranslate: PIN_NATIVE_DETAIL_READS_ENABLED ? (id: string) => this.commentApiAction('commentTranslate', id) : undefined,
@@ -7222,6 +7252,9 @@ struct Index {
       inboxPlaceholder: (): PinmonyInboxSnapshot => this.inboxPlaceholder(),
       currentInboxUrl: (): string => this.currentInboxUrl(),
       previewBoardInvitation: (item: PinmonyBoardInvitation): void => this.previewBoardInvitation(item),
+      declineBoardInvitation: (item: PinmonyBoardInvitation): void => this.declineBoardInvitation(item),
+      acceptBoardInvitationItem: (item: PinmonyBoardInvitation): void => this.acceptBoardInvitationItem(item),
+      readBoardInvitations: (preview?: boolean): Promise<void> => this.readBoardInvitations(preview),
       selectInboxSection: (section: string): Promise<void> => this.selectInboxSection(section),
       loadMoreInbox: (): Promise<void> => this.loadMoreInbox(),
       retryInboxContacts: (): Promise<void> => this.retryInboxContacts(),
@@ -7635,7 +7668,10 @@ struct Index {
           if (this.inboxStore.invitationAllVisible && this.inboxStore.boardInvitations) {
               PinmonyBoardInvitationList({ snapshot: this.inboxStore.boardInvitations, all: true,
                 onBack: () => { this.inboxStore.invitationAllVisible = false; },
-                onPreview: (item: PinmonyBoardInvitation) => this.previewBoardInvitation(item) })
+                onPreview: (item: PinmonyBoardInvitation) => this.previewBoardInvitation(item),
+                onDecline: (item: PinmonyBoardInvitation) => this.declineBoardInvitation(item),
+                onAccept: (item: PinmonyBoardInvitation) => this.acceptBoardInvitationItem(item),
+                onReload: () => { this.readBoardInvitations(); } })
                 .width('100%').height('100%').transition(NATIVE_PAGE_TRANSITION)
           }
           if (this.boardStore.boardDetail && this.nativeBoardVisible()) {
@@ -7655,7 +7691,7 @@ struct Index {
               invitationUsername: this.inboxStore.boardInvitationPreview?.inviterUsername || '', invitationAvatarColorIndex: this.inboxStore.boardInvitationPreview?.inviterAvatarColorIndex || 0, invitationName: this.inboxStore.boardInvitationPreview?.inviter || '', invitationAvatar: this.inboxStore.boardInvitationPreview?.inviterAvatar || '',
               invitationVisible: this.inboxStore.invitationBannerVisible && this.inboxStore.boardInvitationPreview?.boardUrl === this.boardStore.boardDetail.pageKey,
               invitationBusy: this.inboxStore.invitationBusy, joinedAvatar: this.inboxStore.joinedBoardAvatar, joinedUsername: this.inboxStore.joinedBoardUsername, joinedName: this.inboxStore.joinedBoardName, joinedAvatarColorIndex: this.inboxStore.joinedBoardAvatarColorIndex,
-              onAcceptInvitation: () => this.acceptBoardInvitation(), onDismissInvitation: () => { this.inboxStore.invitationBannerVisible = false; },
+              onAcceptInvitation: () => this.acceptBoardInvitation(), onDeclineInvitation: () => this.declineBoardInvitationPreview(), onDismissInvitation: () => { this.inboxStore.invitationBannerVisible = false; },
               onShare: () => this.shareCurrentBoard(), onPublish: () => this.openProfilePublish(),
               onLoadMore: () => this.boardOperation('more'), onRetry: () => this.boardOperation('retry'),
               onRefresh: () => this.boardOperation('refresh'),
@@ -7709,6 +7745,9 @@ struct Index {
               if (this.pinStore.detail && !this.pinStore.detailWebFlow && !this.loadFailed) {
                 ForEach(this.detailPresentationIdentities(), (_identity: string) => {
                 PinmonyDetailPage({ onUser: (url: string) => this.openUserProfile(url),
+                  onViewerOpen: (request: PinmonyImageViewerRequest): boolean => this.imageViewer.open(request),
+                  onViewerClose: (owner: string): void => this.imageViewer.close(owner),
+                  onViewerCancel: (owner: string): void => this.imageViewer.cancel(owner),
                   onCoveredBack: (): boolean => this.onBackPress(),
                   onTagSearch: (query: string, pin: string) => this.openDetailTagSearch(query, pin),
                   onTextCopied: () => this.showTextCopiedSnack(),
@@ -8030,8 +8069,17 @@ struct Index {
       }
     })
   }
+  @Builder
+  private sharedImageViewer() {
+    PinmonyImageViewerHost({ session: this.imageViewer, active: !this.businessSuspended })
+  }
+
   build() {
     Stack() {
+      Stack() {}.width(0).height(0).position({ x: 0, y: 0 })
+        .bindContentCover($$this.imageViewer.visible, this.sharedImageViewer(), {
+          modalTransition: ModalTransition.NONE, backgroundColor: Color.Transparent, enableSafeArea: false,
+          onWillDismiss: () => this.imageViewer.close() })
       Stack() { this.buildMainScene() }
         .width('100%').height('100%')
         .enabled(this.noticeChats.length === 0)

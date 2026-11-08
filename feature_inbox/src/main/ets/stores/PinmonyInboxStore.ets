@@ -5,6 +5,38 @@ import { PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 
 @Observed
 export class PinmonyInboxStore {
+  private readonly viewedConversations: Map<string, string> = new Map<string, string>();
+  isUnseenConversation(id: string, stamp: string): boolean {
+    const viewed: string | undefined = this.viewedConversations.get(id);
+    if (viewed === undefined) return true;
+    if (!stamp || stamp === viewed) return false;
+    const incoming: number = Date.parse(stamp);
+    const previous: number = Date.parse(viewed);
+    return Number.isFinite(incoming) && Number.isFinite(previous) ? incoming > previous : true;
+  }
+  clearViewedConversations(): void { this.viewedConversations.clear(); }
+  acknowledgeConversation(id: string, stamp: string): void {
+    if (!/^\d{1,40}$/.test(id)) return;
+    const previous: string | undefined = this.viewedConversations.get(id);
+    const retainedStamp: string = previous !== undefined && !this.isUnseenConversation(id, stamp) ? previous : stamp;
+    this.viewedConversations.delete(id); this.viewedConversations.set(id, retainedStamp);
+    let excess: number = this.viewedConversations.size - 2000;
+    this.viewedConversations.forEach((_stamp: string, key: string): void => {
+      if (excess > 0) { this.viewedConversations.delete(key); excess--; }
+    });
+    const snapshot: PinmonyInboxSnapshot | undefined = this.inbox;
+    if (!snapshot || snapshot.section !== 'messages') return;
+    let removed: number = 0;
+    const items: PinmonyInboxItem[] = snapshot.items.map((item: PinmonyInboxItem): PinmonyInboxItem => {
+      if (item.id !== 'conversation:' + id) return item;
+      removed += item.unreadCount || (item.unread ? 1 : 0);
+      const next: PinmonyInboxItem = JSON.parse(JSON.stringify(item)) as PinmonyInboxItem;
+      next.unread = false; next.unreadCount = 0; return next;
+    });
+    const nextSnapshot: PinmonyInboxSnapshot = JSON.parse(JSON.stringify(snapshot)) as PinmonyInboxSnapshot;
+    nextSnapshot.items = items; this.inbox = nextSnapshot;
+    this.inboxMessagesUnreadCount = Math.max(0, this.inboxMessagesUnreadCount - removed);
+  }
   private readonly viewedUpdates: Map<string, string> = new Map<string, string>();
   isUnseenUpdate(id: string, updatedAt: string): boolean {
     const viewed: string | undefined = this.viewedUpdates.get(id);

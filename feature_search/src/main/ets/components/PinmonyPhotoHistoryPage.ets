@@ -43,7 +43,7 @@ export struct PinmonyPhotoHistoryView {
   private cardWidth(): number { return Math.max(1, (this.widthValue - (this.columns() - 1) * RECOMMEND_PHONE_GAP_VP) / this.columns()); }
   private cardHeight(item: PinmonyPhotoHistoryItem): number { return this.cardWidth() * item.height / item.width; }
   private syncSections(): void {
-    this.sections.splice(0, this.sections.length(), [{ itemsCount: this.visibleItems().length, crossCount: this.columns(), margin:{top:this.titleContentInset() + 16} }]);
+    this.sections.splice(0, this.sections.length(), [{ itemsCount: this.visibleItems().length, crossCount: this.columns(), margin:{top:this.titleContentInset() + 16,bottom:32} }]);
   }
   onLoad?: (cursor: string) => Promise<PinmonyPhotoHistoryPage>;
   onConfirm?: (id: string, origin?: PinmonyPhotoHistoryOrigin) => Promise<void>;

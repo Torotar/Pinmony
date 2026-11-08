@@ -5955,6 +5955,30 @@
     {
       "name": "pm_search_empty_try_again",
       "value": "Tente pesquisar novamente."
-    }
+    },
+    {
+      "name": "pm_system_notifications_off",
+      "value": "As notificações do sistema estão desativadas"
+    },
+    {
+      "name": "pm_system_notifications_enable_message",
+      "value": "Permita notificações do Pinmony nas configurações do sistema. Depois, volte a esta página e ative novamente as notificações no aplicativo."
+    },
+    {
+      "name": "pm_system_notifications_open_settings",
+      "value": "Abrir configurações de notificações"
+    },
+    {
+      "name": "pm_system_notifications_check_failed",
+      "value": "Não foi possível verificar a permissão de notificações do sistema. Tente novamente mais tarde."
+    },
+    {
+      "name": "pm_system_notifications_open_failed",
+      "value": "Não foi possível abrir as configurações de notificações. Ative as notificações do Pinmony manualmente nas configurações do sistema."
+    },
+    {"name":"pm_invitation_decline_failed","value":"Não foi possível recusar o convite. Tente novamente."},
+    {"name":"pm_invitation_decline_uncertain","value":"O resultado da recusa não foi confirmado. Atualize a lista de solicitações para verificar. A solicitação não será reenviada automaticamente."},
+    {"name":"pm_board_invitation_notice_text","value":"{0} convidou você para colaborar em {1}"},
+    {"name":"pm_board_invitation_notice_body","value":"Convidou você para colaborar em {0}"}
   ]
 }

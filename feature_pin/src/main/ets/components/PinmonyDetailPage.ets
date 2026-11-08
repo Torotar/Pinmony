@@ -3,12 +3,12 @@ import { PinmonyCdnImage } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyImageSearchSelection } from 'common_ui';
-import { ImageFlightRect, imageContainRect } from '../services/PinmonyImageTransition';
+import { ImageFlightRect, imageContainRect, measureImageFlightOrigin } from '../services/PinmonyImageTransition';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
-import { PinmonyImageViewer } from './PinmonyImageViewer';
+import { PinmonyImageViewerRequest } from '../services/PinmonyImageViewerSession';
 import { PinmonyShuffleCanvas } from './PinmonyShuffleCanvas';
 import { PinmonyShuffleHitMasks } from '../services/PinmonyShuffleHitMasks';
 import { PinmonyShuffleItem } from '../models/PinmonyShuffle';
@@ -436,7 +436,9 @@ export struct PinmonyDetailPage {
   @State private viewerMounted: boolean = false;
   @State private viewerImageReady: boolean = false;
   @State private viewerClosing: boolean = false;
-  @State private viewerOrigin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
+  onViewerOpen?: (request: PinmonyImageViewerRequest) => boolean;
+  onViewerClose?: (owner: string) => void;
+  onViewerCancel?: (owner: string) => void;
   @State private searchMounted: boolean = false;
   @State private searchClosing: boolean = false;
   @State private searchImageReady: boolean = false;
@@ -486,13 +488,33 @@ export struct PinmonyDetailPage {
       this.searchClosing = false; this.searchMounted = true;
     } else if (this.searchMounted) this.searchClosing = true;
     if (this.imageLayer === 'zoom') {
-      if (!this.viewerMounted) this.viewerImageReady = false;
-      this.viewerOrigin = this.measureViewerOrigin();
-      this.viewerClosing = false; this.viewerMounted = true;
+      if (this.viewerMounted) return;
+      this.viewerImageReady = false; this.viewerClosing = false; this.viewerMounted = true;
+      const pin: string = this.displayedDetail().pinUrl;
+      const accepted: boolean = this.onViewerOpen?.({ owner: this.viewerOwner(), detail: this.displayedDetail(),
+        imageUrl: this.zoomImageUrl || this.displayedDetail().originalImageUrl || this.displayedDetail().imageUrl,
+        previewUrl: this.zoomImageUrl || this.displayedDetail().imageUrl, sourceRadius: 18,
+        sourceId: () => this.viewerSourceId(),
+        isCurrent: () => this.viewerMounted && this.pageActive && this.displayedDetail().pinUrl === pin,
+        prepareReturn: () => { const before: ImageFlightRect = this.measureViewerOrigin();
+          return this.prepareViewerReturn().y - before.y; },
+        onReady: () => { this.viewerImageReady = true; },
+        onImageChange: (url: string) => { this.zoomImageUrl = url; },
+        onClosed: () => { this.viewerMounted = false; this.viewerImageReady = false; this.viewerClosing = false;
+          if (this.imageLayer === 'zoom') this.onImageLayer?.(''); },
+        onClose: () => { this.onImageLayer?.(''); },
+        actionsReady: this.actionsReady, onAction: this.onAction, onDownload: this.onDownload,
+        onSave: this.onViewerSave, onControlsChange: (visible: boolean) => { this.viewerControls = visible; } }) || false;
+      if (!accepted) { this.viewerMounted = false; this.onImageLayer?.(''); }
     } else if (this.viewerMounted) {
-      this.viewerOrigin = this.prepareViewerReturn();
-      this.viewerClosing = true;
+      this.viewerClosing = true; this.onViewerClose?.(this.viewerOwner());
     }
+  }
+  private viewerOwner(): string { return 'pin-' + this.traceId.toString(); }
+  private viewerSourceId(): string {
+    const selectedIndex: number = this.displayedDetail().carousel?.freeScroll ?
+      (this.displayedDetail().carousel?.items || []).findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.zoomImageUrl) : -1;
+    return 'pinmony-photo-source-' + this.traceId.toString() + (selectedIndex >= 0 ? '-' + selectedIndex.toString() : '');
   }
   private prepareViewerReturn(): ImageFlightRect {
     const origin: ImageFlightRect = this.measureViewerOrigin();
@@ -515,16 +537,15 @@ export struct PinmonyDetailPage {
       const ui = this.getUIContext();
       const selectedIndex: number = this.displayedDetail().carousel?.freeScroll ?
         (this.displayedDetail().carousel?.items || []).findIndex((item: PinmonyCarouselItem): boolean => item.imageUrl === this.zoomImageUrl) : -1;
-      const source = ui.getComponentUtils().getRectangleById('pinmony-photo-source-' + this.traceId.toString() +
-        (selectedIndex >= 0 ? '-' + selectedIndex.toString() : ''));
-      const root = ui.getComponentUtils().getRectangleById('pinmony-photo-root-' + this.traceId.toString());
-      return { x: ui.px2vp(source.windowOffset.x - root.windowOffset.x),
-        y: ui.px2vp(source.windowOffset.y - root.windowOffset.y),
-        width: ui.px2vp(source.size.width), height: ui.px2vp(source.size.height) };
+      return measureImageFlightOrigin(ui, 'pinmony-photo-source-' + this.traceId.toString() +
+        (selectedIndex >= 0 ? '-' + selectedIndex.toString() : ''), 'pinmony-photo-root-' + this.traceId.toString());
     } catch (_) { return { x: 0, y: 0, width: 0, height: 0 }; }
   }
   @Prop visualResult: PinmonyVisualResult = emptyVisualResult();
-  @Prop pageActive: boolean = true;
+  @Prop @Watch('onViewerPageActiveChanged') pageActive: boolean = true;
+  private onViewerPageActiveChanged(): void {
+    if (!this.pageActive) this.onViewerCancel?.(this.viewerOwner());
+  }
   @State private zoomImageUrl: string = '';
   private productGalleryOffset: number = 0;
   @State private searchLabelVisible: boolean = true;
@@ -617,6 +638,7 @@ export struct PinmonyDetailPage {
 
   private onPinChanged(): void {
     if (this.activePin !== this.displayedDetail().pinUrl) {
+      this.onViewerCancel?.(this.viewerOwner());
       this.viewerMounted = false; this.viewerClosing = false;
       this.searchMounted = false; this.searchImageReady = false; this.searchClosing = false;
       this.activePin = this.displayedDetail().pinUrl;
@@ -669,6 +691,7 @@ export struct PinmonyDetailPage {
     this.searchLabelTimer = setTimeout(() => { this.searchLabelVisible = false; }, 2500);
   }
   aboutToDisappear(): void {
+    this.onViewerCancel?.(this.viewerOwner());
     this.shuffleFlightRevision++;
     clearTimeout(this.shuffleFlightTimer);
     this.shuffleFlightActive = false;
@@ -1897,28 +1920,6 @@ export struct PinmonyDetailPage {
           onOpened: () => { this.entryOpacity = 1; this.entryScale = 1; this.entryPhotoHidden = false; this.entryMotionComplete = true; },
           onClosed: () => { this.entryPhotoHidden = false; this.onEntryClosed?.(); } })
           .hitTestBehavior(HitTestMode.None)
-      }
-      if (this.viewerMounted) {
-        PinmonyImageViewer({ detail: this.displayedDetail(), imageUrl: this.zoomImageUrl || this.displayedDetail().originalImageUrl || this.displayedDetail().imageUrl,
-          previewUrl: this.zoomImageUrl || this.displayedDetail().imageUrl,
-          onImageChange: (url: string) => { this.zoomImageUrl = url; },
-          origin: this.viewerOrigin, closing: this.viewerClosing,
-          onReady: () => { this.viewerImageReady = true; },
-          onClosed: () => {
-            // The close animation can finish before the parent receives the new layer prop.
-            // `viewerClosing` is the local source of truth for that transition, so the
-            // carousel (including its indicator) is always restored after the viewer exits.
-            if (this.imageLayer !== 'zoom' || this.viewerClosing) {
-              this.viewerMounted = false;
-              this.viewerImageReady = false;
-              this.viewerClosing = false;
-            }
-          },
-          active: this.videoActive,
-          actionsReady: this.actionsReady,
-          onClose: () => { if (this.onImageLayer) this.onImageLayer(''); }, onAction: this.onAction,
-          onDownload: this.onDownload, onSave: this.onViewerSave,
-          onControlsChange: (visible: boolean) => { this.viewerControls = visible; } })
       }
     }.width('100%').height('100%').id('pinmony-photo-root-' + this.traceId.toString())
       .onAreaChange((_old: Area, area: Area) => {

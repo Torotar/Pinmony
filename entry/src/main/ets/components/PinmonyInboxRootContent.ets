@@ -15,6 +15,9 @@ export interface PinmonyInboxRootView {
   inboxPlaceholder: () => PinmonyInboxSnapshot;
   currentInboxUrl: () => string;
   previewBoardInvitation: (item: PinmonyBoardInvitation) => void;
+  declineBoardInvitation: (item: PinmonyBoardInvitation) => void;
+  acceptBoardInvitationItem: (item: PinmonyBoardInvitation) => void;
+  readBoardInvitations: (preview?: boolean) => Promise<void>;
   selectInboxSection: (section: string) => Promise<void>;
   loadMoreInbox: () => Promise<void>;
   retryInboxContacts: () => Promise<void>;
@@ -40,6 +43,9 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),
               retainedContent: view.inboxStore.inboxRetainedContent,
               invitations: view.inboxStore.boardInvitations, onInvitationPreview: (item: PinmonyBoardInvitation) => view.previewBoardInvitation(item),
+              onInvitationDecline: (item: PinmonyBoardInvitation) => { view.declineBoardInvitation(item); },
+              onInvitationAccept: (item: PinmonyBoardInvitation) => { view.acceptBoardInvitationItem(item); },
+              onInvitationReload: () => { view.readBoardInvitations(); },
               onInvitationAll: () => { view.inboxStore.invitationAllVisible = true; },
               initialScrollOffset: view.inboxStore.inboxScrollOffset,
               onScrollPosition: (url: string, section: string, offset: number) => {

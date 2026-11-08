@@ -4,7 +4,7 @@ const source=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailE
 const sf=ts.createSourceFile('motion.ts',source.replace(/\bstruct\b/g,'class'),99,true), methods=[];
 const names=['aboutToAppear','aboutToDisappear','openWithoutPhoto','target','heroVisible','begin','imageComplete','closeChanged','move'];
 function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(sf)))methods.push(n.getText(sf));ts.forEachChild(n,visit);} visit(sf);
-const geometry=fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets','utf8').replace(/export /g,'');
+const geometry=fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export /g,'');
 const imageContainRect=vm.runInNewContext(ts.transpileModule(geometry+';imageContainRect;',{compilerOptions:{target:99}}).outputText);
 const timers=[],animations=[],preparationTimers=[];
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:99}}).outputText,

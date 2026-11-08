@@ -5955,6 +5955,30 @@
     {
       "name": "pm_search_empty_try_again",
       "value": "Попробуйте выполнить поиск еще раз."
-    }
+    },
+    {
+      "name": "pm_system_notifications_off",
+      "value": "Системные уведомления отключены"
+    },
+    {
+      "name": "pm_system_notifications_enable_message",
+      "value": "Разрешите уведомления Pinmony в системных настройках, затем вернитесь на эту страницу и снова включите уведомления в приложении."
+    },
+    {
+      "name": "pm_system_notifications_open_settings",
+      "value": "Открыть настройки уведомлений"
+    },
+    {
+      "name": "pm_system_notifications_check_failed",
+      "value": "Не удалось проверить разрешение на системные уведомления. Повторите попытку позже."
+    },
+    {
+      "name": "pm_system_notifications_open_failed",
+      "value": "Не удалось открыть настройки уведомлений. Включите уведомления Pinmony вручную в системных настройках."
+    },
+    {"name":"pm_invitation_decline_failed","value":"Не удалось отклонить приглашение. Повторите попытку."},
+    {"name":"pm_invitation_decline_uncertain","value":"Результат отклонения не подтверждён. Обновите список запросов для проверки. Повторная отправка автоматически не выполняется."},
+    {"name":"pm_board_invitation_notice_text","value":"{0} приглашает вас к совместной работе над доской {1}"},
+    {"name":"pm_board_invitation_notice_body","value":"Вас пригласили к совместной работе над доской {0}"}
   ]
 }

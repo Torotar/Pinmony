@@ -264,7 +264,10 @@ function acceptsCanonicalNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetw
     }
     if (match[1] === 'BoardInvitesResource' || match[1] === 'BoardInviteResource') {
       if (match[2] === 'get') return job.method === 'GET' && job.body === '';
-      if (match[1] !== 'BoardInviteResource' || match[2] !== 'update' || job.method !== 'POST') return false;
+      if (match[1] !== 'BoardInviteResource' || !['update','delete'].includes(match[2]) || job.method !== 'POST') return false;
+      if (match[2] === 'delete' && (job.page !== 'https://www.pinterest.com/inbox/' ||
+        job.headers['X-Pinterest-Pws-Handler'] !== 'www/inbox.js' || job.headers['X-Pinterest-Source-Url'] !== '/inbox/' ||
+        !job.body.startsWith('source_url=%2Finbox%2F&data='))) return false;
       try {
         const data: RegExpMatchArray | null = job.body.match(/(?:^|&)data=([^&]+)/);
         if (!data || job.body.split('&').length !== 2 || !/(?:^|&)source_url=/.test(job.body)) return false;
@@ -1661,7 +1664,7 @@ export class PinmonyNativeNetwork {
         !!source && decodeURIComponent(source[1]) === path && Object.keys(e).length === 2 && !!e.context && !Array.isArray(e.context) && Object.keys(e.context).length === 0 && !!o && !Array.isArray(o) &&
         (get ? job.body === '' : job.method === 'POST') && job.headers['Accept'] === 'application/json' && job.headers['Content-Type'] === 'application/x-www-form-urlencoded' &&
         job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['X-Pinterest-Source-Url'] === path &&
-        job.headers['X-Pinterest-Pws-Handler'] === (mode === 'quiz' ? 'www/search/[scope].js' : 'www/index.js');
+        job.headers['X-Pinterest-Pws-Handler'] === (mode === 'quiz' ? 'www/search/[scope].js' : mode === 'invites' && job.url === captured.origin + '/resource/BoardInviteResource/delete/' ? 'www/inbox.js' : 'www/index.js');
       const endpoint: string = job.url.split('?')[0].slice(captured.origin.length);
       const data: Record<string,Object | null> = o['data'] as Record<string,Object | null>;
       const search: boolean = /^\/search\/(?:pins\/?)?(?:\?[^#]*)?$/.test(path);
@@ -1686,7 +1689,7 @@ export class PinmonyNativeNetwork {
         if(endpoint === '/resource/ApiResource/create/')permitted = basic && o['url'] === '/v3/settings/notifications/objects/' && Object.keys(data).length === 1 && JSON.stringify(data['object_ids_to_unsubscribe']) === JSON.stringify([target]);
       }else if(mode === 'invites' && (/^\/(?:inbox|messages|updates|notifications)\/$/.test(path) || /^\/[A-Za-z0-9_]+\/[^/?#]+\/$/.test(path))) {
         if(get && endpoint === '/resource/BoardInvitesResource/get/')permitted = basic && exact(['current_user','field_set_key']) && o['current_user'] === true && o['field_set_key'] === 'news';
-        if(endpoint === '/resource/BoardInviteResource/' + (get ? 'get/' : 'update/'))permitted = basic && exact(get ? ['board_id','invited_user_id','field_set_key'] : ['board_id','invited_user_id']) && /^\d{1,30}$/.test(o['board_id'] as string) && /^\d{1,30}$/.test(o['invited_user_id'] as string) && target === o['board_id'] + ':' + o['invited_user_id'] && (!get || o['field_set_key'] === 'boardEdit');
+        if(endpoint === '/resource/BoardInviteResource/' + (get ? 'get/' : 'update/') || !get && endpoint === '/resource/BoardInviteResource/delete/' && path === '/inbox/')permitted = basic && exact(get ? ['board_id','invited_user_id','field_set_key'] : ['board_id','invited_user_id']) && /^\d{1,30}$/.test(o['board_id'] as string) && /^\d{1,30}$/.test(o['invited_user_id'] as string) && target === o['board_id'] + ':' + o['invited_user_id'] && (!get || o['field_set_key'] === 'boardEdit');
       }
     }catch (_) {}
     return this.request(job,(): PinmonyNetworkContext => {const actual: PinmonyBusinessSessionContext = session();return {authenticated:permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId && actual.generation === captured.generation && actual.origin === captured.origin,epoch:captured.generation,page:job.page,userAgent:actual.userAgent};});

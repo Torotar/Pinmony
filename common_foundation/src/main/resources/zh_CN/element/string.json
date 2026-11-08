@@ -1730,7 +1730,7 @@
     },
     {
       "name": "pm_find_inspiration_save_what_you_love_2499cd29",
-      "value": "发现灵感，收藏喜欢。"
+      "value": "发现灵感，收藏喜欢"
     },
     {
       "name": "pm_current_version_837bc957",
@@ -5955,6 +5955,30 @@
     {
       "name": "pm_search_empty_try_again",
       "value": "请尝试再次搜索。"
-    }
+    },
+    {
+      "name": "pm_system_notifications_off",
+      "value": "系统通知未开启"
+    },
+    {
+      "name": "pm_system_notifications_enable_message",
+      "value": "请在系统设置中允许 Pinmony 发送通知，然后返回此页面再次开启“应用程序内”通知。"
+    },
+    {
+      "name": "pm_system_notifications_open_settings",
+      "value": "去开启通知"
+    },
+    {
+      "name": "pm_system_notifications_check_failed",
+      "value": "无法检查系统通知权限，请稍后重试。"
+    },
+    {
+      "name": "pm_system_notifications_open_failed",
+      "value": "无法打开系统通知设置，请在系统设置中手动开启 Pinmony 的通知。"
+    },
+    {"name":"pm_invitation_decline_failed","value":"拒绝邀请失败，请重试。"},
+    {"name":"pm_invitation_decline_uncertain","value":"拒绝结果尚未确认。请刷新请求列表核对，不会自动重新提交。"},
+    {"name":"pm_board_invitation_notice_text","value":"{0}邀请你在{1}上进行合作"},
+    {"name":"pm_board_invitation_notice_body","value":"邀请你在{0}上进行合作"}
   ]
 }
