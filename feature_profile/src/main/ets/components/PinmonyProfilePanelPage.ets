@@ -8,6 +8,11 @@ import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } fro
 import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyProfilePanel';
 import { PinmonyUserAvatar } from 'common_ui';
+interface PinmonyProfileEditFieldOptions {
+  label: string;
+  text: string;
+  placeholder: string;
+}
 @Component
 export struct PinmonyProfilePanelPage {
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
@@ -238,15 +243,15 @@ export struct PinmonyProfilePanelPage {
     return options;
   }
   @Builder
-  private field(label: string, value: string, placeholder: string = '') {
+  private field($$: PinmonyProfileEditFieldOptions) {
     Column({ space: 8 }) {
-      Text(this.uiText(label)).fontSize(14).fontColor($r('app.color.secondary_text'))
-      TextInput({ text: value, placeholder: placeholder }).width('100%').height(40).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0).fontSize(17)
+      Text(this.uiText($$.label)).fontSize(14).fontColor($r('app.color.secondary_text'))
+      TextInput({ text: $$.text, placeholder: $$.placeholder }).width('100%').height(40).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0).fontSize(17)
         .placeholderColor($r('app.color.secondary_text')).fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent)
         .enabled(!this.saving && !this.snapshot.loading)
-        .onChange((text: string) => { if (label === '用户名') this.usernameDraft = text; else if (label === '名字') this.firstNameDraft = text; else if (label === '姓氏') this.lastNameDraft = text; else if (label === '网站') this.websiteDraft = text; })
-        .onFocus(() => { if (label === '用户名') { this.usernameFocused = true; this.revealUsernameUrl(); } })
-        .onBlur(() => { if (label === '用户名') this.usernameFocused = false; })
+        .onChange((text: string) => { if ($$.label === 'pm_username_1a3f0617') this.usernameDraft = text; else if ($$.label === 'pm_first_name_67733104') this.firstNameDraft = text; else if ($$.label === 'pm_last_name_b85f26df') this.lastNameDraft = text; else if ($$.label === 'pm_website_fb8d739d') this.websiteDraft = text; })
+        .onFocus(() => { if ($$.label === 'pm_username_1a3f0617') { this.usernameFocused = true; this.revealUsernameUrl(); } })
+        .onBlur(() => { if ($$.label === 'pm_username_1a3f0617') this.usernameFocused = false; })
     }.width('100%').constraintSize({ minHeight: 92 }).padding({ left: 18, right: 18, top: 14, bottom: 14 })
       .alignItems(HorizontalAlign.Start).border({ width: 1, color: $r('app.color.surface_muted'), radius: 20 })
   }
@@ -254,11 +259,22 @@ export struct PinmonyProfilePanelPage {
   private destination(name?: string, _param?: Object) {
     if (name === 'follower-search') { this.searchDestination() } else { this.panelDestination() }
   }
+  private canPullPanelRefresh(): boolean {
+    return this.active && this.snapshot.mode !== 'edit' && !this.rootRestorePending && !this.searchRestorePending &&
+      !this.snapshot.loading && !this.snapshot.refreshing && !this.snapshot.moreLoading && !this.followingBusy && !this.saving;
+  }
+  private showPanelRefreshIndicator(): boolean {
+    return this.active && this.snapshot.mode !== 'edit' && (this.snapshot.refreshing === true ||
+      this.canPullPanelRefresh() && (this.panelRefreshState === RefreshStatus.Drag || this.panelRefreshState === RefreshStatus.OverDrag));
+  }
+  private requestPanelRefresh(): void {
+    if (this.canPullPanelRefresh()) this.onRefresh?.();
+  }
   @Builder
   private panelRefreshIndicator() {
     Column() {
       LoadingProgress().width(24).height(24).color($r('app.color.accent'))
-        .visibility(this.snapshot.refreshing || this.panelRefreshState === RefreshStatus.Drag || this.panelRefreshState === RefreshStatus.OverDrag ? Visibility.Visible : Visibility.Hidden)
+        .visibility(this.showPanelRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)
     }.width('100%').height(64).justifyContent(FlexAlign.Center)
       .offset({ y: this.contentTopInset() }).hitTestBehavior(HitTestMode.None)
   }
@@ -282,7 +298,7 @@ export struct PinmonyProfilePanelPage {
         Column({ space: 20 }) {
           Column({ space: 20 }) {
           if (!this.snapshot.loading && this.snapshot.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.error, this.uiLanguage) }) }
-          else if (!this.snapshot.loading && this.snapshot.mode === 'edit') {
+          else if (this.snapshot.mode === 'edit') {
             if (this.snapshot.loading) {
               Image($r('app.media.profile_avatar_loading')).width(120).height(120).borderRadius(60)
             } else {
@@ -291,8 +307,8 @@ export struct PinmonyProfilePanelPage {
             Button(this.snapshot.avatarBusy ? this.uiText("pm_processing_d3d21191") : this.snapshot.avatarAction === 'refresh' ? this.uiText("pm_refresh_profile_picture_96fa37f1") : this.snapshot.avatarAction === 'check' ? this.uiText("pm_check_status_7c5569c3") : this.uiText("pm_change_6b01fce4")).type(ButtonType.Normal).borderRadius(16).height(40).fontSize(16).fontColor($r('app.color.primary_text'))
               .backgroundColor($r('app.color.surface_muted')).enabled(!this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy).onClick(() => { if (!this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy && this.onAvatar) this.onAvatar(); })
             if (this.snapshot.avatarError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.avatarError, this.uiLanguage) }) }
-            this.field('名字', this.firstNameDraft)
-            this.field('姓氏', this.lastNameDraft)
+            this.field({ label: 'pm_first_name_67733104', text: this.firstNameDraft, placeholder: '' })
+            this.field({ label: 'pm_last_name_b85f26df', text: this.lastNameDraft, placeholder: '' })
             Column({ space: 8 }) {
               Text(this.uiText("pm_about_52d25a9e")).fontSize(14).fontColor($r('app.color.secondary_text'))
               TextArea({ text: this.aboutDraft, placeholder: this.uiText("pm_tell_your_story_42ba0e47") }).width('100%').height(64).padding({ left: 6, right: 6, top: 4, bottom: 4 }).borderRadius(0)
@@ -301,9 +317,9 @@ export struct PinmonyProfilePanelPage {
                 .backgroundColor(Color.Transparent)
             }.width('100%').constraintSize({ minHeight: 128 }).padding(18).alignItems(HorizontalAlign.Start)
               .border({ width: 1, color: $r('app.color.surface_muted'), radius: 20 })
-            this.field('网站', this.websiteDraft, 'https://')
+            this.field({ label: 'pm_website_fb8d739d', text: this.websiteDraft, placeholder: 'https://' })
             Text(this.uiText("pm_add_a_link_to_bring_visitors_to_your_website_82987d9c")).width('100%').fontSize(12).fontColor($r('app.color.secondary_text'))
-            this.field('用户名', this.usernameDraft)
+            this.field({ label: 'pm_username_1a3f0617', text: this.usernameDraft, placeholder: '' })
             Text('www.pinterest.com/' + this.usernameDraft).width('100%').fontSize(12).fontColor($r('app.color.secondary_text'))
           } else if (!this.snapshot.loading) {
             if (this.snapshot.items.length === 0) {
@@ -365,8 +381,8 @@ export struct PinmonyProfilePanelPage {
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
           .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))
       }.width('100%').layoutWeight(1)
-        .pullToRefresh(this.snapshot.mode !== 'edit' && !this.snapshot.loading && !this.snapshot.refreshing && !this.snapshot.moreLoading && !this.followingBusy && !this.saving)
-        .onRefreshing(() => { this.onRefresh?.(); })
+        .pullToRefresh(this.canPullPanelRefresh())
+        .onRefreshing(() => this.requestPanelRefresh())
         .onStateChange((state: RefreshStatus) => { this.panelRefreshState = state; })
       }.width('100%').height('100%')
       if (this.snapshot.loading) {
