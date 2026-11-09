@@ -49,9 +49,17 @@ Object.assign(storeExports, require('./arkts-module-loader.cjs').createArktsLoad
   page.visible = true; page.getUIContext = () => ({ getPromptAction: () => ({ showToast: x => messages.push(x.message) }) });
   page.onOpenExternalLink = async url => { links.push(url); };
   await page.openLink('https://github.com/Torotar/Pinmony'); assert.equal(links.length, 1); assert.equal(page.openingLink, false);
+  assert.equal((source.match(/this\.openUpdateDownload\(\)/g) || []).length, 2, 'both update and download entries use the same destination');
+  assert(!source.includes('this.openLink(this.release.html_url)'), 'release metadata must not control download navigation');
+  page.release = { html_url: 'https://github.com/Torotar/Pinmony/releases/tag/v99.0.0' };
+  await page.openUpdateDownload();
+  assert.equal(links.at(-1), 'https://appgallery.huawei.com/apptest/CfRhJnKdQS', 'download opens the designated Huawei testing page');
+  assert.equal(page.openingLink, false);
   page.onOpenExternalLink = async () => { throw Error('unavailable'); };
   await page.openLink('https://github.com/Torotar/Pinmony/issues'); assert.equal(messages.length, 1); assert.equal(page.openingLink, false);
   page.openingLink = true; await page.openLink('ignored'); assert.equal(messages.length, 1);
+  const linkCount = links.length;
+  await page.openUpdateDownload(); assert.equal(links.length, linkCount, 'update download retains the duplicate-open guard');
   for (const [latest, installed, expected] of [['V2.1.1', '2.1.0', true], ['v2.10.0', '2.9.0', true],
     ['V2.1.0', '2.1.0', false], ['v1.9.9', '2.1.0', false], ['v3.0.0-beta', '2.1.0', false]]) {
     assert.equal(releaseExports.isNewerRelease(latest, installed), expected);

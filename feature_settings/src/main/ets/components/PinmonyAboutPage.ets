@@ -111,6 +111,9 @@ export struct PinmonyAboutPage {
       }
     } finally { this.openingLink = false; }
   }
+  private async openUpdateDownload(): Promise<void> {
+    await this.openLink('https://appgallery.huawei.com/apptest/CfRhJnKdQS');
+  }
 
   @Builder
   private destination() {
@@ -139,7 +142,7 @@ export struct PinmonyAboutPage {
             }.width('100%').backgroundColor(Color.Transparent).enabled(!this.openingLink && !PinmonyI18n.isText(this.updateStatus, "正在检查更新…"))
               .onClick(() => {
                 if (PinmonyI18n.includesText(this.updateStatus, '检查更新失败')) this.checkUpdate();
-                else if (this.hasUpdate && this.release) this.openLink(this.release.html_url);
+                else if (this.hasUpdate && this.release) this.openUpdateDownload();
                 else this.checkUpdate();
               })
             if (this.hasUpdate && this.release) {
@@ -147,7 +150,7 @@ export struct PinmonyAboutPage {
               Button({ type: ButtonType.Normal }) {
                 PinmonyAboutInfoRow({ icon: $r('sys.symbol.arrow_down'), title: this.uiText("pm_download_55c561dc"), description: this.uiText("pm_open_releases_in_browser_5cb655da"), link: true })
               }.width('100%').backgroundColor(Color.Transparent).enabled(!this.openingLink)
-                .onClick(() => { if (this.release) this.openLink(this.release.html_url); })
+                .onClick(() => { if (this.release) this.openUpdateDownload(); })
             }
           }.width('100%').backgroundColor($r('app.color.input_surface')).borderRadius(20).clip(true)
           ForEach(this.newerReleases, (item: PinmonyRelease) => {

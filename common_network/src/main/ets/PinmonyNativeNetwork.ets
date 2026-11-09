@@ -428,6 +428,8 @@ export class RequestScheduler {
     this.maxConcurrent = maxConcurrent > 0 ? Math.floor(maxConcurrent) : 1;
   }
 
+  isIdle(): boolean { return this.active === 0 && this.queue.length === 0; }
+
   enqueue<T>(priority: Priority, task: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve: (value: T) => void, reject: (reason: Error) => void) => {
       const item: RequestSchedulerItem = {
@@ -483,6 +485,8 @@ export class NetworkManager {
   private sessionAccessCount: number = 0;
   private preconnectState: string = 'idle';
   private preconnectStartedAt: number = 0;
+  private foreground: boolean = true;
+  private connectionRenewPending: boolean = false;
   private readonly scheduler: RequestScheduler = new RequestScheduler(8);
   private readonly requestPolicy: PinmonyRequestPolicy = new PinmonyRequestPolicy();
 
@@ -494,6 +498,7 @@ export class NetworkManager {
   }
 
   private getOrCreateSession(): rcp.Session {
+    this.renewIdleConnection();
     if (!this.session) {
       try { this.session = rcp.createSession({ requestConfiguration: {
         transfer: { autoRedirect: false, timeout: { connectMs: 10000, transferMs: 20000 } },
@@ -518,7 +523,29 @@ export class NetworkManager {
   }
 
   static enqueue<T>(priority: Priority, task: () => Promise<T>): Promise<T> {
-    return NetworkManager.instance().scheduler.enqueue(priority, task);
+    const manager: NetworkManager = NetworkManager.instance();
+    manager.renewIdleConnection();
+    return manager.scheduler.enqueue(priority, task);
+  }
+
+  static setForeground(value: boolean): void {
+    const manager: NetworkManager = NetworkManager.instance();
+    if (manager.foreground === value) return;
+    manager.foreground = value;
+    if (!value) manager.connectionRenewPending = true;
+    else manager.renewIdleConnection();
+  }
+
+  private renewIdleConnection(): void {
+    if (!this.foreground || !this.connectionRenewPending || !this.scheduler.isIdle() || this.preconnectState === 'pending') return;
+    const session: rcp.Session | undefined = this.session;
+    this.session = undefined;
+    this.connectionRenewPending = false;
+    this.preconnectState = 'idle';
+    this.preconnectStartedAt = 0;
+    if (!session) return;
+    try { session.close(); } catch (_) { PinmonyRuntimeLog.warn('NetworkTrace: resumed-session-close-unavailable'); }
+    PinmonyRuntimeLog.info('NetworkTrace: transport-renew reason=foreground generation=' + this.sessionGeneration.toString());
   }
 
   static cancel(request: rcp.Request): void {

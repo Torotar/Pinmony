@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-assert(index.includes(".zIndex(this.detailProfileTransition && (this.detailProfileReturning || !!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)"), 'profile must stay above detail during return but not cover its child panels');
+assert(index.includes(".zIndex(!this.retainProfileBoardParent() && !this.retainProfilePinParent() && this.detailProfileTransition && (this.detailProfileReturning || !!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)"), 'profile must stay above detail during return but below its child board');
 assert(index.includes("Column() { this.buildProfileContent() }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))"), 'profile transition must have an opaque page surface');
 assert(index.includes("this.profileStore.panel || this.retainedProfilePanel") && index.includes(".zIndex(2).transition(DETAIL_PROFILE_TRANSITION)"), 'list underlay must remain mounted beneath an independently animated profile');
 // Execute the actual profile transition expression with both entry and popped

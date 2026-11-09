@@ -4,6 +4,8 @@ import { PinmonyProfileStore, PinmonyProfilePage } from 'feature_profile';
 import { PinmonyAuthStatus } from 'common_session';
 
 export interface PinmonyProfileRootView {
+  coveredByBoard: boolean;
+  coveredByPin: boolean;
   profileStore: PinmonyProfileStore;
   pinStore: PinmonyPinStore;
   retainPinSource: boolean;
@@ -50,11 +52,11 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
               if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource) && !view.loadFailed) {
                 PinmonyProfilePage({
                   onCoveredBack: () => view.coveredBack(),
-                  backActive: !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible &&
+                  backActive: !view.coveredByBoard && !view.coveredByPin && !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible &&
                     (!view.pinStore.detail && !view.pinStore.detailOpeningPin || view.detailProfileEntry),
-                  interactionReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.authStatus === 'authenticated' &&
+                  interactionReady: !view.coveredByBoard && !view.coveredByPin && !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.authStatus === 'authenticated' &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
-                  automaticLoadingEnabled: !view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.profileStore.profileNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) &&
+                  automaticLoadingEnabled: !view.coveredByBoard && !view.coveredByPin && !view.pinStore.detail && !view.pinStore.detailOpeningPin && (view.profileStore.profileNativeReadsReady || !view.nativeRootOnly || view.rootContentInteracted) &&
                     (view.activeTab === 3 || view.profileStore.origins.length > 0),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
                   profile: view.profileStore.profile,
@@ -67,7 +69,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                   syncError: view.profileStore.profileError,
                   initialScrollOffset: view.profileStore.profileScrollOffset,
                   onScrollPosition: (url: string, section: string, offset: number) => {
-                    if (!view.profileStore.profile || view.profileStore.profile.profileUrl !== url || view.profileStore.profile.section !== section ||
+                    if (view.coveredByBoard || view.coveredByPin || !view.profileStore.profile || view.profileStore.profile.profileUrl !== url || view.profileStore.profile.section !== section ||
                         view.currentProfileUrl() !== url) return;
                     view.profileStore.profileScrollOffset = offset;
                     if (view.profileStore.profileNativeReadsReady || view.profileStore.profileActionsReady) view.profileStore.profileCache.put(view.profileStore.profile, offset);

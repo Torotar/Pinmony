@@ -5058,6 +5058,21 @@ struct Index {
         this.boardStore.pendingBoardUrl === this.boardStore.boardDetail.pageKey || this.boardUrlFromAddress(this.nativeDisplayAddress()) === this.boardStore.boardDetail.pageKey);
   }
 
+  private retainProfileBoardParent(): boolean {
+    const profile: PinmonyProfileSnapshot | undefined = this.profileStore.profile;
+    return this.profileStore.origins.length > 0 && !!profile && this.nativeBoardVisible() &&
+      this.boardStore.boardReturnPage === this.boardStore.boardDetail?.pageKey &&
+      this.profileUrlFromAddress(this.boardStore.boardReturnUrl) === profile.profileUrl;
+  }
+
+  private retainProfilePinParent(): boolean {
+    const profile: PinmonyProfileSnapshot | undefined = this.profileStore.profile;
+    const pin: string = this.pinStore.detail?.pinUrl || this.pinStore.detailOpeningPin;
+    if (!profile || !pin || this.profileUrlFromAddress(this.nativeBackTarget || this.navigationAddress)) return false;
+    const source: string = this.pinStore.detailOrigin(this.pinIdentity(pin)) || this.pinStore.detailReturnUrl;
+    return this.profileUrlFromAddress(source) === profile.profileUrl;
+  }
+
   private syncNativeReturnRoute(address: string): void { return this.navigationCoordinator.syncNativeReturnRoute(address); }
 
   private openProfilePanelBoard(url: string): void {
@@ -7295,10 +7310,12 @@ struct Index {
   @Builder
   private buildProfileContent() {
     PinmonyBuildProfileRootContent({
+      coveredByBoard: this.retainProfileBoardParent(),
+      coveredByPin: this.retainProfilePinParent(),
       coveredBack: (): boolean => this.onBackPress(),
       profileChatActive: this.profileChatActive,
       detailProfileEntry: this.detailProfileTransition && !!this.profileUrlFromAddress(this.navigationAddress),
-      retainPinSource: this.homeEntryCardId.startsWith('pinmony-profile-photo-') &&
+      retainPinSource: this.retainProfilePinParent() || this.homeEntryCardId.startsWith('pinmony-profile-photo-') &&
         !!this.homeEntryPhoto && this.homeEntryPhoto.pinUrl === (this.pinStore.detail?.pinUrl || this.pinStore.detailOpeningPin),
       profileStore: this.profileStore,
       pinStore: this.pinStore,
@@ -7629,11 +7646,11 @@ struct Index {
             Column() { this.buildProfileContent() }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
               .zIndex(0).transition(NATIVE_PAGE_TRANSITION)
           }
-          if (!this.chatProfileTransition && this.profileStore.origins.length > 0 && this.currentProfileUrl()) {
+          if (!this.chatProfileTransition && this.profileStore.origins.length > 0 && (this.currentProfileUrl() || this.retainProfileBoardParent() || this.retainProfilePinParent())) {
             Column() { this.buildProfileContent() }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
-              .hitTestBehavior(this.profileChatActive ? HitTestMode.None : HitTestMode.Default)
-              .accessibilityLevel(this.profileChatActive ? 'no-hide-descendants' : 'auto')
-              .zIndex(this.detailProfileTransition && (this.detailProfileReturning || !!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)
+              .hitTestBehavior(this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? 'no-hide-descendants' : 'auto')
+              .zIndex(!this.retainProfileBoardParent() && !this.retainProfilePinParent() && this.detailProfileTransition && (this.detailProfileReturning || !!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)
               .transition(this.detailProfileTransition ? DETAIL_PROFILE_TRANSITION : this.activeTab === 1 || this.activeTab === 2 || this.chatProfileTransition || this.settingsProfileDepth >= 0 ? NATIVE_PAGE_TRANSITION :
                 TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
                   this.settingsProfileDepth >= 0 || this.settingsProfileReturning ?

@@ -1352,12 +1352,21 @@ struct PinmonyBoardSurface {
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
   }
 
+  private showSectionRefreshIndicator(): boolean {
+    return this.phase() === 'section' && !this.snapshot.postOperationLoading &&
+      (this.snapshot.flow?.refreshing === true || this.boardRefreshActive && !this.snapshot.flow?.loading);
+  }
+
   @Builder
   private boardRefreshPlaceholder() {
     if (this.phase() === 'section') {
       Row() {
         LoadingProgress().color($r('app.color.accent')).width(32).height(32)
-      }.width('100%').justifyContent(FlexAlign.Center)
+          .visibility(this.showSectionRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)
+      }.width('100%').height(64).justifyContent(FlexAlign.Center)
+        .offset({ y: this.titleContentInset() })
+        .hitTestBehavior(HitTestMode.None)
+        .accessibilityText(this.uiText("pm_loading_board_b5e739be"))
     } else {
       Column() {
         LoadingProgress().color($r('app.color.accent')).width(32).height(32)

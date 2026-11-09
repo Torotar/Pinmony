@@ -259,6 +259,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    NetworkManager.setForeground(true);
     PinmonyInboxBackgroundLifecycle.change(false);
     // Ability has brought to foreground
     this.logLifecycle('foreground', 'windowStage=' + this.windowStageReady.toString() +
@@ -278,6 +279,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onBackground(): void {
+    NetworkManager.setForeground(false);
     PinmonyInboxBackgroundLifecycle.change(true);
     // Ability has back to background
     this.logLifecycle('background', 'windowStage=' + this.windowStageReady.toString() +
