@@ -1,4 +1,4 @@
-import { PinmonyActionNotice, PinmonyCdnImage } from 'common_ui';
+import { PinmonyActionNotice, PinmonyCdnImage, PinmonyUiCommitQueue } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
@@ -11,6 +11,7 @@ export struct PinmonyDetailHero {
   // The parent ForEach replaces this component only on a source change or retry.
   @Prop source: DetailHeroSource = { key: '', url: '', pinUrl: '', revision: 0 };
   @Prop heightVp: number = 300;
+  @Prop radiusVp: number = 18;
   @Prop openId: number = 0;
   @Prop label: string = '';
   @Prop phase: string = 'current';
@@ -25,12 +26,14 @@ export struct PinmonyDetailHero {
   private decoded: boolean = false;
   private deadline: number = -1;
   private startedAt: number = 0;
+  private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
   onLoaded?: (pinUrl: string, imageUrl: string) => void;
   onFailed?: (pinUrl: string) => void;
   onRetry?: () => void;
   onTap?: () => void;
 
   aboutToAppear(): void {
+    this.uiCommits.activate();
     this.visible = true; this.mountedKey = this.source.key; this.startedAt = Date.now();
     this.audit('node-created');
     this.deadline = setTimeout(() => {
@@ -41,6 +44,7 @@ export struct PinmonyDetailHero {
   }
 
   aboutToDisappear(): void {
+    this.uiCommits.dispose();
     this.visible = false; this.stopDeadline(); this.audit('node-disposed');
   }
 
@@ -63,7 +67,13 @@ export struct PinmonyDetailHero {
   }
 
   private onRenderChanged(): void {
-    if (this.isCurrent() && this.decoded && this.onLoaded) this.onLoaded(this.source.pinUrl, this.source.url);
+    const identity: string = this.renderIdentity;
+    const key: string = this.source.key;
+    this.uiCommits.post('render-confirmation', (): void => {
+      if (this.isCurrent() && this.decoded && this.renderIdentity === identity && this.source.key === key) {
+        this.onLoaded?.(this.source.pinUrl, this.source.url);
+      }
+    });
   }
 
   private completeImage(status: number): void {
@@ -98,7 +108,7 @@ export struct PinmonyDetailHero {
       // State feedback never removes the Image while its source is still current.
       PinmonyCdnImage({ url: this.source.url, fit: ImageFit.Contain, useSharedDecode: false,
         onDecoded: () => this.completeImage(1), onFailure: (code: number) => this.failImage(code) })
-        .width('100%').height(this.heightVp).borderRadius(18).clip(true)
+        .width('100%').height(this.heightVp).borderRadius(this.radiusVp).clip(true)
         .opacity(this.previewAvailable && this.imageState !== 'loaded' ? 0 : 1)
         .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); })
         .accessibilityText(this.label || this.uiText("pm_pin_image_c269651e"))
@@ -110,6 +120,6 @@ export struct PinmonyDetailHero {
           PinmonyActionNotice({ message: this.imageState === 'failed' ? this.uiText("pm_image_failed_to_load_572993f5") : this.uiText("pm_image_loading_timed_out_b829c7d3"), actionText: this.uiText("pm_reload_image_0ad285f1"), onAction: () => this.retryImage() })
         }.padding(12).borderRadius(12).backgroundColor($r('app.color.page_background'))
       }
-    }.width('100%').height(this.heightVp).borderRadius(18).clip(true)
+    }.width('100%').height(this.heightVp).borderRadius(this.radiusVp).clip(true)
   }
 }

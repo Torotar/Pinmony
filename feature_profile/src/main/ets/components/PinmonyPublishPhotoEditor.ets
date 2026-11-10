@@ -500,7 +500,7 @@ export struct PinmonyPublishPhotoEditor {
   }
   build() {
     Stack({alignContent:Alignment.Center}) {
-      HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+      HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
         .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
       if(this.state.busy) { PinmonyLoadingOverlay({message:this.text('pm_loading_please_wait_b6aaac70')}) }
     }.width('100%').height('100%')

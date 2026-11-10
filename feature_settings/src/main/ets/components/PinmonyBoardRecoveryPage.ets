@@ -121,7 +121,7 @@ export struct PinmonyBoardRecoveryPage {
         this.recoveryLoading()
       }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
     } else {
-    HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
     }
   }

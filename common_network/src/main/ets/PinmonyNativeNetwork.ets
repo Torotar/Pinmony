@@ -2124,6 +2124,18 @@ export class PinmonyNativeNetwork {
   async requestBusinessSearchDiscoveryRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
     ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;
+    // Discovery uses the same mobile content contract on phones and tablets.
+    // Preserve the active engine versions and credentials; normalize only the
+    // tablet device tokens for this read, never the login host or other APIs.
+    const mobileAgent = (agent: string): string => {
+      if (!/\bArkWeb\/[0-9.]+/.test(agent) || !/\bTablet\b/.test(agent)) return agent;
+      let normalized: string = agent.replace(/\bTablet\b/g, 'Phone');
+      if (!/\bMobile\b/.test(normalized)) normalized = normalized.replace(/\bSafari\//, 'Mobile Safari/');
+      return normalized;
+    };
+    PinmonyRuntimeLog.info('SearchDiscoveryTrace: phase=context tablet=' + /\bTablet\b/.test(captured.userAgent).toString() +
+      ' mobile=' + /\bMobile\b/.test(captured.userAgent).toString() +
+      ' normalized=' + (mobileAgent(captured.userAgent) !== captured.userAgent).toString());
     try {
       const query: SearchDiscoveryQuery = JSON.parse(job.body) as SearchDiscoveryQuery;
       const variables: SearchDiscoveryVariables = query.variables;
@@ -2142,7 +2154,7 @@ export class PinmonyNativeNetwork {
       const actual: PinmonyBusinessSessionContext = session();
       return { authenticated: permitted && ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
         actual.generation === captured.generation && actual.origin === captured.origin,
-        epoch: captured.generation, page: job.page, userAgent: actual.userAgent };
+        epoch: captured.generation, page: job.page, userAgent: mobileAgent(actual.userAgent) };
     });
   }
   async requestBusinessHomeRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,

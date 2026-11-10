@@ -9,20 +9,24 @@ export struct PinmonyDetailEntryMotion {
   @Prop rootId: string = '';
   @Prop imageWidth: number = 1;
   @Prop imageHeight: number = 1;
+  @Prop targetRadius: number = 18;
   @Prop bottomInset: number = 0;
   @Prop restoredOffset: number = 0;
   @Prop @Watch('closeChanged') closing: boolean = false;
   onReveal?: (closing: boolean, pageExit: boolean) => void;
+  onTransition?: (expanded: number) => void;
   onOpened?: () => void;
   onClosed?: () => void;
   @State private frame: ImageFlightRect = { x: 0, y: 0, width: 1, height: 1 };
   @State private showing: boolean = false;
+  @State private frameRadius: number = 18;
   private source: ImageFlightRect = { x: 0, y: 0, width: 1, height: 1 };
   private alive: boolean = false;
   private decoded: boolean = false;
   private rendered: boolean = false;
   private measured: boolean = false;
   private started: boolean = false;
+  private sourcePrepared: boolean = false;
   private version: number = 0;
   private timer: number = -1;
   private layoutAttempts: number = 0;
@@ -31,16 +35,19 @@ export struct PinmonyDetailEntryMotion {
 
   aboutToAppear(): void {
     this.alive = true;
-    // A cold preview must not keep the entire detail transparent on network IO.
-    this.preparationTimer = setTimeout(() => this.openWithoutPhoto(), 80);
+    // Reuse the visible card's native image cache. Allow its first drawable frame
+    // to arrive before falling back; 80ms also expired on warm tablet entries.
+    // Keep cold/failed images bounded so they cannot trap a transparent detail.
+    this.preparationTimer = setTimeout(() => this.openWithoutPhoto(), 500);
   }
   aboutToDisappear(): void {
     this.alive = false; this.version++; clearTimeout(this.timer); clearTimeout(this.preparationTimer);
   }
   private openWithoutPhoto(): void {
-    if (!this.alive || this.closing || this.started) return;
+    if (!this.alive || this.started) return;
     this.preparationExpired = true;
-    PinmonyRuntimeLog.info('DetailMotionTrace: event=preview-wait-ended');
+    PinmonyRuntimeLog.info('DetailMotionTrace: event=preview-wait-ended decoded=' + this.decoded.toString() +
+      ' rendered=' + this.rendered.toString() + ' measured=' + this.measured.toString());
     this.begin();
   }
   private target(): ImageFlightRect | undefined {
@@ -73,9 +80,8 @@ export struct PinmonyDetailEntryMotion {
   }
   private begin(): void {
     if (!this.alive || this.started || !this.measured) return;
-    const pageOnly: boolean = this.photo.returnPageOnly === true || !this.closing &&
-      (this.restoredOffset > 0 || this.preparationExpired);
-    if (!pageOnly && !this.decoded) return;
+    const pageOnly: boolean = this.photo.returnPageOnly === true || this.preparationExpired ||
+      !this.closing && this.restoredOffset > 0 && !this.heroVisible();
     const target: ImageFlightRect | undefined = this.target();
     if (!target) {
       if (++this.layoutAttempts < 12) {
@@ -90,11 +96,18 @@ export struct PinmonyDetailEntryMotion {
       return;
     }
     this.frame = this.closing ? target : this.source;
+    this.frameRadius = this.closing ? this.targetRadius : 18;
     this.showing = !pageOnly && this.heroVisible();
-    // Data readiness may arrive before this Image has a drawable frame. Make
-    // the photo visible at its source first, then wait for its render callback.
-    // Page-only transitions do not display this Image and need no render wait.
-    if (this.showing && !this.rendered) return;
+    if (this.showing && !this.sourcePrepared) {
+      this.sourcePrepared = true;
+      PinmonyRuntimeLog.info('DetailMotionTrace: event=source-prepared widthVp=' + this.frame.width.toFixed(1) +
+        ' heightVp=' + this.frame.height.toFixed(1));
+    }
+    // Admit a real, visible card frame before waiting for ANY image callback.
+    // A transparent 1px Image can defer even data readiness, so waiting first
+    // creates a cycle that always ends in the page-fade timeout on some devices.
+    // The underlying detail stays hidden until this source can actually draw.
+    if ((!pageOnly && !this.decoded) || (this.showing && !this.rendered)) return;
     this.started = true;
     clearTimeout(this.preparationTimer);
     // Commit the source frame before starting the destination animation.
@@ -120,7 +133,7 @@ export struct PinmonyDetailEntryMotion {
     const target: ImageFlightRect = measuredTarget || this.frame;
     const version: number = ++this.version;
     const pageExit: boolean = !measuredTarget || this.photo.returnPageOnly === true || !this.heroVisible() ||
-      !this.rendered || !closing && (this.restoredOffset > 0 || this.preparationExpired);
+      !this.rendered || this.preparationExpired;
     if (!this.showing) this.frame = target;
     this.showing = !pageExit;
     PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (closing ? 'close-start' : 'open-start'));
@@ -133,7 +146,11 @@ export struct PinmonyDetailEntryMotion {
         this.showing = false;
         PinmonyRuntimeLog.info('DetailMotionTrace: event=' + (closing ? 'close-end' : 'open-end'));
         if (closing) this.onClosed?.(); else this.onOpened?.();
-      } }, () => { this.frame = closing ? this.source : target; });
+      } }, () => {
+        this.frame = closing ? this.source : target;
+        this.frameRadius = closing ? 18 : this.targetRadius;
+        this.onTransition?.(closing ? 0 : 1);
+      });
   }
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -143,7 +160,7 @@ export struct PinmonyDetailEntryMotion {
         onFailure: (_code: number) => { if (!this.alive || this.started) return;
           if (this.closing) this.onClosed?.(); else this.openWithoutPhoto(); } })
         .width(this.frame.width).height(this.frame.height)
-        .borderRadius(18).clip(true).position({ x: this.frame.x, y: this.frame.y })
+        .borderRadius(this.frameRadius).clip(true).position({ x: this.frame.x, y: this.frame.y })
         .opacity(this.showing ? 1 : 0).accessibilityLevel('no')
     }.width('100%').height('100%').clip(true).hitTestBehavior(HitTestMode.None)
       .onAreaChange(() => { this.measured = true; this.begin(); })

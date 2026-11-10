@@ -1,5 +1,65 @@
-const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]);
-const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');const a=source.indexOf('  private swipeCategory('),b=source.indexOf('  private imageHeight(',a);assert(a>=0&&b>a);const Host=vm.runInNewContext(ts.transpileModule('class Host {'+source.slice(a,b)+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
-const h=new Host(),swipes=[];Object.assign(h,{interactionReady:true,offlinePreview:false,categories:[{id:'a',selected:false,enabled:true},{id:'b',selected:true,enabled:true},{id:'disabled',selected:false,enabled:false},{id:'c',selected:false,enabled:true}],selectTab:tab=>swipes.push(tab.id)});h.swipeCategory(-80,8);h.swipeCategory(80,8);assert.deepEqual(swipes,['c','a']);h.swipeCategory(-20,0);h.swipeCategory(-50,70);assert.equal(swipes.length,2);h.categories[1].selected=false;h.categories[0].selected=true;h.swipeCategory(80,0);assert.equal(swipes.length,2);h.interactionReady=false;h.swipeCategory(-80,0);assert.equal(swipes.length,2);console.log('Home swipe: direction, disabled skip, no wrap, vertical/short gesture and inactive guards passed');
-
-assert(source.includes('.priorityGesture('));assert(!source.includes('.parallelGesture('));assert(source.includes('.onActionStart(() => { this.suppressSwipeClick = true; })'));assert(source.includes('event.type === TouchType.Down) this.suppressSwipeClick = false'));const opens=[...source.matchAll(/if \(([^\n]*?)this.onPin\) this.onPin\(pin.id\);/g)];assert.equal(opens.length,4);assert(opens.every(match=>match[1].includes('!this.suppressSwipeClick')),'every image/video click must suppress a recognized swipe');
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ts=require(process.argv[2]||'typescript'),nl=String.fromCharCode(10);
+const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
+const pane=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets','utf8');
+const ast=ts.createSourceFile('home.ts',source.replaceAll('struct ','class '),ts.ScriptTarget.Latest,true);
+const names=['pageTabs','syncCategories','requestCategory','selectTab','activePane','updatePagerBackdrop'],methods=[];
+function visit(node){if(ts.isMethodDeclaration(node)&&names.includes(node.name.getText(ast)))methods.push(node.getText(ast));ts.forEachChild(node,visit);}
+visit(ast);assert.equal(methods.length,names.length);
+const start=source.indexOf('}.index(this.pagerIndex)',source.indexOf('  private categoryFeed()')),end=source.indexOf(nl+'  }',start);
+assert(start>=0&&end>start);
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join(nl)+nl+'bind(mock){mock'+source.slice(start+1,end)+'}} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{TouchType:{Down:0,Up:1}});
+function boot(ready=true,offline=false){
+  const h=new Host(),events={},calls=[],moves=[],tabs=[{id:'a',enabled:true},{id:'disabled',enabled:false},{id:'b',enabled:true},{id:'c',enabled:true}];
+  Object.assign(h,{categories:tabs,home:{tabs},selectedId:'b',pendingTabId:'',pagerIndex:1,pagerPosition:-1,pagerMoving:false,suppressSwipeClick:false,interactionReady:ready,offlinePreview:offline,captures:0,bindings:0,categoryId:()=> 'b',captureCurrentPosition(){this.captures++;},bindCurrentScroller(){this.bindings++;},categorySwiper:{changeIndex:(...args)=>moves.push(args)},onTab:id=>calls.push(id)});
+  h.syncCategories();
+  const mock=new Proxy({},{get:(_target,name)=>(...args)=>{events[name]=args;return mock;}});
+  h.bind(mock);return {h,events,calls,moves};
+}
+const {h,events,calls,moves}=boot();
+assert.deepEqual(Array.from(h.pageTabs(),t=>t.id),['a','b','c'],'disabled categories excluded');
+assert.equal(events.loop[0],false,'no wrapping');assert.equal(events.disableSwipe[0],false);
+assert.equal(h.activePane('b'),true);
+h.selectTab(h.categories[0]);assert.deepEqual(moves,[[0,true]]);
+assert.deepEqual(calls,[],'wait for actual page change');
+events.onChange[0](0);assert.equal(h.selectedId,'a');assert.deepEqual(calls,['a']);
+assert.equal(h.captures,1);assert.equal(h.bindings,1);
+events.onChange[0](0);assert.equal(calls.length,1,'duplicate notification');
+events.onChange[0](99);assert.equal(h.selectedId,'a','invalid index');
+events.onChange[0](2);assert.deepEqual(calls,['a','c']);
+h.selectTab(h.categories[1]);h.selectTab(h.categories[3]);h.selectTab({id:'missing',enabled:true});
+assert.equal(moves.length,1,'disabled/current/missing');
+h.categoryId=()=> 'c';assert.equal(h.activePane('c'),true);
+events.onContentDidScroll[0](2,2,.25);assert.equal(h.pagerMoving,true);
+assert.equal(h.suppressSwipeClick,true);assert.equal(h.activePane('c'),false);
+const position=h.pagerPosition;
+events.onAnimationStart[0](2);assert.equal(h.pagerPosition,position);
+events.onAnimationEnd[0]();assert.equal(h.pagerMoving,false);assert.equal(h.pagerPosition,-1);
+assert.equal(h.activePane('c'),true);
+assert.equal(h.suppressSwipeClick,true,'settle retains click gate');
+events.onTouch[0]({type:1});assert.equal(h.suppressSwipeClick,true);
+events.onTouch[0]({type:0});assert.equal(h.suppressSwipeClick,false);
+const cancelled=boot();
+cancelled.events.onContentDidScroll[0](1,1,.2);
+cancelled.events.onContentDidScroll[0](1,1,0);
+cancelled.events.onAnimationEnd[0]();
+assert.equal(cancelled.h.selectedId,'b');assert.equal(cancelled.calls.length,0,'cancelled drag issues no request');
+assert.equal(cancelled.h.activePane('b'),true);assert.equal(cancelled.h.suppressSwipeClick,true);
+const blocked=boot(false);assert.equal(blocked.events.disableSwipe[0],true);
+blocked.h.selectTab(blocked.h.categories[0]);assert.equal(blocked.moves.length,0);
+const offline=boot(false,true);assert.equal(offline.events.disableSwipe[0],false);
+offline.h.selectTab(offline.h.categories[0]);offline.events.onChange[0](0);
+assert.equal(offline.moves.length,1);assert.equal(offline.h.selectedId,'a');
+assert.equal(offline.calls.length,0,'offline display issues no request');
+assert(source.includes('suppressPinClick: this.suppressSwipeClick'));
+const clicks=pane.split(nl).filter(line=>line.includes('.onClick(() => {')&&line.includes('this.onPin('));
+assert.equal(clicks.length,4,'all image/video paths');
+for(const line of clicks){
+  const body=line.slice(line.indexOf('=> {')+4,line.lastIndexOf('})'));
+  const callback=vm.runInNewContext(ts.transpileModule('(function(pin){'+body+'})',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+  const opened=[],host={suppressPinClick:true,recoveredSources:{},onPin:(...args)=>opened.push(args)};
+  callback.call(host,{id:'pin',imageUrl:'image'});assert.equal(opened.length,0);
+  host.suppressPinClick=false;callback.call(host,{id:'pin',imageUrl:'image'});
+  assert.equal(opened.length,1);assert.equal(opened[0][0],'pin');
+}
+console.log('Home Swiper passed: enabled pages, no wrap, callbacks, readiness/offline gates, drag/settle/cancel, four card click guards.');

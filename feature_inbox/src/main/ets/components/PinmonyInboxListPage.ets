@@ -4,6 +4,8 @@ import { PinmonyInboxConversationSwipe } from './PinmonyInboxConversationSwipe';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { CapsuleSegmentButtonV2, SegmentButtonV2Items } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { PinmonyInboxSegmentMaterial } from './PinmonyInboxSegmentMaterial';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyUserAvatar, PinmonyImmersiveLight } from 'common_ui';
@@ -13,7 +15,8 @@ import { PinmonyInboxItem, PinmonyInboxSnapshot } from '../models/PinmonyInbox';
 export struct PinmonyInboxListPage {
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
-  @State private listHeaderHeight: number = 0;
+  private readonly listHeaderHeight: number = 72;
+  private readonly listSegmentsBuilder: () => void = (): void => { this.listSegments(); };
   @State private searchHeaderHeight: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
@@ -183,21 +186,35 @@ export struct PinmonyInboxListPage {
   }
 
   @Builder
-  private listDestination() {
-    HdsNavDestination() {
-      Stack({alignContent:Alignment.TopStart}) {
-        if (this.section !== 'activity') {
-        Column() {
-        Row() {
+  private listSegments() {
+    if (this.section !== 'activity') {
+      Row() {
+        if (deviceInfo.apiAvailable('26.0.0')) {
+          CapsuleSegmentButtonV2({
+            items: this.segments,
+            enableStateAnimation: true,
+            backgroundSystemMaterial: PinmonyInboxSegmentMaterial.create(this.immersiveLightMode),
+            selectedIndex: this.section === 'contacts' ? 1 : 0,
+            $selectedIndex: (index: number): void => {
+              this.selectSection(index === 0 ? 'messages' : 'contacts');
+            }
+          }).width('100%').constraintSize({ maxWidth: 448 })
+        } else {
           CapsuleSegmentButtonV2({ items: this.segments, enableStateAnimation: true,
             selectedIndex: this.section === 'contacts' ? 1 : 0,
             onItemClicked: (index: number) => {
               this.selectSection(index === 0 ? 'messages' : 'contacts');
-            } }) .width('100%').constraintSize({ maxWidth: 360 })
-        }.width('100%').justifyContent(FlexAlign.Center).padding({ left: 20, right: 20, top: 12, bottom: 12 })
-        }.width('100%').margin({top:this.titleContentInset()}).backgroundColor($r('app.color.page_background')).zIndex(1)
-          .onAreaChange((_old:Area,area:Area) => {this.listHeaderHeight = Number(area.height);})
+            } }).width('100%').constraintSize({ maxWidth: 448 })
         }
+      }.width('100%').height(this.listHeaderHeight).justifyContent(FlexAlign.Center)
+        .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+    }
+  }
+
+  @Builder
+  private listDestination() {
+    HdsNavDestination() {
+      Stack({alignContent:Alignment.TopStart}) {
         List({ scroller: this.scroller, space: 8 }) {
           ListItem() { Column().width('100%').height(Math.max(0, this.titleContentInset() + (this.section === 'activity' ? 0 : this.listHeaderHeight) - 8)) }
             .accessibilityLevel('no-hide-descendants')
@@ -207,13 +224,17 @@ export struct PinmonyInboxListPage {
                 if (this.section === 'activity') this.onAction('activity-retry'); else if (this.section === 'contacts') this.onContactsRetry(); else this.onRetry();
               } }) }
             }
-            ForEach(this.rows(false), (item: PinmonyInboxItem) => { this.swipeRow(item) },
-              (item: PinmonyInboxItem): string => (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread + ':' + item.updatedAt + ':' + item.imageUrl + ':' + item.activityFollowed + ':' + item.activityBusy + ':' + item.activityUncertain) + ':' + this.uiLanguage)
+            ForEach(this.rows(false), (item: PinmonyInboxItem) => {
+              if (this.section === 'activity') {
+                ListItem() { PinmonyInboxActivityRow({ item: item, interactionReady: this.actionsReady, onAction: this.onAction, onUser: this.onUser }) }
+              } else { this.swipeRow(item) }
+            },
+              (item: PinmonyInboxItem): string => this.section === 'activity' ? item.id : (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread + ':' + item.updatedAt + ':' + item.imageUrl + ':' + item.activityFollowed + ':' + item.activityBusy + ':' + item.activityUncertain) + ':' + this.uiLanguage)
             if (!this.loading() && !this.error() && this.rows(false).length === 0) {
-              ListItem() { Text(this.text(this.section === 'activity' ? 'pm_activity_empty' : this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))
-                .fontColor($r('app.color.secondary_text')).padding(24) }
+              ListItem() { Row() { Text(this.text(this.section === 'activity' ? 'pm_activity_empty' : this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))
+                .fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center).width('100%').constraintSize({ maxWidth: 448 }).padding(24) }.width('100%').justifyContent(FlexAlign.Center) }.width('100%')
             }
-        }.width('100%').height('100%').constraintSize({ maxWidth: 720 }).align(Alignment.Top).scrollBar(BarState.Auto)
+        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto)
           .contentEndOffset(32)
           .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + (this.section === 'activity' ? 0 : this.listHeaderHeight))})
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
@@ -232,6 +253,7 @@ export struct PinmonyInboxListPage {
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
         content: { title: { mainTitle: this.text(this.section === 'activity' ? 'pm_activity_title' : 'pm_inbox_63a5e7b7') },
+          bottomBuilder: { builder: this.listSegmentsBuilder, height: this.section === 'activity' ? 0 : this.listHeaderHeight },
           backIcon: { isEnabled: true, action: () => this.onBack() },
           menu: { value: [{ content: { icon: $r('app.media.inbox_search_outline'), label: this.text('pm_search_44ce7ae9'),
             action: () => this.openSearch() } }] } } }, this.hdsDarkMode))
@@ -269,14 +291,18 @@ export struct PinmonyInboxListPage {
                 if (this.section === 'activity') this.onAction('activity-retry'); else if (this.section === 'contacts') this.onContactsRetry(); else this.onRetry();
               } }) }
             }
-            ForEach(this.rows(), (item: PinmonyInboxItem) => { this.swipeRow(item) },
-              (item: PinmonyInboxItem): string => (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread + ':' + item.updatedAt + ':' + item.imageUrl + ':' + item.activityFollowed + ':' + item.activityBusy + ':' + item.activityUncertain) + ':' + this.uiLanguage)
+            ForEach(this.rows(), (item: PinmonyInboxItem) => {
+              if (this.section === 'activity') {
+                ListItem() { PinmonyInboxActivityRow({ item: item, interactionReady: this.actionsReady, onAction: this.onAction, onUser: this.onUser }) }
+              } else { this.swipeRow(item) }
+            },
+              (item: PinmonyInboxItem): string => this.section === 'activity' ? item.id : (item.id + ':' + item.title + ':' + item.subtitle + ':' + item.timeLabel + ':' + item.unread + ':' + item.updatedAt + ':' + item.imageUrl + ':' + item.activityFollowed + ':' + item.activityBusy + ':' + item.activityUncertain) + ':' + this.uiLanguage)
             if (!this.loading() && !this.error() && this.rows().length === 0) {
-              ListItem() { Text(this.text(this.query().trim() ? 'pm_inbox_no_matching_username' :
+              ListItem() { Row() { Text(this.text(this.query().trim() ? 'pm_inbox_no_matching_username' :
                 this.section === 'activity' ? 'pm_activity_empty' : this.section === 'contacts' ? 'pm_no_suggested_contacts_03b9d232' : 'pm_your_conversations_will_appear_here_2f066d17'))
-                .fontColor($r('app.color.secondary_text')).padding(24) }
+                .fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center).width('100%').constraintSize({ maxWidth: 448 }).padding(24) }.width('100%').justifyContent(FlexAlign.Center) }.width('100%')
             }
-        }.width('100%').height('100%').constraintSize({ maxWidth: 720 }).align(Alignment.Top).scrollBar(BarState.Auto)
+        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto)
           .contentEndOffset(32)
           .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.searchHeaderHeight)})
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })

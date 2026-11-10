@@ -719,6 +719,7 @@ export struct PinmonyHomeFeedPane {
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
           PinmonyCdnImage({ url: this.recoveredSources[pin.imageUrl] || pin.imageUrl, fit: ImageFit.Cover,
+            traceLoading: true, traceIndex: this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id),
             loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false,
             onDecoded: () => {
               if (session !== this.home.session || pageKey !== this.home.pageKey ||

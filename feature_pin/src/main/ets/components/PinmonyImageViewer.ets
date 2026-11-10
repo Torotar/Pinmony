@@ -18,9 +18,10 @@ export struct PinmonyImageViewer {
   @Prop previewUrl: string = '';
   @Prop origin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
   @Prop originRadius: number = 18;
-  @Prop @Watch('transitionChanged') closing: boolean = false;
+  @Prop @Watch('queueReturnTransition') closing: boolean = false;
   onClosed?: () => void;
   onReady?: () => void;
+  onTransition?: (expanded: number) => void;
   @State private frameX: number = 0;
   @State private frameY: number = 0;
   @State private frameWidth: number = 360;
@@ -154,6 +155,14 @@ export struct PinmonyImageViewer {
     this.frameX = rect.x; this.frameY = rect.y;
     this.frameWidth = rect.width; this.frameHeight = rect.height;
   }
+  private queueReturnTransition(): void {
+    // origin and closing arrive in the same parent update. Read the destination
+    // after all props are synchronized, rather than from inside a prop watcher.
+    clearTimeout(this.transitionTimer);
+    this.transitionTimer = setTimeout((): void => {
+      if (this.mounted) this.transitionChanged();
+    }, 0);
+  }
   private transitionChanged(): void {
     if (!this.mounted) return;
     clearTimeout(this.transitionTimer);
@@ -180,6 +189,8 @@ export struct PinmonyImageViewer {
       } }, () => {
       this.setFrame(target); this.frameRadius = closing ? this.sourceRadius() : 0;
       this.backdrop = closing ? 0 : 1;
+      // Source backdrop follows this exact animation transaction, like collage.
+      this.onTransition?.(closing ? 0 : 1);
       this.scaleValue = 1; this.dx = 0; this.dy = 0;
     });
   }

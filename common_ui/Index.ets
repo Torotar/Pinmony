@@ -1,4 +1,5 @@
 export { PinmonyStatusPage } from './src/main/ets/components/PinmonyStatusPage';
+export { PinmonyUiCommitQueue } from './src/main/ets/services/PinmonyUiCommitQueue';
 export { PinmonyListDataSource } from './src/main/ets/services/PinmonyListDataSource';
 export { PinmonyActionNotice } from './src/main/ets/components/PinmonyActionNotice';
 export { PinmonyUserAvatar } from './src/main/ets/components/PinmonyUserAvatar';

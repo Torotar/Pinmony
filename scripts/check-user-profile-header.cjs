@@ -1,13 +1,17 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
 function method(name){const start=source.indexOf('  private '+name+'(');assert(start>=0);return source.slice(start,source.indexOf('\n  private ',start+1)).replace(/@Builder/g,'');}
-const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['requestProfileBack','profileCoverHeight','profileTitleOptions','onProfileChanged','modern','retainHubSnapshot','measureProfileName','updateCompactHeader'].map(method).join('\n')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText, {Color:{Transparent:'transparent'},BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},$r:x=>x});
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+['requestProfileBack','profileCoverHeight','profileHeaderLeading','profileTitleOptions','onProfileChanged','modern','retainHubSnapshot','measureProfileName','updateCompactHeader'].map(method).join('\n')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText, {Color:{Transparent:'transparent'},BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},$r:x=>x});
 Host.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
+// This fixture exercises the non-pager visitor header; pager retention has its own regression.
+Host.prototype.retainLegacySnapshot = () => {};
+Host.prototype.legacyPagerEnabled = () => false;
+Host.prototype.stopHubChromeAnimation = () => {};
 const h=new Host(),events=[];Object.assign(h,{profile:{profileUrl:'profile',isOwn:false,coverUrl:'https://i.pinimg.com/synthetic.jpg'},contentWidth:360,onBack:()=>events.push('back'),onShare:()=>events.push('share'),scroller:{scrollTo(){}},activeProfile:'profile'});
 assert.equal(h.profileCoverHeight(),187.20000000000002);h.profile.isOwn=true;assert.equal(h.profileCoverHeight(),0);h.profile.isOwn=false;
 const title=h.profileTitleOptions();assert.equal(title.enableComponentSafeArea,false,'scrolling content can reach the title blur');assert.equal(title.content.menu.value.length,1);assert.equal(title.content.menu.value[0].content.label,'分享个人资料');title.content.menu.value[0].content.action();assert.deepEqual(events,['share']);
-title.content.backIcon.action();h.requestProfileBack();assert.deepEqual(events,['share','back'],'one return gesture cannot pop twice');
-h.profile.profileUrl='parent';h.onProfileChanged();h.requestProfileBack();assert.equal(events.length,3,'new profile permits next return');
+h.backActive=true;title.content.backIcon.action();h.requestProfileBack();assert.deepEqual(events,['share','back'],'one return gesture cannot pop twice');
+h.hubPaneChromeOffsets=new Map();h.profile.profileUrl='parent';h.onProfileChanged();h.requestProfileBack();assert.equal(events.length,3,'new profile permits next return');
 assert(source.includes('.maxFontSize(18).minFontSize(12)'));assert(source.includes('.padding({ left: 64, right: 72 })'));
 let scrollOffset=0;h.scroller.offset=()=>({yOffset:scrollOffset});h.profile.isOwn=true;
 h.measureProfileName({position:{y:140},height:20});assert.equal(h.profileNameBottom,160);assert.equal(h.compactHeader,false);
@@ -19,4 +23,14 @@ h.profile.isOwn=false;scrollOffset=160;h.updateCompactHeader();assert.equal(h.co
 scrollOffset=h.profileCoverHeight()+160;h.updateCompactHeader();assert.equal(h.compactHeader,true);
 h.profile.profileUrl='next';h.onProfileChanged();assert.equal(h.compactHeader,false);assert.equal(h.profileNameBottom,0);
 assert(!source.includes('this.headerHeight + this.profileCoverHeight()'));
+for (const isOwn of [true, false]) {
+  for (const coverUrl of ['', 'https://i.pinimg.com/synthetic.jpg']) {
+    h.profile = { isOwn, coverUrl, business: false };
+    assert.equal(h.profileHeaderLeading(), false, 'personal accounts center regardless of ownership or cover');
+    h.profile.business = true;
+    assert.equal(h.profileHeaderLeading(), true, 'business accounts lead regardless of ownership or cover');
+  }
+}
+assert(source.includes('.justifyContent(this.profileHeaderLeading() ? FlexAlign.Start : FlexAlign.Center)'));
+assert(source.includes('.alignItems(this.profileHeaderLeading() ? HorizontalAlign.Start : HorizontalAlign.Center)'));
 console.log('Visitor profile: cover bounds, share-only title, adaptive title constraints and duplicate return guard passed');

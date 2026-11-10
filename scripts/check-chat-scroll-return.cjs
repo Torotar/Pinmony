@@ -29,7 +29,8 @@ vm.runInNewContext(ts.transpileModule('class Page {' + methods.join('\n') + '} g
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const page = new context.Page(), scroll = new PinmonyChatScrollPosition();
 Object.assign(page, { snapshot: { screen: 'chat', conversationId: '100', sentRevision: 2, messages: [], users: [] },
-  presentedConversation: '', sentRevision: 0, restoreOffset: 850, chatPosition: scroll, draft: 'retained draft' });
+  presentedConversation: '', sentRevision: 0, restoreOffset: 850, chatPosition: scroll, draft: 'retained draft',
+  updateConversationTitle() {} }); // Title retention is covered by check-chat-dismissal.cjs.
 page.prepareChatPosition(); page.snapshotChanged();
 assert.equal(scroll.layout(2200, 500), 850, 'cached send revision cannot replay scroll-to-bottom');
 page.snapshot.sentRevision = 0; page.snapshotChanged();

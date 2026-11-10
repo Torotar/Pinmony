@@ -1553,6 +1553,18 @@
       "value": "Ainda não há seguidores"
     },
     {
+      "name": "pm_profile_user_no_followers",
+      "value": "Este usuário ainda não tem seguidores"
+    },
+    {
+      "name": "pm_profile_user_no_followed_boards",
+      "value": "Este usuário ainda não segue nenhum painel"
+    },
+    {
+      "name": "pm_profile_user_no_followed_users",
+      "value": "Este usuário ainda não segue ninguém"
+    },
+    {
       "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
       "value": "Você ainda não segue nenhuma pasta"
     },
@@ -5979,6 +5991,18 @@
     {"name":"pm_invitation_decline_failed","value":"Não foi possível recusar o convite. Tente novamente."},
     {"name":"pm_invitation_decline_uncertain","value":"O resultado da recusa não foi confirmado. Atualize a lista de solicitações para verificar. A solicitação não será reenviada automaticamente."},
     {"name":"pm_board_invitation_notice_text","value":"{0} convidou você para colaborar em {1}"},
-    {"name":"pm_board_invitation_notice_body","value":"Convidou você para colaborar em {0}"}
+    {"name":"pm_board_invitation_notice_body","value":"Convidou você para colaborar em {0}"},
+    {
+      "name": "pm_detail_photo_fit",
+      "value": "Ajustar fotos à tela"
+    },
+    {
+      "name": "pm_detail_photo_fit_description",
+      "value": "Exibir fotos inteiras na tela em tablets e dispositivos dobráveis abertos"
+    },
+    {
+      "name": "pm_message_reaction_title",
+      "value": "Reações"
+    }
   ]
 }

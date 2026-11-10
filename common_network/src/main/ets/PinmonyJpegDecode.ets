@@ -14,6 +14,7 @@ export interface PinmonyJpegLease {
   ready: Promise<image.PixelMap>;
   release: () => void;
   setActive: (active: boolean) => void;
+  setPriority?: (priority: number) => void;
 }
 
 class PinmonyJpegEntry {
@@ -62,7 +63,7 @@ export class PinmonyJpegDecode {
     const current: PinmonyJpegEntry = entry;
     current.refs++;
     const owner: number = ++PinmonyJpegDecode.sequence;
-    const rank: number = priority >= 2 ? 2 : priority === 0 ? 0 : 1;
+    let rank: number = priority >= 2 ? 2 : priority === 0 ? 0 : 1;
     current.owners.set(owner, active ? rank : -1);
     current.touched = ++PinmonyJpegDecode.clock;
     if (!current.task) current.task = PinmonyJpegDecode.decode(source, current);
@@ -70,6 +71,12 @@ export class PinmonyJpegDecode {
     PinmonyJpegDecode.pump();
     if (current.bitmap) PinmonyJpegDecode.trace(current, 'cache-hit', Date.now());
     return { taskId: current.id, bitmap: current.bitmap, ready: current.task,
+      setPriority: (priority: number): void => {
+        if (released) return;
+        rank = priority >= 2 ? 2 : priority === 0 ? 0 : 1;
+        if ((current.owners.get(owner) ?? -1) >= 0) current.owners.set(owner, rank);
+        PinmonyJpegDecode.pump();
+      },
       setActive: (enabled: boolean): void => {
         if (released) return;
         current.owners.set(owner, enabled ? rank : -1);

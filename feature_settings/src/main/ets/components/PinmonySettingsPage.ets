@@ -259,7 +259,7 @@ export struct PinmonySettingsPage {
     Stack() {
     HdsNavigation(this.pathStack) {
       Column().width('100%').height('100%')
-    }
+    }.mode(NavigationMode.Stack)
     .width('100%').height('100%')
     .hideTitleBar(true)
     .navDestination(this.destination)

@@ -9,5 +9,5 @@ const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyPro
 const condition=source.split('\n').find(l=>l.includes('if(')&&l.includes('!this.automaticPhotoPaging()')&&l.includes('contentHasMore')).trim().slice(3,-3);
 const canShow=vm.runInNewContext('(function(){return '+condition+';})');
 for(const busy of ['loading','contentLoading']){const view={loading:false,profile:{contentLoading:false,contentHasMore:true,contentLoadingMore:false},modern:()=>true,automaticPhotoPaging:()=>false,automaticFollowingBoardPaging:()=>false};if(busy==='loading')view.loading=true;else view.profile.contentLoading=true;assert.equal(canShow.call(view),false,'no paging button during primary loading');}
-assert(source.includes('else if (!this.loading && !this.profile.contentLoading && this.profile.contentLoadingMore)'));
+assert(source.includes('else if (!this.suppressContentLoading() && !this.loading && !this.profile.contentLoading && this.profile.contentLoadingMore)'));
 console.log('Profile loading states: pending identity stays loading, genuine error retries, primary loading suppresses paging controls');

@@ -1541,6 +1541,18 @@
       "value": "暫無粉絲"
     },
     {
+      "name": "pm_profile_user_no_followers",
+      "value": "該使用者暫無粉絲"
+    },
+    {
+      "name": "pm_profile_user_no_followed_boards",
+      "value": "該使用者尚未追蹤任何圖板"
+    },
+    {
+      "name": "pm_profile_user_no_followed_users",
+      "value": "該使用者尚未追蹤任何人"
+    },
+    {
       "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
       "value": "你尚未關注任何圖板"
     },
@@ -5979,6 +5991,18 @@
     {"name":"pm_invitation_decline_failed","value":"拒絕邀請失敗，請重試。"},
     {"name":"pm_invitation_decline_uncertain","value":"拒絕結果尚未確認。請重新整理請求清單核對，不會自動重新提交。"},
     {"name":"pm_board_invitation_notice_text","value":"{0}邀請你在{1}上進行合作"},
-    {"name":"pm_board_invitation_notice_body","value":"邀請你在{0}上進行合作"}
+    {"name":"pm_board_invitation_notice_body","value":"邀請你在{0}上進行合作"},
+    {
+      "name": "pm_detail_photo_fit",
+      "value": "完整顯示詳情照片"
+    },
+    {
+      "name": "pm_detail_photo_fit_description",
+      "value": "在平板和展開的摺疊螢幕上，將照片縮放至螢幕內完整顯示"
+    },
+    {
+      "name": "pm_message_reaction_title",
+      "value": "表情回饋"
+    }
   ]
 }

@@ -17,6 +17,8 @@ async function verifyHost(path, methods, mounted, pending, bitmap, load, sharedF
     leases.push(lease); return lease;
   } } });
   const host = new Host();
+  host.uiCommits = new (require('./ui-commit-harness.cjs').createUiCommitHarness(ts).Queue)();
+  host.tracePhases = new Set();
   Object.assign(host, { [mounted]: true, loadingActive: true, viewportOnly: false, inViewport: false,
     useSharedDecode: false, url: 'synthetic.jpg', sourceUrl: 'synthetic.jpg', imageRevision: 1,
     softwareAttemptedRevision: -1, generation: 0, phase: 'loading', traceImage() {} });

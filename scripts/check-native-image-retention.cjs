@@ -17,6 +17,8 @@ function harness(path, smart) {
     } }
   });
   const node = new Host();
+  node.uiCommits = new (require('./ui-commit-harness.cjs').createUiCommitHarness(ts).Queue)();
+  node.tracePhases = new Set();
   Object.assign(node, { visible: true, imageVisible: true, loadingActive: true, viewportOnly: false, inViewport: true,
     useSharedDecode: false, nativeSourceAdmitted: false, url: 'source-a', sourceUrl: 'source-a', generation: 0,
     imageRevision: 1, softwareAttemptedRevision: -1, traceImage() {} });

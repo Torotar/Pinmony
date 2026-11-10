@@ -1,4 +1,5 @@
 import { PinmonyHdsTitleBar } from 'common_ui';
+import { PinmonyUiCommitQueue } from 'common_ui';
 import { PinmonyCdnImage } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -113,6 +114,26 @@ class PinmonyDetailFlowSource implements IDataSource {
 
 @Component
 export struct PinmonyDetailPage {
+  private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
+  @StorageProp('detailPhotoFitEnabled') @Watch('queuePhotoFitAudit') private detailPhotoFitEnabled: boolean = false;
+  @StorageProp('gestureBarHeightPx') @Watch('queuePhotoFitAudit') private gestureBarHeightPx: number = 0;
+  private photoFitAuditKey: string = '';
+  private queuePhotoFitAudit(): void {
+    this.uiCommits.post('photo-fit-audit', (): void => {
+      if (!this.heroVisible) return;
+      const height: number = this.heroHeight();
+      const bottom: number = this.getUIContext().px2vp(this.gestureBarHeightPx);
+      const key: string = this.renderIdentity + ':' + this.detailPhotoFitEnabled.toString() + ':' + this.viewportWidth + ':' +
+        this.viewportHeight + ':' + this.detailMediaWidth() + ':' + height + ':' + bottom + ':' + this.titleContentInset();
+      if (key === this.photoFitAuditKey) return;
+      this.photoFitAuditKey = key;
+      PinmonyRuntimeLog.info('DetailPhotoFitTrace: openId=' + this.traceId.toString() +
+        ' enabled=' + this.detailPhotoFitEnabled.toString() + ' applied=' + this.fitPhotoToScreen().toString() +
+        ' viewportWidthVp=' + this.viewportWidth.toFixed(1) + ' viewportHeightVp=' + this.viewportHeight.toFixed(1) +
+        ' mediaWidthVp=' + this.detailMediaWidth().toFixed(1) + ' mediaHeightVp=' + height.toFixed(1) +
+        ' topInsetVp=' + this.titleContentInset().toFixed(1) + ' bottomInsetVp=' + bottom.toFixed(1));
+    });
+  }
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
@@ -399,7 +420,19 @@ export struct PinmonyDetailPage {
     this.shuffleViewerPresented = false;
     this.onBack?.();
   }
-  private shuffleImageReady(key: string): void {
+  private shuffleImageReady(key: string, backdropUrl: string = ''): void {
+    const pin: string = this.displayedDetail().pinUrl;
+    const selection: string = this.shuffleSelectedImage;
+    const backdrop: string = this.shuffleBackdrop || this.displayedDetail().imageUrl;
+    if (backdropUrl && backdropUrl !== backdrop) return;
+    this.uiCommits.post('shuffle-ready-' + key, (): void => {
+      if (!this.heroVisible || pin !== this.displayedDetail().pinUrl || selection !== this.shuffleSelectedImage ||
+        backdrop !== (this.shuffleBackdrop || this.displayedDetail().imageUrl)) return;
+      if (key === 'backdrop') this.shuffleReadyBackdrop = backdrop;
+      this.commitShuffleImageReady(key);
+    });
+  }
+  private commitShuffleImageReady(key: string): void {
     if (!this.shuffleReadyImages.includes(key)) this.shuffleReadyImages = this.shuffleReadyImages.concat(key).slice(-64);
     const item: PinmonyShuffleItem | undefined = this.shuffleItems[this.shuffleIndex];
     if (this.shuffleSelectedImage && item && this.shuffleReadyBackdrop === (this.shuffleBackdrop || this.displayedDetail().imageUrl) &&
@@ -415,6 +448,8 @@ export struct PinmonyDetailPage {
   onShuffleRetry?: () => void;
   onEntryClosed?: () => void;
   @State private entryOpacity: number = 1;
+  @State private entryBackdropProgress: number = 1;
+  @State private carouselBackdropIndex: number = 0;
   @State private entryScale: number = 1;
   @State private entryPhotoHidden: boolean = false;
   @State private entryMotionComplete: boolean = false;
@@ -470,6 +505,15 @@ export struct PinmonyDetailPage {
     } catch (_) {}
   }
   private onImageLayerChanged(): void {
+    const pin: string = this.displayedDetail().pinUrl;
+    const owner: string = this.viewerOwner();
+    this.uiCommits.post('image-layer', (): void => {
+      if (!this.heroVisible || pin !== this.displayedDetail().pinUrl || owner !== this.viewerOwner()) return;
+      this.commitImageLayerChange();
+    });
+  }
+  @State private viewerBackdropProgress: number = 0;
+  private commitImageLayerChange(): void {
     if (this.imageLayer === 'zoom' && (this.disableImageZoom || !!this.displayedDetail().shuffleId)) {
       this.onImageLayer?.('');
       return;
@@ -493,14 +537,18 @@ export struct PinmonyDetailPage {
       const pin: string = this.displayedDetail().pinUrl;
       const accepted: boolean = this.onViewerOpen?.({ owner: this.viewerOwner(), detail: this.displayedDetail(),
         imageUrl: this.zoomImageUrl || this.displayedDetail().originalImageUrl || this.displayedDetail().imageUrl,
-        previewUrl: this.zoomImageUrl || this.displayedDetail().imageUrl, sourceRadius: 18,
+        previewUrl: this.zoomImageUrl || this.displayedDetail().imageUrl,
+        sourceRadius: this.detailPhotoRadius(),
         sourceId: () => this.viewerSourceId(),
         isCurrent: () => this.viewerMounted && this.pageActive && this.displayedDetail().pinUrl === pin,
         prepareReturn: () => { const before: ImageFlightRect = this.measureViewerOrigin();
           return this.prepareViewerReturn().y - before.y; },
         onReady: () => { this.viewerImageReady = true; },
+        onTransition: (expanded: number) => { this.viewerBackdropProgress = expanded; },
         onImageChange: (url: string) => { this.zoomImageUrl = url; },
-        onClosed: () => { this.viewerMounted = false; this.viewerImageReady = false; this.viewerClosing = false;
+        onClosed: () => { if (!this.heroVisible) return;
+          this.viewerMounted = false; this.viewerImageReady = false; this.viewerClosing = false;
+          this.viewerBackdropProgress = 0;
           if (this.imageLayer === 'zoom') this.onImageLayer?.(''); },
         onClose: () => { this.onImageLayer?.(''); },
         actionsReady: this.actionsReady, onAction: this.onAction, onDownload: this.onDownload,
@@ -544,7 +592,10 @@ export struct PinmonyDetailPage {
   @Prop visualResult: PinmonyVisualResult = emptyVisualResult();
   @Prop @Watch('onViewerPageActiveChanged') pageActive: boolean = true;
   private onViewerPageActiveChanged(): void {
-    if (!this.pageActive) this.onViewerCancel?.(this.viewerOwner());
+    const owner: string = this.viewerOwner();
+    this.uiCommits.post('viewer-active', (): void => {
+      if (!this.pageActive && owner === this.viewerOwner()) this.onViewerCancel?.(owner);
+    });
   }
   @State private zoomImageUrl: string = '';
   private productGalleryOffset: number = 0;
@@ -638,10 +689,15 @@ export struct PinmonyDetailPage {
 
   private onPinChanged(): void {
     if (this.activePin !== this.displayedDetail().pinUrl) {
-      this.onViewerCancel?.(this.viewerOwner());
+      const owner: string = this.viewerOwner();
+      this.uiCommits.post('viewer-pin-change', (): void => { this.onViewerCancel?.(owner); });
       this.viewerMounted = false; this.viewerClosing = false;
+      this.viewerBackdropProgress = 0;
       this.searchMounted = false; this.searchImageReady = false; this.searchClosing = false;
       this.activePin = this.displayedDetail().pinUrl;
+      // A reused page must not inherit the previous Pin's completed flight.
+      // Returning to a retained parent keeps its reading position and skips entry.
+      this.resetEntryMotion();
       this.decodedHeroSource = undefined;
       this.expanded = false;
       this.zoomImageUrl = '';
@@ -650,11 +706,16 @@ export struct PinmonyDetailPage {
       this.videoFailure = ''; this.videoRetryRevision = 0;
       this.restoreScrollPosition();
       this.startSearchLabel();
-      if (this.onImageLayer) this.onImageLayer('');
+      const pin: string = this.activePin;
+      const layer: string = this.imageLayer;
+      this.uiCommits.post('pin-layer-reset', (): void => {
+        if (this.heroVisible && pin === this.displayedDetail().pinUrl && this.imageLayer === layer) this.onImageLayer?.('');
+      });
     }
     this.syncDetailFlow();
     this.updateDetailLayout();
     this.auditRecommendationGate('detail-update');
+    this.queuePhotoFitAudit();
   }
 
   private notifyImageLoaded(pinUrl: string, imageUrl: string): void {
@@ -671,15 +732,25 @@ export struct PinmonyDetailPage {
     this.onImageLoaded(pinUrl, imageUrl, this.renderIdentity);
   }
 
+  private resetEntryMotion(): void {
+    this.entryMotionComplete = this.entryResumed;
+    this.entryOpacity = this.entryPhoto && !this.entryResumed ? 0 : 1;
+    this.entryBackdropProgress = this.entryOpacity;
+    this.carouselBackdropIndex = 0;
+    this.entryScale = 1;
+    this.entryPhotoHidden = false;
+  }
+
   aboutToAppear(): void {
+    this.uiCommits.activate();
     this.heroVisible = true;
-    if (this.entryPhoto && !this.entryResumed) this.entryOpacity = 0;
-    if (this.entryResumed) this.entryMotionComplete = true;
+    this.resetEntryMotion();
     this.activePin = this.displayedDetail().pinUrl;
     this.syncDetailFlow();
     this.updateDetailLayout();
     this.auditRecommendationGate('appear');
     this.auditRecommendationLayout();
+    this.queuePhotoFitAudit();
     this.startSearchLabel();
     this.detailPathStack.clear();
     this.detailPathStack.pushPath({ name: 'pin-web-detail' }, false);
@@ -691,7 +762,10 @@ export struct PinmonyDetailPage {
     this.searchLabelTimer = setTimeout(() => { this.searchLabelVisible = false; }, 2500);
   }
   aboutToDisappear(): void {
-    this.onViewerCancel?.(this.viewerOwner());
+    this.uiCommits.dispose();
+    const owner: string = this.viewerOwner();
+    const cancel: ((owner: string) => void) | undefined = this.onViewerCancel;
+    setTimeout((): void => { cancel?.(owner); }, 0);
     this.shuffleFlightRevision++;
     clearTimeout(this.shuffleFlightTimer);
     this.shuffleFlightActive = false;
@@ -950,10 +1024,36 @@ export struct PinmonyDetailPage {
       Number(description.height) > Number(shortDescription.height) + 1;
   }
 
+  private fitPhotoToScreen(): boolean {
+    return this.detailPhotoFitEnabled && !this.displayedDetail().isVideo;
+  }
+
+  private needsPhotoBackdrop(): boolean {
+    const detail: PinmonyDetailSnapshot = this.displayedDetail();
+    if (detail.isVideo || detail.carousel?.freeScroll) return false;
+    const item: PinmonyCarouselItem | undefined = detail.carousel?.items[this.carouselBackdropIndex];
+    if (item?.video) return false;
+    const width: number = item?.imageWidth || detail.imageWidth;
+    const height: number = item?.imageHeight || detail.imageHeight;
+    return width > 0 && height > 0 && this.detailMediaWidth() * height / width > this.heroHeight() + 0.5;
+  }
+
+  private detailPhotoRadius(): number { return this.needsPhotoBackdrop() ? 0 : 18; }
+
+  private backdropImageUrl(): string {
+    return this.displayedDetail().carousel?.items[this.carouselBackdropIndex]?.imageUrl || this.displayedDetail().imageUrl;
+  }
+
   private heroHeight(): number {
     const width: number = this.detailPaneWidth();
-    if (this.displayedDetail().imageWidth <= 0 || this.displayedDetail().imageHeight <= 0) return width * 1.15;
-    const height: number = width * this.displayedDetail().imageHeight / this.displayedDetail().imageWidth;
+    const height: number = this.displayedDetail().imageWidth > 0 && this.displayedDetail().imageHeight > 0 ?
+      width * this.displayedDetail().imageHeight / this.displayedDetail().imageWidth : width * 1.15;
+    if (this.fitPhotoToScreen()) {
+      // Header has 8vp outer spacing and 8vp inner spacing; leave 16vp below the photo.
+      return Math.min(height, Math.max(1, this.viewportHeight - this.titleContentInset() -
+        this.getUIContext().px2vp(this.gestureBarHeightPx) - 32));
+    }
+    if (this.displayedDetail().imageWidth <= 0 || this.displayedDetail().imageHeight <= 0) return height;
     return this.displayedDetail().isVideo || this.displayedDetail().mediaKind === 'carousel' || !!this.displayedDetail().carousel ? Math.min(1200, height) : height;
   }
 
@@ -1150,10 +1250,23 @@ export struct PinmonyDetailPage {
 
   @Builder
   private detailMedia() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      // Keep the backdrop visible while the clear photo belongs to the entry flight.
+      if (this.needsPhotoBackdrop() && this.displayedDetail().imageUrl &&
+        (((this.displayedDetail().mediaLoading || this.mediaReadBusy) && !this.displayedDetail().video) ||
+          this.displayedDetail().mediaKind === 'carousel' || !this.displayedDetail().isVideo)) {
+        Stack() {
+          PinmonyCdnImage({ url: this.backdropImageUrl(), useSharedDecode: false }).width('100%').height(this.heroHeight())
+            .blur(28 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress))
+            .opacity(0.72 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress)).hitTestBehavior(HitTestMode.None)
+        }.width('100%').height(this.heroHeight()).borderRadius(18).clip(true).hitTestBehavior(HitTestMode.None)
+      }
     Column() {
           if (this.displayedDetail().carousel) {
             PinmonyCarouselView({ carousel: this.displayedDetail().carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
+              maxMediaHeightVp: this.fitPhotoToScreen() ? this.heroHeight() : 0,
               previewUrl: this.displayedDetail().imageUrl,
+              onPageChanged: (index: number) => { this.carouselBackdropIndex = index; },
               productOffset: this.productGalleryOffset,
               onProductOffset: (offset: number) => { this.productGalleryOffset = offset; },
               sourceId: 'pinmony-photo-source-' + this.traceId.toString(),
@@ -1180,7 +1293,8 @@ export struct PinmonyDetailPage {
                   PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.displayedDetail().mediaError ?? '', this.uiLanguage) || this.uiText("pm_carousel_unavailable_093874a4"), actionText: this.uiText("pm_reload_media_57dfcd7b"), onAction: () => { if (this.onVideoRetry) this.onVideoRetry(); } })
                 }.padding(16).borderRadius(12).backgroundColor($r('app.color.page_background'))
               }
-            }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
+            }.width('100%').height(this.heroHeight())
+              .backgroundColor(this.displayedDetail().imageUrl ? Color.Transparent : $r('app.color.surface_muted')).borderRadius(18).clip(true)
             if (this.displayedDetail().mediaKind === 'carousel') {
               // Reserve the indicator row before the validated slots are ready.
               Row().width('100%').height(28)
@@ -1240,11 +1354,12 @@ export struct PinmonyDetailPage {
               .backgroundColor('#77303030').enabled(this.actionsReady || this.auxiliaryReady || this.deferredActions)
               .onClick(() => { if (this.onImageLayer) this.onImageLayer('search'); })
               .accessibilityText(this.uiText("pm_find_related_content_in_this_image_20372b79"))
-          }.width('100%').height(this.heroHeight()).backgroundColor($r('app.color.surface_muted')).borderRadius(18).clip(true)
+          }.width('100%').height(this.heroHeight())
+            .backgroundColor(this.displayedDetail().imageUrl ? Color.Transparent : $r('app.color.surface_muted')).borderRadius(this.detailPhotoRadius()).clip(true)
           }
 
+    }.width('100%').opacity(this.entryPhotoHidden ? 0 : 1)
     }.width(this.detailMediaWidth()).id('pinmony-entry-target-' + this.traceId.toString())
-      .opacity(this.entryPhotoHidden ? 0 : 1)
       .margin({ left: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0,
         right: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0 })
   }
@@ -1509,12 +1624,9 @@ export struct PinmonyDetailPage {
     // Image lifecycle belongs to a component with a stable complete source key.
     Stack() {
     // Keep the decoded hero mounted when late collage metadata arrives.
-    if (this.displayedDetail().imageUrl) {
-      PinmonyCdnImage({ url: this.displayedDetail().imageUrl, useSharedDecode: false }).width('100%').height(this.heroHeight())
-        .blur(28).opacity(0.72).hitTestBehavior(HitTestMode.None)
-    }
+    Stack() {
     ForEach(this.heroImageSources(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl), (source: DetailHeroSource) => {
-      PinmonyDetailHero({ source: source, openId: this.traceId, heightVp: this.heroHeight(), label: this.displayedDetail().title,
+      PinmonyDetailHero({ source: source, openId: this.traceId, heightVp: this.heroHeight(), radiusVp: this.detailPhotoRadius(), label: this.displayedDetail().title,
         phase: this.displayedDetail().kind, blocked: !!this.contentError, renderIdentity: this.renderIdentity,
         stageReady: this.displayedDetail().imageStageReady === true, confirmedLoaded: this.displayedDetail().imageLoaded === true,
         previewAvailable: this.decodedHeroSource?.pinUrl === this.displayedDetail().pinUrl,
@@ -1536,9 +1648,10 @@ export struct PinmonyDetailPage {
     if (this.displayedDetail().shuffleLoading) {
       LoadingProgress().width(28).height(28).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
     }
-    }.width('100%').height(this.heroHeight()).borderRadius(18).clip(true)
-      .id('pinmony-photo-source-' + this.traceId.toString())
+    }.width('100%').height(this.heroHeight())
       .opacity(this.viewerMounted && this.viewerImageReady || this.searchMounted && this.searchImageReady ? 0 : 1)
+    }.width('100%').height(this.heroHeight()).borderRadius(this.detailPhotoRadius()).clip(true)
+      .id('pinmony-photo-source-' + this.traceId.toString())
   }
 
   private heroImageSources(url: string, pinUrl: string): DetailHeroSource[] {
@@ -1673,19 +1786,19 @@ export struct PinmonyDetailPage {
       // flight progress, including the committed source and return endpoint.
       Column().width('100%').height('100%').backgroundColor($r('app.color.page_background'))
         .opacity(this.shuffleBackdropOpacity).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-        Image(this.shuffleBackdrop || this.displayedDetail().imageUrl).width('100%').height('100%')
+        ForEach([this.shuffleBackdrop || this.displayedDetail().imageUrl], (backdropUrl: string) => {
+        Image(backdropUrl).width('100%').height('100%')
           .objectFit(ImageFit.Cover).blur(80 * this.shuffleBackdropOpacity)
           .opacity(0.5 * this.shuffleBackdropOpacity)
           .onComplete((event) => {
             if (event?.loadingStatus !== 0 && event?.loadingStatus !== 1) return;
-            this.shuffleReadyBackdrop = this.shuffleBackdrop || this.displayedDetail().imageUrl;
-            this.shuffleImageReady('backdrop');
+            this.shuffleImageReady('backdrop', backdropUrl);
           })
           .onError(() => {
-            this.shuffleReadyBackdrop = this.shuffleBackdrop || this.displayedDetail().imageUrl;
-            this.shuffleImageReady('backdrop');
+            this.shuffleImageReady('backdrop', backdropUrl);
           })
           .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+        }, (backdropUrl: string): string => backdropUrl)
       if (this.shuffleSelectedImage && this.shuffleItems.length > 0) {
         Column() { this.shuffleViewerContent() }.width('100%').height('100%')
           .opacity(this.shuffleViewerVisible() && !this.shuffleFlightPreparing ? 1 : 0)
@@ -1873,7 +1986,7 @@ export struct PinmonyDetailPage {
     Stack() {
       HdsNavigation(this.detailPathStack) {
         Column().width('100%').height('100%')
-      }
+      }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true)
       .navDestination(this.detailDestination).backgroundColor($r('app.color.page_background'))
       .hitTestBehavior(this.viewerMounted || this.shuffleOverlayVisible() ? HitTestMode.None : HitTestMode.Default)
@@ -1907,6 +2020,7 @@ export struct PinmonyDetailPage {
           targetId: 'pinmony-entry-target-' + this.traceId.toString(),
           rootId: 'pinmony-photo-root-' + this.traceId.toString(),
           imageWidth: this.displayedDetail().imageWidth, imageHeight: this.displayedDetail().imageHeight,
+          targetRadius: this.detailPhotoRadius(),
           restoredOffset: this.initialScrollOffset,
           bottomInset: !this.displayedDetail().carousel?.freeScroll &&
             (this.displayedDetail().mediaKind === 'carousel' || !!this.displayedDetail().carousel) ? 28 : 0, closing: this.entryClosing,
@@ -1917,7 +2031,8 @@ export struct PinmonyDetailPage {
               this.entryOpacity = closing ? 0 : 1;
             });
           },
-          onOpened: () => { this.entryOpacity = 1; this.entryScale = 1; this.entryPhotoHidden = false; this.entryMotionComplete = true; },
+          onTransition: (expanded: number) => { this.entryBackdropProgress = expanded; },
+          onOpened: () => { this.entryOpacity = 1; this.entryBackdropProgress = 1; this.entryScale = 1; this.entryPhotoHidden = false; this.entryMotionComplete = true; },
           onClosed: () => { this.entryPhotoHidden = false; this.onEntryClosed?.(); } })
           .hitTestBehavior(HitTestMode.None)
       }
@@ -1929,6 +2044,7 @@ export struct PinmonyDetailPage {
           this.viewportWidth = width;
           this.viewportHeight = height;
           this.updateDetailLayout();
+          this.queuePhotoFitAudit();
         }
       }).backgroundColor(this.entryPhoto ? Color.Transparent : $r('app.color.page_background'))
   }

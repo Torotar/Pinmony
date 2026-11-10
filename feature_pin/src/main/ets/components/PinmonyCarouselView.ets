@@ -11,6 +11,7 @@ export struct PinmonyCarouselView {
   @Prop @Watch('onCarouselChanged') carousel: PinmonyCarousel;
   @Prop contentWidth: number = 324;
   @Prop mediaHeightVp: number = 0;
+  @Prop maxMediaHeightVp: number = 0;
   @Prop sourceId: string = '';
   @Prop previewUrl: string = '';
   @Prop imageHidden: boolean = false;
@@ -31,6 +32,7 @@ export struct PinmonyCarouselView {
   @State private revision: number = 0;
   @State private firstRenderedKey: string = '';
   onImageTap?: (imageUrl: string) => void;
+  onPageChanged?: (index: number) => void;
   onFirstImageSettled?: (failed: boolean) => void;
   private identity: string = '';
   private alive: boolean = false;
@@ -73,6 +75,7 @@ export struct PinmonyCarouselView {
       this.onProductOffset?.(target);
     } else {
       this.page = index;
+      this.onPageChanged?.(index);
       this.controller.changeIndex(index, false);
     }
   }
@@ -80,11 +83,17 @@ export struct PinmonyCarouselView {
   private mediaHeight(): number {
     if (this.carousel.freeScroll) {
       const first: PinmonyCarouselItem = this.carousel.items[0];
-      return Math.max(220, Math.min(620, this.contentWidth * 0.82 * first.imageHeight / Math.max(1, first.imageWidth)));
+      const height: number = Math.max(220, Math.min(620, this.contentWidth * 0.82 * first.imageHeight / Math.max(1, first.imageWidth)));
+      return this.maxMediaHeightVp > 0 ? Math.min(height, this.maxMediaHeightVp) : height;
     }
     if (this.mediaHeightVp > 0) return this.mediaHeightVp;
     const item: PinmonyCarouselItem = this.carousel.items[0];
     return Math.max(220, Math.min(620, this.contentWidth * item.imageHeight / item.imageWidth));
+  }
+
+  private photoRadius(item: PinmonyCarouselItem): number {
+    if (item.video || this.carousel.freeScroll || item.imageWidth <= 0 || item.imageHeight <= 0) return 18;
+    return this.contentWidth * item.imageHeight / item.imageWidth > this.mediaHeight() + 0.5 ? 0 : 18;
   }
 
   private videoSlotMounted(index: number): boolean {
@@ -163,7 +172,7 @@ export struct PinmonyCarouselView {
                 } })
               }
             } else {
-              Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(index === 0).borderRadius(18).clip(true)
+              Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(index === 0).borderRadius(this.photoRadius(item)).clip(true)
                 .onComplete((event) => this.settleFirstImage(item, index, event?.loadingStatus ?? -1))
                 .onError(() => {
                   if (!this.alive || this.carousel.items[index]?.id !== item.id ||
@@ -179,9 +188,9 @@ export struct PinmonyCarouselView {
       }
       .width('100%').height(this.mediaHeight()).loop(false).autoPlay(false)
       .indicator(this.indicatorController)
-      .borderRadius(18).clip(true)
+      .borderRadius(this.carousel.items[this.page] ? this.photoRadius(this.carousel.items[this.page]) : 18).clip(true)
       .id(this.sourceId).opacity(this.imageHidden ? 0 : 1)
-      .onChange((index: number) => { this.page = index; })
+      .onChange((index: number) => { this.page = index; this.onPageChanged?.(index); })
       .accessibilityText(this.uiFormat("pm_image_value_of_value_2349ba46", [this.page + 1, this.carousel.items.length]))
       IndicatorComponent(this.indicatorController)
         .count(this.carousel.items.length)

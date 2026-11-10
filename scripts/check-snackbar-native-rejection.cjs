@@ -50,6 +50,24 @@ async function main() {
   lifecycle.dismiss(persistent);lifecycle.dismiss(persistent);
   assert.equal(lifecycle.isCurrent(persistent),false);
   assert.equal(persistentDismissals,1,'persistent notice remains dismissible and closes once');
+  const pending = [], callbacks = [];
+  let currentBacks = 0;
+  const reused = { show(icon, message, operation, style) {
+    callbacks.push(style.pressBackCallback);
+    return new Promise((resolve, reject) => pending.push(reject));
+  }, dismiss() {} };
+  lifecycle.show(reused, {}, {}, {}, {duration:0, pressBackCallback:()=>currentBacks++});
+  lifecycle.show(reused, {}, {}, {}, {duration:0, pressBackCallback:()=>currentBacks++});
+  pending[0](Error('private superseded show'));
+  await flush();
+  assert(lifecycle.isCurrent(reused), 'old rejection cannot release reused instance current presentation');
+  callbacks[0]();
+  assert.equal(currentBacks, 0, 'old native back cannot invoke superseded action');
+  assert(lifecycle.isCurrent(reused));
+  callbacks[1]();
+  assert.equal(currentBacks, 1);
+  assert.equal(lifecycle.isCurrent(reused), false);
+  assert.equal(unhandled.length, 0);
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
   assert.equal((index.match(/PinmonySnackBarLifecycle\.show\(snack,/g)||[]).length,9);
   assert(!/\bsnack\.(show|dismiss)\(/.test(index),'every Index HDS call uses the boundary');

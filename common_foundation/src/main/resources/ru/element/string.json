@@ -1553,6 +1553,18 @@
       "value": "Пока нет подписчиков"
     },
     {
+      "name": "pm_profile_user_no_followers",
+      "value": "У этого пользователя пока нет подписчиков"
+    },
+    {
+      "name": "pm_profile_user_no_followed_boards",
+      "value": "Этот пользователь пока не подписан ни на одну доску"
+    },
+    {
+      "name": "pm_profile_user_no_followed_users",
+      "value": "Этот пользователь пока ни на кого не подписан"
+    },
+    {
       "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
       "value": "Вы еще не подписаны ни на одну доску"
     },
@@ -5979,6 +5991,18 @@
     {"name":"pm_invitation_decline_failed","value":"Не удалось отклонить приглашение. Повторите попытку."},
     {"name":"pm_invitation_decline_uncertain","value":"Результат отклонения не подтверждён. Обновите список запросов для проверки. Повторная отправка автоматически не выполняется."},
     {"name":"pm_board_invitation_notice_text","value":"{0} приглашает вас к совместной работе над доской {1}"},
-    {"name":"pm_board_invitation_notice_body","value":"Вас пригласили к совместной работе над доской {0}"}
+    {"name":"pm_board_invitation_notice_body","value":"Вас пригласили к совместной работе над доской {0}"},
+    {
+      "name": "pm_detail_photo_fit",
+      "value": "Фото целиком на экране"
+    },
+    {
+      "name": "pm_detail_photo_fit_description",
+      "value": "Масштабировать фото по размеру экрана на планшетах и раскрытых складных устройствах"
+    },
+    {
+      "name": "pm_message_reaction_title",
+      "value": "Реакции"
+    }
   ]
 }

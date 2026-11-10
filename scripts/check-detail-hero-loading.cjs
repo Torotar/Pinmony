@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
+const commits = require('./ui-commit-harness.cjs').createUiCommitHarness(ts);
 const source = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailHero.ets', 'utf8');
 const parent = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
 const method = name => source.match(new RegExp('  (?:private )?' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0];
@@ -16,7 +17,7 @@ vm.runInNewContext(ts.transpileModule(`class Hero {
 } globalThis.Hero = Hero;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 function hero(revision = 0) {
   const node = new context.Hero();
-  Object.assign(node, { source: { pinUrl: 'https://www.pinterest.com/pin/101/', url: 'https://i.pinimg.com/hero.jpg',
+  Object.assign(node, { uiCommits: new commits.Queue(), source: { pinUrl: 'https://www.pinterest.com/pin/101/', url: 'https://i.pinimg.com/hero.jpg',
     key: 'synthetic-source-' + revision, revision }, imageState: 'loading', decoded: false, deadline: -1,
     stageReady: false, confirmedLoaded: false, phase: 'opening', openId: 3, onLoaded: (...args) => decoded.push(args) });
   node.aboutToAppear(); return node;
@@ -27,7 +28,7 @@ assert.equal(opening.imageState, 'timeout'); assert.equal(decoded.length, 0);
 opening.completeImage(0); assert.equal(decoded.length, 0, 'download success is not decode success');
 opening.completeImage(1); assert.equal(opening.imageState, 'loaded'); assert.equal(decoded.length, 1);
 opening.completeImage(1); assert.equal(decoded.length, 1, 'duplicate decode callbacks do not duplicate notifications');
-opening.renderIdentity = 'current-confirmation'; opening.onRenderChanged();
+opening.renderIdentity = 'current-confirmation'; opening.onRenderChanged(); assert.equal(decoded.length, 1, 'watched prop cannot synchronously notify parent'); commits.flush();
 assert.equal(decoded.length, 2, 'an unchanged decoded node reports readiness for a new detail confirmation');
 const stage = hero(); stage.stageReady = true; stage.onStageChanged();
 assert.equal(stage.imageState, 'loading', 'bridge deadline does not prematurely show image timeout');

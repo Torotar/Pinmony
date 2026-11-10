@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
+const commits = require('./ui-commit-harness.cjs').createUiCommitHarness(ts);
 
 function loadSession() {
   const geometry = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyImageTransition.ets', 'utf8')
@@ -58,7 +59,7 @@ function run() {
   const host = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyImageViewerHost.ets', 'utf8');
   const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
   const ast = ts.createSourceFile('pin.ts', pin.replace(/\bstruct\b/g, 'class'), 99, true);
-  const names = ['onImageLayerChanged', 'viewerOwner', 'viewerSourceId', 'prepareViewerReturn', 'onViewerPageActiveChanged'];
+  const names = ['onImageLayerChanged', 'commitImageLayerChange', 'viewerOwner', 'viewerSourceId', 'prepareViewerReturn', 'onViewerPageActiveChanged'];
   const methods = [];
   function visit(node) {
     if (ts.isMethodDeclaration(node) && names.includes(node.name.getText(ast))) methods.push(node.getText(ast));
@@ -71,14 +72,14 @@ function run() {
   const p = fixture(), entry = new PinEntry(); let scroll = 120;
   const detail = { pinUrl: 'current-pin', imageUrl: 'first', originalImageUrl: 'original',
     carousel: { freeScroll: true, items: [{ imageUrl: 'first' }, { imageUrl: 'second' }] } };
-  Object.assign(entry, { imageLayer: 'zoom', traceId: 7, pageActive: true, viewerMounted: false, zoomImageUrl: 'first',
-    displayedDetail: () => detail, viewportHeight: 720,
+  Object.assign(entry, { uiCommits: new commits.Queue(), heroVisible: true, imageLayer: 'zoom', traceId: 7, pageActive: true, viewerMounted: false, zoomImageUrl: 'first',
+    displayedDetail: () => detail, detailPhotoRadius: () => 18, viewportHeight: 720,
     measureViewerOrigin: () => ({ x: 18, y: 80, width: 324, height: 500 }),
     detailScroller: { offset: () => ({ yOffset: scroll }), scrollTo: opts => scroll = opts.yOffset },
     onViewerOpen: request => p.session.open(request), onViewerClose: owner => p.session.close(owner),
     onViewerCancel: owner => p.session.cancel(owner),
     onImageLayer: layer => { entry.imageLayer = layer; entry.onImageLayerChanged(); } });
-  entry.onImageLayerChanged(); assert(p.session.visible && entry.viewerMounted);
+  entry.onImageLayerChanged(); commits.flush(); assert(p.session.visible && entry.viewerMounted);
   assert.equal(entry.viewerImageReady, false);
   p.session.request.onImageChange('second'); assert.equal(p.session.request.sourceId(), 'pinmony-photo-source-7-1');
   const pinRevision = p.session.revision;
@@ -86,8 +87,8 @@ function run() {
   p.session.close(); assert.equal(scroll, 0); assert.equal(p.session.origin.y, 293);
   assert.equal(entry.imageLayer, ''); assert(p.session.closing && entry.viewerMounted);
   p.session.finish(pinRevision); assert(!entry.viewerMounted && !entry.viewerImageReady);
-  entry.imageLayer = 'zoom'; entry.onImageLayerChanged(); assert(p.session.visible);
-  entry.pageActive = false; entry.onViewerPageActiveChanged(); assert(!p.session.visible);
+  entry.imageLayer = 'zoom'; entry.onImageLayerChanged(); commits.flush(); assert(p.session.visible);
+  entry.pageActive = false; entry.onViewerPageActiveChanged(); commits.flush(); assert(!p.session.visible);
   for (const entry of [pin, comments]) {
     assert(!entry.includes('PinmonyImageViewer({'), 'entry points cannot retain independent viewer instances');
     assert(!entry.includes('.bindContentCover('), 'entry points cannot retain independent full-screen hosts');

@@ -28,6 +28,8 @@ function harness() {
     inboxUnreadNativeReads: { poll() { effects.push('unread-poll'); }, reset() {} },
     inboxMessageNotice: { reset() {} }, resetNoticeChats() {},
     inboxBackgroundSync: { stop() { effects.push('background-stop'); } },
+    boardInvitationNotice: { reset() { effects.push('invitation-reset'); } },
+    imageViewer: { cancel() { effects.push('viewer-cancel'); } },
     isHomeRootAddress: url => url === home, profileUrlFromAddress: () => '',
     homeCacheAccountIdFromProfileUrl: () => '', homePageKeyFromAddress: url => url === home ? home : '',
     tryRestoreAuthenticatedHome() {},
@@ -118,6 +120,8 @@ relogin.emit('authenticated'); assert.equal(relogin.effects.filter(x => x === 'b
 console.log('Relogin: current native root, visible bottom bar, stale evidence and duplicate confirmation passed');
 const reset = harness();
 reset.native.resetNativeBusinessSession();
+assert.deepEqual(reset.effects, ['invitation-reset', 'viewer-cancel', 'background-stop', 'avatar-reset'],
+  'session reset clears invitation, viewer, background and avatar dependencies');
 assert(reset.effects.includes('background-stop'), 'session reset stops background synchronization');
 assert(reset.effects.includes('avatar-reset'), 'the real reset hook invalidates avatar reads');
 assert.equal(reset.native.businessSession.context('authenticated').authenticated, false, 'reset invalidates native business authorization');

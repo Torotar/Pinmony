@@ -159,7 +159,7 @@ export struct PinmonyBoardOrderPage {
       .onBackPressed(() => { this.requestBack(); return true; })
   }
   build() {
-    HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination)
       .backgroundColor($r('app.color.page_background'))
   }

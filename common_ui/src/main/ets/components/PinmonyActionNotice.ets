@@ -1,6 +1,7 @@
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
 import { PinmonySnackBarLifecycle } from '../services/PinmonySnackBarLifecycle';
+import { PinmonyUiCommitQueue } from '../services/PinmonyUiCommitQueue';
 
 class PinmonyActionNoticeLease {
   static serial: number = 0;
@@ -10,6 +11,7 @@ class PinmonyActionNoticeLease {
 // Lifecycle adapter only. All visible content is rendered by the official HDS component.
 @Component
 export struct PinmonyActionNotice {
+  private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
   @Prop @Watch('syncNotice') message: string = '';
   @Prop @Watch('syncNotice') actionText: string = '';
   @Prop @Watch('syncNotice') actionEnabled: boolean = true;
@@ -24,8 +26,8 @@ export struct PinmonyActionNotice {
   private lease: number = -1;
   private expiresAt: number = 0;
 
-  aboutToAppear(): void { this.mounted = true; this.syncNotice(); }
-  aboutToDisappear(): void { this.mounted = false; this.dismissNotice(); }
+  aboutToAppear(): void { this.uiCommits.activate(); this.mounted = true; this.syncNotice(); }
+  aboutToDisappear(): void { this.mounted = false; this.uiCommits.dispose(); this.dismissNotice(); }
   private dismissNotice(nativeClosed: boolean = false): void {
     this.generation++;
     const owns: boolean = this.lease === PinmonyActionNoticeLease.serial;
@@ -40,6 +42,10 @@ export struct PinmonyActionNotice {
     }
   }
   private syncNotice(): void {
+    if (!this.mounted) return;
+    this.uiCommits.post('notice-state', (): void => { if (this.mounted) this.commitNotice(); });
+  }
+  private commitNotice(): void {
     const key: string = this.scope + ':' + this.message + ':' + this.actionText + ':' + this.actionEnabled;
     if (!this.mounted || !this.active || !this.message) { this.closedKey = ''; this.dismissNotice(); return; }
     if (key === this.shownKey || key === this.closedKey) return;

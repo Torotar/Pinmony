@@ -8,7 +8,7 @@ function method(name) {
   assert(next > 0, name);
   return source.slice(start, start + next);
 }
-const names = ['messageConfirmationKey', 'openMessageMenu', 'openBlockMenu', 'closeMessageMenu', 'messageMenuDisappeared', 'copyMessageText', 'snapshotChanged'];
+const names = ['messageConfirmationKey', 'openMessageMenu', 'openBlockMenu', 'closeMessageMenu', 'messageMenuDisappeared', 'copyMessageText', 'updateConversationTitle', 'snapshotChanged'];
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + names.map(method).join('\n') + '} Host;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText);

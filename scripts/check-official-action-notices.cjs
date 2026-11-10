@@ -1,5 +1,6 @@
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
+const commits = require('./ui-commit-harness.cjs').createUiCommitHarness(ts);
 const file = 'common_ui/src/main/ets/components/PinmonyActionNotice.ets';
 const source = fs.readFileSync(file, 'utf8');
 assert(source.includes("from '@kit.UIDesignKit'"));
@@ -9,34 +10,34 @@ const executable = code.replace('@Component', '').replace('export struct', 'clas
 const shown = [], dismissed = []; let actions = 0;
 const PinmonySnackBarLifecycle = require('./snackbar-lifecycle-harness.cjs').loadSnackBarLifecycle(ts, {info(){},warn(){}});
 const Notice = vm.runInNewContext(ts.transpileModule(executable, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, {
-  HdsSnackBar: class { show(icon, message, operation, style) { shown.push({ owner: this, icon, message, operation, style }); } dismiss() { dismissed.push(this); } },
+  PinmonyUiCommitQueue: commits.Queue, HdsSnackBar: class { show(icon, message, operation, style) { shown.push({ owner: this, icon, message, operation, style }); } dismiss() { dismissed.push(this); } },
   PinmonyRuntimeLog: {info(){},warn(){}}, PinmonySnackBarLifecycle, Date,
   SnackBarIconType: { NORMAL: 1 }, SnackBarOperationType: { TEXT_WITH_CLOSE: 3, CLOSE_BUTTON_ONLY: 1 }, $r: x => x
 });
 function notice(message = 'failure') {
   const n = new Notice(); n.message = message; n.actionText = 'reload'; n.onAction = () => actions++; n.getUIContext = () => ({}); return n;
 }
-const first = notice(); first.syncNotice(); assert.equal(shown.length, 0);
-first.aboutToAppear(); assert.equal(shown.length, 1); const old = shown[0];
-first.syncNotice(); assert.equal(shown.length, 1, 'no duplicate notices for unchanged state');
-first.scope = 'another-document'; first.syncNotice(); old.operation.onContentClick(); assert.equal(actions, 0);
-shown.at(-1).operation.onContentClick(); assert.equal(actions, 1); first.syncNotice(); assert.equal(shown.length, 2, 'explicitly dismissed state stays closed');
-first.message = ''; first.syncNotice(); first.message = 'failure'; first.syncNotice(); assert.equal(shown.length, 3, 'a new failure may show the same message');
-first.actionEnabled = false; first.syncNotice(); assert.equal(shown.at(-1).operation.operationType, 1); shown.at(-1).operation.onContentClick(); assert.equal(actions, 1, 'disabled operation is never dispatched');
-const second = notice('second'); second.aboutToAppear(); const current = shown.at(-1); const count = dismissed.length;
+const first = notice(); first.syncNotice(); commits.flush(); assert.equal(shown.length, 0);
+first.aboutToAppear(); commits.flush(); assert.equal(shown.length, 1); const old = shown[0];
+first.syncNotice(); commits.flush(); assert.equal(shown.length, 1, 'no duplicate notices for unchanged state');
+first.scope = 'another-document'; first.syncNotice(); commits.flush(); old.operation.onContentClick(); assert.equal(actions, 0);
+shown.at(-1).operation.onContentClick(); assert.equal(actions, 1); first.syncNotice(); commits.flush(); assert.equal(shown.length, 2, 'explicitly dismissed state stays closed');
+first.message = ''; first.syncNotice(); commits.flush(); first.message = 'failure'; first.syncNotice(); commits.flush(); assert.equal(shown.length, 3, 'a new failure may show the same message');
+first.actionEnabled = false; first.syncNotice(); commits.flush(); assert.equal(shown.at(-1).operation.operationType, 1); shown.at(-1).operation.onContentClick(); assert.equal(actions, 1, 'disabled operation is never dispatched');
+const second = notice('second'); second.aboutToAppear(); commits.flush(); const current = shown.at(-1); const count = dismissed.length;
 first.aboutToDisappear(); assert.equal(dismissed.length, count, 'old page cannot dismiss a newer page notice');
 current.style.pressBackCallback(); assert.equal(actions, 1, 'back only dismisses');
 assert.equal(dismissed.length,count,'native back must not trigger an application dismiss');
 current.style.pressBackCallback();assert.equal(dismissed.length,count,'repeated native back remains released');
-second.message = 'English failure'; second.syncNotice(); assert.equal(shown.at(-1).message.title, 'English failure');
-const inactive = shown.at(-1); second.active = false; second.syncNotice(); inactive.operation.onContentClick(); assert.equal(actions, 1);
-second.active = true; second.syncNotice(); assert.equal(shown.at(-1).message.title, 'English failure');
+second.message = 'English failure'; second.syncNotice(); commits.flush(); assert.equal(shown.at(-1).message.title, 'English failure');
+const inactive = shown.at(-1); second.active = false; second.syncNotice(); commits.flush(); inactive.operation.onContentClick(); assert.equal(actions, 1);
+second.active = true; second.syncNotice(); commits.flush(); assert.equal(shown.at(-1).message.title, 'English failure');
 second.aboutToDisappear(); shown.at(-1).operation.onContentClick(); assert.equal(actions, 1);
-const nativeClose = notice('native close'); nativeClose.aboutToAppear();
+const nativeClose = notice('native close'); nativeClose.aboutToAppear(); commits.flush();
 const closes = dismissed.length;shown.at(-1).operation.onCloseButtonClick();
 assert.equal(dismissed.length,closes,'native close never dismisses HDS a second time');
 nativeClose.aboutToDisappear();assert.equal(dismissed.length,closes);
-const expired = notice('expired');expired.aboutToAppear();expired.expiresAt=Date.now()-1;
+const expired = notice('expired');expired.aboutToAppear(); commits.flush();expired.expiresAt=Date.now()-1;
 const expireCloses=dismissed.length;expired.aboutToDisappear();
 assert.equal(dismissed.length,expireCloses,'native timeout does not trigger a second close');
 let pages = 0;

@@ -24,6 +24,7 @@ export struct PinmonyProfilePanelPage {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncUsername') snapshot: PinmonyProfilePanel;
   @Prop active: boolean = true;
+  @Prop ownProfile: boolean = false;
   @State private followerQuery: string = '';
   @State private followerSearching: boolean = false;
   @State private searchMotionOffset: string = '0%';
@@ -46,6 +47,7 @@ export struct PinmonyProfilePanelPage {
     this.onSection(section);
   }
   private swipeFollowingSection(offsetX: number, offsetY: number): void {
+    if (!this.active || this.snapshot.mode !== 'following') return;
     if (Math.abs(offsetX) < 48 || Math.abs(offsetX) <= Math.abs(offsetY)) return;
     if (offsetX < 0 && this.snapshot.section === 'users') this.selectFollowingSection('boards');
     else if (offsetX > 0 && this.snapshot.section === 'boards') this.selectFollowingSection('users');
@@ -72,6 +74,9 @@ export struct PinmonyProfilePanelPage {
   private usernameFocused: boolean = false;
   private followerEndCheckToken: number = 0;
   private presentationToken: number = -1;
+  private presentedPanelPage: string = '';
+  private panelEntranceToken: number = 0;
+  @State private panelEntranceOffset: string = '0%';
   private presentationMounted: boolean = false;
   private scrollRestoreToken: number = 0;
   private rootRestorePending: boolean = false;
@@ -81,8 +86,23 @@ export struct PinmonyProfilePanelPage {
       if (this.usernameFocused && this.snapshot.mode === 'edit') this.scroller.scrollEdge(Edge.Bottom);
     }, 350);
   }
-  aboutToDisappear(): void { this.presentationMounted = false; this.scrollRestoreToken++; this.usernameFocused = false; this.sectionMotionToken++; this.followerEndCheckToken++; this.onSearchBackChange?.(undefined); }
+  aboutToDisappear(): void { this.presentationMounted = false; this.panelEntranceToken++; this.scrollRestoreToken++; this.usernameFocused = false; this.sectionMotionToken++; this.followerEndCheckToken++; this.onSearchBackChange?.(undefined); }
   private syncUsername(): void {
+    const previousPage: string = this.presentedPanelPage;
+    this.presentedPanelPage = this.snapshot.page;
+    if (previousPage !== this.snapshot.page) {
+      this.panelEntranceToken++;
+      this.panelEntranceOffset = '0%';
+    }
+    if (this.presentationMounted && previousPage && previousPage !== this.snapshot.page &&
+        this.snapshot.loading && !this.snapshot.refreshing && ['followers', 'following'].includes(this.snapshot.mode)) {
+      const token: number = ++this.panelEntranceToken;
+      this.panelEntranceOffset = '100%';
+      setTimeout(() => {
+        if (!this.presentationMounted || token !== this.panelEntranceToken || this.presentedPanelPage !== this.snapshot.page) return;
+        this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => { this.panelEntranceOffset = '0%'; });
+      }, 16);
+    }
     if (this.snapshot.mode === 'followers') this.followerQuery = this.snapshot.query || '';
     if (this.presentationMounted && this.presentationToken !== this.snapshot.token) this.restorePresentation();
     this.syncFollowingMotion();
@@ -290,7 +310,7 @@ export struct PinmonyProfilePanelPage {
                 onItemClicked: (index: number) => {
                   const section: string = index === 0 ? 'users' : 'boards';
                   this.selectFollowingSection(section);
-                } }).width('100%')
+                } }).width('100%').constraintSize({ maxWidth: 448 })
             }.width('100%').height(48).padding({ left: 24, right: 24 }).justifyContent(FlexAlign.Center)
           }
       Refresh({ refreshing: this.snapshot.refreshing === true, builder: this.panelRefreshIndicator }) {
@@ -323,7 +343,7 @@ export struct PinmonyProfilePanelPage {
             Text('www.pinterest.com/' + this.usernameDraft).width('100%').fontSize(12).fontColor($r('app.color.secondary_text'))
           } else if (!this.snapshot.loading) {
             if (this.snapshot.items.length === 0) {
-              Text(this.snapshot.mode === 'followers' && this.followerQuery.trim() ? this.uiText('pm_no_search_results_available_6025e7b5') : this.snapshot.mode === 'followers' ? this.uiText("pm_no_followers_yet_480f3c81") : this.snapshot.section === 'boards' ? this.uiText("pm_you_are_not_following_any_boards_yet_d8537a5c") : this.uiText("pm_you_are_not_following_anyone_yet_6289b8af")).fontColor($r('app.color.primary_text'))
+              Text(this.snapshot.mode === 'followers' && this.followerQuery.trim() ? this.uiText('pm_no_search_results_available_6025e7b5') : this.snapshot.mode === 'followers' ? this.uiText(this.ownProfile ? 'pm_no_followers_yet_480f3c81' : 'pm_profile_user_no_followers') : this.snapshot.section === 'boards' ? this.uiText(this.ownProfile ? 'pm_you_are_not_following_any_boards_yet_d8537a5c' : 'pm_profile_user_no_followed_boards') : this.uiText(this.ownProfile ? 'pm_you_are_not_following_anyone_yet_6289b8af' : 'pm_profile_user_no_followed_users')).fontColor($r('app.color.primary_text'))
             }
             if (this.snapshot.section === 'boards') {
               Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
@@ -370,7 +390,7 @@ export struct PinmonyProfilePanelPage {
           if (this.snapshot.moreError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_followers_db11cdc1"), actionEnabled: this.snapshot.hasMore === true && !this.snapshot.moreLoading && !this.followingBusy && !this.saving, onAction: () => { this.onLoadMore?.(); } }) }
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
         }.width('100%').padding({ left: 24, right: 24, top: this.contentTopInset() + 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
-      }.width('100%').layoutWeight(1).align(Alignment.Top).clip(true)
+      }.width('100%').height('100%').align(Alignment.Top).clip(true)
         .opacity(this.snapshot.mode === 'edit' && this.snapshot.loading ? 0.4 : 1)
         .enabled(this.snapshot.mode !== 'edit' || !this.snapshot.loading)
         .onScrollEdge((side: Edge) => { if (side === Edge.Bottom) this.loadNextPage(); })
@@ -378,9 +398,10 @@ export struct PinmonyProfilePanelPage {
         .onAppear(() => { if (this.rootRestorePending) this.restoreScrollOffsets(); })
         .scrollBarMargin({ start: LengthMetrics.vp(this.contentTopInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+      }.width('100%').layoutWeight(1)
+        .backgroundColor($r('app.color.page_background'))
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
           .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))
-      }.width('100%').layoutWeight(1)
         .pullToRefresh(this.canPullPanelRefresh())
         .onRefreshing(() => this.requestPanelRefresh())
         .onStateChange((state: RefreshStatus) => { this.panelRefreshState = state; })
@@ -457,9 +478,10 @@ export struct PinmonyProfilePanelPage {
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
   build() {
-    HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .customNavContentTransition((from: NavContentInfo, to: NavContentInfo, operation: NavigationOperation) =>
         this.followerSearchTransition(from, to, operation))
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
+      .translate({ x: this.panelEntranceOffset })
   }
 }

@@ -13,6 +13,7 @@ export interface PinmonyImageViewerRequest {
   isCurrent: () => boolean;
   prepareReturn?: () => number;
   onReady: () => void;
+  onTransition?: (expanded: number) => void;
   onClosed: () => void;
   onClose?: () => void;
   onImageChange?: (url: string) => void;
@@ -33,12 +34,15 @@ export class PinmonyImageViewerSession {
   request: PinmonyImageViewerRequest | undefined = undefined;
   origin: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
   private ui: UIContext | undefined = undefined;
+  beforeReturn?: () => Promise<void>;
+  private preparingReturn: boolean = false;
   readonly hostId: string = 'pinmony-shared-image-viewer';
 
   open(request: PinmonyImageViewerRequest): boolean {
     if (this.visible || !request.imageUrl || !request.isCurrent()) return false;
     this.revision++;
     this.request = request;
+    this.beforeReturn = undefined; this.preparingReturn = false;
     this.ready = false; this.closing = false; this.ui = undefined;
     this.origin = { x: 0, y: 0, width: 0, height: 0 };
     this.visible = true;
@@ -60,10 +64,32 @@ export class PinmonyImageViewerSession {
     this.ready = true; this.request!.onReady();
     PinmonyRuntimeLog.info('ViewerHost: stage=rendered');
   }
+  transition(revision: number, expanded: number): void {
+    if (!this.current(revision)) return;
+    this.request?.onTransition?.(Math.max(0, Math.min(1, expanded)));
+  }
   close(owner: string = ''): void {
-    if (!this.visible || !this.request || owner && owner !== this.request.owner || this.closing) return;
+    if (!this.visible || !this.request || owner && owner !== this.request.owner || this.closing || this.preparingReturn) return;
     const request: PinmonyImageViewerRequest = this.request;
     if (!request.isCurrent() || !this.ready || !this.ui) { this.cancel(owner); return; }
+    if (this.beforeReturn) {
+      this.preparingReturn = true;
+      const revision: number = this.revision;
+      PinmonyRuntimeLog.info('ViewerHost: stage=return-preparing');
+      this.beforeReturn().catch((): void => {
+        PinmonyRuntimeLog.warn('ViewerHost: status return preparation failed');
+      }).then((): void => {
+        if (!this.current(revision)) return;
+        this.preparingReturn = false;
+        this.beginClose();
+      });
+      return;
+    }
+    this.beginClose();
+  }
+  private beginClose(): void {
+    if (!this.request || !this.ui || this.closing) return;
+    const request: PinmonyImageViewerRequest = this.request;
     const origin: ImageFlightRect = measureImageFlightOrigin(this.ui, request.sourceId(), this.hostId);
     const shift: number = request.prepareReturn?.() || 0;
     this.origin = { x: origin.x, y: origin.y + shift, width: origin.width, height: origin.height };
@@ -80,6 +106,7 @@ export class PinmonyImageViewerSession {
     const request: PinmonyImageViewerRequest = this.request;
     this.revision++; this.visible = false; this.closing = false; this.ready = false;
     this.request = undefined; this.ui = undefined;
+    this.beforeReturn = undefined; this.preparingReturn = false;
     request.onClosed();
     PinmonyRuntimeLog.info('ViewerHost: stage=closed');
   }

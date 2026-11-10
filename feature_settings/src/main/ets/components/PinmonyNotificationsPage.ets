@@ -190,32 +190,6 @@ export struct PinmonyNotificationsPage {
     }
   }
   @Builder
-  private coldLoadingBackground() {
-    Column({ space: 16 }) {
-      ForEach(['first', 'second', 'third'], (sectionKey: string) => {
-        Column({ space: 16 }) {
-          Row().width('42%').height(24).borderRadius(4)
-            .backgroundColor($r('app.color.primary_text')).margin({ top: 16 })
-          Column() {
-            ForEach(['first', 'second', 'third'], (rowKey: string) => {
-              Column({ space: 8 }) {
-                Row() {
-                  Row().width('62%').height(16).borderRadius(4)
-                    .backgroundColor($r('app.color.primary_text'))
-                  Blank()
-                  SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(16).fontColor([$r('app.color.secondary_text')])
-                }.width('100%')
-                Row().width('80%').height(14).borderRadius(4)
-                  .backgroundColor($r('app.color.secondary_text'))
-              }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
-            }, (rowKey: string): string => sectionKey + ':' + rowKey)
-          }.width('100%')
-        }.width('100%').alignItems(HorizontalAlign.Start)
-      }, (sectionKey: string): string => sectionKey)
-    }.width('100%').alignItems(HorizontalAlign.Start)
-      .accessibilityLevel('no-hide-descendants').hitTestBehavior(HitTestMode.None)
-  }
-  @Builder
   private destination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
@@ -224,7 +198,6 @@ export struct PinmonyNotificationsPage {
           if (this.store.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { this.retry(); }, actionEnabled: !this.store.busy && !this.store.loading && !this.checkingSystemNotification && !this.confirmationOpen })
           }
-          if (this.store.loading && !this.store.notifications.length) { this.coldLoadingBackground() }
           ForEach(this.store.notifications, (group: NotificationGroup) => {
             Text(PinmonyNotificationCopy.group(group, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).margin({ top: 16 })
             Column() {

@@ -4453,7 +4453,7 @@ struct Index {
           .textAlign(TextAlign.Center).borderRadius(9).backgroundColor($r('app.color.detail_save_accent'))
           .offset({ x: 10, y: -7 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       } else if(this.nativeTabHasUnread(index) && index !== 2) {
-        Circle().width(6).height(6).fill($r('app.color.detail_save_accent'))
+        Circle().width(6).height(6).foregroundColor($r('app.color.detail_save_accent'))
           .offset({ x: 3, y: -3 }).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }
       }.width(24).height(24)
@@ -4882,6 +4882,10 @@ struct Index {
 
   private currentProfileUrl(): string {
     if (this.profileStore.origins.length > 0) {
+      if (this.detailProfileReturning && this.profileStore.profileUrl &&
+          this.extractPinUrl(this.profileStore.origins[this.profileStore.origins.length - 1].page) === this.pinStore.detailPin) {
+        return this.profileUrlFromAddress(this.profileStore.profileUrl);
+      }
       const target: string = this.profileUrlFromAddress(this.nativeBackTarget || this.navigationAddress);
       if(PIN_NATIVE_PROFILE_READS_ENABLED)return target;
       if (target) return target;
@@ -5322,6 +5326,40 @@ struct Index {
   @State private retainedProfilePanel: PinmonyProfilePanel | undefined = undefined;
   @State private panelProfileVisible: boolean = false;
   private panelProfileDepth: number = -1;
+  private readonly profilePanelSearchHandlers: Map<string, () => boolean> = new Map<string, () => boolean>();
+  private readonly profilePanelExitSnapshots: Map<string, PinmonyProfilePanel> = new Map<string, PinmonyProfilePanel>();
+  private profilePanelIdentity(panel: PinmonyProfilePanel | undefined): string {
+    return panel ? panel.page + '|' + panel.mode : '';
+  }
+  private profilePanelPresentations(): PinmonyProfilePanel[] {
+    const panels: PinmonyProfilePanel[] = [];
+    const retained: string = this.profilePanelIdentity(this.retainedProfilePanel);
+    const current: string = this.profilePanelIdentity(this.profileStore.panel);
+    if (this.retainedProfilePanel) panels.push(this.retainedProfilePanel);
+    if (this.profileStore.panel && current !== retained) panels.push(this.profileStore.panel);
+    return panels;
+  }
+  private profilePanelPresentation(panel: PinmonyProfilePanel): PinmonyProfilePanel {
+    const identity: string = this.profilePanelIdentity(panel);
+    if (this.profileStore.panel && this.profilePanelIdentity(this.profileStore.panel) === identity) return this.profileStore.panel;
+    if (this.retainedProfilePanel && this.profilePanelIdentity(this.retainedProfilePanel) === identity) return this.retainedProfilePanel;
+    // The removed destination keeps its own last snapshot during slide-out.
+    return this.profilePanelExitSnapshots.get(identity) || panel;
+  }
+  private registerProfilePanelSearch(identity: string, handler: (() => boolean) | undefined): void {
+    if (handler) this.profilePanelSearchHandlers.set(identity, handler);
+    else {
+      this.profilePanelSearchHandlers.delete(identity);
+      const exiting: PinmonyProfilePanel | undefined = this.profilePanelExitSnapshots.get(identity);
+      if (exiting) this.coordinatorTasks.timeout(() => {
+        if (this.profilePanelExitSnapshots.get(identity) === exiting) this.profilePanelExitSnapshots.delete(identity);
+      }, 180);
+    }
+    this.profileStore.panelSearchBack = this.profilePanelSearchHandlers.size > 0 ? (): boolean => {
+      const current: string = this.profilePanelIdentity(this.profileStore.panel);
+      return this.profilePanelSearchHandlers.get(current)?.() || false;
+    } : undefined;
+  }
   @State private settingsProfileReturning: boolean = false;
   @State private settingsProfileName: string = '';
   @State private settingsProfileAvatar: string = '';
@@ -5436,8 +5474,36 @@ struct Index {
       return;
     }
     if (this.detailProfileReturning && !returnFrameReady) return;
-    if (this.detailProfileTransition && pendingOrigin && this.extractPinUrl(pendingOrigin.page) && !this.detailProfileReturning) {
+    if (pendingOrigin && this.extractPinUrl(pendingOrigin.page) && !this.detailProfileReturning) {
+      // Nested profiles may have replaced the entry flag. The actual parent
+      // destination decides whether this return needs the detail preparation.
+      this.detailProfileTransition = true;
       this.detailProfileReturning = true;
+      if (PIN_NATIVE_PROFILE_READS_ENABLED) {
+        const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+        const pin: string = this.extractPinUrl(pendingOrigin.page);
+        this.nativeChildBackUntil = Date.now() + 820;
+        this.profileNativeReads.pause();
+        // Mount the returning detail below the still-visible profile. Keep its
+        // identity when committing the return, so image nodes are not rebuilt.
+        this.beginDetailOpening(pin, '', true);
+        const opening: number = this.pinStore.detailOpeningToken;
+        const started: number = Date.now();
+        const reveal = (): void => {
+          const current: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+          if (!this.detailProfileReturning || !current.authenticated || current.accountId !== session.accountId ||
+              current.generation !== session.generation || this.pinStore.detailOpeningToken !== opening ||
+              this.navigationAddress !== pin || this.profileStore.origins[this.profileStore.origins.length - 1] !== pendingOrigin) return;
+          const elapsed: number = Date.now() - started;
+          if (elapsed < 600 && (!this.detailImageLoadedUrl || this.detailImageLoadedUrl !== this.pinStore.detail?.imageUrl)) {
+            this.coordinatorTasks.timeout(reveal, 32); return;
+          }
+          this.nativeChildBackUntil = Date.now() + 180;
+          this.backFromUserProfile(true);
+        };
+        this.coordinatorTasks.timeout(reveal, 32);
+        return;
+      }
       setTimeout(() => {
         if (this.detailProfileReturning && this.profileStore.origins[this.profileStore.origins.length - 1] === pendingOrigin) this.backFromUserProfile(true);
       }, 16);
@@ -5461,14 +5527,31 @@ struct Index {
     }
     if(this.settingsProfileDepth === this.profileStore.origins.length){this.settingsProfileReturning = true;this.settingsProfileDepth = -1;this.profileSettingsVisible = true;}
     this.closeProfilePanel();
-    this.clearProfile();
+    const preparedDetailReturn: boolean = PIN_NATIVE_PROFILE_READS_ENABLED && this.detailProfileReturning &&
+      !!this.pinStore.detail && this.pinStore.detail.pinUrl === this.extractPinUrl(origin.page) && this.pinStore.detailPin === this.pinStore.detail.pinUrl;
+    const leavingProfile: PinmonyProfileSnapshot | undefined = this.profileStore.profile;
+    const restoreProfile = (): void => {
+      this.clearProfile();
+      if (origin.profile) {
+        this.profileStore.profileCache.put(origin.profile, origin.scroll);
+        this.profileStore.profile = origin.profile;
+        this.profileStore.profileScrollOffset = origin.scroll;
+        this.profileStore.profileActionsReady = false;
+      }
+    };
+    if (preparedDetailReturn) {
+      // Preserve the outgoing profile's children throughout its slide-out.
+      const depth: number = this.profileStore.origins.length;
+      const opening: number = this.pinStore.detailOpeningToken;
+      const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+      this.coordinatorTasks.timeout(() => {
+        const current: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+        if (current.authenticated && current.accountId === session.accountId && current.generation === session.generation &&
+            this.profileStore.origins.length === depth && this.profileStore.profile === leavingProfile &&
+            this.pinStore.detailOpeningToken === opening && this.navigationAddress === origin.page) restoreProfile();
+      }, 180);
+    } else restoreProfile();
     this.activeTab = origin.tab; this.tabsController.changeIndex(origin.tab);
-    if (origin.profile) {
-      this.profileStore.profileCache.put(origin.profile, origin.scroll);
-      this.profileStore.profile = origin.profile;
-      this.profileStore.profileScrollOffset = origin.scroll;
-      this.profileStore.profileActionsReady = false;
-    }
     if(PIN_NATIVE_PROFILE_READS_ENABLED){
       const saved: PinmonyProfileBoardOrigin | undefined = this.profileBoardOrigins.get(this.profileStore.origins.length);
       this.profileBoardOrigins.delete(this.profileStore.origins.length);
@@ -5479,7 +5562,10 @@ struct Index {
       this.pageHistory.visit(origin.page,'load');
       if(this.extractPinUrl(origin.page)){
         if(saved?.board){this.boardStore.boardDetail = saved.board;this.boardStore.boardReturnUrl = saved.returnUrl;this.boardStore.boardReturnPage = saved.returnPage;this.boardStore.rootTab = saved.rootTab;}
-        this.beginDetailOpening(this.extractPinUrl(origin.page), '', true);
+        const pin: string = this.extractPinUrl(origin.page);
+        if (preparedDetailReturn) {
+          this.nativeBackTarget = '';
+        } else this.beginDetailOpening(pin, '', true);
       }else if(saved?.board){
         this.boardStore.boardDetail = saved.board;this.boardStore.boardReturnUrl = saved.returnUrl;this.boardStore.boardReturnPage = saved.returnPage;this.boardStore.rootTab = saved.rootTab;
         this.boardStore.presentationOnly = false;this.boardStore.presentationPage = saved.board.pageKey;this.boardNativeReads.demand();
@@ -5526,7 +5612,15 @@ struct Index {
 
   private async followProfileUser(id: string = ''): Promise<void> { await this.profileActionsController.follow(id); }
 
-  private closeProfilePanel(): void { this.immediateFollowingReturn = false; try { this.profileActionsController.closePanel();  } finally { this.rootContextCoordinator.notify(); } }
+  private closeProfilePanel(): void {
+    const panel: PinmonyProfilePanel | undefined = this.profileStore.panel;
+    if (panel && this.profilePanelIdentity(panel) !== this.profilePanelIdentity(this.retainedProfilePanel)) {
+      this.profilePanelExitSnapshots.set(this.profilePanelIdentity(panel), panel);
+    }
+    this.immediateFollowingReturn = false;
+    try { this.profileActionsController.closePanel(); }
+    finally { this.rootContextCoordinator.notify(); }
+  }
 
   private nativeProfileSaved(page: string,username: string): void {
     const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
@@ -7069,6 +7163,27 @@ struct Index {
     PinmonySearchFilterSheet({ searchStore: this.searchStore, onSelect: (id: string) => this.selectSearchFilter(id), onRetry: () => this.retrySearchFilters() })
   }
 
+  @State private nativeSheetWindowWidth: number = 0;
+  @State private nativeSheetWindowHeight: number = 0;
+  private nativeModalHeight(): SheetSize | number {
+    if (this.activeSheetKind === 'comments') {
+      const shortSide: number = Math.min(this.nativeSheetWindowWidth, this.nativeSheetWindowHeight);
+      return shortSide > 0 ? shortSide * 0.9 : SheetSize.LARGE;
+    }
+    if (['save', 'edit'].includes(this.activeSheetKind)) return SheetSize.LARGE;
+    if (this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu) {
+      let width: number = this.nativeSheetWindowWidth, height: number = this.nativeSheetWindowHeight;
+      if (width <= 0 || height <= 0) {
+        try {
+          const screen: display.Display = display.getDefaultDisplaySync();
+          width = this.getUIContext().px2vp(screen.width); height = this.getUIContext().px2vp(screen.height);
+        } catch (_) { return this.pinStore.shareSearchActive ? SheetSize.LARGE : SheetSize.FIT_CONTENT; }
+      }
+      if (height > width) return height * 0.9;
+      if (this.pinStore.shareSearchActive) return SheetSize.LARGE;
+    }
+    return SheetSize.FIT_CONTENT;
+  }
   private nativeModalLabel(): string {
     return this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? this.uiText("pm_add_to_section_d7aed82c") : this.uiText("pm_add_pins_or_sections_2274f06f")) : PinmonyI18n.render(this.profileStore.publishTitle, this.uiLanguage) || this.uiText("pm_add_to_profile_e076cb80")) :
         this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416")) : this.uiText("pm_edit_pin_f9119bcf")) : this.activeSheetKind === 'comments' ? this.uiText("pm_what_do_you_think_e8fb167b") : this.activeSheetKind === 'save' ?
@@ -7314,8 +7429,8 @@ struct Index {
       coveredByPin: this.retainProfilePinParent(),
       coveredBack: (): boolean => this.onBackPress(),
       profileChatActive: this.profileChatActive,
-      detailProfileEntry: this.detailProfileTransition && !!this.profileUrlFromAddress(this.navigationAddress),
-      retainPinSource: this.retainProfilePinParent() || this.homeEntryCardId.startsWith('pinmony-profile-photo-') &&
+      detailProfileEntry: this.detailProfileTransition && (this.detailProfileReturning || !!this.profileUrlFromAddress(this.navigationAddress)),
+      retainPinSource: this.detailProfileReturning || this.retainProfilePinParent() || this.homeEntryCardId.startsWith('pinmony-profile-photo-') &&
         !!this.homeEntryPhoto && this.homeEntryPhoto.pinUrl === (this.pinStore.detail?.pinUrl || this.pinStore.detailOpeningPin),
       profileStore: this.profileStore,
       pinStore: this.pinStore,
@@ -7521,6 +7636,7 @@ struct Index {
           Column().width(0).height(0)
             .bindSheet($$this.boardRecoveryVisible, this.boardRecoverySheet(), {
               radius: LengthMetrics.vp(32),
+              preferType: this.nativeSheetWindowWidth >= 600 ? SheetType.CENTER : undefined,
               height:'75%', showClose:true, backgroundColor:$r('app.color.page_background'),
               onWillDismiss:(action:DismissSheetAction): void => { if (!this.settingsStore.busy) action.dismiss(); },
               onDisappear:(): void => this.closeBoardRecovery() })
@@ -7642,44 +7758,53 @@ struct Index {
               .width('100%').height('100%').transition(NATIVE_PAGE_TRANSITION)
           }
 
-          if (this.chatProfileTransition && this.chatProfileVisible && this.profileStore.origins.length > 0 && this.currentProfileUrl()) {
+          if (this.chatProfileTransition && this.chatProfileVisible && this.profileStore.origins.length > 0 &&
+              (this.currentProfileUrl() || this.retainProfileBoardParent() || this.retainProfilePinParent())) {
             Column() { this.buildProfileContent() }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+              .hitTestBehavior(this.retainProfileBoardParent() || this.retainProfilePinParent() ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.retainProfileBoardParent() || this.retainProfilePinParent() ? 'no-hide-descendants' : 'auto')
               .zIndex(0).transition(NATIVE_PAGE_TRANSITION)
           }
           if (!this.chatProfileTransition && this.profileStore.origins.length > 0 && (this.currentProfileUrl() || this.retainProfileBoardParent() || this.retainProfilePinParent())) {
             Column() { this.buildProfileContent() }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
-              .hitTestBehavior(this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? HitTestMode.None : HitTestMode.Default)
-              .accessibilityLevel(this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? 'no-hide-descendants' : 'auto')
-              .zIndex(!this.retainProfileBoardParent() && !this.retainProfilePinParent() && this.detailProfileTransition && (this.detailProfileReturning || !!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)
+              .hitTestBehavior(this.detailProfileReturning || this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.detailProfileReturning || this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? 'no-hide-descendants' : 'auto')
+              .zIndex(this.detailProfileReturning || !this.retainProfileBoardParent() && !this.retainProfilePinParent() && this.detailProfileTransition && (!!this.pinStore.detail || !!this.pinStore.detailOpeningPin) ? 1 : 0)
               .transition(this.detailProfileTransition ? DETAIL_PROFILE_TRANSITION : this.activeTab === 1 || this.activeTab === 2 || this.chatProfileTransition || this.settingsProfileDepth >= 0 ? NATIVE_PAGE_TRANSITION :
                 TransitionEffect.asymmetric(TransitionEffect.IDENTITY,
                   this.settingsProfileDepth >= 0 || this.settingsProfileReturning ?
                     TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn}) : TransitionEffect.IDENTITY))
           }
 
-          if (this.profileStore.panel || this.retainedProfilePanel) {
-            PinmonyProfilePanelPage({ snapshot: (this.profileStore.panel || this.retainedProfilePanel)!, followingBusy: this.profileStore.followingBusy, onFollow: (id: string) => this.followProfileUser(id), onAvatar: () => this.changeProfileAvatar(), saving: this.profileStore.saving, onSave: (input: string) => this.saveProfilePanel(input),
+          ForEach(this.profilePanelPresentations(), (_panel: PinmonyProfilePanel) => {
+            PinmonyProfilePanelPage({ snapshot: this.profilePanelPresentation(_panel),
+              ownProfile: this.profileStore.profile?.isOwn === true && this.profileStore.profile?.profileUrl === _panel.page,
+              followingBusy: this.profileStore.followingBusy, onFollow: (id: string) => this.followProfileUser(id), onAvatar: () => this.changeProfileAvatar(), saving: this.profileStore.saving, onSave: (input: string) => this.saveProfilePanel(input),
               onCoveredBack: (): boolean => this.onBackPress(),
-              active: !!this.profileStore.panel,
-              onPresentationChange: (searchOpen: boolean, scrollOffset: number, searchScrollOffset: number) => { this.profileNativeActions.retainPanelPresentation(searchOpen, scrollOffset, searchScrollOffset); },
+              active: this.profilePanelIdentity(this.profileStore.panel) === this.profilePanelIdentity(_panel),
+              onPresentationChange: (searchOpen: boolean, scrollOffset: number, searchScrollOffset: number) => {
+                if (this.profilePanelIdentity(this.profileStore.panel) === this.profilePanelIdentity(_panel)) this.profileNativeActions.retainPanelPresentation(searchOpen, scrollOffset, searchScrollOffset);
+              },
               onBoard: (url: string) => this.openProfilePanelBoard(url), onUser: (url: string) => this.openUserProfile(url), onBack: () => this.closeProfilePanel(),
               onSection: (section: string) => this.openProfilePanel('following', section),
               onLoadMore: () => { this.profileNativeActions.more(); },
               onRefresh: () => { const panel = this.profileStore.panel; if (panel) this.profileNativeActions.open(panel.mode, panel.section, true); },
               onSearch: (query: string) => { this.profileNativeActions.searchFollowers(query); },
-              onSearchBackChange: (handler: (() => boolean) | undefined) => { this.profileStore.panelSearchBack = handler; } })
+              onSearchBackChange: (handler: (() => boolean) | undefined) => { this.registerProfilePanelSearch(this.profilePanelIdentity(_panel), handler); } })
               .width('100%').height('100%')
-              .hitTestBehavior(this.retainedProfilePanel && !this.profileStore.panel ? HitTestMode.None : HitTestMode.Default)
-              .accessibilityLevel(this.retainedProfilePanel && !this.profileStore.panel ? 'no-hide-descendants' : 'auto')
+              .hitTestBehavior(this.profilePanelIdentity(this.profileStore.panel) === this.profilePanelIdentity(_panel) ? HitTestMode.Default : HitTestMode.None)
+              .accessibilityLevel(this.profilePanelIdentity(this.profileStore.panel) === this.profilePanelIdentity(_panel) ? 'auto' : 'no-hide-descendants')
+              .zIndex(this.retainedProfilePanel && this.panelProfileVisible &&
+                (this.profilePanelIdentity(this.profileStore.panel) === this.profilePanelIdentity(_panel) || this.profilePanelExitSnapshots.has(this.profilePanelIdentity(_panel))) ? 3 : 0)
               .transition(this.immediateFollowingReturn ? TransitionEffect.asymmetric(
                 TransitionEffect.IDENTITY, TransitionEffect.translate({ x: '100%' }).animation({ duration: 150, curve: Curve.EaseIn })) : NATIVE_PAGE_TRANSITION)
-          }
-          if (this.retainedProfilePanel && this.panelProfileVisible && !this.profileStore.panel &&
+          }, (_panel: PinmonyProfilePanel): string => this.profilePanelIdentity(_panel))
+          if (this.retainedProfilePanel && this.panelProfileVisible &&
               !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() && this.currentProfileUrl()) {
             Column() { this.buildProfileContent() }.width('100%').height('100%')
               .backgroundColor($r('app.color.page_background'))
-              .hitTestBehavior(this.profileChatActive ? HitTestMode.None : HitTestMode.Default)
-              .accessibilityLevel(this.profileChatActive ? 'no-hide-descendants' : 'auto')
+              .hitTestBehavior(this.profileChatActive || !!this.profileStore.panel ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.profileChatActive || !!this.profileStore.panel ? 'no-hide-descendants' : 'auto')
               .zIndex(2).transition(DETAIL_PROFILE_TRANSITION)
           }
           if (this.inboxStore.invitationAllVisible && this.inboxStore.boardInvitations) {
@@ -7893,7 +8018,8 @@ struct Index {
                   },
                   onDownload: () => this.downloadViewerImage(),
                   onViewerSave: () => this.saveViewerImage(),
-                  videoActive: _identity === this.detailRootIdentity() && this.pinStore.videoForeground && !this.activeSheetKind && !this.pinStore.detailWebFlow,
+                  videoActive: _identity === this.detailRootIdentity() && this.pinStore.videoForeground && !this.activeSheetKind && !this.pinStore.detailWebFlow &&
+                    !(this.detailProfileTransition && this.profileStore.origins.length > 0 && !!this.currentProfileUrl()),
                   onVideoRetry: () => this.retryDetailMedia(),
                   postActionsReady: _identity === this.detailRootIdentity() && this.postNativeOperations.ready(),
                   menuActionsReady: _identity === this.detailRootIdentity() && PIN_NATIVE_PIN_MENUS_ENABLED && this.detailNativeReads.owned(),
@@ -7959,8 +8085,8 @@ struct Index {
             }
             .width('100%')
             .height('100%')
-            .hitTestBehavior(this.detailProfileTransition && this.profileUrlFromAddress(this.navigationAddress) ? HitTestMode.None : HitTestMode.Default)
-            .accessibilityLevel(this.detailProfileTransition && this.profileUrlFromAddress(this.navigationAddress) ? 'no-hide-descendants' : 'auto')
+            .hitTestBehavior(this.detailProfileTransition && (this.detailProfileReturning || this.profileUrlFromAddress(this.navigationAddress)) ? HitTestMode.None : HitTestMode.Default)
+            .accessibilityLevel(this.detailProfileTransition && (this.detailProfileReturning || this.profileUrlFromAddress(this.navigationAddress)) ? 'no-hide-descendants' : 'auto')
             .transition(!this.inboxNewsPinSlide() && (this.homeEntryPhoto || this.detailProfileTransition) ? TransitionEffect.IDENTITY : NATIVE_PAGE_TRANSITION)
           }
           if (this.homeStore.pendingHomeMorePin && !this.loadFailed) {
@@ -8018,13 +8144,23 @@ struct Index {
       0 : this.getUIContext().px2vp(this.statusBarHeightPx) })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .backgroundColor($r('app.color.page_background'))
+    .onAreaChange((_old: Area, area: Area) => {
+      const width: number = Number(area.width), height: number = Number(area.height);
+      if (width > 0 && Math.abs(width - this.nativeSheetWindowWidth) > 1) this.nativeSheetWindowWidth = width;
+      if (width > 0 && AppStorage.get<number>('pinmonySheetWindowWidthVp') !== width) {
+        AppStorage.setOrCreate<number>('pinmonySheetWindowWidthVp', width);
+      }
+      if (height > 0 && Math.abs(height - this.nativeSheetWindowHeight) > 1) this.nativeSheetWindowHeight = height;
+    })
     .bindSheet($$this.showNativeSheet, this.buildNativeSheet(), {
       radius: LengthMetrics.vp(32),
+      preferType: this.nativeSheetWindowWidth >= 600 ? SheetType.CENTER :
+        this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu &&
+        this.nativeSheetWindowHeight > this.nativeSheetWindowWidth ? SheetType.BOTTOM : undefined,
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=Index.showNativeSheet radius=uniform-32vp' + ' kind=' + this.activeSheetKind); },
       keyboardAvoidMode: this.activeSheetKind === 'comments' ? SheetKeyboardAvoidMode.RESIZE_ONLY :
         SheetKeyboardAvoidMode.TRANSLATE_AND_SCROLL,
-     height: ['save', 'edit', 'comments'].includes(this.activeSheetKind) ? SheetSize.LARGE :
-        this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu && this.pinStore.shareSearchActive ? SheetSize.LARGE : SheetSize.FIT_CONTENT,
+      height: this.nativeModalHeight(),
       dragBar: true,
       showClose: true,
       title: { title: this.nativeModalLabel() },

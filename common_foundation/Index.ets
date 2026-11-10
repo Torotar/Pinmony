@@ -12,3 +12,4 @@ export { PinmonyPublishAnchor } from './src/main/ets/services/PinmonyPublishAnch
 export { isProductPin } from './src/main/ets/PinmonyProductPin';
 
 export { PinmonyProfileLayoutPreference } from './src/main/ets/services/PinmonyProfileLayoutPreference';
+export { PinmonyDetailDisplayPreference } from './src/main/ets/services/PinmonyDetailDisplayPreference';

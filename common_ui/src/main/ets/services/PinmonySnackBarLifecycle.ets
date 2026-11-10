@@ -8,13 +8,14 @@ import { PinmonyRuntimeLog } from 'common_foundation';
 export class PinmonySnackBarLifecycle {
   private static current: HdsSnackBar | undefined = undefined;
   private static expiresAt: number = 0;
+  private static revision: number = 0;
 
   static isCurrent(snack: HdsSnackBar): boolean {
     return PinmonySnackBarLifecycle.current === snack && Date.now() < PinmonySnackBarLifecycle.expiresAt;
   }
 
-  private static release(snack: HdsSnackBar): void {
-    if (PinmonySnackBarLifecycle.current !== snack) return;
+  private static release(snack: HdsSnackBar, revision: number = PinmonySnackBarLifecycle.revision): void {
+    if (PinmonySnackBarLifecycle.current !== snack || revision !== PinmonySnackBarLifecycle.revision) return;
     PinmonySnackBarLifecycle.current = undefined;
     PinmonySnackBarLifecycle.expiresAt = 0;
   }
@@ -23,6 +24,7 @@ export class PinmonySnackBarLifecycle {
     operation: SnackBarOperationOptions, style: SnackBarStyleOptions): void {
     const previous: HdsSnackBar | undefined = PinmonySnackBarLifecycle.current;
     if (previous) PinmonySnackBarLifecycle.dismiss(previous);
+    const revision: number = ++PinmonySnackBarLifecycle.revision;
     PinmonySnackBarLifecycle.current = snack;
     const duration: number = style.duration ?? 4000;
     PinmonySnackBarLifecycle.expiresAt = duration <= 0 ? Number.POSITIVE_INFINITY : Date.now() + duration;
@@ -32,24 +34,25 @@ export class PinmonySnackBarLifecycle {
     // Revoke global ownership before HDS notifies the page. The old page may
     // unmount later, after a different feature has already shown its notice.
     style.pressBackCallback = (): void => {
-      if (PinmonySnackBarLifecycle.current !== snack) return;
-      PinmonySnackBarLifecycle.release(snack); back?.();
+      if (PinmonySnackBarLifecycle.current !== snack || revision !== PinmonySnackBarLifecycle.revision) return;
+      PinmonySnackBarLifecycle.release(snack, revision); back?.();
     };
     operation.onCloseButtonClick = (): void => {
-      if (PinmonySnackBarLifecycle.current !== snack) return;
-      PinmonySnackBarLifecycle.release(snack); close?.();
+      if (PinmonySnackBarLifecycle.current !== snack || revision !== PinmonySnackBarLifecycle.revision) return;
+      PinmonySnackBarLifecycle.release(snack, revision); close?.();
     };
     operation.onContentClick = (): void => {
-      if (PinmonySnackBarLifecycle.current !== snack || Date.now() >= PinmonySnackBarLifecycle.expiresAt) return;
+      if (PinmonySnackBarLifecycle.current !== snack || revision !== PinmonySnackBarLifecycle.revision || Date.now() >= PinmonySnackBarLifecycle.expiresAt) return;
       content?.();
     };
     try {
+      PinmonyRuntimeLog.info('SnackBarNative: operation=show sequence=' + revision.toString());
       Promise.resolve<void>(snack.show(icon, message, operation, style)).catch((): void => {
-        PinmonySnackBarLifecycle.release(snack);
+        PinmonySnackBarLifecycle.release(snack, revision);
         PinmonyRuntimeLog.warn('SnackBarNative: operation=show outcome=rejected');
       });
     } catch (_) {
-      PinmonySnackBarLifecycle.release(snack);
+      PinmonySnackBarLifecycle.release(snack, revision);
       PinmonyRuntimeLog.warn('SnackBarNative: operation=show outcome=threw');
     }
   }
@@ -60,6 +63,7 @@ export class PinmonySnackBarLifecycle {
     PinmonySnackBarLifecycle.release(snack);
     if (expired) return;
     try {
+      PinmonyRuntimeLog.info('SnackBarNative: operation=dismiss sequence=' + PinmonySnackBarLifecycle.revision.toString());
       Promise.resolve<void>(snack.dismiss()).catch((): void => {
         PinmonyRuntimeLog.warn('SnackBarNative: operation=dismiss outcome=rejected');
       });

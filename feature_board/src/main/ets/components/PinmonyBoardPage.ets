@@ -193,6 +193,7 @@ export struct PinmonyBoardPage {
 
 @Component
 struct PinmonyBoardSurface {
+  @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
   @State private viewOpen: boolean = false;
@@ -1173,7 +1174,9 @@ struct PinmonyBoardSurface {
     }.width(40).height(40).backgroundColor($r('app.color.input_surface'))
       .enabled(this.boardActionEnabled(1)).accessibilityText(this.uiText('pm_board_view_title'))
       .onClick(() => {this.viewPage=this.snapshot.pageKey;this.viewScope=this.scrollScope();this.viewOpen=true;})
-      .bindSheet($$this.viewOpen,this.boardViewSheet(),{radius:LengthMetrics.vp(32),height:SheetSize.FIT_CONTENT,showClose:true,dragBar:true,
+      .bindSheet($$this.viewOpen,this.boardViewSheet(),{
+      radius:LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,height:SheetSize.FIT_CONTENT,showClose:true,dragBar:true,
         title:{title:this.uiText('pm_board_view_title')},backgroundColor:$r('app.color.page_background'),
         onDisappear: () => { this.closeBoardView(); }})
   }
@@ -1443,7 +1446,8 @@ struct PinmonyBoardSurface {
                     if(!this.snapshot.flow?.busy && !this.snapshot.flow?.loading){this.privacyPage = this.snapshot.pageKey;this.privacyOpen = true;}
                   })
                   .bindSheet($$this.privacyOpen, this.privacySheet(), {
-                    radius: LengthMetrics.vp(32),
+      radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
                     height: SheetSize.FIT_CONTENT, showClose: true, dragBar: false,
                     title: {title:this.uiText(this.snapshot.privacy === 'secret' ? 'pm_board_secret_title' : 'pm_board_public_title')},
                     backgroundColor: $r('app.color.page_background'), maskColor:'#66000000',
@@ -1629,7 +1633,7 @@ struct PinmonyBoardSurface {
             }
             if (this.snapshot.flow?.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.flow.error, this.uiLanguage) }); PinmonyActionNotice({ message: this.uiText("pm_retry_b8784c8d"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.act('retry') }) }
             if (!this.snapshot.flow?.loading && !this.snapshot.flow?.error && !this.snapshot.flow?.pins.length) {
-              Text(this.uiText("pm_there_are_no_pins_in_this_section_yet_694eda70")).fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Center).margin({top:60,bottom:60})
+              Text(this.uiText("pm_there_are_no_pins_in_this_section_yet_694eda70")).fontColor($r('app.color.primary_text')).width('100%').constraintSize({ maxWidth: 448 }).align(Alignment.Center).textAlign(TextAlign.Center).margin({top:60,bottom:60})
             }
           }
           if (this.phase() && this.phase() !== 'select' && this.phase() !== 'ideas' && this.phase() !== 'section') {
@@ -1734,6 +1738,7 @@ struct PinmonyBoardSurface {
     .backgroundColor($r('app.color.page_background'))
     .bindSheet($$this.menuOpen, this.optionsSheet(), {
       radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardPage.menuOpen radius=uniform-32vp'); },
       height: this.mergeOpen ? SheetSize.LARGE : SheetSize.FIT_CONTENT, showClose: true, dragBar: true,
       scrollSizeMode: ScrollSizeMode.CONTINUOUS,
@@ -1778,7 +1783,7 @@ struct PinmonyBoardSurface {
     Stack({ alignContent: Alignment.Center }) {
       HdsNavigation(this.boardPathStack) {
         Column().width('100%').height('100%')
-      }
+      }.mode(NavigationMode.Stack)
       .width('100%').height('100%')
       .translate({ x: this.sectionMotionX })
       .hitTestBehavior(this.sectionMotionBusy ? HitTestMode.None : HitTestMode.Default)
@@ -1820,6 +1825,7 @@ struct PinmonyBoardSurface {
       Column().width(0).height(0)
     .bindSheet($$this.targetCreateSheetOpen, this.targetCreateForm(), {
       radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
       height: SheetSize.FIT_CONTENT, showClose: true, dragBar: true,
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=board-target-create'); },
       onAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=appear source=board-target-create'); },
@@ -1834,6 +1840,7 @@ struct PinmonyBoardSurface {
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
     .bindSheet($$this.moveSheetOpen, this.organizeContent(true), {
       radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
       height: SheetSize.LARGE, showClose: true, dragBar: true,
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=board-single-move'); },
       title: { title: this.creatingBoardTarget ? this.uiText('pm_create_board_513babc9') : this.creatingTarget ? this.uiText('pm_add_section_779008ec') : this.uiText(this.snapshot.flow?.targetBoardId ? 'pm_select_section_c87be634' : 'pm_save_to_board_0233a416') },

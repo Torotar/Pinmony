@@ -3,10 +3,10 @@ import { LengthMetrics } from '@kit.ArkUI';
 import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
-import { PinmonyI18n, PinmonyProfileLayoutPreference } from 'common_foundation';
+import { PinmonyI18n, PinmonyProfileLayoutPreference, PinmonyDetailDisplayPreference } from 'common_foundation';
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
-import { window } from '@kit.ArkUI';
+import { display, window } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -27,8 +27,14 @@ export struct PinmonyDisplaySettingsPage {
   @StorageLink('themePreference') private themePreference: string = 'system';
   @StorageLink('pinmonyLanguagePreference') private languagePreference: string = 'system';
   @StorageLink('screenOrientationPreference') private orientationPreference: string = 'system';
+  @StorageLink('detailPhotoFitEnabled') private detailPhotoFitEnabled: boolean = false;
   @State private orientationBusy: boolean = false;
-  private readonly isTablet: boolean = deviceInfo.deviceType === 'tablet';
+  private readonly supportsOrientation: boolean = this.canConfigureOrientation();
+  private canConfigureOrientation(): boolean {
+    if (deviceInfo.deviceType === 'tablet') return true;
+    try { return display.isFoldable(); }
+    catch (_) { return false; }
+  }
   private paths: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
   private errorSnack: HdsSnackBar | undefined = undefined;
@@ -88,7 +94,7 @@ export struct PinmonyDisplaySettingsPage {
     }
   }
   private async selectOrientation(index: number): Promise<void> {
-    if (!this.isTablet || this.orientationBusy || index < 0 || index > 3) return;
+    if (!this.supportsOrientation || this.orientationBusy || index < 0 || index > 3) return;
     const values: string[] = ['system', 'auto', 'portrait', 'landscape'];
     const value: string = values[index];
     if (value === this.orientationPreference) return;
@@ -185,7 +191,7 @@ export struct PinmonyDisplaySettingsPage {
       }, (language: string): string => language)
     }.width('100%').constraintSize({ minHeight: 64 }).padding({ left: 16, right: 16, top: 8, bottom: 8 })
 
-    if (this.isTablet) {
+    if (this.supportsOrientation) {
       Row({ space: 12 }) {
         Text(this.uiText("pm_screen_orientation_60cc99cc")).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
         ForEach([this.uiLanguage], (language: string) => {
@@ -194,6 +200,8 @@ export struct PinmonyDisplaySettingsPage {
           .value(this.orientationPreference === 'auto' ? this.uiText("pm_always_rotate_automatically_d3a0ff23") : this.orientationPreference === 'portrait' ? this.uiText("pm_portrait_c35bd83b") : this.orientationPreference === 'landscape' ? this.uiText("pm_landscape_055a6b3a") : this.uiText("pm_follow_system_217cfe7d"))
           .font({ size: 15 }).fontColor($r('app.color.primary_text'))
           .backgroundColor($r('app.color.display_settings_control')).borderRadius(16).enabled(!this.orientationBusy)
+          .selectedOptionBgColor($r('app.color.display_settings_control'))
+          .selectedOptionFontColor($r('app.color.primary_text')).optionFontColor($r('app.color.primary_text'))
           .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
       }, (language: string): string => language)
@@ -202,16 +210,6 @@ export struct PinmonyDisplaySettingsPage {
     }
     }.width('100%')
     Column() {
-    Row({ space: 16 }) {
-      Column({ space: 6 }) {
-        Text(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564")).fontSize(17).fontColor($r('app.color.primary_text'))
-      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled })
-          .selectedColor($r('app.color.accent'))
-          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).onChange((value: boolean) => { this.collapseEnabled = value; })
-        .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
-    }.width('100%').constraintSize({ minHeight: 64 }).padding({ left: 16, right: 16, top: 8, bottom: 8 })
-
     Row({ space: 16 }) {
       Text(this.uiText('pm_immersive_light')).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -237,6 +235,25 @@ export struct PinmonyDisplaySettingsPage {
 
     }.width('100%')
     Column() {
+      Row({ space: 16 }) {
+        Column({ space: 6 }) {
+          Text(this.uiText('pm_detail_photo_fit')).fontSize(17).fontColor($r('app.color.primary_text'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Toggle({ type: ToggleType.Switch, isOn: this.detailPhotoFitEnabled })
+          .selectedColor($r('app.color.accent')).margin({ left: 12, right: 12, top: 8, bottom: 8 })
+          .accessibilityText(this.uiText('pm_detail_photo_fit'))
+          .onChange((next: boolean) => { PinmonyDetailDisplayPreference.savePhotoFit(next); })
+      }.width('100%').constraintSize({ minHeight: 64 }).padding({ left: 16, right: 16, top: 8, bottom: 8 })
+    Row({ space: 16 }) {
+      Column({ space: 6 }) {
+        Text(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564")).fontSize(17).fontColor($r('app.color.primary_text'))
+      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled })
+          .selectedColor($r('app.color.accent'))
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).onChange((value: boolean) => { this.collapseEnabled = value; })
+        .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
+    }.width('100%').constraintSize({ minHeight: 64 }).padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
     Row({ space: 16 }) {
       Text(this.uiText('pm_profile_legacy_layout')).fontSize(17).fontColor($r('app.color.primary_text')).layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.legacyProfile })
@@ -294,7 +311,7 @@ export struct PinmonyDisplaySettingsPage {
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
   build() {
-    HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
   }
 }

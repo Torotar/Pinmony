@@ -106,7 +106,7 @@ export struct PinmonyInboxNewsPage {
         .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM],[LayoutSafeAreaEdge.TOP])
         .backgroundColor($r('app.color.page_background'))
         .onBackPressed(() => {if(!this.active){this.onCoveredBack?.();return true;}this.act('back');return true;})
-    }.hideTitleBar(true).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+    }.mode(NavigationMode.Stack).hideTitleBar(true).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
       .hitTestBehavior(this.active ? HitTestMode.Default : HitTestMode.None)
       .accessibilityLevel(this.active ? 'auto' : 'no-hide-descendants')
   }

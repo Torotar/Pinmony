@@ -11,6 +11,7 @@ interface CommentPhotoSize { key: string; url: string; width: number; height: nu
 
 @Component
 export struct PinmonyCommentsSheet {
+  @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private hasCurrentTranslation(item: PinmonyComment): boolean {
@@ -283,7 +284,8 @@ export struct PinmonyCommentsSheet {
     }.width('100%').height('100%').padding({ left: 16, right: 16, top: 12, bottom: 20 })
       .backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.menuOpen, this.commentMenu(), {
-        radius: LengthMetrics.vp(32),
+      radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyCommentsSheet.menuOpen radius=uniform-32vp'); },
         height: SheetSize.FIT_CONTENT, showClose: !this.deleteOpen,
         dragBar: !this.deleteOpen, backgroundColor: $r('app.color.page_background'), maskColor: '#66000000' })

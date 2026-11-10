@@ -225,11 +225,13 @@ export struct PinmonyRecommendationSettingsPage {
   }
   @Builder
   private recommend() {
+    Row() {
     CapsuleSegmentButtonV2({
       items: new SegmentButtonV2Items([{ text: this.uiText("pm_ai_content_7cdf4844") }, { text: this.uiText("pm_activity_780353e5") }, { text: this.uiText('pm_boards_53f23afe') }]),
       selectedIndex: this.store.recommendationTab === 'ai' ? 0 : this.store.recommendationTab === 'activity' ? 1 : 2,
       $selectedIndex: (index: number) => { this.selectRecommendation(index); }
-    }).width('100%').margin({ bottom: 12 }).enabled(!this.store.busy && !this.store.loading)
+    }).width('100%').constraintSize({ maxWidth: 448 }).enabled(!this.store.busy && !this.store.loading)
+    }.width('100%').justifyContent(FlexAlign.Center).margin({ bottom: 12 })
     if (this.store.recommendationTab === 'ai') {
       Text(this.uiText("pm_adjust_ai_modified_content_in_product_feeds_you_can_see_less_of__6f514185")).fontSize(15).fontColor($r('app.color.secondary_text'))
       Row({ space: 16 }) {
@@ -298,7 +300,7 @@ export struct PinmonyRecommendationSettingsPage {
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
   build() {
-    HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
   }
 }

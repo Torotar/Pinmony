@@ -1,3 +1,5 @@
+import { ComponentContent } from '@kit.ArkUI';
+import { PinmonyDraftExpiryTipOptions, buildPinmonyDraftExpiryTip } from './PinmonyDraftExpiryTip';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyDraggablePublishButton, PinmonyActionNotice } from 'common_ui';
@@ -31,7 +33,9 @@ export struct PinmonyPublishPage {
   @State private link: string = '';
   @State private sourceAreaWidth: number = 0;
   @State private sourceAreaHeight: number = 0;
-  @State private showDraftExpiryTip: boolean = false;
+  private showDraftExpiryTip: boolean = false;
+  private draftExpiryOpening: boolean = false;
+  private draftExpiryContent: ComponentContent<PinmonyDraftExpiryTipOptions> | undefined = undefined;
   private readonly photoViewState: PinmonyPublishPhotoViewState = new PinmonyPublishPhotoViewState();
   private readonly stack: NavPathStack = new NavPathStack();
   private readonly scroller: Scroller = new Scroller();
@@ -48,7 +52,41 @@ export struct PinmonyPublishPage {
     this.stack.pushPath({ name: 'publish' }, false);
     this.syncDraftCards();
   }
-  aboutToDisappear(): void { this.mounted = false; }
+  aboutToDisappear(): void { this.mounted = false; this.dismissDraftExpiryTip(); }
+
+  private async toggleDraftExpiryTip(): Promise<void> {
+    if (!this.mounted || this.state.phase !== 'photo' || this.websiteRouteOpen) return;
+    if (this.showDraftExpiryTip) { await this.dismissDraftExpiryTip(); return; }
+    if (this.draftExpiryOpening) return;
+    this.showDraftExpiryTip = true; this.draftExpiryOpening = true;
+    try {
+      if (!this.draftExpiryContent) this.draftExpiryContent = new ComponentContent<PinmonyDraftExpiryTipOptions>(this.getUIContext(),
+        wrapBuilder(buildPinmonyDraftExpiryTip), { source: 'pm_pin_drafts_expiry' });
+      await this.getUIContext().getPromptAction().openPopup(this.draftExpiryContent,
+        { id: 'pinmony-draft-expiry-info' }, {
+          placement: Placement.BottomRight, enableArrow: true, autoCancel: true,
+          popupColor: $r('app.color.page_background'),
+          onStateChange: (event: PopupStateChangeParam): void => {
+            if (!event.isVisible) this.showDraftExpiryTip = false;
+          }
+        });
+    } catch (_) { this.showDraftExpiryTip = false; }
+    finally { this.draftExpiryOpening = false; }
+    if (!this.mounted || !this.showDraftExpiryTip || this.state.phase !== 'photo' || this.websiteRouteOpen) {
+      await this.dismissDraftExpiryTip();
+    }
+  }
+
+  private async dismissDraftExpiryTip(): Promise<void> {
+    this.showDraftExpiryTip = false;
+    const content: ComponentContent<PinmonyDraftExpiryTipOptions> | undefined = this.draftExpiryContent;
+    if (!content || this.draftExpiryOpening) return;
+    try { await this.getUIContext().getPromptAction().closePopup(content); }
+    catch (_) { /* The system may already have dismissed the popup. */ }
+    if (!this.mounted && this.draftExpiryContent === content) {
+      content.dispose(); this.draftExpiryContent = undefined;
+    }
+  }
 
   private syncWebsiteRoute(): void {
     const open: boolean = !!this.state.fromDraftBox && this.state.kind === 'website';
@@ -90,11 +128,13 @@ export struct PinmonyPublishPage {
   }
 
   private pageBack(phase: string): void {
+    this.dismissDraftExpiryTip();
     if (this.websiteClosing || phase !== this.state.phase || this.state.busy) return;
     this.act(phase === 'empty' || this.state.fromDraftBox ? 'back' : 'close');
   }
 
   private syncDraftCards(): void {
+    if (this.state.phase !== 'photo' || this.state.kind !== 'photo') this.dismissDraftExpiryTip();
     this.syncWebsiteRoute();
     const next: PinmonyPublishDraft[] = (this.state.drafts || []).slice();
     const removed: boolean = this.draftCardsToken === this.state.token && this.state.phase === 'photo' &&
@@ -177,7 +217,8 @@ export struct PinmonyPublishPage {
         menu: { value: phase === 'photo' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.info_circle')).fontSize(22).fontColor([$r('app.color.primary_text')]),
           label: this.uiText('pm_pin_drafts_expiry'), isEnabled: true,
-          action: () => { this.showDraftExpiryTip = !this.showDraftExpiryTip; }
+          componentId: 'pinmony-draft-expiry-info',
+          action: () => { this.toggleDraftExpiryTip(); }
         } }] : phase === 'website' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.arrow_right')).fontColor([$r('app.color.primary_text')]),
           label: this.uiText("pm_choose_image_9ad12a1a"), isEnabled: this.canReadWebsite(),
@@ -257,12 +298,7 @@ export struct PinmonyPublishPage {
       }.width('100%').layoutWeight(1)
       }.width('100%').height('100%').onAreaChange((_old: Area,area: Area) => {this.sourceAreaWidth = Number(area.width);this.sourceAreaHeight = Number(area.height);})
       if ($$.phase === 'photo') { PinmonyDraggablePublishButton({areaWidth:this.sourceAreaWidth,areaHeight:this.sourceAreaHeight,actionEnabled:!this.websiteRouteOpen && !this.websiteClosing && !this.state.loading && !this.state.busy && !this.state.draftLoading,menuEnabled:!this.websiteRouteOpen && !this.websiteClosing,menuItems:this.photoSources()}) }
-      if ($$.phase === 'photo' && this.showDraftExpiryTip) {
-        Text(this.uiText('pm_pin_drafts_expiry')).fontSize(14).fontColor($r('app.color.primary_text'))
-          .backgroundColor($r('app.color.surface_muted')).padding({left:14,right:14,top:10,bottom:10})
-          .borderRadius(10).margin({top:8,right:12}).shadow({radius:8,color:'#26000000',offsetX:0,offsetY:3})
-          .onClick(() => { this.showDraftExpiryTip = false; })
-      }
+
       }
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleBar($$.phase), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([$$.websiteChild ? this.websiteScroller : this.scroller])
       .translate({ x: $$.websiteChild ? this.websiteMotionOffset : '0%' })
@@ -283,7 +319,7 @@ export struct PinmonyPublishPage {
       PinmonyPublishBoardPage({state:this.state,pins:this.state.pins,pinsLoading:this.state.loading,onAction:this.onAction})
     } else {
       Stack({alignContent:Alignment.Center}) {
-        HdsNavigation(this.stack) { Column().width('100%').height('100%') }.customNavContentTransition((from: NavContentInfo, to: NavContentInfo, operation: NavigationOperation) => this.websiteTransition(from, to, operation)).width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
+        HdsNavigation(this.stack) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack).customNavContentTransition((from: NavContentInfo, to: NavContentInfo, operation: NavigationOperation) => this.websiteTransition(from, to, operation)).width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
         if (this.state.kind === 'photo' && (this.state.loading || this.state.draftLoading)) { LoadingProgress().color($r('app.color.accent')).width(28).height(28).hitTestBehavior(HitTestMode.None) }
         else if (this.state.loading || this.state.busy) { PinmonyLoadingOverlay({message:this.uiText('pm_loading_photos_35b3ef9b')}) }
       }.width('100%').height('100%')

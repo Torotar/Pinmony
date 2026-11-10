@@ -23,6 +23,7 @@ function host(file, names, extra = {}) {
 const publish = host('feature_profile/src/main/ets/components/PinmonyPublishPage.ets', ['syncDraftCards']);
 const p = publish.view;
 Object.assign(p, { draftCards: [], draftCardsToken: -1, draftLayoutRevision: 0,
+  dismissDraftExpiryTip() {}, syncWebsiteRoute() {},
   state: { token: 1, phase: 'photo', drafts: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] } });
 p.syncDraftCards();assert.equal(publish.animations.length, 0, 'initial loading is not a delete animation');
 p.state.busy = true;p.syncDraftCards();assert.equal(publish.animations.length, 0, 'clicking delete cannot remove or animate unconfirmed drafts');
@@ -47,5 +48,6 @@ const board = host('feature_board/src/main/ets/components/PinmonyBoardPage.ets',
 Object.assign(board.view, { density: 1, boardViewLive: () => true });board.view.selectBoardDensity(0);
 assert.deepEqual(savedBoard, [0]);assert.equal(board.animations.length, 1);
 board.view.boardViewLive = () => false;board.view.selectBoardDensity(2);assert.deepEqual(savedBoard, [0]);
-for (const item of [profile, board]) assert.match(item.source, /geometryTransition\(this\..*density-.*follow: true/, 'density layouts keep matched card identities');
+assert(!profile.source.includes('pinmony-profile-density-'), 'retained Pin cards cannot also participate in shared geometry transitions');
+assert.match(board.source, /geometryTransition\(this\..*density-.*follow: true/, 'retain existing board transition');
 console.log('Card motion: confirmed draft reflow, failure/session isolation, stable scroller, density animation and interaction guards passed');

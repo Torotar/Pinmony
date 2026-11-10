@@ -25,8 +25,11 @@ const visibilityPattern = /if \(([^\n]+)\) \{ this\.visibilityContent\(\) \}/;
 assert(condition(visibility, visibilityPattern, { store: { loading: true } }), 'visibility fields appear on cold load');
 assert(!condition(visibility, visibilityPattern, { store: { loading: false } }), 'failed cold load is not shown as valid settings');
 assert(visibility.includes('!!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error'), 'visibility controls remain gated');
-const editPattern = /else if \((!this\.snapshot\.loading && this\.snapshot\.mode === 'edit')\) \{/;
-assert(!condition(profile, editPattern, { snapshot: { mode: 'edit', loading: true } }), 'do not create by-value field builders with empty loading drafts');
+const editPattern = /else if \((this\.snapshot\.mode === 'edit')\) \{/;
+assert(condition(profile, editPattern, { snapshot: { mode: 'edit', loading: true } }), 'reactive edit fields remain mounted while loading');
+assert(profile.includes('private field($$: PinmonyProfileEditFieldOptions)'), 'field builder keeps reactive draft parameters');
+assert(profile.includes('TextInput({ text: $$.text,'), 'loaded drafts propagate into mounted inputs');
+assert(profile.includes(".opacity(this.snapshot.mode === 'edit' && this.snapshot.loading ? 0.4 : 1)"), 'loading edit body is dimmed');
 assert(condition(profile, editPattern, { snapshot: { mode: 'edit', loading: false } }), 'create the form after loaded drafts are available, matching the original backup');
 assert(!condition(profile, editPattern, { snapshot: { mode: 'following', loading: false } }), 'other modes retain their own content');
 const ts = require(process.argv[2] || 'typescript');
@@ -38,7 +41,7 @@ const drafts = new DraftHost();
 const loadedFields = { firstName: 'First', lastName: 'Last', about: 'About', website: 'https://example.com', username: 'sample' };
 Object.assign(drafts, { snapshot: { mode: 'edit', token: 1, loading: true, ...loadedFields }, usernameToken: -1, syncFollowingMotion() {}, scheduleFollowerEndCheck() {} });
 drafts.syncUsername();
-assert(!condition(profile, editPattern, drafts), 'initial empty fields are not mounted during loading');
+assert(condition(profile, editPattern, drafts), 'reactive fields stay mounted but disabled during loading');
 drafts.snapshot.loading = false;
 drafts.syncUsername();
 assert(condition(profile, editPattern, drafts), 'loaded form mounts without any scroll event');
@@ -55,20 +58,7 @@ assert.equal(drafts.firstNameDraft, 'Next', 'next edit session initializes fresh
 assert.equal((profile.match(/\.enabled\(!this\.saving && !this\.snapshot\.loading\)/g) || []).length, 2, 'single-line fields and about stay disabled');
 assert(profile.includes('.enabled(!this.saving && !this.snapshot.loading && !this.snapshot.avatarBusy)'), 'avatar action stays disabled');
 assert(!notifications.includes('loadingContent()'), 'notification loading never replaces real groups with invented placeholder categories');
-const coldPattern = /if \((this\.store\.loading && !this\.store\.notifications\.length)\) \{ this\.coldLoadingBackground\(\) \}/;
-for (const loading of [false, true]) {
-  for (const rows of [[], [{ key: 'verified', categories: [] }]]) {
-    for (const error of ['', 'failed']) {
-      assert.equal(condition(notifications, coldPattern, { store: { loading, notifications: rows, error } }), loading && rows.length === 0,
-        'cold/retry background exists only during loading without real rows; failure/empty completion never shows fake settings');
-    }
-  }
-}
-const coldBody = notifications.slice(notifications.indexOf('  private coldLoadingBackground()'), notifications.indexOf('  private destination()'));
-assert(coldBody.includes(".accessibilityLevel('no-hide-descendants').hitTestBehavior(HitTestMode.None)"), 'cold background is decoration only');
-assert(!/\b(?:Text|Toggle|Checkbox|Button)\(|\.on(?:Click|Change)\(|this\.(?:onRequest|change)\(/.test(coldBody), 'cold background invents no category copy, values or actions');
-assert(coldBody.includes("$r('app.color.primary_text')") && coldBody.includes("$r('app.color.secondary_text')"), 'cold background follows light/dark theme colors');
-assert(notifications.indexOf('this.coldLoadingBackground()') < notifications.indexOf('.opacity(this.store.loading ? 0.4 : 1)'), 'cold and real content share the existing dimmed body');
+assert(!notifications.includes('coldLoadingBackground'), 'notification cold load shows spinner without grey skeleton');
 assert(notifications.includes('ForEach(this.store.notifications,'), 'verified notification content is retained during loading');
 const native = read('entry/src/main/ets/app/PinmonySettingsNativeFlow.ets');
 assert(!native.slice(native.indexOf("if (action === 'notifications') {")).split('return;')[0].includes('this.store.notifications = []'), 'notification refresh retains verified content until replacement response');

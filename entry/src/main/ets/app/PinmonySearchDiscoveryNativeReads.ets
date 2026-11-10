@@ -123,7 +123,9 @@ export class PinmonySearchDiscoveryNativeReads {
     const envelope: DiscoveryRequest = { queryHash: append ? 'a53e4b9faaa4d08b5450d8a2f60945e513d19f0273c6175ed3a6560c70f22b4b' : 'a0959c548d14cf06adbc04230c8151f3aec27082f8328131fbf4ac52af844041',
       variables: append ? { count: 6, cursor: previous } : {} };
     const job: PinmonyNetworkJob = { id: id, page: page, epoch: this.generation, url: this.origin + '/_/graphql/', method: 'POST', body: JSON.stringify(envelope),
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } };
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest',
+        'X-Pinterest-AppState': 'active', 'X-Pinterest-Pws-Handler': 'www/search.js',
+        'X-Pinterest-Source-Url': '/search/' } };
     try {
       const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessSearchDiscoveryRead(job, (): PinmonyBusinessSessionContext => this.ports.session(), live);
       if (!live()) return;
@@ -161,6 +163,10 @@ export class PinmonySearchDiscoveryNativeReads {
         if (existing >= 0) sections[existing] = section; else if (sections.length < 80) sections.push(section);
       });
       const cursor: string = typeof connection.pageInfo.endCursor === 'string' && connection.pageInfo.endCursor.length <= 4096 ? connection.pageInfo.endCursor : '';
+      PinmonyRuntimeLog.info('SearchDiscoveryTrace: phase=parsed edges=' + connection.edges.length.toString() +
+        ' heroes=' + heroes.length.toString() + ' sections=' + sections.length.toString() +
+        ' hasNext=' + connection.pageInfo.hasNextPage.toString() + ' hasCursor=' + (!!cursor).toString());
+      if (connection.edges.length > 0 && heroes.length === 0 && sections.length === 0) throw new Error('discovery-unmapped');
       this.heroes = heroes; this.sections = sections; this.cursor = cursor;
       this.ended = !connection.pageInfo.hasNextPage || !cursor || !!previous && cursor === previous || connection.edges.length === 0;
       this.ready = true; this.ports.committed(page);

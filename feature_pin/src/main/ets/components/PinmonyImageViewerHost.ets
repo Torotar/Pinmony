@@ -1,6 +1,8 @@
 import { PinmonyImageViewer } from './PinmonyImageViewer';
 import { PinmonyImageViewerSession } from '../services/PinmonyImageViewerSession';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyViewerSystemBars } from '../services/PinmonyViewerSystemBars';
+import { common } from '@kit.AbilityKit';
 
 @Component
 export struct PinmonyImageViewerHost {
@@ -8,9 +10,32 @@ export struct PinmonyImageViewerHost {
   @Prop active: boolean = true;
   @State private measured: boolean = false;
   private hostRevision: number = 0;
+  private systemBarOwner: number = 0;
+  private systemBarContext: common.Context | undefined = undefined;
 
-  aboutToAppear(): void { this.hostRevision = this.session.revision; }
-  aboutToDisappear(): void { this.session.hostGone(this.hostRevision); }
+  aboutToAppear(): void {
+    this.hostRevision = this.session.revision;
+    const context = this.getUIContext().getHostContext();
+    this.systemBarContext = context;
+    if (context) this.systemBarOwner = PinmonyViewerSystemBars.acquire(context);
+  }
+  aboutToDisappear(): void {
+    const context: common.Context | undefined = this.systemBarContext;
+    if (context) PinmonyViewerSystemBars.release(this.systemBarOwner, context);
+    this.systemBarOwner = 0;
+    this.systemBarContext = undefined;
+    this.session.hostGone(this.hostRevision);
+  }
+
+  private onViewerTransition(expanded: number): void {
+    if (!this.session.current(this.hostRevision)) return;
+    const context: common.Context | undefined = this.systemBarContext;
+    if (expanded === 0 && this.systemBarOwner !== 0 && context) {
+      PinmonyViewerSystemBars.release(this.systemBarOwner, context);
+      this.systemBarOwner = 0;
+    }
+    this.session.transition(this.hostRevision, expanded);
+  }
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -21,6 +46,7 @@ export struct PinmonyImageViewerHost {
           closing: this.session.closing, active: this.active,
           actionsReady: this.session.request.actionsReady || false,
           onReady: () => this.session.rendered(this.hostRevision),
+          onTransition: (expanded: number) => this.onViewerTransition(expanded),
           onClosed: () => this.session.finish(this.hostRevision),
           onClose: () => this.session.close(),
           onImageChange: this.session.request.onImageChange,

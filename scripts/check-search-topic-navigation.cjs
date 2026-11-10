@@ -3,6 +3,13 @@ const ts = require(process.argv[2] || 'typescript');
 const runtime = require('./search-controller-harness.cjs').createSearchRuntime(ts);
 const fs=require('node:fs'),vm=require('node:vm');
 const pageSource=fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets','utf8');
+const geometryStart=pageSource.indexOf('  private wideDiscoveryLayout(');
+const geometrySource=pageSource.slice(geometryStart,pageSource.indexOf('  private discoverySlots(',geometryStart));
+const GeometryHost=vm.runInNewContext(ts.transpileModule('class GeometryHost {'+geometrySource+'} GeometryHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+const geometry=new GeometryHost();
+for(const width of [360,599,600,960,1440,1920]){geometry.viewportWidth=width;geometry.contentWidth=width;assert.equal(geometry.discoveryColumns(),width<600?1:2);if(width<600)assert.equal(geometry.discoveryPhotoHeight(),176);else assert(Math.abs(((width/2-50)/4)/geometry.discoveryPhotoHeight()-0.56)<1e-9);}
+const discoveryBlock=pageSource.slice(pageSource.indexOf('  private discoveryContent('),pageSource.indexOf('  private discoveryInitialLoading('));
+assert(discoveryBlock.indexOf('this.heroCarousel()')<discoveryBlock.indexOf('this.discoveryRows()'),'carousel stays above theme rows below the search header');
 const keyStart=pageSource.indexOf('  private discoveryRowKey(');
 const keyMethod=pageSource.slice(keyStart,pageSource.indexOf('\n  @State',keyStart));
 const KeyHost=vm.runInNewContext(ts.transpileModule('class KeyHost {'+keyMethod+'} KeyHost;',

@@ -1553,6 +1553,18 @@
       "value": "No followers yet"
     },
     {
+      "name": "pm_profile_user_no_followers",
+      "value": "This user has no followers yet"
+    },
+    {
+      "name": "pm_profile_user_no_followed_boards",
+      "value": "This user isn’t following any boards yet"
+    },
+    {
+      "name": "pm_profile_user_no_followed_users",
+      "value": "This user isn’t following anyone yet"
+    },
+    {
       "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
       "value": "You are not following any boards yet"
     },
@@ -5979,6 +5991,18 @@
     {"name":"pm_invitation_decline_failed","value":"Could not decline the invitation. Please try again."},
     {"name":"pm_invitation_decline_uncertain","value":"The decline result is unconfirmed. Refresh the requests list to check. It will not be submitted again automatically."},
     {"name":"pm_board_invitation_notice_text","value":"{0} invited you to collaborate on {1}"},
-    {"name":"pm_board_invitation_notice_body","value":"Invited you to collaborate on {0}"}
+    {"name":"pm_board_invitation_notice_body","value":"Invited you to collaborate on {0}"},
+    {
+      "name": "pm_detail_photo_fit",
+      "value": "Fit detail photos to screen"
+    },
+    {
+      "name": "pm_detail_photo_fit_description",
+      "value": "Scale photos to fit the screen on tablets and unfolded foldable devices"
+    },
+    {
+      "name": "pm_message_reaction_title",
+      "value": "Reactions"
+    }
   ]
 }

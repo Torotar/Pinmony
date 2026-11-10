@@ -1553,6 +1553,18 @@
       "value": "팔로워가 아직 없습니다"
     },
     {
+      "name": "pm_profile_user_no_followers",
+      "value": "이 사용자는 아직 팔로워가 없습니다"
+    },
+    {
+      "name": "pm_profile_user_no_followed_boards",
+      "value": "이 사용자는 아직 팔로우하는 보드가 없습니다"
+    },
+    {
+      "name": "pm_profile_user_no_followed_users",
+      "value": "이 사용자는 아직 아무도 팔로우하지 않습니다"
+    },
+    {
       "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
       "value": "아직 팔로우하는 보드가 없습니다"
     },
@@ -5979,6 +5991,18 @@
     {"name":"pm_invitation_decline_failed","value":"초대를 거절하지 못했습니다. 다시 시도해 주세요."},
     {"name":"pm_invitation_decline_uncertain","value":"거절 결과를 확인하지 못했습니다. 요청 목록을 새로고침해 확인해 주세요. 자동으로 다시 제출하지 않습니다."},
     {"name":"pm_board_invitation_notice_text","value":"{0}님이 {1}에서 공동 작업하도록 초대했습니다"},
-    {"name":"pm_board_invitation_notice_body","value":"{0}에서 공동 작업하도록 초대했습니다"}
+    {"name":"pm_board_invitation_notice_body","value":"{0}에서 공동 작업하도록 초대했습니다"},
+    {
+      "name": "pm_detail_photo_fit",
+      "value": "상세 사진 전체 보기"
+    },
+    {
+      "name": "pm_detail_photo_fit_description",
+      "value": "태블릿과 펼친 폴더블 기기에서 사진 전체가 화면에 맞도록 크기를 조절합니다"
+    },
+    {
+      "name": "pm_message_reaction_title",
+      "value": "반응"
+    }
   ]
 }

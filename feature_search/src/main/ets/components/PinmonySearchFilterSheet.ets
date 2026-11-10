@@ -18,7 +18,7 @@ export struct PinmonySearchFilterSheet {
   @Builder
   private priceHandle(upper: boolean) {
     Stack() {
-      Circle().width(16).height(16).fill($r('app.color.primary_text'))
+      Circle().width(16).height(16).foregroundColor($r('app.color.primary_text'))
     }.width(40).height(44).position({ x: this.priceHandleOffset(upper), y: 0 })
       .accessibilityText((upper ? this.uiText("pm_maximum_price_dcb810cc") : this.uiText("pm_minimum_price_fc7533e3")) + this.price(upper).toString())
       .gesture(PanGesture({ direction: PanDirection.Horizontal, distance: 0 })

@@ -10,6 +10,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 
 @Component
 export struct PinmonyBoardSectionPage {
+  @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
@@ -59,7 +60,7 @@ export struct PinmonyBoardSectionPage {
         Column() { this.nextButton() }
           .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
       }.width('100%').height('100%')
-    }.width('100%').height('100%')
+    }.mode(NavigationMode.Stack).width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.scroller])
       .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { enableComponentSafeArea: false,
         style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
@@ -88,7 +89,8 @@ export struct PinmonyBoardSectionPage {
   build() {
     Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
       .bindSheet($$this.visible, this.sectionSheet(), {
-        radius: LengthMetrics.vp(32),
+      radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardSectionPage.visible radius=uniform-32vp'); },
         height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
         backgroundColor: $r('app.color.page_background'),

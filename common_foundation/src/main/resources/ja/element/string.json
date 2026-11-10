@@ -1553,6 +1553,18 @@
       "value": "フォロワーはまだいません"
     },
     {
+      "name": "pm_profile_user_no_followers",
+      "value": "このユーザーにはまだフォロワーがいません"
+    },
+    {
+      "name": "pm_profile_user_no_followed_boards",
+      "value": "このユーザーはまだボードをフォローしていません"
+    },
+    {
+      "name": "pm_profile_user_no_followed_users",
+      "value": "このユーザーはまだ誰もフォローしていません"
+    },
+    {
       "name": "pm_you_are_not_following_any_boards_yet_d8537a5c",
       "value": "まだフォローしているボードはありません"
     },
@@ -5979,6 +5991,18 @@
     {"name":"pm_invitation_decline_failed","value":"招待を辞退できませんでした。もう一度お試しください。"},
     {"name":"pm_invitation_decline_uncertain","value":"辞退の結果を確認できません。リクエスト一覧を更新して確認してください。自動で再送信はしません。"},
     {"name":"pm_board_invitation_notice_text","value":"{0}さんから{1}での共同作業に招待されました"},
-    {"name":"pm_board_invitation_notice_body","value":"{0}での共同作業に招待されました"}
+    {"name":"pm_board_invitation_notice_body","value":"{0}での共同作業に招待されました"},
+    {
+      "name": "pm_detail_photo_fit",
+      "value": "詳細写真を画面に収める"
+    },
+    {
+      "name": "pm_detail_photo_fit_description",
+      "value": "タブレットと展開した折りたたみ端末で写真全体が画面に収まるように縮小します"
+    },
+    {
+      "name": "pm_message_reaction_title",
+      "value": "リアクション"
+    }
   ]
 }

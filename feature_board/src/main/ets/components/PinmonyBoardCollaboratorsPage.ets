@@ -187,7 +187,7 @@ struct PinmonyBoardCollaboratorsSurface {
       .backgroundColor($r('app.color.page_background'))
   }
   build() {
-    HdsNavigation(this.stack) {}
+    HdsNavigation(this.stack) {}.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true)
       .navDestination(this.destination).backgroundColor($r('app.color.page_background'))
   }

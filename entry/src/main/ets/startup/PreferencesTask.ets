@@ -1,7 +1,7 @@
 import { StartupTask, common } from '@kit.AbilityKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { ConfigurationConstant } from '@kit.AbilityKit';
-import { PinmonyI18n, PinmonyPublishAnchor, PinmonyProfileLayoutPreference } from 'common_foundation';
+import { PinmonyI18n, PinmonyPublishAnchor, PinmonyProfileLayoutPreference, PinmonyDetailDisplayPreference } from 'common_foundation';
 import { PinmonySessionHistory } from 'common_session';
 import { preferences } from '@kit.ArkData';
 import lazy { PinmonyInboxHiddenConversations } from 'feature_inbox';
@@ -42,6 +42,8 @@ export default class PreferencesTask extends StartupTask {
     PersistentStorage.persistProp('immersiveLightEnabled', true);
     PersistentStorage.persistProp('immersiveLightMode', AppStorage.get<boolean>('immersiveLightEnabled') === false ? 'off' : 'immersive');
     PersistentStorage.persistProp('screenOrientationPreference', 'system');
+    PersistentStorage.persistProp('detailPhotoFitEnabled', false);
+    PinmonyDetailDisplayPreference.initialize(context);
     PersistentStorage.persistProp('pinmonySessionOrigin', 'https://www.pinterest.com');
     PinmonySessionHistory.initialize(context);
     PinmonyRuntimeLog.info('StartupTask: preferences-restored elapsedMs=' + (Date.now() - startedAt).toString());

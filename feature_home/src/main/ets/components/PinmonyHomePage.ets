@@ -3,6 +3,7 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyHomeSnapshot, PinmonyHomeTab, PinmonyHomeImageRecovery } from '../models/PinmonyHome';
 import { PinmonyHomeFeedPane } from './PinmonyHomeFeedPane';
+import { PinmonyHomeCategoryMaterial } from './PinmonyHomeCategoryMaterial';
 
 @Component
 export struct PinmonyHomePage {
@@ -299,6 +300,7 @@ export struct PinmonyHomePage {
                 .fontWeight(FontWeight.Medium)
                 .backgroundColor(this.categoryTabSelected(index, tab) ? $r('app.color.detail_save_accent') : $r('app.color.input_surface'))
                 .fontColor(this.categoryTabSelected(index, tab) ? Color.White : $r('app.color.primary_text'))
+                .attributeModifier(new PinmonyHomeCategoryMaterial(this.immersiveLightMode, this.categoryTabSelected(index, tab)))
                 .enabled((this.interactionReady || this.offlinePreview) && tab.enabled)
                 .accessibilitySelected(this.categoryTabSelected(index, tab))
                 .onClick(() => {
@@ -404,6 +406,7 @@ export struct PinmonyHomePage {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       HdsNavigation() { this.categoryFeed() }
+        .mode(NavigationMode.Stack)
         .width('100%').height('100%')
         .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
         .titleBar(this.homeTitleBarOptions())

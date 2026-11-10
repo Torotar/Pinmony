@@ -8,6 +8,7 @@ const events = [];
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + source.slice(start, end) + '} Host;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
 { ComponentContent: Content, wrapBuilder: x => x, buildPhotoMenu() {},
+  PinmonySearchPhotoMenuMaterial: { options: (_mode, options) => options },
   PinmonyRuntimeLog: { info: s => events.push(s), warn: s => events.push(s) } });
 (async () => {
   const host = new Host(); let opens = 0, closes = 0, uploads = 0, histories = 0, disappear, finishClose, rejectClose = false;

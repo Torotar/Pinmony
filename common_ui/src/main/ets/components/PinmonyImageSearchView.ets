@@ -8,6 +8,7 @@ import { PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin, PinmonyImageS
 
 @Component
 export struct PinmonyImageSearchView {
+  @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop pin: string = '';
@@ -104,6 +105,7 @@ export struct PinmonyImageSearchView {
   @State private crop: PinmonyImageCrop = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
   @State private widthValue: number = 360;
   @State private heightValue: number = 720;
+  @State private resultContentWidth: number = 340;
   @State private sheetVisible: boolean = false;
   @State private sheetHeight: string | SheetSize = '40%';
   @State private expanded: boolean = false;
@@ -284,27 +286,32 @@ export struct PinmonyImageSearchView {
   }
   @Builder
   private card(p: PinmonyRelatedPin) {
-    Image(p.imageUrl).width('100%').height(Math.max(100, Math.min(430, (this.widthValue - 30) / 2 * p.imageHeight / p.imageWidth)))
+    Image(p.imageUrl).width('100%').height(Math.max(100, Math.min(430,
+      (this.resultContentWidth - (this.resultColumnCount() - 1) * 10) / this.resultColumnCount() * p.imageHeight / p.imageWidth)))
       .id((this.uploadedPhoto ? 'pinmony-photo-result-' : 'pinmony-visual-result-' + this.pin + '-') + p.id)
       .objectFit(ImageFit.Cover).borderRadius(16)
       .onClick(() => this.openRelated(p))
       .accessibilityText(p.title || this.uiText("pm_open_related_pin_e1e5dfc7"))
   }
+  private resultColumnCount(): number { return this.widthValue > this.heightValue ? 3 : 2; }
+  private resultColumns(): number[] { return this.resultColumnCount() === 3 ? [0, 1, 2] : [0, 1]; }
   @Builder
   private resultsPanel() {
     Column({ space: 12 }) {
       Scroll(this.resultScroller) {
         Column({ space: 12 }) {
           Row({ space: 10 }) {
-            Column({ space: 10 }) {
-              ForEach(this.result.items.filter((_p: PinmonyRelatedPin, i: number): boolean => i % 2 === 0),
-                (p: PinmonyRelatedPin) => { this.card(p) }, (p: PinmonyRelatedPin): string => p.id)
-            }.layoutWeight(1)
-            Column({ space: 10 }) {
-              ForEach(this.result.items.filter((_p: PinmonyRelatedPin, i: number): boolean => i % 2 === 1),
-                (p: PinmonyRelatedPin) => { this.card(p) }, (p: PinmonyRelatedPin): string => p.id)
-            }.layoutWeight(1)
+            ForEach(this.resultColumns(), (column: number) => {
+              Column({ space: 10 }) {
+                ForEach(this.result.items.filter((_p: PinmonyRelatedPin, i: number): boolean => i % this.resultColumnCount() === column),
+                  (p: PinmonyRelatedPin) => { this.card(p) }, (p: PinmonyRelatedPin): string => p.id)
+              }.layoutWeight(1)
+            }, (column: number): string => this.resultColumnCount().toString() + ':' + column.toString())
           }.width('100%').alignItems(VerticalAlign.Top)
+            .onAreaChange((_old: Area, area: Area) => {
+              const width: number = Number(area.width);
+              if (width > 0 && Math.abs(width - this.resultContentWidth) > 1) this.resultContentWidth = width;
+            })
           if (this.result.error) {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => { if (this.onSearch) this.onSearch(this.crop, this.result.items.length > 0, false); }, actionEnabled: !this.uploadedPhoto })
           } else if (this.result.loading) {
@@ -385,7 +392,8 @@ export struct PinmonyImageSearchView {
     Column() { this.searchContent() }.width('100%').height('100%')
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       .bindSheet($$this.sheetVisible, this.resultsPanel, {
-        radius: LengthMetrics.vp(32),
+      radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : SheetType.BOTTOM,
         onWillAppear: (): void => { this.sheetAppearing = true; this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=uniform-32vp'); },
         onAppear: (): void => this.resultSheetAppeared(),
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: this.uiText("pm_more_pins_like_this_6e224087") },

@@ -5,7 +5,7 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import lazy { window } from '@kit.ArkUI';
+import lazy { display, window } from '@kit.ArkUI';
 import lazy { deviceInfo } from '@kit.BasicServicesKit';
 import lazy { webview } from '@kit.ArkWeb';
 import lazy { NetworkManager, PinmonyJpegDecode } from 'common_network';
@@ -46,7 +46,8 @@ export default class EntryAbility extends UIAbility {
     const name: string = typeof reason.name === 'string' && /^[A-Za-z]+$/.test(reason.name) ? reason.name : 'UnknownError';
     // Classify known errors without exporting arbitrary messages or business payloads.
     const message: string = typeof reason.message === 'string' ? reason.message : '';
-    const category: string = /measure|MeasureUtils|constraintWidth/i.test(message) ? 'text-measure' :
+    const category: string = /CloseCustomDialog|close.*dialog|cannot find dialog/i.test(message) ? 'dialog-close' :
+      /measure|MeasureUtils|constraintWidth/i.test(message) ? 'text-measure' :
       /ForEach|duplicate.*key/i.test(message) ? 'node-identity' :
       /Webview|WebView|controller|runJavaScript/i.test(message) ? 'web-controller' :
       /cancel|abort/i.test(message) ? 'cancellation' : 'unknown';
@@ -59,6 +60,7 @@ export default class EntryAbility extends UIAbility {
     const rawStack: string = typeof reason.stack === 'string' ? reason.stack : '';
     const uiOperation: string = /closeMenu/i.test(message + rawStack) ? 'menu-close' :
       /openMenu/i.test(message + rawStack) ? 'menu-open' :
+      /CloseCustomDialog|close.*dialog|cannot find dialog/i.test(message + rawStack) ? 'dialog-close' :
       /SnackBar/i.test(message + rawStack) ? 'snackbar' : 'unknown';
     PinmonyRuntimeLog.error('Runtime error detail: code=' + code + ' operation=' + uiOperation +
       ' messagePresent=' + (message.length > 0).toString() + ' stackPresent=' + (rawStack.length > 0).toString());
@@ -126,6 +128,12 @@ export default class EntryAbility extends UIAbility {
     this.syncSystemColorMode(newConfig.colorMode);
   }
 
+  private canConfigureOrientation(): boolean {
+    if (deviceInfo.deviceType === 'tablet') return true;
+    try { return display.isFoldable(); }
+    catch (_) { return false; }
+  }
+
   onWindowStageCreate(windowStage: window.WindowStage): void {
     this.windowStageReady = true;
     this.logLifecycle('window-stage-create', 'windowStage=true content=' + this.contentLoaded.toString());
@@ -134,7 +142,7 @@ export default class EntryAbility extends UIAbility {
 
     try {
       this.mainWindow = windowStage.getMainWindowSync();
-      if (deviceInfo.deviceType === 'tablet') {
+      if (this.canConfigureOrientation()) {
         const preference: string = AppStorage.get<string>('screenOrientationPreference') || 'system';
         const orientation: window.Orientation = preference === 'auto' ? window.Orientation.AUTO_ROTATION :
           preference === 'portrait' ? window.Orientation.PORTRAIT : preference === 'landscape' ?
@@ -201,6 +209,8 @@ export default class EntryAbility extends UIAbility {
   }
 
   private updateStatusBarHeight(heightPx: number): void {
+    // A hidden system bar must not shrink the retained source page's layout.
+    if (heightPx <= 0 && AppStorage.get<boolean>('pinmonyViewerPreserveStatusInset') === true) return;
     AppStorage.setOrCreate<number>('statusBarHeightPx', Math.max(0, heightPx));
   }
 
@@ -246,7 +256,7 @@ export default class EntryAbility extends UIAbility {
       this.mainWindow.setWindowSystemBarProperties({
         statusBarColor: '#00000000',
         navigationBarColor: '#00000000',
-        statusBarContentColor: contentColor,
+        statusBarContentColor: AppStorage.get<boolean>('pinmonyViewerStatusCovered') === true ? '#00000000' : contentColor,
         navigationBarContentColor: contentColor
       });
     } catch (err) {

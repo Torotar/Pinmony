@@ -237,8 +237,8 @@ export struct PinmonyPhotoHistoryView {
           PinmonyActionNotice({ message: this.text('pm_photo_history_error'), actionText: this.text('pm_retry_b8784c8d'), onAction: () => this.load() })
         } else if (!this.busy && !this.items.length) {
           Column({ space: 8 }) {
-            Text(this.text('pm_photo_history_empty')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-            Text(this.text('pm_photo_history_empty_hint')).fontSize(15).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
+            Text(this.text('pm_photo_history_empty')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center).width('100%').constraintSize({ maxWidth: 448 })
+            Text(this.text('pm_photo_history_empty_hint')).fontSize(15).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center).width('100%').constraintSize({ maxWidth: 448 })
           }.width('100%').height('100%').padding({top:this.titleContentInset()}).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         }
       }.width('100%').height('100%').padding({left:16,right:16})

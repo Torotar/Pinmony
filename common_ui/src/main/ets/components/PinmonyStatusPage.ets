@@ -17,10 +17,10 @@ export struct PinmonyStatusPage {
         LoadingProgress().width(36).height(36).color($r('app.color.accent'))
       }
       if (this.loading) {
-      Text(PinmonyI18n.render(this.title, this.uiLanguage)).fontSize(18).fontColor($r('app.color.primary_text'))
+      Text(PinmonyI18n.render(this.title, this.uiLanguage)).fontSize(18).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center).width('100%').constraintSize({ maxWidth: 448 })
       if (this.message) {
         Text(PinmonyI18n.render(this.message, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
-          .textAlign(TextAlign.Center).maxLines(4).margin({ left: 24, right: 24 })
+          .textAlign(TextAlign.Center).width('100%').constraintSize({ maxWidth: 448 }).maxLines(4)
       }
       }
       if (!this.loading) {
@@ -31,6 +31,8 @@ export struct PinmonyStatusPage {
       }
     }
     .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .padding({ left: 24, right: 24 })
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))

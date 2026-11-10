@@ -15,6 +15,7 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 // from the profile's ordinary "整理到图板" flow.
 @Component
 export struct PinmonyPublishBoardPage {
+  @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -72,7 +73,7 @@ export struct PinmonyPublishBoardPage {
         Column() { this.createButton() }
           .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
       }.width('100%').height('100%')
-    }.width('100%').height('100%')
+    }.mode(NavigationMode.Stack).width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.createScroller])
       .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { enableComponentSafeArea: false,
         style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
@@ -124,7 +125,7 @@ export struct PinmonyPublishBoardPage {
   }
   @Builder
   private sectionsPage() {
-    HdsNavigation(this.sectionPaths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.sectionPaths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.sectionsDestination)
   }
   build() {
@@ -133,7 +134,8 @@ export struct PinmonyPublishBoardPage {
     if (this.state.phase === 'create') {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
         .bindSheet($$this.createVisible, this.createSheet(), {
-          radius: LengthMetrics.vp(32),
+      radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
           onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPublishBoardPage.createVisible radius=uniform-32vp'); },
           height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
           backgroundColor: $r('app.color.page_background'),

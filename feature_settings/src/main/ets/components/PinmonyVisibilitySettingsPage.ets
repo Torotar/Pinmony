@@ -11,6 +11,7 @@ import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyVisibilitySettingsPage {
+  @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
@@ -144,7 +145,8 @@ export struct PinmonyVisibilitySettingsPage {
       .bindToScrollable([this.scroller]).onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.store.confirmOpen, this.privacySheet(), {
-        radius: LengthMetrics.vp(32),
+      radius: LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisibilitySettingsPage.store.confirmOpen radius=uniform-32vp'); },
         height: Math.min(380, this.viewportHeight * 0.8), showClose: true, dragBar: false,
         backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
@@ -152,7 +154,7 @@ export struct PinmonyVisibilitySettingsPage {
       })
   }
   build() {
-    HdsNavigation(this.paths) { Column().width('100%').height('100%') }
+    HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))
       .onAreaChange((_old: Area, area: Area) => { const height: number = Number.parseFloat(area.height.toString()); if (Number.isFinite(height)) this.viewportHeight = Math.max(200, height); })
   }

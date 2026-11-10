@@ -6,7 +6,7 @@ const file = 'feature_profile/src/main/ets/components/PinmonyPublishPage.ets';
 const source = fs.readFileSync(file, 'utf8');
 const sf = ts.createSourceFile(file, source.replace('export struct PinmonyPublishPage', 'export class PinmonyPublishPage'), ts.ScriptTarget.Latest, true);
 const view = sf.statements.find(n => ts.isClassDeclaration(n) && n.name.text === 'PinmonyPublishPage');
-const names = ['syncWebsiteRoute', 'websiteTransition', 'destinationPhase', 'pageBack', 'act'];
+const names = ['syncWebsiteRoute', 'websiteTransition', 'destinationPhase', 'pageBack', 'dismissDraftExpiryTip', 'act'];
 const methods = names.map(name => view.members.find(n => ts.isMethodDeclaration(n) && n.name?.getText(sf) === name).getText(sf)).join('\n');
 const scope = { exports: {}, NavigationOperation: { POP: 'pop' }, Curve: { EaseOut: 'easeOut' } };
 vm.runInNewContext(ts.transpileModule('export class Host {' + methods + '}', { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, scope);

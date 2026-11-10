@@ -65,6 +65,8 @@ function fixture() {
     'searchNativeReads','searchDiscoveryNativeReads','homeNativeReads']) host[name] = { reset() {} };
   Object.assign(host, { nativeLoginEnabled: true, nativeBusinessRoutesEnabled: true, loginHostMounted: false,
     inboxBackgroundSync: { stop() { effects.push('background-stop'); } },
+    boardInvitationNotice: { reset() { effects.push('invitation-reset'); } },
+    imageViewer: { cancel() { effects.push('viewer-cancel'); } },
     authStatus: 'checking', authEpoch: 0, nativeSessionEpoch: 0, nativeVerificationPending: false,
     nativeLoginEvidenceKey: '', nativeSessionOrigin: 'https://www.pinterest.com', businessSuspended: false,
     controller: new Controller(), sessionEnvironment: new PinmonySessionEnvironment(), businessSession: new PinmonyBusinessSession(),
