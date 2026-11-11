@@ -68,9 +68,15 @@ assert.equal(store.detailOrigin('1'), '', 'origin history is bounded');
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const documentBinding = fs.readFileSync('feature_pin/src/main/ets/services/PinmonyDetailDocumentBinding.ets', 'utf8');
 function method(name) {
-  const start = index.indexOf('  private ' + name);
-  assert(start >= 0, name);
-  return index.slice(start, index.indexOf('\n  private ', start + 1));
+  const ast = ts.createSourceFile('index.ts', index.replace(/\bstruct\b/g, 'class'), 99, true);
+  let found;
+  const methodName = name.replace(/^async /, '');
+  function visit(node) {
+    if (ts.isMethodDeclaration(node) && node.name.getText(ast) === methodName) found = node.getText(ast);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast); assert(found, name);
+  return found;
 }
 // Legacy document-return compatibility; native profile returns execute in check-native-profile-navigation.cjs.
 const context = { PIN_NATIVE_PROFILE_READS_ENABLED: false, PINTEREST_URL: home, PIN_NATIVE_NETWORK_ENABLED: true,

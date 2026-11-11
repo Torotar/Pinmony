@@ -133,7 +133,7 @@ const stateBlock = source.slice(stateStart, source.indexOf('  private selectPinV
 const modernState = stateBlock.slice(0, stateBlock.indexOf('    } else {\n    Toggle('));
 assert(modernState.includes('Button({type:ButtonType.Normal})') && !modernState.includes('Toggle('), 'API26 uses Button material host rather than Toggle button skin');
 assert(modernState.includes('.padding(0)') && modernState.includes('.height(40)'), 'preserve filter geometry');
-assert(stateBlock.includes("!this.hubSelected(kind) &&"), 'selected filters retain the accent background');
+assert(stateBlock.includes('materialColor: this.hubStateMaterialColor(kind)'), 'selected filters retain their accent through material tint');
 assert(!stateBlock.slice(stateBlock.indexOf('} else {')).includes('.systemMaterial('), 'legacy toggle has no new material attribute');
 assert.equal((stateBlock.match(/this.requestHub\(\)/g) || []).length, 2, 'both toggle branches retain the filter request');
 const materialExpressions = [];
@@ -149,8 +149,15 @@ for (const [index, materialExpression] of materialExpressions.entries()) for (co
       isImmersiveMaterialSupported: () => supported,
       ImmersiveMaterial: class { constructor(options) { effects.push(options); } } }
   });
-  const result = evaluate.call({ immersiveLightMode: mode, hubSelected: () => false });
-  if (index === 0) assert.equal(evaluate.call({ immersiveLightMode: mode, hubSelected: () => true }), empty, 'selected filter preserves its accent');
+  const result = evaluate.call({ immersiveLightMode: mode, hubSelected: () => false, hubStateMaterialColor: () => undefined });
+  if (index === 0) {
+    const selected = evaluate.call({ immersiveLightMode: mode, hubSelected: () => true, hubStateMaterialColor: () => 'accent-tint' });
+    if (!supported || mode === 'off') assert.equal(selected, empty, 'off/unsupported clears selected material');
+    else {
+      assert.notEqual(selected, empty, 'selected filter retains immersive material');
+      assert.equal(effects.at(-1).materialColor, 'accent-tint', 'selected material preserves the accent tint');
+    }
+  }
   if (!supported || mode === 'off') assert.equal(result, empty, 'off/unsupported clears the material');
   else {
     assert.equal(effects[0].style, mode === 'gentle' ? 3 : index === 3 ? 0 : 2);
@@ -162,4 +169,4 @@ console.log('Profile custom title passed: all header controls in HDS builder, dr
 
 assert.equal((source.match(/\.shadow\(\{ radius:/g)||[]).length,5, 'all five profile control surfaces use compact explicit shadows');
 
-assert(source.includes('.shadow({ radius: !this.hubSelected(kind) &&'), 'selected accent filters have no material shadow');
+assert(!modernState.includes('.shadow({ radius: !this.hubSelected(kind) &&'), 'selected accent filters retain their material shadow');

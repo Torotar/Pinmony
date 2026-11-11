@@ -156,6 +156,7 @@ async function main() {
   runtime.cache.writeHomeCache(cache,'partition-one',snapshot(4),()=>markers++);
   runtime.cache.writeHomeCache(cache,'partition-two',snapshot(4),()=>markers++);
   assert.notEqual(writes[0][0],writes[1][0]); assert.equal(markers,2);
+  assert.equal(writes[0][2], reads[0][1], 'read and write share the presentation-only retention window');
   cached={snapshot:snapshot(1,[],{dataSource:'dom'})};
   assert.equal(runtime.cache.readHomeCache(cache,'partition-one',root,'test'),undefined);
   assert.equal(removed.length,1);

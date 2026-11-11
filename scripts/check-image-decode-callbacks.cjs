@@ -75,7 +75,8 @@ const Prefetch = vm.runInNewContext(ts.transpileModule('class Prefetch {' + pref
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText);
 const queue = new Prefetch();
-Object.assign(queue, { home: { pins: [{ imageUrl: 'card' }, { imageUrl: 'old' }] },
+Object.assign(queue, { firstImageSettled: true, paneActive: true, feedActive: true, imageLoadingActive: true,
+  home: { pins: [{ imageUrl: 'card' }, { imageUrl: 'old' }] },
   recoveredSources: { old: 'recovered' }, prefetchedImageUrls: ['card', 'detail', 'detail', 'recovered', 'other', ''] });
 assert.deepEqual(Array.from(queue.uniquePrefetchImages()), ['detail', 'other'],
   'prefetch excludes current card/recovery sources and duplicates while retaining distinct detail tiers');

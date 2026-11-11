@@ -19,6 +19,7 @@ function runtime(ts, globals = {}) {
     return loader;
 }
 function stores(native, loader, globals = {}) {
+    native.homeImageWarmup ||= new (loader.loadFile('entry/src/main/ets/app/PinmonyHomeImageWarmup.ets').PinmonyHomeImageWarmup)();
     native.usesNativeProfileReads ||= () => globals.PIN_NATIVE_PROFILE_READS_ENABLED === true;
     native.uiText ||= source => require('./local-message-test-fixture.cjs').rawLocalMessages.text(source);
     native.sessionDocumentUrl ||= () => native.controller?.getUrl?.() || '';

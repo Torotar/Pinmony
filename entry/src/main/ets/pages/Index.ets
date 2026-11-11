@@ -102,11 +102,12 @@ import { PinmonyReturnCoordinator, PinmonyReturnPorts } from '../app/PinmonyRetu
 
 import { pinWebDocumentStartScripts } from '../app/PinmonyScriptRegistry';
 
-import { PinmonyHomeController, PinmonyHomePorts, readHomeCache, writeHomeCache, PinmonyHomeStore,
+import { PinmonyHomeController, PinmonyHomePorts, readHomeCache, writeHomeCache, readHomeImageConnectionSeed, PinmonyHomeStore,
   PinmonyHomeMenuState, PinmonyHomeMenuSheet, PinmonyHomePin, PinmonyHomeSnapshot } from 'feature_home';
 
 import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply,
   PIN_NATIVE_NETWORK_ENABLED, useNativeTransport } from 'common_network';
+import { PinmonyHomeImageWarmup } from '../app/PinmonyHomeImageWarmup';
 import { PinmonyBuildLoginPage } from '../components/PinmonyLoginPage';
 import { PinmonyTranslationDiagnosticHost } from '../components/PinmonyTranslationDiagnosticHost';
 import { PINMONY_TRANSLATION_DIAGNOSTIC_ENABLED } from '../app/PinmonyTranslationDiagnosticConfig';
@@ -427,6 +428,7 @@ struct Index {
   } as PinmonyFailureRecoveryCoordinatorPorts);
 
   private readonly bottomBarCoordinator: PinmonyBottomBarCoordinator = new PinmonyBottomBarCoordinator({
+    foreground: (): boolean => !this.businessSuspended,
     searchResultsVisible: (): boolean => this.activeTab === 1 &&
       (this.searchStore.photoSearchVisible || this.searchStore.searchInputFocused ||
         /[?&]q=[^&#]+/i.test(this.searchStore.search?.pageKey || this.currentSearchPageKey())),
@@ -457,6 +459,7 @@ struct Index {
   private pageLifecycleStartedAt: number = 0;
   private pageLifecycleLastEventAt: number = 0;
   private homeApiCache: ApiCache | undefined = undefined;
+  private readonly homeImageWarmup: PinmonyHomeImageWarmup = new PinmonyHomeImageWarmup();
   @StorageLink('pinmonyMemoryPressureSequence') @Watch('trimPresentationMemory')
   private memoryPressureSequence: number = 0;
   private trimPresentationMemory(): void {
@@ -1450,6 +1453,7 @@ struct Index {
     this.searchController.invalidatePending();
     this.pinStore.videoForeground = false;
     this.businessSuspended = true;
+    this.homeImageWarmup.dispose();
     this.nativeNetwork.setForeground(false); this.detailReadNetwork.setForeground(false); this.userAvatarReads.pause();
     this.tabRequestToken++; this.rootReadToken = -1; this.pendingWebTab = -1;
     this.runSessionScript('window.PinmonyNetwork && window.PinmonyNetwork.setForeground(false)').catch(() => {});
@@ -2462,6 +2466,7 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.homeImageWarmup.dispose();
     this.imageViewer.cancel();
     this.inboxBackgroundSync.dispose();
     this.userAvatarReads.dispose();
@@ -3861,6 +3866,7 @@ struct Index {
   }
 
   private clearRootTabCaches(clearPersistentCache: boolean = true): void {
+    this.homeImageWarmup.dispose();
     this.pagePerformance.cancel();
     this.controllerLifecycle().pause();
     this.boardInvitationController.reset();
@@ -4065,6 +4071,10 @@ struct Index {
   private restoreHomeDiskCache(accountId: string, pageKey: string, trigger: string): boolean {
     this.initializeHomeApiCache();
     if (!this.homeApiCache || !accountId || !pageKey) return false;
+    if (trigger === 'authenticated-identity' && this.authStatus === 'authenticated' && !this.businessSuspended &&
+        this.activeTab === 0 && !this.offlinePreviewMode) {
+      this.homeImageWarmup.prepare(readHomeImageConnectionSeed(this.homeApiCache, accountId, pageKey));
+    }
     const snapshot: PinmonyHomeSnapshot | undefined = readHomeCache(this.homeApiCache, accountId, pageKey, trigger);
     if (!snapshot) return false;
     this.homeController.restoreCacheSnapshot(snapshot);

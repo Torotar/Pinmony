@@ -50,7 +50,10 @@ async function verifyHost(path, methods, mounted, pending, bitmap, load, sharedF
   const home = read('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets');
   const detail = read('feature_pin/src/main/ets/components/PinmonyDetailPage.ets');
   const search = read('feature_search/src/main/ets/components/PinmonySearchPage.ets');
-  assert(home.includes('loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false'));
+  assert(home.includes('loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: true'),
+    'visible home cards retain current viewport-first admission');
+  assert(home.includes('PinmonyCdnImage({ url: url, useSharedDecode: false, viewportOnly: false,'),
+    'explicit hidden prefetch uses native image cache without waiting for a visibility callback');
   assert.equal((detail.match(/loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false/g) || []).length, 2);
   assert.equal((home.match(/cachedCount\(12, true\)/g) || []).length, 1);
   assert.equal((detail.match(/cachedCount\(12, true\)/g) || []).length, 1);

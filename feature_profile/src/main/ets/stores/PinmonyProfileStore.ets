@@ -6,6 +6,11 @@ import { PinmonyProfileSnapshot, PinmonyPublishOption } from '../models/PinmonyP
 
 export interface ProfileOrigin { page: string; tab: number; profile?: PinmonyProfileSnapshot; scroll: number; panel?: PinmonyProfilePanel; }
 
+// Return-position bookkeeping is not a render input during a scroll gesture.
+class PinmonyProfileScrollPosition {
+  offset: number = 0;
+}
+
 @Observed
 export class PinmonyProfileStore {
   searchVisible: boolean = false;
@@ -37,7 +42,10 @@ export class PinmonyProfileStore {
   profileSessionReady: boolean = false;
   profilePullRefreshing: boolean = false;
   profilePullToken: number = 0;
-  profileScrollOffset: number = 0;
+  private readonly scrollPosition: PinmonyProfileScrollPosition = new PinmonyProfileScrollPosition();
+  get profileScrollOffset(): number { return this.scrollPosition.offset; }
+  set profileScrollOffset(offset: number) { this.scrollPosition.offset = offset; }
+  rememberScrollOffset(offset: number): void { this.scrollPosition.offset = offset; }
   private _profileLoading: boolean = false;
   get profileLoading(): boolean { return this._profileLoading; }
   set profileLoading(value: boolean) {

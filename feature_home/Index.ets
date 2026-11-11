@@ -8,4 +8,4 @@ export { retainHomePins } from './src/main/ets/services/PinmonyHomeRetention';
 export { PinmonyHomeStore } from './src/main/ets/stores/PinmonyHomeStore';
 export { PinmonyHomeController } from './src/main/ets/controllers/PinmonyHomeController';
 export { PinmonyHomePorts } from './src/main/ets/models/PinmonyHomePorts';
-export { readHomeCache, writeHomeCache } from './src/main/ets/services/PinmonyHomeCache';
+export { readHomeCache, writeHomeCache, readHomeImageConnectionSeed } from './src/main/ets/services/PinmonyHomeCache';

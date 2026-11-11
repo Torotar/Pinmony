@@ -82,7 +82,7 @@ pending.end(2);assert.equal(pending.hubTitlePosition(),2,'direct click settles t
 pending.hubIndicatorClickTarget=-1;pending.hubPagerPosition=1.3;pending.switchHubTab('boards');pending.end(1);
 assert.equal(pending.hubTitlePosition(),1,'onChange before animation end also keeps its destination');
 assert(!source.includes('this.setHubChromeCollapsed(false);this.sortVisible = false;this.hubTab = tab'),'selection cannot force expansion');
-assert(source.includes('hubChromeOffsetVp:this.hubPaneChromeOffset(tab)'));
+assert(!source.includes('hubChromeOffsetVp:'),'title frame changes cannot propagate an unused prop to all retained panes');
 assert(source.includes('.bindToScrollable(this.hubScrollBinding())'));
 assert(source.includes('this.updateHubPagerPosition(selectedIndex,index,position);'));
 assert(source.includes('if(this.hubPagerPosition < 0)this.hubPagerPosition = index'),'release preserves current drag progress');

@@ -205,6 +205,40 @@ export struct PinmonyHomeFeedPane {
   private paginationTraceKey: string = '';
   private imageTraceCount: number = 0;
   private imageTraceStartedAt: number = Date.now();
+  @State private firstImageSettled: boolean = false;
+  private firstImageSource: string = '';
+  private syncFirstImagePriority(): void {
+    const first: PinmonyHomePin | undefined = this.home.pins[0];
+    const source: string = this.home.pageKey + ':' + this.home.selectedTab + ':' +
+      (first ? first.id + ':' + first.imageUrl : '');
+    if (source === this.firstImageSource) return;
+    this.firstImageSource = source;
+    this.firstImageSettled = false;
+  }
+
+  private settleFirstImage(pin: PinmonyHomePin): void {
+    if (!this.paneMounted || this.firstImageSettled) return;
+    const index: number = this.home.pins.findIndex((item: PinmonyHomePin): boolean =>
+      item.id === pin.id && item.imageUrl === pin.imageUrl);
+    if (index < this.visibleFirst || index > Math.max(this.visibleFirst, this.visibleLast)) return;
+    // Both success and failure release speculative work; a failed card must
+    // not leave pagination or retained detail preparation waiting forever.
+    this.firstImageSettled = true;
+    this.onPrefetchAvailabilityChanged();
+  }
+
+  private releaseUnobservableImagePriority(): void {
+    if (!this.paneMounted || !this.paneActive || this.firstImageSettled || this.visibleLast < this.visibleFirst) return;
+    const last: number = Math.min(this.visibleLast, this.home.pins.length - 1);
+    if (last < this.visibleFirst) return;
+    for (let index: number = this.visibleFirst; index <= last; index++) {
+      const pin: PinmonyHomePin = this.home.pins[index];
+      if (!pin.video && this.failedImages.indexOf(pin.imageUrl) < 0) return;
+    }
+    // Video posters and retained error cards have no image callback here.
+    this.firstImageSettled = true;
+    this.onPrefetchAvailabilityChanged();
+  }
   private paginationTrace(reason: string): void {
     if (reason === 'speculative-disabled' && (!this.paneActive || this.home.pins.length === 0)) return;
     const key: string = reason + ':' + this.home.pins.length.toString() + ':' +
@@ -235,6 +269,7 @@ export struct PinmonyHomeFeedPane {
   onPrefetchPins?: (first: number, last: number) => void;
 
   aboutToAppear(): void {
+    this.syncFirstImagePriority();
     this.syncFeedRows();
     this.paneMounted = true;
     if (this.paneActive) this.watchImageNetwork();
@@ -401,6 +436,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private onHomeChanged(): void {
+    this.syncFirstImagePriority();
     if (this.lastHomePinCount > 0 && this.home.pins.length === 0) {
       this.reportScrollPosition(true);
       this.restoreDone = false;
@@ -443,12 +479,15 @@ export struct PinmonyHomeFeedPane {
     if (!this.restoreDone) this.restoreScrollPosition();
     this.onImageRecovery();
     this.syncFeedRows();
+    this.releaseUnobservableImagePriority();
     this.onPrefetchAvailabilityChanged();
     this.scheduleViewportFill();
   }
 
   private prefetchNextScreen(): void {
     if (!this.paneMounted || !this.paneActive || !this.feedActive) return;
+    // Feed pagination runs alongside visible images. Only detail/image
+    // prefetch waits for image settlement, never the next feed page.
     if (!allowsSpeculativeReads()) { this.paginationTrace('speculative-disabled'); return; }
     if (this.prefetchNotBefore > Date.now()) {
       if (this.prefetchTimer === -1) {
@@ -567,6 +606,7 @@ export struct PinmonyHomeFeedPane {
 
   private prefetchVisibleDetails(): void {
     if (!this.paneMounted || !this.paneActive) return;
+    if (!this.firstImageSettled) return;
     if (!allowsSpeculativeReads()) return;
     if (!this.feedActive || !this.actionsReady || this.loading || this.refreshing || this.pendingTabId ||
       this.home.refreshing || this.visibleLast < 0 || !this.onPrefetchPins) return;
@@ -720,10 +760,11 @@ export struct PinmonyHomeFeedPane {
         Stack({ alignContent: Alignment.TopStart }) {
           PinmonyCdnImage({ url: this.recoveredSources[pin.imageUrl] || pin.imageUrl, fit: ImageFit.Cover,
             traceLoading: true, traceIndex: this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id),
-            loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false,
+            loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: true,
             onDecoded: () => {
               if (session !== this.home.session || pageKey !== this.home.pageKey ||
                 imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
+              this.settleFirstImage(pin);
               if (this.imageTraceCount++ < 40) PinmonyRuntimeLog.info('HomeImageTrace: phase=complete index=' +
                 this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
                 ' sincePageMs=' + (Date.now() - this.imageTraceStartedAt));
@@ -731,6 +772,7 @@ export struct PinmonyHomeFeedPane {
             onFailure: (code: number) => {
               if (session !== this.home.session || pageKey !== this.home.pageKey) return;
               if (imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
+              this.settleFirstImage(pin);
               if (this.failedImages.indexOf(pin.imageUrl) < 0) {
                 PinmonyRuntimeLog.warn('HomeImageError: revision=' + imageRevision.toString() +
                   ' index=' + this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
@@ -802,6 +844,8 @@ export struct PinmonyHomeFeedPane {
   }
 
   private uniquePrefetchImages(): string[] {
+    if (!this.firstImageSettled || !this.paneActive || !this.feedActive || !this.imageLoadingActive ||
+      this.loading || this.refreshing || this.home.refreshing || !!this.pendingTabId) return [];
     const cardSources: Set<string> = new Set<string>();
     this.home.pins.forEach((pin: PinmonyHomePin): void => {
       cardSources.add(this.recoveredSources[pin.imageUrl] || pin.imageUrl);
@@ -847,7 +891,11 @@ export struct PinmonyHomeFeedPane {
         // This zero-height container has no input or accessibility semantics.
         Row() {
           ForEach(this.uniquePrefetchImages(), (url: string) => {
-            PinmonyCdnImage({ url: url, loadPriority: 0 }).width(1).height(1).opacity(0).accessibilityLevel('no')
+            // Use the same native Image cache path as visible cards, as in the
+            // earlier home feed. Detail/hero shared decoding remains unchanged.
+            PinmonyCdnImage({ url: url, useSharedDecode: false, viewportOnly: false,
+              loadingActive: this.imageLoadingActive && this.paneActive })
+              .width(1).height(1).opacity(0).accessibilityLevel('no')
           }, (url: string) => url)
         }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }
@@ -933,6 +981,7 @@ export struct PinmonyHomeFeedPane {
             .onScrollIndex((first: number, last: number) => {
               this.visibleFirst = Math.max(0, first);
               this.visibleLast = Math.min(last, this.home.pins.length - 1);
+              this.releaseUnobservableImagePriority();
               if (this.paneActive && this.feedActive) this.paginationWindow.viewport(this.visibleLast, Date.now());
               if (this.onVisiblePins) this.onVisiblePins(first, last);
               this.retryRecoveredImages();

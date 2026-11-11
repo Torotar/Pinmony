@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const src=fs.readFileSync('common_ui/src/main/ets/components/PinmonyDraggablePublishButton.ets','utf8');
 const methods=src.slice(src.indexOf('  private left()'),src.indexOf('  build()'));
 const saves=[];
-const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Date,Curve:{EaseOut:1},PinmonyRuntimeLog:{info(){}},PinmonyPublishAnchor:{save:(...a)=>saves.push(a)}});
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Date,Curve:{EaseOut:1},PinmonyRuntimeLog:{info(){}},PinmonyPublishAnchor:{save:(...a)=>saves.push(a)},deviceInfo:{apiAvailable:()=>false},$r:key=>key,BlurStyle:{COMPONENT_ULTRA_THICK:1}});
 const h=new Host();Object.assign(h,{areaWidth:400,areaHeight:700,moved:false,right:true,fraction:1,actionEnabled:true,getUIContext:()=>({animateTo:(_,action)=>action()})});
 h.resize();assert.equal(h.x,172);assert.equal(h.y,624,'default retains 20vp bottom gap');
 h.start();h.move({offsetX:-10000,offsetY:-10000});assert.equal(h.x,16);assert.equal(h.y,16);h.settle();assert.equal(h.x,16);assert(!h.dragging);assert(h.suppressClickUntil>Date.now(),'drag release cannot publish');

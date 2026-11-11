@@ -1,8 +1,11 @@
 import { PinmonyI18n, PinmonyRuntimeLog, PinmonyPublishAnchor } from 'common_foundation';
+import { uiMaterial } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
 
 @Component
 export struct PinmonyDraggablePublishButton {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @Prop @Watch('resize') areaWidth: number = 0;
   @Prop @Watch('resize') areaHeight: number = 0;
   @Prop @Watch('syncMenuAvailability') actionEnabled: boolean = true;
@@ -66,6 +69,31 @@ export struct PinmonyDraggablePublishButton {
     PinmonyRuntimeLog.info('PublishMenuTrace: event=closed');
     if (this.mounted && this.menuEnabled && this.actionEnabled) action?.();
   }
+  private sourceMenuOptions(): MenuOptions {
+    const options: MenuOptions = {
+      backgroundColor: $r('app.color.publish_source_button_glass'),
+      backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK,
+      onAppear: (): void => { PinmonyRuntimeLog.info('PublishMenuTrace: event=shown'); },
+      onDisappear: (): void => this.finishMenuClose()
+    };
+    if (!this.menuEnabled) return options;
+    if (deviceInfo.apiAvailable('26.0.0')) {
+      let active: boolean = false;
+      if (this.immersiveLightMode !== 'off') {
+        try { active = uiMaterial.isImmersiveMaterialSupported(); }
+        catch (_) { /* Preserve the ordinary menu when capability lookup is unavailable. */ }
+      }
+      options.systemMaterial = active ? new uiMaterial.ImmersiveMaterial({
+        style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
+        colorInvert: false, applyShadow: true, interactive: true, lightEffect: {}
+      }) : uiMaterial.Material.empty;
+      if (active) {
+        options.backgroundColor = Color.Transparent;
+        options.backgroundBlurStyle = BlurStyle.NONE;
+      }
+    }
+    return options;
+  }
   private resize(): void {
     if (!Number.isFinite(this.areaWidth) || !Number.isFinite(this.areaHeight) ||
       this.areaWidth < 56 || this.areaHeight < 56) return;
@@ -118,7 +146,7 @@ export struct PinmonyDraggablePublishButton {
       .onClick(() => {
         if (this.actionEnabled && !this.dragging && !this.pendingMenuAction && Date.now() >= this.suppressClickUntil) { if (this.menuEnabled) { this.menuOpen = true; PinmonyRuntimeLog.info('PublishMenuTrace: event=request items=' + this.menuItems.length.toString()); } else this.onPublish?.(); }
       })
-      .bindMenu(this.menuEnabled && this.menuOpen,this.boundMenuItems(),{backgroundColor:$r('app.color.publish_source_button_glass'),backgroundBlurStyle:BlurStyle.COMPONENT_ULTRA_THICK,onAppear:(): void => {PinmonyRuntimeLog.info('PublishMenuTrace: event=shown');},onDisappear:(): void => this.finishMenuClose()})
+      .bindMenu(this.menuEnabled && this.menuOpen,this.boundMenuItems(),this.sourceMenuOptions())
       .onTouch((event: TouchEvent) => {
         if (event.type === TouchType.Up || event.type === TouchType.Cancel) this.settle();
       })

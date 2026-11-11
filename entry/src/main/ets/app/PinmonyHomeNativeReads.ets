@@ -40,6 +40,7 @@ export class PinmonyHomeNativeReads {
   private readonly store: PinmonyHomeStore;
   private revision: number = 0;
   private sequence: number = 0;
+  private feedSequence: number = 0;
   private account: string = '';
   private generation: number = -1;
   private origin: string = '';
@@ -47,6 +48,7 @@ export class PinmonyHomeNativeReads {
   private board: string = '';
   private bookmark: string = '';
   private boardSummary: PinmonyHomeBoard | undefined = undefined;
+  private boardSummaryBusy: boolean = false;
   private busy: boolean = false;
   private failedAppend: boolean = false;
   private categoriesBusy: boolean = false;
@@ -64,7 +66,7 @@ export class PinmonyHomeNativeReads {
   }
   pause(): void {
     this.revision++; this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear();
-    this.busy = false; this.categoriesBusy = false;
+    this.busy = false; this.categoriesBusy = false; this.boardSummaryBusy = false;
     this.store.homeLoading = false; this.store.homeRefreshing = false; this.store.pendingHomeTab = '';
     if (this.store.home) { this.store.home.loadingMore = false; this.store.home.refreshing = false; }
   }
@@ -162,6 +164,8 @@ export class PinmonyHomeNativeReads {
   }
   private commit(snapshot: PinmonyHomeSnapshot, kind: 'feed' | 'pagination' | 'cache' = 'feed'): void {
     if (!this.current()) return;
+    // Pagination must inherit the summary of the restored category snapshot.
+    this.boardSummary = snapshot.board?.id === this.board ? snapshot.board : undefined;
     snapshot.sourceError = this.store.homeSourceWarning || undefined; snapshot.categorySourceFailure = !!this.store.homeSourceWarning;
     snapshot.tabs = this.makeTabs(); snapshot.selectedTab = snapshot.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected)?.label || PinmonyI18n.message('pm_all_ae99f297');
     this.store.home = snapshot; this.store.cachedHome = snapshot; this.store.homeNativeReadsReady = true;
@@ -170,6 +174,10 @@ export class PinmonyHomeNativeReads {
     this.feeds.set(this.board, { snapshot: snapshot, bookmark: this.bookmark });
     if (this.feeds.size > 4) { const first: string = Array.from(this.feeds.keys())[0]; if (first !== this.board) this.feeds.delete(first); }
     this.ports.committed(snapshot, kind);
+    if (kind === 'cache' && this.board && !this.boardSummary) {
+      const revision: number = this.revision, board: string = this.board;
+      this.readBoard(board, (): boolean => revision === this.revision && board === this.board && this.current());
+    }
   }
   private async request(resource: string, options: HomeOptions, source: string, live: () => boolean): Promise<PinmonyNetworkReply> {
     const id: string = 'native_home_' + (++this.sequence).toString();
@@ -189,10 +197,12 @@ export class PinmonyHomeNativeReads {
     const revision: number = this.revision, board: string = this.board;
     const live = (): boolean => revision === this.revision && board === this.board && this.current();
     const previous: string = append ? this.bookmark : '';
+    const task: number = ++this.feedSequence;
+    const retainedOffset: number = this.store.cachedHomeScrollOffset;
     this.busy = true; this.store.homeLoading = !this.store.home?.pins.length;
     this.store.homeRefreshing = !append && !!this.store.home?.pins.length; this.store.homeError = '';
     if (this.store.home) this.store.home.loadingMore = append;
-    PinmonyRuntimeLog.info('HomeReadTrace: native request append=' + append.toString());
+    PinmonyRuntimeLog.info('HomeReadTrace: native request append=' + append.toString() + ' task=' + task.toString());
     try {
       const options: HomeOptions = board ? { type: 'board', id: board, __track__referrer: 19 } :
         { field_set_key: 'hf_grid', in_nux: false, in_news_hub: false, static_feed: false };
@@ -210,10 +220,18 @@ export class PinmonyHomeNativeReads {
       const pins: PinmonyHomePin[] = append ? (this.store.home?.pins || []).slice() : [];
       incoming.forEach((pin: PinmonyHomePin): void => { if (pins.length < 3000 && !pins.some((old: PinmonyHomePin): boolean => old.id === pin.id)) pins.push(pin); });
       const cursor: string = typeof data.bookmark === 'string' && data.bookmark.length <= 4096 ? data.bookmark : '';
-      this.bookmark = cursor;
       const snapshot: PinmonyHomeSnapshot = { kind: 'state', session: 0, pageKey: this.origin + '/', selectedTab: '', tabs: [],
         board: this.boardSummary?.id === board ? this.boardSummary : undefined, pins: pins, dataSource: 'api', loadingMore: false,
         refreshing: false, endReached: !cursor || cursor === '-end-' || !!previous && cursor === previous || data.data.length === 0 || pins.length >= 3000 };
+      // As in earlier releases, validated feed data commits independently of
+      // image downloads. Keep the old feed if the user scrolled during the read.
+      if (!append && this.store.home?.pins.length && Math.abs(this.store.cachedHomeScrollOffset - retainedOffset) >= 1) {
+        PinmonyRuntimeLog.info('HomeReadTrace: phase=retained task=' + task.toString() + ' reason=scroll-changed');
+        return;
+      }
+      if (!live()) return;
+      this.bookmark = cursor;
+      PinmonyRuntimeLog.info('HomeReadTrace: phase=commit task=' + task.toString() + ' count=' + pins.length.toString());
       this.failedAppend = false;
       this.commit(snapshot, append ? 'pagination' : 'feed');
     } catch (_) { if (live()) { this.failedAppend = append; this.store.homeError = append ? PinmonyI18n.message('pm_unable_to_load_more_pins_please_retry_0a0a8b67') : PinmonyI18n.message("pm_unable_to_load_home_feed_please_retry_cc9728f6"); } }
@@ -235,12 +253,16 @@ export class PinmonyHomeNativeReads {
       const tabs: PinmonyHomeTab[] = [];
       data.data.forEach((item: HomeItem): void => { if (item?.type === 'board' && /^\d+$/.test(String(item.id || '')) && item.name?.trim() &&
         !tabs.some((tab: PinmonyHomeTab): boolean => tab.id === 'tab:' + item.id)) tabs.push({ id: 'tab:' + item.id, label: item.name.trim().slice(0,160), selected: false, enabled: true }); });
+      const previousWarning: string = this.store.homeSourceWarning;
       this.tabs = tabs; this.categoriesReady = true; this.store.homeSourceWarning = '';
-      if (this.store.home) { this.store.home.tabs = this.makeTabs(); this.store.home.sourceError = undefined; this.store.home.categorySourceFailure = false; this.store.homeError = ''; this.ports.committed(this.store.home, 'metadata'); }
+      if (this.store.home) { this.store.home.tabs = this.makeTabs(); this.store.home.sourceError = undefined; this.store.home.categorySourceFailure = false; if (this.store.homeError === previousWarning) this.store.homeError = ''; this.ports.committed(this.store.home, 'metadata'); }
     } catch (_) { if (live()) { this.store.homeSourceWarning = PinmonyI18n.message("pm_unable_to_load_saved_board_categories_pull_down_to_retry_e1dd3288"); this.store.homeError = this.store.homeSourceWarning; if (this.store.home) { this.store.home.sourceError = this.store.homeSourceWarning; this.store.home.categorySourceFailure = true; } } }
     finally { if (revision === this.revision) this.categoriesBusy = false; }
   }
   private async readBoard(board: string, live: () => boolean): Promise<void> {
+    if (!live() || this.boardSummaryBusy) return;
+    const revision: number = this.revision;
+    this.boardSummaryBusy = true;
     try {
       const reply: PinmonyNetworkReply = await this.request('BoardResource', { field_set_key: 'profile_grid_item', is_mobile_fork: true, board_id: board }, '/?tabId=' + board, live);
       if (!live() || reply.error || reply.status !== 200) return;
@@ -253,8 +275,25 @@ export class PinmonyHomeNativeReads {
       const value: PinmonyHomeBoard = { boardUrl: boardUrl.startsWith(this.origin + '/') ? boardUrl : '', id: board, name: data.name.trim().slice(0,160), pinCount: Math.floor(data.pin_count),
         thumbnailUrl: this.imageUrl(data.cover_images?.['236x']?.url || data.cover_images?.['200x150']?.url || data.image_cover_url || data.image_cover_hd_url || '') };
       this.boardSummary = value;
-      if (this.store.home && this.board === board) { this.store.home.board = value; this.ports.committed(this.store.home, 'metadata'); }
+      const current: PinmonyHomeSnapshot | undefined = this.store.home;
+      if (current && this.board === board) {
+        // Publish a new snapshot so @State/@Prop watchers retain late metadata.
+        // Reuse pins and every feed flag; metadata must not reset pagination.
+        const snapshot: PinmonyHomeSnapshot = {
+          kind: current.kind, session: current.session, contextEpoch: current.contextEpoch,
+          pageKey: current.pageKey, selectedTab: current.selectedTab, tabs: current.tabs,
+          board: value, pins: current.pins, error: current.error, dataSource: current.dataSource,
+          loadingMore: current.loadingMore, refreshing: current.refreshing, endReached: current.endReached,
+          sourceError: current.sourceError, categorySourceFailure: current.categorySourceFailure
+        };
+        const cached: HomeFeed | undefined = this.feeds.get(board);
+        if (cached) this.feeds.set(board, { snapshot: snapshot, bookmark: cached.bookmark });
+        this.store.home = snapshot;
+        if (cached) this.store.cachedHome = snapshot;
+        this.ports.committed(snapshot, 'metadata');
+      }
     } catch (_) {}
+    finally { if (revision === this.revision) this.boardSummaryBusy = false; }
   }
   private imageUrl(url: string): string { return url.length <= 2000 && /^https:\/\/(?:[a-z0-9-]+\.)*pinimg\.com\//i.test(url) ? url : ''; }
   private mapPins(data: HomeItem[]): PinmonyHomePin[] {

@@ -3,7 +3,7 @@ const ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
 const ast=ts.createSourceFile('profile.ts',source.replace(/\bstruct\b/g,'class'),ts.ScriptTarget.Latest,true);
 function method(name){let found;function visit(node){if(ts.isMethodDeclaration(node)&&node.name.getText(ast)===name)found=node.getText(ast);ts.forEachChild(node,visit);}visit(ast);assert(found);return found;}
-const methods=['hubHeaderInset','hubChromeHeight','hubCollapseHeight','hubHeaderBackgroundOpacity','hubPaneChromeOffset','hubChromeVisibleHeight','hubContentInset','updateHubChrome','registerHubScroller','setHubChromeCollapsed','stopHubChromeAnimation','hubTitlePosition','hubTitleBottomHeight','switchHubTab'];
+const methods=['hubHeaderInset','hubChromeHeight','hubCollapseHeight','hubHeaderBackgroundOpacity','hubPaneChromeOffset','hubContentInset','updateHubChrome','registerHubScroller','setHubChromeCollapsed','stopHubChromeAnimation','hubTitlePosition','hubTitleBottomHeight','switchHubTab'];
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.map(method).join('')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{ScrollState:{Scroll:1},Curve:{EaseOut:1}});
 let animations=0,autoComplete=true,latestAnimator;
 function createAnimator(opts){
@@ -11,7 +11,7 @@ function createAnimator(opts){
  const animation={opts,cancelled:false,play(){if(autoComplete){this.onFrame(opts.end);this.onFinish();}},cancel(){this.cancelled=true;}};
  latestAnimator=animation;return animation;
 }
-const h=new Host();Object.assign(h,{modern:()=>true,hubPane:true,interactionReady:true,refreshing:false,loading:false,sortVisible:false,hubTab:'boards',hubChromeOffset:0,hubChromeAnimationTarget:-1,hubChromeAnimationEpoch:0,hubPagerPosition:-1,hubPaneChromeOffsets:new Map(),hubChromeOffsetVp:0,hubChromeScrollDistance:0,statusBarHeightPx:24,requestHub(){},getUIContext:()=>({px2vp:n=>n,createAnimator})});
+const h=new Host();Object.assign(h,{modern:()=>true,hubPane:true,interactionReady:true,refreshing:false,loading:false,sortVisible:false,hubTab:'boards',hubChromeOffset:0,hubChromeAnimationTarget:-1,hubChromeAnimationEpoch:0,hubPagerPosition:-1,hubPaneChromeOffsets:new Map(),hubChromeScrollDistance:0,statusBarHeightPx:24,requestHub(){},getUIContext:()=>({px2vp:n=>n,createAnimator})});
 h.updateHubChrome(6,1,100);assert.equal(h.hubChromeOffset,0);
 h.updateHubChrome(4,1,104);assert.equal(h.hubChromeOffset,112,'10vp triggers full eased collapse');
 const count=animations;h.updateHubChrome(20,1,124);assert.equal(animations,count,'same target does not restart animation');
@@ -33,8 +33,8 @@ const pane=new Pane();Object.assign(pane,{hubPane:true,restoringScroll:false,int
 pane.didScroll(0,10,1);assert.equal(h.hubChromeOffset,112);
 position=90;pane.didScroll(0,-10,1);assert.equal(h.hubChromeOffset,0);
 pane.restoringScroll=true;pane.didScroll(0,20,1);assert.equal(h.hubChromeOffset,0);assert.equal(forwarded,3);
-assert.equal(h.hubContentInset(),216);h.hubChromeOffsetVp=56;assert.equal(h.hubChromeVisibleHeight(),56);assert.equal(h.hubContentInset(),216,'only scrollable padding reserves title space while the viewport extends under blur');
-h.hubChromeOffsetVp=112;assert.equal(h.hubChromeVisibleHeight(),0);assert.equal(h.hubContentInset(),216);
+for(const offset of [0,56,112]){h.hubChromeOffset=offset;assert.equal(h.hubContentInset(),216,'chrome frames do not resize the content inset');}
+assert(!source.includes('hubChromeOffsetVp'),'content panes receive no unused animation frame prop');
 h.hubChromeOffset=0;assert.equal(h.hubHeaderBackgroundOpacity(),1);h.hubChromeOffset=56;assert.equal(h.hubHeaderBackgroundOpacity(),0.5);h.hubChromeOffset=112;assert.equal(h.hubHeaderBackgroundOpacity(),0);
 autoComplete=false;
 for(const tab of ['pins','boards','collages']){

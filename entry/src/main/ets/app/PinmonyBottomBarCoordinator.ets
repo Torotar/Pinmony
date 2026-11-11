@@ -5,6 +5,7 @@ import { HdsTabsController, HdsAnimationMode } from '@kit.UIDesignKit';
 
 export interface PinmonyBottomBarCoordinatorPorts {
   searchResultsVisible?: () => boolean;
+  foreground?: () => boolean;
   floatingTabsMounted: () => boolean;
   setFloatingTabsMounted: (value: boolean) => void;
   floatingTabsHidden: () => boolean;
@@ -31,9 +32,18 @@ export interface PinmonyBottomBarCoordinatorPorts {
 
 export class PinmonyBottomBarCoordinator {
   private readonly ports: PinmonyBottomBarCoordinatorPorts;
+  private scrollDistance: number = 0;
+  private scrollTab: number = -1;
+  private lastScrollAt: number = 0;
+  private lastAnimationAt: number = 0;
+  private pendingScrollAnimation: number = -1;
+  // Application request spacing, not an assumed HDS animation duration.
+  private readonly scrollAnimationSpacingMs: number = 320;
+  private readonly scrollDirectionThresholdVp: number = 20;
   constructor(ports: PinmonyBottomBarCoordinatorPorts) { this.ports = ports; }
 
   resetForSession(): void {
+    this.resetScrollMotion();
     this.rootTabsScrollHidden = [false, false, false, false];
     this.childBottomBarRestoreHidden = null;
     this.childBottomBarRootTab = -1;
@@ -68,15 +78,52 @@ export class PinmonyBottomBarCoordinator {
   private set floatingTabsMotionToken(value: number) { this.ports.setFloatingTabsMotionToken(value); }
   private get coordinatorTasks(): PinmonyTaskRegistry { return this.ports.coordinatorTasks(); }
 
+  private cancelPendingScrollAnimation(): void {
+    if (this.pendingScrollAnimation !== -1) this.coordinatorTasks.cancelTimeout(this.pendingScrollAnimation);
+    this.pendingScrollAnimation = -1;
+  }
+
+  private resetScrollMotion(): void {
+    this.cancelPendingScrollAnimation();
+    this.scrollDistance = 0;
+    this.scrollTab = -1;
+    this.lastScrollAt = 0;
+  }
+
   setBottomBarHidden(hidden: boolean,
     mode: HdsAnimationMode = HdsAnimationMode.SCROLL_ANIMATION, force: boolean = false): void {
-    if (!this.floatingTabsMounted || !force && this.floatingTabsHidden === hidden) return;
+    if (!this.floatingTabsMounted) { this.resetScrollMotion(); return; }
+    if (mode === HdsAnimationMode.SCROLL_ANIMATION && !force) {
+      // Replace any queued reversal with the latest confirmed direction.
+      this.cancelPendingScrollAnimation();
+      if (this.floatingTabsHidden === hidden) return;
+      const remaining: number = this.scrollAnimationSpacingMs - (Date.now() - this.lastAnimationAt);
+      if (remaining > 0) {
+        const tab: number = this.activeTab;
+        this.pendingScrollAnimation = this.coordinatorTasks.timeout((): void => {
+          this.pendingScrollAnimation = -1;
+          if (tab !== this.activeTab || !this.floatingTabsMounted || this.authStatus !== 'authenticated' ||
+              this.ports.foreground?.() === false ||
+              !this.bottomBarScrollCollapseEnabled || !this.nativeRootTabsVisible() ||
+              this.pinStore.detailOpeningPin || this.ports.searchResultsVisible?.() ||
+              tab === 2 && !this.inboxContentScrollable) return;
+          this.setBottomBarHidden(hidden, HdsAnimationMode.SCROLL_ANIMATION);
+        }, remaining);
+        return;
+      }
+      this.rootTabsScrollHidden[this.activeTab] = hidden;
+    } else if (force || this.floatingTabsHidden !== hidden) {
+      this.resetScrollMotion();
+    }
+    if (!force && this.floatingTabsHidden === hidden) return;
+    this.lastAnimationAt = Date.now();
     this.floatingTabsHidden = hidden;
     if (hidden) this.tabsController.applyHideAnimation(mode);
     else this.tabsController.applyShowAnimation(mode);
   }
 
   resumeAfterForeground(): void {
+    this.resetScrollMotion();
     ++this.floatingTabsMotionToken;
     this.coordinatorTasks.timeout(() => {
       if (!this.floatingTabsMounted) return;
@@ -94,6 +141,7 @@ export class PinmonyBottomBarCoordinator {
   }
 
   onBottomBarScrollSettingChanged(): void {
+    this.resetScrollMotion();
     this.rootTabsScrollHidden = [false, false, false, false];
     if (this.childBottomBarRestoreHidden !== null) this.childBottomBarRestoreHidden = false;
     this.syncFloatingTabsMotion();
@@ -102,26 +150,45 @@ export class PinmonyBottomBarCoordinator {
   updateInboxScrollAvailability(scrollable: boolean): void {
     this.inboxContentScrollable = scrollable;
     if (scrollable) return;
+    if (this.activeTab === 2) this.resetScrollMotion();
     this.rootTabsScrollHidden[2] = false;
     if (this.childBottomBarRootTab === 2) this.childBottomBarRestoreHidden = false;
     if (this.authStatus === 'authenticated' && this.activeTab === 2 && this.nativeRootTabsVisible()) {
-      this.setBottomBarHidden(false, HdsAnimationMode.SCROLL_ANIMATION);
+      this.setBottomBarHidden(false, HdsAnimationMode.CLICK_ANIMATION);
     }
   }
 
   handleRootContentScroll(offset: number, state: ScrollState): void {
-    if (this.ports.searchResultsVisible?.()) return;
-    if (this.activeTab === 2 && !this.inboxContentScrollable) return;
-    if (!this.bottomBarScrollCollapseEnabled || state !== ScrollState.Scroll || offset === 0 ||
+    if (this.ports.searchResultsVisible?.() || this.activeTab === 2 && !this.inboxContentScrollable ||
+        this.ports.foreground?.() === false ||
+        !this.bottomBarScrollCollapseEnabled ||
         !this.floatingTabsMounted || this.authStatus !== 'authenticated' ||
-        this.pinStore.detailOpeningPin || !this.nativeRootTabsVisible()) return;
-    const hidden: boolean = offset > 0;
-    this.rootTabsScrollHidden[this.activeTab] = hidden;
-    this.setBottomBarHidden(hidden);
+        this.pinStore.detailOpeningPin || !this.nativeRootTabsVisible()) {
+      this.resetScrollMotion();
+      return;
+    }
+    if (state !== ScrollState.Scroll) {
+      this.scrollDistance = 0;
+      this.lastScrollAt = 0;
+      return;
+    }
+    if (!Number.isFinite(offset) || Math.abs(offset) < 0.1) return;
+    const now: number = Date.now();
+    if (this.scrollTab !== this.activeTab || now - this.lastScrollAt > 160 || this.scrollDistance * offset < 0) {
+      this.scrollDistance = 0;
+    }
+    this.scrollTab = this.activeTab;
+    this.lastScrollAt = now;
+    this.scrollDistance += offset;
+    if (Math.abs(this.scrollDistance) < this.scrollDirectionThresholdVp) return;
+    this.scrollDistance = 0;
+    this.setBottomBarHidden(offset > 0);
   }
 
   syncBottomBarForPageDepth(): void {
+    if (this.scrollTab !== -1 && this.scrollTab !== this.activeTab) this.resetScrollMotion();
     if (this.authStatus !== 'authenticated') {
+      this.resetScrollMotion();
       this.rootTabsScrollHidden = [false, false, false, false];
       this.childBottomBarRestoreHidden = null;
       this.childBottomBarRootTab = -1;
@@ -129,6 +196,7 @@ export class PinmonyBottomBarCoordinator {
       return;
     }
     if (this.pinStore.detailOpeningPin || !this.nativeRootTabsVisible() || this.ports.searchResultsVisible?.()) {
+      this.resetScrollMotion();
       // Like Frogmark folder depth: capture once, never overwrite in children.
       if (this.childBottomBarRestoreHidden === null) {
         this.childBottomBarRootTab = this.activeTab;

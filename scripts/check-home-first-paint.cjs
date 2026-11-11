@@ -46,8 +46,10 @@ assert.equal(home.homeForPresentation(root).pins.length, 0, 'a confirmed empty r
 home.home = undefined;
 
 let address = root + 'inbox/';
+let warmupDisposals = 0;
 const native = new context.Native();
 Object.assign(native, { homeStore: home, authStatus: 'authenticated', activeTab: 0, currentWebTab: 2,
+  homeImageWarmup: { dispose() { warmupDisposals++; } },
   pendingWebTab: 0, loadFailed: false, profileSettingsVisible: false, pinStore: {}, boardStore: {},
   profileStore: { origins: [], profileCache: { clear() {} } },
   inboxStore: { inboxCache: { clear() {} } }, searchStore: { searchCache: { clear() {} } },
@@ -69,6 +71,7 @@ native.activeTab = 0; native.pendingWebTab = -1; native.currentWebTab = 0; addre
 assert.equal(native.homePresentationPageKey(), root, 'confirmed login can present a native shell before home document starts');
 require('./home-controller-harness.cjs').createHomeRuntime(ts,context).bindIndex(native);
 native.clearRootTabCaches();
+assert.equal(warmupDisposals, 1, 'session reset detaches the startup image warmup observer');
 assert.equal(home.homeForPresentation(root), undefined, 'session reset removes cache from presentation');
 native.prepareHomeForPageBegin(root);
 assert.equal(home.homeLoading, true, 'first home navigation starts a skeleton before bridge data');

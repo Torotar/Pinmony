@@ -120,8 +120,10 @@ export struct PinmonyDetailPage {
   private photoFitAuditKey: string = '';
   @State private photoFitActionBottom: number = 64;
   private measurePhotoFitActions(area: Area): void {
-    const bottom: number = Number(area.position.y) + Number(area.height);
-    if (Number.isFinite(bottom) && bottom >= 44 && Math.abs(bottom - this.photoFitActionBottom) > 0.5) {
+    const measured: number = Number(area.position.y) + Number(area.height);
+    // Keep the initial two-line button allowance when loading controls become ready.
+    const bottom: number = Math.max(64, measured);
+    if (Number.isFinite(measured) && measured >= 44 && Math.abs(bottom - this.photoFitActionBottom) > 0.5) {
       this.photoFitActionBottom = bottom;
       this.queuePhotoFitAudit();
     }
@@ -145,7 +147,8 @@ export struct PinmonyDetailPage {
         ' enabled=' + this.detailPhotoFitEnabled.toString() + ' applied=' + this.fitPhotoToScreen().toString() +
         ' viewportWidthVp=' + this.viewportWidth.toFixed(1) + ' viewportHeightVp=' + this.viewportHeight.toFixed(1) +
         ' mediaWidthVp=' + this.detailMediaWidth().toFixed(1) + ' mediaHeightVp=' + height.toFixed(1) +
-        ' topInsetVp=' + this.titleContentInset().toFixed(1) + ' bottomInsetVp=' + bottom.toFixed(1));
+        ' topInsetVp=' + this.titleContentInset().toFixed(1) + ' bottomInsetVp=' + bottom.toFixed(1) +
+        ' reservedHeightVp=' + this.photoFitReservedHeight().toFixed(1) + ' actionBottomVp=' + this.photoFitActionBottom.toFixed(1));
     });
   }
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
@@ -1052,7 +1055,16 @@ export struct PinmonyDetailPage {
     return width > 0 && height > 0 && this.detailMediaWidth() * height / width > this.heroHeight() + 0.5;
   }
 
-  private detailPhotoRadius(): number { return this.needsPhotoBackdrop() ? 0 : 18; }
+  private detailPhotoRadius(): number {
+    if (!this.needsPhotoBackdrop()) return 18;
+    const detail: PinmonyDetailSnapshot = this.displayedDetail();
+    const item: PinmonyCarouselItem | undefined = detail.carousel?.items[this.carouselBackdropIndex];
+    const width: number = item?.imageWidth || detail.imageWidth;
+    const height: number = item?.imageHeight || detail.imageHeight;
+    const sideInset: number = (this.detailMediaWidth() - this.heroHeight() * width / height) / 2;
+    // Narrow side fill lies inside the existing 18vp corner arc: clip photo and backdrop together.
+    return sideInset < 18 ? 18 : 0;
+  }
 
   private backdropImageUrl(): string {
     return this.displayedDetail().carousel?.items[this.carouselBackdropIndex]?.imageUrl || this.displayedDetail().imageUrl;
@@ -1378,6 +1390,20 @@ export struct PinmonyDetailPage {
   }
 
   @Builder
+  private detailStateNotices() {
+    if (this.contentError) {
+      PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_details_94912123"), onAction: () => { if (this.onContentRetry) this.onContentRetry(); }, actionEnabled: this.contentRetryable })
+    } else if (this.displayedDetail().kind !== 'cached' && !this.actionsReady && !this.readsReady && !this.deferredActions) {
+      Text(this.displayedDetail().kind === 'cached' ? this.uiText("pm_syncing_pin_status_e1429d05") : this.uiText("pm_verifying_pin_content_cbcfd002"))
+        .fontSize(14).fontColor($r('app.color.secondary_text'))
+    } else if (this.displayedDetail().kind !== 'cached' && (this.displayedDetail().actionsRetained || this.displayedDetail().commentsRetained || this.displayedDetail().relatedRetained) &&
+        (this.displayedDetail().commentLoading || this.displayedDetail().relatedLoading)) {
+      Text(this.uiText("pm_syncing_interactions_and_recommendations_d5a043fa")).fontSize(14).fontColor($r('app.color.secondary_text'))
+    }
+    this.videoRetryNotice()
+  }
+
+  @Builder
   private detailInformation() {
     Column({ space: 18 }) {
           if (this.displayedDetail().shuffleError) {
@@ -1410,17 +1436,9 @@ export struct PinmonyDetailPage {
               .id('pinmony-shuffle-strip-' + this.traceId.toString())
               .onAreaChange(() => this.revealShuffleReturn())
           }
-          if (this.contentError) {
-            PinmonyActionNotice({ active: this.videoActive, message: PinmonyI18n.render(this.contentError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_details_94912123"), onAction: () => { if (this.onContentRetry) this.onContentRetry(); }, actionEnabled: this.contentRetryable })
-          } else if (this.displayedDetail().kind !== 'cached' && !this.actionsReady && !this.readsReady && !this.deferredActions) {
-            Text(this.displayedDetail().kind === 'cached' ? this.uiText("pm_syncing_pin_status_e1429d05") : this.uiText("pm_verifying_pin_content_cbcfd002"))
-              .fontSize(14).fontColor($r('app.color.secondary_text'))
-          } else if (this.displayedDetail().kind !== 'cached' && (this.displayedDetail().actionsRetained || this.displayedDetail().commentsRetained || this.displayedDetail().relatedRetained) &&
-              (this.displayedDetail().commentLoading || this.displayedDetail().relatedLoading)) {
-            Text(this.uiText("pm_syncing_interactions_and_recommendations_d5a043fa")).fontSize(14).fontColor($r('app.color.secondary_text'))
+          if (!this.fitPhotoToScreen()) {
+            this.detailStateNotices()
           }
-
-          this.videoRetryNotice()
           Row() {
             Row({ space: 6 }) {
               ForEach(this.leftActions(), (item: PinmonyDetailAction) => {
@@ -1457,6 +1475,10 @@ export struct PinmonyDetailPage {
           .width('100%')
           .alignItems(VerticalAlign.Center)
           .onAreaChange((_old: Area, area: Area) => this.measurePhotoFitActions(area))
+
+          if (this.fitPhotoToScreen()) {
+            this.detailStateNotices()
+          }
 
           Column({ space: 6 }) {
             if (this.displayedDetail().creator.length > 0) {

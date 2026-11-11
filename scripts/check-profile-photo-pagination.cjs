@@ -16,5 +16,12 @@ const buttonLine=source.split('\n').find(line=>line.includes('if(')&&line.includ
 const buttonVisible=vm.runInNewContext('(function(){return '+buttonLine.trim().slice(3,-3)+';})');
 f=following();assert.equal(buttonVisible.call(f.v),false,'followed boards never show manual load-more button');
 f.v.boardFilter='';f.v.profile.hubMode='boards';assert.equal(buttonVisible.call(f.v),true,'other board filters retain their existing button');
-assert(source.includes('else if (!this.loading && !this.profile.contentLoading && this.profile.contentLoadingMore)'),'board paging retains its footer spinner');
+const footer=source.match(/else if \(([^\n]+this\.profile\.contentLoadingMore)\) \{\s*LoadingProgress\(\)/);
+assert(footer,'board paging retains its footer spinner');
+const footerVisible=new Function('return '+footer[1]);
+for(const state of [{},{suppressed:true},{loading:true},{initial:true},{idle:true}]) {
+  assert.equal(!!footerVisible.call({suppressContentLoading:()=>!!state.suppressed,loading:!!state.loading,
+    profile:{contentLoading:!!state.initial,contentLoadingMore:!state.idle}}),Object.keys(state).length===0,
+    'footer shows only during visible pagination, never during suppression or initial loading');
+}
 console.log('Profile photo pagination: reach-end loading, active/read/loading/error/end guards, footer status and other-tab policy passed');

@@ -361,6 +361,7 @@ export struct PinmonySearchPage {
   private pendingInputFocus: boolean = false;
   private inputFocusRevision: number = 0;
   @State private historyExitToRoot: boolean = false;
+  @State private discoveryResultTransition: boolean = false;
   @State private historyRetained: boolean = false;
   @State private categoriesCollapsed: boolean = false;
   @State private searchHeaderScrolled: boolean = false;
@@ -896,6 +897,7 @@ export struct PinmonySearchPage {
       if (hero.enabled && this.onExploreAction) {
         this.reportResultsScroll();
         this.selectHeroPosition(this.snapshot.heroes.findIndex((item: PinmonySearchHero): boolean => item.id === hero.id));
+        this.discoveryResultTransition = true;
         this.onExploreAction(hero.id, 'hero');
       }
     })
@@ -1002,6 +1004,7 @@ export struct PinmonySearchPage {
     .onClick(() => {
       if (item.enabled && this.onExploreAction) {
         this.reportResultsScroll();
+        this.discoveryResultTransition = true;
         this.onExploreAction(item.id, 'idea');
       }
     })
@@ -1046,6 +1049,7 @@ export struct PinmonySearchPage {
           .onClick(() => {
             if (this.onExploreAction) {
               this.reportResultsScroll();
+              this.discoveryResultTransition = true;
               this.onExploreAction(section.actionId, 'ideaSection');
             }
           })
@@ -1709,7 +1713,6 @@ export struct PinmonySearchPage {
         if (!this.committedQuery()) {
           Stack({ alignContent: Alignment.Top }) {
             this.searchMaterialContent('discovery')
-            this.searchInteractiveHeader(false)
           }.width('100%').height('100%')
             .hitTestBehavior(this.inputEditing ? HitTestMode.None : HitTestMode.Default)
             .accessibilityLevel(this.inputEditing ? 'no-hide-descendants' : 'auto')
@@ -1717,20 +1720,22 @@ export struct PinmonySearchPage {
         if (!this.inputEditing && this.committedQuery()) {
           Stack({ alignContent: Alignment.Top }) {
             this.searchMaterialContent('results')
-            this.searchInteractiveHeader(false)
           }.width('100%').height('100%')
             .zIndex(this.historyExitToRoot ? 0 : 2)
+            .transition(this.discoveryResultTransition ?
+              TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }) :
+              TransitionEffect.IDENTITY)
         }
         if (this.inputEditing || this.historyRetained) {
           Stack({ alignContent: Alignment.Top }) {
             this.searchMaterialContent('history')
-            this.searchInteractiveHeader(true)
           }.width('100%').height('100%')
             .zIndex(1)
             .visibility(this.inputEditing || !!this.committedQuery() ? Visibility.Visible : Visibility.Hidden)
             .hitTestBehavior(this.active && this.inputEditing ? HitTestMode.Default : HitTestMode.None)
             .accessibilityLevel(this.active && this.inputEditing ? 'auto' : 'no-hide-descendants')
         }
+        this.searchInteractiveHeader(this.inputEditing)
       }.width('100%').height('100%')
     }
       .hideTitleBar(true)
@@ -1868,7 +1873,7 @@ export struct PinmonySearchPage {
     .height(56 + (this.searchCategoriesVisible() ? 54 : 0))
     .margin({ top: this.getUIContext().px2vp(this.statusBarHeightPx) })
     .hitTestBehavior(HitTestMode.Transparent)
-    .zIndex(1)
+    .zIndex(3)
     .onAppear(() => PinmonyRuntimeLog.info('SearchTouchTrace: event=header-mounted layer=destination'))
     .onTouch((event: TouchEvent) => {
       if (event.type === TouchType.Down) {
@@ -1968,6 +1973,7 @@ export struct PinmonySearchPage {
   }
 
   private openSearchHistory(): void {
+    this.discoveryResultTransition = false;
     this.pendingInputFocus = false; this.inputFocusRevision++;
     this.historyExitToRoot = false;
     this.historyRetained = true;
@@ -1988,6 +1994,7 @@ export struct PinmonySearchPage {
   private submitSearchInput(value: string): void {
     const submittedQuery: string = value.trim();
     if (!this.active || !this.interactionReady || !submittedQuery || !this.onSubmit) return;
+    this.discoveryResultTransition = false;
     // closeInputPanel restores the committed query, so capture the draft first.
     this.closeInputPanel(false);
     this.onSubmit(submittedQuery);
@@ -2029,12 +2036,14 @@ export struct PinmonySearchPage {
   }
 
   private onInputFocus(focused: boolean): void {
+    if (focused) this.discoveryResultTransition = false;
     if (focused) { this.historyExitToRoot = false; this.historyRetained = true; }
     this.inputEditing = focused;
     if (focused && this.onQueryChange) this.onQueryChange(this.query, true);
     if (this.onInputFocusChange) {
       this.onInputFocusChange(focused, () => this.closeInputPanel(false, true));
     }
+    if (focused) this.focusMountedSearchInput();
   }
 
 }

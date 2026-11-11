@@ -44,7 +44,15 @@ module.exports = function checkLiveLanguage(ts, i18n) {
   assert(!/sectionTab\('[^']+',\s*this\.uiText/.test(profile), 'Profile section builders must receive resource keys');
   assert(profile.includes('Text(PinmonyI18n.text(nameKey, this.uiLanguage))'));
   assert(profile.includes("boards[start].id + ':' + this.uiLanguage"));
-  assert(profile.includes("(pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage"));
+  assert(profile.includes('(pin: PinmonyCreatedPin) => this.pinRenderKey(pin)'));
+  const pinKeyStart=profile.indexOf('  private pinRenderKey(');
+  assert(pinKeyStart >= 0);
+  const PinKeys=vm.runInNewContext(ts.transpileModule('class PinKeys {'+
+    profile.slice(pinKeyStart,profile.indexOf('\n  private ',pinKeyStart+1))+'} PinKeys;',
+    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+  const pinKeys=Object.assign(new PinKeys(),{pinRenderKeys:new Map(),uiLanguage:'zh'}),pin={id:'language-fixture',title:'Website title'};
+  const chineseKey=pinKeys.pinRenderKey(pin);pinKeys.uiLanguage='en';assert.notEqual(pinKeys.pinRenderKey(pin),chineseKey);
+  pinKeys.uiLanguage='zh';assert.equal(pinKeys.pinRenderKey(pin),chineseKey,'retained Pin keys follow live language round trips');
   if (i18n) {
     const homeSource=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets','utf8');
     const methods=['emptyFeedMessage','feedStatusText'].map(name=>{

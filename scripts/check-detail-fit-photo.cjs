@@ -68,6 +68,28 @@ detail.carousel.freeScroll = false;
 assert.equal(page.photoFitReservedHeight(), 60, 'wide carousel still reserves its indicator');
 page.photoFitActionBottom = 64;
 assert(source.includes('.onAreaChange((_old: Area, area: Area) => this.measurePhotoFitActions(area))'));
+page.contentWidth = page.viewportWidth = 400; page.viewportHeight = 700;
+detail = { imageWidth: 1000, imageHeight: 4000 };
+const loadingHeight = page.heroHeight();
+const auditsBeforeReady = fitAudits;
+for (const rowHeight of [44, 54, 64, 44]) {
+  page.measurePhotoFitActions({ position: { y: 0 }, height: rowHeight });
+  assert.equal(page.heroHeight(), loadingHeight,
+    'loading placeholder, ready actions and two-line save keep the same fitted photo height');
+}
+assert.equal(fitAudits, auditsBeforeReady, 'ordinary loading completion never starts a new fit layout');
+page.measurePhotoFitActions({ position: { y: 0 }, height: 80 });
+assert.equal(page.heroHeight(), loadingHeight - 16, 'larger accessibility controls still reserve their real height');
+page.measurePhotoFitActions({ position: { y: 0 }, height: 44 });
+assert.equal(page.heroHeight(), loadingHeight, 'font-size change can restore the stable base allowance');
+const info = source.slice(source.indexOf('  private detailInformation()'), source.indexOf('  private detailHeader()'));
+const measuredActions = info.indexOf('.onAreaChange((_old: Area, area: Area) => this.measurePhotoFitActions(area))');
+assert(measuredActions >= 0);
+assert.match(info.slice(0, measuredActions), /if \(!this\.fitPhotoToScreen\(\)\) \{\s*this\.detailStateNotices\(\)/,
+  'disabled fit and video retain their existing notice order');
+assert.match(info.slice(measuredActions), /if \(this\.fitPhotoToScreen\(\)\) \{\s*this\.detailStateNotices\(\)/,
+  'fitted photo status notices sit after the measured actions and cannot change their vertical origin');
+console.log('Photo fit loading stability: loading/ready/two-line controls, large text and notice placement passed');
 deviceInfo.deviceType = 'phone';
 detail = { imageWidth: 1000, imageHeight: 3000 };
 page.contentWidth = page.viewportWidth = 900; page.viewportHeight = 650;
@@ -131,3 +153,45 @@ detail={imageWidth:1000,imageHeight:700,carousel:{items:[{imageWidth:1000,imageH
 assert.equal(page.detailPhotoRadius(),18);page.carouselBackdropIndex=1;assert.equal(page.detailPhotoRadius(),0,'carousel uses current photo dimensions');
 detail.carousel.freeScroll=true;assert.equal(page.detailPhotoRadius(),18,'product gallery retains independent corners');
 console.log('Adaptive photo corners: fitting/tall/unknown, fit switch and carousel slide geometry passed');
+
+const radiusStart = carouselSource.indexOf('  private photoRadius(');
+const RadiusCarousel = vm.runInNewContext(ts.transpileModule(`class RadiusCarousel {
+  ${carouselSource.slice(radiusStart, carouselSource.indexOf('\n  }', radiusStart) + 4)}
+} RadiusCarousel`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
+const radiusCarousel = new RadiusCarousel();
+radiusCarousel.carousel = { freeScroll: false };
+page.carouselBackdropIndex = 0;
+// Construct exact rendered side insets around the 18vp outer corner arc.
+for (const [viewportWidth, viewportHeight] of [[400,700],[800,1200],[1200,800]]) {
+  page.contentWidth = page.viewportWidth = viewportWidth; page.viewportHeight = viewportHeight;
+  detail = { imageWidth: 1000, imageHeight: 10000 };
+  const availableHeight = page.heroHeight();
+  const mediaWidth = page.detailMediaWidth();
+  for (const inset of [0.25, 2, 8, 17.9, 18.1, 32, 64]) {
+    detail = { imageWidth: mediaWidth - inset * 2, imageHeight: availableHeight };
+    const expectedRadius = inset < 18 ? 18 : 0;
+    assert.equal(page.needsPhotoBackdrop(), true, 'even narrow side fill keeps its animated backdrop');
+    assert.equal(page.detailPhotoRadius(), expectedRadius, 'single photo clips within the corner arc when side fill is narrow');
+    detail.carousel = { items: [{ imageWidth: detail.imageWidth, imageHeight: detail.imageHeight }], freeScroll: true };
+    assert.equal(page.detailPhotoRadius(), 18, 'product gallery keeps independent rounded cards');
+    detail.carousel.freeScroll = false;
+    // The ordinary carousel also reserves its own indicator row.
+    const carouselHeight = page.heroHeight();
+    detail.carousel.items[0] = { imageWidth: mediaWidth - inset * 2, imageHeight: carouselHeight };
+    assert.equal(page.detailPhotoRadius(), expectedRadius, 'detail transition uses the selected carousel photo geometry');
+    radiusCarousel.contentWidth = mediaWidth;
+    radiusCarousel.mediaHeight = () => carouselHeight;
+    assert.equal(radiusCarousel.photoRadius(detail.carousel.items[0]), expectedRadius,
+      'carousel image and Swiper clip agree with detail entry and viewer endpoints');
+  }
+}
+radiusCarousel.carousel.freeScroll = true;
+assert.equal(radiusCarousel.photoRadius({imageWidth:100,imageHeight:1000}),18);
+radiusCarousel.carousel.freeScroll = false;
+for (const item of [{imageWidth:0,imageHeight:0},{video:{},imageWidth:100,imageHeight:1000}]) {
+  assert.equal(radiusCarousel.photoRadius(item),18,'unknown images and video retain existing corners');
+}
+assert(source.includes('sourceRadius: this.detailPhotoRadius()'));
+assert(source.includes('targetRadius: this.detailPhotoRadius()'));
+assert(carouselSource.includes('.borderRadius(this.photoRadius(item)).clip(true)'));
+console.log('Narrow backdrop corners: phone/tablet/wide, selected carousel slot, corner-arc boundary and entry/viewer radius parity passed');

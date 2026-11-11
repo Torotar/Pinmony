@@ -71,7 +71,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                   onScrollPosition: (url: string, section: string, offset: number) => {
                     if (view.coveredByBoard || view.coveredByPin || !view.profileStore.profile || view.profileStore.profile.profileUrl !== url || view.profileStore.profile.section !== section ||
                         view.currentProfileUrl() !== url) return;
-                    view.profileStore.profileScrollOffset = offset;
+                    view.profileStore.rememberScrollOffset(offset);
                     if (view.profileStore.profileNativeReadsReady || view.profileStore.profileActionsReady) view.profileStore.profileCache.put(view.profileStore.profile, offset);
                   },
                   loading: view.profileStore.profileSwitching,

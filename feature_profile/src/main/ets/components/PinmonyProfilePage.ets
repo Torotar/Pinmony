@@ -1,6 +1,6 @@
 import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
-import { AnimatorResult, ComponentContent, LengthMetrics, uiMaterial } from '@kit.ArkUI';
+import { AnimatorResult, ColorMetrics, ComponentContent, LengthMetrics, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
@@ -87,7 +87,7 @@ export struct PinmonyProfilePage {
   private readonly hubPaneChromeOffsets: Map<string, number> = new Map<string, number>();
   private hubChromeSession: number = -1;
   private hubChromeScrollDistance: number = 0;
-  @Prop hubChromeOffsetVp: number = 0;
+  private readonly pinRenderKeys: Map<PinmonyCreatedPin, string> = new Map<PinmonyCreatedPin, string>();
   onHubScroll?: (offset: number, state: ScrollState, position: number) => void;
   @State private hubSnapshots: PinmonyProfileSnapshot[] = [];
   private readonly hubSwiper: SwiperController = new SwiperController();
@@ -347,9 +347,6 @@ export struct PinmonyProfilePage {
     }
     return [candidate];
   }
-  private hubChromeVisibleHeight(): number {
-    return Math.max(0, this.hubCollapseHeight() - this.hubChromeOffsetVp);
-  }
   private hubContentInset(): number {
     if (!this.modern() || !this.hubPane) return 0;
     // The root body expands under the component safe area. Only the scrollable
@@ -468,7 +465,7 @@ export struct PinmonyProfilePage {
         ForEach(['pins','boards','collages'], (tab: string) => {
           PinmonyProfilePage({
             onHubScrollerReady: (scroller: Scroller) => this.registerHubScroller(tab, scroller),
-            hubPane:true,hubChromeOffsetVp:this.hubPaneChromeOffset(tab),denseHubPins:this.densePins,profile:this.hubSnapshot(tab),interactionReady:this.interactionReady && this.hubTab === tab,
+            hubPane:true,denseHubPins:this.densePins,profile:this.hubSnapshot(tab),interactionReady:this.interactionReady && this.hubTab === tab,
             readsReady:this.readsReady && this.hubTab === tab,actionsReady:this.actionsReady && this.hubTab === tab,
             automaticLoadingEnabled:this.automaticLoadingEnabled && this.hubTab === tab,
             refreshing:this.refreshing && this.hubTab === tab,initialScrollOffset:this.hubInitialScrollOffset(tab),
@@ -579,6 +576,7 @@ export struct PinmonyProfilePage {
     }
   }
   private onProfileChanged(): void {
+    this.pinRenderKeys.clear();
     if (this.legacyContentPane) return;
     this.retainLegacySnapshot();
     if (!this.hubPane && (this.activeProfile !== this.profile.profileUrl || this.hubChromeSession !== this.profile.session)) {
@@ -674,6 +672,15 @@ export struct PinmonyProfilePage {
 
   private contentColumnsTemplate(): string {
     return this.columnSlots().map((): string => '1fr').join(' ');
+  }
+
+  private pinRenderKey(pin: PinmonyCreatedPin): string {
+    let content: string | undefined = this.pinRenderKeys.get(pin);
+    if (content === undefined) {
+      content = JSON.stringify(pin);
+      this.pinRenderKeys.set(pin, content);
+    }
+    return pin.id + ':' + this.uiLanguage + ':' + content;
   }
 
   private rowStarts(length: number): number[] {
@@ -1183,7 +1190,7 @@ export struct PinmonyProfilePage {
             this.createdPinCard(pin)
           }
           .width('100%')
-        }, (pin: PinmonyCreatedPin) => pin.id + ':' + this.uiLanguage + ':' + JSON.stringify(pin))
+        }, (pin: PinmonyCreatedPin) => this.pinRenderKey(pin))
       }
       .width('100%')
       .columnsTemplate(this.contentColumnsTemplate())
@@ -1561,6 +1568,15 @@ export struct PinmonyProfilePage {
     if(kind === 'groups' || kind === 'secret' || kind === 'following')return this.boardFilter === kind;
     return kind === 'collage-drafts' ? this.collageDrafts : this.collageCreated;
   }
+  private hubStateMaterialColor(kind: string): ResourceColor | undefined {
+    if (!this.hubSelected(kind)) return undefined;
+    try {
+      const accent: ColorMetrics = ColorMetrics.resourceColor($r('app.color.detail_save_accent'));
+      return ColorMetrics.rgba(accent.red, accent.green, accent.blue, 0.9).color;
+    } catch (_) {
+      return $r('app.color.detail_save_accent');
+    }
+  }
   @Builder
   private hubStateButton(label: string, kind: string) {
     if (deviceInfo.apiAvailable('26.0.0')) {
@@ -1576,12 +1592,13 @@ export struct PinmonyProfilePage {
     }.height(40).padding(0).borderRadius(16)
       .backgroundColor(this.hubSelected(kind) ? $r('app.color.detail_save_accent') : $r('app.color.surface_muted'))
 
-      .systemMaterial(!this.hubSelected(kind) && this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
+      .systemMaterial(this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
         new uiMaterial.ImmersiveMaterial({
           style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
+          materialColor: this.hubStateMaterialColor(kind),
           colorInvert: false, applyShadow: false, interactive: true, lightEffect: {}
         }) : uiMaterial.Material.empty)
-      .shadow({ radius: !this.hubSelected(kind) && this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
+      .shadow({ radius: this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
       .accessibilityText(this.uiText(label)).accessibilitySelected(this.hubSelected(kind))
       .enabled(this.interactionReady && !this.profile.suggestionWriting)
       .onClick(() => {

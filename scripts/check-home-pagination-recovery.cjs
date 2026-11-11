@@ -49,7 +49,7 @@ function drain() { for (let i = 0; timers.size && i < 8; i++) {
 function fixture() {
   const h = new Host(), calls = [];
   Object.assign(h, { paneMounted: true, paneActive: true, feedActive: true, paginationWasActive: false,
-    actionsReady: true, paginationReady: true, restoreDone: true, restoringScroll: false,
+    actionsReady: true, paginationReady: true, restoreDone: true, restoringScroll: false, firstImageSettled: false,
     visibleFirst: 4, visibleLast: 11, prefetchNotBefore: 0, prefetchTimer: -1,
     detailPrefetchTimer: -1, viewportFillTimer: -1, viewportHeight: 0, pendingEnd: false,
     home: { dataSource: 'api', pageKey: 'https://www.pinterest.com/', session: 1, selectedTab: 'all',
@@ -60,7 +60,7 @@ function fixture() {
   return { h, calls };
 }
 const f = fixture(); f.h.onPrefetchAvailabilityChanged(); drain();
-assert.equal(f.calls.length, 1);
+assert.equal(f.calls.length, 1, 'pending photo decode must not block feed pagination');
 f.h.onPrefetchAvailabilityChanged(); drain(); assert.equal(f.calls.length, 1, 'same snapshot is deduplicated');
 f.h.home.loadingMore = true; f.h.feedActive = false; f.h.onPrefetchAvailabilityChanged();
 f.h.home.loadingMore = false; f.h.feedActive = true; f.h.onPrefetchAvailabilityChanged(); drain();
@@ -71,6 +71,17 @@ assert.equal(f.calls.length, 2, 'return while original request is in flight neve
 f.h.home.loadingMore = false; f.h.onPrefetchAvailabilityChanged(); drain();
 assert.equal(f.calls.length, 3, 'late cancellation completion releases the retry');
 
+const slowPhotos = fixture();
+slowPhotos.h.home.pins = slowPhotos.h.home.pins.slice(0, 5);
+slowPhotos.h.visibleFirst = 0; slowPhotos.h.visibleLast = 4;
+slowPhotos.h.prefetchNotBefore = now + 900;
+slowPhotos.h.prefetchNextScreen();
+assert.equal(slowPhotos.calls.length, 0, 'retains the existing bounded prefetch delay');
+assert.equal(timers.size, 1, 'pagination is scheduled even when no photo has decoded');
+now += 900; drain();
+assert.deepEqual(slowPhotos.calls, ['prefetch'], 'five-card feed prefetches before a slow six-second image download finishes');
+assert.equal(slowPhotos.h.firstImageSettled, false, 'feed prefetch never marks pending images as decoded');
+
 for (const block of ['sourceError', 'endReached']) {
   const g = fixture(); g.h.home[block] = true; g.h.onPrefetchAvailabilityChanged(); drain();
   assert.equal(g.calls.length, 0, block + ' is not automatically replayed');
@@ -78,6 +89,10 @@ for (const block of ['sourceError', 'endReached']) {
 allowed = false;
 const disabled = fixture(); disabled.h.onPrefetchAvailabilityChanged(); drain();
 assert.equal(disabled.calls.length, 0, 'request protection disables speculative reads'); allowed = true;
+allowed = false;
+const disabledDemand = fixture(); disabledDemand.h.loadNearEnd();
+assert.deepEqual(disabledDemand.calls, ['demand'], 'near-end demand remains available with pending photos when speculative reads are disabled');
+allowed = true;
 for (const hidden of ['paneActive', 'paneMounted', 'feedActive', 'actionsReady', 'paginationReady']) {
   const g = fixture(); g.h[hidden] = false; g.h.onPrefetchAvailabilityChanged(); drain();
   assert.equal(g.calls.length, 0, hidden + ' blocks background prefetch');
@@ -97,7 +112,7 @@ short.h.feedActive = false; short.h.onPrefetchAvailabilityChanged();
 short.h.feedActive = true; short.h.onPrefetchAvailabilityChanged(); drain();
 assert.equal(short.calls.filter(c => c === 'demand').length, 2, 'cancelled short-viewport fill becomes eligible on return');
 const near = fixture(); near.h.loadNearEnd(); near.h.loadNearEnd();
-assert.deepEqual(near.calls, ['demand'], 'near-end is independently deduplicated');
+assert.deepEqual(near.calls, ['demand'], 'near-end proceeds before photo decode and is independently deduplicated');
 near.h.feedActive = false; near.h.onPrefetchAvailabilityChanged();
 near.h.feedActive = true; near.h.onPrefetchAvailabilityChanged(); near.h.loadNearEnd();
 assert.equal(near.calls.filter(c => c === 'demand').length, 2, 'activation releases cancelled near-end suppression');

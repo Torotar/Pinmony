@@ -9,6 +9,7 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { display, window } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
+import { PinmonyDisplaySelectMenuMaterial } from './PinmonyDisplaySelectMenuMaterial';
 import { PinmonyRuntimeLog } from 'common_foundation';
 @Component
 export struct PinmonyDisplaySettingsPage {
@@ -158,6 +159,7 @@ export struct PinmonyDisplaySettingsPage {
         .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
+        .attributeModifier(new PinmonyDisplaySelectMenuMaterial(this.immersiveLightMode))
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
           if (index >= 0 && index < 9) {
@@ -184,6 +186,7 @@ export struct PinmonyDisplaySettingsPage {
         .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text'))
         .optionFontColor($r('app.color.primary_text'))
+        .attributeModifier(new PinmonyDisplaySelectMenuMaterial(this.immersiveLightMode))
         .accessibilityText(this.uiText("pm_theme_0fa0bfe4") + this.themeLabel())
         .onSelect((index: number) => {
           if (index >= 0 && index < 3) this.selectTheme(['system', 'light', 'dark'][index]);
@@ -202,6 +205,7 @@ export struct PinmonyDisplaySettingsPage {
           .backgroundColor($r('app.color.display_settings_control')).borderRadius(16).enabled(!this.orientationBusy)
           .selectedOptionBgColor($r('app.color.display_settings_control'))
           .selectedOptionFontColor($r('app.color.primary_text')).optionFontColor($r('app.color.primary_text'))
+          .attributeModifier(new PinmonyDisplaySelectMenuMaterial(this.immersiveLightMode))
           .accessibilityText(this.uiText("pm_screen_orientation_60cc99cc"))
           .onSelect((index: number) => { this.selectOrientation(index); })
       }, (language: string): string => language)
@@ -223,6 +227,7 @@ export struct PinmonyDisplaySettingsPage {
         .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
         .selectedOptionFontColor($r('app.color.primary_text')).optionFontColor($r('app.color.primary_text'))
+        .attributeModifier(new PinmonyDisplaySelectMenuMaterial(this.immersiveLightMode))
         .accessibilityText(this.uiText('pm_immersive_light'))
         .onSelect((index: number) => {
           if (index >= 0 && index < 4) {

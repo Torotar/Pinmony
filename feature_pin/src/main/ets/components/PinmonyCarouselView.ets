@@ -93,7 +93,8 @@ export struct PinmonyCarouselView {
 
   private photoRadius(item: PinmonyCarouselItem): number {
     if (item.video || this.carousel.freeScroll || item.imageWidth <= 0 || item.imageHeight <= 0) return 18;
-    return this.contentWidth * item.imageHeight / item.imageWidth > this.mediaHeight() + 0.5 ? 0 : 18;
+    const sideInset: number = (this.contentWidth - this.mediaHeight() * item.imageWidth / item.imageHeight) / 2;
+    return sideInset < 18 ? 18 : 0;
   }
 
   private videoSlotMounted(index: number): boolean {

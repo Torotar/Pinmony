@@ -3,6 +3,21 @@ import { ApiCache, buildCacheKey, CACHE_TTL, PinmonyRuntimeLog } from 'common_fo
 export interface PinmonyHomeCacheRecord { snapshot: PinmonyHomeSnapshot; }
 interface PinmonyHomeCacheKeyParams { pageKey: string; }
 
+// An older thumbnail can prepare the downloader, but cannot become live feed
+// content or extend the five-minute presentation cache/session permissions.
+export function readHomeImageConnectionSeed(cache: ApiCache, accountId: string, pageKey: string): string {
+  if (!accountId || !/^https:\/\/(?:www\.)?pinterest\.com\/$/i.test(pageKey)) return '';
+  try {
+    const result = cache.getWithMetadata<PinmonyHomeCacheRecord>(homeCacheKey(accountId, pageKey), 24 * 60 * 60 * 1000);
+    if (!result.value) return '';
+    const normalized: PinmonyHomeCacheRecord | undefined = normalizeHomeCacheRecord(result.value, pageKey);
+    if (!normalized) return '';
+    const pin: PinmonyHomePin | undefined = normalized.snapshot.pins.find((item: PinmonyHomePin): boolean =>
+      /^https:\/\/i\.pinimg\.com\/(?:170|236|474|564|736)x\/[a-zA-Z0-9/_-]+\.(?:jpe?g|png|webp)$/i.test(item.imageUrl));
+    return pin?.imageUrl || '';
+  } catch (_) { return ''; }
+}
+
 export function homeCacheKey(accountId: string, pageKey: string): string {
     const params: PinmonyHomeCacheKeyParams = { pageKey: pageKey };
     return buildCacheKey(accountId, 'home_feed', params);
