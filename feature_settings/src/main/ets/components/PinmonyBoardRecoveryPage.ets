@@ -111,8 +111,6 @@ export struct PinmonyBoardRecoveryPage {
     if (this.panelMode) {
       Stack({ alignContent: Alignment.Center }) {
         Column() {
-          Text(this.text('pm_board_recovery_title')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-            .width('100%').padding({left:24,right:64,top:16,bottom:16})
           this.recoveryContent()
           Button(this.text('pm_board_recovery_submit'), { type: ButtonType.Normal })
             .width('90%').height(48).borderRadius(16).enabled(this.canRestore())

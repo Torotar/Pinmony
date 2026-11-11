@@ -1,3 +1,5 @@
+import { PinmonyModalNavigation } from 'common_ui';
+import { PinmonyImmersiveLight } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
@@ -141,6 +143,8 @@ export struct PinmonyCommentsSheet {
     return item.id + ':' + JSON.stringify(item) + ':' + this.uiLanguage;
   }
 
+  @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
+
   @Builder
   private commentRow(item: PinmonyComment, reply: boolean = false) {
     Row({ space: 10 }) {
@@ -219,6 +223,16 @@ export struct PinmonyCommentsSheet {
     }.alignItems(VerticalAlign.Top).width('100%')
   }
 
+  @Builder
+  private presentedCommentMenu() {
+    if (this.deleteOpen) { this.commentMenu() } else {
+      PinmonyModalNavigation({ titleText: this.uiText('pm_comment_options_8216ef81'), fillContent: false,
+        closeEnabled: true, onClose: () => { this.menuOpen = false; } }) {
+        this.commentMenu()
+      }
+    }
+  }
+
   build() {
     Column({ space: 12 }) {
       Divider().color($r('app.color.secondary_text')).opacity(0.2)
@@ -286,13 +300,14 @@ export struct PinmonyCommentsSheet {
       this.composer()
     }.width('100%').height('100%').padding({ left: 16, right: 16, top: 12, bottom: 20 })
       .backgroundColor($r('app.color.page_background'))
-      .bindSheet($$this.menuOpen, this.commentMenu(), {
+      .bindSheet($$this.menuOpen, this.presentedCommentMenu(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyCommentsSheet.menuOpen radius=uniform-32vp'); },
         onDisappear: (): void => this.finishCommentMenuClose(),
-        height: SheetSize.FIT_CONTENT, showClose: !this.deleteOpen,
-        dragBar: !this.deleteOpen, backgroundColor: $r('app.color.page_background'), maskColor: '#66000000' })
+        height: SheetSize.FIT_CONTENT, showClose: false,
+
+        dragBar: !this.deleteOpen, backgroundColor: $r('app.color.page_background'), maskColor: '#66000000' }, this.sheetMaterialMode, false))
   }
 
   @Builder

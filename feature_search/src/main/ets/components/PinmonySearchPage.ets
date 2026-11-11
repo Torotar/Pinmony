@@ -1,3 +1,4 @@
+import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar, PinmonyUiCommitQueue } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice, PinmonyListDataSource } from 'common_ui';
@@ -234,6 +235,8 @@ export struct PinmonySearchPage {
       items: this.photoResults.map((item: PinmonySearchResult): PinmonyImageSearchItem => ({ id: item.id, pinUrl: item.targetUrl,
         imageUrl: item.imageUrl, title: item.title, imageWidth: item.imageWidth, imageHeight: item.imageHeight })) };
   }
+  @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
+
   @Builder
   private searchDestination(name?: string, param?: Object) {
     if (name === 'photo-history') {
@@ -1875,6 +1878,14 @@ export struct PinmonySearchPage {
     })
   }
 
+  @Builder
+  private presentedQuizSheet() {
+    PinmonyModalNavigation({ titleText: this.snapshot.quiz?.mode === 'picker' ? this.uiText("pm_choose_inspiration_up_to_10_images_19ae0263") : this.uiText("pm_inspiration_results_ffbd36b2"), fillContent: true,
+      closeEnabled: true, onClose: () => { this.requestQuizClose(); } }) {
+      this.quizSheet()
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.Top }) {
     HdsNavigation(this.searchPathStack) {
@@ -1905,11 +1916,11 @@ export struct PinmonySearchPage {
     .backgroundColor($r('app.color.page_background'))
     }.width('100%').height('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
-    .bindSheet($$this.quizSheetOpen, this.quizSheet(), {
+    .bindSheet($$this.quizSheetOpen, this.presentedQuizSheet(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonySearchPage.quizSheetOpen radius=uniform-32vp'); },
-      height: '85%', preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : SheetType.BOTTOM, dragBar: false, showClose: true,
-      title: { title: this.snapshot.quiz?.mode === 'picker' ? this.uiText("pm_choose_inspiration_up_to_10_images_19ae0263") : this.uiText("pm_inspiration_results_ffbd36b2") },
+      height: '85%', preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : SheetType.BOTTOM, dragBar: false, showClose: false,
+
       backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
       onWillSpringBackWhenDismiss: (_action: SpringBackAction): void => {},
       onDisappear: (): void => this.finishQuizClose(),
@@ -1917,7 +1928,7 @@ export struct PinmonySearchPage {
         this.requestQuizClose();
         action.dismiss();
       }
-    })
+    }, this.sheetMaterialMode, false))
   }
 
   private searchCategoriesVisible(): boolean {

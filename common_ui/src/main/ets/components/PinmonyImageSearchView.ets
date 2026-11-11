@@ -1,3 +1,5 @@
+import { PinmonyModalNavigation } from './PinmonyModalNavigation';
+import { PinmonyImmersiveLight } from '../services/PinmonyImmersiveLight';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from './PinmonyActionNotice';
 import { PinmonyImageSearchSelection } from './PinmonyImageSearchSelection';
@@ -284,6 +286,8 @@ export struct PinmonyImageSearchView {
     this.crop = { x: left, y: top, w: right - left, h: bottom - top };
     this.queueSearch();
   }
+  @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
+
   @Builder
   private card(p: PinmonyRelatedPin) {
     Image(p.imageUrl).width('100%').height(Math.max(100, Math.min(430,
@@ -388,15 +392,23 @@ export struct PinmonyImageSearchView {
         if (this.dragCorner >= -1) this.drag(event, this.dragCorner);
       }))
   }
+  @Builder
+  private presentedResultsPanel() {
+    PinmonyModalNavigation({ titleText: this.uiText("pm_more_pins_like_this_6e224087"), fillContent: true,
+      closeEnabled: true, onClose: () => { this.sheetVisible = false; if (this.alive && this.presentationActive && !this.relatedOpening && !this.closing && !this.closeRequested) { this.closeRequested = true; this.onClose?.(); } } }) {
+      this.resultsPanel()
+    }
+  }
+
   build() {
     Column() { this.searchContent() }.width('100%').height('100%')
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
-      .bindSheet($$this.sheetVisible, this.resultsPanel, {
+      .bindSheet($$this.sheetVisible, this.presentedResultsPanel(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : SheetType.BOTTOM,
         onWillAppear: (): void => { this.sheetAppearing = true; this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=uniform-32vp'); },
         onAppear: (): void => this.resultSheetAppeared(),
-        height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: true, dragBar: true, title: { title: this.uiText("pm_more_pins_like_this_6e224087") },
+        height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: false, dragBar: true,
         detentSelection: this.sheetHeight,
         scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,
@@ -410,6 +422,6 @@ export struct PinmonyImageSearchView {
           }
         },
         onDisappear: () => this.resultSheetDisappeared()
-      })
+      }, this.sheetMaterialMode, false))
   }
 }

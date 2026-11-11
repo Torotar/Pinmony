@@ -79,6 +79,7 @@ export struct PinmonyEditPinSheet {
   build() {
     if (this.result.phase === 'boards') {
       PinmonySaveSheet({ result: this.result.picker,
+        onClose: () => { if (!this.result.busy && !this.result.picker.busy) this.act('editPhase', ',"edit"'); },
         onRetry: () => this.act('editPhase', ',"boards"'),
         onSave: (id: string) => this.act('editSelect', ',' + JSON.stringify(id)),
         onCreate: (name: string, secret: boolean) => this.act('boardsCreate', ',' + JSON.stringify(name) + ',' + secret.toString()),

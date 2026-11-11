@@ -32,6 +32,7 @@ for (const file of files) {
 const root = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert.match(root, /AppStorage\.setOrCreate<number>\('pinmonySheetWindowWidthVp', width\)/);
 assert.equal(count, 19, 'Audit every added or removed sheet entry');
-const profileViews = entries.filter(entry => entry.startsWith('feature_profile/') && entry.includes('this.pinViewSheet()'));
+const profileViews = entries.filter(entry => entry.startsWith('feature_profile/') && entry.includes('this.presentedPinViewSheet()'));
 assert.equal(profileViews.length, 2, 'both profile toolbar layouts bind the view sheet and need the same wide-window policy');
+const profile=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');assert(profile.includes('private presentedPinViewSheet()') && profile.includes('this.pinViewSheet()'),'both hosts retain original layout content');
 console.log(`Wide-window sheets: ${count} entries, breakpoint, shrink-back and shared width binding passed; device geometry excluded.`);

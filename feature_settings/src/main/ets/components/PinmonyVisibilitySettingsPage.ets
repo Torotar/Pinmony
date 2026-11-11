@@ -1,3 +1,4 @@
+import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -81,6 +82,8 @@ export struct PinmonyVisibilitySettingsPage {
       content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: !this.store.busy, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: [] } } };
   }
+  @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
+
   @Builder
   private visibilityContent() {
     Row() {
@@ -107,7 +110,6 @@ export struct PinmonyVisibilitySettingsPage {
   private privacySheet() {
     Scroll() {
       Column({ space: 24 }) {
-        Text(this.store.pendingPrivate ? this.uiText("pm_make_profile_private_5d577229") : this.uiText("pm_make_profile_public_147d123a")).width('100%').fontSize(23).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
         Row({ space: 16 }) {
           SymbolGlyph($r('sys.symbol.person_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
           Text(this.store.pendingPrivate ? this.uiText("pm_only_your_followers_can_see_your_profile_and_its_content_0ca3b7cb") : this.uiText("pm_anyone_can_see_your_profile_pins_followers_and_boards_44055147")).layoutWeight(1).fontSize(16).fontColor($r('app.color.primary_text'))
@@ -122,7 +124,7 @@ export struct PinmonyVisibilitySettingsPage {
         Button(this.store.busy ? this.uiText("pm_saving_6bdb4435") : this.store.pendingPrivate ? this.uiText("pm_make_private_c25c078d") : this.uiText("pm_make_public_7a73baf0"))
           .width('100%').height(48).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
           .enabled(this.available()).onClick(() => { this.confirmPrivacy(); })
-      }.width('100%').padding({ left: 20, right: 20, top: 48, bottom: 24 }).alignItems(HorizontalAlign.Start)
+      }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 24 }).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%')
   }
   @Builder
@@ -144,16 +146,25 @@ export struct PinmonyVisibilitySettingsPage {
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
       .bindToScrollable([this.scroller]).onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
-      .bindSheet($$this.store.confirmOpen, this.privacySheet(), {
+      .bindSheet($$this.store.confirmOpen, this.presentedPrivacySheet(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisibilitySettingsPage.store.confirmOpen radius=uniform-32vp'); },
-        height: Math.min(380, this.viewportHeight * 0.8), showClose: true, dragBar: false,
+        height: Math.min(380, this.viewportHeight * 0.8), showClose: false, dragBar: false,
+
         backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
         onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.store.busy) action.springBack(); },
         onWillDismiss: (action: DismissSheetAction) => { if (this.store.busy) return; this.store.confirmOpen = false; action.dismiss(); }
-      })
+      }, this.sheetMaterialMode, false))
   }
+  @Builder
+  private presentedPrivacySheet() {
+    PinmonyModalNavigation({ titleText: this.uiText(this.store.pendingPrivate ? 'pm_make_profile_private_5d577229' : 'pm_make_profile_public_147d123a'), fillContent: true,
+      closeEnabled: !this.store.busy, onClose: () => { if (!this.store.busy) this.store.confirmOpen = false; } }) {
+      this.privacySheet()
+    }
+  }
+
   build() {
     HdsNavigation(this.paths) { Column().width('100%').height('100%') }.mode(NavigationMode.Stack)
       .width('100%').height('100%').hideTitleBar(true).navDestination(this.destination).backgroundColor($r('app.color.page_background'))

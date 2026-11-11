@@ -142,7 +142,7 @@ export struct PinmonyMoreSheet {
     .width('100%')
     .height(this.bodyHeight())
     .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+    .edgeEffect(EdgeEffect.None)
     .clip(false)
   }
 

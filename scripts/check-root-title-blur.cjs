@@ -32,10 +32,17 @@ for (const [module, page, methods] of pages) {
   for (const mode of ['immersive', 'gentle', 'exquisite', 'off']) {
     const host = new Host();
     Object.assign(host, { immersiveLightMode: mode, inputEditing: false, visibleCategories: () => ['pins'], uiText: name => name,
-      inboxSegmentsBuilder: () => {} });
+      inboxSegmentsBuilder: () => {},
+      hubTopTitleContent: { retained: true }, updateHubTitleContent() { this.titleUpdated = true; },
+      hubTitleBottomHeight: () => 136 });
     for (const method of methods) {
       const options = host[method]();
       const style = options.style;
+      if (method === 'hubTitleBarOptions') {
+        assert.equal(host.titleUpdated, true, 'title options synchronize retained content');
+        assert.equal(options.content.stackBuilderComponent, host.hubTopTitleContent, 'HDS receives the retained entity');
+        assert.equal(options.content.bottomBuilder.height, 136, 'bottom host keeps its computed height');
+      }
       if (page === 'PinmonyInboxPage') {
         assert.equal(options.avoidLayoutSafeArea, true);
         assert.equal(options.enableComponentSafeArea, false, 'inbox body must continue behind the title material');

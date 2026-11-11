@@ -119,7 +119,7 @@ import { PIN_NATIVE_DETAIL_READS_ENABLED, PinmonyDetailNativeReads, PinmonyDetai
 import { PinmonyBusinessSession, PinmonySessionEnvironment, PinmonyBusinessSessionContext, PinmonyAuthStatus, PinmonyAuthMessage, PIN_AUTH_BRIDGE_SCRIPT, PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, isPinterestAuthRoute, PINTEREST_LOGIN_URL } from 'common_session';
 import { PinmonySessionVerification, PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED } from '../app/PinmonySessionVerification';
 
-import { PinmonyStatusPage } from 'common_ui';
+import { PinmonyStatusPage, PinmonyModalNavigation } from 'common_ui';
 
 import { PinmonySettingsPage, PinmonySettingsStore, PinmonySettingsController, PinmonySettingsPorts,
   PIN_ACCOUNT_SETTINGS_SCRIPT, PIN_NOTIFICATIONS_READ_SCRIPT, PIN_LOGOUT_API_ENABLED } from 'feature_settings';
@@ -4453,6 +4453,8 @@ struct Index {
   private nativeTabHasUnread(index: number): boolean {
     return index === 3 && this.updateUnread || index === 2 && (this.inboxBadgeUpdatesUnread || this.inboxBadgeMessagesUnread);
   }
+  @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
+
   @Builder
   private buildNativeTab(labelKey: string, symbol: Resource, index: number) {
     Column({ space: 2 }) {
@@ -5777,9 +5779,6 @@ struct Index {
   @Builder
   private buildProfileMenuSheet() {
     Column({ space: 4 }) {
-      Text(this.uiText("pm_profile_options_344df243")).fontSize(20).fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.primary_text')).width('100%')
-        .padding({ left: 24, right: 24, top: 18, bottom: 12 })
       Text(this.uiText("pm_block_5e2a9472")).fontSize(17).fontColor($r('app.color.primary_text'))
         .width('100%').height(56).padding({ left: 24, right: 24 })
         .onClick(() => {}).accessibilityText(this.uiText("pm_block_5e2a9472"))
@@ -7194,10 +7193,7 @@ struct Index {
   @State private nativeSheetWindowWidth: number = 0;
   @State private nativeSheetWindowHeight: number = 0;
   private nativeModalHeight(): SheetSize | number {
-    if (this.activeSheetKind === 'comments') {
-      const shortSide: number = Math.min(this.nativeSheetWindowWidth, this.nativeSheetWindowHeight);
-      return shortSide > 0 ? shortSide * 0.9 : SheetSize.LARGE;
-    }
+    if (this.activeSheetKind === 'comments') return SheetSize.LARGE;
     if (['save', 'edit'].includes(this.activeSheetKind)) return SheetSize.LARGE;
     if (this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu) {
       let width: number = this.nativeSheetWindowWidth, height: number = this.nativeSheetWindowHeight;
@@ -7212,15 +7208,22 @@ struct Index {
     }
     return SheetSize.FIT_CONTENT;
   }
+  private nativeSheetUsesThemedModal(): boolean {
+    return ['publish', 'comments', 'searchFilter', 'profileMenu'].includes(this.activeSheetKind) ||
+      this.activeSheetKind === 'edit' && this.pinStore.editResult.phase !== 'boards' ||
+      this.activeSheetKind === 'share' && !!this.homeStore.customHomeMenu;
+  }
   private nativeSheetHasHdsTitle(): boolean {
-    return this.activeSheetKind === 'save' || this.activeSheetKind === 'more' || this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu;
+    return this.nativeSheetUsesThemedModal() || this.activeSheetKind === 'edit' || this.activeSheetKind === 'save' || this.activeSheetKind === 'more' || this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu;
   }
   private nativeModalLabel(): string {
     return this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? this.uiText("pm_add_to_section_d7aed82c") : this.uiText("pm_add_pins_or_sections_2274f06f")) : PinmonyI18n.render(this.profileStore.publishTitle, this.uiLanguage) || this.uiText("pm_add_to_profile_e076cb80")) :
         this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416")) : this.uiText("pm_edit_pin_f9119bcf")) : this.activeSheetKind === 'comments' ? this.uiText("pm_what_do_you_think_e8fb167b") : this.activeSheetKind === 'save' ?
           (this.pinStore.saveCreating ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416")) : this.activeSheetKind === 'more' ? this.uiText("pm_options_bb7486f4") :
-          this.activeSheetKind === 'searchFilter' ? this.uiText("pm_filters_8d35790c") : PinmonyI18n.render(this.pinStore.shareTitle, this.uiLanguage);
+          this.activeSheetKind === 'searchFilter' ? this.uiText("pm_filters_8d35790c") :
+          this.activeSheetKind === 'profileMenu' ? this.uiText('pm_profile_options_344df243') : PinmonyI18n.render(this.pinStore.shareTitle, this.uiLanguage);
   }
+
 
   private sheetExitKind: string = '';
   private pendingPhotoSaveMenu: PinmonyHomeMenuState | undefined = undefined;
@@ -7297,6 +7300,20 @@ struct Index {
     else if (this.activeSheetKind === 'share') this.requestShareSheetClose();
     else if (this.activeSheetKind === 'searchFilter') this.dismissSearchFilters();
     else if (this.activeSheetKind === 'profileMenu') this.dismissProfileMenu();
+  }
+
+  @Builder
+  private buildPresentedNativeSheet() {
+    if (this.nativeSheetUsesThemedModal()) {
+      PinmonyModalNavigation({ titleText: this.nativeModalLabel(),
+        fillContent: this.activeSheetKind === 'comments' || this.activeSheetKind === 'edit',
+        closeEnabled: this.activeSheetKind !== 'edit' || !this.pinStore.editResult.busy && !this.pinStore.editResult.picker.busy,
+        onClose: () => this.closeNativeModal() }) {
+        this.buildNativeSheet()
+      }
+    } else {
+      this.buildNativeSheet()
+    }
   }
 
   @Builder
@@ -7726,13 +7743,14 @@ struct Index {
           }
 
           Column().width(0).height(0)
-            .bindSheet($$this.boardRecoveryVisible, this.boardRecoverySheet(), {
+            .bindSheet($$this.boardRecoveryVisible, this.presentedBoardRecoverySheet(), PinmonyImmersiveLight.sheetOptions({
               radius: LengthMetrics.vp(32),
               preferType: this.nativeSheetWindowWidth >= 600 ? SheetType.CENTER : undefined,
-              height:'75%', showClose:true, backgroundColor:$r('app.color.page_background'),
+              height:'75%', showClose: false,
+               backgroundColor:$r('app.color.page_background'),
               onWillSpringBackWhenDismiss:(action:SpringBackAction): void => { if (this.settingsStore.busy) action.springBack(); },
               onWillDismiss:(action:DismissSheetAction): void => { if (!this.settingsStore.busy) action.dismiss(); },
-              onDisappear:(): void => this.closeBoardRecovery() })
+              onDisappear:(): void => this.closeBoardRecovery() }, this.sheetMaterialMode, false))
           if (this.profileSettingsVisible || this.settingsProfileDepth >= 0) {
             PinmonySettingsPage({ store: this.settingsStore, profileName:this.settingsProfileDepth >= 0 ? this.settingsProfileName : this.profileStore.profile?.displayName || this.profileStore.profile?.handle || '',profileUrl:this.authenticatedProfileUrl,profileAvatarColorIndex:this.settingsProfileDepth >= 0 ? this.settingsProfileAvatarColorIndex : this.profileStore.profile?.avatarColorIndex || 0,profileAvatar:this.settingsProfileDepth >= 0 ? this.settingsProfileAvatar : this.profileStore.profile?.avatarUrl || '',onViewProfile:() => {const page: string = this.profileStore.profile?.profileUrl || '';if(page)this.openUserProfile(page,true);}, onPin: (id: string): void => {
               if (this.authStatus !== 'authenticated' || this.businessSuspended || this.settingsStore.busy || this.settingsStore.loading || !this.settingsStore.data?.activities.some((pin): boolean => pin.id === id)) return;
@@ -8245,7 +8263,7 @@ struct Index {
       }
       if (height > 0 && Math.abs(height - this.nativeSheetWindowHeight) > 1) this.nativeSheetWindowHeight = height;
     })
-    .bindSheet($$this.showNativeSheet, this.buildNativeSheet(), {
+    .bindSheet($$this.showNativeSheet, this.buildPresentedNativeSheet(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.nativeSheetWindowWidth >= 600 ? SheetType.CENTER :
         this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu &&
@@ -8324,11 +8342,19 @@ struct Index {
         else if (this.activeSheetKind === 'profileMenu') this.dismissProfileMenu();
         action.dismiss();
       }
-    })
+    }, this.sheetMaterialMode, !this.nativeSheetHasHdsTitle()))
   }
   @Builder
   private sharedImageViewer() {
     PinmonyImageViewerHost({ session: this.imageViewer, active: !this.businessSuspended })
+  }
+
+  @Builder
+  private presentedBoardRecoverySheet() {
+    PinmonyModalNavigation({ titleText: this.uiText('pm_board_recovery_title'), fillContent: true,
+      closeEnabled: !this.settingsStore.busy, onClose: () => { if (!this.settingsStore.busy) this.boardRecoveryVisible = false; } }) {
+      this.boardRecoverySheet()
+    }
   }
 
   build() {

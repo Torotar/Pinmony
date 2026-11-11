@@ -14,7 +14,9 @@ for(const mode of ['off','gentle','immersive','exquisite'])for(const language of
  o.content.menu.value[0].content.action();assert.equal(closed,1);
 }
 assert(sheet.includes('Scroll(this.menuScroller)')&&sheet.includes('.bindToScrollable([this.menuScroller])'));
-assert(sheet.includes('.edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })')&&sheet.includes('.clip(false)'));
+assert(sheet.includes('.edgeEffect(EdgeEffect.None)'), 'menu body has no overscroll spring');
+assert(!sheet.includes('EdgeEffect.Spring')&&!sheet.includes('alwaysEnabled: true'), 'neither short nor long menu content enables body rebound');
+assert(sheet.includes('.clip(false)'), 'scroll content can still draw beneath the HDS gradient blur title');
 assert.equal((sheet.match(/Scroll\(/g)||[]).length,1,'loading, empty, error and menu share the same scroll scope');
 assert(sheet.includes('.titleMode(HdsNavigationTitleMode.MODAL)'));
 const Measurement=compile(sheet.slice(sheet.indexOf('  private bodyHeight()'),sheet.indexOf("  @StorageLink('pinmonyLanguage')")));
@@ -49,4 +51,4 @@ for(const kind of ['more','save','edit','comments','share','publish','searchFilt
 }
 handler.activeSheetKind='edit';handler.pinStore.editResult.busy=true;handler.handle({springBack(){springs++;}});assert.equal(springs,1,'blocked edit rebounds');
 handler.activeSheetKind='save';handler.pinStore.saveResult.busy=true;handler.handle({springBack(){springs++;}});assert.equal(springs,2,'blocked save rebounds');
-console.log('More menu: HDS mode/theme/language configuration, actual scroll binding, short-content spring, close state retention and ordinary pause passed');
+console.log('More menu: HDS mode/theme/language configuration, actual scroll binding, body spring disabled, close state retention and ordinary pause passed');

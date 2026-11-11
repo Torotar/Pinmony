@@ -1,3 +1,4 @@
+import { PinmonyModalNavigation } from 'common_ui';
 import { ComponentContent } from '@kit.ArkUI';
 import { PinmonyChatTitleOptions, buildPinmonyChatTitle } from './PinmonyChatTitle';
 import { PinmonyHdsTitleBar } from 'common_ui';
@@ -288,6 +289,8 @@ export struct PinmonyInboxFlowPage {
       date.getFullYear().toString() + '年' + (date.getMonth() + 1).toString() + '月' + date.getDate().toString() + '日';
     return date.toDateString() === yesterday.toDateString() ? this.uiText('pm_activity_yesterday') + ' ' + time : datePart + ' ' + time;
   }
+
+  @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
 
   @Builder
   private avatar(user: InboxFlowUser, size: number = 40) {
@@ -630,6 +633,22 @@ export struct PinmonyInboxFlowPage {
     }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 24 })
   }
 
+  @Builder
+  private presentedUpdatesMenu() {
+    PinmonyModalNavigation({ titleText: this.uiText("pm_update_options_c3643cd9"), fillContent: false,
+      closeEnabled: true, onClose: () => { this.showUpdatesMenu = false; } }) {
+      this.updatesMenuContent()
+    }
+  }
+
+  @Builder
+  private presentedMessageMenu() {
+    PinmonyModalNavigation({ titleText: this.messageMenuKind === 'block' ? (this.snapshot.blocked ? this.uiText("pm_unblock_contact_4b2a7e25") : this.uiText("pm_block_contact_a32510e0")) : this.uiText('pm_message_reaction_title'), fillContent: false,
+      closeEnabled: true, onClose: () => { this.closeMessageMenu(); } }) {
+      this.activeSheetContent()
+    }
+  }
+
   build() {
     if (this.snapshot.screen === 'news') {
       PinmonyInboxNewsPage({snapshot:this.snapshot,active:this.active,onAction:(action: string,value: string): void => this.act(action,value),
@@ -641,14 +660,14 @@ export struct PinmonyInboxFlowPage {
       Column().width(1).height(1)
         .hitTestBehavior(HitTestMode.Transparent)
         .onAppear(() => { this.presentedNewsId = this.snapshot.newsId || ''; this.showUpdatesMenu = !this.snapshot.newsHidden; })
-        .bindSheet($$this.showUpdatesMenu, this.updatesMenuContent(), {
+        .bindSheet($$this.showUpdatesMenu, this.presentedUpdatesMenu(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
           onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyInboxFlowPage.showUpdatesMenu radius=uniform-32vp'); },
           height: SheetSize.FIT_CONTENT,
           dragBar: true,
-          showClose: true,
-          title: { title: this.uiText("pm_update_options_c3643cd9") },
+          showClose: false,
+
           backgroundColor: $r('app.color.page_background'),
           maskColor: '#66000000',
           onDisappear: () => {
@@ -662,7 +681,7 @@ export struct PinmonyInboxFlowPage {
             action.dismiss();
             this.showUpdatesMenu = false;
           }
-        })
+        }, this.sheetMaterialMode, false))
     } else {
     HdsNavigation(this.flowPathStack) {}.mode(NavigationMode.Stack).width('100%').height('100%').hideTitleBar(true)
       .backgroundColor($r('app.color.page_background'))
@@ -786,18 +805,18 @@ export struct PinmonyInboxFlowPage {
         }
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
-      .bindSheet($$this.showMessageMenu, this.activeSheetContent(), {
+      .bindSheet($$this.showMessageMenu, this.presentedMessageMenu(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { this.messageMenuClosing = false; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyInboxFlowPage.showMessageMenu radius=uniform-32vp'); },
-        height: SheetSize.FIT_CONTENT, showClose: true,
-        title: { title: this.messageMenuKind === 'block' ? (this.snapshot.blocked ? this.uiText("pm_unblock_contact_4b2a7e25") : this.uiText("pm_block_contact_a32510e0")) : this.uiText('pm_message_reaction_title') }, dragBar: true,
+        height: SheetSize.FIT_CONTENT, showClose: false,
+         dragBar: true,
         backgroundColor: $r('app.color.page_background'),
         onWillSpringBackWhenDismiss: (_action: SpringBackAction): void => {},
         onWillDismiss: (action: DismissSheetAction) => { this.closeMessageMenu(); action.dismiss(); },
         onWillDisappear: (): void => { this.messageMenuClosing = true; },
         onDisappear: (): void => this.messageMenuDisappeared()
-      })
+      }, this.sheetMaterialMode, false))
     if (this.snapshot.screen === 'chat' && (this.snapshot.loading || !this.chatLayoutReady && this.snapshot.messages.length > 0 && !this.snapshot.error) || this.snapshot.directContact && !this.snapshot.error) {
       LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
     }
