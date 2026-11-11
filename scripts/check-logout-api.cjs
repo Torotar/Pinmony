@@ -104,7 +104,7 @@ async function main() {
 
   const settingsSource = fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets', 'utf8');
   const confirmMethod = settingsSource.match(/  private confirmLogout\([\s\S]*?(?=\r?\n  private )/)[0];
-  const confirmContext = {};
+  const confirmContext = { PinmonyImmersiveLight: { alertOptions: options => options } };
   require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
   }).outputText, confirmContext);

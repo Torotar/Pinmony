@@ -15,7 +15,7 @@ export interface PinmonySharePanelsControllerPorts {
   nativeSearch?: (value: string) => void;
   nativeRefresh?: () => Promise<void>;
   nativeAction?: (id: string) => Promise<void>;
-  nativePause?: () => void;
+  nativePause?: (preservePresentation?: boolean) => void;
   copyText: (value: string) => Promise<void>;
   currentProfileUrl: () => string;
   profileTitle: () => string;
@@ -61,15 +61,15 @@ export class PinmonySharePanelsController {
   private readonly store: PinmonyPinStore;
   private readonly ports: PinmonySharePanelsControllerPorts;
   constructor(store: PinmonyPinStore, ports: PinmonySharePanelsControllerPorts) { this.store = store; this.ports = ports; }
-  pause(): void {
+  pause(preservePresentation: boolean = false): void {
     if(this.ports.nativeMenu?.())this.ports.nativeMenuPause?.();
-    if(this.ports.nativeShare?.())this.ports.nativePause?.();
+    if(this.ports.nativeShare?.())this.ports.nativePause?.(preservePresentation);
     this.searchTasks.invalidate(); this.lastSearchKey = '';
     this.generation++; this.searchToken++; this.refreshToken++; this.refreshing = false; this.tasks.invalidate();
-    if (this.ports.activeSheetKind() === 'share' && this.store.shareLoading) {
+    if (!preservePresentation && this.ports.activeSheetKind() === 'share' && this.store.shareLoading) {
       this.store.shareLoading = false; this.store.shareError = PinmonyI18n.message("pm_share_loading_paused_please_retry_1a0f4d77");
     }
-    if (this.ports.activeSheetKind() === 'more' && this.store.moreLoading) {
+    if (!preservePresentation && this.ports.activeSheetKind() === 'more' && this.store.moreLoading) {
       this.store.moreLoading = false; this.store.moreError = PinmonyI18n.message("pm_option_loading_paused_please_retry_aedb895b");
     }
   }

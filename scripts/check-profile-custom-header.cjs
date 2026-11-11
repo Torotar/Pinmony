@@ -123,25 +123,42 @@ assert.equal((searchEntry.match(/if\(this\.onSearch\)this\.onSearch\(\)/g) || []
 assert.equal((searchEntry.match(/if\(this\.onPublish\)this\.onPublish\(\)/g) || []).length, 2, 'both versions retain the real publish route');
 assert.equal((searchEntry.match(/\.width\(44\)\.height\(44\)/g) || []).length, 2, 'publish retains its circular dimensions');
 assert.equal((searchEntry.match(/accessibilityText\(this\.uiText\('pm_publish_b61f333b'\)\)/g) || []).length, 2);
+const filtersStart = source.indexOf('  private hubFilters(');
+const filtersEnd = source.indexOf('  private hubSearchContent()', filtersStart);
+const filterButtons = source.slice(filtersStart, filtersEnd);
+assert.equal((filterButtons.match(/deviceInfo.apiAvailable/g) || []).length, 2);
+const stateStart = source.indexOf('  private hubStateButton(');
+const stateBlock = source.slice(stateStart, source.indexOf('  private selectPinView', stateStart));
+const modernState = stateBlock.slice(0, stateBlock.indexOf('    } else {\n    Toggle('));
+assert(modernState.includes('Button({type:ButtonType.Normal})') && !modernState.includes('Toggle('), 'API26 uses Button material host rather than Toggle button skin');
+assert(modernState.includes('.padding(0)') && modernState.includes('.height(40)'), 'preserve filter geometry');
+assert(stateBlock.includes("!this.hubSelected(kind) &&"), 'selected filters retain the accent background');
+assert(!stateBlock.slice(stateBlock.indexOf('} else {')).includes('.systemMaterial('), 'legacy toggle has no new material attribute');
+assert.equal((stateBlock.match(/this.requestHub\(\)/g) || []).length, 2, 'both toggle branches retain the filter request');
 const materialExpressions = [];
 function findMaterial(node) {
   if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'systemMaterial') materialExpressions.push(node.arguments[0].getText(ast));
   ts.forEachChild(node, findMaterial);
 }
-findMaterial(ast); assert.equal(materialExpressions.length, 2);
+findMaterial(ast); assert.equal(materialExpressions.length, 5);
 for (const [index, materialExpression] of materialExpressions.entries()) for (const supported of [false, true]) for (const mode of ['off', 'gentle', 'immersive', 'exquisite']) {
   const empty = {}, effects = [];
   const evaluate = vm.runInNewContext('(function(){ return (' + materialExpression + '); })', {
-    uiMaterial: { Material: { empty }, ImmersiveStyle: { THICK: 3, ULTRA_THIN: 0, REGULAR: 2 },
+    kind: 'favorite', uiMaterial: { Material: { empty }, ImmersiveStyle: { THICK: 3, ULTRA_THIN: 0, REGULAR: 2 },
       isImmersiveMaterialSupported: () => supported,
       ImmersiveMaterial: class { constructor(options) { effects.push(options); } } }
   });
-  const result = evaluate.call({ immersiveLightMode: mode });
+  const result = evaluate.call({ immersiveLightMode: mode, hubSelected: () => false });
+  if (index === 0) assert.equal(evaluate.call({ immersiveLightMode: mode, hubSelected: () => true }), empty, 'selected filter preserves its accent');
   if (!supported || mode === 'off') assert.equal(result, empty, 'off/unsupported clears the material');
   else {
-    assert.equal(effects[0].style, mode === 'gentle' ? 3 : index === 0 ? 0 : 2);
+    assert.equal(effects[0].style, mode === 'gentle' ? 3 : index === 3 ? 0 : 2);
     assert.equal(effects[0].interactive, true); assert.equal(effects[0].applyShadow, false);
     assert.equal(effects[0].colorInvert, false);
   }
 }
 console.log('Profile custom title passed: all header controls in HDS builder, drag/cancel positions, retained collapse, stable body inset, hidden pane touch/accessibility gates.');
+
+assert.equal((source.match(/\.shadow\(\{ radius:/g)||[]).length,5, 'all five profile control surfaces use compact explicit shadows');
+
+assert(source.includes('.shadow({ radius: !this.hubSelected(kind) &&'), 'selected accent filters have no material shadow');

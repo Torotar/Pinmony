@@ -285,6 +285,10 @@ export struct PinmonySearchPage {
   @Prop initialResultsScrollOffset: number = 0;
   @State private query: string = '';
   @State private quizSheetOpen: boolean = false;
+  @State private quizClosingKey: string = '';
+  private quizCloseDispatched: boolean = false;
+  @Prop @Watch('quizBackRequested') quizCloseRequest: number = 0;
+  private quizBackRequested(): void { if (this.quizCloseRequest > 0) this.requestQuizClose(); }
   @State private entryQuiz: PinmonySearchQuiz | undefined = undefined;
   private readonly flowSections: WaterFlowSections = new WaterFlowSections();
   private flowShape: string = '';
@@ -529,7 +533,10 @@ export struct PinmonySearchPage {
     const quiz: PinmonySearchQuiz | undefined = this.snapshot.quiz;
     if (!quiz) this.entryQuiz = undefined;
     else if (quiz.mode === 'entry') this.entryQuiz = quiz;
-    this.quizSheetOpen = !!quiz && quiz.mode !== 'entry';
+    if (this.quizClosingKey && (this.quizClosingKey !== this.quizContextKey() || !quiz || quiz.mode === 'entry')) {
+      this.quizClosingKey = ''; this.quizCloseDispatched = false;
+    }
+    this.quizSheetOpen = !this.quizClosingKey && !!quiz && quiz.mode !== 'entry';
     this.syncResultRows();
     const shape: string = (this.entryQuiz ? '1:' : '0:') + this.snapshot.results.length.toString() + ':' + this.contentColumns().toString();
     if (shape !== this.flowShape) {
@@ -541,12 +548,29 @@ export struct PinmonySearchPage {
     }
   }
 
+  private quizContextKey(): string { return this.snapshot.pageKey + ':' + this.snapshot.session.toString(); }
+  private requestQuizClose(): void {
+    if (this.quizClosingKey || !this.snapshot.quiz || this.snapshot.quiz.mode === 'entry') return;
+    this.quizClosingKey = this.quizContextKey();
+    this.quizCloseDispatched = false;
+    this.quizSheetOpen = false;
+  }
+  private finishQuizClose(): void {
+    if (this.quizSheetOpen || this.quizCloseDispatched) return;
+    const key: string = this.quizClosingKey;
+    if (key && key === this.quizContextKey() && this.snapshot.quiz && this.snapshot.quiz.mode !== 'entry' && this.onQuizAction) {
+      this.quizCloseDispatched = true;
+      this.onQuizAction('back', '');
+    }
+  }
+
   @Builder
   private quizSheet() {
     if (this.snapshot.quiz && this.snapshot.quiz.mode !== 'entry') {
       PinmonySearchQuizPanel({ quiz: this.snapshot.quiz,
-        onAction: (kind: string, id: string) => { if (this.onQuizAction) this.onQuizAction(kind, id); },
-        onPin: (url: string) => { if (this.onResult) this.onResult(url); } })
+        onAction: (kind: string, id: string) => { if (!this.quizClosingKey && this.onQuizAction) this.onQuizAction(kind, id); },
+        onPin: (url: string) => { if (!this.quizClosingKey && this.onResult) this.onResult(url); } })
+        .enabled(!this.quizClosingKey)
     }
   }
 
@@ -1474,6 +1498,7 @@ export struct PinmonySearchPage {
           .fontColor($r('app.color.primary_text'))
           .backgroundColor(this.searchControlBackground())
           .attributeModifier(new PinmonySearchFieldMaterial(this.immersiveLightMode, this.hdsDarkMode))
+          .shadow({ radius: PinmonySearchHeaderMaterial.active(this.immersiveLightMode) ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
           .borderRadius(22)
           .enterKeyType(EnterKeyType.Search)
           .cancelButton({ style: CancelButtonStyle.INPUT })
@@ -1516,6 +1541,7 @@ export struct PinmonySearchPage {
           .width(44).height(44).flexShrink(0).padding(0)
           .backgroundColor(this.searchControlBackground())
           .attributeModifier(new PinmonySearchButtonMaterial(this.immersiveLightMode, this.hdsDarkMode))
+          .shadow({ radius: PinmonySearchHeaderMaterial.active(this.immersiveLightMode) ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
           .accessibilityText(this.uiText('pm_photo_search'))
           .enabled(this.interactionReady && !this.photoBusy)
           .onClick(() => { this.photoMenu(); })
@@ -1885,10 +1911,11 @@ export struct PinmonySearchPage {
       height: '85%', preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : SheetType.BOTTOM, dragBar: false, showClose: true,
       title: { title: this.snapshot.quiz?.mode === 'picker' ? this.uiText("pm_choose_inspiration_up_to_10_images_19ae0263") : this.uiText("pm_inspiration_results_ffbd36b2") },
       backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
+      onWillSpringBackWhenDismiss: (_action: SpringBackAction): void => {},
+      onDisappear: (): void => this.finishQuizClose(),
       onWillDismiss: (action: DismissSheetAction) => {
+        this.requestQuizClose();
         action.dismiss();
-        this.quizSheetOpen = false;
-        if (this.snapshot.quiz && this.snapshot.quiz.mode !== 'entry' && this.onQuizAction) this.onQuizAction('back', '');
       }
     })
   }
@@ -1923,7 +1950,7 @@ export struct PinmonySearchPage {
       return;
     }
     if (this.snapshot.quiz && this.snapshot.quiz.mode !== 'entry' && this.onQuizAction) {
-      this.onQuizAction('back', '');
+      this.requestQuizClose();
     } else if (this.committedQuery() && this.onBack) this.onBack();
     else if (this.onRootBack) this.onRootBack();
     else if (this.onBack) this.onBack();

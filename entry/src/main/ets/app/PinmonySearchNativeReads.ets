@@ -93,7 +93,7 @@ export class PinmonySearchNativeReads {
   private hintReady: boolean = false;
   private filterRevision: number = 0;
   private filterId: string = '';
-  cancelFilters(): void { this.filterRevision++; if(this.filterId) this.ports.network().cancel(this.filterId); this.filterId = ''; this.store.searchFilterLoading = false; this.store.searchFilterOpen = false; }
+  cancelFilters(preservePresentation: boolean = false): void { this.filterRevision++; if(this.filterId) this.ports.network().cancel(this.filterId); this.filterId = ''; if (!preservePresentation) this.store.searchFilterLoading = false; this.store.searchFilterOpen = false; }
   private readonly requests: Set<string> = new Set<string>();
   private readonly feeds: Map<string, ReadFeed> = new Map<string, ReadFeed>();
   private readonly auxiliary: PinmonySearchNativeAuxiliary;

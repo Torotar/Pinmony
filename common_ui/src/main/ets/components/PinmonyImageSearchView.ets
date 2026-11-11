@@ -402,6 +402,7 @@ export struct PinmonyImageSearchView {
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,
         onHeightDidChange: (height: number) => { this.expanded = this.getUIContext().px2vp(height) > this.heightValue * 0.7; },
         onDetentsDidChange: (height: number) => this.updateSheetDetent(height),
+        onWillSpringBackWhenDismiss: (_action: SpringBackAction): void => {},
         onWillDismiss: (action: DismissSheetAction) => {
           action.dismiss();
           if (this.alive && this.presentationActive && !this.relatedOpening && !this.closing && !this.closeRequested) {

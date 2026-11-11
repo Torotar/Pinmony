@@ -89,5 +89,13 @@ assert.match(source, /getRectangleById\(this.homeEntryCardId\)/, 'return measure
 const searchView = fs.readFileSync('entry/src/main/ets/components/PinmonySearchRootContent.ets', 'utf8');
 assert.match(source, /preparingDetailReturn: this.preservingSearchForPin\(\)/);
 assert.match(searchView, /view.preparingDetailReturn \|\|/);
-assert.match(searchView, /view.nativeSearchPageVisible\(\) \|\| view.preparingDetailReturn \? Visibility.Visible/);
+const visibility=searchView.match(/\.visibility\(([^\r\n]+)\)/);assert(visibility);
+const visible=new Function('view','Visibility','return '+visibility[1]+';');
+const Visibility={Visible:'visible',Hidden:'hidden'};
+for(const [search,preparing,covered,expected] of [[false,false,false,'hidden'],[true,false,false,'visible'],
+ [false,true,false,'visible'],[false,false,true,'visible'],[true,true,true,'visible']]) {
+ assert.equal(visible({nativeSearchPageVisible:()=>search,preparingDetailReturn:preparing,profileCovered:covered},Visibility),expected,
+  'search stays mounted through Pin return and profile cover');
+}
+assert.match(searchView,/hitTestBehavior\(view.nativeSearchPageVisible\(\) \? HitTestMode.Default : HitTestMode.None\)/);
 console.log('Notification motion: stable parent identity/scroll, covered input guards, layer order, Pin slide and paired timing passed');

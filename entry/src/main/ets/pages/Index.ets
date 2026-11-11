@@ -524,6 +524,7 @@ struct Index {
   @State private nativeRootOnly: boolean = false;
   private publishBoardReturn: string = '';
   @State private boardSectionVisible: boolean = false;
+  @State private boardSectionCloseRequest: number = 0;
   @State private boardSectionSubmitting: boolean = false;
   private boardSectionToken: number = 0;
   private singlePinMovePage: string = '';
@@ -667,7 +668,7 @@ struct Index {
     nativeSearch: (value: string): void => this.shareNativeFlow.search(value),
     nativeRefresh: (): Promise<void> => this.shareNativeFlow.refresh(),
     nativeAction: (id: string): Promise<void> => this.shareNativeFlow.action(id),
-    nativePause: (): void => this.shareNativeFlow.pause(),
+    nativePause: (preservePresentation?: boolean): void => this.shareNativeFlow.pause(preservePresentation),
     copyText: (value: string): Promise<void> => this.systemActions.copyText(value),
     currentProfileUrl: (): string => this.currentProfileUrl(),
     profileTitle: (): string => this.profileStore.profile?.displayName || this.profileStore.profile?.handle || this.uiText("pm_pinterest_profile_ccf1ac90"),
@@ -828,11 +829,11 @@ struct Index {
     dismissApiBoards: (): void => { if (!this.backSavePanelLevel()) this.dismissApiBoards(); },
     dismissApiComments: (): void => this.dismissApiComments(),
     dismissEditPin: (force?: boolean): void => this.dismissEditPin(force),
-    dismissMoreSheet: (): void => this.dismissMoreSheet(),
+    dismissMoreSheet: (): void => this.requestMoreSheetClose(),
     dismissProfileMenu: (): void => this.dismissProfileMenu(),
     dismissProfilePublish: (): void => this.dismissProfilePublish(),
     dismissSearchFilters: (): void => this.dismissSearchFilters(),
-    dismissShareSheet: (): void => this.dismissShareSheet(),
+    dismissShareSheet: (): void => this.requestShareSheetClose(),
     editPinAction: (method: string, args: string): void => this.editPinAction(method, args),
     extractPinUrl: (value: string): string => this.extractPinUrl(value),
     failureDetails: (): string => this.failureDetails,
@@ -891,7 +892,7 @@ struct Index {
     returnCoordinator: (): PinmonyReturnCoordinator => this.returnCoordinator,
     returnFromDetailWebFlow: (): Promise<void> => this.returnFromDetailWebFlow(),
     returnFromProfileWebFlow: (): Promise<void> => this.returnFromProfileWebFlow(),
-    returnFromSearchQuiz: (): boolean => this.returnFromSearchQuiz(),
+    returnFromSearchQuiz: (): boolean => this.requestSearchQuizClose(),
     rootContentInteracted: (): boolean => this.rootContentInteracted,
     setRootContentInteracted: (value: boolean): boolean => { this.rootContentInteracted = value; return value; },
     rootPresentationAddress: (index: number): string => this.rootPresentationAddress(index),
@@ -1107,14 +1108,14 @@ struct Index {
     isCurrentBoardMenuPin: (pinUrl: string, pageKey: string): boolean => this.isCurrentBoardMenuPin(pinUrl, pageKey),
     isCurrentMorePin: (pin: string): boolean => this.isCurrentMorePin(pin),
     isCurrentSearchMenuPin: (pinUrl: string, pageKey: string): boolean => this.isCurrentSearchMenuPin(pinUrl, pageKey),
-    openApiBoards: (requestedPin?: string): Promise<void> => this.openApiBoards(requestedPin),
+    openApiBoards: (requestedPin?: string): Promise<void> => this.openPhotoMenuSave(requestedPin || ''),
     openApiDetailMore: (): Promise<void> => this.openApiDetailMore(),
     pinIdentity: (value: string): string => this.pinIdentity(value),
     pinStore: (): PinmonyPinStore => this.pinStore,
     rejectOfflineAction: (action: string, message?: string): boolean => this.rejectOfflineAction(action, message),
     retainedBoardContent: (): PinmonyBoardDetail | undefined => this.retainedBoardContent,
     setRetainedBoardContent: (value: PinmonyBoardDetail | undefined): PinmonyBoardDetail | undefined => { this.retainedBoardContent = value; return value; },
-    shareBoardPinAfterMenu: (pin: string, page: string): Promise<void> => this.shareDetailPinAfterMenu(pin, page, false, false),
+    shareBoardPinAfterMenu: (pin: string, page: string): Promise<void> => this.openPhotoMenuSave(pin, true),
     sharePinUrl: (url: string, title?: string): Promise<void> => this.sharePinUrl(url, title),
     showMessage: (message: string): void => this.showMessage(message),
     showNativeSheet: (): boolean => this.showNativeSheet,
@@ -1524,7 +1525,7 @@ struct Index {
     store: (): PinmonyInboxStore => this.inboxStore,
     session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),
     page: (): string => this.currentInboxUrl(),
-    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.noticeChats.length === 0 && (this.activeTab === 2 || this.profileChatActive) && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.boardStore.boardDetail && !this.activeSheetKind,
+    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && this.noticeChats.length === 0 && !this.chatProfileTransition && (this.profileChatActive || this.profileStore.origins.length === 0) && (this.activeTab === 2 || this.profileChatActive) && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.boardStore.boardDetail && !this.activeSheetKind,
     network: (): PinmonyNativeNetwork => this.nativeNetwork,
     settled: (): void => {this.finishRootPull('inbox'); this.markRootPerformance(2); this.rootContextCoordinator.notify();}
   } as PinmonyInboxMessagesNativeReadsPorts);
@@ -1705,13 +1706,13 @@ struct Index {
 
   private readonly postPanelsController: PinmonyPostPanelsController = new PinmonyPostPanelsController(this.pinStore, {
     nativePause: (): void => this.postNativeOperations?.pause(),
-    cancelNativeCommentWrites: (): void => this.commentNativeWrites?.pause(),
+    cancelNativeCommentWrites: (preservePresentation?: boolean): void => this.commentNativeWrites?.pause(preservePresentation),
     nativeCommentWrite: PIN_NATIVE_COMMENT_WRITES_ENABLED ? (encoded: string, current: () => boolean): Promise<void> => this.commentNativeWrites.write(encoded,current) : undefined,
     nativeCommentLike: PIN_NATIVE_COMMENT_WRITES_ENABLED ? (id: string, current: () => boolean): Promise<void> => this.commentNativeWrites.like(id,current) : undefined,
     nativeTranslate: PIN_NATIVE_DETAIL_READS_ENABLED ? (id: string, current: () => boolean): Promise<void> => this.detailNativeReads.translateComment(id, current) : undefined,
     nativeReplies: PIN_NATIVE_DETAIL_READS_ENABLED ? (id: string, current: () => boolean): Promise<void> => this.detailNativeReads.readReplies(id, current) : undefined,
     nativeComments: PIN_NATIVE_DETAIL_READS_ENABLED ? (append: boolean, current: () => boolean): Promise<void> => this.detailNativeReads.readComments(append, current) : undefined,
-    cancelNativeComments: (): void => this.detailNativeReads.cancelComments(),
+    cancelNativeComments: (preservePresentation?: boolean): void => this.detailNativeReads.cancelComments(preservePresentation),
     adoptComments: async (): Promise<boolean> => {
       if (!await this.ensureDetailActionContext() || this.activeSheetKind !== 'comments') return false;
       const pin: string = this.pinStore.commentResult.pin;
@@ -2013,7 +2014,7 @@ struct Index {
     nativeSearchFollowUser: (id: string): Promise<void> => this.searchNativeReads.followUser(id),
     nativeSearchFollowBoard: (id: string): Promise<void> => this.searchNativeReads.followBoard(id),
     nativeSearchDeleteHistory: (id: string): Promise<void> => this.searchNativeReads.deleteHistory(id),
-    nativeSearchCancelFilters: (): void => this.searchNativeReads.cancelFilters(),
+    nativeSearchCancelFilters: (preservePresentation?: boolean): void => this.searchNativeReads.cancelFilters(preservePresentation),
     nativeSearchFilters: (): Promise<void> => this.searchNativeReads.filters(),
     nativeSearchFilterTarget: (id: string): string => this.searchNativeReads.filterTarget(id),
     nativeDiscovery: (): boolean => this.nativeBusinessRoutesEnabled && this.authStatus === 'authenticated' && this.activeTab === 1,
@@ -2231,6 +2232,9 @@ struct Index {
     this.inboxMessageNotice.dismissViewed();
     if(this.noticeChats.length) { this.noticeChats[this.noticeChats.length - 1].poll(); this.inboxUnreadNativeReads.pollMessages(); return; }
     if(this.activeTab !== 2 && !this.profileChatActive) { this.inboxPagePollMode = ''; this.inboxUnreadNativeReads.poll(); return; }
+    if(this.chatProfileTransition || (!this.profileChatActive && this.profileStore.origins.length > 0)) {
+      this.inboxPagePollMode = ''; this.inboxUnreadNativeReads.pollMessages(); return;
+    }
     if(!this.inboxMessagesNativeReads.owned() || !!this.inboxStore.inboxFlow)this.inboxUnreadNativeReads.pollMessages();
     if (this.inboxUpdatesNativeReads.eligible()) {
       if (this.businessSuspended || this.authStatus !== 'authenticated' || this.activeTab !== 2 ||
@@ -2750,6 +2754,8 @@ struct Index {
   }
 
   private dismissShareSheet(): void { try {
+    this.pendingPhotoSaveMenu = undefined;
+    this.pendingPhotoMenuShare = false;
     PinmonyRuntimeLog.info('AsyncAction: stage=share-close');
     this.sharePanelsController.pause();
     if(this.nativeBusinessRoutesEnabled)this.shareNativeFlow.close();
@@ -2860,27 +2866,41 @@ struct Index {
     } else this.closeMoreWebPanel(session, pin);
    } finally { this.rootContextCoordinator.notify(); } }
 
+  private requestMoreSheetClose(): void {
+    if (this.activeSheetKind !== 'more' || this.sheetExitKind === 'more') return;
+    this.sheetExitKind = 'more';
+    this.pinStore.shareBackHandledUntil = Date.now() + 500;
+    this.lastRootBackAt = 0;
+    this.showNativeSheet = false;
+    this.sharePanelsController.pause(true);
+  }
+
   private async openApiDetailMore(): Promise<void> {
     await this.sharePanelsController.openApiDetailMore();
   }
 
   private async performMoreAction(id: string): Promise<void> {
+    if (!this.showNativeSheet || this.activeSheetKind !== 'more') return;
     await this.sharePanelsController.performMoreAction(id);
   }
 
   private async refreshMoreSheet(): Promise<void> {
+    if (!this.showNativeSheet || this.activeSheetKind !== 'more') return;
     await this.sharePanelsController.refreshMoreSheet();
   }
 
   private async performShareAction(id: string): Promise<void> {
+    if (!this.showNativeSheet || this.activeSheetKind !== 'share') return;
     await this.sharePanelsController.performShareAction(id);
   }
 
   private async searchShareContacts(value: string): Promise<void> {
+    if (!this.showNativeSheet || this.activeSheetKind !== 'share') return;
     await this.sharePanelsController.searchShareContacts(value);
   }
 
   private async refreshShareSheet(): Promise<void> {
+    if (!this.showNativeSheet || this.activeSheetKind !== 'share') return;
     await this.sharePanelsController.refreshShareSheet();
   }
 
@@ -4600,7 +4620,7 @@ struct Index {
   }
 
   private backOnePage(fallback: string = PINTEREST_URL, targetOverride: string = ''): boolean {
-    if (this.boardSectionVisible) { this.closeBoardSection(); return true; }
+    if (this.boardSectionVisible) { this.boardSectionCloseRequest++; return true; }
     if (this.boardStore.collaborators) { this.closeBoardCollaborators(); return true; }
     if (this.pageHistory.isPending()) return true;
     try {
@@ -4729,6 +4749,13 @@ struct Index {
     this.backOnePage(parent || PINTEREST_URL, origin);
   }
 
+  @State private searchQuizCloseRequest: number = 0;
+  private requestSearchQuizClose(): boolean {
+    const current: PinmonySearchSnapshot | undefined = this.searchStore.search;
+    if (!current || current.pageKey !== this.currentSearchPageKey() || !current.quiz || current.quiz.mode === 'entry') return false;
+    this.searchQuizCloseRequest++;
+    return true;
+  }
   private returnFromSearchQuiz(): boolean {
     if(PIN_NATIVE_SEARCH_READS_ENABLED){if(this.searchStore.search?.pageKey === this.currentSearchPageKey() && this.searchStore.search?.quiz && this.searchStore.search.quiz.mode !== 'entry'){this.searchNativeReads.quizAction('back');return true;}return false;}
     const current: PinmonySearchSnapshot | undefined = this.searchStore.search;
@@ -5744,7 +5771,6 @@ struct Index {
   private dismissProfileMenu(): void {
     if (this.activeSheetKind === 'profileMenu') {
       this.showNativeSheet = false;
-      this.activeSheetKind = '';
     }
   }
 
@@ -5791,6 +5817,7 @@ struct Index {
   }
 
   private openBoardSection(): void {
+    this.boardSectionCloseRequest = 0;
     this.boardSectionToken++;this.boardSectionVisible = true;
     const board: PinmonyBoardDetail | undefined = this.boardStore.boardDetail;
     if(PIN_NATIVE_BOARD_READS_ENABLED && board?.nativeVersion !== undefined) {
@@ -6448,6 +6475,7 @@ struct Index {
   private dismissApiComments(): void { try { this.postPanelsController.dismiss('comments');  } finally { this.rootContextCoordinator.notify(); } }
 
   private commentApiAction(method: string, id: string = ''): void {
+    if (!this.showNativeSheet || this.activeSheetKind !== 'comments') return;
     const operation: string = ['commentsMore','commentReplies','commentLike','commentTranslate'].includes(method) ? method : 'unsupported';
     PinmonyRuntimeLog.info('AsyncAction: stage=comment-action operation=' + operation);
     this.postPanelsController.commentAction(method, id).catch((): void => {
@@ -6459,15 +6487,15 @@ struct Index {
 
   private async pickCommentImage(): Promise<string> {
     const token: number = this.pinStore.commentToken;
-    if (this.activeSheetKind !== 'comments' || this.pinStore.commentResult.busy) return '';
+    if (!this.showNativeSheet || this.activeSheetKind !== 'comments' || this.pinStore.commentResult.busy) return '';
     try {
       const selectedUri: string = await this.systemActions.pickImage();
-      if (token !== this.pinStore.commentToken || this.activeSheetKind !== 'comments') return '';
+      if (!this.showNativeSheet || token !== this.pinStore.commentToken || this.activeSheetKind !== 'comments') return '';
       return selectedUri;
     } catch (_) { this.showMessage(PinmonyI18n.message("pm_image_selection_incomplete_216e6d3a")); return ''; }
   }
 
-  private async writeComment(encoded: string): Promise<void> { await this.postPanelsController.writeComment(encoded); }
+  private async writeComment(encoded: string): Promise<void> { if (!this.showNativeSheet || this.activeSheetKind !== 'comments') return; await this.postPanelsController.writeComment(encoded); }
 
   private async prepareCommentWrite(encoded: string, pin: string, current: () => boolean): Promise<string> {
     let value: NativeCommentWrite;
@@ -7149,12 +7177,12 @@ struct Index {
 
   @Builder
   private buildShareSheet() {
-    PinmonyShareSheet({ pinStore: this.pinStore, onAction: (id: string) => this.performShareAction(id), onSearch: (value: string) => this.searchShareContacts(value), onRetry: () => this.refreshShareSheet(), hasCopyLink: () => this.hasCarouselCopyLink(), isCopyLink: (label: string) => this.isCopyLinkAction(label), onReady: () => { this.pagePerformance.markSecondary('share', this.pinStore.shareSession.toString(), 'component-ready'); this.scheduleShareWebOpen(); } })
+    PinmonyShareSheet({ pinStore: this.pinStore, titleText: this.nativeModalLabel(), onClose: () => this.closeNativeModal(), onAction: (id: string) => this.performShareAction(id), onSearch: (value: string) => this.searchShareContacts(value), onRetry: () => this.refreshShareSheet(), hasCopyLink: () => this.hasCarouselCopyLink(), isCopyLink: (label: string) => this.isCopyLinkAction(label), onReady: () => { this.pagePerformance.markSecondary('share', this.pinStore.shareSession.toString(), 'component-ready'); this.scheduleShareWebOpen(); } })
   }
 
   @Builder
   private buildMoreSheet() {
-    PinmonyMoreSheet({ pinStore: this.pinStore, onAction: (id: string) => this.performMoreAction(id),
+    PinmonyMoreSheet({ pinStore: this.pinStore, onClose: () => this.requestMoreSheetClose(), onAction: (id: string) => this.performMoreAction(id),
       onRetry: () => this.refreshMoreSheet() })
   }
 
@@ -7184,11 +7212,74 @@ struct Index {
     }
     return SheetSize.FIT_CONTENT;
   }
+  private nativeSheetHasHdsTitle(): boolean {
+    return this.activeSheetKind === 'save' || this.activeSheetKind === 'more' || this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu;
+  }
   private nativeModalLabel(): string {
     return this.activeSheetKind === 'publish' ? (this.publishBoardReturn ? (this.boardStore.boardDetail?.flow?.phase === 'section' ? this.uiText("pm_add_to_section_d7aed82c") : this.uiText("pm_add_pins_or_sections_2274f06f")) : PinmonyI18n.render(this.profileStore.publishTitle, this.uiLanguage) || this.uiText("pm_add_to_profile_e076cb80")) :
         this.activeSheetKind === 'edit' ? (this.pinStore.editResult.phase === 'boards' ? (this.pinStore.saveCreating ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416")) : this.uiText("pm_edit_pin_f9119bcf")) : this.activeSheetKind === 'comments' ? this.uiText("pm_what_do_you_think_e8fb167b") : this.activeSheetKind === 'save' ?
           (this.pinStore.saveCreating ? this.uiText("pm_create_board_513babc9") : this.uiText("pm_save_to_board_0233a416")) : this.activeSheetKind === 'more' ? this.uiText("pm_options_bb7486f4") :
           this.activeSheetKind === 'searchFilter' ? this.uiText("pm_filters_8d35790c") : PinmonyI18n.render(this.pinStore.shareTitle, this.uiLanguage);
+  }
+
+  private sheetExitKind: string = '';
+  private pendingPhotoSaveMenu: PinmonyHomeMenuState | undefined = undefined;
+  private pendingPhotoSaveEpoch: number = -1;
+  private pendingPhotoSavePage: string = '';
+  private pendingPhotoMenuShare: boolean = false;
+
+  private async openPhotoMenuSave(pin: string, share: boolean = false): Promise<void> {
+    const menu: PinmonyHomeMenuState | undefined = this.homeStore.customHomeMenu;
+    if (!menu || menu.pinUrl !== pin || this.activeSheetKind !== 'share' || !this.showNativeSheet ||
+        this.pendingPhotoSaveMenu || this.authStatus !== 'authenticated' || this.businessSuspended) return;
+    this.pendingPhotoSaveMenu = menu;
+    this.pendingPhotoMenuShare = share;
+    this.pendingPhotoSaveEpoch = this.authEpoch;
+    this.pendingPhotoSavePage = this.nativeDisplayAddress();
+    // Keep the old menu and title mounted until its native Sheet has disappeared.
+    this.showNativeSheet = false;
+  }
+
+  private async finishPhotoMenuSave(): Promise<void> {
+    const menu: PinmonyHomeMenuState | undefined = this.pendingPhotoSaveMenu;
+    const share: boolean = this.pendingPhotoMenuShare;
+    this.pendingPhotoSaveMenu = undefined;
+    this.pendingPhotoMenuShare = false;
+    if (!menu || this.homeStore.customHomeMenu !== menu) return;
+    if (this.authEpoch !== this.pendingPhotoSaveEpoch || this.authStatus !== 'authenticated' ||
+        this.businessSuspended || this.nativeDisplayAddress() !== this.pendingPhotoSavePage) {
+      this.dismissShareSheet();
+      return;
+    }
+    if (share) {
+      const page: string = this.pendingPhotoSavePage;
+      this.dismissShareSheet();
+      this.homeStore.homeMenuPin = menu.pinUrl;
+      this.homeStore.homeMenuPage = page;
+      await this.shareNativeFlow.open('pin', menu.pinUrl, this.pinIdentity(menu.pinUrl));
+      return;
+    }
+    this.activeSheetKind = '';
+    try {
+      // Keep the card ownership context for the existing save service permission checks.
+      await this.openApiBoards(menu.pinUrl);
+    } finally {
+      if (this.homeStore.customHomeMenu === menu && this.activeSheetKind !== 'save') this.dismissShareSheet();
+    }
+  }
+
+  private requestShareSheetClose(): void {
+    if (this.activeSheetKind !== 'share') return;
+    if (this.pendingPhotoSaveMenu) return;
+    if (this.homeStore.customHomeMenu) { this.dismissShareSheet(); return; }
+    if (this.sheetExitKind === 'share') return;
+    this.sheetExitKind = 'share';
+    this.pinStore.shareBackHandledUntil = Date.now() + 500;
+    this.lastRootBackAt = 0;
+    // Keep the title, contacts and panel identity mounted for the native Sheet exit.
+    // Existing onDisappear performs the full dismissShareSheet cleanup afterwards.
+    this.showNativeSheet = false;
+    this.sharePanelsController.pause(true);
   }
 
   private closeNativeModal(): void {
@@ -7202,8 +7293,8 @@ struct Index {
     } else if (this.activeSheetKind === 'comments') this.dismissApiComments();
     else if (this.activeSheetKind === 'save') this.dismissApiBoards();
     else if (this.activeSheetKind === 'publish') this.dismissProfilePublish();
-    else if (this.activeSheetKind === 'more') this.dismissMoreSheet();
-    else if (this.activeSheetKind === 'share') this.dismissShareSheet();
+    else if (this.activeSheetKind === 'more') this.requestMoreSheetClose();
+    else if (this.activeSheetKind === 'share') this.requestShareSheetClose();
     else if (this.activeSheetKind === 'searchFilter') this.dismissSearchFilters();
     else if (this.activeSheetKind === 'profileMenu') this.dismissProfileMenu();
   }
@@ -7245,7 +7336,7 @@ struct Index {
         onClose: () => this.dismissApiComments(),
         onLike: (id: string) => this.commentApiAction('commentLike', id) })
     } else if (this.activeSheetKind === 'save') {
-      PinmonySaveSheet({ result: this.pinStore.saveResult, onRetry: () => {
+      PinmonySaveSheet({ result: this.pinStore.saveResult, onClose: () => this.closeNativeModal(), onRetry: () => {
           if(this.pinStore.saveResult.targetBoardId)this.saveApiAction('boardsSections', ',' + JSON.stringify(this.pinStore.saveResult.targetBoardId));else this.openApiBoards();
         },
         onOpenBoard: PIN_NATIVE_POST_OPERATIONS_ENABLED ? (id: string) => this.saveApiAction('boardsSections', ',' + JSON.stringify(id)) : undefined,
@@ -7356,6 +7447,7 @@ struct Index {
       rootPullKind: this.rootPullKind,
       pullRefreshRoot: (kind: string): Promise<void> => this.pullRefreshRoot(kind),
       returnFromSearchQuiz: (): boolean => this.returnFromSearchQuiz(),
+      quizCloseRequest: this.searchQuizCloseRequest,
       backFromSearch: (): void => this.backFromSearch(),
       rootBack: (): boolean => this.onBackPress(),
       performSearchQuizAction: (kind: string, id: string): Promise<void> => this.performSearchQuizAction(kind, id),
@@ -7638,6 +7730,7 @@ struct Index {
               radius: LengthMetrics.vp(32),
               preferType: this.nativeSheetWindowWidth >= 600 ? SheetType.CENTER : undefined,
               height:'75%', showClose:true, backgroundColor:$r('app.color.page_background'),
+              onWillSpringBackWhenDismiss:(action:SpringBackAction): void => { if (this.settingsStore.busy) action.springBack(); },
               onWillDismiss:(action:DismissSheetAction): void => { if (!this.settingsStore.busy) action.dismiss(); },
               onDisappear:(): void => this.closeBoardRecovery() })
           if (this.profileSettingsVisible || this.settingsProfileDepth >= 0) {
@@ -7860,7 +7953,7 @@ struct Index {
           }
 
           if (this.boardSectionVisible) {
-            PinmonyBoardSectionPage({ ready: this.boardSectionReady(), onCreate: (name: string): Promise<string> => this.createBoardSection(name), onClose: () => {
+            PinmonyBoardSectionPage({ ready: this.boardSectionReady(), closeRequest: this.boardSectionCloseRequest, onCreate: (name: string): Promise<string> => this.createBoardSection(name), onClose: () => {
               this.closeBoardSection();
             } })
               .width('100%').height('100%')
@@ -8161,12 +8254,13 @@ struct Index {
       keyboardAvoidMode: this.activeSheetKind === 'comments' ? SheetKeyboardAvoidMode.RESIZE_ONLY :
         SheetKeyboardAvoidMode.TRANSLATE_AND_SCROLL,
       height: this.nativeModalHeight(),
-      dragBar: true,
-      showClose: true,
-      title: { title: this.nativeModalLabel() },
+      dragBar: this.activeSheetKind !== 'save',
+      showClose: !this.nativeSheetHasHdsTitle(),
+      title: this.nativeSheetHasHdsTitle() ? undefined : { title: this.nativeModalLabel() },
       backgroundColor: $r('app.color.page_background'),
       maskColor: '#66000000',
       onDisappear: (): void => {
+        if (!this.showNativeSheet) this.sheetExitKind = '';
         if (!this.showNativeSheet && ['save', 'edit'].includes(this.activeSheetKind)) {
           const closed: (() => void) | undefined = this.postSheetClosed;
           const dismissed: boolean = this.postSheetDismissed;
@@ -8174,7 +8268,9 @@ struct Index {
           if(dismissed && this.homeStore.customHomeMenu)this.dismissShareSheet();
           if(closed)closed();
         }
+        if (!this.showNativeSheet && this.activeSheetKind === 'profileMenu') this.activeSheetKind = '';
         if (!this.showNativeSheet && this.activeSheetKind === 'searchFilter') {
+          this.searchController.finishSearchFiltersClose();
           const target: string = this.pendingSearchFilterTarget, source: string = this.pendingSearchFilterSource;
           this.pendingSearchFilterTarget = ''; this.pendingSearchFilterSource = ''; this.activeSheetKind = '';
           if (target && this.authStatus === 'authenticated' && this.activeTab === 1 &&
@@ -8198,8 +8294,14 @@ struct Index {
         }
         this.notifyDetailSystemShareClosed();
         if (!this.showNativeSheet && this.activeSheetKind === 'share' && !this.detailSystemShareClosed) {
-          this.dismissShareSheet();
+          if (this.pendingPhotoSaveMenu) this.finishPhotoMenuSave().catch(() => {});
+          else this.dismissShareSheet();
         }
+        if (!this.showNativeSheet && this.activeSheetKind === 'more') this.dismissMoreSheet();
+      },
+      onWillSpringBackWhenDismiss: (action: SpringBackAction): void => {
+        if (this.activeSheetKind === 'edit' && (this.pinStore.editResult.busy || this.pinStore.editResult.picker.busy || this.pinStore.editResult.phase !== 'edit') ||
+            this.activeSheetKind === 'save' && this.pinStore.saveResult.busy) action.springBack();
       },
       onWillDismiss: (action: DismissSheetAction) => {
         if (this.detailSystemShareClosed) { action.dismiss(); return; }
@@ -8211,13 +8313,15 @@ struct Index {
           this.dismissEditPin();
         } else if (this.activeSheetKind === 'comments') this.dismissApiComments();
         else if (this.activeSheetKind === 'save') {
+          if (this.pinStore.saveResult.busy) return;
           if (action.reason === DismissReason.PRESS_BACK && this.backSavePanelLevel()) return;
           this.dismissApiBoards();
         }
         else if (this.activeSheetKind === 'publish') this.dismissProfilePublish();
-        else if (this.activeSheetKind === 'more') this.dismissMoreSheet();
-        else if (this.activeSheetKind === 'share') this.dismissShareSheet();
+        else if (this.activeSheetKind === 'more') this.requestMoreSheetClose();
+        else if (this.activeSheetKind === 'share') this.requestShareSheetClose();
         else if (this.activeSheetKind === 'searchFilter') this.dismissSearchFilters();
+        else if (this.activeSheetKind === 'profileMenu') this.dismissProfileMenu();
         action.dismiss();
       }
     })

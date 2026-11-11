@@ -214,6 +214,28 @@ struct PinmonyBoardSurface {
   @Prop initialSelectedIds: string[] = [];
   @Prop @Watch('snapshotChanged') snapshot: PinmonyBoardDetail;
   @State private moveSheetOpen: boolean = false;
+  private moveClosingKey: string = '';
+  private moveCloseDispatched: boolean = false;
+  private syncMoveVisibility(): void {
+    if (this.moveClosingKey && (this.moveClosingKey !== this.confirmationKey() || this.snapshot.flow?.phase !== 'targets')) {
+      this.moveClosingKey = ''; this.moveCloseDispatched = false;
+    }
+    this.moveSheetOpen = !this.moveClosingKey && this.singlePinMove && this.snapshot.flow?.phase === 'targets';
+  }
+  private requestMoveClose(): void {
+    if (this.snapshot.flow?.busy || this.snapshot.flow?.uncertain || this.moveClosingKey) return;
+    this.moveClosingKey = this.confirmationKey();
+    this.moveCloseDispatched = false;
+    this.moveSheetOpen = false;
+  }
+  private finishMoveClose(): void {
+    if (this.moveSheetOpen || this.moveCloseDispatched) return;
+    const key: string = this.moveClosingKey;
+    if (key && key === this.confirmationKey() && this.snapshot.flow?.phase === 'targets' && !this.snapshot.flow.busy && !this.snapshot.flow.uncertain && this.onAction) {
+      this.moveCloseDispatched = true;
+      this.onAction(JSON.stringify({ action: this.singlePinMove ? 'close' : 'select', value: '' }));
+    }
+  }
   @State private menuOpen: boolean = false;
   @State private mergeOpen: boolean = false;
   @State private privacyOpen: boolean = false;
@@ -319,7 +341,7 @@ struct PinmonyBoardSurface {
   }
 
   aboutToAppear(): void {
-    this.moveSheetOpen = this.singlePinMove && this.snapshot.flow?.phase === 'targets';
+    this.syncMoveVisibility();
     if (this.snapshot.flow?.phase === 'targets') {
       this.selectedIds = this.initialSelectedIds.slice();
       this.selectionSession = this.snapshot.pageKey + ':' + (this.snapshot.nativeAccountGeneration ?? this.snapshot.session).toString();
@@ -333,7 +355,7 @@ struct PinmonyBoardSurface {
   }
 
   private snapshotChanged(): void {
-    this.moveSheetOpen = this.singlePinMove && this.snapshot.flow?.phase === 'targets';
+    this.syncMoveVisibility();
     if (this.sectionEntryPending && this.phase() === 'section') {
       this.sectionEntryPending = false;
       if (this.sectionMotionWidth > 0) {
@@ -417,19 +439,19 @@ struct PinmonyBoardSurface {
     if (this.phase() !== 'edit' || this.snapshot.flow?.loading || this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
     const identity: string = this.confirmationKey();
     const page: string = this.snapshot.pageKey;
-    this.getUIContext().showAlertDialog({ title: this.uiText("pm_delete_board_193df6a1"),
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({ title: this.uiText("pm_delete_board_193df6a1"),
       message: this.uiText("pm_permanently_delete_this_board_and_all_its_pins_this_cannot_be_un_6c0d51fd"),
       primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: () => {} },
       secondaryButton: { value: this.uiText("pm_delete_board_193df6a1"), action: () => {
         if (this.confirmationKey() === identity && this.snapshot.pageKey === page && this.phase() === 'edit' &&
             !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain) this.act('delete');
       } }
-    });
+    }));
   }
   private confirmDeleteSelected(): void {
     const ids: string[] = this.selectedIds.slice();
     if (this.phase() !== 'select' || !ids.length || this.snapshot.flow?.loading || this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
-    this.getUIContext().showAlertDialog({ title: this.uiText("pm_delete_pin_e216e3fe"),
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({ title: this.uiText("pm_delete_pin_e216e3fe"),
       message: this.uiText("pm_delete_this_pin_bd01697d"),
       primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: () => {} },
       secondaryButton: { value: this.uiText("pm_delete_pin_e216e3fe"), action: () => {
@@ -438,13 +460,13 @@ struct PinmonyBoardSurface {
           this.act('deleteSelected', JSON.stringify(ids));
         }
       } }
-    });
+    }));
   }
   private confirmMerge(target: PinmonyBoardTarget): void {
     const identity: string = this.confirmationKey();
     const targetId: string = target.id;
     if (this.phase() !== 'mergeTargets' || this.snapshot.flow?.loading || this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText('pm_merge_board_confirm_title'),
       message: this.uiText('pm_merge_board_confirm_message').replace('{source}', this.snapshot.title).replace('{target}', target.title),
       primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => {} },
@@ -452,9 +474,10 @@ struct PinmonyBoardSurface {
         if (this.confirmationKey() === identity && this.phase() === 'mergeTargets' && this.snapshot.flow?.phase === 'mergeTargets' &&
           !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && target.id === targetId) this.act('merge', targetId);
       } }
-    });
+    }));
   }
   private act(action: string, value: string = ''): void {
+    if (this.moveClosingKey) return;
     if (action === 'section' && !this.phase()) this.sectionEntryPending = true;
     if (this.onAction) this.onAction(JSON.stringify({ action: action, value: value }));
   }
@@ -497,7 +520,10 @@ struct PinmonyBoardSurface {
     if (this.snapshot.flow?.phase === 'archive') { this.archiveOpen = false; this.act('close'); return; }
     if (this.menuOpen) { this.menuOpen = false; if (this.archiveOpen) this.act('close'); this.archiveOpen = false; return; }
     if(this.snapshot.flow?.phase === 'targets' && this.snapshot.flow.targetBoardId && !this.snapshot.flow.uncertain){this.act('sectionTargetBack');return;}
-    if(this.snapshot.flow?.phase === 'targets') { this.act(this.singlePinMove ? 'close' : 'select'); return; }
+    if(this.snapshot.flow?.phase === 'targets') {
+      if (this.singlePinMove) this.requestMoveClose(); else this.act('select');
+      return;
+    }
     if ((this.phase() === 'sectionEdit' || (this.phase() === 'select' || this.phase() === 'ideas') && this.snapshot.flow?.sectionId) && !this.snapshot.flow?.uncertain) { this.act('sectionReturn'); return; }
     if (this.phase() === 'section' && this.sectionMotionWidth > 0) {
       const epoch: number = ++this.sectionMotionEpoch;
@@ -855,11 +881,11 @@ struct PinmonyBoardSurface {
     if (!this.snapshot.collaborator || this.snapshot.editable || this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
     const identity: string = this.confirmationKey();
     const page: string = this.snapshot.pageKey;
-    this.getUIContext().showAlertDialog({ title: this.uiText("pm_leave_board_25f267d9"), message: this.uiText("pm_this_board_will_be_removed_from_your_profile_you_will_no_longer__774c3739"),
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({ title: this.uiText("pm_leave_board_25f267d9"), message: this.uiText("pm_this_board_will_be_removed_from_your_profile_you_will_no_longer__774c3739"),
       primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: () => {} },
       secondaryButton: { value: this.uiText("pm_leave_7345ed45"), action: () => {
         if (this.confirmationKey() === identity && this.snapshot.pageKey === page && this.phase() === 'edit' && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain) this.act('leave');
-      } } });
+      } } }));
   }
 
   private sectionRows(): number[] {
@@ -909,11 +935,11 @@ struct PinmonyBoardSurface {
   private confirmSectionDelete(): void {
     const identity: string = this.confirmationKey(), section: string = this.snapshot.flow?.sectionId || '';
     if(this.phase() !== 'sectionEdit' || this.snapshot.flow?.busy || this.snapshot.flow?.loading || this.snapshot.flow?.uncertain)return;
-    this.getUIContext().showAlertDialog({title:this.uiText("pm_delete_section_dc032a0b"),message:this.uiText("pm_permanently_delete_this_section_and_all_its_pins_this_cannot_be__f7229feb"),
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({title:this.uiText("pm_delete_section_dc032a0b"),message:this.uiText("pm_permanently_delete_this_section_and_all_its_pins_this_cannot_be__f7229feb"),
       primaryButton:{value:this.uiText("pm_cancel_2cd0f3be"),action:(): void => {}},secondaryButton:{value:this.uiText("pm_delete_section_dc032a0b"),action:(): void => {
         if(this.confirmationKey() === identity && this.snapshot.flow?.sectionId === section && this.phase() === 'sectionEdit' &&
           !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain)this.act('sectionDelete');
-      }}});
+      }}}));
   }
 
   @Builder
@@ -1019,7 +1045,7 @@ struct PinmonyBoardSurface {
     const identity: string = this.confirmationKey();
     const page: string = this.snapshot.pageKey;
     this.archiveOpen = true;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText("pm_archive_board_b37a311e"),
       message: this.uiText("pm_if_you_archive_cb914746") + this.snapshot.title + this.uiText("pm_it_will_no_longer_appear_on_your_profile_and_you_cannot_save_new_d6e15b6f"),
       autoCancel: false,
@@ -1037,7 +1063,7 @@ struct PinmonyBoardSurface {
           this.archiveOpen = false; this.act('close');
         }
       }
-    });
+    }));
   }
 
   @Builder
@@ -1451,9 +1477,9 @@ struct PinmonyBoardSurface {
                     height: SheetSize.FIT_CONTENT, showClose: true, dragBar: false,
                     title: {title:this.uiText(this.snapshot.privacy === 'secret' ? 'pm_board_secret_title' : 'pm_board_public_title')},
                     backgroundColor: $r('app.color.page_background'), maskColor:'#66000000',
+                    onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.snapshot.flow?.busy) action.springBack(); },
                     onWillDismiss: (action: DismissSheetAction) => {
                       if(this.snapshot.flow?.busy)return;
-                      if(this.snapshot.flow?.phase === 'edit' && this.snapshot.flow.loading)this.act('close');
                       this.privacyOpen = false;action.dismiss();
                     },
                     onDisappear: () => {
@@ -1752,6 +1778,7 @@ struct PinmonyBoardSurface {
         if(key && key === current){this.sectionEditName = this.snapshot.flow?.sectionTitle || '';this.act('sectionEdit');}
         else if(share && share === current && this.phase() === 'section' && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && this.onShare)this.onShare();
       },
+      onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.snapshot.flow?.busy) action.springBack(); },
       onWillDismiss: (action: DismissSheetAction) => {
         if (this.snapshot.flow?.busy) return;
         this.menuOpen = false;
@@ -1832,6 +1859,7 @@ struct PinmonyBoardSurface {
       onDisappear: (): void => this.finishTargetCreateClose(),
       title: { title: this.creatingBoardTarget ? this.uiText('pm_create_board_513babc9') : this.uiText('pm_add_section_779008ec') },
       backgroundColor: $r('app.color.page_background'),
+      onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) action.springBack(); },
       onWillDismiss: (action: DismissSheetAction): void => {
         if (this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
         this.closeTargetCreate(); action.dismiss();
@@ -1845,6 +1873,8 @@ struct PinmonyBoardSurface {
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=board-single-move'); },
       title: { title: this.creatingBoardTarget ? this.uiText('pm_create_board_513babc9') : this.creatingTarget ? this.uiText('pm_add_section_779008ec') : this.uiText(this.snapshot.flow?.targetBoardId ? 'pm_select_section_c87be634' : 'pm_save_to_board_0233a416') },
       backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
+      onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) action.springBack(); },
+      onDisappear: (): void => this.finishMoveClose(),
       onWillDismiss: (action: DismissSheetAction) => {
         if (this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
         if (action.reason === DismissReason.PRESS_BACK && (this.creatingTarget || this.creatingBoardTarget || this.snapshot.flow?.targetBoardId)) {
@@ -1853,9 +1883,8 @@ struct PinmonyBoardSurface {
           else this.act('sectionTargetBack');
           return;
         }
-        this.moveSheetOpen = false;
+        this.requestMoveClose();
         action.dismiss();
-        if (this.snapshot.flow?.phase === 'targets') this.act(this.singlePinMove ? 'close' : 'select');
       }
     })
     .onAreaChange((_old: Area, area: Area) => {

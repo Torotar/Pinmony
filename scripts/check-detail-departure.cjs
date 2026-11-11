@@ -79,7 +79,10 @@ async function main() {
 
   const page = source('feature_pin/src/main/ets/components/PinmonyDetailPage.ets');
   const componentHost = {};
-  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page { ${method(page, 'notifyImageLoaded')} }
+  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page {
+    displayedDetail() { return this.detail; }
+    ${method(page, 'heroRenderKey')}
+    ${method(page, 'notifyImageLoaded')} }
     globalThis.Page = Page;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, componentHost);
   const component = new componentHost.Page(), images = [];
   component.detail={pinUrl:'',imageUrl:''};component.renderIdentity = 'opening-1'; component.onImageLoaded = (...args) => images.push(args);
@@ -89,6 +92,13 @@ async function main() {
   component.renderIdentity = 'opening-2'; component.notifyImageLoaded(pin, 'https://i.pinimg.com/1.jpg');
   component.notifyImageLoaded(pin, 'https://i.pinimg.com/2.jpg');
   assert.equal(images.length, 4, 'formal binding, reopening and image changes still each notify');
+  component.detail = { pinUrl: pin, imageUrl: 'https://i.pinimg.com/2.jpg' };
+  component.heroRenderRevision = 0;
+  component.notifyImageLoaded(pin, component.detail.imageUrl);
+  assert.equal(component.decodedHeroSource.key, component.heroRenderKey(component.detail.imageUrl, pin));
+  const decoded = component.decodedHeroSource;
+  component.notifyImageLoaded('https://www.pinterest.com/pin/999/', component.detail.imageUrl);
+  assert.equal(component.decodedHeroSource, decoded, 'late image from another Pin cannot replace decoded source');
   const postScript = script('feature_pin/src/main/ets/services/PinmonyPostApiScript.ets');
   const actionsFunction = postScript.match(/detailActions: function[\s\S]*?(?=\n    like: function)/)[0];
   let base = { reaction_by_me: 0, reaction_counts: { '1': 0 } };

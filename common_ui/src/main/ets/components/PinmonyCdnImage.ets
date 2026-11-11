@@ -3,6 +3,7 @@ import { effectKit } from '@kit.ArkGraphics2D';
 import { PinmonyUiCommitQueue } from '../services/PinmonyUiCommitQueue';
 import { PinmonyJpegDecode, PinmonyJpegLease, acceptsSoftwareJpeg } from 'common_network';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyImageLoadTrace } from '../services/PinmonyImageLoadTrace';
 
 let pinmonyImageTraceSerial: number = 0;
 
@@ -34,6 +35,7 @@ export struct PinmonyCdnImage {
   private readonly traceTask: number = ++pinmonyImageTraceSerial;
   private sourceStartedAt: number = 0;
   private tracePhases: Set<string> = new Set<string>();
+  private readonly loadTrace: PinmonyImageLoadTrace = new PinmonyImageLoadTrace();
 
   aboutToAppear(): void { this.uiCommits.activate(); this.visible = true; this.reload(); }
   aboutToDisappear(): void { this.visible = false; this.uiCommits.dispose(); this.generation++; this.release(); }
@@ -98,12 +100,13 @@ export struct PinmonyCdnImage {
       else { this.auditImage('failed', code); this.onFailure?.(code); }
     });
   }
-  private auditImage(phase: string, code: number = 0): void {
+  private auditImage(phase: string, code: number = 0, failureInfo?: RequestDownloadInfo): void {
     if (!this.traceLoading || !this.visible || this.tracePhases.has(phase)) return;
     this.tracePhases.add(phase);
-    PinmonyRuntimeLog.info('ImageLoadTrace: task=' + this.traceTask.toString() + ' generation=' + this.generation.toString() +
-      ' index=' + this.traceIndex.toString() + ' phase=' + phase + ' sinceSourceMs=' +
-      Math.max(0, Date.now() - this.sourceStartedAt).toString() + ' code=' + (Number.isFinite(code) ? code : 0).toString());
+    try {
+      this.loadTrace.record(this.traceTask, this.generation, this.traceIndex, this.sourceStartedAt,
+        this.url, phase, code, failureInfo);
+    } catch (_) { PinmonyRuntimeLog.warn('ImageLoadTrace: diagnostics-unavailable'); }
   }
   @Builder
   private imageBody(generation: number) {
@@ -112,10 +115,16 @@ export struct PinmonyCdnImage {
           .onAppear(() => { if (this.visible && generation === this.generation) this.auditImage('node-mounted'); })
           .onComplete((event) => {
             if (!this.visible || generation !== this.generation) return;
+            if (event?.loadingStatus === 0) this.auditImage('native-data-ready');
+            if (event?.loadingStatus === 1) this.auditImage('native-decoded');
             if (event?.loadingStatus === 0) this.queueImageEvent(generation, 0);
             if (event?.loadingStatus === 1) this.queueImageEvent(generation, 1);
           })
-          .onError((event) => { if (this.visible && generation === this.generation) this.queueImageEvent(generation, -1, event?.error?.code || 0); })
+          .onError((event) => {
+            if (!this.visible || generation !== this.generation) return;
+            this.auditImage('native-failed', event?.error?.code || 0, event?.downloadInfo);
+            this.queueImageEvent(generation, -1, event?.error?.code || 0);
+          })
       }
   }
   build() {

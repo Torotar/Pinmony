@@ -1,3 +1,6 @@
+import { BlurStrategy, HdsNavigation, HdsNavigationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType } from '@kit.UIDesignKit';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { PinmonyHdsTitleBar, PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySaveBoard, PinmonySaveResult } from '../models/PinmonyComments';
@@ -7,6 +10,11 @@ import { PinmonyBoardPlaceholder, PinmonyBoardPickerRow, PinmonyBoardPickerFoote
 export struct PinmonySaveSheet {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'exquisite';
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
+  private boardScroller: Scroller = new Scroller();
+  private createScroller: Scroller = new Scroller();
+  onClose?: () => void;
   @Prop result: PinmonySaveResult;
   @State private creating: boolean = false;
   @State private name: string = '';
@@ -44,7 +52,43 @@ export struct PinmonySaveSheet {
       actionEnabled:board.enabled && !this.result.busy && !this.result.loading,
       onSelect:() => {if(this.onOpenBoard && board.id !== 'profile-quick-saves')this.onOpenBoard(board.id);else this.onSave?.(board.id);}})
   }
+  private titleOptions(): HdsNavigationTitleBarOptions {
+    return { avoidLayoutSafeArea: false, enableComponentSafeArea: true,
+      content: {
+        title: { mainTitle: this.uiText(this.creating ? 'pm_create_board_513babc9' : 'pm_save_to_board_0233a416') },
+        menu: { value: [{ content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
+          label: this.uiText('pm_close_3fd47edc'), action: () => this.onClose?.()
+        } }] }
+      },
+      style: {
+        blurStrategy: this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+        thermoCtrl: this.immersiveLightMode !== 'off',
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
+        scrollEffectOpts: { enableScrollEffect: this.immersiveLightMode !== 'off', scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+        originalStyle: {
+          backgroundStyle: { backgroundColor: this.immersiveLightMode !== 'off' ? Color.Transparent : $r('app.color.page_background'), maskExtraHeight: 0 },
+          contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } }
+        },
+        scrollEffectStyle: {
+          backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightMode !== 'off' ? 18 : 0 },
+          contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } }
+        }
+      }
+    };
+  }
+
   build() {
+    HdsNavigation() { this.sheetBody() }
+      .mode(NavigationMode.Stack).width('100%').height('100%')
+      .titleMode(HdsNavigationTitleMode.MODAL).hideBackButton(true).hideToolBar(true)
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleOptions(), this.hdsDarkMode))
+      .bindToScrollable([this.boardScroller, this.createScroller])
+      .backgroundColor($r('app.color.page_background')).clip(true)
+  }
+
+  @Builder
+  private sheetBody() {
     if (this.result.error && !this.result.items.length && !this.result.shortlist.length && !this.creating) {
       Column({ space: 16 }) {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.error, this.uiLanguage), actionText: this.uiText("pm_reload_boards_c3e7cfa5"), onAction: () => { if (this.onRetry) this.onRetry(); }, actionEnabled: !this.result.busy && !this.result.loading })
@@ -60,7 +104,7 @@ export struct PinmonySaveSheet {
         PinmonyActionNotice({ message: PinmonyI18n.render(this.result.feedback, this.uiLanguage) })
       }
       if (this.creating) {
-        Scroll() {
+        Scroll(this.createScroller) {
           Column({ space: 12 }) {
         Text(this.uiText("pm_board_name_dd9a7122")).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
         TextInput({ placeholder: this.uiText("pm_board_name_dd9a7122"), text: this.name }).maxLength(100)
@@ -76,6 +120,7 @@ export struct PinmonySaveSheet {
         }.width('100%')
           }.width('100%').alignItems(HorizontalAlign.Start)
         }.width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
+          .clip(false) // Official HDS dynamic-blur guide: let scroll content draw beneath the title.
         Row({ space: 12 }) {
           Button(this.uiText("pm_back_to_boards_dcf21f0d"), { type: ButtonType.Normal }).layoutWeight(1).height(48).fontSize(16).fontWeight(FontWeight.Medium).borderRadius(20)
             .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
@@ -88,9 +133,9 @@ export struct PinmonySaveSheet {
             .fontColor(Color.White)
             .enabled(!!this.name.trim() && !this.result.busy && !this.result.loading)
             .onClick(() => { if (this.onCreate) this.onCreate(this.name.trim(), this.secret); })
-        }.width('100%').padding({ left: 4, right: 4, top: 12, bottom: 28 })
+        }.width('100%').padding({ left: 4, right: 4, top: 12, bottom: 28 }).backgroundColor($r('app.color.page_background')).zIndex(1)
       } else {
-        Scroll() {
+        Scroll(this.boardScroller) {
           Column({ space: 8 }) {
             if(this.result.targetBoardId) {
               ForEach(this.result.items.concat(this.result.shortlist).filter((board: PinmonySaveBoard,index: number,all: PinmonySaveBoard[]): boolean => board.id === this.result.targetBoardId && all.findIndex((b: PinmonySaveBoard): boolean => b.id === board.id) === index), (board: PinmonySaveBoard) => {
@@ -139,6 +184,8 @@ export struct PinmonySaveSheet {
             }
           }.width('100%')
         }.layoutWeight(1).width('100%').align(Alignment.TopStart).scrollBar(BarState.Off)
+          .clip(false) // Official HDS dynamic-blur guide: let scroll content draw beneath the title.
+        Column({ space: 12 }) {
         if(this.result.targetBoardId) {
           Divider().color($r('app.color.secondary_text')).opacity(0.15)
           PinmonyBoardPickerFooter({inset:0,back:true,labelKey:'pm_back_to_boards_dcf21f0d',
@@ -166,6 +213,7 @@ export struct PinmonySaveSheet {
               .onClick(() => { if (this.onRemove) this.onRemove(); })
           }.width('100%').padding({ left: 4, right: 4, top: 0, bottom: 28 })
         }
+        }.width('100%').backgroundColor($r('app.color.page_background')).zIndex(1)
       }
     }.width('100%').height('100%').padding({left:16,right:16,top:16,bottom:0}).backgroundColor($r('app.color.page_background'))
     if (this.result.busy || this.result.loading) {

@@ -424,16 +424,16 @@ export class PinmonyDetailNativeReads {
   }
   loadMore(): void { if (this.owned() && !this.relatedLoading && (!this.relatedEnded || !!this.relatedError)) this.readRelated(!!this.bookmark); }
 
-  cancelComments(): void {
+  cancelComments(preservePresentation: boolean = false): void {
     const listLoading: boolean = this.commentsBusy;
     this.commentsRevision++; this.commentsBusy = false;
-    this.store.commentResult?.items.forEach((item: PinmonyComment): void => {
+    if (!preservePresentation) this.store.commentResult?.items.forEach((item: PinmonyComment): void => {
       if (item.repliesLoading) { item.repliesLoading = false; item.repliesError = PinmonyI18n.message("pm_reply_loading_interrupted_please_retry_0ee5475c"); }
       this.cancelTranslation(item);
       item.replies?.forEach((reply: PinmonyComment): void => this.cancelTranslation(reply));
     });
     const result: PinmonyCommentResult = this.store.commentResult;
-    if (result?.pin === this.pin) {
+    if (!preservePresentation && result?.pin === this.pin) {
       if (listLoading && result.loading) { result.loading = false; result.error = PinmonyI18n.message("pm_comment_loading_interrupted_please_retry_96182a1c"); }
       this.publishComments(result);
     }

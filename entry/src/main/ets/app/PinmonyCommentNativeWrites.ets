@@ -33,11 +33,11 @@ export class PinmonyCommentNativeWrites {
   private readonly requests: Set<string> = new Set<string>();
   private readonly waits: Map<string,() => void> = new Map<string,() => void>();
   constructor(ports: PinmonyCommentNativePorts) { this.ports = ports; this.store = ports.store(); }
-  pause(): void {
+  pause(preservePresentation: boolean = false): void {
     this.revision++;
     this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear();
     this.waits.forEach((cancel: () => void): void => cancel()); this.waits.clear();
-    if (this.pending && this.result && this.store.commentToken === this.token && this.store.commentResult.pin === this.result.pin) {
+    if (!preservePresentation && this.pending && this.result && this.store.commentToken === this.token && this.store.commentResult.pin === this.result.pin) {
       this.store.commentResult.busy = false;
       if (this.submitted) { this.store.commentResult.uncertain = true; this.store.commentResult.actionError = PinmonyI18n.message("pm_result_not_confirmed_close_and_reload_to_check_it_will_not_be_re_d952b803"); }
       this.publish();

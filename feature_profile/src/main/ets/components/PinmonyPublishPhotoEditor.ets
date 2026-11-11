@@ -104,7 +104,7 @@ export struct PinmonyPublishPhotoEditor {
   private confirmDraftExit(): void {
     this.draftExitDialogOpen = true;
     const token: number = this.state.token;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title:this.text('pm_publish_draft_exit_title'),message:this.text('pm_publish_draft_exit_message'),autoCancel:false,
       primaryButton:{value:this.text('pm_publish_save_draft'),action:(): void => {
         this.draftExitDialogOpen = false;
@@ -114,7 +114,7 @@ export struct PinmonyPublishPhotoEditor {
         this.draftExitDialogOpen = false;
         if (this.state.token === token) this.onAction('cancelDraftExit','',false);
       }}
-    });
+    }));
   }
   private topicsChanged(): boolean {
     return (this.state.topicDraft || []).map((topic: PinmonyPublishTopic): string => topic.id).sort().join(',') !== (this.state.selectedTopics || []).map((topic: PinmonyPublishTopic): string => topic.id).sort().join(',');

@@ -3,7 +3,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
-const methods = ['fitPhotoToScreen', 'heroHeight', 'wideDetail', 'detailPaneWidth', 'detailMediaWidth', 'needsPhotoBackdrop', 'detailPhotoRadius'].map(name => {
+const methods = ['fitPhotoToScreen', 'heroHeight', 'wideDetail', 'detailPaneWidth', 'detailMediaWidth', 'needsPhotoBackdrop', 'detailPhotoRadius', 'photoFitReservedHeight', 'measurePhotoFitActions'].map(name => {
   const start = source.indexOf(`  private ${name}(`);
   assert(start >= 0);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -18,6 +18,9 @@ page.displayedDetail = () => detail;
 page.titleContentInset = () => 80;
 page.getUIContext = () => ({ px2vp: px => px / 2 });
 page.gestureBarHeightPx = 48;
+page.photoFitActionBottom = 64;
+let fitAudits = 0;
+page.queuePhotoFitAudit = () => fitAudits++;
 for (const [width, height] of [[1200, 800], [900, 650], [800, 1200], [650, 700], [400, 700]]) {
   Object.assign(page, { contentWidth: width, viewportWidth: width, viewportHeight: height });
   for (const [iw, ih] of [[1000, 3000], [3000, 1000], [1000, 1000], [1000, 15000], [0, 0]]) {
@@ -28,6 +31,8 @@ for (const [width, height] of [[1200, 800], [900, 650], [800, 1200], [650, 700],
     const fitted = page.heroHeight();
     assert(fitted > 0 && fitted <= height - 80 - 24 - 32);
     assert(fitted <= original);
+    assert(fitted + 80 + 24 + page.photoFitReservedHeight() <= height,
+      'photo, full action row, spacing and safe areas fit the first viewport');
     // Contain rendering must fit both dimensions, including very tall photos.
     if (iw && ih) {
       const scale = Math.min(page.detailPaneWidth() / iw, fitted / ih);
@@ -41,6 +46,28 @@ for (const [width, height] of [[1200, 800], [900, 650], [800, 1200], [650, 700],
     assert.equal(page.heroHeight(), videoHeight, 'video layout stays unchanged');
   }
 }
+// Measured prefix includes notices above the row and a two-line save label.
+page.contentWidth = page.viewportWidth = 400; page.viewportHeight = 700;
+page.detailPhotoFitEnabled = true;
+detail = { imageWidth: 1000, imageHeight: 4000 };
+page.measurePhotoFitActions({ position: { y: 36 }, height: 68 });
+assert.equal(page.photoFitActionBottom, 104);
+assert.equal(page.heroHeight(), 700 - 80 - 24 - 32 - 18 - 104);
+page.measurePhotoFitActions({ position: { y: 36 }, height: 68 });
+page.measurePhotoFitActions({ position: { y: 0 }, height: 0 });
+assert.equal(fitAudits, 1, 'stable or invalid measurements do not cause layout feedback');
+detail.carousel = { items: [] };
+assert.equal(page.heroHeight(), 700 - 80 - 24 - 32 - 18 - 104 - 28,
+  'carousel indicator also fits above the action row');
+detail.carousel.freeScroll = true;
+assert.equal(page.heroHeight(), 700 - 80 - 24 - 32 - 18 - 104,
+  'free-scroll gallery has no separate indicator');
+page.contentWidth = page.viewportWidth = 1200; page.viewportHeight = 800;
+assert.equal(page.photoFitReservedHeight(), 32, 'side-by-side information does not consume photo height');
+detail.carousel.freeScroll = false;
+assert.equal(page.photoFitReservedHeight(), 60, 'wide carousel still reserves its indicator');
+page.photoFitActionBottom = 64;
+assert(source.includes('.onAreaChange((_old: Area, area: Area) => this.measurePhotoFitActions(area))'));
 deviceInfo.deviceType = 'phone';
 detail = { imageWidth: 1000, imageHeight: 3000 };
 page.contentWidth = page.viewportWidth = 900; page.viewportHeight = 650;

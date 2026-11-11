@@ -150,6 +150,7 @@ export struct PinmonyVisibilitySettingsPage {
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisibilitySettingsPage.store.confirmOpen radius=uniform-32vp'); },
         height: Math.min(380, this.viewportHeight * 0.8), showClose: true, dragBar: false,
         backgroundColor: $r('app.color.page_background'), maskColor: '#66000000',
+        onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.store.busy) action.springBack(); },
         onWillDismiss: (action: DismissSheetAction) => { if (this.store.busy) return; this.store.confirmOpen = false; action.dismiss(); }
       })
   }

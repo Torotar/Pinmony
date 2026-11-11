@@ -164,7 +164,7 @@ export struct PinmonyPublishPage {
   private confirmDeleteDraft(draftId: string): void {
     if (this.state.busy || this.state.uncertain || this.state.draftLoading) return;
     const token: number = this.state.token;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText('pm_pin_draft_delete_title'),
       message: this.uiText('pm_pin_draft_delete_message'),
       primaryButton: { value: this.uiText('pm_delete_2f9daa82'), action: () => {
@@ -175,7 +175,7 @@ export struct PinmonyPublishPage {
         }
       } },
       secondaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: (): void => {} }
-    });
+    }));
   }
 
   private readonly retainedDraftSections: WaterFlowSections = new WaterFlowSections();

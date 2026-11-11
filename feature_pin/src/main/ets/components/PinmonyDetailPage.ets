@@ -118,6 +118,20 @@ export struct PinmonyDetailPage {
   @StorageProp('detailPhotoFitEnabled') @Watch('queuePhotoFitAudit') private detailPhotoFitEnabled: boolean = false;
   @StorageProp('gestureBarHeightPx') @Watch('queuePhotoFitAudit') private gestureBarHeightPx: number = 0;
   private photoFitAuditKey: string = '';
+  @State private photoFitActionBottom: number = 64;
+  private measurePhotoFitActions(area: Area): void {
+    const bottom: number = Number(area.position.y) + Number(area.height);
+    if (Number.isFinite(bottom) && bottom >= 44 && Math.abs(bottom - this.photoFitActionBottom) > 0.5) {
+      this.photoFitActionBottom = bottom;
+      this.queuePhotoFitAudit();
+    }
+  }
+  private photoFitReservedHeight(): number {
+    const detail: PinmonyDetailSnapshot = this.displayedDetail();
+    const indicator: number = (detail.mediaKind === 'carousel' || !!detail.carousel) && !detail.carousel?.freeScroll ? 28 : 0;
+    // 16vp header spacing, 16vp bottom breathing room, and the stacked information gap.
+    return 32 + indicator + (this.wideDetail() ? 0 : 18 + this.photoFitActionBottom);
+  }
   private queuePhotoFitAudit(): void {
     this.uiCommits.post('photo-fit-audit', (): void => {
       if (!this.heroVisible) return;
@@ -1049,9 +1063,8 @@ export struct PinmonyDetailPage {
     const height: number = this.displayedDetail().imageWidth > 0 && this.displayedDetail().imageHeight > 0 ?
       width * this.displayedDetail().imageHeight / this.displayedDetail().imageWidth : width * 1.15;
     if (this.fitPhotoToScreen()) {
-      // Header has 8vp outer spacing and 8vp inner spacing; leave 16vp below the photo.
       return Math.min(height, Math.max(1, this.viewportHeight - this.titleContentInset() -
-        this.getUIContext().px2vp(this.gestureBarHeightPx) - 32));
+        this.getUIContext().px2vp(this.gestureBarHeightPx) - this.photoFitReservedHeight()));
     }
     if (this.displayedDetail().imageWidth <= 0 || this.displayedDetail().imageHeight <= 0) return height;
     return this.displayedDetail().isVideo || this.displayedDetail().mediaKind === 'carousel' || !!this.displayedDetail().carousel ? Math.min(1200, height) : height;
@@ -1443,6 +1456,7 @@ export struct PinmonyDetailPage {
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
+          .onAreaChange((_old: Area, area: Area) => this.measurePhotoFitActions(area))
 
           Column({ space: 6 }) {
             if (this.displayedDetail().creator.length > 0) {

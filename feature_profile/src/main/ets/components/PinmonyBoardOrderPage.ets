@@ -1,3 +1,4 @@
+import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { vibrator } from '@kit.SensorServiceKit';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
@@ -54,12 +55,12 @@ export struct PinmonyBoardOrderPage {
     this.resetDrag();
     if (!this.hasUnsavedOrder()) { this.onBack?.(); return; }
     this.leaveDialogOpen = true;
-    this.getUIContext().showAlertDialog({ title: this.text('pm_order_discard_title'), message: this.text('pm_order_discard_message'),
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({ title: this.text('pm_order_discard_title'), message: this.text('pm_order_discard_message'),
       primaryButton: { value: this.text('pm_cancel_2cd0f3be'), action: () => { this.leaveDialogOpen = false; } },
       secondaryButton: { value: this.text('pm_order_discard_action'), action: () => {
         this.leaveDialogOpen = false;
         if (this.alive && !this.busy) this.onBack?.();
-      } }, cancel: () => { this.leaveDialogOpen = false; } });
+      } }, cancel: () => { this.leaveDialogOpen = false; } }));
   }
   private move(_boardId: string, offsetY: number): void {
     if (this.dragging < 0 || this.busy || this.blocked) return;
@@ -93,13 +94,13 @@ export struct PinmonyBoardOrderPage {
     this.ordered = next;
   }
   private confirmMerge(source: PinmonyBoard, target: PinmonyBoard): void {
-    this.getUIContext().showAlertDialog({ title: this.text('pm_merge_board_confirm_title'),
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({ title: this.text('pm_merge_board_confirm_title'),
       message: this.text('pm_merge_board_confirm_message').replace('{source}', source.title).replace('{target}', target.title),
       primaryButton: { value: this.text('pm_cancel_2cd0f3be'), action: () => {} },
       secondaryButton: { value: this.text('pm_merge_board_confirm_action'), action: () => {
         if (this.alive && !this.busy && !this.blocked && this.ordered.some((b: PinmonyBoard): boolean => b.id === source.id) &&
           this.ordered.some((b: PinmonyBoard): boolean => b.id === target.id)) this.merge(source, target);
-      } } });
+      } } }));
   }
   private async merge(source: PinmonyBoard, target: PinmonyBoard): Promise<void> {
     if (!this.onMerge) return;

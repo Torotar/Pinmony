@@ -104,6 +104,9 @@ export struct PinmonyProfilePage {
   private profileNameBottom: number = 0;
   @State private compactHeader: boolean = false;
   @State private aboutVisible: boolean = false;
+  private aboutPendingAction: string = '';
+  private aboutActionPage: string = '';
+  private aboutActionSession: number = -1;
   @State private sectionMotion: number = 0;
   onAction?: (id: string, kind: string) => void;
   onBoard?: (id: string) => void;
@@ -117,6 +120,9 @@ export struct PinmonyProfilePage {
   private pendingVisibility: boolean | undefined = undefined;
   onBoardVisibility?: (value?: boolean) => void;
   private recoveryRequested: boolean = false;
+  private customOrderRequested: boolean = false;
+  private sortActionPage: string = '';
+  private sortActionSession: number = -1;
   onBoardRecovery?: () => void;
   @StorageLink('pinmonyUpdateUnread') private updateUnread: boolean = false;
   onSettings?: () => void;
@@ -900,21 +906,57 @@ export struct PinmonyProfilePage {
           }
         }.fontColor($r('app.color.primary_text')).layoutWeight(1)
       }.width('100%').constraintSize({ minHeight: 48 })
-      .onClick(() => { this.aboutVisible = false; this.perform('followers'); })
+      .onClick(() => this.closeAboutFor('followers'))
       Row({ space: 16 }) {
         SymbolGlyph($r('sys.symbol.person_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
         Text(PinmonyI18n.render(this.profile.following, this.uiLanguage)).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
       }.width('100%').constraintSize({ minHeight: 48 })
-      .onClick(() => { this.aboutVisible = false; this.perform('following'); })
+      .onClick(() => this.closeAboutFor('following'))
       Blank().layoutWeight(1)
       if (this.profile.isOwn) {
         Button(this.uiText("pm_edit_profile_3b0b2bb8"), { type: ButtonType.Normal })
           .width('100%').height(48).borderRadius(16)
           .backgroundColor($r('app.color.surface_muted'))
           .fontColor($r('app.color.primary_text'))
-          .onClick(() => { this.aboutVisible = false; this.perform('edit'); })
+          .onClick(() => this.closeAboutFor('edit'))
       }
     }.width('100%').height('100%').padding(24).alignItems(HorizontalAlign.Start)
+  }
+
+  private closeAboutFor(action: string): void {
+    if (!this.aboutVisible || this.aboutPendingAction || !this.interactionReady) return;
+    this.aboutPendingAction = action;
+    this.aboutActionPage = this.profile.profileUrl;
+    this.aboutActionSession = this.profile.session;
+    this.aboutVisible = false;
+  }
+
+  private finishAboutClose(): void {
+    const action: string = this.aboutPendingAction;
+    this.aboutPendingAction = '';
+    if (action && this.interactionReady && this.aboutActionPage === this.profile.profileUrl &&
+        this.aboutActionSession === this.profile.session) this.perform(action);
+  }
+
+  private requestSortDestination(custom: boolean): void {
+    if (!this.sortVisible || !this.interactionReady) return;
+    this.sortActionPage = this.profile.profileUrl;
+    this.sortActionSession = this.profile.session;
+    this.customOrderRequested = custom;
+    this.recoveryRequested = !custom;
+    this.sortVisible = false;
+  }
+
+  private finishSortClose(): void {
+    this.sortVisible = false;
+    const custom: boolean = this.customOrderRequested;
+    const recovery: boolean = this.recoveryRequested;
+    this.customOrderRequested = false;
+    this.recoveryRequested = false;
+    if (!this.interactionReady || this.profile.isOwn !== true ||
+        this.sortActionPage !== this.profile.profileUrl || this.sortActionSession !== this.profile.session) return;
+    if (custom) this.customOrderVisible = true;
+    else if (recovery && this.onBoardRecovery) this.onBoardRecovery();
   }
 
   @Builder
@@ -1247,11 +1289,8 @@ export struct PinmonyProfilePage {
       height: SheetSize.FIT_CONTENT, showClose: true, backgroundColor: $r('app.color.page_background'),
       onWillAppear: () => { PinmonyRuntimeLog.info('ProfileSortTrace: phase=panel-appear hasSort=' + (!!this.profile.boardSort).toString() + ' busy=' + (!!this.profile.boardSortBusy).toString()); },
       onDisappear: () => {
-        this.sortVisible = false;
         PinmonyRuntimeLog.info('ProfileSortTrace: phase=panel-disappear');
-        if (!this.recoveryRequested) return;
-        this.recoveryRequested = false;
-        if (this.interactionReady && this.profile.isOwn === true && this.onBoardRecovery) this.onBoardRecovery();
+        this.finishSortClose();
       }
     })
     }
@@ -1337,7 +1376,7 @@ export struct PinmonyProfilePage {
     }.width('100%').padding(0).backgroundColor(Color.Transparent)
     .enabled(true)
     .accessibilityText(this.uiText(label)).accessibilitySelected(this.profile.boardSort === value)
-    .onClick(() => { if (this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.boardSortError && !!this.profile.boardSort) { if (value === 'custom') { this.sortVisible = false; this.customOrderVisible = true; } else if (this.onBoardSort) this.onBoardSort(value); } })
+    .onClick(() => { if (this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy && !this.profile.boardSortError && !!this.profile.boardSort) { if (value === 'custom') { this.requestSortDestination(true); } else if (this.onBoardSort) this.onBoardSort(value); } })
   }
 
   @Builder
@@ -1368,7 +1407,7 @@ export struct PinmonyProfilePage {
       }.width('100%').padding(0).backgroundColor(Color.Transparent)
         .enabled(true)
         .accessibilityText(this.uiText('pm_board_recovery_title'))
-        .onClick(() => { if (this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy) { this.recoveryRequested = true; this.sortVisible = false; } })
+        .onClick(() => { if (this.interactionReady && !this.profile.boardSortBusy && !this.profile.visibilityBusy) this.requestSortDestination(false); })
     }.width('100%').padding({ bottom: 20 })
   }
   @Builder
@@ -1484,6 +1523,40 @@ export struct PinmonyProfilePage {
   }
   @Builder
   private hubStateButton(label: string, kind: string) {
+    if (deviceInfo.apiAvailable('26.0.0')) {
+    Button({type:ButtonType.Normal}) {
+      Row({space:6}) {
+        if(kind === 'favorite') {
+          SymbolGlyph($r('sys.symbol.star_fill')).fontSize(18)
+            .fontColor([this.hubSelected(kind) ? Color.White : $r('app.color.primary_text')])
+        }
+        Text(this.uiText(label)).fontSize(16).fontWeight(FontWeight.Medium).maxLines(1)
+          .fontColor(this.hubSelected(kind) ? Color.White : $r('app.color.primary_text'))
+      }.padding({left:16,right:16}).hitTestBehavior(HitTestMode.None)
+    }.height(40).padding(0).borderRadius(16)
+      .backgroundColor(this.hubSelected(kind) ? $r('app.color.detail_save_accent') : $r('app.color.surface_muted'))
+
+      .systemMaterial(!this.hubSelected(kind) && this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
+        new uiMaterial.ImmersiveMaterial({
+          style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
+          colorInvert: false, applyShadow: false, interactive: true, lightEffect: {}
+        }) : uiMaterial.Material.empty)
+      .shadow({ radius: !this.hubSelected(kind) && this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
+      .accessibilityText(this.uiText(label)).accessibilitySelected(this.hubSelected(kind))
+      .enabled(this.interactionReady && !this.profile.suggestionWriting)
+      .onClick(() => {
+        if(!this.interactionReady || this.profile.suggestionWriting)return;
+        const value: boolean = !this.hubSelected(kind);
+        if(kind === 'favorite')this.favoriteFilter = value;
+        else if(kind === 'created')this.createdFilter = value;
+        else if(kind === 'groups' || kind === 'secret' || kind === 'following')this.boardFilter = value ? kind : '';
+        else {
+          this.collageDrafts = kind === 'collage-drafts' && value;
+          this.collageCreated = kind === 'collage-created' && value;
+        }
+        this.requestHub();
+      })
+    } else {
     Toggle({type:ToggleType.Button,isOn:this.hubSelected(kind)}) {
       Row({space:6}) {
         if(kind === 'favorite') {
@@ -1509,6 +1582,7 @@ export struct PinmonyProfilePage {
         }
         this.requestHub();
       })
+    }
   }
   private selectPinView(value: number): void {
     if(!this.pinViewOpen || !this.pinViewPage || this.pinViewPage!==this.profile.profileUrl || this.pinViewSession!==this.profile.session || !this.modern() || this.hubTab!=='pins' || !this.interactionReady || this.profile.suggestionWriting)return;
@@ -1548,6 +1622,25 @@ export struct PinmonyProfilePage {
     Scroll() {
       Row({space:8}) {
         if(tab === 'pins') {
+          if (deviceInfo.apiAvailable('26.0.0')) {
+          Button({type:ButtonType.Normal}) {
+            SymbolGlyph($r('sys.symbol.square_grid_2x2')).fontSize(22).fontColor([$r('app.color.primary_text')])
+          }.width(40).height(40).borderRadius(14).backgroundColor($r('app.color.surface_muted'))
+      .systemMaterial(this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
+        new uiMaterial.ImmersiveMaterial({
+          style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
+          colorInvert: false, applyShadow: false, interactive: true, lightEffect: {}
+        }) : uiMaterial.Material.empty)
+      .shadow({ radius: this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
+            .accessibilityText(this.uiText('pm_profile_layout_heading'))
+            .enabled(this.interactionReady && !this.profile.suggestionWriting)
+            .onClick(() => {this.pinViewPage=this.profile.profileUrl;this.pinViewSession=this.profile.session;this.draftPinDensity=this.pinDensity;this.pinViewOpen=true;})
+            .bindSheet($$this.pinViewOpen,this.pinViewSheet(),{
+      radius:LengthMetrics.vp(32),
+      preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,height:SheetSize.FIT_CONTENT,showClose:true,
+              title:{title:this.uiText('pm_profile_layout_heading')},backgroundColor:$r('app.color.page_background'),
+              onDisappear:()=>{this.closePinView();}})
+          } else {
           Button({type:ButtonType.Normal}) {
             SymbolGlyph($r('sys.symbol.square_grid_2x2')).fontSize(22).fontColor([$r('app.color.primary_text')])
           }.width(40).height(40).borderRadius(14).backgroundColor($r('app.color.surface_muted'))
@@ -1559,11 +1652,27 @@ export struct PinmonyProfilePage {
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,height:SheetSize.FIT_CONTENT,showClose:true,
               title:{title:this.uiText('pm_profile_layout_heading')},backgroundColor:$r('app.color.page_background'),
               onDisappear:()=>{this.closePinView();}})
+          }
           this.hubStateButton('pm_profile_hub_favorites','favorite')
           this.hubStateButton('pm_profile_hub_created','created')
 
 
         } else if(tab === 'boards') {
+          if (deviceInfo.apiAvailable('26.0.0')) {
+          Button({type:ButtonType.Normal}) {
+            Row({space:6}) {
+              Image($r('app.media.profile_sliders')).width(22).height(22).fillColor($r('app.color.primary_text'))
+            }
+          }.width(58).height(40).borderRadius(14).backgroundColor($r('app.color.surface_muted'))
+      .systemMaterial(this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
+        new uiMaterial.ImmersiveMaterial({
+          style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
+          colorInvert: false, applyShadow: false, interactive: true, lightEffect: {}
+        }) : uiMaterial.Material.empty)
+      .shadow({ radius: this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
+            .accessibilityText(this.uiText('pm_profile_board_sort')).enabled(this.interactionReady && !this.boardFilter && !this.profile.suggestionWriting)
+            .onClick(() => {this.sortVisible = true;if(this.onBoardSort)this.onBoardSort('');})
+          } else {
           Button({type:ButtonType.Normal}) {
             Row({space:6}) {
               Image($r('app.media.profile_sliders')).width(22).height(22).fillColor($r('app.color.primary_text'))
@@ -1571,6 +1680,7 @@ export struct PinmonyProfilePage {
           }.width(58).height(40).borderRadius(14).backgroundColor($r('app.color.surface_muted'))
             .accessibilityText(this.uiText('pm_profile_board_sort')).enabled(this.interactionReady && !this.boardFilter && !this.profile.suggestionWriting)
             .onClick(() => {this.sortVisible = true;if(this.onBoardSort)this.onBoardSort('');})
+          }
           this.hubStateButton('pm_profile_hub_groups','groups')
           this.hubStateButton('pm_profile_hub_secret','secret')
           this.hubStateButton('pm_following_7dfa5d8f','following')
@@ -1600,6 +1710,7 @@ export struct PinmonyProfilePage {
               style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.ULTRA_THIN,
               colorInvert: false, applyShadow: false, interactive: true, lightEffect: {}
             }) : uiMaterial.Material.empty)
+      .shadow({ radius: this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
           .onClick(() => {if(this.onSearch)this.onSearch();}).enabled(this.interactionReady && !this.profile.suggestionWriting)
         Button({type:ButtonType.Circle}) {
           SymbolGlyph($r('sys.symbol.plus')).fontSize(30).fontColor([$r('app.color.primary_text')])
@@ -1609,6 +1720,7 @@ export struct PinmonyProfilePage {
               style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
               colorInvert: false, applyShadow: false, interactive: true, lightEffect: {}
             }) : uiMaterial.Material.empty)
+      .shadow({ radius: this.immersiveLightMode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
           .onClick(() => {if(this.onPublish)this.onPublish();}).enabled(this.interactionReady && !this.profile.suggestionWriting)
         } else {
         Button({type:ButtonType.Normal}) {
@@ -1876,6 +1988,7 @@ export struct PinmonyProfilePage {
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
       onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyProfilePage.aboutVisible radius=uniform-32vp'); },
+      onDisappear: (): void => this.finishAboutClose(),
       height: '75%', showClose: true, backgroundColor: $r('app.color.page_background') })
     }.width('100%').height('100%')
       .height(this.profileBodyHeight())

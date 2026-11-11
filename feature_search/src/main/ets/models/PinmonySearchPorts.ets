@@ -9,7 +9,7 @@ export interface PinmonySearchPorts {
   nativeSearchFollowBoard?: (id: string) => Promise<void>;
   nativeSearchDeleteHistory?: (id: string) => Promise<void>;
   nativeSearchInput?: (term: string, immediate: boolean) => Promise<void>;
-  nativeSearchCancelFilters?: () => void;
+  nativeSearchCancelFilters?: (preservePresentation?: boolean) => void;
   nativeSearchFilters?: () => Promise<void>;
   nativeSearchFilterTarget?: (id: string) => string;
 

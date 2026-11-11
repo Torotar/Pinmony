@@ -164,14 +164,14 @@ export struct PinmonySocialPermissionsPage {
     if (!this.available() || this.store.screen !== 'socialBlocked') return;
     const token: number = this.store.token;
     this.confirming = true;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: PinmonyI18n.format('pm_social_unblock_title',[user.name],this.uiLanguage), message: this.uiText('pm_social_unblock_description'), alignment: DialogAlignment.Bottom,
       primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => { this.confirming = false; } },
       secondaryButton: { value: this.uiText('pm_social_unblock'), fontColor: $r('app.color.accent'), action: () => {
         const current: boolean = this.confirming && this.visible && token === this.store.token && this.store.screen === 'socialBlocked'; this.confirming = false;
         if (current && this.available() && this.store.social.blocked.some((u: SocialBlockedUser): boolean => u.id === user.id) && this.onRequest) this.onRequest('socialUnblock',user.id);
       } }, cancel: () => { this.confirming = false; }
-    });
+    }));
   }
   @Builder
   private link(title: string, detail: string, target: string, requiresReady: boolean = false) {

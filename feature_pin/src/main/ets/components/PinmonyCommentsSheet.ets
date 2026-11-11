@@ -24,6 +24,9 @@ export struct PinmonyCommentsSheet {
   @State private editing: boolean = false;
   @State private menuItem: PinmonyComment | undefined = undefined;
   @State private menuOpen: boolean = false;
+  private pendingDeleteId: string = '';
+  private pendingDeletePin: string = '';
+  private pendingDeleteVersion: number = 0;
   @State private deleteOpen: boolean = false;
   @State private choosing: boolean = false;
   @State private photoSizes: CommentPhotoSize[] = [];
@@ -287,6 +290,7 @@ export struct PinmonyCommentsSheet {
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyCommentsSheet.menuOpen radius=uniform-32vp'); },
+        onDisappear: (): void => this.finishCommentMenuClose(),
         height: SheetSize.FIT_CONTENT, showClose: !this.deleteOpen,
         dragBar: !this.deleteOpen, backgroundColor: $r('app.color.page_background'), maskColor: '#66000000' })
   }
@@ -346,6 +350,25 @@ export struct PinmonyCommentsSheet {
     }.width('100%')
   }
 
+  private requestCommentDelete(): void {
+    if (!this.menuOpen || this.pendingDeleteId || !this.menuItem?.canDelete || !this.onWrite ||
+        this.result.busy || this.result.uncertain) return;
+    this.pendingDeleteId = this.menuItem.id;
+    this.pendingDeletePin = this.result.pin;
+    this.pendingDeleteVersion = this.result.mutationVersion || 0;
+    this.menuOpen = false;
+  }
+
+  private finishCommentMenuClose(): void {
+    const id: string = this.pendingDeleteId;
+    this.pendingDeleteId = '';
+    this.deleteOpen = false;
+    this.menuItem = undefined;
+    if (id && this.pendingDeletePin === this.result.pin &&
+        this.pendingDeleteVersion === (this.result.mutationVersion || 0) && !this.result.busy &&
+        !this.result.uncertain && this.onWrite) this.onWrite(JSON.stringify({ action: 'delete', id: id, text: '' }));
+  }
+
   @Builder
   private commentMenu() {
     Column({ space: 16 }) {
@@ -357,9 +380,7 @@ export struct PinmonyCommentsSheet {
             .onClick(() => { this.deleteOpen = false; })
           Button(this.uiText("pm_delete_2f9daa82")).layoutWeight(1).backgroundColor($r('app.color.accent')).fontColor($r('app.color.detail_on_accent'))
             .onClick(() => {
-              if (this.menuItem && this.onWrite && !this.result.busy && !this.result.uncertain)
-                this.onWrite(JSON.stringify({ action: 'delete', id: this.menuItem.id, text: '' }));
-              this.menuOpen = false;
+              this.requestCommentDelete();
             })
         }.width('100%')
       } else {

@@ -8,7 +8,8 @@ function method(name) {
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  private ', start + 1));
 }
-const context = { setTimeout() {}, PIN_NATIVE_PROFILE_READS_ENABLED: false }; // Explicit manual-rollback coverage; native production path is checked separately.
+const returnFrames = [];
+const context = { setTimeout(callback) { returnFrames.push(callback); }, PIN_NATIVE_PROFILE_READS_ENABLED: false }; // Explicit manual-rollback coverage; native production path is checked separately.
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Native {' + ['openUserProfile', 'backFromUserProfile'].map(method).join('\n') + '} globalThis.Native = Native;', {
   compilerOptions: { target: ts.ScriptTarget.ES2020 }
 }).outputText, context);
@@ -16,6 +17,7 @@ const native = new context.Native(), loads = [], back = [], cached = [];
 let page = 'https://www.pinterest.com/pin/123/';
 Object.assign(native, { authStatus: 'authenticated', activeTab: 0,
   usesNativeProfileReads: () => false,
+  extractPinUrl: url => /^https:\/\/www\.pinterest\.com\/pin\/\d+\/$/.test(url) ? url : '',
   profileStore: { origins: [], profileScrollOffset: 48 },
   pinStore: { detail: { pinUrl: page }, detailScrollOffset: 64, detailCache: { put(...args) { cached.push(args); } } },
   tabsController: { changeIndex() {} }, pageHistory: { visit() {} },
@@ -37,6 +39,10 @@ assert.equal(native.profileStore.origins[0].page, page);
 assert.equal(native.profileStore.origins[0].tab, 0);
 assert.equal(cached[0][2], 64, 'post scroll is cached before leaving');
 native.backFromUserProfile();
+assert.equal(native.profileStore.origins.length, 1, 'detail return retains profile until the prepared frame');
+assert(native.detailProfileReturning);
+assert.equal(returnFrames.length, 1);
+returnFrames.shift()();
 assert.equal(native.activeTab, 0);
 assert.equal(back[0][1], page, 'return targets the originating post');
 assert.equal(native.profileStore.origins.length, 0);
@@ -72,11 +78,13 @@ vm.runInNewContext(ts.transpileModule('class Routes {' + ['usesNativeProfileRead
   compilerOptions: { target: ts.ScriptTarget.ES2020 }
 }).outputText, routes);
 const route = new routes.Routes();
-Object.assign(route, { authStatus: 'authenticated', profileStore: { origins: [{}] }, authenticatedProfileUrl: 'https://www.pinterest.com/self/',
+Object.assign(route, { authStatus: 'authenticated', nativeBusinessRoutesEnabled: true, profileStore: { origins: [{}] }, authenticatedProfileUrl: 'https://www.pinterest.com/self/',
   navigationAddress: 'https://www.pinterest.com/self/', profileUrlFromAddress: value => value,
   nativeRootPageAddress: () => '', controller: { getUrl: () => page } });
 assert.equal(route.currentProfileUrl(), route.navigationAddress, 'opening target wins before hidden document navigation');
 assert.equal(route.usesNativeProfileReads(), true, 'nested self profile uses the native account reader');
 route.navigationAddress = 'https://www.pinterest.com/other/';
 assert.equal(route.usesNativeProfileReads(), true, 'other profiles use the native account reader');
+route.nativeBusinessRoutesEnabled = false;
+assert.equal(route.usesNativeProfileReads(), false, 'explicit route rollback disables the native account reader');
 console.log('User avatar origin, URL guard, post scroll and return checks passed');

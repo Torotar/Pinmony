@@ -11,19 +11,27 @@ assert(!rootMethod[1].includes('detailOpeningToken'), 'root identity must not in
 assert(!rootMethod[1].includes('detail.session'), 'root identity must not include snapshot session');
 assert(index.includes('ForEach(this.detailPresentationIdentities()'),
   'detail root ForEach must use stable Pin identity');
-assert(index.includes('? this.detailRenderIdentity() : _identity'),
-  'volatile render identity must remain available to the detail component');
+const renderBinding = index.match(/renderIdentity: (_identity[^\r\n]+),\r?\n/);
+assert(renderBinding, 'detail component must receive its own render identity');
 assert(detail.includes('ForEach(this.heroImageSources(this.displayedDetail().imageUrl, this.displayedDetail().pinUrl)') && detail.includes('=> source.key'),
   'hero image source identity controls structural node reuse');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
+const Binding = vm.runInNewContext(ts.transpileModule('class Binding { resolve(_identity) { return ' + renderBinding[1] + '; } } Binding;',
+  { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
+const binding = new Binding();
+Object.assign(binding, { detailRootIdentity: () => 'current', detailRenderIdentity: () => 'current-revision',
+  detailSearchParents: [{ identity: 'parent', renderIdentity: 'parent-revision' }] });
+assert.equal(binding.resolve('current'), 'current-revision', 'current snapshot revision reaches the retained detail');
+assert.equal(binding.resolve('parent'), 'parent-revision', 'covered parent keeps its own render revision');
+assert.equal(binding.resolve('other'), 'other', 'unsaved presentation retains its identity fallback');
 const routeMethods = ['detailRootIdentity','detailPresentationIdentities','detailPresentation'].map(name =>
   index.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'))[0]).join('\n');
 const Routes = vm.runInNewContext(ts.transpileModule('class Routes {'+routeMethods+'} Routes;',
   {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
 const routes = new Routes();
 const parent = {pinUrl:'https://www.pinterest.com/pin/101/'}, child = {pinUrl:'https://www.pinterest.com/pin/102/'};
-Object.assign(routes,{pinStore:{detail:parent},pinIdentity:v=>v.match(/\/pin\/(\d+)/)?.[1] || '',homeEntryCardId:'',homeEntryPhoto:undefined});
+Object.assign(routes,{pinStore:{detail:parent},detailSearchParents:[],pinIdentity:v=>v.match(/\/pin\/(\d+)/)?.[1] || '',homeEntryCardId:'',homeEntryPhoto:undefined});
 assert.equal(routes.detailPresentationIdentities().join(','),'101');
 routes.relatedEntryParent=parent;routes.homeEntryPhoto={pinUrl:child.pinUrl};routes.homeEntryCardId='pinmony-related-photo-parent-child';routes.pinStore.detail=child;
 assert.equal(routes.detailPresentationIdentities().join(','),'101,102','child insertion retains the mounted parent key in the same ForEach');
@@ -37,11 +45,14 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class P
   ${method('heroRenderKey')}
   ${method('heroImageSources')}
   ${method('retryHeroImage')}
+  ${method('resetEntryMotion')}
+  ${method('viewerOwner')}
 } globalThis.Page = Page;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const page = new context.Page();
 Object.assign(page, { detail: { pinUrl: 'https://www.pinterest.com/pin/101/', imageUrl: 'https://i.pinimg.com/1.jpg', kind: 'cached', session: 0 },
-  heroIdentityKey: '', heroRenderRevision: 0, heroLoadedUrl: '', activePin: '', heroVisible: true,
+  traceId: 7, heroIdentityKey: '', heroRenderRevision: 0, heroLoadedUrl: '', activePin: '', heroVisible: true,
   stopHeroDeadline() {}, syncHeroDeadline() {}, auditHeroImage() {},
+  uiCommits: { post(_key, action) { action(); } }, syncDetailFlow() {}, queuePhotoFitAudit() {},
   notifyImageLoaded() {}, restoreScrollPosition() {}, startSearchLabel() {}, updateDetailLayout() {}, auditRecommendationGate() {} });
 page.onPinChanged();
 const cachedKey = page.heroRenderKey(page.detail.imageUrl, page.detail.pinUrl);

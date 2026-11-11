@@ -79,7 +79,7 @@ export struct PinmonySettingsPage {
     if (this.exportingLog || this.clearingLog || this.clearLogConfirmOpen || !this.pageVisible) return;
     this.suppressLogClick = true;
     this.clearLogConfirmOpen = true;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText('pm_clear_logs'), message: this.uiText('pm_clear_logs_confirm'),
       primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => {
         this.clearLogConfirmOpen = false; this.suppressLogClick = false;
@@ -89,7 +89,7 @@ export struct PinmonySettingsPage {
         if (this.pageVisible && this.store.screen === 'root') this.clearLog();
       } },
       cancel: () => { this.clearLogConfirmOpen = false; this.suppressLogClick = false; }
-    });
+    }));
   }
   private async clearLog(): Promise<void> {
     if (this.exportingLog || this.clearingLog) return;
@@ -122,7 +122,7 @@ export struct PinmonySettingsPage {
     if (this.logoutConfirmOpen || this.store.busy || this.store.loading || !this.onRequest) return;
     const token: number = this.store.token;
     this.logoutConfirmOpen = true;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText("pm_log_out_e7677436"), message: this.uiText("pm_log_out_of_this_account_ad88739b"),
       primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: () => { this.logoutConfirmOpen = false; } },
       secondaryButton: { value: this.uiText("pm_log_out_e7677436"), action: () => {
@@ -131,7 +131,7 @@ export struct PinmonySettingsPage {
             !this.store.busy && !this.store.loading && this.onRequest) this.onRequest('logout', '');
       } },
       cancel: () => { this.logoutConfirmOpen = false; }
-    });
+    }));
   }
 
   private titleBarOptions(): HdsNavigationTitleBarOptions {

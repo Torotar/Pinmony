@@ -32,3 +32,6 @@ for (const api of [24, 25, 26]) for (const supported of [false, true]) for (cons
   }
 }
 console.log('Search photo material: actual shared Button modifier, API 24/25/26, support, themes, modes, anchor, action and readiness passed.');
+
+assert(button.includes('.shadow({ radius: PinmonySearchHeaderMaterial.active'), 'photo button has compact shadow');
+assert.equal((page.match(/\.shadow\(\{ radius: PinmonySearchHeaderMaterial.active/g)||[]).length,2, 'only search field and photo button gain shadows');

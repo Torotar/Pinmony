@@ -14,6 +14,7 @@ function method(text, name) {
 const Host = vm.runInNewContext(ts.transpileModule(`class Host {
   ${method(source, 'selectDetailEntryMotion')}
   ${method(source, 'backFromDetail')}
+  ${method(source, 'inboxNewsPinSlide')}
 } Host;`, { compilerOptions: { target: 99 } }).outputText, {
   PinmonyRuntimeLog: { info() {} }, display: { getDefaultDisplaySync: () => ({ width: 400, height: 900 }) }
 });
@@ -26,7 +27,7 @@ let generation = 1;
 Object.assign(n, { detailEntryPhotos: new Map(), detailEntryCards: new Map(), detailEntryGeneration: -1,
   nativeBusinessSessionContext: () => ({ generation }), extractPinUrl: value => id(value) ? value : '', pinIdentity: id,
   pinStore: { detailCache: { get: key => cache.get(key) }, detailOrigin: key => parents.get(pin(key)) },
-  activeSheetKind: '', pageHistory: { isPending: () => false },
+  activeSheetKind: '', inboxStore: {}, pageHistory: { isPending: () => false },
   getUIContext: () => ({ px2vp: x => x, getComponentUtils: () => ({ getRectangleById: () => ({
     windowOffset: { x: 12, y: 100 }, size: { width: 160, height: 220 } }) }) }) });
 function open(key, parent, card) {
@@ -59,10 +60,14 @@ async function main() {
   assert.equal(n.detailEntryPhotos.size, 32); assert.equal(n.detailEntryCards.size, 32);
   n.homeEntryPhoto = undefined; n.selectDetailEntryMotion(pin(49), false, pin(48));
   assert.equal(n.detailEntryPhotos.has(pin(49)), false, 'unmeasured reopening cannot reuse stale geometry');
-  const Page = vm.runInNewContext(ts.transpileModule(`class Page { ${method(page, 'aboutToAppear')} } Page;`,
+  const Page = vm.runInNewContext(ts.transpileModule(`class Page {
+    ${method(page, 'aboutToAppear')}
+    ${method(page, 'resetEntryMotion')}
+  } Page;`,
     { compilerOptions: { target: 99 } }).outputText);
   for (const resumed of [false, true]) {
     const p = new Page(); Object.assign(p, { entryPhoto: {}, entryResumed: resumed, entryOpacity: 1, entryMotionComplete: false,
+      uiCommits: { activate() {} }, queuePhotoFitAudit() {},
       displayedDetail: () => ({ pinUrl: pin(1) }), syncDetailFlow() {}, updateDetailLayout() {}, auditRecommendationGate() {},
       auditRecommendationLayout() {}, startSearchLabel() {}, detailPathStack: { clear() {}, pushPath() {} } });
     p.aboutToAppear(); assert.equal(p.entryOpacity, resumed ? 1 : 0); assert.equal(p.entryMotionComplete, resumed);

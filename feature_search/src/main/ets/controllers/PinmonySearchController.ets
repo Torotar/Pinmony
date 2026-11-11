@@ -12,6 +12,7 @@ import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 // Owns search business state; product navigation/session capabilities are injected.
 interface PinmonyCategorySearchReturn { source: string; target: string; }
 export class PinmonySearchController {
+  private filterClosing: boolean = false;
   private submittedLinkGeneration: number = 0;
   private categoryReturns: PinmonyCategorySearchReturn[] = [];
   private readonly tasks: PinmonyTaskRegistry = new PinmonyTaskRegistry();
@@ -31,7 +32,7 @@ export class PinmonySearchController {
     this.searchStore.searchRequestToken++;
     this.searchStore.searchFilterToken++;
     this.cancelTimers();
-    if (this.searchStore.searchFilterLoading) {
+    if (!this.filterClosing && this.searchStore.searchFilterLoading) {
       this.searchStore.searchFilterLoading = false;
       this.searchStore.searchFilterError = PinmonyI18n.message("pm_filter_loading_cancelled_please_retry_a3e57b38");
     }
@@ -217,7 +218,7 @@ export class PinmonySearchController {
     if (this.ports.nativeSearch?.()) {
       if (!this.searchStore.searchNativeInputReady || !this.searchStore.search?.query.trim() || this.ports.sheetKind()) return;
       if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing(); this.searchStore.searchInputFocused = false;
-      this.searchStore.searchFilterToken++; this.searchStore.searchFilterOptions = []; this.ports.setFilterVisible(true); await this.ports.nativeSearchFilters?.(); return;
+      this.filterClosing = false; this.searchStore.searchFilterToken++; this.searchStore.searchFilterOptions = []; this.ports.setFilterVisible(true); await this.ports.nativeSearchFilters?.(); return;
     }
     this.ports.traceAction('search.filters');
     const generation: number = this.generation;
@@ -237,6 +238,7 @@ export class PinmonySearchController {
     this.searchStore.searchInputStopEditing = undefined;
     const token: number = ++this.searchStore.searchFilterToken;
     this.searchStore.searchFilterOptions = [];
+    this.filterClosing = false;
     this.searchStore.searchFilterError = '';
     this.searchStore.searchFilterLoading = true;
     this.ports.setFilterVisible(true);
@@ -262,7 +264,7 @@ export class PinmonySearchController {
   }
 
   async refreshSearchFilters(token: number = this.searchStore.searchFilterToken, attempt: number = 0): Promise<void> {
-    if (token !== this.searchStore.searchFilterToken || this.ports.sheetKind() !== 'searchFilter') return;
+    if (this.filterClosing || token !== this.searchStore.searchFilterToken || this.ports.sheetKind() !== 'searchFilter') return;
     try {
       const raw: string = await this.ports.runScript('JSON.stringify(' +
         this.searchFilterScript('PinmonySearchReadFilters') + ')');
@@ -306,6 +308,7 @@ export class PinmonySearchController {
   }
 
   async retrySearchFilters(): Promise<void> {
+    if (this.filterClosing) return;
     if (this.ports.nativeSearch?.()) { if(this.ports.sheetKind() === 'searchFilter' && !this.searchStore.searchFilterLoading) await this.ports.nativeSearchFilters?.(); return; }
     if (this.ports.sheetKind() !== 'searchFilter' || this.searchStore.searchFilterLoading) return;
     const token: number = ++this.searchStore.searchFilterToken;
@@ -330,6 +333,7 @@ export class PinmonySearchController {
   }
 
   async selectSearchFilter(id: string): Promise<void> {
+    if (this.filterClosing) return;
     if (this.ports.nativeSearch?.()) {
       if (this.ports.sheetKind() !== 'searchFilter' || this.searchStore.searchFilterLoading) return;
       const target: string = this.ports.nativeSearchFilterTarget?.(id) || '';
@@ -367,15 +371,21 @@ export class PinmonySearchController {
   }
 
   dismissSearchFilters(): void {
-    if (this.ports.sheetKind() !== 'searchFilter') return;
+    if (this.ports.sheetKind() !== 'searchFilter' || this.filterClosing) return;
+    this.filterClosing = true;
     const script: string = this.searchFilterScript('PinmonySearchCloseFilters');
     this.searchStore.searchFilterToken++;
-    if (this.ports.nativeSearch?.()) this.ports.nativeSearchCancelFilters?.();
+    if (this.ports.nativeSearch?.()) this.ports.nativeSearchCancelFilters?.(true);
     this.ports.setFilterVisible(false);
+    if (!this.ports.nativeSearch?.()) this.ports.runScript(script).catch(() => PinmonyRuntimeLog.warn('Pinmony: could not close web search filters'));
+  }
+
+  finishSearchFiltersClose(): void {
+    if (!this.filterClosing) return;
+    this.filterClosing = false;
     this.searchStore.searchFilterLoading = false;
     this.searchStore.searchFilterError = '';
     this.searchStore.searchFilterOptions = [];
-    if (!this.ports.nativeSearch?.()) this.ports.runScript(script).catch(() => PinmonyRuntimeLog.warn('Pinmony: could not close web search filters'));
   }
 
   expectSearch(): void {

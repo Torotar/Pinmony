@@ -178,12 +178,12 @@ export struct PinmonyPhotoHistoryView {
   }
   private confirmDeleteAll(): void {
     if (this.managementAnimating || this.busy || this.deleting || !this.onDelete || this.uncertainIds.length > 0) return;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.text('pm_photo_history_delete_all'),
       message: this.text('pm_photo_history_delete_all_confirm'),
       primaryButton: { value: this.text('pm_cancel_2cd0f3be'), action: () => {} },
       secondaryButton: { value: this.text('pm_photo_history_delete_all'), action: () => { this.deleteAllPhotos(); } }
-    });
+    }));
   }
   @Builder
   private historyContent(management: boolean) {

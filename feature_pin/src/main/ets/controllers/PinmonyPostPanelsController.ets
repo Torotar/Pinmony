@@ -8,13 +8,13 @@ interface PinmonyPanelCommentAction { action: string; }
 
 export interface PinmonyPostPanelsPorts {
   nativePause?: () => void;
-  cancelNativeCommentWrites?: () => void;
+  cancelNativeCommentWrites?: (preservePresentation?: boolean) => void;
   nativeCommentWrite?: (encoded: string, current: () => boolean) => Promise<void>;
   nativeCommentLike?: (id: string, current: () => boolean) => Promise<void>;
   nativeTranslate?: (id: string, current: () => boolean) => Promise<void>;
   nativeReplies?: (id: string, current: () => boolean) => Promise<void>;
   nativeComments?: (append: boolean, current: () => boolean) => Promise<void>;
-  cancelNativeComments?: () => void;
+  cancelNativeComments?: (preservePresentation?: boolean) => void;
   adoptComments?: () => Promise<boolean>;
   authenticated: () => boolean;
   foreground: () => boolean;
@@ -45,7 +45,7 @@ export class PinmonyPostPanelsController {
   private pin: string = '';
   private page: string = '';
   constructor(store: PinmonyPinStore, ports: PinmonyPostPanelsPorts) { this.store = store; this.ports = ports; }
-  pause(): void { this.ports.nativePause?.();this.ports.cancelNativeCommentWrites?.();this.ports.cancelNativeComments?.(); this.generation++; this.tasks.invalidate(); this.reading = false; }
+  pause(preservePresentation: boolean = false): void { this.ports.nativePause?.();this.ports.cancelNativeCommentWrites?.(preservePresentation);this.ports.cancelNativeComments?.(preservePresentation); this.generation++; this.tasks.invalidate(); this.reading = false; }
   resume(): void { this.poll(); }
   private token(): number { return this.mode === 'comments' ? this.store.commentToken : this.mode === 'save' ? this.store.saveToken : this.store.editToken; }
   private context(token: number): boolean {
@@ -243,7 +243,7 @@ export class PinmonyPostPanelsController {
   dismiss(kind: string, force: boolean = false): void {
     if (this.mode !== kind) return;
     if (kind === 'edit' && !force && (this.pendingWrite || this.store.editResult.busy || this.store.editResult.picker.busy)) return;
-    this.pause();
+    this.pause(kind === 'comments');
     if (kind === 'comments') this.store.commentToken++;
     else if (kind === 'save') { this.store.saveToken++; this.store.saveCreating = false; this.store.saveResult.busy = false; }
     else { this.store.editToken++; this.store.editResult.busy = false; this.store.editResult.picker.busy = false; }

@@ -402,13 +402,13 @@ export struct PinmonyInboxFlowPage {
             const id: string = this.selectedMessage?.id || '';
             const intent: string = this.messageConfirmationKey();
             const epoch: number = this.messageMenuEpoch;
-            this.getUIContext().showAlertDialog({ title: this.uiText("pm_delete_message_053d6b4d"), message: this.uiText("pm_delete_this_message_94c4bcb6"),
+            this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({ title: this.uiText("pm_delete_message_053d6b4d"), message: this.uiText("pm_delete_this_message_94c4bcb6"),
               primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: (): void => {} },
               secondaryButton: { value: this.uiText("pm_delete_2f9daa82"), action: (): void => {
                 if (this.active && this.showMessageMenu && epoch === this.messageMenuEpoch && this.messageConfirmationKey() === intent) {
                   this.act('deleteMessage', id); this.closeMessageMenu();
                 }
-              } } });
+              } } }));
           })
       }
     }.padding({ left: 16, right: 16, bottom: 24 }).width('100%')
@@ -657,6 +657,7 @@ export struct PinmonyInboxFlowPage {
             if (this.snapshot.unsubscribedPin && this.onPinUnsubscribed) this.onPinUnsubscribed();
             this.act('back');
           },
+          onWillSpringBackWhenDismiss: (_action: SpringBackAction): void => {},
           onWillDismiss: (action: DismissSheetAction) => {
             action.dismiss();
             this.showUpdatesMenu = false;
@@ -792,6 +793,7 @@ export struct PinmonyInboxFlowPage {
         height: SheetSize.FIT_CONTENT, showClose: true,
         title: { title: this.messageMenuKind === 'block' ? (this.snapshot.blocked ? this.uiText("pm_unblock_contact_4b2a7e25") : this.uiText("pm_block_contact_a32510e0")) : this.uiText('pm_message_reaction_title') }, dragBar: true,
         backgroundColor: $r('app.color.page_background'),
+        onWillSpringBackWhenDismiss: (_action: SpringBackAction): void => {},
         onWillDismiss: (action: DismissSheetAction) => { this.closeMessageMenu(); action.dismiss(); },
         onWillDisappear: (): void => { this.messageMenuClosing = true; },
         onDisappear: (): void => this.messageMenuDisappeared()

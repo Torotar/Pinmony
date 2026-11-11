@@ -24,6 +24,10 @@ export struct PinmonyPublishBoardPage {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('syncCreate') state: PinmonyPublishFlow = {} as PinmonyPublishFlow;
   @State private createVisible: boolean = false;
+  @State private createClosing: boolean = false;
+  private createCloseToken: number = -1;
+  private createClosePage: string = '';
+  private createCloseDispatched: boolean = false;
   @State private name: string = '';
   @State private secret: boolean = false;
   private readonly sectionPaths: NavPathStack = new NavPathStack();
@@ -34,7 +38,26 @@ export struct PinmonyPublishBoardPage {
   onAction: (action: string, value: string, secret: boolean) => void = () => {};
 
   aboutToAppear(): void { this.syncCreate(); }
-  private syncCreate(): void { this.createVisible = this.state.phase === 'create'; if (this.state.phase === 'sections' && !this.sectionPaths.size()) this.sectionPaths.pushPath({name:'sections'}); }
+  private syncCreate(): void {
+    if (this.createClosing && (this.createCloseToken !== this.state.token || this.createClosePage !== this.state.page || this.state.phase !== 'create')) {
+      this.createClosing = false; this.createCloseDispatched = false;
+    }
+    this.createVisible = !this.createClosing && this.state.phase === 'create';
+    if (this.state.phase === 'sections' && !this.sectionPaths.size()) this.sectionPaths.pushPath({name:'sections'});
+  }
+  private requestCreateClose(): void {
+    if (this.state.busy || this.createClosing || this.state.phase !== 'create') return;
+    this.createCloseToken = this.state.token;
+    this.createClosePage = this.state.page;
+    this.createCloseDispatched = false;
+    this.createClosing = true;
+    this.createVisible = false;
+  }
+  private finishCreateClose(): void {
+    if (this.createVisible || !this.createClosing || this.createCloseDispatched) return;
+    const current: boolean = this.createCloseToken === this.state.token && this.createClosePage === this.state.page && this.state.phase === 'create';
+    if (current && !this.state.busy) { this.createCloseDispatched = true; this.closeCreate(); }
+  }
   private closeCreate(): void {
     this.onAction(this.state.kind === 'board' || this.state.uncertain ? 'close' : 'boards', '', false);
   }
@@ -59,7 +82,7 @@ export struct PinmonyPublishBoardPage {
   private createButton() {
       Button(this.uiText("pm_create_board_513babc9")).width('100%').height(48).backgroundColor($r('app.color.accent'))
         .fontColor($r('app.color.detail_on_accent'))
-        .enabled(!!this.name.trim() && !this.state.loading && !this.state.busy && !this.state.uncertain)
+        .enabled(!!this.name.trim() && !this.state.loading && !this.state.busy && !this.state.uncertain && !this.createClosing)
         .onClick(() => this.onAction('create', this.name.trim(), this.secret))
   }
   @Builder
@@ -96,9 +119,9 @@ export struct PinmonyPublishBoardPage {
         content: { title: { mainTitle: this.uiText("pm_create_board_513babc9") }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, label: this.uiText("pm_close_3fd47edc"), isEnabled: !this.state.busy,
-          action: () => { if (!this.state.busy) { this.createVisible = false; this.closeCreate(); } }
+          action: () => this.requestCreateClose()
         } }] } } }, this.hdsDarkMode))
-      .backgroundColor($r('app.color.page_background'))
+      .backgroundColor($r('app.color.page_background')).enabled(!this.createClosing)
   }
 
   @Builder
@@ -139,9 +162,11 @@ export struct PinmonyPublishBoardPage {
           onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPublishBoardPage.createVisible radius=uniform-32vp'); },
           height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
           backgroundColor: $r('app.color.page_background'),
+          onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.state.busy) action.springBack(); },
+          onDisappear: (): void => this.finishCreateClose(),
           onWillDismiss: (action: DismissSheetAction) => {
             if (this.state.busy) return;
-            this.createVisible = false; this.closeCreate(); action.dismiss();
+            this.requestCreateClose(); action.dismiss();
           }
         })
     } else {

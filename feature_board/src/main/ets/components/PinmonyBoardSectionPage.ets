@@ -16,6 +16,8 @@ export struct PinmonyBoardSectionPage {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop ready: boolean = false;
+  @Prop @Watch('backRequested') closeRequest: number = 0;
+  private backRequested(): void { if (this.closeRequest > 0) this.requestClose(); }
   onClose: () => void = () => {};
   onCreate: (name: string) => Promise<string> = async () => this.uiText("pm_this_action_is_unavailable_f3ea5b4e");
   @State private busy: boolean = false;
@@ -23,8 +25,19 @@ export struct PinmonyBoardSectionPage {
   @State private error: string = '';
   @State private name: string = '';
   @State private visible: boolean = false;
+  @State private closePending: boolean = false;
   private readonly scroller: Scroller = new Scroller();
   aboutToAppear(): void { this.visible = true; }
+  private requestClose(): void {
+    if (this.busy || this.closePending) return;
+    this.closePending = true;
+    this.visible = false;
+  }
+  private finishClose(): void {
+    if (this.visible || !this.closePending) return;
+    this.closePending = false;
+    this.onClose();
+  }
   @Builder
   private sectionForm() {
     Column({ space: 20 }) {
@@ -39,15 +52,15 @@ export struct PinmonyBoardSectionPage {
   @Builder
   private nextButton() {
       Button(this.uiText("pm_next_acfc4e74")).width('100%').height(48).backgroundColor($r('app.color.accent'))
-        .fontColor($r('app.color.detail_on_accent')).enabled(this.ready && !!this.name.trim() && !this.busy && !this.submitted)
+        .fontColor($r('app.color.detail_on_accent')).enabled(this.ready && !!this.name.trim() && !this.busy && !this.submitted && !this.closePending)
         .onClick(async () => {
-          if (!this.ready || this.busy || this.submitted || !this.name.trim()) return;
+          if (!this.ready || this.busy || this.submitted || this.closePending || !this.name.trim()) return;
           this.busy = true; this.submitted = true;
           try { this.error = await this.onCreate(this.name.trim()); }
           catch (_) { this.error = PinmonyI18n.message("pm_creation_not_confirmed_close_and_refresh_to_check_before_submitt_99e27f05"); }
           finally { this.busy = false; }
           if (this.error && !PinmonyI18n.isUnconfirmed(this.error)) this.submitted = false;
-          if (!this.error) { this.visible = false; this.onClose(); }
+          if (!this.error) this.requestClose();
         })
   }
   @Builder
@@ -82,7 +95,7 @@ export struct PinmonyBoardSectionPage {
         },
         content: { title: { mainTitle: this.uiText("pm_add_section_779008ec") }, menu: { value: [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
-          type: IconStyleMode.SMALL, isEnabled: !this.busy, label: this.uiText("pm_close_3fd47edc"), action: () => { if (!this.busy) { this.visible = false; this.onClose(); } }
+          type: IconStyleMode.SMALL, isEnabled: !this.busy, label: this.uiText("pm_close_3fd47edc"), action: () => this.requestClose()
         } }] } } }, this.hdsDarkMode))
       .backgroundColor($r('app.color.page_background'))
   }
@@ -94,9 +107,11 @@ export struct PinmonyBoardSectionPage {
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardSectionPage.visible radius=uniform-32vp'); },
         height: SheetSize.MEDIUM, detents: [SheetSize.MEDIUM], dragBar: true, showClose: false,
         backgroundColor: $r('app.color.page_background'),
+        onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.busy) action.springBack(); },
+        onDisappear: (): void => this.finishClose(),
         onWillDismiss: (action: DismissSheetAction) => {
           if (this.busy) return;
-          this.visible = false; this.onClose(); action.dismiss();
+          this.requestClose(); action.dismiss();
         }
       })
   }

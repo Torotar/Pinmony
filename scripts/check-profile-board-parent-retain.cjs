@@ -31,9 +31,21 @@ for (const invalidate of [
   h => { h.boardStore.boardDetail = undefined; }
 ]) { const f = fixture(); invalidate(f); assert.equal(f.retainProfileBoardParent(), false, 'unrelated or closed board cannot retain parent'); }
 assert(source.includes('(this.currentProfileUrl() || this.retainProfileBoardParent() || this.retainProfilePinParent())'), 'board route cannot unmount parent');
-assert(source.includes('.hitTestBehavior(this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? HitTestMode.None'));
-assert(source.includes(".accessibilityLevel(this.profileChatActive || this.retainProfileBoardParent() || this.retainProfilePinParent() ? 'no-hide-descendants'"));
-assert(source.includes('.zIndex(!this.retainProfileBoardParent() && !this.retainProfilePinParent() && this.detailProfileTransition'), 'parent stays below board');
+const profileLayer = source.slice(source.indexOf('if (!this.chatProfileTransition && this.profileStore.origins.length > 0'), source.indexOf('ForEach(this.profilePanelPresentations()'));
+const touchExpression = profileLayer.match(/\.hitTestBehavior\(([^\n]+)\)/)[1];
+const accessibilityExpression = profileLayer.match(/\.accessibilityLevel\(([^\n]+)\)/)[1];
+const zExpression = profileLayer.match(/\.zIndex\(([^\n]+)\)/)[1];
+const touch = vm.runInNewContext('(function(){return '+touchExpression+';})', {HitTestMode:{None:'none',Default:'default'}});
+const accessibility = new Function('return '+accessibilityExpression);
+const z = new Function('return '+zExpression);
+for (const state of [{}, {board:true}, {pin:true}, {chat:true}, {returning:true}]) {
+  const context = {profileChatActive:!!state.chat,detailProfileReturning:!!state.returning,detailProfileTransition:true,
+    pinStore:{detail:{}},retainProfileBoardParent:()=>!!state.board,retainProfilePinParent:()=>!!state.pin};
+  const covered = !!(state.board || state.pin || state.chat || state.returning);
+  assert.equal(touch.call(context),covered?'none':'default','covered profile cannot receive touch');
+  assert.equal(accessibility.call(context),covered?'no-hide-descendants':'auto','covered profile cannot receive accessibility focus');
+  assert.equal(z.call(context),state.board || state.pin?0:1,'profile stays below its child and above its returning detail');
+}
 for (const prop of ['backActive', 'interactionReady', 'automaticLoadingEnabled']) {
   assert(content.includes(prop + ': !view.coveredByBoard &&'), prop + ' blocked when covered');
 }

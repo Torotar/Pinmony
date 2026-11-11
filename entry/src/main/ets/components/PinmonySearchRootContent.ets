@@ -37,6 +37,7 @@ export interface PinmonySearchRootView {
   rootPullKind: string;
   pullRefreshRoot: (kind: string) => Promise<void>;
   returnFromSearchQuiz: () => boolean;
+  quizCloseRequest: number;
   backFromSearch: () => void;
   rootBack: () => boolean;
   performSearchQuizAction: (kind: string, id: string) => Promise<void>;
@@ -52,6 +53,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
           if ((view.shouldKeepSearchRootMounted() && !view.pinStore.detail || view.preparingDetailReturn ||
             view.searchStore.photoSearchVisible && view.activeTab === 1 && view.authStatus === 'authenticated') && !view.loadFailed) {
             PinmonySearchPage({
+              quizCloseRequest: view.quizCloseRequest,
               onPhotoSearch: view.photoSearch,
               onPhotoHistory: view.photoHistory,
               onDeletePhotoHistory: view.deletePhotoHistory,

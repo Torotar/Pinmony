@@ -1,12 +1,18 @@
-import { PinmonyActionNotice } from 'common_ui';
+import { HdsNavigation, HdsNavigationTitleMode, HdsNavigationTitleBarOptions, BlurStrategy, IconStyleMode } from '@kit.UIDesignKit';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { PinmonyActionNotice, PinmonyImmersiveLight, PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { ShareSheetOption } from '../models/PinmonySheets';
 import { PinmonyUserAvatar } from 'common_ui';
 @Component
 export struct PinmonyShareSheet {
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
+  @Prop titleText: string = '';
+  onClose: () => void = (): void => {};
   @ObjectLink pinStore: PinmonyPinStore;
   onAction: (id: string) => void = (): void => {};
   onSearch: (value: string) => void = (): void => {};
@@ -72,7 +78,40 @@ export struct PinmonyShareSheet {
   }
 
 
+  private closeTitleOptions(): HdsNavigationTitleBarOptions {
+    return { avoidLayoutSafeArea: false, enableComponentSafeArea: true,
+      style: {
+        blurStrategy: BlurStrategy.DISABLE, thermoCtrl: false,
+        scrollEffectOpts: { enableScrollEffect: false },
+        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
+        originalStyle: {
+          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0, blurRadius: 0 },
+          contentStyle: {
+            titleStyle: { mainTitleColor: $r('app.color.primary_text') },
+            menuStyle: { backgroundColor: this.immersiveLightMode === 'off' ? $r('app.color.input_surface') : undefined, iconColor: $r('app.color.primary_text') }
+          }
+        }
+      },
+      content: {
+        title: { mainTitle: this.titleText },
+        menu: { value: [{ content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
+          type: IconStyleMode.SMALL, label: this.uiText('pm_close_3fd47edc'), action: () => this.onClose()
+        } }] }
+      }
+    };
+  }
+
   build() {
+    HdsNavigation() { this.shareBody() }
+      .mode(NavigationMode.Stack).width('100%').height('100%')
+      .titleMode(HdsNavigationTitleMode.MODAL).hideBackButton(true).hideToolBar(true)
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.closeTitleOptions(), this.hdsDarkMode))
+      .backgroundColor($r('app.color.page_background'))
+  }
+
+  @Builder
+  private shareBody() {
     Stack({ alignContent: Alignment.Center }) {
     Column() {
       if (this.pinStore.shareLoading && !this.pinStore.shareSearchActive) {

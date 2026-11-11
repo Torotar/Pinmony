@@ -8,14 +8,14 @@ const Host = vm.runInNewContext(ts.transpileModule('class Host {' + source.slice
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
 const page = new Host(), calls = [];
 for (const method of ['dismissEditPin', 'dismissApiComments', 'dismissApiBoards', 'dismissProfilePublish',
-  'dismissMoreSheet', 'dismissShareSheet', 'dismissSearchFilters', 'dismissProfileMenu']) {
+  'requestMoreSheetClose', 'requestShareSheetClose', 'dismissSearchFilters', 'dismissProfileMenu']) {
   page[method] = () => calls.push(method);
 }
 page.pinStore = { editResult: { busy: false, picker: { busy: false }, phase: 'edit' } };
 page.editPinAction = (...args) => calls.push(args);
 for (const [kind, method] of Object.entries({ edit: 'dismissEditPin', comments: 'dismissApiComments',
-  save: 'dismissApiBoards', publish: 'dismissProfilePublish', more: 'dismissMoreSheet',
-  share: 'dismissShareSheet', searchFilter: 'dismissSearchFilters', profileMenu: 'dismissProfileMenu' })) {
+  save: 'dismissApiBoards', publish: 'dismissProfilePublish', more: 'requestMoreSheetClose',
+  share: 'requestShareSheetClose', searchFilter: 'dismissSearchFilters', profileMenu: 'dismissProfileMenu' })) {
   page.activeSheetKind = kind; page.closeNativeModal(); assert.equal(calls.pop(), method);
 }
 page.activeSheetKind = 'edit';
@@ -24,8 +24,8 @@ page.pinStore.editResult.busy = false; page.pinStore.editResult.picker.busy = tr
 page.closeNativeModal(); assert.equal(calls.length, 0);
 page.pinStore.editResult.picker.busy = false; page.pinStore.editResult.phase = 'boards';
 page.closeNativeModal(); assert.deepEqual(calls.pop(), ['editPhase', ',"edit"']);
-assert(source.includes('title: { title: this.nativeModalLabel() }'));
-assert(source.includes('showClose: true')); // Sheet now owns its native title and close button.
+assert(source.includes("title: this.nativeSheetHasHdsTitle() ? undefined : { title: this.nativeModalLabel() }"));
+assert(source.includes("showClose: !this.nativeSheetHasHdsTitle()")); // Save owns its HDS title; other Sheets keep native chrome.
 assert(source.includes('PinmonyImmersiveLight.effect('));
 assert(source.includes('private closeNativeModal()'));
 console.log('Modal title: native HDS material, close routing, edit/picker busy gates and child-phase back passed');

@@ -38,6 +38,7 @@ async function main() {
   const h = new Harness(); let nativeBacks = 0, parentBacks = 0;
   Object.assign(h, {
     noticeChats: [],
+    imageViewer: { visible: false },
     searchController: { cancelSubmittedPin: () => false }, nativeBoardVisible: () => false, restoreInboxNewsSearchParent: () => false,
     profileChatActive: true, nativeChildBackUntil: 0, profileStore: { origins: [{}] }, pinStore: {}, inboxStore: { inboxFlow: { screen: 'settings' } },
     inboxMessagesNativeReads: { async action(action) {
@@ -57,7 +58,7 @@ async function main() {
   h.requestProfileBack(); assert.equal(parentBacks, 0); assert.equal(h.backRequested, false, 'covered profile cannot latch its back state');
   h.backActive = true; h.requestProfileBack(); h.requestProfileBack(); assert.equal(parentBacks, 1);
   const binding = fs.readFileSync('entry/src/main/ets/components/PinmonyProfileRootContent.ets', 'utf8');
-  assert(binding.includes('backActive: !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible'));
+  assert(binding.includes('backActive: !view.coveredByBoard && !view.coveredByPin && !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible'));
   assert(index.includes('pageActive: _identity === this.detailRootIdentity() && !this.profileChatActive &&'));
   for (const file of ['feature_profile/src/main/ets/components/PinmonyProfilePage.ets',
     'feature_inbox/src/main/ets/components/PinmonyInboxListPage.ets',

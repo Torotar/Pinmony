@@ -1,3 +1,4 @@
+import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyEditPinResult } from '../models/PinmonyEditPin';
@@ -50,7 +51,7 @@ export struct PinmonyEditPinSheet {
     const epoch: number = ++this.deleteDialogEpoch;
     this.deleteDialogOpen = true;
     this.act('editPhase', ',"confirm"');
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText(this.result.editableContent ? 'pm_delete_this_pin_bd01697d' : 'pm_remove_saved_pin_confirm'),
       message: this.uiText('pm_this_cannot_be_undone_55d5e34b'),
       primaryButton: { value: this.uiText('pm_cancel_2cd0f3be'), action: () => this.cancelDelete(epoch, pin) },
@@ -62,7 +63,7 @@ export struct PinmonyEditPinSheet {
         this.act('editCommit', ',true');
       } },
       cancel: () => this.cancelDelete(epoch, pin)
-    });
+    }));
   }
 
   private cancelDelete(epoch: number, pin: string): void {

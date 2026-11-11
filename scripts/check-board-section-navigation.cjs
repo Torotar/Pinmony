@@ -15,10 +15,13 @@ for (const layer of ['showingIdeas', 'organizing', 'targeting', 'editing', 'cove
 function method(name) {
   const start = source.indexOf('  private ' + name + '(');
   assert(start >= 0);
-  return source.slice(start, source.indexOf('\n  private ', start + 1)).replace(/\s*@Builder\s*$/, '');
+  const next = /\n  (?:private |@Builder|@State|@Storage|@Prop)/g;
+  next.lastIndex = start + 1;
+  const end = next.exec(source);
+  return source.slice(start, end ? end.index : source.length);
 }
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
-  ['snapshotChanged', 'modernBoardActions', 'boardActionEnabled', 'back', 'phase', 'closeTargetCreate', 'finishTargetCreateClose'].map(method).join('\n') +
+  ['snapshotChanged', 'syncMoveVisibility', 'requestMoveClose', 'finishMoveClose', 'confirmationKey', 'modernBoardActions', 'boardActionEnabled', 'back', 'phase', 'closeTargetCreate', 'finishTargetCreateClose'].map(method).join('\n') +
   '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, { PinmonyRuntimeLog: { info() {} } });
 const LayerHost = vm.runInNewContext(ts.transpileModule('class LayerHost {' +
   ['organizing', 'targeting', 'editing', 'covering', 'dispatch'].map(method).join('\n') +
@@ -84,9 +87,24 @@ host.snapshot.flow.targetBoardId = ''; host.back(); assert.equal(actions.pop(), 
 assert.equal(host.phase(), 'targets', 'bulk move presents a target page');
 host.singlePinMove = true;
 assert.equal(host.phase(), 'section', 'single-pin move retains its source section beneath the sheet');
-host.back(); assert.equal(actions.pop(), 'close');
+host.onAction = raw => actions.push(JSON.parse(raw).action);
+const beforeMoveClose = actions.length;
+host.back(); assert.equal(actions.length, beforeMoveClose, 'single move waits for native exit');
+host.finishMoveClose(); assert.equal(actions.pop(), 'close');
 host.snapshot.flow.sectionId = '';
 assert.equal(host.phase(), '', 'single-pin move retains its source board beneath the sheet');
-host.snapshotChanged(); assert.equal(host.moveSheetOpen, true);
+host.snapshotChanged(); assert.equal(host.moveSheetOpen, false, 'old target snapshot cannot reopen the closing sheet');
+host.snapshot.flow.phase = ''; host.snapshotChanged();
+host.snapshot.flow.phase = 'targets'; host.snapshotChanged(); assert.equal(host.moveSheetOpen, true, 'a new move can open after the prior phase ended');
 host.snapshot.flow.phase = ''; host.snapshotChanged(); assert.equal(host.moveSheetOpen, false);
 console.log('Board section navigation: creation lifecycle, retained errors/unknown results, modern/legacy permissions and nested returns passed');
+
+const viewButton = method('boardViewButton');
+assert(!viewButton.includes('systemMaterial') && !viewButton.includes('deviceInfo.apiAvailable'), 'view button and sheet material integrations are withdrawn');
+assert.equal((viewButton.match(/this.viewOpen=true/g) || []).length, 1, 'retain original view menu route');
+assert(viewButton.includes('.enabled(this.boardActionEnabled(1))'), 'retain original loading and permission gates');
+assert(viewButton.includes(".width(40).height(40).backgroundColor($r('app.color.input_surface'))"), 'restore original size and background');
+assert(viewButton.includes('.bindSheet($$this.viewOpen,this.boardViewSheet(),{'), 'restore original sheet binding');
+assert(viewButton.includes('radius:LengthMetrics.vp(32)') && viewButton.includes('height:SheetSize.FIT_CONTENT') && viewButton.includes('this.closeBoardView()'), 'restore original panel size and close cleanup');
+assert(!source.includes('boardViewSheetOptions') && !source.includes('boardViewEnabled') && !source.includes('boardViewMaterialTraceKey') && !source.includes('target=board-view-button'), 'remove all button/sheet material helpers and diagnostic hooks');
+console.log('Board view rollback: original button AND sheet binding restored; material helpers and diagnostics removed');

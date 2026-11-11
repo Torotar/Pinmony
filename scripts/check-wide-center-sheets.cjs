@@ -5,6 +5,7 @@ const files = cp.execFileSync('rg', ['-l', '\\.bindSheet\\(', 'entry', 'common_u
   'feature_board', 'feature_profile', 'feature_search', 'feature_inbox', 'feature_pin',
   'feature_settings', '-g', '*.ets'], { encoding: 'utf8' }).trim().split(/\r?\n/);
 let count = 0;
+const entries = [];
 for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   const root = file.replaceAll('\\', '/').startsWith('entry/');
@@ -25,9 +26,12 @@ for (const file of files) {
         (policy.includes(': SheetType.BOTTOM') ? 'bottom' : undefined), file);
     }
     count++;
+    entries.push(file.replaceAll('\\', '/') + ':' + source.slice(match.index).split('\n')[0].trim());
   }
 }
 const root = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert.match(root, /AppStorage\.setOrCreate<number>\('pinmonySheetWindowWidthVp', width\)/);
-assert.equal(count, 18, 'Audit every added or removed sheet entry');
+assert.equal(count, 19, 'Audit every added or removed sheet entry');
+const profileViews = entries.filter(entry => entry.startsWith('feature_profile/') && entry.includes('this.pinViewSheet()'));
+assert.equal(profileViews.length, 2, 'both profile toolbar layouts bind the view sheet and need the same wide-window policy');
 console.log(`Wide-window sheets: ${count} entries, breakpoint, shrink-back and shared width binding passed; device geometry excluded.`);

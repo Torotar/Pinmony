@@ -117,7 +117,7 @@ export struct PinmonyNotificationsPage {
     }
     const token: number = this.store.token;
     this.confirmationOpen = true;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText('pm_are_you_sure_8889016c'),
       message: this.uiText(choice.type === 'push' ? 'pm_notifications_disable_push' : choice.type === 'email' ? 'pm_notifications_disable_email' : 'pm_notifications_disable_news'),
       alignment: DialogAlignment.Bottom,
@@ -128,7 +128,7 @@ export struct PinmonyNotificationsPage {
         if (owned && !this.store.busy && !this.store.loading && !this.store.writeUncertain && this.onRequest) this.onRequest('notificationSet', JSON.stringify(choice));
       } },
       cancel: () => { this.confirmationOpen = false; }
-    });
+    }));
   }
   private permissionCurrent(token: number, epoch: number): boolean {
     return this.permissionOwner(token, epoch) && !this.store.busy && !this.store.loading && !this.store.writeUncertain;
@@ -140,7 +140,7 @@ export struct PinmonyNotificationsPage {
   private showSystemNotificationPrompt(token: number, epoch: number, choice?: NotificationChoice): void {
     if (this.confirmationOpen || !this.permissionOwner(token, epoch)) return;
     this.confirmationOpen = true;
-    this.getUIContext().showAlertDialog({
+    this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
       title: this.uiText('pm_system_notifications_off'),
       message: this.uiText('pm_system_notifications_enable_message'),
       alignment: DialogAlignment.Center,
@@ -155,7 +155,7 @@ export struct PinmonyNotificationsPage {
         }
       } },
       cancel: () => { this.confirmationOpen = false; }
-    });
+    }));
   }
   private async enableInAppNotification(choice: NotificationChoice): Promise<void> {
     const token: number = this.store.token;

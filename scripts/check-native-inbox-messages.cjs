@@ -47,7 +47,11 @@ const failedResume=resumed.reader.resume();resumed.requests.at(-1).resolve('inva
 const inboxUI=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxPage.ets','utf8');const keyStart=inboxUI.indexOf('  private updateRowKey('),keyEnd=inboxUI.indexOf('\n  @Builder',keyStart);
 const KeyView=vm.runInNewContext(ts.transpileModule('class KeyView {'+inboxUI.slice(keyStart,keyEnd)+'} KeyView;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText),keyView=new KeyView();keyView.uiLanguage='zh-CN';
 const oldRow={id:'conversation:100',title:'Peer',subtitle:'old',imageUrl:'',enabled:true,unread:true};for(const patch of [{subtitle:'latest'},{timeLabel:'22:00'},{unread:false},{unreadCount:3},{outgoing:true},{imageUrl:'https://i.pinimg.com/new.jpg'},{enabled:false},{profileUrl:'https://www.pinterest.com/peer/'}])assert.notEqual(keyView.updateRowKey(oldRow),keyView.updateRowKey({...oldRow,...patch}),'same-id row changes must invalidate stale builder');assert.equal(keyView.updateRowKey(oldRow),keyView.updateRowKey({...oldRow}),'unchanged polling does not rebuild rows');const chineseKey=keyView.updateRowKey(oldRow);keyView.uiLanguage='en-US';assert.notEqual(keyView.updateRowKey(oldRow),chineseKey);
-assert.equal((inboxUI.match(/=> this\.updateRowKey\(item\)/g)||[]).length,4,'updates/messages/contacts/activity all use content-aware row identity');
+assert.equal((inboxUI.match(/=> this\.updateRowKey\(item\)/g)||[]).length,3,'updates/messages/contacts use content-aware builder identity');
+const activityBlock=inboxUI.slice(inboxUI.indexOf('ForEach((this.snapshot.activities'),inboxUI.indexOf('ForEach(this.snapshot.items'));
+assert(activityBlock.includes('PinmonyInboxActivityRow({item:item'), 'activity updates must reach the observed row component');
+const activityUI=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxActivityRow.ets','utf8');
+assert.match(activityUI,/@Prop\s+item:\s*PinmonyInboxItem/,'same-id activity rows receive changed props without recreating their avatar');
 console.log('Inbox freshness: same-id preview/read/avatar/language invalidation, single-flight visible revalidation and failed refresh retention passed');
 const badge=fixture();await start(badge);assert.equal(badge.store.inboxMessagesUnread,true);
 async function badgeRefresh(data){const p=badge.reader.refresh();const jobs=badge.requests.slice(-2);jobs[0].resolve(data);jobs[1].resolve(body('v3_user_contacts_suggestion',[]));await p;}

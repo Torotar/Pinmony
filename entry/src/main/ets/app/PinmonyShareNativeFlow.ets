@@ -137,11 +137,11 @@ export class PinmonyShareNativeFlow {
     private contacts(): void { this.store.shareContacts = this.users.map((u: User): ShareSheetOption => ({ username:/^[A-Za-z0-9_]+$/.test(u.username || '') ? u.username : undefined, avatarColorIndex: Number.isInteger(u.avatar_color_index) && u.avatar_color_index! >= 1 && u.avatar_color_index! <= 10 ? u.avatar_color_index : undefined, id: 'native-contact:' + u.id, label: ((u.full_name || u.label || u.username || '') + (u.username ? ' @' + u.username : '')).slice(0, 300), icon: /^https:\/\//.test(u.send_pin_image || u.image_medium_url || u.image || '') ? (u.send_pin_image || u.image_medium_url || u.image || '').slice(0, 4096) : '', enabled: !this.busy && !this.unknown.has(this.key(u.id)) && !this.sent.has(u.id) })); if (this.users.some((u: User): boolean => this.unknown.has(this.key(u.id))))
         this.store.shareError = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238"); }
     // Cancelling a transport cannot prove that an already sent mutation was undone.
-    pause(): void { if (this.busy && this.pending) {
+    pause(preservePresentation: boolean = false): void { if (this.busy && this.pending) {
         this.unknown.add(this.pending);
-        this.store.shareFeedback = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238");
-    } this.busy = false; this.pending = ''; this.contacts(); this.revision++; this.searchRevision++; if (this.timer >= 0)
-        clearTimeout(this.timer); this.timer = -1; this.client.cancel(); this.contactsClient.cancel(); if (this.store.shareLoading || PinmonyI18n.isText(this.store.shareFeedback, '正在加载联系人…')) {
+        if (!preservePresentation) this.store.shareFeedback = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238");
+    } this.busy = false; this.pending = ''; if (!preservePresentation) this.contacts(); this.revision++; this.searchRevision++; if (this.timer >= 0)
+        clearTimeout(this.timer); this.timer = -1; this.client.cancel(); this.contactsClient.cancel(); if (!preservePresentation && (this.store.shareLoading || PinmonyI18n.isText(this.store.shareFeedback, '正在加载联系人…'))) {
         this.store.shareLoading = false;
         this.store.shareFeedback = '';
         this.store.shareError = PinmonyI18n.message("pm_share_loading_paused_please_retry_1a0f4d77");

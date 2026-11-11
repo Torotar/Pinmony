@@ -1,6 +1,20 @@
+import { uiMaterial } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 
 export class PinmonyImmersiveLight {
+  public static alertOptions(options: AlertDialogParamWithButtons): AlertDialogParamWithButtons {
+    if (deviceInfo.apiAvailable('26.0.0')) {
+      const mode: string = AppStorage.get<string>('immersiveLightMode') ?? 'immersive';
+      options.systemMaterial = mode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
+        new uiMaterial.ImmersiveMaterial({
+          style: mode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
+          colorInvert: false, applyShadow: true
+        }) : uiMaterial.Material.empty;
+    }
+    return options;
+  }
+
   public static effect(mode: string): SystemMaterialParams | undefined {
     if (mode === 'off') return undefined;
     let materialType: hdsMaterial.MaterialType = hdsMaterial.MaterialType.ADAPTIVE;

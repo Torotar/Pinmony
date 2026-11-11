@@ -21,12 +21,15 @@ const close = vm.runInNewContext(ts.transpileModule('(function(){' + source.slic
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText);
 for (const stale of [false, true]) {
+  let cleaned = 0;
   const navigated = [], state = { showNativeSheet: false, activeSheetKind: 'searchFilter',
+    searchController: { finishSearchFiltersClose: () => cleaned++ },
     pendingSearchFilterTarget: page + '&rs=filter', pendingSearchFilterSource: page,
     authStatus: 'authenticated', activeTab: 1, pinStore: {}, currentSearchPageKey: () => stale ? 'other' : page,
     searchNativeReads: { navigate: p => navigated.push(p) } };
   close.call(state); close.call(state);
   assert.equal(state.activeSheetKind, ''); assert.equal(state.pendingSearchFilterTarget, '');
   assert.equal(navigated.length, stale ? 0 : 1);
+  assert.equal(cleaned, 1, 'presentation cleanup executes once after disappearance');
 }
 console.log('Pin return resumes native search; filter navigation waits for Sheet disappearance and rejects stale routes');
