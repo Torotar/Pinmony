@@ -250,7 +250,8 @@ export struct PinmonySettingsPage {
     } else if (this.store.screen === 'about') {
       PinmonyAboutPage({ onBack: this.onBack, onOpenExternalLink: this.onOpenExternalLink })
     } else if (this.store.screen.startsWith('social')) {
-      PinmonySocialPermissionsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
+      PinmonySocialPermissionsPage({ store: this.store, routeScreen: screen, active: screen === this.store.screen,
+        onRequest: this.onRequest, onBack: this.onBack })
     } else if (this.store.screen === 'notifications') {
       PinmonyNotificationsPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack, onRetry: () => { if (this.onRequest) this.onRequest('notifications', ''); } })
     } else if (['display', 'theme', 'recommend', 'visibility'].includes(this.store.screen)) {
@@ -258,6 +259,17 @@ export struct PinmonySettingsPage {
     } else if (this.store.screen !== 'root') {
       PinmonyAccountPage({ store: this.store, retainedAccount: screen === 'account' && this.store.screen === 'personal', onRequest: this.onRequest, onBack: this.onBack })
     }
+  }
+
+  private settingsPageScreens(): string[] {
+    if (this.store.screen === 'root') return [];
+    if (this.store.screen === 'personal') return ['account', 'personal'];
+    if (this.store.screen === 'social') return ['social'];
+    if (['socialFriends', 'socialFollowers', 'socialFollowing', 'socialOthers'].includes(this.store.screen)) {
+      return ['social', 'socialMessages', this.store.screen];
+    }
+    if (this.store.screen.startsWith('social')) return ['social', this.store.screen];
+    return [this.store.screen];
   }
 
   build() {
@@ -271,10 +283,10 @@ export struct PinmonySettingsPage {
     .backgroundColor($r('app.color.page_background'))
     .hitTestBehavior(this.store.screen === 'root' ? HitTestMode.Default : HitTestMode.None)
     .accessibilityLevel(this.store.screen === 'root' ? 'auto' : 'no-hide-descendants')
-    ForEach(this.store.screen === 'root' ? [] : this.store.screen === 'personal' ? ['account', 'personal'] : [this.store.screen.startsWith('social') ? 'social' : this.store.screen], (_screen: string) => {
+    ForEach(this.settingsPageScreens(), (_screen: string) => {
       Column() { this.settingsSubpage(_screen) }.width('100%').height('100%')
-        .hitTestBehavior(_screen === 'account' && this.store.screen === 'personal' ? HitTestMode.None : HitTestMode.Default)
-        .accessibilityLevel(_screen === 'account' && this.store.screen === 'personal' ? 'no-hide-descendants' : 'auto')
+        .hitTestBehavior(_screen !== this.store.screen ? HitTestMode.None : HitTestMode.Default)
+        .accessibilityLevel(_screen !== this.store.screen ? 'no-hide-descendants' : 'auto')
         .backgroundColor($r('app.color.page_background'))
         .transition(TransitionEffect.asymmetric(
           TransitionEffect.translate({x:'100%'}).animation({duration:180,curve:Curve.EaseOut}),

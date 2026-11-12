@@ -15,6 +15,8 @@ export struct PinmonySocialPermissionsPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') @Watch('syncErrorSnack') private uiLanguage: string = 'zh';
   @ObjectLink @Watch('syncErrorSnack') store: PinmonySettingsStore;
+  @Prop routeScreen: string = '';
+  @Prop @Watch('syncErrorSnack') active: boolean = true;
   onBack?: () => void;
   onRequest?: (action: string, value: string) => void;
   @State private query: string = '';
@@ -31,7 +33,7 @@ export struct PinmonySocialPermissionsPage {
   private errorSnackKey: string = '';
   private dismissErrorSnack(): void { this.errorSnack?.dismiss(); this.errorSnackKey = ''; }
   private syncErrorSnack(): void {
-    if (!this.visible || !this.store.error || this.store.busy || this.store.loading || this.confirming) {
+    if (!this.visible || this.active === false || !this.store.error || this.store.busy || this.store.loading || this.confirming) {
       this.dismissErrorSnack(); return;
     }
     const key: string = this.store.screen + ':' + this.store.token + ':' + this.store.error + ':' + this.uiLanguage;
@@ -44,23 +46,24 @@ export struct PinmonySocialPermissionsPage {
         content: this.uiText(this.store.writeUncertain || PinmonyI18n.isUnconfirmed(this.store.error) ? 'pm_reload_df7392cc' : 'pm_retry_b8784c8d'),
         contentAccessibilityText: this.uiText('pm_reload_current_settings_d2b82d8a'),
         onContentClick: () => {
-          if (!this.visible || key !== this.errorSnackKey || this.store.busy || this.store.loading || this.confirming) return;
+          if (!this.visible || this.active === false || key !== this.errorSnackKey || this.store.busy || this.store.loading || this.confirming) return;
           this.dismissErrorSnack();
           if (this.onRequest) this.onRequest(this.store.screen === 'socialBlocked' ? 'socialBlocked' : 'socialRead', '');
         }
       }, { backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK, blurStrategy: BlurStrategy.ENABLE, duration: 4000, pressBackCallback: () => {
-        if (!this.visible || key !== this.errorSnackKey) return;
+        if (!this.visible || this.active === false || key !== this.errorSnackKey) return;
         this.dismissErrorSnack(); if (this.onBack) this.onBack();
       } });
   }
   private uiText(key: string): string { return PinmonyI18n.text(key, this.uiLanguage); }
+  private pageScreen(): string { return this.routeScreen || this.store.screen; }
   private messageTabLabel(id: number): string {
     return this.uiText(id === -1 ? 'pm_social_business_tab' : id === 0 ? 'pm_social_friends' : id === 1 ? 'pm_social_followers' : id === 2 ? 'pm_social_following' : 'pm_social_others_short');
   }
   private messageTabIds(): number[] { return this.store.social.business ? [-1,0,1,2,4] : [0,1,2,4]; }
   aboutToAppear(): void { this.visible = true; this.myPhraseDraftActive = false; this.otherPhraseDraftActive = false; this.stack.pushPath({ name: 'social' }, false); this.syncErrorSnack(); }
   aboutToDisappear(): void { this.visible = false; this.confirming = false; this.myPhraseDraftActive = false; this.otherPhraseDraftActive = false; this.dismissErrorSnack(); }
-  private available(): boolean { return this.visible && !this.store.busy && !this.store.loading && !this.store.writeUncertain && !this.confirming; }
+  private available(): boolean { return this.visible && this.active !== false && !this.store.busy && !this.store.loading && !this.store.writeUncertain && !this.confirming; }
   private phraseServerValue(mine: boolean): string {
     const phrases: string[] = mine ? this.store.social.myCommentFilterPhrases || [] : this.store.social.otherCommentFilterPhrases || [];
     return phrases.join(', ');
@@ -126,18 +129,19 @@ export struct PinmonySocialPermissionsPage {
   private title(): string {
     const screens: string[] = ['socialComments','social','socialMessages','socialBlocked','socialMentions','socialFriends','socialFollowers','socialFollowing','socialOthers'];
     const titles: string[] = ['pm_social_comments_title','pm_social_title','pm_social_messages','pm_social_blocked','pm_social_mentions','pm_social_friends','pm_social_followers','pm_social_following',this.store.social.personal ? 'pm_social_others_short' : 'pm_social_others'];
-    return this.uiText(titles[screens.indexOf(this.store.screen)] || 'pm_social_title');
+    return this.uiText(titles[screens.indexOf(this.pageScreen())] || 'pm_social_title');
   }
   private open(screen: string): void {
-    if (!this.visible || this.store.busy || this.store.loading || this.confirming) return;
+    if (!this.visible || this.active === false || this.store.busy || this.store.loading || this.confirming) return;
     if (screen === 'socialMessages' && this.store.social.business) this.store.socialMessageGroup = -1;
-    this.store.token++; this.store.screen = screen; this.store.error = '';
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, (): void => {
+      this.store.token++; this.store.screen = screen; this.store.error = '';
+    });
     if (this.onRequest) this.onRequest(screen === 'socialBlocked' ? 'socialBlocked' : 'socialRead','');
-    this.scroller.scrollTo({ xOffset: 0, yOffset: 0 });
   }
-  private groupId(): number { return this.store.screen === 'socialMessages' && (this.store.social.personal || this.store.social.business) ? this.store.socialMessageGroup : this.store.screen === 'socialFriends' ? 0 : this.store.screen === 'socialFollowers' ? 1 : this.store.screen === 'socialFollowing' ? 2 : 4; }
+  private groupId(): number { return this.pageScreen() === 'socialMessages' && (this.store.social.personal || this.store.social.business) ? this.store.socialMessageGroup : this.pageScreen() === 'socialFriends' ? 0 : this.pageScreen() === 'socialFollowers' ? 1 : this.pageScreen() === 'socialFollowing' ? 2 : 4; }
   private selectMessageTab(index: number): void {
-    if (!this.visible || this.store.screen !== 'socialMessages' || !(this.store.social.personal || this.store.social.business) || this.store.busy || this.store.loading || this.confirming || !Number.isInteger(index) || index < 0 || index >= this.messageTabIds().length) return;
+    if (!this.visible || this.active === false || this.store.screen !== 'socialMessages' || !(this.store.social.personal || this.store.social.business) || this.store.busy || this.store.loading || this.confirming || !Number.isInteger(index) || index < 0 || index >= this.messageTabIds().length) return;
     this.store.socialMessageGroup = this.messageTabIds()[index];
   }
   private swipeMessageTab(offsetX: number, offsetY: number): void {
@@ -149,8 +153,8 @@ export struct PinmonySocialPermissionsPage {
   private group(id: number): SocialMessageGroup | undefined { return this.store.social.groups.find((g: SocialMessageGroup): boolean => g.id === id); }
   private levelLabel(level: number): string { return this.uiText(level === 0 ? 'pm_social_direct' : level === 1 ? 'pm_social_requests' : 'pm_social_ignore'); }
   private selectionKey(level: number): string {
-    const selected: number = this.store.screen === 'socialMentions' ? this.store.social.mentions ?? -1 : this.group(this.groupId())?.selected ?? -1;
-    return this.store.screen + ':' + this.groupId() + ':' + level + ':' + this.store.token + ':' + selected + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain + ':' + this.store.social.ready + ':' + this.store.social.protected + ':' + this.store.social.myCommentFilterEnabled + ':' + this.store.social.otherCommentFilterEnabled + ':' + (this.store.social.myCommentFilterPhrases || []).join(',') + ':' + (this.store.social.otherCommentFilterPhrases || []).join(',') + ':' + this.uiLanguage;
+    const selected: number = this.pageScreen() === 'socialMentions' ? this.store.social.mentions ?? -1 : this.group(this.groupId())?.selected ?? -1;
+    return this.pageScreen() + ':' + this.groupId() + ':' + level + ':' + this.store.token + ':' + selected + ':' + this.store.busy + ':' + this.store.loading + ':' + this.store.writeUncertain + ':' + this.store.social.ready + ':' + this.store.social.protected + ':' + this.store.social.myCommentFilterEnabled + ':' + this.store.social.otherCommentFilterEnabled + ':' + (this.store.social.myCommentFilterPhrases || []).join(',') + ':' + (this.store.social.otherCommentFilterPhrases || []).join(',') + ':' + this.uiLanguage;
   }
   private choose(level: number): void {
     if (this.suppressSwipeClick || !this.available() || !this.store.social.ready || this.store.social.protected || !this.onRequest) return;
@@ -192,7 +196,7 @@ export struct PinmonySocialPermissionsPage {
   private selection(label: string, value: number, selected: number, messageOption: boolean = false) {
     Row() {
       Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(20).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text')).layoutWeight(1)
-      Radio({ value: String(value), group: this.store.screen + ':' + this.groupId() }).checked(selected === value)
+      Radio({ value: String(value), group: this.pageScreen() + ':' + this.groupId() }).checked(selected === value)
         .radioStyle({ checkedBackgroundColor: $r('app.color.accent'), indicatorColor: Color.White })
         .enabled(this.available() && this.store.social.ready && !this.store.social.protected)
         .accessibilityText(label).onChange((checked: boolean) => { if (checked) this.choose(value); })
@@ -284,20 +288,20 @@ export struct PinmonySocialPermissionsPage {
   }
   @Builder
   private body() {
-    if (this.store.screen === 'social') {
+    if (this.pageScreen() === 'social') {
       Text(this.uiText('pm_social_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
       this.link('pm_social_message_settings',this.uiText('pm_social_message_settings_detail'),'socialMessages')
       this.link('pm_social_blocked',this.uiText('pm_social_blocked_detail'),'socialBlocked')
       this.link('pm_social_mentions',this.uiText('pm_social_mentions_detail'),'socialMentions')
       this.link('pm_social_comments_title',this.uiText('pm_social_comments_entry_detail'),'socialComments',true)
       this.shoppingAndDownloads()
-    } else if (this.store.screen === 'socialComments') {
+    } else if (this.pageScreen() === 'socialComments') {
       if (this.store.social.ready) {
         this.socialToggle('socialComments', this.store.social.commentsEnabled)
         this.socialToggle('mine', this.store.social.myCommentFilterEnabled, this.store.social.commentsEnabled !== true)
         this.socialToggle('others', this.store.social.otherCommentFilterEnabled)
       }
-    } else if (this.store.screen === 'socialMessages') {
+    } else if (this.pageScreen() === 'socialMessages') {
       if (this.store.social.ready && this.store.social.business) {
       Text(this.uiText('pm_social_business_messages')).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
       Text(this.uiText('pm_social_business_detail')).fontSize(16).fontColor($r('app.color.secondary_text'))
@@ -309,7 +313,7 @@ export struct PinmonySocialPermissionsPage {
         this.link('pm_social_following','', 'socialFollowing')
         this.link(this.store.social.personal ? 'pm_social_others_short' : 'pm_social_others','', 'socialOthers')
       }.width('100%')
-    } else if (this.store.screen === 'socialBlocked') {
+    } else if (this.pageScreen() === 'socialBlocked') {
       Text(this.uiText('pm_social_blocked_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
       if (this.store.social.blocked.length) {
         Search({ value: this.query, placeholder: this.uiText('pm_social_search') }).onChange((value: string) => { this.query = value; }).width('100%')
@@ -323,7 +327,7 @@ export struct PinmonySocialPermissionsPage {
         if (!this.blocked().length) { Text(this.uiText('pm_social_no_matches')).fontColor($r('app.color.secondary_text')) }
       } else if (this.store.social.blockedReady && this.store.social.blockedComplete && !this.store.loading && !this.store.error) { Text(this.uiText('pm_social_no_blocked')).width('100%').textAlign(TextAlign.Center).fontColor($r('app.color.secondary_text')).margin({ top:100 }) }
       if (this.store.social.blockedReady && !this.store.social.blockedComplete) { Text(this.uiText('pm_social_blocked_partial')).fontSize(14).fontColor($r('app.color.secondary_text')) }
-    } else if (this.store.screen === 'socialMentions') {
+    } else if (this.pageScreen() === 'socialMentions') {
       Text(this.uiText('pm_social_mentions_detail')).fontSize(16).fontColor($r('app.color.primary_text'))
       Column({ space: 4 }) {
         ForEach([0,1,2], (level: number) => { this.selection(this.uiText(level === 0 ? 'pm_social_mentions_anyone' : level === 1 ? 'pm_social_mentions_following' : 'pm_social_mentions_off'),level,this.store.social.mentions === undefined ? -1 : this.store.social.mentions) }, (level: number): string => this.selectionKey(level))
@@ -336,9 +340,8 @@ export struct PinmonySocialPermissionsPage {
   private destination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
-        ForEach([this.store.screen], (_screen: string) => {
         Column() {
-        if (this.store.screen === 'socialMessages' && (this.store.social.personal || this.store.social.business)) {
+        if (this.pageScreen() === 'socialMessages' && (this.store.social.personal || this.store.social.business)) {
           this.messageTabs()
         } else {
         Scroll(this.scroller) {
@@ -350,15 +353,13 @@ export struct PinmonySocialPermissionsPage {
         }
         }.width('100%').height('100%')
           .opacity(this.store.loading ? 0.4 : 1).enabled(!this.store.loading)
-          .transition(this.store.screen === 'social' ? TransitionEffect.IDENTITY : TransitionEffect.asymmetric(
-            TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
-            TransitionEffect.IDENTITY))
-        }, (screen: string): string => screen)
-        if (this.store.loading || this.store.busy) {
-          if (this.store.busy) {
-            PinmonyLoadingOverlay({ showMessage: false })
-          } else {
-            LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        if (this.active !== false) {
+          if (this.store.loading || this.store.busy) {
+            if (this.store.busy) {
+              PinmonyLoadingOverlay({ showMessage: false })
+            } else {
+              LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+            }
           }
         }
       }.width('100%').height('100%')
@@ -366,10 +367,10 @@ export struct PinmonySocialPermissionsPage {
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
-      content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } } } }, this.hdsDarkMode))
+      content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: true, action: () => { if (this.active !== false && this.onBack) this.onBack(); } } } }, this.hdsDarkMode))
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
-      .onBackPressed(() => { if (this.onBack) this.onBack(); return true; })
+      .onBackPressed(() => { if (this.active === false) return false; if (this.onBack) this.onBack(); return true; })
       .backgroundColor($r('app.color.page_background'))
   }
   build() {

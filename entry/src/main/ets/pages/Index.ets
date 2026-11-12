@@ -7300,6 +7300,12 @@ struct Index {
     if (Date.now() < this.nativeChildBackUntil) return;
     try {
     this.nativeChildBackUntil = Date.now() + 220;
+    if (this.settingsStore.screen.startsWith('social')) {
+      this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseIn }, (): void => {
+        if (this.settingsStore.back() && !this.settingsStore.busy) this.cancelAccountSettings();
+      });
+      return;
+    }
     if (this.settingsStore.back()) { if (!this.settingsStore.busy) this.cancelAccountSettings(); return; }
     const recoveredFromProfile: boolean = this.settingsStore.boardRecoveryFromProfile && this.settingsStore.recoverableBoards.some((board): boolean => board.restored);
     this.cancelAccountSettings(); this.settingsStore.reset(true);
