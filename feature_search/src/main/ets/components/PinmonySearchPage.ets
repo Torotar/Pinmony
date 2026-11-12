@@ -1,3 +1,5 @@
+import { PinmonySearchCategoryBar, PinmonySearchCategoryBarController } from './PinmonySearchCategoryBar';
+import { PinmonySearchImagePrefetch } from '../services/PinmonySearchImagePrefetch';
 import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar, PinmonyUiCommitQueue } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -30,6 +32,12 @@ interface PinmonySearchResultRow {
 
 @Component
 export struct PinmonySearchPage {
+  @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
+  private applyRecoveredPosition(): void {
+    if (AppStorage.get<string>('pinmonyRecoveryScrollKind') !== 'search' || AppStorage.get<string>('pinmonyRecoveryScrollPage') !== this.snapshot.pageKey) return;
+    this.initialResultsScrollOffset = AppStorage.get<number>('pinmonyRecoveryScrollOffset') || 0;
+    this.restoreResultsScroll();
+  }
   @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
@@ -271,11 +279,11 @@ export struct PinmonySearchPage {
   @Prop @Watch('activeChanged') active: boolean = true;
   @Prop @Watch('activeChanged') detailReturnPreview: boolean = false;
   @Prop @Watch('activeChanged') retainPhotoSearch: boolean = false;
-  @Prop automaticLoadingEnabled: boolean = true;
+  @Prop @Watch('syncImagePrefetchActivity') automaticLoadingEnabled: boolean = true;
   @Prop @Watch('onSnapshotChanged') snapshot: PinmonySearchSnapshot = {} as PinmonySearchSnapshot;
   @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
   @StorageProp('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
-  @Prop mediaActive: boolean = false;
+  @Prop @Watch('syncImagePrefetchActivity') mediaActive: boolean = false;
   @Prop loading: boolean = false;
   @Prop refreshing: boolean = false;
   onRefresh?: () => void;
@@ -287,7 +295,7 @@ export struct PinmonySearchPage {
   @Prop historyActionsReady: boolean = false;
   @Prop initialResultsScrollOffset: number = 0;
   @State private query: string = '';
-  @State private quizSheetOpen: boolean = false;
+  @State @Watch('syncImagePrefetchActivity') private quizSheetOpen: boolean = false;
   @State private quizClosingKey: string = '';
   private quizCloseDispatched: boolean = false;
   @Prop @Watch('quizBackRequested') quizCloseRequest: number = 0;
@@ -295,11 +303,33 @@ export struct PinmonySearchPage {
   @State private entryQuiz: PinmonySearchQuiz | undefined = undefined;
   private readonly flowSections: WaterFlowSections = new WaterFlowSections();
   private flowShape: string = '';
-  @State private contentWidth: number = 360;
+  @State @Watch('imageBudgetWidthChanged') private contentWidth: number = 360;
+  private imageBudgetWidthChanged(): void {
+    if (this.imagePrefetchFirst >= 0) this.updateResultImagePrefetch(this.imagePrefetchFirst, this.imagePrefetchLast);
+  }
+  private cachedImageCount(): number { return Math.min(48, this.contentColumns() * 6); }
+  private imagePrefetchCount(): number { return Math.min(24, this.contentColumns() * 4); }
+  private imagePrefetchFirst: number = -1;
+  private imagePrefetchLast: number = -1;
   @State private viewportWidth: number = 360;
   @State private viewportHeight: number = 800;
   @State private failedImages: string[] = [];
-  @State private upcomingImageUrls: string[] = [];
+  private upcomingImageUrls: string[] = [];
+  private readonly imagePrefetch: PinmonySearchImagePrefetch = new PinmonySearchImagePrefetch();
+  private syncImagePrefetchActivity(): void {
+    const active: boolean = this.pagePresent && this.active && this.mediaActive &&
+      this.automaticLoadingEnabled && !this.quizSheetOpen;
+    if (!active) this.imagePrefetch?.setActive(false);
+    // Trim a retained wide-window budget before resuming paused leases.
+    if (this.pagePresent && this.imagePrefetchFirst >= 0) {
+      this.updateResultImagePrefetch(this.imagePrefetchFirst, this.imagePrefetchLast);
+    }
+    if (active) {
+      // Scroll restoration can defer range selection, but cannot restore excess leases.
+      if (this.imagePrefetchFirst >= 0) this.imagePrefetch.update(this.upcomingImageUrls, this.imagePrefetchCount());
+      this.imagePrefetch?.setActive(true);
+    }
+  }
   private lastPrefetchResultCount: number = -1;
   private lastPrefetchDiscoveryCount: number = -1;
   private discoveryContentHeight: number = 0;
@@ -312,16 +342,22 @@ export struct PinmonySearchPage {
   private currentHeroId: string = '';
   onHeroPosition?: (pageKey: string, id: string) => void;
   private readonly inputController: SearchController = new SearchController();
+  private readonly displayInputController: SearchController = new SearchController();
   private readonly searchPathStack: NavPathStack = new NavPathStack();
   private pagePresent: boolean = false;
   private presentationTrace: string = '';
 
   private ensureSearchDestination(): void {
     if (!this.pagePresent || !this.active && !this.detailReturnPreview) return;
-    if (this.searchPathStack.size() === 0) this.searchPathStack.pushPath({ name: 'pin-web-search' }, false);
+    if (this.searchPathStack.size() === 0) {
+      this.historyDestinationRetained = this.inputEditing;
+      this.searchPathStack.pushPath({ name: 'pin-web-search' }, false);
+      if (this.inputEditing) this.searchPathStack.pushPath({ name: 'search-history' }, false);
+    }
   }
 
   private activeChanged(): void {
+    this.syncImagePrefetchActivity();
     if (!this.active) this.heroTransitionIndex = -1;
     this.uiCommits.post('photo-visibility', (): void => {
       if (this.pagePresent && !this.active && !this.retainPhotoSearch) this.closePhotoSearch();
@@ -351,6 +387,7 @@ export struct PinmonySearchPage {
   private readonly swiperController: SwiperController = new SwiperController();
   private readonly discoveryScroller: Scroller = new Scroller();
   private readonly resultsScroller: Scroller = new Scroller();
+  private readonly historyScroller: Scroller = new Scroller();
   private restoringResultsScroll: boolean = false;
   private scrollRestoreRevision: number = 0;
   private resultsOffset: number = 0;
@@ -358,22 +395,34 @@ export struct PinmonySearchPage {
   private activePage: string = '';
   private lastSnapshotQuery: string = '';
   @State private inputEditing: boolean = false;
+  @State private historyBodyDestination: string = '';
+  @State private historyDestinationRetained: boolean = false;
+  @State private historyDestinationClosing: boolean = false;
+  @State private retainedDiscovery: PinmonySearchSnapshot | undefined = undefined;
+  private historyRootReturnPending: boolean = false;
+  private historyClosePage: string = '';
+  private historyCloseSession: number = 0;
   private pendingInputFocus: boolean = false;
   private inputFocusRevision: number = 0;
-  @State private historyExitToRoot: boolean = false;
+  private scheduledInputFocusRevision: number = -1;
   @State private discoveryResultTransition: boolean = false;
-  @State private historyRetained: boolean = false;
-  @State private categoriesCollapsed: boolean = false;
+  private categoriesCollapsed: boolean = false;
+  private readonly categoryBarController: PinmonySearchCategoryBarController = new PinmonySearchCategoryBarController();
+  private readonly categoriesTitleBuilder: () => void = (): void => { this.searchCategoriesTitleBar(); };
+  private readonly emptyCategoriesTitleBuilder: () => void = (): void => {};
   @State private searchHeaderScrolled: boolean = false;
 
   private updateSearchHeaderSurface(offset: number): void {
     const scrolled: boolean = Number.isFinite(offset) && offset > 1;
     if (scrolled === this.searchHeaderScrolled) return;
-    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-      this.searchHeaderScrolled = scrolled;
-    });
+    this.searchHeaderScrolled = scrolled;
   }
   private categoryScrollDistance: number = 0;
+
+  private setCategoriesCollapsed(collapsed: boolean): void {
+    this.categoriesCollapsed = collapsed;
+    this.categoryBarController.setCollapsed(collapsed);
+  }
 
   private updateCategoriesOnScroll(offset: number, state: ScrollState): void {
     if (!this.active || this.inputEditing || this.restoringResultsScroll || this.refreshing ||
@@ -383,9 +432,7 @@ export struct PinmonySearchPage {
     if (position.yOffset <= 1) {
       this.categoryScrollDistance = 0;
       if (this.categoriesCollapsed) {
-        this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-          this.categoriesCollapsed = false;
-        });
+        this.setCategoriesCollapsed(false);
       }
       return;
     }
@@ -396,9 +443,7 @@ export struct PinmonySearchPage {
     const collapsed: boolean = this.categoryScrollDistance > 0;
     this.categoryScrollDistance = 0;
     if (collapsed === this.categoriesCollapsed) return;
-    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-      this.categoriesCollapsed = collapsed;
-    });
+    this.setCategoriesCollapsed(collapsed);
   }
   private initialFillCount: number = 0;
   private initialFillScheduled: boolean = false;
@@ -407,7 +452,7 @@ export struct PinmonySearchPage {
   private fillGeneration: number = 0;
   onQueryChange?: (value: string, refreshSuggestions?: boolean) => void;
   onSubmit?: (value: string) => void;
-  onInputFocusChange?: (focused: boolean, stopEditing: () => void) => void;
+  onInputFocusChange?: (focused: boolean, stopEditing: (deferRootReturn?: boolean) => boolean) => void;
   onHistoryReturnReady?: (openHistory?: () => void) => void;
   onCategory?: (id: string) => void;
   onSuggestion?: (id: string) => void;
@@ -430,9 +475,11 @@ export struct PinmonySearchPage {
   aboutToAppear(): void {
     this.uiCommits.activate();
     if (this.onHistoryReturnReady) this.onHistoryReturnReady(() => this.openSearchHistory());
+    this.rememberDiscoverySnapshot();
     this.restoreHeroPosition();
     this.restoringResultsScroll = this.initialResultsScrollOffset > 0;
     this.pagePresent = true;
+    this.syncImagePrefetchActivity();
     this.ensureSearchDestination();
     this.activeSession = this.snapshot.session;
     this.activePage = this.snapshot.pageKey;
@@ -458,6 +505,7 @@ export struct PinmonySearchPage {
         console.warn('Pinmony: search scroll restoration unavailable');
       }
       this.restoringResultsScroll = false;
+      this.imageBudgetWidthChanged();
     }, 0);
   }
 
@@ -478,27 +526,42 @@ export struct PinmonySearchPage {
   }
 
   aboutToDisappear(): void {
+    this.imagePrefetch.clear();
+    this.upcomingImageUrls = [];
+    this.imagePrefetchFirst = -1;
+    this.imagePrefetchLast = -1;
     this.uiCommits.dispose();
     this.closePhotoSearch();
     if (this.onHistoryReturnReady) this.onHistoryReturnReady(undefined);
     this.pagePresent = false;
+    this.historyRootReturnPending = false;
     this.scrollRestoreRevision++;
     this.pendingInputFocus = false; this.inputFocusRevision++;
     this.fillGeneration++;
     this.resultsViewportReady = false;
     this.initialFillScheduled = false;
     this.searchPathStack.clear();
+    this.retainedDiscovery = undefined;
   }
 
   private onSnapshotChanged(): void {
+    this.rememberDiscoverySnapshot();
     this.ensureSearchDestination();
     this.tracePresentation();
     if (this.activeSession !== this.snapshot.session || this.activePage !== this.snapshot.pageKey) {
+      if (this.historyDestinationClosing) {
+        this.historyRootReturnPending = false;
+        this.closeInputPanel(false);
+      }
+      this.imagePrefetch?.clear();
+      this.imagePrefetchFirst = -1;
+      this.imagePrefetchLast = -1;
+      this.upcomingImageUrls = [];
       const changedPage: boolean = this.activePage !== this.snapshot.pageKey;
       this.activeSession = this.snapshot.session;
       this.activePage = this.snapshot.pageKey;
       this.lastPrefetchDiscoveryCount = -1;
-      this.categoriesCollapsed = false;
+      this.setCategoriesCollapsed(false);
       this.categoryScrollDistance = 0;
       if (changedPage) {
         // The replacement scroll starts at zero before its saved offset is applied.
@@ -509,12 +572,16 @@ export struct PinmonySearchPage {
         this.closePhotoSearch();
         // A committed route replaces the editing intent, even while HDS stays mounted.
         if (this.inputEditing) this.closeInputPanel(false);
+        if (!this.committedQuery()) {
+          this.closeSearchHistoryDestination(false);
+          this.historyBodyDestination = '';
+          this.historyDestinationRetained = false;
+        }
         this.upcomingImageUrls = [];
         this.lastPrefetchResultCount = -1;
         this.entryQuiz = undefined;
         this.failedImages = [];
-        this.currentHeroIndex = 0;
-        this.currentHeroId = '';
+        // Discovery carousel identity belongs to the retained landing page.
       }
       this.initialFillCount = 0;
       this.fillGeneration++;
@@ -525,9 +592,9 @@ export struct PinmonySearchPage {
     const nextQuery: string = this.snapshot.query || '';
     if (nextQuery !== this.lastSnapshotQuery) {
       this.lastSnapshotQuery = nextQuery;
-      if (!this.inputEditing) this.query = this.committedQuery();
     }
-    if (this.currentHeroIndex >= this.snapshot.heroes.length) this.currentHeroIndex = 0;
+    if (!this.inputEditing) this.query = this.committedQuery();
+    if (this.currentHeroIndex >= this.discoverySnapshot().heroes.length) this.currentHeroIndex = 0;
     this.restoreHeroPosition();
     this.syncQuizPresentation();
     this.fillInitialViewport();
@@ -655,13 +722,25 @@ export struct PinmonySearchPage {
     this.onLoadMore();
   }
 
-  private resultsVisible(first: number, last: number): void {
+  private updateResultImagePrefetch(first: number, last: number): void {
+    if (!this.pagePresent || first < 0 || last < first) return;
     if (!this.automaticLoadingEnabled || !this.committedQuery() || !(this.actionsReady || this.resultsReadsReady) || this.restoringResultsScroll) return;
+    this.imagePrefetchFirst = first;
+    this.imagePrefetchLast = last;
     const cardLast: number = Math.max(0, last - (this.entryQuiz ? 1 : 0));
-    const urls: string[] = this.snapshot.results.slice(cardLast + 1, cardLast + 9)
+    const urls: string[] = this.snapshot.results.slice(cardLast + 1, cardLast + 1 + this.imagePrefetchCount())
       .filter((item: PinmonySearchResult): boolean => !!item.imageUrl && !item.video)
       .map((item: PinmonySearchResult): string => item.imageUrl);
-    if (urls.join('|') !== this.upcomingImageUrls.join('|')) this.upcomingImageUrls = urls;
+    if (urls.join('|') !== this.upcomingImageUrls.join('|')) {
+      this.upcomingImageUrls = urls;
+      this.imagePrefetch.update(urls, this.imagePrefetchCount());
+    }
+  }
+
+  private resultsVisible(first: number, last: number): void {
+    if (!this.automaticLoadingEnabled || !this.committedQuery() || !(this.actionsReady || this.resultsReadsReady) || this.restoringResultsScroll) return;
+    this.updateResultImagePrefetch(first, last);
+    const cardLast: number = Math.max(0, last - (this.entryQuiz ? 1 : 0));
     const reserve: number = Math.min(24, Math.max(8, (last - first + 1) * 2));
     if (this.loading || this.snapshot.apiBusy || this.snapshot.apiEnded || this.snapshot.apiContinuationPaused || this.snapshot.apiError ||
         !this.onLoadMore || first < 0 || last < first || this.snapshot.results.length - cardLast - 1 > reserve ||
@@ -712,14 +791,14 @@ export struct PinmonySearchPage {
 
   private discoveryRows(): number[] {
     const rows: number[] = [];
-    for (let i: number = 0; i < this.snapshot.ideaSections.length; i += this.discoveryColumns()) rows.push(i);
+    for (let i: number = 0; i < this.discoverySnapshot().ideaSections.length; i += this.discoveryColumns()) rows.push(i);
     return rows;
   }
 
   private discoveryRowKey(start: number): string {
     // A row index survives refresh, but its buttons must not retain old section closures.
     return this.discoveryColumns().toString() + ':' + start.toString() + ':' + this.uiLanguage + ':' +
-      JSON.stringify(this.snapshot.ideaSections.slice(start, start + this.discoveryColumns()));
+      JSON.stringify(this.discoverySnapshot().ideaSections.slice(start, start + this.discoveryColumns()));
   }
 
   @State private heroBackgrounds: Record<string, string> = {};
@@ -735,9 +814,9 @@ export struct PinmonySearchPage {
   private updateHeroBackground(hero: PinmonySearchHero, red: number, green: number, blue: number): void {
     const url: string = hero.imageUrl;
     if (!this.active || this.heroBackgrounds[url] ||
-        !this.snapshot.heroes.some((item: PinmonySearchHero): boolean => item.imageUrl === url)) return;
+        !this.discoverySnapshot().heroes.some((item: PinmonySearchHero): boolean => item.imageUrl === url)) return;
     const next: Record<string, string> = {};
-    this.snapshot.heroes.slice(0, 80).forEach((item: PinmonySearchHero): void => {
+    this.discoverySnapshot().heroes.slice(0, 80).forEach((item: PinmonySearchHero): void => {
       if (this.heroBackgrounds[item.imageUrl]) next[item.imageUrl] = this.heroBackgrounds[item.imageUrl];
     });
     next[url] = '#' + [red, green, blue].map((channel: number): string =>
@@ -896,7 +975,7 @@ export struct PinmonySearchPage {
     .onClick(() => {
       if (hero.enabled && this.onExploreAction) {
         this.reportResultsScroll();
-        this.selectHeroPosition(this.snapshot.heroes.findIndex((item: PinmonySearchHero): boolean => item.id === hero.id));
+        this.selectHeroPosition(this.discoverySnapshot().heroes.findIndex((item: PinmonySearchHero): boolean => item.id === hero.id));
         this.discoveryResultTransition = true;
         this.onExploreAction(hero.id, 'hero');
       }
@@ -904,47 +983,47 @@ export struct PinmonySearchPage {
   }
 
   private heroImageLoadingEnabled(hero: PinmonySearchHero): boolean {
-    if (!this.active || !this.mediaActive || this.inputEditing || !this.heroCarouselInViewport) return false;
-    const count: number = this.snapshot.heroes.length;
+    if (!this.active || !this.mediaActive || this.inputEditing || !!this.committedQuery() || !this.heroCarouselInViewport) return false;
+    const count: number = this.discoverySnapshot().heroes.length;
     if (count === 0) return false;
     const current: number = Math.max(0, Math.min(this.currentHeroIndex, count - 1));
-    return hero.id === this.snapshot.heroes[current].id ||
-      hero.id === this.snapshot.heroes[(current + count - 1) % count].id ||
-      hero.id === this.snapshot.heroes[(current + 1) % count].id ||
-      hero.id === this.snapshot.heroes[(current + 2) % count].id ||
-      hero.id === this.snapshot.heroes[this.heroTransitionIndex]?.id;
+    return hero.id === this.discoverySnapshot().heroes[current].id ||
+      hero.id === this.discoverySnapshot().heroes[(current + count - 1) % count].id ||
+      hero.id === this.discoverySnapshot().heroes[(current + 1) % count].id ||
+      hero.id === this.discoverySnapshot().heroes[(current + 2) % count].id ||
+      hero.id === this.discoverySnapshot().heroes[this.heroTransitionIndex]?.id;
   }
 
   private heroImagePriority(hero: PinmonySearchHero): number {
-    const count: number = this.snapshot.heroes.length;
+    const count: number = this.discoverySnapshot().heroes.length;
     if (count === 0) return 0;
     const current: number = Math.max(0, Math.min(this.currentHeroIndex, count - 1));
-    if (hero.id === this.snapshot.heroes[current].id || hero.id === this.snapshot.heroes[this.heroTransitionIndex]?.id) return 2;
+    if (hero.id === this.discoverySnapshot().heroes[current].id || hero.id === this.discoverySnapshot().heroes[this.heroTransitionIndex]?.id) return 2;
     // Adjacent slides warm at normal priority; the second next slide uses idle slots.
-    return hero.id === this.snapshot.heroes[(current + 1) % count].id ||
-      hero.id === this.snapshot.heroes[(current + count - 1) % count].id ? 1 : 0;
+    return hero.id === this.discoverySnapshot().heroes[(current + 1) % count].id ||
+      hero.id === this.discoverySnapshot().heroes[(current + count - 1) % count].id ? 1 : 0;
   }
 
   private restoreHeroPosition(): void {
     this.heroTransitionIndex = -1;
     const id: string = this.currentHeroId || this.initialHeroId;
-    const index: number = this.snapshot.heroes.findIndex((hero: PinmonySearchHero): boolean => hero.id === id);
-    this.currentHeroIndex = index >= 0 ? index : Math.max(0, Math.min(this.currentHeroIndex, this.snapshot.heroes.length - 1));
+    const index: number = this.discoverySnapshot().heroes.findIndex((hero: PinmonySearchHero): boolean => hero.id === id);
+    this.currentHeroIndex = index >= 0 ? index : Math.max(0, Math.min(this.currentHeroIndex, this.discoverySnapshot().heroes.length - 1));
     // Keep the identity through transient empty loading snapshots.
-    if (this.snapshot.heroes.length > 0) this.currentHeroId = this.snapshot.heroes[this.currentHeroIndex].id;
+    if (this.discoverySnapshot().heroes.length > 0) this.currentHeroId = this.discoverySnapshot().heroes[this.currentHeroIndex].id;
   }
 
   private selectHeroPosition(index: number): void {
-    if (!this.active || !Number.isInteger(index) || index < 0 || index >= this.snapshot.heroes.length) return;
+    if (!this.active || !Number.isInteger(index) || index < 0 || index >= this.discoverySnapshot().heroes.length) return;
     this.currentHeroIndex = index;
-    this.currentHeroId = this.snapshot.heroes[index].id;
-    if (this.onHeroPosition) this.onHeroPosition(this.snapshot.pageKey, this.currentHeroId);
+    this.currentHeroId = this.discoverySnapshot().heroes[index].id;
+    if (this.onHeroPosition) this.onHeroPosition(this.discoverySnapshot().pageKey, this.currentHeroId);
   }
 
   @Builder
   private heroCarousel() {
     Swiper(this.swiperController) {
-      ForEach(this.snapshot.heroes, (hero: PinmonySearchHero) => {
+      ForEach(this.discoverySnapshot().heroes, (hero: PinmonySearchHero) => {
         Column() {
           Column() { this.heroSlide(hero) }.width('100%').height(this.heroCarouselHeight())
         }.width('100%').height('100%')
@@ -958,10 +1037,10 @@ export struct PinmonySearchPage {
     .indicator(Indicator.dot().bottom(4)
       .itemWidth(7).itemHeight(7).selectedItemWidth(9).selectedItemHeight(9)
       .color($r('app.color.secondary_text')).selectedColor($r('app.color.primary_text')))
-    .autoPlay(this.active && this.mediaActive && !this.inputEditing && this.heroCarouselInViewport && this.snapshot.heroes.length > 1)
+    .autoPlay(this.active && this.mediaActive && !this.committedQuery() && !this.inputEditing && this.heroCarouselInViewport && this.discoverySnapshot().heroes.length > 1)
     .interval(4800)
     .cachedCount(2)
-    .loop(this.snapshot.heroes.length > 1)
+    .loop(this.discoverySnapshot().heroes.length > 1)
     .nestedScroll(SwiperNestedScrollMode.SELF_ONLY)
     .onVisibleAreaChange([0, 0.01], (visible: boolean, ratio: number): void => {
       this.heroCarouselInViewport = visible && ratio > 0;
@@ -969,7 +1048,7 @@ export struct PinmonySearchPage {
     .onChange((index: number) => this.selectHeroPosition(index))
     .onAnimationStart((_index: number, targetIndex: number): void => { this.heroTransitionIndex = targetIndex; })
     .onAnimationEnd((): void => { this.heroTransitionIndex = -1; })
-    .accessibilityText(this.uiText("pm_image_6fd6014d") + (this.currentHeroIndex + 1) + this.uiText("pm_of_0cad3498") + this.snapshot.heroes.length + this.uiText("pm_featured_images_0c27f683"))
+    .accessibilityText(this.uiText("pm_image_6fd6014d") + (this.currentHeroIndex + 1) + this.uiText("pm_of_0cad3498") + this.discoverySnapshot().heroes.length + this.uiText("pm_featured_images_0c27f683"))
   }
 
   @Builder
@@ -1097,7 +1176,7 @@ export struct PinmonySearchPage {
   @Builder
   private searchLoadingState() {
     Column({ space: 12 }) {
-      if (!this.searchPullIndicatorVisible()) {
+      if (!this.suppressSearchContentLoading()) {
         LoadingProgress().width(32).height(32).color($r('app.color.accent'))
         Text(this.uiText("pm_loading_search_content_41fcd6d9")).fontSize(14).fontColor($r('app.color.secondary_text'))
       }
@@ -1111,25 +1190,25 @@ export struct PinmonySearchPage {
     } else {
     Scroll(this.discoveryScroller) {
       Column({ space: 0 }) {
-        if (this.snapshot.heroes.length > 0) {
+        if (this.discoverySnapshot().heroes.length > 0) {
           this.heroCarousel()
         }
         ForEach(this.discoveryRows(), (start: number) => {
           Row() {
             ForEach(this.discoverySlots(), (slot: number) => {
               Column() {
-                if (start + slot < this.snapshot.ideaSections.length) {
-                  this.ideaSection(this.snapshot.ideaSections[start + slot])
+                if (start + slot < this.discoverySnapshot().ideaSections.length) {
+                  this.ideaSection(this.discoverySnapshot().ideaSections[start + slot])
                 }
               }.layoutWeight(1)
             }, (slot: number) => slot.toString())
           }.width('100%').alignItems(VerticalAlign.Top)
         }, (start: number) => this.discoveryRowKey(start))
-        if (this.snapshot.discoveryApi) {
+        if (this.discoverySnapshot().discoveryApi) {
           Column({ space: 10 }) {
-            if (this.snapshot.discoveryError) {
-              PinmonyActionNotice({ active: this.active && this.interactionReady, message: PinmonyI18n.render(this.snapshot.discoveryError, this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
-                  if (this.snapshot.discoveryActive) {
+            if (this.discoverySnapshot().discoveryError) {
+              PinmonyActionNotice({ active: this.active && this.interactionReady, message: PinmonyI18n.render(this.discoverySnapshot().discoveryError || '', this.uiLanguage), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
+                  if (this.discoverySnapshot().discoveryActive) {
                     if (this.onLoadMore) this.onLoadMore();
                   } else if (this.onRetry) this.onRetry();
                 } })
@@ -1137,7 +1216,7 @@ export struct PinmonySearchPage {
               Text(this.uiText('pm_no_more_ideas_35120ab6'))
                 .width('100%').textAlign(TextAlign.Center)
                 .fontSize(14).fontColor($r('app.color.secondary_text'))
-            } else if (!this.snapshot.discoveryBusy && this.snapshot.discoveryActive && this.snapshot.ideaSections.length === 0) {
+            } else if (!this.discoverySnapshot().discoveryBusy && this.discoverySnapshot().discoveryActive && this.discoverySnapshot().ideaSections.length === 0) {
               Text(this.uiText("pm_no_suggested_topics_yet_15697bb3"))
                 .fontSize(14)
                 .fontColor($r('app.color.secondary_text'))
@@ -1145,12 +1224,12 @@ export struct PinmonySearchPage {
           }
           .width('100%')
           .padding(16)
-        } else if (this.snapshot.heroes.length === 0 && this.snapshot.ideaSections.length === 0) {
+        } else if (this.discoverySnapshot().heroes.length === 0 && this.discoverySnapshot().ideaSections.length === 0) {
           this.discoveryEmpty()
         }
       }
       .width('100%')
-      .padding({ top: this.searchFeedInset() + (this.snapshot.heroes.length === 0 ? 72 : 0), bottom: 112 })
+      .padding({ top: this.searchHeaderInset() + (this.discoverySnapshot().categories.length > 0 ? 54 : 0) + (this.discoverySnapshot().heroes.length === 0 ? 72 : 0), bottom: 112 })
       .onAreaChange((_oldArea: Area, area: Area) => { this.discoveryContentHeight = Number(area.height); })
     }
     .width('100%')
@@ -1159,31 +1238,32 @@ export struct PinmonySearchPage {
     .clip(false)
     .align(Alignment.TopStart)
     .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-    .onAppear(() => this.restoreResultsScroll())
+    .onAppear(() => { if (!this.committedQuery()) this.restoreResultsScroll(); })
     .onAreaChange((_oldArea: Area, area: Area) => { this.discoveryViewportHeight = Number(area.height); })
     .onDidScroll((_xOffset: number, offset: number, state: ScrollState) => {
+          if (this.committedQuery() || this.inputEditing || !this.active) return;
           this.reportResultsScroll();
           if (offset > 0) this.discoveryPrefetch();
           if (this.onContentScroll) this.onContentScroll(offset, state);
         })
-    .onScrollStop(() => this.reportResultsScroll(true))
+    .onScrollStop(() => { if (!this.committedQuery() && !this.inputEditing && this.active) this.reportResultsScroll(true); })
     .onReachEnd(() => this.discoveryPrefetch(true))
     }
   }
 
   private discoveryEndVisible(): boolean {
-    return this.snapshot.discoveryApi === true && this.snapshot.discoveryActive === true &&
-      this.snapshot.discoveryEnded === true && !this.snapshot.discoveryBusy && !this.snapshot.discoveryError &&
-      this.snapshot.ideaSections.length > 0;
+    return this.discoverySnapshot().discoveryApi === true && this.discoverySnapshot().discoveryActive === true &&
+      this.discoverySnapshot().discoveryEnded === true && !this.discoverySnapshot().discoveryBusy && !this.discoverySnapshot().discoveryError &&
+      this.discoverySnapshot().ideaSections.length > 0;
   }
 
   private discoveryInitialLoading(): boolean {
-    if (this.discoveryReadsReady && !this.snapshot.discoveryBusy) return false;
-    if (this.snapshot.heroes.length > 0 || this.snapshot.ideaSections.length > 0 ||
-        this.error || this.snapshot.discoveryError || this.snapshot.apiError) return false;
-    return this.loading || this.snapshot.kind === 'loading' || this.snapshot.session === 0 ||
-      this.snapshot.discoveryBusy === true ||
-      (this.snapshot.discoveryApi === true && this.snapshot.discoveryActive !== true);
+    if (this.discoveryReadsReady && !this.discoverySnapshot().discoveryBusy) return false;
+    if (this.discoverySnapshot().heroes.length > 0 || this.discoverySnapshot().ideaSections.length > 0 ||
+        this.error || this.discoverySnapshot().discoveryError || this.discoverySnapshot().apiError) return false;
+    return this.loading || this.discoverySnapshot().kind === 'loading' || this.discoverySnapshot().session === 0 ||
+      this.discoverySnapshot().discoveryBusy === true ||
+      (this.discoverySnapshot().discoveryApi === true && this.discoverySnapshot().discoveryActive !== true);
   }
 
   private pinCardHeight(result: PinmonySearchResult): number {
@@ -1220,19 +1300,17 @@ export struct PinmonySearchPage {
         .justifyContent(FlexAlign.Center)
         .accessibilityText(result.title + (result.imageUrl ? this.uiText("pm_image_failed_to_load_75349c88") : this.uiText("pm_no_preview_image_c39e69a8")))
       } else {
-        Image(result.imageUrl)
+        PinmonyCdnImage({ url: result.imageUrl, fit: ImageFit.Cover,
+          loadingActive: this.active && this.mediaActive && !this.quizSheetOpen,
+          // WaterFlow already bounds mounted cache items; continue loading them offscreen.
+          viewportOnly: false, traceLoading: true,
+          onFailure: () => { this.markImageFailed(result.imageUrl); } })
           .id('pinmony-search-photo-' + result.targetUrl)
           .width('100%')
           .height(this.imageHeight(result))
-          .objectFit(ImageFit.Cover)
           .borderRadius(18)
           .clip(true)
           .accessibilityLevel('no')
-          .onError(() => {
-            if (this.failedImages.indexOf(result.imageUrl) < 0) {
-              this.failedImages = [...this.failedImages, result.imageUrl];
-            }
-          })
       }
       if (result.title && result.title !== '标题暂不可用' || result.kind === 'pin') {
       Row({ space: 4 }) {
@@ -1471,9 +1549,9 @@ export struct PinmonySearchPage {
   }
 
   @Builder
-  private searchHeader(editing: boolean) {
+  private searchHeader(editing: boolean, historyPage: boolean = false) {
     PinmonySearchHeaderMaterialScope() {
-      this.searchHeaderContent(editing)
+      this.searchHeaderContent(editing, historyPage)
     }
   }
 
@@ -1484,9 +1562,9 @@ export struct PinmonySearchPage {
   }
 
   @Builder
-  private searchHeaderContent(editing: boolean) {
+  private searchHeaderContent(editing: boolean, historyPage: boolean = false) {
     Row({ space: 8 }) {
-        if (this.searchBackVisible()) {
+        if (editing || !!this.committedQuery() && (historyPage || !this.historyDestinationRetained)) {
           Button({ type: ButtonType.Circle }) {
             Stack() {
               SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([$r('app.color.primary_text')])
@@ -1495,24 +1573,31 @@ export struct PinmonySearchPage {
           .backgroundColor(this.searchControlBackground())
           .attributeModifier(new PinmonySearchButtonMaterial(this.immersiveLightMode, this.hdsDarkMode))
           .accessibilityText(this.uiText('pm_back_572cf45b'))
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
           .onClick(() => this.handleSearchBack())
         }
-        Search({ value: this.query, placeholder: this.searchPlaceholder(),
-          controller: this.inputController })
+        Search({ value: !historyPage && this.historyDestinationRetained ? '' : this.query, placeholder: this.searchPlaceholder(),
+          controller: historyPage ? this.inputController : this.displayInputController })
           .id(editing ? 'pinmony-search-edit-input' : 'pinmony-search-display-input')
           .layoutWeight(1)
           .height(44)
           .fontColor($r('app.color.primary_text'))
           .backgroundColor(this.searchControlBackground())
           .attributeModifier(new PinmonySearchFieldMaterial(this.immersiveLightMode, this.hdsDarkMode))
-          .shadow({ radius: PinmonySearchHeaderMaterial.active(this.immersiveLightMode) ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
           .borderRadius(22)
+          .enableKeyboardOnFocus(editing)
+          .focusable(editing)
           .enterKeyType(EnterKeyType.Search)
           .cancelButton({ style: CancelButtonStyle.INPUT })
           .onChange((value: string) => {
             // Closing the editing layer restores its committed value. A change
             // from that inactive Search must not cancel a submitted Pin link.
-            if (!this.active || !this.inputEditing) return;
+            if (!editing || !this.active || !this.inputEditing) return;
             if (this.query !== value) this.query = value;
             if (this.onQueryChange) this.onQueryChange(value);
           })
@@ -1526,7 +1611,7 @@ export struct PinmonySearchPage {
           })
           .onBlur(() => { /* Keyboard focus does not dismiss the input panel. */ })
           .accessibilityText(this.uiText("pm_search_pinterest_3a2ae4e9"))
-        if (this.inputEditing) {
+        if (editing) {
           Button({ type: ButtonType.Circle }) {
             SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(24)
               .fontColor([$r('app.color.primary_text')])
@@ -1539,21 +1624,23 @@ export struct PinmonySearchPage {
           .enabled(this.active && this.interactionReady && !!this.onSubmit && this.query.trim().length > 0)
           .onClick(() => this.submitSearchInput(this.query))
         }
-        if (!this.inputEditing && !this.committedQuery()) {
+        if (!editing && (!this.committedQuery() || !historyPage && this.historyDestinationRetained)) {
           Button({ type: ButtonType.Circle }) {
             SymbolGlyph($r('sys.symbol.camera')).fontSize(24)
               .fontColor([$r('app.color.primary_text')])
           }
           .id('pinmony-photo-search-menu')
           .width(44).height(44).flexShrink(0).padding(0)
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
           .backgroundColor(this.searchControlBackground())
           .attributeModifier(new PinmonySearchButtonMaterial(this.immersiveLightMode, this.hdsDarkMode))
-          .shadow({ radius: PinmonySearchHeaderMaterial.active(this.immersiveLightMode) ? 4 : 0, color: this.hdsDarkMode ? '#30000000' : '#18000000', offsetX: 0, offsetY: 1, fill: false })
           .accessibilityText(this.uiText('pm_photo_search'))
           .enabled(this.interactionReady && !this.photoBusy)
           .onClick(() => { this.photoMenu(); })
         }
-        if (!this.inputEditing && !!this.committedQuery()) {
+        if (!editing && !!this.committedQuery()) {
           Button({ type: ButtonType.Circle }) {
             Stack() {
               SymbolGlyph($r('sys.symbol.slider_horizontal_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
@@ -1562,6 +1649,9 @@ export struct PinmonySearchPage {
           .backgroundColor(this.searchControlBackground())
           .attributeModifier(new PinmonySearchButtonMaterial(this.immersiveLightMode, this.hdsDarkMode))
           .accessibilityText(this.uiText('pm_show_filters_12e6eb18'))
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
           .enabled(this.interactionReady)
           .onClick(() => { if (this.interactionReady && this.onFilters) this.onFilters(); })
         }
@@ -1602,7 +1692,7 @@ export struct PinmonySearchPage {
         .width('100%')
         .layoutWeight(1)
         .padding({ left: 16, right: 16, top: this.searchFeedInset() + 16, bottom: 0 })
-        .clipContent(ContentClipMode.BOUNDARY).cachedCount(12, true).clip(false)
+        .clipContent(ContentClipMode.BOUNDARY).cachedCount(this.cachedImageCount(), true).clip(false)
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
         .onAppear(() => this.restoreResultsScroll())
@@ -1626,7 +1716,7 @@ export struct PinmonySearchPage {
           }, (row: PinmonySearchResultRow): string => row.key)
         }.columnsTemplate(this.contentColumnsTemplate()).columnsGap(12).rowsGap(24)
           .width('100%').layoutWeight(1).padding({ left: 12, right: 12, top: this.searchFeedInset() + 16 })
-          .clipContent(ContentClipMode.BOUNDARY).cachedCount(12, true).clip(false)
+          .clipContent(ContentClipMode.BOUNDARY).cachedCount(this.cachedImageCount(), true).clip(false)
           .scrollBar(BarState.Off).onAppear(() => this.restoreResultsScroll())
           .onDidScroll((offset: number, state: ScrollState) => {
             this.updateCategoriesOnScroll(offset, state);
@@ -1675,7 +1765,7 @@ export struct PinmonySearchPage {
 
   @Builder
   private inputSuggestionsContent() {
-    List() {
+    List({ scroller: this.historyScroller }) {
       if (this.snapshot.suggestionBusy) {
         ListItem() { Row({ space: 12 }) { LoadingProgress().color($r('app.color.accent')).width(20).height(20); Text(this.uiText("pm_loading_search_suggestions_4ff5d4ed")).fontSize(14) }.padding(16) }
       }
@@ -1707,42 +1797,54 @@ export struct PinmonySearchPage {
   }
 
   @Builder
-  private searchRootDestination(_name?: string, _param?: Object) {
+  private searchRootDestination(name?: string, _param?: Object) {
     HdsNavDestination() {
-      Stack({ alignContent: Alignment.Top }) {
-        if (!this.committedQuery()) {
-          Stack({ alignContent: Alignment.Top }) {
-            this.searchMaterialContent('discovery')
-          }.width('100%').height('100%')
-            .hitTestBehavior(this.inputEditing ? HitTestMode.None : HitTestMode.Default)
-            .accessibilityLevel(this.inputEditing ? 'no-hide-descendants' : 'auto')
-        }
-        if (!this.inputEditing && this.committedQuery()) {
-          Stack({ alignContent: Alignment.Top }) {
-            this.searchMaterialContent('results')
-          }.width('100%').height('100%')
-            .zIndex(this.historyExitToRoot ? 0 : 2)
-            .transition(this.discoveryResultTransition ?
-              TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }) :
-              TransitionEffect.IDENTITY)
-        }
-        if (this.inputEditing || this.historyRetained) {
-          Stack({ alignContent: Alignment.Top }) {
+      HdsNavigation() {
+        Stack({ alignContent: Alignment.Top }) {
+          if (name !== 'search-history') {
+            // Keep the original landing node (including decoded carousel images)
+            // mounted below results and history for the complete return transition.
+            Stack({ alignContent: Alignment.Top }) {
+              this.searchMaterialContent('discovery')
+            }.width('100%').height('100%')
+              .visibility(this.rootDiscoveryVisible() ? Visibility.Visible : Visibility.Hidden)
+              .hitTestBehavior(this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? 'no-hide-descendants' : 'auto')
+          }
+          if (this.showingSearchHistory(name)) {
             this.searchMaterialContent('history')
-          }.width('100%').height('100%')
-            .zIndex(1)
-            .visibility(this.inputEditing || !!this.committedQuery() ? Visibility.Visible : Visibility.Hidden)
-            .hitTestBehavior(this.active && this.inputEditing ? HitTestMode.Default : HitTestMode.None)
-            .accessibilityLevel(this.active && this.inputEditing ? 'auto' : 'no-hide-descendants')
-        }
-        this.searchInteractiveHeader(this.inputEditing)
-      }.width('100%').height('100%')
+          } else if (name === 'search-history' && !this.committedQuery()) {
+            this.searchStatus()
+          } else if (this.committedQuery() && (name === 'search-history' || !this.historyDestinationRetained)) {
+            Stack({ alignContent: Alignment.Top }) {
+              this.searchMaterialContent('results')
+            }.width('100%').height('100%')
+              .transition(this.discoveryResultTransition ?
+                TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }) :
+                TransitionEffect.IDENTITY)
+          }
+        }.width('100%').height('100%')
+      }
+        .mode(NavigationMode.Stack)
+        .width('100%').height('100%')
+        .hideTitleBar(false)
+        .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
+          { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
+        .titleMode(HdsNavigationTitleMode.MINI)
+        .hideBackButton(true)
+        .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.searchTitleBarOptions(name), this.hdsDarkMode))
+        .bindToScrollable([name !== 'search-history' && this.historyDestinationRetained ? this.discoveryScroller : this.showingSearchHistory(name) ? this.historyScroller : this.committedQuery() ? this.resultsScroller : this.discoveryScroller])
+        .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+        .clip(false)
+        .backgroundColor($r('app.color.page_background'))
     }
       .hideTitleBar(true)
+      .onShown(() => { if (this.showingSearchHistory(name)) this.focusMountedSearchInput(); })
+      .onDisAppear(() => { if (name === 'search-history') this.finishSearchHistoryClose(); })
+      .hitTestBehavior(name === 'search-history' && this.historyDestinationClosing ? HitTestMode.None : HitTestMode.Default)
       .onBackPressed(() => {
         if (!this.active) {
           if (this.retainPhotoSearch) { this.onBack?.(); return true; }
-          // The retained destination must not pop beneath a Pin detail page.
           if (this.detailReturnPreview && this.onBack) { this.onBack(); return true; }
           return false;
         }
@@ -1754,24 +1856,26 @@ export struct PinmonySearchPage {
 
   @Builder
   private searchCategoriesTitleBar() {
-    if (this.searchCategoriesVisible()) {
-      Scroll() {
+    if (this.visibleCategories().length > 0) {
+      PinmonySearchCategoryBar({ controller: this.categoryBarController }) {
         Row({ space: 10 }) {
           ForEach(this.visibleCategories(), (item: PinmonySearchCategory) => {
             this.categoryChip(item)
           }, (item: PinmonySearchCategory) => item.id + ':' + this.uiLanguage)
         }.padding({ left: 16, right: 8 })
       }
-      .width('100%').height(54)
-      .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-      .align(Alignment.Start).clip(true)
-      .hitTestBehavior(HitTestMode.Default)
     }
   }
 
-  private searchPullIndicatorVisible(): boolean {
+
+  private suppressSearchContentLoading(): boolean {
     return this.refreshing || this.searchRefreshState === RefreshStatus.Drag ||
       this.searchRefreshState === RefreshStatus.OverDrag || this.searchRefreshState === RefreshStatus.Refresh;
+  }
+
+  private searchPullIndicatorVisible(): boolean {
+    return this.refreshing || this.searchRefreshState === RefreshStatus.OverDrag ||
+      this.searchRefreshState === RefreshStatus.Refresh;
   }
 
   @Builder
@@ -1788,58 +1892,36 @@ export struct PinmonySearchPage {
 
   @Builder
   private searchMaterialContent(mode: string) {
-    HdsNavigation() {
-      Column() {
-        if (this.automaticLoadingEnabled && this.committedQuery()) {
-          Row() {
-            ForEach(this.upcomingImageUrls, (url: string) => {
-              Image(url).width(1).height(1).opacity(0).accessibilityLevel('no')
-            }, (url: string) => url)
-          }.height(0).clip(true).hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-        }
-        Refresh({ refreshing: this.refreshing, builder: this.searchRefreshIndicator }) {
-          Column() {
-            if (mode === 'history') {
-              this.inputSuggestionsContent()
-            } else if (mode === 'discovery') {
-              if (this.error && this.snapshot.heroes.length === 0 && this.snapshot.ideaSections.length === 0) {
-                this.searchStatus()
-              } else {
-                this.discoveryContent()
-              }
+    Column() {
+      Refresh({ refreshing: this.refreshing, builder: this.searchRefreshIndicator }) {
+        Column() {
+          if (mode === 'history') {
+            this.inputSuggestionsContent()
+          } else if (mode === 'discovery') {
+            if (this.error && this.discoverySnapshot().heroes.length === 0 && this.discoverySnapshot().ideaSections.length === 0) {
+              this.searchStatus()
             } else {
-              this.searchResultsContent()
+              this.discoveryContent()
             }
+          } else {
+            this.searchResultsContent()
           }
-          .width('100%')
-          .height('100%')
         }
-        .width('100%').layoutWeight(1).clip(false)
-        .pullToRefresh(!this.inputEditing && !this.refreshing && !this.loading && !this.quizSheetOpen)
-        .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
-        .onStateChange((state: RefreshStatus) => { this.searchRefreshState = state; })
+        .width('100%')
+        .height('100%')
       }
-      .width('100%')
-      .height('100%')
-      .clip(false)
-      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+      .width('100%').layoutWeight(1).clip(false)
+      .pullToRefresh(!this.inputEditing && !this.refreshing && !this.loading && !this.quizSheetOpen)
+      .onRefreshing(() => { if (this.onRefresh) this.onRefresh(); })
+      .onStateChange((state: RefreshStatus) => { this.searchRefreshState = state; })
     }
-    .mode(NavigationMode.Stack)
-    .hideTitleBar(false)
-    .systemBarStyle({ statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' },
-        { statusBarContentColor: this.systemDarkMode ? '#F7F8FA' : '#1B1E25' })
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .hideBackButton(true)
-    .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.searchTitleBarOptions(), this.hdsDarkMode))
-    .bindToScrollable([this.committedQuery() ? this.resultsScroller : this.discoveryScroller])
-    // HDS owns the status/title inset; retain the system bottom safe area
-    // so the final card menu reaches a visible, tappable position before pagination finishes.
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .width('100%')
+    .height('100%')
     .clip(false)
-    .backgroundColor($r('app.color.page_background'))
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
   }
 
-  private searchTitleBarOptions(): HdsNavigationTitleBarOptions {
+  private searchTitleBarOptions(name?: string): HdsNavigationTitleBarOptions {
     return {
       avoidLayoutSafeArea: true,
       enableComponentSafeArea: false,
@@ -1851,36 +1933,11 @@ export struct PinmonySearchPage {
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode)
       },
       content: {
-        bottomBuilder: { builder: (): void => { this.searchTitleMaterialSlot(); },
-          height: !this.inputEditing && this.visibleCategories().length > 0 ? 54 : 0 }
+        stackBuilder: (): void => { this.searchHeader(this.showingSearchHistory(name), name === 'search-history'); },
+        bottomBuilder: { builder: this.showingSearchHistory(name) || name !== 'search-history' && this.historyDestinationRetained ? this.emptyCategoriesTitleBuilder : this.categoriesTitleBuilder,
+          height: !this.showingSearchHistory(name) && !(name !== 'search-history' && this.historyDestinationRetained) && this.visibleCategories().length > 0 ? 54 : 0 }
       }
     };
-  }
-
-  @Builder
-  private searchTitleMaterialSlot() {
-    Column().width('100%').height(54)
-      .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
-  }
-
-  @Builder
-  private searchInteractiveHeader(editing: boolean) {
-    Column() {
-      this.searchHeader(editing)
-      this.searchCategoriesTitleBar()
-    }
-    .width('100%')
-    .height(56 + (this.searchCategoriesVisible() ? 54 : 0))
-    .margin({ top: this.getUIContext().px2vp(this.statusBarHeightPx) })
-    .hitTestBehavior(HitTestMode.Transparent)
-    .zIndex(3)
-    .onAppear(() => PinmonyRuntimeLog.info('SearchTouchTrace: event=header-mounted layer=destination'))
-    .onTouch((event: TouchEvent) => {
-      if (event.type === TouchType.Down) {
-        PinmonyRuntimeLog.info('SearchTouchTrace: event=header-down editing=' + this.inputEditing.toString() +
-          ' ready=' + this.interactionReady.toString() + ' loading=' + this.loading.toString());
-      }
-    })
   }
 
   @Builder
@@ -1937,7 +1994,7 @@ export struct PinmonySearchPage {
   }
 
   private searchCategoriesVisible(): boolean {
-    return !this.inputEditing && !this.categoriesCollapsed && this.visibleCategories().length > 0;
+    return !this.categoriesCollapsed && this.visibleCategories().length > 0;
   }
 
   private searchHeaderInset(): number {
@@ -1947,17 +2004,20 @@ export struct PinmonySearchPage {
   private searchFeedInset(): number {
     // Only the initial scroll inset reserves room. Showing chips must not resize
     // the viewport or expose the page background above the scrolled photos.
-    return this.searchHeaderInset() + (!this.inputEditing && this.visibleCategories().length > 0 ? 54 : 0);
-  }
-
-  private searchBackVisible(): boolean {
-    return this.inputEditing || !!this.committedQuery();
+    return this.searchHeaderInset() + (this.visibleCategories().length > 0 ? 54 : 0);
   }
 
   private handleSearchBack(): void {
+    if (this.historyDestinationClosing) return;
     if (this.inputEditing) {
-      this.historyExitToRoot = true;
       if (this.committedQuery() && this.onBack) {
+        const paths: string[] = this.searchPathStack.getAllPathName();
+        if (paths[paths.length - 1] === 'search-history') {
+          // Keep the outgoing history and its route intact until native pop completes.
+          this.historyRootReturnPending = true;
+          this.closeSearchHistoryDestination(true);
+          return;
+        }
         // The parent must consume the history intent before focus is cleared.
         this.onBack();
         // HDS keeps this destination mounted; do not rely on a parent stop callback.
@@ -1973,17 +2033,20 @@ export struct PinmonySearchPage {
   }
 
   private openSearchHistory(): void {
+    if (this.historyDestinationClosing) return;
     this.discoveryResultTransition = false;
     this.pendingInputFocus = false; this.inputFocusRevision++;
-    this.historyExitToRoot = false;
-    this.historyRetained = true;
     this.inputController.stopEditing();
+    this.displayInputController.stopEditing();
     this.query = '';
+    // Direct recommendation results have no history destination yet. Install it
+    // without an entry animation; the next back now has a real page to pop.
+    this.showSearchHistoryDestination(false);
     this.inputEditing = true;
-    this.categoriesCollapsed = false;
+    this.setCategoriesCollapsed(false);
     this.categoryScrollDistance = 0;
     if (this.onQueryChange) this.onQueryChange('', true);
-    if (this.onInputFocusChange) this.onInputFocusChange(true, () => this.closeInputPanel(false, true));
+    if (this.onInputFocusChange) this.onInputFocusChange(true, (deferRootReturn: boolean = false) => this.closeInputPanel(false, true, deferRootReturn));
   }
 
   private committedQuery(): string {
@@ -2000,35 +2063,108 @@ export struct PinmonySearchPage {
     this.onSubmit(submittedQuery);
   }
 
-  private closeInputPanel(restore: boolean, returningToRoot: boolean = false): void {
-    if (returningToRoot) this.historyExitToRoot = true;
-    if (restore || returningToRoot || this.historyExitToRoot) this.historyRetained = false;
+  private closeInputPanel(restore: boolean, returningToRoot: boolean = false, deferRootReturn: boolean = false): boolean {
+    if (returningToRoot && deferRootReturn) {
+      if (this.historyDestinationClosing) return true;
+      const paths: string[] = this.searchPathStack.getAllPathName();
+      if (paths[paths.length - 1] === 'search-history') {
+        this.historyRootReturnPending = true;
+        this.closeSearchHistoryDestination(true);
+        return true;
+      }
+    }
     this.pendingInputFocus = false; this.inputFocusRevision++;
     this.inputEditing = false;
+    if (restore || returningToRoot) this.closeSearchHistoryDestination(true);
+    this.historyBodyDestination = '';
     this.inputController.stopEditing();
+    this.displayInputController.stopEditing();
     this.query = this.committedQuery();
     this.lastSnapshotQuery = this.snapshot.query || '';
     if (restore && this.onQueryChange) this.onQueryChange(this.query);
-    if (this.onInputFocusChange) this.onInputFocusChange(false, () => this.closeInputPanel(false, true));
+    if (this.onInputFocusChange) this.onInputFocusChange(false, (deferRootReturn: boolean = false) => this.closeInputPanel(false, true, deferRootReturn));
+    return false;
+  }
+
+  private discoverySnapshot(): PinmonySearchSnapshot {
+    return this.retainedDiscovery || this.snapshot;
+  }
+
+  private rememberDiscoverySnapshot(): void {
+    if (this.committedQuery()) return;
+    if (this.snapshot.heroes.length > 0 || this.snapshot.ideaSections.length > 0 ||
+      this.snapshot.kind === 'state' && !this.loading && this.snapshot.discoveryActive === true) {
+      this.retainedDiscovery = this.snapshot;
+    }
+  }
+
+  private rootDiscoveryVisible(): boolean {
+    return !this.committedQuery() || this.historyDestinationRetained;
+  }
+
+  private showingSearchHistory(name?: string): boolean {
+    return name === 'search-history' && this.historyDestinationClosing ||
+      this.inputEditing && this.historyBodyDestination === name;
+  }
+
+  private showSearchHistoryDestination(animated: boolean = true): void {
+    if (this.historyDestinationClosing) return;
+    this.ensureSearchDestination();
+    if (!this.searchPathStack.getAllPathName().includes('search-history')) {
+      this.searchPathStack.pushPath({ name: 'search-history' }, animated);
+    }
+    this.historyDestinationRetained = true;
+    this.historyBodyDestination = 'search-history';
+  }
+
+  private closeSearchHistoryDestination(animated: boolean): void {
+    if (this.historyDestinationClosing) return;
+    const paths: string[] = this.searchPathStack.getAllPathName();
+    if (paths[paths.length - 1] === 'search-history') {
+      this.historyClosePage = this.snapshot.pageKey;
+      this.historyCloseSession = this.snapshot.session;
+      this.historyDestinationClosing = animated;
+      this.searchPathStack.pop(animated);
+      if (!animated) this.historyDestinationRetained = false;
+    }
+  }
+
+  private finishSearchHistoryClose(): void {
+    if (!this.historyDestinationClosing || this.searchPathStack.getAllPathName().includes('search-history')) return;
+    this.historyDestinationClosing = false;
+    const returnToRoot: boolean = this.historyRootReturnPending;
+    // A route update can arrive after the native exit. Never expose old results.
+    if (!returnToRoot || !this.active) this.historyDestinationRetained = false;
+    this.historyRootReturnPending = false;
+    if (!this.pagePresent || this.historyClosePage !== this.snapshot.pageKey ||
+      this.historyCloseSession !== this.snapshot.session) return;
+    if (returnToRoot && this.active) this.onBack?.();
+    if (!this.committedQuery()) this.historyDestinationRetained = false;
+    this.closeInputPanel(false);
   }
 
   private beginSearchInput(): void {
-    if (!this.active || this.inputEditing) return;
+    if (!this.active || this.inputEditing || this.historyDestinationClosing) return;
     PinmonyRuntimeLog.info('SearchInputTrace: event=user-edit');
     this.pendingInputFocus = true; this.inputFocusRevision++;
     this.onInputFocus(true);
   }
 
   private focusMountedSearchInput(): void {
-    if (!this.pendingInputFocus || !this.inputEditing) return;
+    if (!this.pagePresent || !this.pendingInputFocus || !this.inputEditing ||
+      this.scheduledInputFocusRevision === this.inputFocusRevision) return;
     const revision: number = this.inputFocusRevision;
+    this.scheduledInputFocusRevision = revision;
     setTimeout((): void => {
+      if (this.scheduledInputFocusRevision === revision) this.scheduledInputFocusRevision = -1;
       if (!this.pagePresent || !this.active || !this.inputEditing || !this.pendingInputFocus ||
         revision !== this.inputFocusRevision) return;
-      this.pendingInputFocus = false;
       try {
         this.getUIContext().getFocusController().requestFocus('pinmony-search-edit-input');
-        this.inputController.caretPosition(this.query.length);
+        this.pendingInputFocus = false;
+        const paths: string[] = this.searchPathStack.getAllPathName();
+        const controller: SearchController = paths[paths.length - 1] === 'search-history' ? this.inputController : this.displayInputController;
+        controller.caretPosition(this.query.length);
       } catch (_) {
         PinmonyRuntimeLog.warn('SearchInputTrace: edit focus unavailable');
       }
@@ -2036,12 +2172,13 @@ export struct PinmonySearchPage {
   }
 
   private onInputFocus(focused: boolean): void {
+    if (this.historyDestinationClosing) return;
     if (focused) this.discoveryResultTransition = false;
-    if (focused) { this.historyExitToRoot = false; this.historyRetained = true; }
     this.inputEditing = focused;
+    if (focused) this.showSearchHistoryDestination();
     if (focused && this.onQueryChange) this.onQueryChange(this.query, true);
     if (this.onInputFocusChange) {
-      this.onInputFocusChange(focused, () => this.closeInputPanel(false, true));
+      this.onInputFocusChange(focused, (deferRootReturn: boolean = false) => this.closeInputPanel(false, true, deferRootReturn));
     }
     if (focused) this.focusMountedSearchInput();
   }

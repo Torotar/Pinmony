@@ -25,3 +25,42 @@ assert(!source.includes("(this.state.phase === 'boards') || this.immersiveLightM
 console.log('Organize page motion: retained selection/picker, independent create layer, back/busy/uncertain gates and covered interaction passed');const Layout=vm.runInNewContext(ts.transpileModule('class Layout {'+['contentColumns','columnSlots','contentColumnsTemplate'].map(method).join('\n')+'} Layout;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
 const layout=new Layout();for(const width of [320,360,600,768,1024,1366,1920,360]){layout.contentWidth=width;const columns=layout.contentColumns();assert(columns>=3);assert.equal(layout.columnSlots().length,columns);assert.equal(layout.contentColumnsTemplate().split(' ').length,columns);assert((width-32-(columns-1)*12)/columns>0);}
 console.log('Organize responsive selection: portrait, wide windows and return to portrait passed');
+
+const boardSource=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');
+for (const [label,ui,columnMethod,slotsMethod] of [
+  ['profile',source,'contentColumns','columnSlots'],
+  ['board',boardSource,'selectionColumns','selectionSlots']
+]) {
+  function extract(name) {
+    const start=ui.indexOf('  private '+name+'(');assert(start>=0,name);
+    return ui.slice(start,ui.indexOf('\n  }',start)+4);
+  }
+  const Selection=vm.runInNewContext(ts.transpileModule('class Selection {'+
+    [columnMethod,slotsMethod,'rows','selectedPins'].map(extract).join('\n')+'} Selection;',
+    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+  const selection=new Selection();
+  const pins=Array.from({length:29},(_,id)=>({id:String(id)}));
+  selection.pins=pins;selection.selectionPins=()=>selection.pins;
+  for(const width of [320,360,600,768,1024,1366,1920,360]) {
+    selection.contentWidth=width;
+    const columns=selection[columnMethod]();
+    if(width>=600)assert(columns>3,label+' wide selection uses more than three columns');
+    assert((width-32-(columns-1)*12)/columns<140,label+' cards remain compact');
+    for(const count of [0,1,2,3,7,29]) {
+      selection.pins=pins.slice(0,count);
+      const seen=[];
+      for(const start of selection.rows())for(const slot of selection[slotsMethod]())if(start+slot<count)seen.push(start+slot);
+      assert.deepEqual(seen,Array.from({length:count},(_,id)=>id),label+' no skipped or duplicate Pins');
+    }
+  }
+  selection.pins=pins;
+  for(const ids of [[],['8','2','6'],['8','6'],['8','6','2'],['99','2'],pins.map(pin=>pin.id)]) {
+    selection.selectedIds=ids;selection.state={selectedIds:ids};
+    assert.deepEqual(Array.from(selection.selectedPins(),pin=>pin.id),ids.filter(id=>pins.some(pin=>pin.id===id)),label+' preview follows selection order');
+    assert.deepEqual(pins.map(pin=>pin.id),Array.from({length:29},(_,id)=>String(id)),'feed order stays intact');
+  }
+  assert(ui.includes('ForEach(this.'+slotsMethod+'(), (column: number) => {'),label+' computed columns drive rendered cards');
+  assert(ui.includes('ForEach(this.selectedPins(),'),label+' preview uses ordered Pins');
+  assert(/const width: number = Number\(area.width\);\s*if \([^\n]+\) this.contentWidth = width;/.test(ui),label+' measured width drives responsive columns');
+}
+console.log('Organize selection: both entry points, compact rendered columns, full/partial rows, ordered previews, deselect/reselect and missing IDs passed');

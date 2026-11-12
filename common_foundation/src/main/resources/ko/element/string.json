@@ -1941,6 +1941,10 @@
       "value": "라이트"
     },
     {
+      "name": "pm_follow_account",
+      "value": "계정 설정에 따름"
+    },
+    {
       "name": "pm_follow_system_217cfe7d",
       "value": "시스템 설정 사용"
     },

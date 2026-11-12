@@ -8,7 +8,7 @@ function method(name) {
 }
 const timers = [];
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
-  method('restoreResultsScroll') + method('reportResultsScroll') + '} Host;', {
+  method('restoreResultsScroll') + method('reportResultsScroll') + method('imageBudgetWidthChanged') + '} Host;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText, { setTimeout: fn => timers.push(fn), console });
 function fixture(query = '') {

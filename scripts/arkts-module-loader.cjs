@@ -38,7 +38,9 @@ function createArktsLoader(ts, mocks = {}, globals = {}) {
     if (cache.has(file)) return cache.get(file);
     const exports = {};
     cache.set(file, exports);
-    const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {
+    const compiler = globals.PinmonyTestTransportOnly ? ts.transpileModule.bind(ts) :
+      require('./native-network-test-fixture.cjs').transpile.bind(null, ts);
+    const code = compiler(fs.readFileSync(file, 'utf8'), { compilerOptions: {
       target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS, experimentalDecorators: true
     } }).outputText;
     vm.runInNewContext(code, { exports, Observed: type => type, console,

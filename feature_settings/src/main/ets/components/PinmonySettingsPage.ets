@@ -1,3 +1,4 @@
+import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyUserAvatar, PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -66,11 +67,11 @@ export struct PinmonySettingsPage {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       if (await PinmonyRuntimeLog.export(context)) {
-        this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_logs_exported_2e45dbce"), duration: 4000 });
+        this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_logs_exported_2e45dbce"), duration: 4000 }));
       }
     } catch (_) {
       PinmonyRuntimeLog.error('Runtime: log export failed');
-      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_export_logs_please_retry_2a73568e"), duration: 4000 }); }
+      try { this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_export_logs_please_retry_2a73568e"), duration: 4000 })); }
       catch (_) { PinmonyRuntimeLog.warn('Runtime: log export feedback unavailable'); }
     } finally { this.exportingLog = false; }
   }
@@ -98,9 +99,9 @@ export struct PinmonySettingsPage {
       const cleared: boolean = await PinmonyRuntimeLog.clear();
       if (this.pageVisible) {
         try {
-          this.getUIContext().getPromptAction().showToast({
+          this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({
             message: this.uiText(cleared ? 'pm_logs_cleared' : 'pm_logs_clear_failed'), duration: 3000
-          });
+          }));
         } catch (_) { /* page may disappear while the log operation completes */ }
       }
     } finally { this.clearingLog = false; }
@@ -161,7 +162,7 @@ export struct PinmonySettingsPage {
         }
         if(!this.legacyProfile && this.onViewProfile) {
           ListItem() {
-            Button({type:ButtonType.Normal}) {
+            Button({type:ButtonType.Normal, stateEffect: false}) {
               Row({space:16}) {
                 PinmonyUserAvatar({ profileUrl: this.profileUrl, image: this.profileAvatar, name: this.profileName, colorIndex: this.profileAvatarColorIndex, avatarSize: 48 })
                 Column({space:4}) {
@@ -181,7 +182,7 @@ export struct PinmonySettingsPage {
         }
         if (!this.store.loading) { ForEach(this.options, (id: string) => {
           ListItem() {
-            Button({ type: ButtonType.Normal }) {
+            Button({ type: ButtonType.Normal, stateEffect: false }) {
               Row({ space: 16 }) {
                 Text(id === 'logout' && this.store.busy ? this.uiText("pm_logging_out_0ae60dd3") : id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
                   .fontSize(17)
@@ -225,7 +226,11 @@ export struct PinmonySettingsPage {
       .contentEndOffset(this.getUIContext().px2vp(this.gestureBarHeightPx) + 12)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        if (this.store.busy) {
+          PinmonyLoadingOverlay({ showMessage: false })
+        } else {
+          LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        }
       }
       }.width('100%').height('100%')
     }

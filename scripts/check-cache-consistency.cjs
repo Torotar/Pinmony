@@ -31,7 +31,7 @@ assert.match(index, /this\.restoreHomeDiskCache\(accountId, pageKey, 'authentica
 assert.match(homeController, /this\.homeStore\.homeActionsReady = !message\.refreshing/);
 assert.match(homeController, /this\.ports\.persistSnapshot\(committedHome\)/);
 assert.match(index, /persistSnapshot: .*this\.persistHomeDiskCache\(snapshot\)/);
-assert.match(index, /this\.homeApiCache\.clear\(\)/);
+assert.match(index, /this\.homeApiCache\??\.clearAsync\(\)/);
 assert.match(search, /if \(snapshot\.kind !== 'state'.*return;/s);
 assert.match(inbox, /if \(snapshot\.kind !== 'state'.*return;/s);
 assert.match(profile, /if \(snapshot\.kind !== 'state'.*return;/s);

@@ -9,7 +9,7 @@ for (const [file, bindings] of [
   assert(!source.includes('Checkbox()'), file + ' uses switches instead of checkmarks');
   for (const binding of bindings) assert(source.includes('Toggle({ type: ToggleType.Switch, isOn: ' + binding + ' })'), file + ' retains switch state: ' + binding);
 }
-function moduleFrom(file) { const exports = {}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, { exports, require: () => ({}) }); return exports; }
+function moduleFrom(file) { const exports = {}; vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, { exports, require: () => ({}) }); return exports; }
 const { PIN_ACCOUNT_SETTINGS_SCRIPT } = moduleFrom('feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets');
 const { acceptsNetworkJob } = moduleFrom('common_network/src/main/ets/PinmonyNativeNetwork.ets');
 const page = 'https://www.pinterest.com/synthetic/';

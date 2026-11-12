@@ -4,7 +4,7 @@ import { PinmonyProfileStore } from 'feature_profile';
 import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonySearchStore } from 'feature_search';
 import { PinmonyHomeStore } from 'feature_home';
-import { PinmonyNativeNetwork } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyAuthStatus, isPinterestAuthRoute } from 'common_session';

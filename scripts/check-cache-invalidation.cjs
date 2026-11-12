@@ -16,7 +16,9 @@ function deferred() {
 function fixture() {
   const records = new Map(), writes = [], reads = [];
   class Disk {
-    getWithMetadata(key) {
+    async getWithMetadataAsync(key, maxAge, current) { return current() ? this.getWithMetadata(key, maxAge) : { value: null, status: 'miss', ageMs: -1 }; }
+  async putAsync(key, value, current) { if (!current()) throw Error('invalidated'); this.put(key, value); }
+  getWithMetadata(key) {
       reads.push(key);
       return records.has(key) ? { value: records.get(key), status: 'hit', ageMs: 0 } :
         { value: null, status: 'miss', ageMs: -1 };

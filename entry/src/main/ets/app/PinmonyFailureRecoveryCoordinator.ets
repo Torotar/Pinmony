@@ -7,7 +7,7 @@ import { PinmonyInboxStore, PinmonyInboxSnapshot } from 'feature_inbox';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyProfileStore, PinmonyProfileSnapshot } from 'feature_profile';
 import { PinmonyHomeStore, PinmonyHomeSnapshot } from 'feature_home';
-import { PinmonyNativeNetwork } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyAuthStatus, isPinterestAuthRoute } from 'common_session';
 import { HdsTabsController } from '@kit.UIDesignKit';

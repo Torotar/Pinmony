@@ -63,6 +63,7 @@ export struct PinmonyInboxFlowPage {
   private messageMenuEpoch: number = 0;
   private messageMenuContext: string = '';
   @State private reactionMessageId: string = '';
+  private reactionContext: string = '';
   @State private blockTarget: InboxFlowUser | undefined = undefined;
   private historyPending: boolean = false;
   private contentHeight: number = 0;
@@ -117,6 +118,7 @@ export struct PinmonyInboxFlowPage {
   }
   aboutToDisappear(): void {
     this.visible = false; this.queryToken++;
+    this.reactionMessageId = ''; this.reactionContext = '';
     this.conversationTitleContent?.dispose(); this.conversationTitleContent = undefined;
     this.conversationTitleKey = '';
     // Do not pop the destination while its final frame is being removed.
@@ -127,8 +129,29 @@ export struct PinmonyInboxFlowPage {
     return this.snapshot.pageUrl + ':' + (this.snapshot.conversationId || '') + ':' + (this.snapshot.nativeAccountGeneration === undefined ?
       this.snapshot.session.toString() : this.snapshot.nativeAccountGeneration.toString() + ':' + (this.snapshot.nativeToken || 0).toString());
   }
+  private canReactToMessage(messageId: string): boolean {
+    return this.active && this.snapshot.screen === 'chat' && !this.snapshot.loading &&
+      !this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain &&
+      !this.snapshot.error && !this.snapshot.sendError &&
+      this.snapshot.messages.some((message: InboxFlowMessage): boolean => message.id === messageId && !message.deleted);
+  }
+
+  private chooseReaction(messageId: string, reaction: string, context: string): void {
+    if (context !== this.messageConfirmationKey() || !this.canReactToMessage(messageId) ||
+        this.messageMenuClosing || !['❤️', '😂', '😍', '😮', '👍', '👎'].includes(reaction)) return;
+    this.act('react', messageId + '|' + reaction);
+    this.reactionMessageId = '';
+  }
+
+  private toggleReaction(message: InboxFlowMessage): void {
+    if (!this.canReactToMessage(message.id) || this.showMessageMenu || this.messageMenuClosing) return;
+    this.reactionContext = this.messageConfirmationKey();
+    this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id;
+  }
+
   private openMessageMenu(message: InboxFlowMessage): void {
     if (!this.active || message.deleted || this.showMessageMenu || this.messageMenuClosing) return;
+    this.reactionMessageId = '';
     this.selectedMessage = message;
     this.blockTarget = undefined;
     this.messageMenuKind = 'message';
@@ -172,7 +195,7 @@ export struct PinmonyInboxFlowPage {
   }
 
   private activeChanged(): void {
-    if (!this.active) { this.closeMessageMenu(); return; }
+    if (!this.active) { this.reactionMessageId = ''; this.closeMessageMenu(); return; }
     this.prepareChatPosition();
     this.chatPosition.restore(this.restoreOffset);
     this.positionChat();
@@ -217,6 +240,8 @@ export struct PinmonyInboxFlowPage {
 
   private snapshotChanged(): void {
     this.updateConversationTitle();
+    if (this.reactionMessageId && (this.reactionContext !== this.messageConfirmationKey() ||
+        !this.canReactToMessage(this.reactionMessageId))) this.reactionMessageId = '';
     if (this.messageMenuContext && (this.messageMenuContext !== this.messageConfirmationKey() ||
         this.snapshot.screen !== (this.messageMenuKind === 'block' ? 'settings' : 'chat'))) this.closeMessageMenu();
     this.prepareChatPosition();
@@ -345,11 +370,11 @@ export struct PinmonyInboxFlowPage {
   private reactionChoices() {
     Row({ space: 4 }) {
       ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
-        Button({ type: ButtonType.Normal }) {
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
           Text(PinmonyI18n.render(reaction, this.uiLanguage)).fontSize(24).textAlign(TextAlign.Center).width('100%')
         }.width(40).height(44).padding(0).backgroundColor(Color.Transparent)
-          .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
-          .onClick(() => { this.act('react', this.reactionMessageId + '|' + reaction); this.reactionMessageId = ''; })
+          .enabled(this.canReactToMessage(this.reactionMessageId))
+          .onClick(() => this.chooseReaction(this.reactionMessageId, reaction, this.reactionContext))
       }, (reaction: string): string => JSON.stringify(reaction) + ':' + this.uiLanguage)
     }.padding(8)
   }
@@ -357,16 +382,16 @@ export struct PinmonyInboxFlowPage {
   @Builder
   private messageMenuContent() {
     Column({ space: 8 }) {
-      if (!this.selectedMessage?.board && !this.selectedMessage?.profile) {
+      if (this.selectedMessage && !this.selectedMessage.deleted) {
       Row() {
         ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
-          Button({ type: ButtonType.Circle }) {
+          Button({ type: ButtonType.Circle, stateEffect: false }) {
             Text(PinmonyI18n.render(reaction, this.uiLanguage)).fontSize(24).textAlign(TextAlign.Center).width('100%')
           }.padding(0).width(44).height(44)
             .backgroundColor($r('app.color.surface_muted'))
-            .enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
+            .enabled(this.canReactToMessage(this.selectedMessage?.id || ''))
             .onClick(() => {
-              if (this.selectedMessage) this.act('react', this.selectedMessage.id + '|' + reaction);
+              if (this.selectedMessage) this.chooseReaction(this.selectedMessage.id, reaction, this.messageMenuContext);
               this.closeMessageMenu();
             })
         }, (reaction: string): string => JSON.stringify(reaction) + ':' + this.uiLanguage)
@@ -374,7 +399,7 @@ export struct PinmonyInboxFlowPage {
       Divider().margin({ top: 8, bottom: 8 })
       }
       if (this.selectedMessage?.text && !this.selectedMessage.deleted && this.onCopyText) {
-        Button({ type: ButtonType.Normal }) {
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
           Row({ space: 10 }) {
             SymbolGlyph($r('sys.symbol.rectangle_on_rectangle')).fontSize(20)
               .fontColor([$r('app.color.primary_text')])
@@ -385,13 +410,28 @@ export struct PinmonyInboxFlowPage {
           .onClick(() => this.copyMessageText())
       }
       if (this.selectedMessage?.pinUrl) {
-        Button(this.uiText("pm_save_60a53514")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
+          Row({ space: 10 }) {
+            Image($r('app.media.lucide_bookmark')).width(20).height(20)
+            Text(this.uiText("pm_save_60a53514")).fontSize(18).fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.primary_text'))
+          }.width('100%').justifyContent(FlexAlign.Start)
+        }.width('100%').height(48).padding({ left: 8, right: 8 })
+          .backgroundColor(Color.Transparent).accessibilityText(this.uiText("pm_save_60a53514"))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('save', this.selectedMessage.pinUrl); this.closeMessageMenu(); })
-        Button(this.uiText("pm_share_7e564575")).width('100%').backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text'))
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
+          Row({ space: 10 }) {
+            Image($r('app.media.lucide_share_2')).width(20).height(20)
+              .fillColor($r('app.color.primary_text'))
+            Text(this.uiText("pm_share_7e564575")).fontSize(18).fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.primary_text'))
+          }.width('100%').justifyContent(FlexAlign.Start)
+        }.width('100%').height(48).padding({ left: 8, right: 8 })
+          .backgroundColor(Color.Transparent).accessibilityText(this.uiText("pm_share_7e564575"))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('share', this.selectedMessage.pinUrl); this.closeMessageMenu(); })
       }
       if (this.selectedMessage?.own) {
-        Button({ type: ButtonType.Normal }) {
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
           Row({ space: 10 }) {
             SymbolGlyph($r('sys.symbol.trash')).fontSize(20)
               .fontColor([$r('app.color.accent')])
@@ -465,7 +505,7 @@ export struct PinmonyInboxFlowPage {
 
   private openSharedProfile(messageId: string): void {
     const message: InboxFlowMessage | undefined = this.snapshot.messages.find((item: InboxFlowMessage): boolean => item.id === messageId);
-    if (!this.active || message?.deleted || !message?.profile?.profileUrl || !this.onUser) return;
+    if (!this.active || this.showMessageMenu || this.messageMenuClosing || message?.deleted || !message?.profile?.profileUrl || !this.onUser) return;
     this.captureChatOffset();
     this.onUser(message.profile.profileUrl);
   }
@@ -485,23 +525,25 @@ export struct PinmonyInboxFlowPage {
   private messageSideActions(message: InboxFlowMessage) {
     Column({ space: 8 }) {
       if (!message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
-      if (!message.deleted && !message.board && !message.profile) {
-        Button({ type: ButtonType.Circle }) {
-          Row() {
-            SymbolGlyph($r('sys.symbol.face_smiling')).fontSize(20).fontColor([$r('app.color.primary_text')])
-            Text('+').fontSize(12).fontColor($r('app.color.primary_text'))
+      if (!message.deleted) {
+        Button({ type: ButtonType.Circle, stateEffect: false }) {
+          if (message.reactions?.length) {
+            Text(message.reactions.join(' ')).fontSize(18).fontColor($r('app.color.primary_text'))
+          } else {
+            Row() {
+              SymbolGlyph($r('sys.symbol.face_smiling')).fontSize(20).fontColor([$r('app.color.primary_text')])
+              Text('+').fontSize(12).fontColor($r('app.color.primary_text'))
+            }
           }
         }.width(40).height(40).backgroundColor($r('app.color.page_background'))
           .border({ width: 1, color: $r('app.color.surface_muted') })
           .accessibilityText(this.uiText("pm_choose_a_message_reaction_caf4b514"))
-          .onClick(() => { this.reactionMessageId = this.reactionMessageId === message.id ? '' : message.id; })
+          .enabled(this.canReactToMessage(message.id))
+          .onClick(() => this.toggleReaction(message))
           .bindPopup(this.reactionMessageId === message.id, {
             builder: this.reactionChoices, placement: Placement.Top, showInSubWindow: false,
             onStateChange: (event: ReactionPopupState) => { if (!event.isVisible && this.reactionMessageId === message.id) this.reactionMessageId = ''; }
           })
-        if (message.reactions?.length) {
-          Text(message.reactions.join(' ')).fontSize(18).fontColor($r('app.color.primary_text'))
-        }
       }
     }.padding({ top: !message.own && message.sender?.name ? (this.senderLabelHeights.get(this.messageLayoutKey(message)) || 16) + 8 : 0 })
   }
@@ -514,7 +556,7 @@ export struct PinmonyInboxFlowPage {
           .fontColor($r('app.color.secondary_text')).alignSelf(ItemAlign.Center)
       }
       Row({ space: 8 }) {
-        if (message.own && !message.deleted && (!message.board && !message.profile || !!message.image && !!message.pinUrl)) { this.messageSideActions(message) }
+        if (message.own && !message.deleted) { this.messageSideActions(message) }
         if (!message.own && message.sender) {
           Column() { this.avatar(message.sender, this.messageAvatarSize(message)) }
             .alignSelf(this.textAvatarOffset(message) >= 0 ? ItemAlign.Start : ItemAlign.End)
@@ -538,7 +580,7 @@ export struct PinmonyInboxFlowPage {
             Column({ space: 8 }) {
               if (message.profileImages?.length) {
                 Row() {
-                  ForEach(message.profileImages, (url: string) => { Image(url).width(message.profileImages!.length === 1 ? '100%' : '50%').height(160).objectFit(ImageFit.Cover) }, (url: string) => url)
+                  ForEach(message.profileImages, (url: string) => { Image(url).draggable(false).width(message.profileImages!.length === 1 ? '100%' : '50%').height(160).objectFit(ImageFit.Cover) }, (url: string) => url)
                 }.width(240).clip(true).borderRadius(18)
               }
               Stack({ alignContent: Alignment.Center }) {
@@ -557,6 +599,7 @@ export struct PinmonyInboxFlowPage {
               onOpen: () => { this.captureChatOffset(); if (this.onBoard) this.onBoard(message.id); } })
           } else if (message.image && !message.deleted) {
             Image(message.image).width(this.messageImageWidth(message))
+              .draggable(false)
               .height(this.messageImageWidth(message) / this.messageImageRatio(message))
               .constraintSize({ maxHeight: 460 }).borderRadius(18)
               .objectFit(ImageFit.Contain)
@@ -569,7 +612,7 @@ export struct PinmonyInboxFlowPage {
                   }
                 }
               })
-              .onClick(() => { this.captureChatOffset(); if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
+              .onClick(() => { if (!this.active || this.showMessageMenu || this.messageMenuClosing) return; this.captureChatOffset(); if (message.pinUrl && this.onPin) this.onPin(message.pinUrl); })
           }
           if (message.deleted) {
             Text(message.own ? this.uiText("pm_you_deleted_a_message_4ed92139") : this.snapshot.title + this.uiText("pm_deleted_a_message_4d82968b"))
@@ -597,8 +640,8 @@ export struct PinmonyInboxFlowPage {
           }
 
         }.constraintSize({ maxWidth: 260 }).alignItems(HorizontalAlign.Start)
-          .parallelGesture(LongPressGesture().onAction(() => this.openMessageMenu(message)))
-        if (!message.own && !message.deleted && (!message.board && !message.profile || !!message.image && !!message.pinUrl)) { this.messageSideActions(message) }
+          .priorityGesture(LongPressGesture({ repeat: false }).onAction(() => this.openMessageMenu(message)))
+        if (!message.own && !message.deleted) { this.messageSideActions(message) }
       }.width('100%').justifyContent(message.own ? FlexAlign.End : FlexAlign.Start)
         .padding({ left: 20, right: 20 })
     }.width('100%').padding({ top: 12, bottom: 12 })
@@ -608,20 +651,20 @@ export struct PinmonyInboxFlowPage {
   private updatesMenuContent() {
     Column({ space: 4 }) {
       if (this.snapshot.canUnsubscribePin) {
-        Button({ type: ButtonType.Normal }) {
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
           Text(this.uiText("pm_turn_off_updates_for_this_pin_01676b9f")).fontSize(18).fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
         }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
           .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.unsubscribedPin)
           .onClick(() => this.act('unsubscribePin'))
       }
-      Button({ type: ButtonType.Normal }) {
+      Button({ type: ButtonType.Normal, stateEffect: false }) {
         Text(this.uiText("pm_delete_update_b051285c")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
         .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
         .onClick(() => this.act('hideNews'))
-      Button({ type: ButtonType.Normal }) {
+      Button({ type: ButtonType.Normal, stateEffect: false }) {
         Text(this.uiText("pm_view_notification_settings_c3a6f9ff")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })

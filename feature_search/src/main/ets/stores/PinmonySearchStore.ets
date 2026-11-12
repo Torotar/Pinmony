@@ -1,6 +1,11 @@
 import { PinmonySearchFilterOption, PinmonySearchSnapshot } from '../models/PinmonySearch';
 import { PinmonySearchCache } from '../services/PinmonySearchCache';
 
+interface PinmonySearchScrollPositions {
+  current: number;
+  retained: number;
+}
+
 @Observed
 export class PinmonySearchStore {
   searchNativeReadsReady: boolean = false;
@@ -33,7 +38,7 @@ export class PinmonySearchStore {
   searchInputFocused: boolean = false;
   photoSearchVisible: boolean = false;
   searchOpenHistory?: () => void;
-  searchInputStopEditing: (() => void) | undefined = undefined;
+  searchInputStopEditing: ((deferRootReturn?: boolean) => boolean) | undefined = undefined;
   searchRequestToken: number = 0;
   searchQueryToken: number = 0;
   searchIntentToken: number = 0;
@@ -43,8 +48,20 @@ export class PinmonySearchStore {
   searchQuizReturnPage: string = '';
   readonly searchCache: PinmonySearchCache = new PinmonySearchCache();
   readonly knownSearchPinTitles: Map<string, string> = new Map<string, string>();
-  searchScrollOffset: number = 0;
-  retainedSearchScrollOffset: number = 0;
+  // Live scroll positions are restoration data, not observable UI state.
+  private readonly scrollPositions: PinmonySearchScrollPositions = { current: 0, retained: 0 };
+  get searchScrollOffset(): number { return this.scrollPositions.current; }
+  set searchScrollOffset(offset: number) { this.scrollPositions.current = offset; }
+  get retainedSearchScrollOffset(): number { return this.scrollPositions.retained; }
+  set retainedSearchScrollOffset(offset: number) { this.scrollPositions.retained = offset; }
+
+  rememberScrollPosition(pageKey: string, offset: number): void {
+    this.searchCache.updateScrollOffset(pageKey, offset);
+    // Bypass top-level setters during a gesture so @Observed does not send the
+    // offset back through initialResultsScrollOffset on every pixel of motion.
+    if (this.search?.pageKey === pageKey) this.scrollPositions.current = offset;
+    if (this.retainedSearch?.pageKey === pageKey) this.scrollPositions.retained = offset;
+  }
   searchResultsResetPending: boolean = false;
   searchActionsReady: boolean = true;
   searchInputReady: boolean = false;

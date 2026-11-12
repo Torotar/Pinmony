@@ -14,7 +14,8 @@ export class PinmonyDisplaySelectMenuMaterial implements AttributeModifier<Selec
       }
       instance.menuSystemMaterial(supported ? new uiMaterial.ImmersiveMaterial({
         style: this.mode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
-        colorInvert: false, interactive: true, applyShadow: true
+        colorInvert: false, interactive: true, applyShadow: true,
+        lightEffect: { color: $r('app.color.immersive_interaction_light') }
       }) : uiMaterial.Material.empty);
     }
   }

@@ -85,7 +85,8 @@ export struct PinmonyDraggablePublishButton {
       }
       options.systemMaterial = active ? new uiMaterial.ImmersiveMaterial({
         style: this.immersiveLightMode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
-        colorInvert: false, applyShadow: true, interactive: true, lightEffect: {}
+        colorInvert: false, applyShadow: true, interactive: true,
+        lightEffect: { color: $r('app.color.immersive_interaction_light') }
       }) : uiMaterial.Material.empty;
       if (active) {
         options.backgroundColor = Color.Transparent;

@@ -30,7 +30,7 @@ export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
     }
     state.gender = text(d.gender, 30);
     state.customGender = text(d.custom_gender, 500); state.country = text(d.country, 2);
-    state.accountLanguage = /^(zh|en|ja|ko)([-_][A-Z]{2})?$/.test(text(d.locale, 16)) ? text(d.locale, 16) : '';
+    state.accountLanguage = typeof d.locale === 'string' && d.locale.length <= 16 && /^[A-Za-z]{2,3}(?:[-_][A-Za-z]{2,4})?$/.test(d.locale) ? d.locale : '';
     state.privateProfile = d.opt_in_private_account === true;
     state.searchPrivacy = typeof d.search_privacy_enabled === 'boolean' ? d.search_privacy_enabled : d.exclude_from_search === true;
     state.canChangePrivacy = d.allow_switch_between_private_and_public_profile === true && d.is_parental_control_passcode_enabled !== true && d.is_parental_control_passcode_verification_pending !== true;

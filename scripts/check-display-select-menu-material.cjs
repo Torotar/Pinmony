@@ -18,7 +18,7 @@ function boot(version, supported) {
     { apiAvailable(api) { assert.equal(api, '26.0.0'); return version >= 26; } };
   const Host = vm.runInNewContext(ts.transpileModule(code + '\n' + name + ';', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
-  }).outputText, { deviceInfo, uiMaterial: {
+  }).outputText, { deviceInfo, $r: key => key, uiMaterial: {
     Material: { empty }, ImmersiveStyle: { THICK: 3, REGULAR: 2 },
     isImmersiveMaterialSupported() { capabilityQueries++; if (supported === 'error') throw Error('unavailable'); return supported; },
     ImmersiveMaterial: class { constructor(options) { effects.push(options); this.options = options; } }
@@ -43,6 +43,8 @@ for (const version of [24, 25, 26]) for (const supported of [true, false, 'error
       const effect = h.calls.at(-1).options;
       assert.equal(effect.style, mode === 'gentle' ? 3 : 2);
       assert.equal(effect.colorInvert, false); assert.equal(effect.interactive, true); assert.equal(effect.applyShadow, true);
+      if (compiled) { assert.equal(effect.lightEffect.color.type, 10001); assert(effect.lightEffect.color.id > 0); }
+      else assert.equal(effect.lightEffect.color, 'app.color.immersive_interaction_light');
     }
   }
   if (version >= 26 && supported === true) {

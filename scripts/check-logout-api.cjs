@@ -2,7 +2,7 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const ts = require(process.argv[2] || 'typescript');
 function compiled(file, requireFn = () => ({})) {
   const exports = {};
-  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {
+  require('./product-coordination-harness.cjs').run(ts,require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file, 'utf8'), { compilerOptions: {
     target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, { exports, require: requireFn });
   return exports;
 }
@@ -105,7 +105,7 @@ async function main() {
   const settingsSource = fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets', 'utf8');
   const confirmMethod = settingsSource.match(/  private confirmLogout\([\s\S]*?(?=\r?\n  private )/)[0];
   const confirmContext = { PinmonyImmersiveLight: { alertOptions: options => options } };
-  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {
+  require('./product-coordination-harness.cjs').run(ts,require('./native-network-test-fixture.cjs').transpile(ts, 'class Confirm {' + confirmMethod + '} globalThis.Confirm=Confirm;', {
     compilerOptions: { target: ts.ScriptTarget.ES2021 }
   }).outputText, confirmContext);
   confirmContext.Confirm.prototype.uiText=require('./local-message-test-fixture.cjs').rawLocalMessages.text;

@@ -32,10 +32,14 @@ for (const file of files) {
     assert.equal((source.match(/enableComponentSafeArea:\s*true/g) || []).length, 0, 'detail owns its scrolling title inset without adding a second component inset');
     assert.match(source, /if \(this\.imageLayer === 'search'\)[\s\S]*?avoidLayoutSafeArea: true, enableComponentSafeArea: false/,
       'specialized image search retains its existing title inset ownership');
+  } else if (source.includes('PinmonyHdsTitleBar.modalStyle(')) {
+    assert(source.includes('avoidLayoutSafeArea: false, enableComponentSafeArea: true'), file + ': MODAL owns title safe area');
+    assert(source.includes('top: 12, bottom: 28'), file + ': MODAL form has no manual title spacer');
   } else assert(!/enableComponentSafeArea:\s*true/.test(source), file + ': scrolling must reach title backdrop');
   assert(source.includes('scrollBarMargin'), file + ': scrollbar avoids title');
   const matches = [...source.matchAll(/style:\s*\{\s*blurStrategy:/g)];
-  assert(matches.length > 0, file);
+  assert(matches.length > 0 || source.includes('PinmonyHdsTitleBar.modalStyle('), file);
+  // Shared MODAL style and close behavior are executed by check-panel-style-consistency.cjs.
   for (const match of matches) {
     const imageSearch = file.endsWith('PinmonyDetailPage.ets') && match === matches[0];
     const expression = objectAt(source, match.index);
@@ -104,5 +108,6 @@ assert(editor.includes("phase === 'products' || phase === 'productSearch' ? [thi
 const inbox = fs.readFileSync(files[6], 'utf8');
 assert(inbox.includes('this.titleContentInset() + this.flowHeaderHeight'), 'chat/compose header inset remains in scrolling content');
 const history = fs.readFileSync(files[8], 'utf8');
-assert(history.includes('margin:{top:this.titleContentInset() + 16}'), 'history waterfall retains its existing title inset and section gap');
+assert.match(history, /margin:\s*\{\s*top:\s*this\.titleContentInset\(\)\s*\+\s*16\s*,\s*bottom:\s*32\s*\}/,
+  'history waterfall retains its title inset, section gap and bottom spacing');
 console.log('Flow title blur: ' + files.length + ' components, ' + count + ' title styles, four modes, fixed controls and scrollbar margins passed');

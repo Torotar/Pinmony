@@ -1,6 +1,7 @@
-import { PinmonyNativeNetwork, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyAuthStatus, PinmonyAuthMessage, PinmonySessionVerificationResult, parseSessionVerification, isPinterestAuthRoute, acceptsAuthMessage } from 'common_session';
-import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 
 export const PIN_NATIVE_SESSION_VERIFICATION_ENABLED: boolean = true;
 export const PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED: boolean = true;
@@ -107,6 +108,9 @@ export class PinmonySessionVerification {
       this.job = '';
       PinmonyRuntimeLog.info('SessionVerification: phase=accepted source=native');
       this.ports.accept(message);
+      if (result.status === 'authenticated' && this.ports.status() === 'authenticated' && this.ports.profile() === result.profileUrl) {
+        PinmonyI18n.syncAccountLanguage(result.accountLanguage || '');
+      }
     } catch (_) {
       if (current()) PinmonyRuntimeLog.warn('SessionVerification: result=unknown');
       if (current() && detached) this.ports.unavailable?.();

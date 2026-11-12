@@ -10,7 +10,7 @@ import { searchPinLinkIdentity, searchShortPinLink, searchProfileLink } from '..
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 
 // Owns search business state; product navigation/session capabilities are injected.
-interface PinmonyCategorySearchReturn { source: string; target: string; }
+interface PinmonyCategorySearchReturn { source: string; target: string; snapshot?: PinmonySearchSnapshot; }
 export class PinmonySearchController {
   private filterClosing: boolean = false;
   private submittedLinkGeneration: number = 0;
@@ -198,7 +198,9 @@ export class PinmonySearchController {
   restoreCategorySearchParent(): boolean {
     const context: PinmonyCategorySearchReturn | undefined = this.categoryReturns[this.categoryReturns.length - 1];
     if (!context) return false;
-    if (context.target !== this.ports.currentPageKey() || !this.searchStore.searchCache.get(context.source)) {
+    const cached = this.searchStore.searchCache.get(context.source);
+    if (context.target !== this.ports.currentPageKey() || !cached ||
+      context.snapshot && cached.snapshot !== context.snapshot) {
       this.categoryReturns = []; return false;
     }
     this.categoryReturns.pop();
@@ -218,7 +220,16 @@ export class PinmonySearchController {
     if (this.ports.nativeSearch?.()) {
       if (!this.searchStore.searchNativeInputReady || !this.searchStore.search?.query.trim() || this.ports.sheetKind()) return;
       if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing(); this.searchStore.searchInputFocused = false;
-      this.filterClosing = false; this.searchStore.searchFilterToken++; this.searchStore.searchFilterOptions = []; this.ports.setFilterVisible(true); await this.ports.nativeSearchFilters?.(); return;
+      this.filterClosing = false;
+      this.searchStore.searchFilterToken++;
+      this.searchStore.searchFilterOptions = [];
+      this.searchStore.searchFilterError = '';
+      this.searchStore.searchFilterLoading = true;
+      // Cached filters are prepared synchronously before the first sheet frame.
+      const loading: Promise<void> | undefined = this.ports.nativeSearchFilters?.();
+      this.ports.setFilterVisible(true);
+      await loading;
+      return;
     }
     this.ports.traceAction('search.filters');
     const generation: number = this.generation;
@@ -813,6 +824,7 @@ export class PinmonySearchController {
         this.ports.showMessage(PinmonyI18n.message('pm_search_recommendation_unavailable'));
         return;
       }
+      this.searchStore.searchCache.put(search, this.searchStore.searchScrollOffset);
       this.searchStore.retainedSearch = search;
       this.searchStore.retainedSearchScrollOffset = this.searchStore.searchScrollOffset;
       this.searchStore.searchReturnPageKey = search.pageKey;

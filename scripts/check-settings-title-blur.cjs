@@ -39,7 +39,7 @@ for (const [file, profile] of pages) {
     assert.equal(options.style.originalStyle.backgroundStyle.blurRadius, mode === 'off' ? 0 : 18, file);
     if (profile) {
       host.snapshot.mode = 'following';
-      assert.equal(evaluate.call(host).enableComponentSafeArea, true, 'unrelated profile lists keep their geometry');
+      assert.equal(evaluate.call(host).enableComponentSafeArea, false, 'Following content scrolls behind its immersive title');
     }
   }
   assert(source.includes('.scrollBarMargin({ start: LengthMetrics.vp('), file + ': scrollbar clears title');

@@ -5,6 +5,8 @@
   "main": "Index.ets",
   "dependencies": {
     "common_foundation": "file:../common_foundation",
-    "common_ui": "file:../common_ui"
+    "common_ui": "file:../common_ui",
+    "common_network": "file:../common_network",
+    "common_session": "file:../common_session"
   }
 }

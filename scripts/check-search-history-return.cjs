@@ -4,28 +4,16 @@ const assert = require('assert/strict');
 const ts = require(process.argv[2]);
 const source = fs.readFileSync('feature_search/src/main/ets/components/PinmonySearchPage.ets', 'utf8');
 const destination = source.slice(source.indexOf('  private searchRootDestination('), source.indexOf('  private searchCategoriesTitleBar('));
-const discovery = destination.indexOf("this.searchMaterialContent('discovery')");
-const results = destination.indexOf("this.searchMaterialContent('results')");
-const history = destination.indexOf("this.searchMaterialContent('history')");
-assert(discovery >= 0 && discovery < history && results < history);
-assert(destination.slice(results, history).includes('.zIndex(this.historyExitToRoot ? 0 : 2)'), 'results must remain above history when returning to history, and below it on the way to root');
-assert(destination.slice(history).includes('.zIndex(1)'), 'history exits above the root destination');
-assert.match(destination.slice(history), /TransitionEffect\.translate\(\{ x: '100%' \}\)\.animation\(\{ duration: 180, curve: Curve\.EaseOut \}\)/);
-assert(destination.includes('if (this.inputEditing || this.historyRetained)'), 'history stays mounted beneath submitted results and subsequent child pages');
-assert(destination.slice(history).includes('.hitTestBehavior(this.active && this.inputEditing ? HitTestMode.Default : HitTestMode.None)'));
-assert(destination.slice(history).includes(".accessibilityLevel(this.active && this.inputEditing ? 'auto' : 'no-hide-descendants')"));
-const historyVisibility=destination.slice(history).match(/\.visibility\(([^\n]+)\)/)[1];
-const visible=vm.runInNewContext('(function(){return '+historyVisibility+';})',{Visibility:{Visible:1,Hidden:0}});
-assert.equal(visible.call({inputEditing:false,committedQuery:()=>''}),0,'failed or cancelled root submission cannot leave a disabled history over discovery');
-assert.equal(visible.call({inputEditing:false,committedQuery:()=>'term'}),1,'history remains visible and stationary beneath results');
-assert.equal(visible.call({inputEditing:true,committedQuery:()=>''}),1,'root history remains visible while editing');
-assert.equal((destination.slice(results,history).match(/duration: 180, curve: Curve.EaseOut/g)||[]).length,2,
-  'new results enter and return using matching timing');
-assert(!destination.slice(history, destination.indexOf('.hideTitleBar(true)')).includes('this.historyExitToRoot ?'),
-  'history exit must be installed while visible, not selected in the removal update');
-assert(destination.slice(0, discovery).includes('if (!this.committedQuery())'), 'keep the discovery root mounted below history');
-assert(destination.slice(discovery, results).includes(".accessibilityLevel(this.inputEditing ? 'no-hide-descendants' : 'auto')"),
-  'covered discovery root must not receive accessibility focus');
+assert(destination.includes('this.showingSearchHistory(name)'), 'history and results switch body within the current destination');
+assert(destination.includes("name !== 'search-history' && this.historyDestinationRetained"),'retained root cannot mount a second results scroller');
+assert(!destination.includes('if (this.inputEditing || this.historyRetained)'), 'editing cannot replace root body with a history layer');
+assert(destination.includes("this.searchMaterialContent('discovery')") && destination.includes("this.searchMaterialContent('results')"));
+assert(destination.includes(".titleBar(PinmonyHdsTitleBar.resolve") && destination.includes("this.searchTitleBarOptions(name)"));
+assert(destination.includes("this.showingSearchHistory(name) ? this.historyScroller"), 'history title binds to the actual history scroller');
+assert(source.includes('List({ scroller: this.historyScroller })'));
+assert(destination.includes('TransitionEffect.IDENTITY'), 'keyword results keep in-place loading');
+assert(destination.includes(".hitTestBehavior(this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? HitTestMode.None : HitTestMode.Default)"));
+assert(destination.includes(".accessibilityLevel(this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? 'no-hide-descendants' : 'auto')"));
 const start = source.indexOf('  private handleSearchBack(');
 const end = source.indexOf('\n  private ', start + 1);
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
@@ -34,6 +22,8 @@ const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
 const host = new Host();
 let page = 'results';
 host.snapshot = {};
+host.searchPathStack = { getAllPathName: () => [] };
+host.requestQuizClose=()=>host.onQuizAction();
 host.inputEditing = false;
 host.committedQuery = () => 'query';
 host.openSearchHistory = () => { host.inputEditing = true; page = 'history'; };
@@ -67,25 +57,44 @@ function inputMethod(name) {
   assert(a>=0);return source.slice(a,b<0?source.lastIndexOf('\n}'):b);
 }
 const Input=vm.runInNewContext(ts.transpileModule('class Input {'+
-  ['onInputFocus','openSearchHistory','closeInputPanel','committedQuery'].map(inputMethod).join('\n')+'} Input;',
+  ['onInputFocus','openSearchHistory','closeInputPanel','committedQuery','showSearchHistoryDestination','closeSearchHistoryDestination','finishSearchHistoryClose','submitSearchInput','showingSearchHistory'].map(inputMethod).join('\n')+'} Input;',
   {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
 const input=new Input();let stopEditing;
-Object.assign(input,{snapshot:{pageKey:'https://www.pinterest.com/search/pins/?q=test',query:'test'},
-  inputController:{stopEditing(){}},inputFocusRevision:0,onQueryChange(){},
+const paths=['pin-web-search'], navEvents=[];
+input.setCategoriesCollapsed=value=>{input.categoriesCollapsed=value;};input.ensureSearchDestination=()=>{};input.focusMountedSearchInput=()=>{};
+input.searchPathStack={getAllPathName:()=>paths.slice(),pushPath:(info,animated)=>{paths.push(info.name);navEvents.push(['push',info.name,animated]);},pop:animated=>{navEvents.push(['pop',paths.pop(),animated]);}};
+Object.assign(input,{pagePresent:true,active:true,snapshot:{pageKey:'https://www.pinterest.com/search/pins/?q=test',query:'test',session:1},
+  inputController:{stopEditing(){}},displayInputController:{stopEditing(){}},inputFocusRevision:0,onQueryChange(){},
   onInputFocusChange(focused,stop){if(focused)stopEditing=stop;}});
-for(const enter of [()=>input.onInputFocus(true),()=>input.openSearchHistory()]){
-  enter();assert.equal(input.historyExitToRoot,false);assert.equal(input.inputEditing,true);
-  assert.equal(input.historyRetained,true,'editing mounts the history layer');
-  stopEditing();assert.equal(input.historyExitToRoot,true,'host system back uses root-return layering');
-  assert.equal(input.historyRetained,false,'explicit root return releases the history layer');
-  assert.equal(input.inputEditing,false,'host callback closes history without recursive parent navigation');
-}
-input.onInputFocus(true);input.closeInputPanel(false);
-assert.equal(input.historyExitToRoot,false,'submitting a search retains the results entrance layering');
-assert.equal(input.historyRetained,true,'submission cannot remove the old history and play its exit');
-assert.equal(input.inputEditing,false);
-input.onInputFocus(false);
-assert.equal(input.historyRetained,true,'blur while opening a child must not remove history');
-input.openSearchHistory();input.closeInputPanel(true);
-assert.equal(input.historyRetained,false,'closing unsubmitted root history releases it');
-console.log('search history return checks passed');
+input.onInputFocus(true);
+assert.deepEqual(paths,['pin-web-search','search-history'],'explicit click enters a separate page');
+input.showSearchHistoryDestination();assert.equal(paths.length,2,'repeat click cannot duplicate pages');
+input.closeInputPanel(false);
+assert.equal(input.inputEditing,false);assert.equal(paths.length,2,'submission keeps the history/result destination mounted');
+assert.equal(input.historyDestinationRetained,true);
+const submittedNavigationCount=navEvents.length;
+input.openSearchHistory();assert.equal(input.inputEditing,true);
+assert.equal(input.showingSearchHistory('search-history'),true);assert.equal(input.showingSearchHistory('pin-web-search'),false);
+assert.equal(navEvents.length,submittedNavigationCount,'results return changes only body and never pushes, pops or animates a destination');
+assert.equal(input.pendingInputFocus,false,'returning to history cannot force a keyboard');
+stopEditing();assert.deepEqual(paths,['pin-web-search'],'second back exits history only once');
+assert.equal(input.historyDestinationRetained,true,'retain outgoing host until native exit completes');
+input.finishSearchHistoryClose();
+assert.equal(input.historyDestinationRetained,false);
+// Direct recommendation results install a nonanimated history host for the next exit.
+const rootNavCount=navEvents.length;input.openSearchHistory();
+assert.equal(input.showingSearchHistory('search-history'),true);assert.equal(input.showingSearchHistory('pin-web-search'),false);
+assert.equal(navEvents.length,rootNavCount+1);assert.deepEqual(navEvents.at(-1),['push','search-history',false]);
+input.closeInputPanel(true);assert.deepEqual(paths,['pin-web-search']);
+input.finishSearchHistoryClose();
+input.active=true;input.interactionReady=true;
+let submitted='';input.onSubmit=value=>{submitted=value;};
+input.onInputFocus(true);input.submitSearchInput('   ');assert.equal(input.inputEditing,true,'blank submission keeps history');
+input.query='draft term';const submitNavCount=navEvents.length;input.submitSearchInput('  draft term  ');
+assert.equal(submitted,'draft term');assert.equal(input.inputEditing,false);assert.equal(navEvents.length,submitNavCount,'keyword submission replaces only body');
+input.openSearchHistory();input.closeInputPanel(true);assert.deepEqual(paths,['pin-web-search']);
+input.finishSearchHistoryClose();
+assert(source.includes('this.closeInputPanel(false); this.onSuggestion(item.id);'), 'history/suggestion selection closes the destination before dispatching the original action');
+paths.push('photo-search');input.closeSearchHistoryDestination(true);assert.equal(paths.at(-1),'photo-search','history close cannot pop an unrelated photo page');
+assert(source.includes('.enableKeyboardOnFocus(editing)') && source.includes('.focusable(editing)'), 'only the history search may acquire keyboard focus');
+console.log('Search history/result body-only submit and return, independent entry, single-level back, retained host/controller and photo isolation passed');

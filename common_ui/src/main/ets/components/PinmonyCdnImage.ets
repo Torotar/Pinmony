@@ -29,6 +29,7 @@ export struct PinmonyCdnImage {
   private inViewport: boolean = false;
   @State private loadAllowed: boolean = true;
   @State private nativeSourceAdmitted: boolean = false;
+  private nativeFallback: boolean = false;
   @State private generation: number = 0;
   private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
   private settledGeneration: number = -1;
@@ -38,7 +39,10 @@ export struct PinmonyCdnImage {
   private readonly loadTrace: PinmonyImageLoadTrace = new PinmonyImageLoadTrace();
 
   aboutToAppear(): void { this.uiCommits.activate(); this.visible = true; this.reload(); }
-  aboutToDisappear(): void { this.visible = false; this.uiCommits.dispose(); this.generation++; this.release(); }
+  aboutToDisappear(): void {
+    this.auditImage('host-disposed');
+    this.visible = false; this.uiCommits.dispose(); this.generation++; this.release();
+  }
   private release(): void {
     this.nativeSourceAdmitted = false;
     this.bitmap = undefined;
@@ -53,7 +57,8 @@ export struct PinmonyCdnImage {
     const generation: number = ++this.generation;
     this.release();
     this.loadAllowed = this.loadingActive !== false && (this.viewportOnly !== true || this.inViewport);
-    this.nativeSourceAdmitted = this.useSharedDecode === false && this.loadAllowed;
+    this.nativeFallback = this.useSharedDecode === false || !acceptsSoftwareJpeg(this.url);
+    this.nativeSourceAdmitted = this.nativeFallback && this.loadAllowed;
     if (!this.visible || this.useSharedDecode === false || !acceptsSoftwareJpeg(this.url)) return;
     const lease: PinmonyJpegLease = PinmonyJpegDecode.acquire(this.url, this.loadAllowed, this.loadPriority ?? 1);
     this.lease = lease;
@@ -68,6 +73,10 @@ export struct PinmonyCdnImage {
     }).catch((): void => {
       if (!this.visible || this.generation !== generation || this.lease !== lease) return;
       this.release();
+      // A failed software decode uses the native Image fallback. Once admitted,
+      // viewport/foreground changes may pause work, but must never remove its node.
+      this.nativeFallback = true;
+      this.nativeSourceAdmitted = this.loadAllowed;
     });
   }
   private async samplePhotoColor(bitmap: image.PixelMap, generation: number): Promise<void> {
@@ -83,7 +92,7 @@ export struct PinmonyCdnImage {
     this.loadAllowed = this.loadingActive !== false && (this.viewportOnly !== true || this.inViewport);
     // Admission pauses new work; it must not unmount a native Image already
     // shown beneath a detail transition, Sheet, another tab or background state.
-    if (this.visible && this.useSharedDecode === false && this.loadAllowed) this.nativeSourceAdmitted = true;
+    if (this.visible && this.nativeFallback && this.loadAllowed) this.nativeSourceAdmitted = true;
     this.lease?.setPriority?.(this.loadPriority ?? 1);
     this.lease?.setActive?.(this.visible && this.loadAllowed);
     if (this.bitmap && this.loadAllowed && this.onPhotoColor) this.samplePhotoColor(this.bitmap, this.generation);
@@ -101,7 +110,8 @@ export struct PinmonyCdnImage {
     });
   }
   private auditImage(phase: string, code: number = 0, failureInfo?: RequestDownloadInfo): void {
-    if (!this.traceLoading || !this.visible || this.tracePhases.has(phase)) return;
+    const lifecycle: boolean = phase === 'node-mounted' || phase === 'node-unmounted';
+    if (!this.traceLoading || !this.visible || (!lifecycle && this.tracePhases.has(phase))) return;
     this.tracePhases.add(phase);
     try {
       this.loadTrace.record(this.traceTask, this.generation, this.traceIndex, this.sourceStartedAt,
@@ -113,6 +123,7 @@ export struct PinmonyCdnImage {
       if (this.canRenderImage()) {
         Image(this.bitmap || this.url).width('100%').height('100%').objectFit(this.fit)
           .onAppear(() => { if (this.visible && generation === this.generation) this.auditImage('node-mounted'); })
+          .onDisAppear(() => { if (this.visible && generation === this.generation) this.auditImage('node-unmounted'); })
           .onComplete((event) => {
             if (!this.visible || generation !== this.generation) return;
             if (event?.loadingStatus === 0) this.auditImage('native-data-ready');

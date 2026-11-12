@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const deps=n=>n==='feature_profile'?{PIN_PROFILE_ORGANIZE_ENABLED:true}:n==='feature_pin'?{PIN_POST_API_ENABLED:true,PIN_POST_EXTENSIONS_ENABLED:true,PIN_EDIT_API_ENABLED:true}:n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){},warn(){}},PinmonyTaskRegistry:class{invalidate(){}}}:{};
 const Ops=load('entry/src/main/ets/app/PinmonyPostNativeOperations.ets',deps).PinmonyPostNativeOperations;
 const Confirmed=load('feature_pin/src/main/ets/services/PinmonyConfirmedSaves.ets').PinmonyConfirmedSaves;
@@ -23,7 +23,7 @@ async function picker(f){const start=f.requests.length,p=f.ops.openSave(pin);f.r
 }
 const ui=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
 function method(name){const start=ui.search(new RegExp('  private '+name+'\\('));assert(start>=0);if(name==='displayedDetail')return ui.slice(start,ui.indexOf('\n  }',start)+4);return ui.slice(start,ui.indexOf('\n  private ',start+1)).replace(/\s*@Builder\s*$/,'');}
-const View=vm.runInNewContext(ts.transpileModule('class View {'+['displayedDetail','action','acceptsActionIntent','titleBarOptions','leftActions','actionButtonEnabled','actionCountText'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},Color:{Transparent:0},$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},TextStyleMode:{NORMAL:0}});
+const View=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class View {'+['displayedDetail','action','acceptsActionIntent','titleBarOptions','leftActions','actionButtonEnabled','actionCountText'].map(method).join('\n')+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:1},PinmonyImmersiveLight:{effect:()=>undefined},Color:{Transparent:0},$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},TextStyleMode:{NORMAL:0}});
 View.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
 function view(f){const v=new View();Object.defineProperty(v,'currentDetail',{get:()=>v.detail});Object.assign(v,{detail:f.store.detail,imageLayer:'',shareActionsReady:true,postActionsReady:true,commentActionsReady:true,actionsReady:false,deferredActions:false,auxiliaryReady:true,likeBlocked:f.ops.likeBlocked(pin),saveBusy:false});return v;}
 async function main(){
@@ -32,7 +32,7 @@ async function main(){
  const arrow=index.match(/nativePostAction: (async [\s\S]*?),\s*postExtensionsEnabled:/);assert(arrow);
  const ownStart=index.indexOf('  private ownsPostPin(');assert(ownStart>=0);
  const ownMethod=index.slice(ownStart,index.indexOf('\n  private ',ownStart+1));
- const Host=vm.runInNewContext(ts.transpileModule('class Host {'+ownMethod+' make(){return ('+arrow[1]+');} } Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_POST_OPERATIONS_ENABLED:true,PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PIN_NATIVE_COMMENT_WRITES_ENABLED:true});
+ const Host=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Host {'+ownMethod+' make(){return ('+arrow[1]+');} } Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_POST_OPERATIONS_ENABLED:true,PIN_NATIVE_PIN_MENUS_ENABLED:true,PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PIN_NATIVE_COMMENT_WRITES_ENABLED:true});
  const h=new Host(),shares=[],calls=[];Object.assign(h,{nativeBusinessRoutesEnabled:true,pinStore:f.store,pinIdentity:p=>p.match(/\/pin\/(\d+)\//)?.[1]||'',shareNativeFlow:{open:async(...a)=>shares.push(a)},postNativeOperations:f.ops});
  const dc=new Detail({store:f.store,isOffline:()=>false,isAuthenticated:()=>true,traceAction(){},nativePostAction:h.make(),runScript(){throw Error('Web script')},loadDetailUrl(){throw Error('Web navigation')}});
  v.onAction=(id,kind)=>calls.push(dc.performAction(id,kind));

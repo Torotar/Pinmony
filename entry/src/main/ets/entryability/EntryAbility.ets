@@ -1,5 +1,7 @@
 import { PINMONY_BUILD_IDENTITY } from '../app/PinmonyBuildIdentity';
 import { PinmonyInboxNoticeTap } from '../app/PinmonyInboxNoticeTap';
+import { PinmonyPageRecovery } from '../app/PinmonyPageRecovery';
+import { PinmonyInboxNoticeRecovery } from '../app/PinmonyInboxNoticeRecovery';
 import { PinmonyInboxBackgroundLifecycle } from '../app/PinmonyInboxBackgroundLifecycle';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
@@ -79,6 +81,9 @@ export default class EntryAbility extends UIAbility {
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    this.context.setRestoreEnabled(true);
+    PinmonyPageRecovery.receive(want.parameters, launchParam.launchReason === AbilityConstant.LaunchReason.APP_RECOVERY && !want.uri);
+    PinmonyInboxNoticeRecovery.initialize(this.context);
     PinmonyInboxNoticeTap.receive(want);
     AppStorage.setOrCreate<number>('pinmonyAbilityCreatedAt', Date.now());
     PinmonyRuntimeLog.info('StartupBoundary: ability-onCreate sinceModuleMs=' +
@@ -265,7 +270,29 @@ export default class EntryAbility extends UIAbility {
   }
 
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    PinmonyPageRecovery.clear();
     PinmonyInboxNoticeTap.receive(want);
+  }
+
+  onSaveState(reason: AbilityConstant.StateType, wantParam: Record<string, Object>): AbilityConstant.OnSaveResult {
+    return this.savePageRecoveryState(reason, wantParam, 'sync');
+  }
+
+  async onSaveStateAsync(reason: AbilityConstant.StateType,
+    wantParam: Record<string, Object>): Promise<AbilityConstant.OnSaveResult> {
+    return this.savePageRecoveryState(reason, wantParam, 'async');
+  }
+
+  private savePageRecoveryState(reason: AbilityConstant.StateType, wantParam: Record<string, Object>,
+    mode: string): AbilityConstant.OnSaveResult {
+    const startedAt: number = Date.now();
+    PinmonyRuntimeLog.info('PageRecovery: phase=save-callback mode=' + mode + ' reason=' + reason);
+    const state: string = PinmonyPageRecovery.save();
+    if (state) wantParam[PinmonyPageRecovery.parameterKey()] = state;
+    // This confirms the callback result only; system persistence is a later stage.
+    PinmonyRuntimeLog.info('PageRecovery: phase=save-return mode=' + mode + ' attached=' + (state.length > 0) +
+      ' chars=' + state.length + ' policy=all-agree elapsedMs=' + (Date.now() - startedAt) + ' systemCommitConfirmed=false');
+    return AbilityConstant.OnSaveResult.ALL_AGREE;
   }
 
   onForeground(): void {

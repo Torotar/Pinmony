@@ -9,7 +9,8 @@ import { PinmonyProfileStore } from 'feature_profile';
 import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonyHomeController } from 'feature_home';
 import { PinmonyHomeStore } from 'feature_home';
-import { PinmonyNativeNetwork, PinmonyJpegDecode } from 'common_network';
+import { PinmonyJpegDecode } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyAuthMessage, PinmonyAuthStatus, acceptsAuthMessage, isPinterestAuthRoute } from 'common_session';
@@ -184,6 +185,7 @@ updateAuthState(value: string, nativeEvidence: boolean = false): void {
             PinmonyRuntimeLog.warn('Pinmony: authentication acknowledgement unavailable');
         }
         if (message.status === 'unauthenticated') {
+            PinmonyI18n.clearAccountLanguage();
             this.ports.setOfflineCacheLoading(false);
             if (this.ports.authStatus() === 'authenticated')
                 this.resetAuthenticatedContent();
@@ -212,6 +214,7 @@ updateAuthState(value: string, nativeEvidence: boolean = false): void {
         const accountChanged: boolean = !!this.ports.homeCacheAccountId() && !!accountId &&
             this.ports.homeCacheAccountId() !== accountId;
         if (accountChanged) {
+            PinmonyI18n.clearAccountLanguage();
             PinmonyRuntimeLog.info('HomeCache: account identity changed; clearing memory and preserving disk partitions');
             this.ports.clearOfflineHomeMarker();
             this.ports.clearRootTabCaches(false);
@@ -287,6 +290,7 @@ updateAuthState(value: string, nativeEvidence: boolean = false): void {
 }
 
 resetAuthenticatedContent(): void {
+    PinmonyI18n.clearAccountLanguage();
     this.ports.returnCoordinator().cancel();
     this.ports.controllerLifecycle().pause();
     this.ports.homeController().invalidatePending();

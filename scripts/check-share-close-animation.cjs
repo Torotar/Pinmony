@@ -14,12 +14,12 @@ for(const native of [false,true]){
  let cancels=0,contactUpdates=0;
  const flow=new Native();Object.assign(flow,{store,busy:true,pending:'sending',unknown:new Set(),revision:3,searchRevision:5,timer:-1,account:'synthetic',generation:1,ports:{session:()=>({authenticated:true,accountId:'synthetic',generation:1})},contacts(){contactUpdates++;},client:{cancel(){cancels++;}},contactsClient:{cancel(){cancels++;}}});
  const controller=new Controller();Object.assign(controller,{store,generation:2,searchToken:3,refreshToken:4,searchTasks:{invalidate(){}},tasks:{invalidate(){}},ports:{nativeShare:()=>native,nativePause:keep=>{paused++;flow.pause(keep);},activeSheetKind:()=>h.activeSheetKind}});
- Object.assign(h,{activeSheetKind:'share',showNativeSheet:true,homeStore:{},pinStore:store,nativeBusinessRoutesEnabled:native,sharePanelsController:controller,dismissShareSheet(){cleared++;}});
+ Object.assign(h,{activeSheetKind:'share',showNativeSheet:true,homeStore:{},photoMenuCoordinator:{pause(){}},pinStore:store,nativeBusinessRoutesEnabled:native,sharePanelsController:controller,dismissShareSheet(){cleared++;}});
  h.requestShareSheetClose();assert.equal(h.showNativeSheet,false);assert.equal(h.activeSheetKind,'share');assert.equal(h.pinStore.shareContacts,contacts);assert.equal(paused,native?1:0);assert.equal(cleared,0);
  assert.equal(store.shareLoading,true);assert.equal(store.shareError,'');assert.equal(store.shareFeedback,'正在加载联系人…');assert.equal(contactUpdates,0);assert.equal(controller.generation,3);
  if(native){assert.equal(cancels,2);assert(flow.unknown.has('sending'),'unconfirmed mutation remains blocked');assert.equal(flow.revision,4);assert.equal(flow.searchRevision,6);}
  h.requestShareSheetClose();assert.equal(paused,native?1:0,'repeated close remains idempotent');
- h.showNativeSheet=true;h.homeStore.customHomeMenu={};h.requestShareSheetClose();assert.equal(cleared,1,'custom photo menus retain original dismissal');
+ h.showNativeSheet=true;h.sheetExitKind='';const menu={actions:[{id:'home-save'}]};h.homeStore.customHomeMenu=menu;h.requestShareSheetClose();assert.equal(cleared,0,'card menu defers cleanup exactly like detail');assert.equal(h.homeStore.customHomeMenu,menu);assert.equal(h.activeSheetKind,'share');assert.equal(h.showNativeSheet,false);h.requestShareSheetClose();assert.equal(cleared,0);
  controller.pause();assert.equal(store.shareLoading,false,'ordinary pause still exposes retry state');assert(store.shareError);
 }
 const navigationPorts=source.slice(source.indexOf('    dismissSearchFilters: (): void =>'),source.indexOf('    editPinAction: (method:',source.indexOf('    dismissSearchFilters: (): void =>')));

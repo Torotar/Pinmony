@@ -53,7 +53,10 @@ for (const api of [24, 25, 26]) for (const mode of ['off', 'gentle', 'immersive'
     assert.equal(options.systemMaterial.colorInvert, false);
     assert.equal(options.systemMaterial.applyShadow, true);
     assert.equal(options.systemMaterial.interactive, true);
-    assert.deepEqual(Object.keys(options.systemMaterial.lightEffect), []);
+    if (compiled) {
+      assert.equal(options.systemMaterial.lightEffect.color.type, 10001);
+      assert(options.systemMaterial.lightEffect.color.id > 0);
+    } else assert.equal(options.systemMaterial.lightEffect.color, 'app.color.immersive_interaction_light');
     assert.equal(options.backgroundColor, 'transparent');
     assert.equal(options.backgroundBlurStyle, 0, 'The menu uses material blur without stacking the old blur');
   }

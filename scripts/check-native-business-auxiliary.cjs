@@ -76,7 +76,7 @@ async function policies(){
 }
 async function legacy(){
  for(const [file,flag] of [['feature_search/src/main/ets/services/PinmonySearchQuizApiScript.ets','PinmonyNativeSearchReadsEnabled'],['feature_inbox/src/main/ets/services/PinmonyBoardInvitationScript.ets','PinmonyNativeInboxUpdatesEnabled']]){
-  const exp={},window={[flag]:true};window.top=window;vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:exp});vm.runInNewContext(Object.values(exp).find(v=>typeof v==='string'),{window,location:{hostname:'www.pinterest.com'},fetch(){throw Error('legacy request');}});
+  const exp={},window={[flag]:true};window.top=window;vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:exp});vm.runInNewContext(Object.values(exp).find(v=>typeof v==='string'),{window,location:{hostname:'www.pinterest.com'},fetch(){throw Error('legacy request');}});
   assert.equal(window.PinmonySearchQuizApi,undefined);assert.equal(window.PinmonyBoardInvitations,undefined);
  }
 }

@@ -31,7 +31,7 @@ for (const mode of ['gentle', 'immersive', 'exquisite']) {
     assert.equal(effect.style, mode === 'gentle' ? 3 : 2);
     assert.equal(effect.materialColor, selected ? 'rgba(230,0,35,0.9)' : undefined);
     assert.equal(effect.interactive, true); assert.equal(effect.applyShadow, false);
-    assert.deepEqual(Object.keys(effect.lightEffect), []);
+    assert.equal(effect.lightEffect.color, 'app.color.immersive_interaction_light');
   }
 }
 for (const selected of [true, false]) {

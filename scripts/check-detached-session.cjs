@@ -63,7 +63,7 @@ function fixture() {
   for (const name of stores) host[name + 'Store'] = {};
   for (const name of ['boardNativeReads','profileNativeReads','inboxUpdatesNativeReads','inboxMessagesNativeReads',
     'searchNativeReads','searchDiscoveryNativeReads','homeNativeReads']) host[name] = { reset() {} };
-  Object.assign(host, { nativeLoginEnabled: true, nativeBusinessRoutesEnabled: true, loginHostMounted: false,
+  Object.assign(host, {restoreRecoveredPage(){}, nativeLoginEnabled: true, nativeBusinessRoutesEnabled: true, loginHostMounted: false,
     inboxBackgroundSync: { stop() { effects.push('background-stop'); } },
     boardInvitationNotice: { reset() { effects.push('invitation-reset'); } },
     imageViewer: { cancel() { effects.push('viewer-cancel'); } },

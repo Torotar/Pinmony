@@ -1,7 +1,7 @@
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkContext,
-  PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonySettingsStore, logoutRequestBody, logoutResponseSucceeded } from 'feature_settings';
 
 export interface PinmonyLogoutPorts {

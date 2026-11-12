@@ -147,11 +147,12 @@ export struct PinmonySearchFilterSheet {
           .width('100%')
         }
         .width('100%')
-        .constraintSize({ maxHeight: 520 })
+        .layoutWeight(1)
         .scrollBar(BarState.Off)
       }
     }
     .width('100%')
+    .height('100%')
     .padding({ bottom: 20 })
     .backgroundColor($r('app.color.page_background'))
   }

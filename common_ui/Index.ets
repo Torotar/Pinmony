@@ -41,3 +41,6 @@ export { PinmonyDraggablePublishButton } from './src/main/ets/components/Pinmony
 export { PinmonySnackBarLifecycle } from './src/main/ets/services/PinmonySnackBarLifecycle';
 
 export { PinmonyAvatarColorSource, PinmonyAvatarColorIdentity, PinmonyAvatarColorListener, PinmonyAvatarColorResolver } from './src/main/ets/PinmonyAvatarColorSource';
+
+export { PinmonyOptionsNavigation } from './src/main/ets/components/PinmonyOptionsNavigation';
+export { PinmonyPinViewTransition } from './src/main/ets/services/PinmonyPinViewTransition';

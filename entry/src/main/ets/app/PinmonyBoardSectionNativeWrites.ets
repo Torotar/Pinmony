@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardFlow } from 'feature_board';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 
 export interface BoardSectionWriteIdentity {
   page: string; board: string; section: string; viewer: string; owner: string; intent: number;

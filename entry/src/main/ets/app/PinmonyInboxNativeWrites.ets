@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxFlowSnapshot } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
 export interface PinmonyInboxWriteMessage { id: string; own: boolean; deleted: boolean; reactable: boolean; }

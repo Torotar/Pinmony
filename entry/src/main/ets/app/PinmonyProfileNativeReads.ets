@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileCollaborator, PinmonyProfileStore, PinmonyProfileSnapshot, PinmonyProfileAction, PinmonyBoard, PinmonyCreatedPin } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyProfileSettingsClient, ProfileSettingsResponse, ProfileSettingsPorts } from './PinmonyProfileSettingsClient';
 // Per-feature manual rollout; the transport safety gate is still mandatory.

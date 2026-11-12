@@ -1,3 +1,4 @@
+import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -47,7 +48,7 @@ export struct PinmonySocialPermissionsPage {
           this.dismissErrorSnack();
           if (this.onRequest) this.onRequest(this.store.screen === 'socialBlocked' ? 'socialBlocked' : 'socialRead', '');
         }
-      }, { duration: 4000, pressBackCallback: () => {
+      }, { backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK, blurStrategy: BlurStrategy.ENABLE, duration: 4000, pressBackCallback: () => {
         if (!this.visible || key !== this.errorSnackKey) return;
         this.dismissErrorSnack(); if (this.onBack) this.onBack();
       } });
@@ -353,7 +354,13 @@ export struct PinmonySocialPermissionsPage {
             TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }),
             TransitionEffect.IDENTITY))
         }, (screen: string): string => screen)
-        if (this.store.loading || this.store.busy) { LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None) }
+        if (this.store.loading || this.store.busy) {
+          if (this.store.busy) {
+            PinmonyLoadingOverlay({ showMessage: false })
+          } else {
+            LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+          }
+        }
       }.width('100%').height('100%')
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },

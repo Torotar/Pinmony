@@ -148,36 +148,47 @@ async function main() {
   assert.equal(runtime.cache.normalizeHomeBoard({id:'42',name:'Board',pinCount:3,thumbnailUrl:'https://other.invalid/a.jpg'}),undefined);
   const reads=[],writes=[],removed=[];
   let cached={snapshot:snapshot(99)};
-  const cache={getWithMetadata(key,ttl){reads.push([key,ttl]);return{value:cached,status:'disk',ageMs:100};},
-    put(key,value,ttl){writes.push([key,value,ttl]);},remove(key){removed.push(key);}};
-  assert(runtime.cache.readHomeCache(cache,'partition-one',root,'test'));
+  const cache={async getWithMetadataAsync(key,ttl){reads.push([key,ttl]);return{value:cached,status:'disk',ageMs:100};},
+    async putAsync(key,value,ttl){writes.push([key,value,ttl]);},async removeAsync(key){removed.push(key);}};
+  assert(await runtime.cache.readHomeCache(cache,'partition-one',root,'test'));
   assert.equal(reads[0][1],300000);
   let markers=0;
-  runtime.cache.writeHomeCache(cache,'partition-one',snapshot(4),()=>markers++);
-  runtime.cache.writeHomeCache(cache,'partition-two',snapshot(4),()=>markers++);
+  await runtime.cache.writeHomeCache(cache,'partition-one',snapshot(4),()=>markers++);
+  await runtime.cache.writeHomeCache(cache,'partition-two',snapshot(4),()=>markers++);
   assert.notEqual(writes[0][0],writes[1][0]); assert.equal(markers,2);
   assert.equal(writes[0][2], reads[0][1], 'read and write share the presentation-only retention window');
   cached={snapshot:snapshot(1,[],{dataSource:'dom'})};
-  assert.equal(runtime.cache.readHomeCache(cache,'partition-one',root,'test'),undefined);
+  assert.equal(await runtime.cache.readHomeCache(cache,'partition-one',root,'test'),undefined);
   assert.equal(removed.length,1);
   assert.equal(writes[0][1].snapshot.session,0, 'disk cache never persists action session IDs');
 
   // Exercise the actual Index capability bindings and its remaining auth/persistence gate.
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-  function method(name) { const start=index.indexOf('  private '+name+'('); return index.slice(start,index.indexOf('\n  }',start)+4); }
+  function method(name) { const start=index.search(new RegExp('  private (?:async )?'+name+'\\(')); return index.slice(start,index.indexOf('\n  }',start)+4); }
   const Host=require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Host {'+['restoreHomeDiskCache','persistHomeDiskCache','tryRestoreAuthenticatedHome'].map(method).join('\n')+'} Host;',
     {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{...runtime.cache,PinmonyRuntimeLog:globals.PinmonyRuntimeLog});
   cached={snapshot:snapshot(7)};
-  const host=new Host(); Object.assign(host,{homeStore:new runtime.Store(),homeApiCache:cache,homeCacheAccountId:'partition-one',
+  const host=new Host(); Object.assign(host,{homeCacheIoEpoch:0,homeStore:new runtime.Store(),homeApiCache:cache,homeCacheAccountId:'partition-one',
     authStatus:'checking',activeTab:0,pinStore:{confirmedSaves:{isSaved:()=>false}},boardStore:{},searchStore:{knownSearchPinTitles:new Map()},
     rootTabAddresses:new Map(),pinIdentity:url=>url.match(/\/pin\/(\d+)/)?.[1]||'',currentHomePageKey:()=>root,initializeHomeApiCache(){},saveOfflineHomeMarker(){markers++;}});
   runtime.bindIndex(host);
   const priorWrites=writes.length; host.persistHomeDiskCache(snapshot(1)); assert.equal(writes.length,priorWrites);
-  host.authStatus='authenticated'; assert(host.restoreHomeDiskCache('partition-one',root,'test'));
+  host.authStatus='authenticated'; assert(await host.restoreHomeDiskCache('partition-one',root,'test'));
   assert.equal(host.homeStore.homeActionsReady,false);
-  host.homeController.updateHome(JSON.stringify(snapshot(8)));
+  host.homeController.updateHome(JSON.stringify(snapshot(8))); await new Promise(setImmediate);
   assert.equal(host.homeStore.homeActionsReady,true); assert.equal(writes.length,priorWrites+1);
   const priorReads=reads.length; host.tryRestoreAuthenticatedHome('partition-two',root); assert.equal(reads.length,priorReads);
+
+  for (const invalidate of [h=>h.homeCacheIoEpoch++,h=>h.activeTab=1,h=>h.homeCacheAccountId='other',h=>h.homeStore.startupFeedCommitted=true]) {
+    let release; const waiting=new Promise(resolve=>release=resolve), commits=[];
+    const late=new Host();Object.assign(late,{homeCacheIoEpoch:0,businessSuspended:false,authStatus:'authenticated',activeTab:0,
+      homeCacheAccountId:'partition-one',homeStore:{startupFeedCommitted:false},pinStore:{},boardStore:{},
+      homeController:{restoreCacheSnapshot:s=>commits.push(s)},initializeHomeApiCache(){},
+      homeApiCache:{getWithMetadataAsync:()=>waiting}});
+    const restoring=late.restoreHomeDiskCache('partition-one',root,'test');invalidate(late);
+    release({value:{snapshot:snapshot(7)},status:'disk',ageMs:1});assert.equal(await restoring,false);
+    assert.equal(commits.length,0,'late disk data cannot replace a different page/account or a committed network feed');
+  }
 
   assert.doesNotMatch(fs.readFileSync('feature_home/src/main/ets/controllers/PinmonyHomeController.ets','utf8'), /this\.(controller|activeTab|pinStore|searchStore|navigationAddress)\b/);
   for(const signature of ['onPageHide():','aboutToDisappear():']) {

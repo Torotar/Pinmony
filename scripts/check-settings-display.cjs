@@ -14,7 +14,8 @@ const state = new Map(), traces = [];
 let preference = 'system', resourceMode = 1;
 const context = { ConfigurationConstant: { ColorMode: { COLOR_MODE_LIGHT: 1, COLOR_MODE_DARK: 0, COLOR_MODE_NOT_SET: -1 } },
   AppStorage: { get: key => key === 'themePreference' ? preference : state.get(key), setOrCreate: (key, value) => state.set(key,value) },
-  PinmonyRuntimeLog: {info: line => traces.push(line)}, hilog: { error() {} }, DOMAIN: 0 };
+  PinmonyRuntimeLog: {info: line => traces.push(line), warn: line => traces.push(line)},
+  PinmonyImmersiveLight: {toastOptions: options => options}, hilog: { error() {} }, DOMAIN: 0 };
 vm.runInNewContext(ts.transpileModule('class Theme {' + method(ability, 'syncSystemColorMode', '  onForeground(') +
   method(component, 'selectTheme', '  private options(') + '} globalThis.Theme = Theme;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const native = new context.Theme();

@@ -5,7 +5,8 @@ import { PinmonyInboxNoticeConversation } from './PinmonyInboxMessageNotice';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxStore, PinmonyInboxSnapshot, PinmonyInboxItem, PinmonyInboxFlowSnapshot, InboxFlowUser, InboxFlowMessage, InboxFlowBoard } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyInboxNativeWrites, PinmonyInboxWriteIdentity, PinmonyInboxWriteMessage } from './PinmonyInboxNativeWrites';
 // Per-feature manual rollout; the transport safety gate is still mandatory.
@@ -101,7 +102,7 @@ export class PinmonyInboxMessagesNativeReads {
         {page:this.page,viewerId:this.viewer,token:this.flow.nativeToken || 0,screen:this.flow.screen,conversationId:this.flow.conversationId || '',
           contacts:this.flow.users.filter((u: InboxFlowUser): boolean => !u.self && u.id !== this.viewer).map((u: InboxFlowUser): string => u.id),selectedIds:this.flow.selectedIds.slice(),profileEntry:this.profileContactEntry,
           messages:this.flow.messages.map((m: InboxFlowMessage): PinmonyInboxWriteMessage =>
-            ({id:m.id,own:m.own && m.sender?.id === this.viewer,deleted:m.deleted === true,reactable:!m.profile && !m.board}))} : undefined,
+            ({id:m.id,own:m.own && m.sender?.id === this.viewer,deleted:m.deleted === true,reactable:!m.deleted}))} : undefined,
       session: (): PinmonyBusinessSessionContext => this.ports.session(),network: (): PinmonyNativeNetwork => this.ports.network(),
       changed: (flow: PinmonyInboxFlowSnapshot): void => {
         this.flow = flow;

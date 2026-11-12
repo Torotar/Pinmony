@@ -9,6 +9,7 @@ const code = ts.transpileModule('class View {' + source.slice(start, end) +
   { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
 const messages = [];
 const context = { $r: x => x, SnackBarIconType: { NORMAL: 1 },
+  BlurStyle: { COMPONENT_ULTRA_THICK: 6 }, BlurStrategy: { ENABLE: 1 },
   SymbolGlyphModifier: class { fontColor() { return this; } },
   HdsSnackBar: class { show(icon, message) { messages.push(message.title); } dismiss() {} } };
 vm.runInNewContext(code, context);

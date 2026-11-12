@@ -18,7 +18,7 @@ const context = { ...auth, PINTEREST_URL: home, PINTEREST_LOGIN_URL: login,
 require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + ['updateAuthState', 'retryLogin', 'authWebVisible', 'describeFailure', 'enterAuthenticatedRoot', 'nativeRootTabsVisible', 'confirmBusinessSession', 'resetNativeBusinessSession', 'usesNativeProfileReads'].map(method).join('\n') +
   '} globalThis.Native=Native;', { target: ts.ScriptTarget.ES2020 }), context);
 function harness() {
-  const native = new context.Native(), loads = [], scripts = [], effects = [];
+  const native = new context.Native(); native.restoreRecoveredPage=()=>{}; const loads = [], scripts = [], effects = [];
   let current = home;
   Object.assign(native, { authStatus: 'checking', authEpoch: 1, authCheckTimer: -1, loginRedirectEpoch: -1,
     navigationAddress: '', controller: { getUrl: () => current, getUserAgent: () => 'synthetic', loadUrl: url => loads.push(url),

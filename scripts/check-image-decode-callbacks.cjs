@@ -71,11 +71,13 @@ assert.match(home, /PinmonyCdnImage\(\{[\s\S]*?onDecoded: \(\) =>/);
 assert.match(fs.readFileSync('common_ui/src/main/ets/components/PinmonyCdnImage.ets', 'utf8'), /event\?\.loadingStatus === 1/);
 assert.match(home, /session !== this\.home\.session \|\| pageKey !== this\.home\.pageKey/);
 const prefetch = home.match(/  private uniquePrefetchImages\([\s\S]*?\r?\n  \}/)[0];
-const Prefetch = vm.runInNewContext(ts.transpileModule('class Prefetch {' + prefetch + '} Prefetch;', {
+const budget = home.match(/  private detailImagePrefetchCount\([^\n]+/)[0];
+const columns = home.match(/  private contentColumns\([\s\S]*?\r?\n  \}/)[0];
+const Prefetch = vm.runInNewContext(ts.transpileModule('class Prefetch {' + prefetch + budget + columns + '} Prefetch;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText);
 const queue = new Prefetch();
-Object.assign(queue, { firstImageSettled: true, paneActive: true, feedActive: true, imageLoadingActive: true,
+Object.assign(queue, { firstImageSettled: true, paneActive: true, feedActive: true, imageLoadingActive: true, contentWidth: 360,
   home: { pins: [{ imageUrl: 'card' }, { imageUrl: 'old' }] },
   recoveredSources: { old: 'recovered' }, prefetchedImageUrls: ['card', 'detail', 'detail', 'recovered', 'other', ''] });
 assert.deepEqual(Array.from(queue.uniquePrefetchImages()), ['detail', 'other'],

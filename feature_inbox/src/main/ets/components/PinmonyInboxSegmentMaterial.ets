@@ -17,7 +17,8 @@ export class PinmonyInboxSegmentMaterial {
         return new uiMaterial.ImmersiveMaterial({
           style: mode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
           interactive: true,
-          applyShadow: false
+          applyShadow: false,
+          lightEffect: { color: $r('app.color.immersive_interaction_light') }
         });
       }
       return uiMaterial.Material.empty;

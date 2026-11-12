@@ -12,3 +12,5 @@ export { SocialPermissions, SocialMessageGroup, SocialBlockedUser, SocialMessage
 
 export { PinmonyUpdateNotice } from './src/main/ets/services/PinmonyUpdateNotice';
 export { PinmonyBoardRecoveryPage } from './src/main/ets/components/PinmonyBoardRecoveryPage';
+
+export { PinmonySettingsNetwork } from './src/main/ets/services/PinmonySettingsNetwork';

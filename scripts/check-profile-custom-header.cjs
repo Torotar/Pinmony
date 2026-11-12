@@ -111,7 +111,10 @@ const searchStart = title.indexOf('Column() { this.hubSearch() }');
 assert(searchStart > title.indexOf('.translate({ x: -this.hubTitlePosition() * this.contentWidth })'), 'shared search is outside the horizontally translated filter row');
 const search = title.slice(searchStart, title.indexOf("}.width('100%').height(this.hubTitleBottomHeight())", searchStart));
 assert(search.includes('.position({ x: 0, y: 24 * this.hubTitleSearchOpacity() })') && !search.includes('.translate('), 'shared search and publish rise with collapse and remain outside horizontal filter motion');
-assert(search.includes("this.hubTab !== 'collages'") && search.includes("'no-hide-descendants'"), 'hidden shared search cannot receive input or accessibility focus');
+assert(search.includes('.visibility(this.hubTitleSearchOpacity() > 0 ? Visibility.Visible : Visibility.Hidden)') &&
+  search.includes('.hitTestBehavior(this.canUseHubSearchControls() ? HitTestMode.Default : HitTestMode.None)') &&
+  search.includes(".accessibilityLevel(this.canUseHubSearchControls() ? 'auto' : 'no-hide-descendants')"),
+  'hidden shared search cannot receive input or accessibility focus');
 assert(!source.includes(".position({x:0,y:this.getUIContext().px2vp(this.statusBarHeightPx)})"));
 assert(source.includes('.bindToScrollable(this.hubScrollBinding())'));
 const searchEntryStart = source.indexOf('  private hubSearch()');
@@ -120,20 +123,31 @@ assert(searchEntry.includes("if (deviceInfo.apiAvailable('26.0.0'))"));
 const legacySearch = searchEntry.slice(searchEntry.indexOf('} else {'));
 assert(!legacySearch.includes('.systemMaterial('), 'API24 search keeps its original supported attributes');
 assert.equal((searchEntry.match(/this\.hubSearchContent\(\)/g) || []).length, 2, 'both API branches reuse the same search label and icon');
-assert.equal((searchEntry.match(/if\(this\.onSearch\)this\.onSearch\(\)/g) || []).length, 2, 'both versions retain the real search route');
-assert.equal((searchEntry.match(/if\(this\.onPublish\)this\.onPublish\(\)/g) || []).length, 2, 'both versions retain the real publish route');
+assert.equal((searchEntry.match(/this\.openHubSearch\(\)/g) || []).length, 2, 'both versions retain the guarded search route');
+assert.equal((searchEntry.match(/this\.openHubPublish\(\)/g) || []).length, 2, 'both versions retain the guarded publish route');
+assert(source.includes('if (this.canUseHubSearchControls() && this.onSearch) this.onSearch();'));
+assert(source.includes('if (this.canUseHubSearchControls() && this.onPublish) this.onPublish();'));
 assert.equal((searchEntry.match(/\.width\(44\)\.height\(44\)/g) || []).length, 2, 'publish retains its circular dimensions');
 assert.equal((searchEntry.match(/accessibilityText\(this\.uiText\('pm_publish_b61f333b'\)\)/g) || []).length, 2);
 const filtersStart = source.indexOf('  private hubFilters(');
 const filtersEnd = source.indexOf('  private hubSearchContent()', filtersStart);
 const filterButtons = source.slice(filtersStart, filtersEnd);
+for (const [name, block, controlHeight, rowHeight] of [
+  ['search', searchEntry, 48, 60], ['filters', filterButtons, 40, 52]
+]) {
+  const insets = block.match(/\.padding\(\{left:16,right:16,top:(\d+),bottom:(\d+)\}\)/);
+  assert(insets, `${name} reserves paint space above and below the controls`);
+  const top = Number(insets[1]), bottom = Number(insets[2]);
+  assert(top >= 6 && bottom >= 6, `${name} keeps the 6vp shadow inside its row boundary`);
+  assert.equal(top + controlHeight + bottom, rowHeight, `${name} preserves the collapse and content-inset geometry`);
+}
 assert.equal((filterButtons.match(/deviceInfo.apiAvailable/g) || []).length, 2);
 const stateStart = source.indexOf('  private hubStateButton(');
 const stateBlock = source.slice(stateStart, source.indexOf('  private selectPinView', stateStart));
 const modernState = stateBlock.slice(0, stateBlock.indexOf('    } else {\n    Toggle('));
 assert(modernState.includes('Button({type:ButtonType.Normal})') && !modernState.includes('Toggle('), 'API26 uses Button material host rather than Toggle button skin');
 assert(modernState.includes('.padding(0)') && modernState.includes('.height(40)'), 'preserve filter geometry');
-assert(stateBlock.includes('materialColor: this.hubStateMaterialColor(kind)'), 'selected filters retain their accent through material tint');
+assert(source.includes('materialColor: selected ? this.hubStateMaterialColor(kind) : undefined'), 'selected filters retain their accent through material tint');
 assert(!stateBlock.slice(stateBlock.indexOf('} else {')).includes('.systemMaterial('), 'legacy toggle has no new material attribute');
 assert.equal((stateBlock.match(/this.requestHub\(\)/g) || []).length, 2, 'both toggle branches retain the filter request');
 const materialExpressions = [];
@@ -142,16 +156,21 @@ function findMaterial(node) {
   ts.forEachChild(node, findMaterial);
 }
 findMaterial(ast); assert.equal(materialExpressions.length, 5);
+const retainedMaterialMethod = source.slice(source.indexOf('  private hubMaterialEnabled('),source.indexOf('  private hubStateMaterialColor('));
 for (const [index, materialExpression] of materialExpressions.entries()) for (const supported of [false, true]) for (const mode of ['off', 'gentle', 'immersive', 'exquisite']) {
   const empty = {}, effects = [];
-  const evaluate = vm.runInNewContext('(function(){ return (' + materialExpression + '); })', {
+  const Host = vm.runInNewContext(ts.transpileModule('class Host {' + retainedMaterialMethod + '\nrender(){return '+materialExpression+';} } Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText, {
+    $r: key => key, deviceInfo:{apiAvailable:()=>true},
     kind: 'favorite', uiMaterial: { Material: { empty }, ImmersiveStyle: { THICK: 3, ULTRA_THIN: 0, REGULAR: 2 },
       isImmersiveMaterialSupported: () => supported,
       ImmersiveMaterial: class { constructor(options) { effects.push(options); } } }
   });
-  const result = evaluate.call({ immersiveLightMode: mode, hubSelected: () => false, hubStateMaterialColor: () => undefined });
+  const materialHost=Object.assign(new Host(),{immersiveLightMode:mode,hdsDarkMode:false,hubControlMaterials:new Map(),hubMaterialConfiguration:'',hubSelected:()=>false,hubStateMaterialColor:()=>undefined});
+  const result = materialHost.render();
+  assert.equal(materialHost.render(),result,'unrelated updates retain the exact material object');
   if (index === 0) {
-    const selected = evaluate.call({ immersiveLightMode: mode, hubSelected: () => true, hubStateMaterialColor: () => 'accent-tint' });
+    materialHost.hubSelected=()=>true;materialHost.hubStateMaterialColor=()=>'accent-tint';
+    const selected = materialHost.render();
     if (!supported || mode === 'off') assert.equal(selected, empty, 'off/unsupported clears selected material');
     else {
       assert.notEqual(selected, empty, 'selected filter retains immersive material');
@@ -167,6 +186,41 @@ for (const [index, materialExpression] of materialExpressions.entries()) for (co
 }
 console.log('Profile custom title passed: all header controls in HDS builder, drag/cancel positions, retained collapse, stable body inset, hidden pane touch/accessibility gates.');
 
-assert.equal((source.match(/\.shadow\(\{ radius:/g)||[]).length,5, 'all five profile control surfaces use compact explicit shadows');
+assert.equal((source.match(/\.shadow\(\{ radius: this\.getUIContext\(\)\.vp2px\(6\)/g)||[]).length,13,
+  'modern and legacy search, publish and filter controls retain density-aware soft shadows in both API branches');
 
 assert(!modernState.includes('.shadow({ radius: !this.hubSelected(kind) &&'), 'selected accent filters retain their material shadow');
+
+const emptyBlock = source.slice(source.indexOf('  private hubEmptyState()'), source.indexOf('  private async createSuggestedBoard('));
+const imageSize = emptyBlock.match(/Image\(this\.emptyIllustration\(\)\)\.width\((Math\.min\([^\n]+?\))\)\.height\((Math\.min\([^\n]+?\))\)/);
+assert(imageSize, 'All profile empty states retain the shared responsive illustration');
+assert.equal(imageSize[1], imageSize[2], 'Illustrations retain square bounds and original image aspect ratio');
+assert(emptyBlock.includes('.objectFit(ImageFit.Contain)'));
+const illustrationWidth = new Function('return ' + imageSize[1]);
+for (const width of [240, 320, 360, 400, 600, 840, 1440]) {
+  const size = illustrationWidth.call({contentWidth:width});
+  assert(Math.abs(size - Math.min(240, width * 0.60) * 0.75) < 0.001, 'Illustration is 25 percent smaller at width ' + width);
+  assert(size <= 180 && size < width - 40, 'Illustration fits the padded content');
+}
+const emptyMethods = [];
+function collectEmptyMethods(node) {
+  if (ts.isMethodDeclaration(node) && ['emptyKind', 'emptyIllustration'].includes(node.name.getText(ast))) emptyMethods.push(node.getText(ast));
+  ts.forEachChild(node, collectEmptyMethods);
+}
+collectEmptyMethods(ast);
+const EmptyHost = vm.runInNewContext(ts.transpileModule('class EmptyHost {' + emptyMethods.join('\n') + '} EmptyHost;', {
+  compilerOptions:{target:ts.ScriptTarget.ES2021}
+}).outputText, {$r: key => key});
+const emptyHost = new EmptyHost();
+for (const [tab, filter, favorite, created, drafts, kind] of [
+  ['pins','',false,false,false,'saved_pins'], ['pins','',true,false,false,'favorites'],
+  ['pins','',false,true,false,'created'], ['pins','',true,true,false,'combined'],
+  ['boards','',false,false,false,'saved_boards'], ['boards','groups',false,false,false,'groups'],
+  ['boards','secret',false,false,false,'boards'], ['boards','following',false,false,false,'boards'],
+  ['collages','',false,false,false,'collages'], ['collages','',false,false,true,'collage_drafts']
+]) {
+  Object.assign(emptyHost,{hubTab:tab,boardFilter:filter,favoriteFilter:favorite,createdFilter:created,collageDrafts:drafts});
+  assert.equal(emptyHost.emptyKind(),kind);
+  assert(emptyHost.emptyIllustration().startsWith('app.media.profile_empty_'));
+}
+console.log('Profile empty illustrations: shared 25 percent reduction, 180vp maximum, narrow/wide widths and all ten tab/filter combinations passed.');

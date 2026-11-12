@@ -12,10 +12,12 @@ export function boardCoverPreview(pin: PinmonyBoardPin, x: number, y: number, wi
     left:(100*((frameAspect-width*scale)/2-x*scale)/frameAspect)+'%',top:(100*((1-height*scale)/2-y*scale))+'%'};
 }
 
-// BoardCoverImageCrop in the captured website bundle: a 236px square frame,
-// aspect-fill scale, clamped image position, rounded source-pixel coordinates.
-export function boardCoverCrop(pin: PinmonyBoardPin, x: number = 0, y: number = 0): PinmonyBoardCoverCrop {
-  const side: number = Math.min(pin.imageWidth, pin.imageHeight);
-  return {pinId:pin.id,cropX:Math.round(Math.max(0,Math.min(pin.imageWidth-side,x))),
-    cropY:Math.round(Math.max(0,Math.min(pin.imageHeight-side,y))),width:side,height:side,scale:236/side};
+// Captured BoardCoverImageCrop formula: 236px-wide frame, aspect-fill scale,
+// clamped image position and rounded source pixels. Keep square as the legacy default.
+export function boardCoverCrop(pin: PinmonyBoardPin, x: number = 0, y: number = 0, frameAspect: number = 1): PinmonyBoardCoverCrop {
+  const scale: number = Math.max(236/pin.imageWidth,236/frameAspect/pin.imageHeight);
+  const width: number = Math.max(1,Math.round(236/scale));
+  const height: number = Math.max(1,Math.round(236/frameAspect/scale));
+  return {pinId:pin.id,cropX:Math.round(Math.max(0,Math.min(pin.imageWidth-width,x))),
+    cropY:Math.round(Math.max(0,Math.min(pin.imageHeight-height,y))),width:width,height:height,scale:scale};
 }

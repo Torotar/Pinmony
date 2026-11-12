@@ -18,7 +18,8 @@ const modules = {
     PinmonyRuntimeLog: { initialize: () => { events.push('log'); return new Promise(() => {}); }, info: x => logs.push(x), warn: x => logs.push(x) },
     PinmonyI18n: { initialize: () => { if (languageFails) throw Error(); events.push('language'); }, syncSystemLanguage: () => events.push('language-fallback') },
     PinmonyProfileLayoutPreference: { initialize: () => events.push('profile-layout') },
-    PinmonyPublishAnchor: { initialize: () => events.push('anchor') }
+    PinmonyPublishAnchor: { initialize: () => events.push('anchor') },
+    PinmonyDetailDisplayPreference: { initialize: () => events.push('detail-display') }
   },
   '@kit.ArkWeb': { webview: { BackForwardCacheSupportedFeatures: class {}, WebviewController: {
     setWebDebuggingAccess: value => assert.equal(value, false),
@@ -45,7 +46,7 @@ function load(task) {
     await load(task).init(context);
     done.add(task.name);
   }
-  assert.deepEqual(events, ['log', 'theme:0', 'language', 'profile-layout', 'inbox-local', 'anchor', 'retention', 'engine']);
+  assert.deepEqual(events, ['log', 'theme:0', 'language', 'profile-layout', 'inbox-local', 'anchor', 'detail-display', 'retention', 'engine']);
   assert.equal(state.get('immersiveLightMode'), 'off', 'legacy disabled setting survives migration');
   assert.equal(state.get('themePreference'), 'dark', 'saved preference survives default registration');
   assert.equal(state.get('pinmonySessionConfirmed'), false);

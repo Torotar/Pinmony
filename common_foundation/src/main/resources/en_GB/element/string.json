@@ -1941,6 +1941,10 @@
       "value": "Light"
     },
     {
+      "name": "pm_follow_account",
+      "value": "Follow account"
+    },
+    {
       "name": "pm_follow_system_217cfe7d",
       "value": "Follow system"
     },

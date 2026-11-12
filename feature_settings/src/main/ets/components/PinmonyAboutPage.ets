@@ -106,7 +106,7 @@ export struct PinmonyAboutPage {
       await this.onOpenExternalLink(url);
     } catch (_) {
       if (this.visible) {
-        try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_open_link_please_retry_99322633"), duration: 3000 }); }
+        try { this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_open_link_please_retry_99322633"), duration: 3000 })); }
         catch (_) { PinmonyRuntimeLog.warn('About: link failure feedback unavailable'); }
       }
     } finally { this.openingLink = false; }

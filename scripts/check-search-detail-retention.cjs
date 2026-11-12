@@ -6,7 +6,7 @@ const ast = ts.createSourceFile('search.ts', page.replace(/\bstruct\b/g, 'class'
 const methods = [];
 let back;
 function visit(n) {
-  if (ts.isMethodDeclaration(n) && ['ensureSearchDestination', 'activeChanged'].includes(n.name.getText(ast))) methods.push(n.getText(ast));
+  if (ts.isMethodDeclaration(n) && ['ensureSearchDestination', 'activeChanged', 'syncImagePrefetchActivity'].includes(n.name.getText(ast))) methods.push(n.getText(ast));
   if (ts.isCallExpression(n) && n.expression.getText(ast).endsWith('.onBackPressed') && n.arguments[0]?.getText(ast).includes('this.detailReturnPreview')) back = n.arguments[0].getText(ast);
   ts.forEachChild(n, visit);
 }
@@ -16,7 +16,8 @@ async function main() {
 const paths = [{ name: 'pin-web-search' }], destination = paths[0];
 let detailBack = 0, searchBack = 0;
 const h = new Host(); h.uiCommits = new commits.Queue();
-Object.assign(h, { active: true, detailReturnPreview: false, pagePresent: true, resultsOffset: 1420, categoriesCollapsed: true,
+const prefetchActivity = []; h.imagePrefetch = { setActive: active => prefetchActivity.push(active) };
+Object.assign(h, { active: true, mediaActive: true, automaticLoadingEnabled: true, detailReturnPreview: false, pagePresent: true, resultsOffset: 1420, categoriesCollapsed: true,
   searchPathStack: { size: () => paths.length, pushPath: p => paths.push(p), clear: () => { paths.length = 0; } },
   closePhotoSearch() {}, restoreHeroPosition() {}, tracePresentation() {}, onBack: () => detailBack++, handleSearchBack: () => searchBack++ });
 for (let i = 0; i < 3; i++) {
@@ -28,6 +29,7 @@ for (let i = 0; i < 3; i++) {
   assert.equal(h.resultsOffset, 1420); assert.equal(h.categoriesCollapsed, true);
 }
 assert.equal(detailBack, 3); assert.equal(searchBack, 0);
+assert.deepEqual(prefetchActivity, [false, true, false, true, false, true], 'retained detail cover pauses and resumes image prefetch without dropping page state');
 h.active = false; h.detailReturnPreview = false; h.activeChanged(); commits.flush();
 await Promise.resolve();
 assert.equal(paths.length, 0, 'ordinary inactive roots still release navigation');

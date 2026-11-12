@@ -1,3 +1,4 @@
+import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
@@ -90,8 +91,11 @@ export struct PinmonyBoardRecoveryPage {
   @Builder
   private recoveryLoading() {
     if (this.store.loading || this.store.busy) {
-      LoadingProgress().color($r('app.color.accent')).width(32).height(32)
-        .hitTestBehavior(HitTestMode.None)
+      if (this.store.busy) {
+        PinmonyLoadingOverlay({ showMessage: false })
+      } else {
+        LoadingProgress().color($r('app.color.accent')).width(32).height(32).hitTestBehavior(HitTestMode.None)
+      }
     }
   }
   @Builder

@@ -1,3 +1,5 @@
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { PinmonyFollowingSegmentMaterial, PinmonyFollowingSearchMaterial } from './PinmonyFollowingSegmentMaterial';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -8,6 +10,9 @@ import { CapsuleSegmentButtonV2, SegmentButtonV2Items, SymbolGlyphModifier } fro
 import { HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions } from '@kit.UIDesignKit';
 import { PinmonyProfilePanel, PinmonyProfilePanelItem } from '../models/PinmonyProfilePanel';
 import { PinmonyUserAvatar } from 'common_ui';
+interface PinmonyProfilePanelItemOptions {
+  item: PinmonyProfilePanelItem;
+}
 interface PinmonyProfileEditFieldOptions {
   label: string;
   text: string;
@@ -18,7 +23,7 @@ export struct PinmonyProfilePanelPage {
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
   private editTitleInset(): number { return this.snapshot.mode === 'edit' ? this.getUIContext().px2vp(this.statusBarHeightPx) + 56 : 0; }
-  private contentTopInset(): number { return this.snapshot.mode === 'following' ? 0 : this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
+  private contentTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') @Watch('syncFollowingLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
@@ -30,7 +35,9 @@ export struct PinmonyProfilePanelPage {
   @State private searchMotionOffset: string = '0%';
   private followerSearchClosing: boolean = false;
   @State private panelRefreshState: RefreshStatus = RefreshStatus.Inactive;
-  @State private searchHeaderHeight: number = 0;
+  @State private searchHeaderHeight: number = 76;
+  private readonly followingSegmentBuilder: () => void = (): void => { this.followingSegmentBar(); };
+  private readonly searchTitleInputBuilder: () => void = (): void => { this.searchTitleInput(); };
   private readonly followingSegments: SegmentButtonV2Items = new SegmentButtonV2Items([
     { text: this.uiText("pm_profiles_0d0e1a86") }, { text: this.uiText("pm_board_bd3f17ee") }
   ]);
@@ -104,7 +111,14 @@ export struct PinmonyProfilePanelPage {
       }, 16);
     }
     if (this.snapshot.mode === 'followers') this.followerQuery = this.snapshot.query || '';
-    if (this.presentationMounted && this.presentationToken !== this.snapshot.token) this.restorePresentation();
+    if (this.presentationMounted && this.presentationToken !== this.snapshot.token) {
+      // A retained following page already owns its scroll and local search route.
+      if (this.snapshot.mode === 'following' && previousPage === this.snapshot.page && this.presentationToken >= 0) {
+        this.presentationToken = this.snapshot.token;
+      } else {
+        this.restorePresentation();
+      }
+    }
     this.syncFollowingMotion();
     this.scheduleFollowerEndCheck();
     if (this.snapshot.mode === 'edit' && !this.snapshot.loading && this.usernameToken !== this.snapshot.token) {
@@ -238,10 +252,10 @@ export struct PinmonyProfilePanelPage {
     };
   }
   private options(): HdsNavigationTitleBarOptions {
-    return { avoidLayoutSafeArea: true, enableComponentSafeArea: this.snapshot.mode === 'following',
+    return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
       style: { blurStrategy: (this.immersiveLightMode !== 'off' && this.snapshot.mode !== 'followers') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off' && this.snapshot.mode !== 'followers'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off' && this.snapshot.mode !== 'followers'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
-      content: { title: { mainTitle: this.snapshot.mode === 'edit' ? this.uiText("pm_edit_profile_3b0b2bb8") : this.snapshot.mode === 'followers' ? this.uiText("pm_followers_261c51c9") : this.uiText("pm_following_7dfa5d8f") },
+      content: { bottomBuilder: this.snapshot.mode === 'following' ? { builder: this.followingSegmentBuilder, height: 48 } : undefined, title: { mainTitle: this.snapshot.mode === 'edit' ? this.uiText("pm_edit_profile_3b0b2bb8") : this.snapshot.mode === 'followers' ? this.uiText("pm_followers_261c51c9") : this.uiText("pm_following_7dfa5d8f") },
         backIcon: { isEnabled: true, action: () => { if (this.onBack) this.onBack(); } },
         menu: { value: this.snapshot.mode === 'edit' ? [{ content: {
           icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),
@@ -251,17 +265,61 @@ export struct PinmonyProfilePanelPage {
     const options: HdsNavigationTitleBarOptions = this.options();
     options.enableComponentSafeArea = false;
     options.style = {
-      blurStrategy: BlurStrategy.DISABLE,
-      thermoCtrl: false,
-      scrollEffectOpts: { enableScrollEffect: false },
-      scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0, blurRadius: 0 },
+      blurStrategy: this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+      thermoCtrl: this.immersiveLightMode !== 'off',
+      scrollEffectOpts: { enableScrollEffect: this.immersiveLightMode !== 'off', scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
+      systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
+      scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightMode !== 'off' ? 18 : 0 },
         contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text') } } },
-      originalStyle: { backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0, blurRadius: 0 },
+      originalStyle: { backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: this.immersiveLightMode !== 'off' ? 18 : 0 },
         contentStyle: { backIconStyle: { iconColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text') } } }
     };
-    options.content = { title: { mainTitle: this.uiText('pm_search_44ce7ae9') }, backIcon: { isEnabled: true, action: () => this.closeFollowerSearch() }, menu: { value: [] } };
+    options.content = { bottomBuilder: { builder: this.searchTitleInputBuilder, height: 76 }, title: { mainTitle: this.uiText('pm_search_44ce7ae9') }, backIcon: { isEnabled: true, action: () => this.closeFollowerSearch() }, menu: { value: [] } };
     return options;
   }
+  private panelItem(fallback: PinmonyProfilePanelItem): PinmonyProfilePanelItem {
+    return this.snapshot.items.find((current: PinmonyProfilePanelItem): boolean => current.id === fallback.id) || fallback;
+  }
+
+  @Builder
+  private boardCard($$: PinmonyProfilePanelItemOptions) {
+    Column({ space: 8 }) {
+      if ($$.item.covers && $$.item.covers.length > 0) {
+        Row({ space: 2 }) {
+          Image($$.item.covers[0]).height('100%').layoutWeight(2).objectFit(ImageFit.Cover)
+          if ($$.item.covers.length > 1) {
+            Column({ space: 2 }) {
+              Image($$.item.covers[1]).width('100%').layoutWeight(1).objectFit(ImageFit.Cover)
+              if ($$.item.covers.length > 2) { Image($$.item.covers[2]).width('100%').layoutWeight(1).objectFit(ImageFit.Cover) }
+            }.height('100%').layoutWeight(1)
+          }
+        }.width('100%').aspectRatio(1.5).borderRadius(16).clip(true)
+        .onClick(() => { if ($$.item.targetUrl && this.onBoard) this.onBoard($$.item.targetUrl); })
+      }
+      Text(PinmonyI18n.render($$.item.name, this.uiLanguage)).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
+        .onClick(() => { if ($$.item.targetUrl && this.onBoard) this.onBoard($$.item.targetUrl); })
+      Text(PinmonyI18n.render(($$.item.pinCount || '') + ($$.item.updated ? ' · ' + $$.item.updated : ''), this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
+      Button($$.item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).type(ButtonType.Normal).borderRadius(16).fontColor($r('app.color.detail_on_accent')).backgroundColor($r('app.color.accent'))
+        .enabled(!this.followingBusy && $$.item.canFollow === true).onClick(() => { if(this.onFollow)this.onFollow($$.item.id); })
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private searchPanelItem($$: PinmonyProfilePanelItemOptions) {
+    Row({ space: 16 }) {
+      PinmonyUserAvatar({ profileUrl: this.snapshot.section === 'boards' ? '' : $$.item.profileUrl || '', username: this.snapshot.section === 'boards' ? '' : $$.item.username || '', userId: this.snapshot.section === 'boards' ? '' : $$.item.id, image: this.snapshot.section === 'boards' ? ($$.item.covers?.[0] || $$.item.avatar || '') : ($$.item.avatar || ''), name: $$.item.name, colorIndex: this.snapshot.section === 'boards' ? 0 : $$.item.avatarColorIndex || 0, websiteFallback: this.snapshot.section !== 'boards', avatarSize: 48 })
+        .onClick(() => { if (this.snapshot.section === 'boards' && $$.item.targetUrl) this.onBoard?.($$.item.targetUrl); else if ($$.item.profileUrl) this.openPanelUser($$.item.profileUrl); })
+      Text($$.item.name).fontColor($r('app.color.primary_text')).layoutWeight(1)
+        .onClick(() => { if (this.snapshot.section === 'boards' && $$.item.targetUrl) this.onBoard?.($$.item.targetUrl); else if ($$.item.profileUrl) this.openPanelUser($$.item.profileUrl); })
+      if ($$.item.canFollow !== false) {
+        Button($$.item.following ? this.uiText('pm_following_7dfa5d8f') : this.uiText('pm_follow_eb137dee'))
+          .type(ButtonType.Normal).borderRadius(16).fontColor($r('app.color.detail_on_accent'))
+          .backgroundColor($r('app.color.accent'))
+          .enabled(!this.followingBusy).onClick(() => this.onFollow?.($$.item.id))
+      }
+    }.width('100%')
+  }
+
   @Builder
   private field($$: PinmonyProfileEditFieldOptions) {
     Column({ space: 8 }) {
@@ -285,7 +343,7 @@ export struct PinmonyProfilePanelPage {
   }
   private showPanelRefreshIndicator(): boolean {
     return this.active && this.snapshot.mode !== 'edit' && (this.snapshot.refreshing === true ||
-      this.canPullPanelRefresh() && (this.panelRefreshState === RefreshStatus.Drag || this.panelRefreshState === RefreshStatus.OverDrag));
+      this.canPullPanelRefresh() && (this.panelRefreshState === RefreshStatus.OverDrag || this.panelRefreshState === RefreshStatus.Refresh));
   }
   private requestPanelRefresh(): void {
     if (this.canPullPanelRefresh()) this.onRefresh?.();
@@ -296,23 +354,42 @@ export struct PinmonyProfilePanelPage {
       LoadingProgress().width(24).height(24).color($r('app.color.accent'))
         .visibility(this.showPanelRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)
     }.width('100%').height(64).justifyContent(FlexAlign.Center)
-      .offset({ y: this.contentTopInset() }).hitTestBehavior(HitTestMode.None)
+      .offset({ y: this.contentTopInset() + (this.snapshot.mode === 'following' ? 48 : 0) }).hitTestBehavior(HitTestMode.None)
+  }
+  @Builder
+  private followingSegmentBar() {
+    Row() {
+      if (deviceInfo.apiAvailable('26.0.0')) {
+        CapsuleSegmentButtonV2({ items: this.followingSegments, enableStateAnimation: true,
+          buttonBackgroundColor: PinmonyFollowingSegmentMaterial.enabled(this.immersiveLightMode) ? undefined : PinmonyFollowingSegmentMaterial.background(),
+          buttonBackgroundBlurStyle: BlurStyle.NONE,
+          backgroundSystemMaterial: PinmonyFollowingSegmentMaterial.create(this.immersiveLightMode),
+          selectedIndex: this.snapshot.section === 'boards' ? 1 : 0,
+          $selectedIndex: (index: number): void => this.selectFollowingSection(index === 0 ? 'users' : 'boards')
+        }).width('100%').constraintSize({ maxWidth: 448 })
+          .borderRadius(24)
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
+      } else {
+        CapsuleSegmentButtonV2({ items: this.followingSegments, enableStateAnimation: true,
+          buttonBackgroundColor: PinmonyFollowingSegmentMaterial.background(),
+          buttonBackgroundBlurStyle: BlurStyle.NONE,
+          selectedIndex: this.snapshot.section === 'boards' ? 1 : 0,
+          onItemClicked: (index: number): void => this.selectFollowingSection(index === 0 ? 'users' : 'boards')
+        }).width('100%').constraintSize({ maxWidth: 448 })
+          .borderRadius(24)
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
+      }
+    }.width('100%').height(48).padding({ left: 24, right: 24 }).justifyContent(FlexAlign.Center)
   }
   @Builder
   private panelDestination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
-      Column() {
-          if (this.snapshot.mode === 'following') {
-            Row() {
-              CapsuleSegmentButtonV2({ items: this.followingSegments, enableStateAnimation: true,
-                selectedIndex: this.snapshot.section === 'boards' ? 1 : 0,
-                onItemClicked: (index: number) => {
-                  const section: string = index === 0 ? 'users' : 'boards';
-                  this.selectFollowingSection(section);
-                } }).width('100%').constraintSize({ maxWidth: 448 })
-            }.width('100%').height(48).padding({ left: 24, right: 24 }).justifyContent(FlexAlign.Center)
-          }
+      Stack({ alignContent: Alignment.TopStart }) {
       Refresh({ refreshing: this.snapshot.refreshing === true, builder: this.panelRefreshIndicator }) {
       Scroll(this.scroller) {
         Column({ space: 20 }) {
@@ -346,28 +423,14 @@ export struct PinmonyProfilePanelPage {
               Text(this.snapshot.mode === 'followers' && this.followerQuery.trim() ? this.uiText('pm_no_search_results_available_6025e7b5') : this.snapshot.mode === 'followers' ? this.uiText(this.ownProfile ? 'pm_no_followers_yet_480f3c81' : 'pm_profile_user_no_followers') : this.snapshot.section === 'boards' ? this.uiText(this.ownProfile ? 'pm_you_are_not_following_any_boards_yet_d8537a5c' : 'pm_profile_user_no_followed_boards') : this.uiText(this.ownProfile ? 'pm_you_are_not_following_anyone_yet_6289b8af' : 'pm_profile_user_no_followed_users')).fontColor($r('app.color.primary_text'))
             }
             if (this.snapshot.section === 'boards') {
-              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+              GridRow({ columns: { xs: 2, sm: 2, md: 3, lg: 4, xl: 6, xxl: 8 },
+                breakpoints: { value: ['320vp', '600vp', '840vp', '1440vp', '1920vp'], reference: BreakpointsReference.ComponentSize },
+                gutter: { x: 16, y: 24 } }) {
               ForEach(this.snapshot.items, (item: PinmonyProfilePanelItem) => {
-                Column({ space: 8 }) {
-                  if (item.covers && item.covers.length > 0) {
-                    Row({ space: 2 }) {
-                      Image(item.covers[0]).height(140).layoutWeight(2).objectFit(ImageFit.Cover)
-                      if (item.covers.length > 1) {
-                        Column({ space: 2 }) {
-                          Image(item.covers[1]).width('100%').layoutWeight(1).objectFit(ImageFit.Cover)
-                          if (item.covers.length > 2) { Image(item.covers[2]).width('100%').layoutWeight(1).objectFit(ImageFit.Cover) }
-                        }.height(140).layoutWeight(1)
-                      }
-                    }.width('100%').borderRadius(16).clip(true)
-                    .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
-                  }
-                  Text(PinmonyI18n.render(item.name, this.uiLanguage)).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
-                    .onClick(() => { if (item.targetUrl && this.onBoard) this.onBoard(item.targetUrl); })
-                  Text(PinmonyI18n.render((item.pinCount || '') + (item.updated ? ' · ' + item.updated : ''), this.uiLanguage)).fontSize(13).fontColor($r('app.color.secondary_text'))
-                  Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).type(ButtonType.Normal).borderRadius(16).fontColor(item.following ? $r('app.color.primary_text') : Color.White).backgroundColor(item.following ? $r('app.color.surface_muted') : $r('app.color.accent'))
-                    .enabled(!this.followingBusy && item.canFollow === true).onClick(() => { if(this.onFollow)this.onFollow(item.id); })
-                }.width('48%').margin({ bottom: 24 }).alignItems(HorizontalAlign.Start)
-              }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage + ':' + item.following + ':' + item.canFollow)
+                GridCol({ span: 1 }) {
+                this.boardCard({ item: this.panelItem(item) })
+                }
+              }, (item: PinmonyProfilePanelItem): string => item.id)
               }.width('100%')
             } else {
             ForEach(this.snapshot.items, (item: PinmonyProfilePanelItem) => {
@@ -381,7 +444,7 @@ export struct PinmonyProfilePanelPage {
                   }
                   if (item.followerCount !== undefined) { Text(item.followerCount.toString() + this.uiText('pm_followers_7c3af361')).fontSize(12).fontColor($r('app.color.secondary_text')) }
                 }.alignItems(HorizontalAlign.Start).layoutWeight(1).onClick(() => { if (item.profileUrl && this.onUser) this.openPanelUser(item.profileUrl); })
-                if (item.canFollow !== false) { Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).type(ButtonType.Normal).borderRadius(16).fontColor(item.following ? $r('app.color.primary_text') : Color.White).backgroundColor(item.following ? $r('app.color.surface_muted') : $r('app.color.accent')).enabled(!this.followingBusy).onClick(() => { if (this.onFollow) this.onFollow(item.id); }) }
+                if (item.canFollow !== false) { Button(item.following ? this.uiText("pm_following_7dfa5d8f") : this.uiText("pm_follow_eb137dee")).type(ButtonType.Normal).borderRadius(16).fontColor($r('app.color.detail_on_accent')).backgroundColor($r('app.color.accent')).enabled(!this.followingBusy).onClick(() => { if (this.onFollow) this.onFollow(item.id); }) }
               }.width('100%')
             }, (item: PinmonyProfilePanelItem) => (item.id) + ':' + this.uiLanguage + ':' + item.following + ':' + item.canFollow)
             }
@@ -389,16 +452,16 @@ export struct PinmonyProfilePanelPage {
           if (this.snapshot.moreLoading) { LoadingProgress().width(28).height(28).color($r('app.color.accent')) }
           if (this.snapshot.moreError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.snapshot.moreError, this.uiLanguage), actionText: this.uiText("pm_retry_loading_followers_db11cdc1"), actionEnabled: this.snapshot.hasMore === true && !this.snapshot.moreLoading && !this.followingBusy && !this.saving, onAction: () => { this.onLoadMore?.(); } }) }
           }.width('100%').translate({ x: this.snapshot.mode === 'following' ? this.sectionOffset : 0 })
-        }.width('100%').padding({ left: 24, right: 24, top: this.contentTopInset() + 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
+        }.width('100%').padding({ left: 24, right: 24, top: this.contentTopInset() + (this.snapshot.mode === 'following' ? 48 : 0) + 16, bottom: this.snapshot.mode === 'edit' ? 64 : 32 })
       }.width('100%').height('100%').align(Alignment.Top).clip(true)
         .opacity(this.snapshot.mode === 'edit' && this.snapshot.loading ? 0.4 : 1)
         .enabled(this.snapshot.mode !== 'edit' || !this.snapshot.loading)
         .onScrollEdge((side: Edge) => { if (side === Edge.Bottom) this.loadNextPage(); })
         .onReachEnd(() => this.loadNextPage())
         .onAppear(() => { if (this.rootRestorePending) this.restoreScrollOffsets(); })
-        .scrollBarMargin({ start: LengthMetrics.vp(this.contentTopInset()) })
+        .scrollBarMargin({ start: LengthMetrics.vp(this.contentTopInset() + (this.snapshot.mode === 'following' ? 48 : 0)) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-      }.width('100%').layoutWeight(1)
+      }.width('100%').height('100%')
         .backgroundColor($r('app.color.page_background'))
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 24 })
           .onActionEnd((event: GestureEvent) => this.swipeFollowingSection(event.offsetX, event.offsetY)))
@@ -409,7 +472,9 @@ export struct PinmonyProfilePanelPage {
       if (this.snapshot.loading) {
         Stack({ alignContent: Alignment.Center }) {
           LoadingProgress().width(40).height(40).color($r('app.color.accent'))
-        }.width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+        }.width('100%').height('100%')
+          .padding({ top: this.snapshot.mode === 'following' ? this.contentTopInset() + 48 : 0 })
+          .hitTestBehavior(HitTestMode.None)
       }
       }.width('100%').height('100%')
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
@@ -422,34 +487,30 @@ export struct PinmonyProfilePanelPage {
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP]).backgroundColor($r('app.color.page_background'))
   }
   @Builder
+  private searchTitleInput() {
+    Row() {
+        Search({ value: this.followerQuery, placeholder: this.uiText('pm_search_by_name_or_username_59fb9fda') })
+          .maxLength(200)
+          .height(44).fontColor($r('app.color.primary_text'))
+          .backgroundColor(PinmonyFollowingSegmentMaterial.enabled(this.immersiveLightMode) ? Color.Transparent : $r('app.color.surface_muted'))
+          .attributeModifier(new PinmonyFollowingSearchMaterial(this.immersiveLightMode, this.hdsDarkMode))
+          .borderRadius(24)
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
+          .onChange((query: string) => { this.followerQuery = query; this.onSearch?.(query); this.searchScroller.scrollTo({ xOffset: 0, yOffset: 0 }); })
+    }.width('100%').height(76).padding({ left: 24, right: 24, top: 16, bottom: 16 })
+      .onAreaChange((_old: Area, area: Area) => { this.searchHeaderHeight = Number(area.height); if (this.searchRestorePending) this.restoreScrollOffsets(); })
+  }
+  @Builder
   private searchDestination() {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.TopStart }) {
-        Column() {
-        TextInput({ text: this.followerQuery, placeholder: this.uiText('pm_search_by_name_or_username_59fb9fda') })
-          .maxLength(200)
-          .height(44).fontColor($r('app.color.primary_text')).backgroundColor($r('app.color.surface_muted'))
-          .onChange((query: string) => { this.followerQuery = query; this.onSearch?.(query); this.searchScroller.scrollTo({ xOffset: 0, yOffset: 0 }); })
-          .margin({ left: 24, right: 24, top: 16, bottom: 16 })
-        }.width('100%').margin({ top: this.getUIContext().px2vp(this.statusBarHeightPx) + 56 })
-          .backgroundColor($r('app.color.page_background')).zIndex(1)
-          .onAreaChange((_old: Area, area: Area) => { this.searchHeaderHeight = Number(area.height); if (this.searchRestorePending) this.restoreScrollOffsets(); })
         Scroll(this.searchScroller) {
           Column({ space: 20 }) {
             ForEach(this.visibleItems(), (item: PinmonyProfilePanelItem) => {
-              Row({ space: 16 }) {
-                PinmonyUserAvatar({ profileUrl: this.snapshot.section === 'boards' ? '' : item.profileUrl || '', username: this.snapshot.section === 'boards' ? '' : item.username || '', userId: this.snapshot.section === 'boards' ? '' : item.id, image: this.snapshot.section === 'boards' ? (item.covers?.[0] || item.avatar || '') : (item.avatar || ''), name: item.name, colorIndex: this.snapshot.section === 'boards' ? 0 : item.avatarColorIndex || 0, websiteFallback: this.snapshot.section !== 'boards', avatarSize: 48 })
-                  .onClick(() => { if (this.snapshot.section === 'boards' && item.targetUrl) this.onBoard?.(item.targetUrl); else if (item.profileUrl) this.openPanelUser(item.profileUrl); })
-                Text(item.name).fontColor($r('app.color.primary_text')).layoutWeight(1)
-                  .onClick(() => { if (this.snapshot.section === 'boards' && item.targetUrl) this.onBoard?.(item.targetUrl); else if (item.profileUrl) this.openPanelUser(item.profileUrl); })
-                if (item.canFollow !== false) {
-                  Button(item.following ? this.uiText('pm_following_7dfa5d8f') : this.uiText('pm_follow_eb137dee'))
-                    .type(ButtonType.Normal).borderRadius(16).fontColor(item.following ? $r('app.color.primary_text') : Color.White)
-                    .backgroundColor(item.following ? $r('app.color.surface_muted') : $r('app.color.accent'))
-                    .enabled(!this.followingBusy).onClick(() => this.onFollow?.(item.id))
-                }
-              }.width('100%')
-            }, (item: PinmonyProfilePanelItem): string => item.id + ':' + this.uiLanguage + ':' + item.following + ':' + item.canFollow)
+              this.searchPanelItem({ item: this.panelItem(item) })
+            }, (item: PinmonyProfilePanelItem): string => item.id)
             if (this.snapshot.moreLoading) {
               LoadingProgress().width(32).height(32).color($r('app.color.accent'))
             }
@@ -466,6 +527,7 @@ export struct PinmonyProfilePanelPage {
             }
           }.width('100%').padding({ left: 24, right: 24, top: this.getUIContext().px2vp(this.statusBarHeightPx) + 56 + this.searchHeaderHeight, bottom: 32 })
         }.width('100%').height('100%').align(Alignment.Top)
+          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
           .onReachEnd(() => this.loadSearchPage())
           .onScrollStop(() => this.retainPresentation())
           .onAppear(() => { if (this.searchRestorePending) this.restoreScrollOffsets(); })

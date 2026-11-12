@@ -19,7 +19,7 @@ function resolveTypeScript() {
 }
 try {
   const ts = resolveTypeScript();
-  const checks = ['check-log-performance-followup.cjs', 'check-official-action-notices.cjs', 'check-profile-hub.cjs', 'check-startup.cjs', 'check-global-performance.cjs', 'check-native-detail-reads.cjs', 'check-page-performance.cjs',
+  const checks = ['check-framework-completion.cjs', 'check-notice-recovery.cjs', 'check-async-disk-cache.cjs', 'check-inbox-message-notice.cjs', 'check-profile-avatar-upload.cjs', 'check-log-performance-followup.cjs', 'check-official-action-notices.cjs', 'check-profile-hub.cjs', 'check-startup.cjs', 'check-global-performance.cjs', 'check-native-detail-reads.cjs', 'check-page-performance.cjs',
     'check-native-search-reads.cjs', 'check-native-search-discovery.cjs', 'check-search-quiz-presentation.cjs',
     'check-home-return-timing.cjs', 'check-board-section-scroll.cjs', 'check-native-feature-gates.cjs', 'check-cache-invalidation.cjs', 'check-cache-age.cjs',
     'check-cache-consistency.cjs', 'check-home-disk-cache.cjs', 'check-native-home-reads.cjs',

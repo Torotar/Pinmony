@@ -51,5 +51,5 @@ for (const prop of ['backActive', 'interactionReady', 'automaticLoadingEnabled']
 }
 assert(content.includes('if (view.coveredByBoard || view.coveredByPin || !view.profileStore.profile'), 'covered scroll callbacks cannot replace saved position');
 assert(source.includes('coveredByBoard: this.retainProfileBoardParent()'));
-assert(source.includes('TransitionEffect.IDENTITY) : BOARD_PAGE_TRANSITION)'), 'new board retains its entry and return transition');
+assert(source.includes('NATIVE_PAGE_TRANSITION : BOARD_PAGE_TRANSITION)'), 'new board retains its entry and return transition');
 console.log('Profile board parent: matching route retention, created tab, invalid context cleanup, covered gates, scroll preservation and board animation passed');

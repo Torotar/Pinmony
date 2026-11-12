@@ -85,9 +85,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               initialResultsScrollOffset: view.searchStore.searchScrollOffset,
               onResultsScrollPosition: (pageKey: string, offset: number) => {
                 if (view.currentSearchPageKey() !== pageKey || view.currentPinUrl() || view.pinStore.detail) return;
-                view.searchStore.searchCache.updateScrollOffset(pageKey, offset);
-                if (view.searchStore.search?.pageKey === pageKey) view.searchStore.searchScrollOffset = offset;
-                if (view.searchStore.retainedSearch?.pageKey === pageKey) view.searchStore.retainedSearchScrollOffset = offset;
+                view.searchStore.rememberScrollPosition(pageKey, offset);
               },
               loading: view.searchStore.searchLoading,
               error: view.searchStore.searchError,
@@ -114,7 +112,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               onRootBack: () => { view.rootBack(); },
               onQuizAction: (kind: string, id: string) => view.performSearchQuizAction(kind, id),
               onFilters: () => view.openSearchFilters(),
-              onInputFocusChange: (focused: boolean, stopEditing: () => void) => {
+              onInputFocusChange: (focused: boolean, stopEditing: (deferRootReturn?: boolean) => boolean) => {
                 const visible: boolean = view.shouldKeepSearchPageMounted();
                 view.searchStore.searchInputFocused = visible && focused;
                 view.searchStore.searchInputStopEditing = visible && focused ? stopEditing : undefined;

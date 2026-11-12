@@ -1,3 +1,4 @@
+import { PinmonyScrollRecovery } from 'common_foundation';
 import { PinmonyActionNotice, PinmonyListDataSource, PinmonyCdnImage, PinmonyVideoSource } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyVideoCard } from 'common_ui';
@@ -15,6 +16,13 @@ interface PinmonyHomeFeedRow {
 
 @Component
 export struct PinmonyHomeFeedPane {
+  @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
+  private applyRecoveredPosition(): void {
+    if (!this.paneActive) return;
+    const offset: number | undefined = PinmonyScrollRecovery.offset('home', this.home.pageKey);
+    if (offset !== undefined) { this.initialScrollOffset = offset; this.restoreDone = false; this.restoreAwaitingPinCount = -1; this.restoreScrollPosition(); }
+  }
+
   private readonly feedRows: PinmonyListDataSource<PinmonyHomeFeedRow> = new PinmonyListDataSource<PinmonyHomeFeedRow>();
   private syncFeedRows(): void {
     const rows: PinmonyHomeFeedRow[] = (this.home.pins || []).map((pin: PinmonyHomePin): PinmonyHomeFeedRow => ({
@@ -46,6 +54,32 @@ export struct PinmonyHomeFeedPane {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private homeTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx); }
   @State private refreshGestureState: RefreshStatus = RefreshStatus.Inactive;
+  private refreshStateTimer: number = -1;
+  private refreshStateRevision: number = 0;
+
+  private cancelRefreshStateUpdate(): void {
+    this.refreshStateRevision++;
+    if (this.refreshStateTimer !== -1) clearTimeout(this.refreshStateTimer);
+    this.refreshStateTimer = -1;
+  }
+
+  private queueRefreshState(state: RefreshStatus): void {
+    // Refresh can report its state while ArkUI is updating the component tree.
+    // Commit on the next turn and retain only the latest event for this pane.
+    this.cancelRefreshStateUpdate();
+    if (!this.paneMounted) return;
+    const revision: number = this.refreshStateRevision;
+    const pageKey: string = this.home.pageKey;
+    const session: number = this.home.session;
+    const category: string = this.categoryId;
+    this.refreshStateTimer = setTimeout((): void => {
+      if (revision !== this.refreshStateRevision) return;
+      this.refreshStateTimer = -1;
+      if (!this.paneMounted || this.home.pageKey !== pageKey ||
+        this.home.session !== session || this.categoryId !== category) return;
+      if (this.refreshGestureState !== state) this.refreshGestureState = state;
+    }, 0);
+  }
   @StorageLink('pinmonyLanguage') @Watch('syncFeedRows') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   private uiFormat(source: string, values: (string | number)[]): string { return PinmonyI18n.format(source, values, this.uiLanguage); }
@@ -148,7 +182,10 @@ export struct PinmonyHomeFeedPane {
   @Prop initialScrollOffset: number = 0;
   @Prop menuLoadingId: string = '';
   @Prop error: string = '';
-  @State private contentWidth: number = 360;
+  @State @Watch('imageBudgetWidthChanged') private contentWidth: number = 360;
+  private imageBudgetWidthChanged(): void { this.prefetchVisibleDetails(); }
+  private cachedImageCount(): number { return Math.min(48, this.contentColumns() * 6); }
+  private detailImagePrefetchCount(): number { return Math.min(18, this.contentColumns() * 3); }
   @State private failedImages: string[] = [];
   @State private homeChromeCollapsed: boolean = false;
   @Prop categoryId: string = '';
@@ -266,7 +303,7 @@ export struct PinmonyHomeFeedPane {
   onContentScroll?: (offset: number, state: ScrollState) => void;
   onScrollPosition?: (pageKey: string, offset: number, epoch: number) => void;
   onVisiblePins?: (first: number, last: number) => void;
-  onPrefetchPins?: (first: number, last: number) => void;
+  onPrefetchPins?: (first: number, last: number, limit?: number) => void;
 
   aboutToAppear(): void {
     this.syncFirstImagePriority();
@@ -290,6 +327,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   aboutToDisappear(): void {
+    this.cancelRefreshStateUpdate();
     // The framework may already have detached the Scroller here. Persist the
     // last attached measurement rather than replacing the category offset with 0.
     if (this.restoreDone && this.onScrollPosition) {
@@ -610,7 +648,7 @@ export struct PinmonyHomeFeedPane {
     if (!allowsSpeculativeReads()) return;
     if (!this.feedActive || !this.actionsReady || this.loading || this.refreshing || this.pendingTabId ||
       this.home.refreshing || this.visibleLast < 0 || !this.onPrefetchPins) return;
-    this.onPrefetchPins(this.visibleFirst, this.visibleLast);
+    this.onPrefetchPins(this.visibleFirst, this.visibleLast, this.detailImagePrefetchCount());
   }
 
   private emptyFeedMessage(): string {
@@ -760,7 +798,8 @@ export struct PinmonyHomeFeedPane {
         Stack({ alignContent: Alignment.TopStart }) {
           PinmonyCdnImage({ url: this.recoveredSources[pin.imageUrl] || pin.imageUrl, fit: ImageFit.Cover,
             traceLoading: true, traceIndex: this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id),
-            loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: true,
+            // Match search results: mounted WaterFlow cache items may load offscreen.
+            loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false,
             onDecoded: () => {
               if (session !== this.home.session || pageKey !== this.home.pageKey ||
                 imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
@@ -851,7 +890,7 @@ export struct PinmonyHomeFeedPane {
       cardSources.add(this.recoveredSources[pin.imageUrl] || pin.imageUrl);
     });
     const seen: Set<string> = new Set<string>();
-    return this.prefetchedImageUrls.filter((url: string): boolean => {
+    return this.prefetchedImageUrls.slice(0, this.detailImagePrefetchCount()).filter((url: string): boolean => {
       if (!url || seen.has(url) || cardSources.has(url)) return false;
       seen.add(url);
       return true;
@@ -958,7 +997,7 @@ export struct PinmonyHomeFeedPane {
             .height('100%')
             .padding({ left: 12, right: 12, top: this.homeTopInset() + (this.home.board ? 132 : 64) })
             .clipContent(ContentClipMode.BOUNDARY)
-            .cachedCount(12, true)
+            .cachedCount(this.cachedImageCount(), true)
             .edgeEffect(EdgeEffect.None)
             .clip(false)
             .scrollBar(BarState.Off)
@@ -1013,7 +1052,7 @@ export struct PinmonyHomeFeedPane {
           .clip(false)
           .pullToRefresh(this.canPullRefresh())
           .onRefreshing(() => this.requestPullRefresh())
-          .onStateChange((state: RefreshStatus) => { this.refreshGestureState = state; })
+          .onStateChange((state: RefreshStatus) => { this.queueRefreshState(state); })
           this.feedStatus()
         }
         .width('100%')

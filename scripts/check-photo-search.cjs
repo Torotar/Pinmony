@@ -37,7 +37,8 @@ for (const mode of ['off', 'gentle', 'immersive', 'always']) {
   options.content.backIcon.action();
 }
 assert.equal(closed, 4);
-assert(photoPage.includes('.titleBar(this.photoSearchTitleBarOptions())'));
+assert(photoPage.includes('.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.photoSearchTitleBarOptions(), this.hdsDarkMode))'),
+  'dedicated photo search options pass through the shared theme-aware title resolver');
 assert(photoPage.includes('.mode(NavDestinationMode.STANDARD)'), 'search is its own full page destination');
 assert(photoPage.includes('.hideTitleBar(false)'));
 assert(!photoPage.includes('NavDestinationMode.DIALOG'));

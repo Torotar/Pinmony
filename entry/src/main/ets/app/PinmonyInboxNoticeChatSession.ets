@@ -1,6 +1,6 @@
 import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyInboxMessagesNativeReads } from './PinmonyInboxMessagesNativeReads';
 import { PIN_INBOX_CHAT_POLL_MS } from './PinmonyInboxUnreadNativeReads';
 

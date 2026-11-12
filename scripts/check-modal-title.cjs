@@ -33,17 +33,18 @@ console.log('Modal title: native HDS material, close routing, edit/picker busy g
 const heightStart = source.indexOf('  private nativeModalHeight()');
 const heightEnd = source.indexOf('\n  private nativeSheetUsesThemedModal(', heightStart);
 assert(heightStart > 0 && heightEnd > heightStart);
-const SheetSize = { LARGE: 'large', FIT_CONTENT: 'fit-content' };
+const SheetSize = { LARGE: 'large', MEDIUM: 'medium', FIT_CONTENT: 'fit-content' };
 const HeightHost = vm.runInNewContext(ts.transpileModule('class HeightHost {' + source.slice(heightStart, heightEnd) + '} HeightHost;', {}).outputText, { SheetSize });
 const heightHost = new HeightHost();
 for (const [width, height] of [[0, 0], [360, 800], [800, 360], [600, 960], [1280, 840], [360, 800]]) {
   Object.assign(heightHost, {activeSheetKind: 'comments', nativeSheetWindowWidth: width, nativeSheetWindowHeight: height});
   assert.equal(heightHost.nativeModalHeight(), SheetSize.LARGE, 'comments open at maximum detent across initial, portrait, landscape and resized windows');
 }
-for (const [kind, expected] of [['save', SheetSize.LARGE], ['edit', SheetSize.LARGE], ['more', SheetSize.FIT_CONTENT], ['publish', SheetSize.FIT_CONTENT], ['searchFilter', SheetSize.FIT_CONTENT], ['profileMenu', SheetSize.FIT_CONTENT]]) {
+for (const [kind, expected] of [['save', SheetSize.LARGE], ['edit', SheetSize.LARGE], ['more', SheetSize.FIT_CONTENT], ['publish', SheetSize.FIT_CONTENT], ['searchFilter', SheetSize.MEDIUM], ['profileMenu', SheetSize.FIT_CONTENT]]) {
   heightHost.activeSheetKind = kind;
   assert.equal(heightHost.nativeModalHeight(), expected, kind + ' height remains unchanged');
 }
-assert(source.includes("keyboardAvoidMode: this.activeSheetKind === 'comments' ? SheetKeyboardAvoidMode.RESIZE_ONLY"), 'comments retain resize-only keyboard avoidance');
+assert.match(source, /keyboardAvoidMode: this\.activeSheetKind === 'comments' \?\s*\(this\.nativeSheetWindowWidth >= 600 \? SheetKeyboardAvoidMode\.TRANSLATE_AND_RESIZE : SheetKeyboardAvoidMode\.RESIZE_ONLY\)/,
+  'CENTER comments translate and resize; bottom comments retain resize-only avoidance');
 assert(source.includes('height: this.nativeModalHeight()'), 'shared Sheet uses the checked height policy');
 console.log('Comments height: default LARGE across window sizes; other panel heights and keyboard policy retained');

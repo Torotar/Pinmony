@@ -1,5 +1,6 @@
 import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
+import { PinmonyPinViewTransition } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { HdsSnackBar } from '@kit.UIDesignKit';
@@ -44,6 +45,13 @@ interface BoardSettingOptions {
   changed: (value: boolean) => void;
 }
 
+interface PinmonyBoardViewOption {
+  resourceKey: string;
+  selected: boolean;
+  enabled: boolean;
+  onSelect: () => void;
+}
+
 interface BoardSurfaceAction {
   action: string;
   value?: string[];
@@ -59,6 +67,8 @@ const BOARD_ORGANIZE_PAGE_TRANSITION: TransitionEffect = TransitionEffect.asymme
 
 @Component
 export struct PinmonyBoardPage {
+  @Prop initialContentOffset: number = 0;
+  onContentPosition?: (offset: number) => void;
   @Prop discoveryBoard: boolean = false;
   @Prop profileBoard: boolean = false;
   @Prop singlePinMove: boolean = false;
@@ -142,6 +152,7 @@ export struct PinmonyBoardPage {
   @Builder
   private boardSurface($$: BoardSurfaceParams) {
     PinmonyBoardSurface({ snapshot: $$.board, profileBoard: this.profileBoard, discoveryBoard: this.discoveryBoard,
+      initialContentOffset: this.initialContentOffset, onContentPosition: this.onContentPosition,
       initialSelectedIds: $$.board.flow?.phase === 'targets' ? this.targetSelectedIds : [],
       singlePinMove: this.singlePinMove, invitationName: this.invitationName, invitationAvatar: this.invitationAvatar, invitationAvatarColorIndex: this.invitationAvatarColorIndex,
       invitationUsername: this.invitationUsername, invitationVisible: this.invitationVisible, invitationBusy: this.invitationBusy, joinedAvatar: this.joinedAvatar, joinedUsername: this.joinedUsername, joinedName: this.joinedName, joinedAvatarColorIndex: this.joinedAvatarColorIndex,
@@ -307,10 +318,13 @@ struct PinmonyBoardSurface {
   private flowScroller: Scroller = new Scroller();
   private targetScroller: Scroller = new Scroller();
   private coverScroller: Scroller = new Scroller();
+  private readonly coverHostScroller: Scroller = new Scroller();
   private readonly sectionScrollers: Map<string, Scroller> = new Map<string, Scroller>();
   private scrollOwner: string = '';
   private visibleScrollScope: string = '';
   private readonly scrollOffsets: Map<string, number> = new Map<string, number>();
+  @Prop initialContentOffset: number = 0;
+  onContentPosition?: (offset: number) => void;
   private scrollRestoreToken: number = 0;
   private restoringScroll: boolean = false;
 
@@ -321,7 +335,7 @@ struct PinmonyBoardSurface {
     this.visibleScrollScope = scope;this.restoringScroll = true;
     const token: number = ++this.scrollRestoreToken;
     if(this.snapshot.flow?.loading || this.snapshot.loading)return;
-    const offset: number = this.scrollOffsets.get(scope) || 0;
+    const offset: number = this.scrollOffsets.get(scope) ?? (!this.phase() ? this.initialContentOffset : 0);
     this.headerScrolled = offset > 180;
     setTimeout((): void => {
       if(token !== this.scrollRestoreToken || scope !== this.scrollScope())return;
@@ -415,7 +429,7 @@ struct PinmonyBoardSurface {
     if (!this.savedSnack) this.savedSnack = new HdsSnackBar(this.getUIContext());
     this.savedSnack.show({ icon: $r('sys.symbol.checkmark_circle'), iconType: SnackBarIconType.NORMAL,
       iconSymbolModifier: new SymbolGlyphModifier($r('sys.symbol.checkmark_circle')).fontColor([$r('app.color.accent')]) },
-      { title: this.uiText("pm_saved_to_b23743c1") + this.snapshot.title }, {}, { duration: 4000 });
+      { title: this.uiText("pm_saved_to_b23743c1") + this.snapshot.title }, {}, { backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK, blurStrategy: BlurStrategy.ENABLE, duration: 4000 });
   }
 
   private isDiscoveryBoard(): boolean { return this.discoveryBoard || !this.profileBoard && this.snapshot.featured === true; }
@@ -662,6 +676,33 @@ struct PinmonyBoardSurface {
   private selectionPins(): PinmonyBoardPin[] { return this.snapshot.flow?.sectionId && this.selectingPins() || this.snapshot.flow?.sectionId && this.phase() === 'targets' ? this.snapshot.flow?.pins || [] : this.snapshot.pins; }
 
   @State private contentWidth: number = 360;
+  @State private editViewportWidth: number = 0;
+  @State private editViewportHeight: number = 0;
+
+  private editColumns(): number {
+    // Measure the page host, not the scrolling form or the cover's own width.
+    if (!this.snapshot.editable || this.editViewportHeight <= 0 ||
+      this.editViewportWidth < 600 || this.editViewportWidth <= this.editViewportHeight) return 4;
+    return this.editViewportWidth >= 840 ? 12 : 8;
+  }
+
+  private coverContentHeight(): number {
+    // Match the cover flow's existing title, top spacing and 40vp bottom padding.
+    return Math.max(0, this.editViewportHeight - this.titleContentInset() - 18 - 40);
+  }
+
+  private coverPinsHeight(): number {
+    return Math.max(0, this.editViewportHeight - this.titleContentInset() - 18);
+  }
+
+  private splitCoverScrolling(): boolean {
+    return !!this.snapshot.flow?.cover && !this.snapshot.flow.cover.adjusting && this.editColumns() > 4;
+  }
+
+  private coverPinsScrolled(offset: number): void {
+    if(this.restoringScroll || !this.splitCoverScrolling() || !Number.isFinite(offset))return;
+    this.scrollOffsets.set(this.scrollScope(),offset);this.headerScrolled = offset > 180;
+  }
 
   private contentColumns(): number {
     if (this.modernBoardActions() && this.density === 0) return Math.max(1, Math.floor(this.contentWidth / 360));
@@ -784,7 +825,6 @@ struct PinmonyBoardSurface {
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
-    .geometryTransition(this.modernBoardActions() ? 'pinmony-board-density-' + this.snapshot.pageKey + '-' + this.scrollScope() + '-' + pin.id : '', { follow: true })
     .accessibilitySelected(this.selectingPins() && this.selectedIds.includes(pin.id))
     .accessibilityText(pin.title || this.uiText("pm_open_pin_e0bdd278"))
   }
@@ -794,13 +834,22 @@ struct PinmonyBoardSurface {
     if (this.selectedIds.length > 0) {
       Scroll() {
         Row({ space: 8 }) {
-          ForEach(this.selectionPins().filter((pin: PinmonyBoardPin) => this.selectedIds.includes(pin.id)), (pin: PinmonyBoardPin) => {
+          ForEach(this.selectedPins(), (pin: PinmonyBoardPin) => {
             Image(pin.imageUrl).width(42).height(58).objectFit(ImageFit.Cover).borderRadius(8)
               .onClick(() => { if (this.selectingPins()) this.toggle(pin.id); })
           }, (pin: PinmonyBoardPin) => pin.id)
         }.padding(12)
       }.scrollable(ScrollDirection.Horizontal).height(82).width('100%').scrollBar(BarState.Off).align(Alignment.TopStart)
     }
+  }
+
+  private selectedPins(): PinmonyBoardPin[] {
+    const pins: PinmonyBoardPin[] = [];
+    for (const id of this.selectedIds) {
+      const pin: PinmonyBoardPin | undefined = this.selectionPins().find((item: PinmonyBoardPin): boolean => item.id === id);
+      if (pin) pins.push(pin);
+    }
+    return pins;
   }
 
   @Builder
@@ -840,6 +889,11 @@ struct PinmonyBoardSurface {
     } else if (this.phase() === 'edit') {
       if(this.snapshot.flow?.cover) {
         PinmonyBoardCoverContent({cover:this.snapshot.flow.cover,locked:this.snapshot.flow.busy,
+          contentHeightLimit: this.coverContentHeight(),
+          pinsHeightLimit: this.coverPinsHeight(),
+          splitLayout: this.editColumns() > 4,
+          pinsScroller: this.contentScroll(),
+          onPinsScroll:(offset: number): void => {this.coverPinsScrolled(offset);},
           onAction:(action: string,value: string): void => {this.act(action,value);},onReady:(ready: boolean): void => {this.coverPreviewReady = ready;},
           onPreviewLoading:(loading: boolean): void => {this.coverPreviewLoading = loading;}})
       } else { this.editContent() }
@@ -946,9 +1000,7 @@ struct PinmonyBoardSurface {
   }
 
   @Builder
-  private editContent() {
-    Column({ space: 20 }) {
-      if (this.snapshot.editable) {
+  private editCover() {
       Column({space:10}) {
         this.editLabel(this.uiText('pm_board_cover_label'))
         Stack({alignContent:Alignment.BottomEnd}) {
@@ -981,6 +1033,26 @@ struct PinmonyBoardSurface {
         }.width('100%').aspectRatio(5/3).borderRadius(20).clip(true).backgroundColor($r('app.color.surface_muted'))
           .enabled(this.snapshot.nativeReadsReady === true && !this.snapshot.flow?.loading && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain)
       }.width('100%')
+  }
+
+  @Builder
+  private editContent() {
+    GridRow({ columns: this.editColumns(), gutter: { x: 20, y: 20 } }) {
+      if (this.snapshot.editable) {
+        GridCol({ span: 4 }) {
+          this.editCover()
+        }
+      }
+      GridCol({ span: this.editColumns() === 4 ? 4 : this.editColumns() - 4 }) {
+        this.editFields()
+      }
+    }.width('100%')
+  }
+
+  @Builder
+  private editFields() {
+    Column({ space: 20 }) {
+      if (this.snapshot.editable) {
       Column({ space: 10 }) {
         this.editLabel(this.uiText("pm_name_d44e9b3d"))
         TextInput({ text: this.editName }).maxLength(100).height(48).borderRadius(16)
@@ -1141,16 +1213,16 @@ struct PinmonyBoardSurface {
   }
 
   @Builder
-  private viewOption(key: string, selected: boolean, action: () => void, enabled: boolean = true) {
+  private viewOption($$: PinmonyBoardViewOption) {
     Button({type:ButtonType.Normal}) {
       Row() {
-        Text(this.uiText(key)).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
-        Checkbox().select(selected).shape(CheckBoxShape.CIRCLE)
+        Text(this.uiText($$.resourceKey)).fontSize(18).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
+        Checkbox().select($$.selected).shape(CheckBoxShape.CIRCLE)
           .selectedColor($r('app.color.accent')).unselectedColor($r('app.color.secondary_text'))
           .mark({strokeColor:Color.White}).width(24).height(24).margin(0)
           .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       }.width('100%')
-    }.width('100%').height(48).backgroundColor(Color.Transparent).stateEffect(false).hoverEffect(HoverEffect.None).enabled(enabled).accessibilityChecked(selected).onClick(action)
+    }.width('100%').height(48).backgroundColor(Color.Transparent).stateEffect(false).hoverEffect(HoverEffect.None).enabled($$.enabled).accessibilityChecked($$.selected).onClick(() => { $$.onSelect(); })
   }
 
   @Builder
@@ -1158,14 +1230,19 @@ struct PinmonyBoardSurface {
     Column({space:0}) {
       if (!this.phase()) {
       Text(this.uiText('pm_board_view_type')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
-      this.viewOption('pm_all_pins_9a2e0270',this.snapshot.favoriteOnly!==true,()=>{this.selectBoardViewFavorites(false);},this.boardViewFilterReady())
-      this.viewOption('pm_board_view_favorites',this.snapshot.favoriteOnly===true,()=>{this.selectBoardViewFavorites(true);},this.boardViewFilterReady() && this.snapshot.canFilterFavorites===true)
+      this.viewOption({ resourceKey: 'pm_all_pins_9a2e0270', selected: this.snapshot.favoriteOnly!==true,
+        onSelect: () => { this.selectBoardViewFavorites(false); }, enabled: this.boardViewFilterReady() })
+      this.viewOption({ resourceKey: 'pm_board_view_favorites', selected: this.snapshot.favoriteOnly===true,
+        onSelect: () => { this.selectBoardViewFavorites(true); }, enabled: this.boardViewFilterReady() && this.snapshot.canFilterFavorites===true })
       }
       Text(this.uiText('pm_board_view_density')).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%').margin({top:12})
       ForEach([this.density], (_density: number) => {
-      this.viewOption('pm_board_view_wide',this.density===0,()=>{this.selectBoardDensity(0);})
-      this.viewOption('pm_board_view_default',this.density===1,()=>{this.selectBoardDensity(1);})
-      this.viewOption('pm_board_view_compact',this.density===2,()=>{this.selectBoardDensity(2);})
+      this.viewOption({ resourceKey: 'pm_board_view_wide', selected: this.density===0, enabled: true,
+        onSelect: () => { this.selectBoardDensity(0); } })
+      this.viewOption({ resourceKey: 'pm_board_view_default', selected: this.density===1, enabled: true,
+        onSelect: () => { this.selectBoardDensity(1); } })
+      this.viewOption({ resourceKey: 'pm_board_view_compact', selected: this.density===2, enabled: true,
+        onSelect: () => { this.selectBoardDensity(2); } })
       }, (density: number): string => density.toString())
     }.width('100%').padding({left:24,right:24,top:12,bottom:24})
   }
@@ -1180,7 +1257,7 @@ struct PinmonyBoardSurface {
 
   private selectBoardDensity(value: number): void {
     if (!this.boardViewLive() || this.density === value) return;
-    this.getUIContext().animateTo({ duration: 280, curve: Curve.EaseOut }, () => {
+    PinmonyPinViewTransition.run(this.getUIContext(), () => {
       PinmonyProfileLayoutPreference.saveBoardDensity(value);
     });
   }
@@ -1296,11 +1373,10 @@ struct PinmonyBoardSurface {
       }.width('100%')
       ForEach(this.rows(), (start: number) => {
         Row({ space: 12 }) {
-          this.card(this.selectionPins()[start])
-          if (start + 1 < this.selectionPins().length) { this.card(this.selectionPins()[start + 1]) }
-          else { Blank().layoutWeight(1) }
-          if (start + 2 < this.selectionPins().length) { this.card(this.selectionPins()[start + 2]) }
-          else { Blank().layoutWeight(1) }
+          ForEach(this.selectionSlots(), (column: number) => {
+            if (start + column < this.selectionPins().length) { this.card(this.selectionPins()[start + column]) }
+            else { Blank().layoutWeight(1) }
+          }, (column: number) => column.toString() + ':' + this.uiLanguage)
         }.width('100%').alignItems(VerticalAlign.Top)
       }, (start: number) => this.selectionColumns().toString() + ':' + start.toString() + ':' +
         JSON.stringify(this.selectionPins().slice(start, start + this.selectionColumns())) + ':' + this.uiLanguage)
@@ -1365,6 +1441,10 @@ struct PinmonyBoardSurface {
           else { this.flowContent() }
         }.width('100%').padding({ left: 16, right: 16, top: (targetSheet ? 0 : this.titleContentInset()) + (this.selectedIds.length > 0 ? 82 : 0) + (targetSheet || this.phase() === 'targets' ? 1 : 0) + 16, bottom: 24 })
       }.height('100%').width('100%').scrollBar(BarState.Off).align(Alignment.TopStart)
+        .onAreaChange((_old: Area, area: Area) => {
+          const width: number = Number(area.width);
+          if (!targetSheet && width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
+        })
         .scrollBarMargin({ start: LengthMetrics.vp((targetSheet ? 0 : this.titleContentInset()) + (this.selectedIds.length > 0 ? 82 : 0)) })
         .onReachEnd(() => {
           if (this.creatingTarget || this.creatingBoardTarget || this.snapshot.flow?.busy || this.snapshot.flow?.uncertain) return;
@@ -1399,7 +1479,9 @@ struct PinmonyBoardSurface {
 
   @Builder
   private boardRefreshPlaceholder() {
-    if (this.phase() === 'section') {
+    if (this.snapshot.flow?.cover) {
+      Row().height(0).hitTestBehavior(HitTestMode.None)
+    } else if (this.phase() === 'section') {
       Row() {
         LoadingProgress().color($r('app.color.accent')).width(32).height(32)
           .visibility(this.showSectionRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)
@@ -1431,9 +1513,9 @@ struct PinmonyBoardSurface {
         this.organizeContent()
       } else {
       Stack({ alignContent: Alignment.Bottom }) {
-      Refresh({ refreshing: !this.snapshot.postOperationLoading && (this.snapshot.refreshing === true || this.phase() === 'section' && this.snapshot.flow?.refreshing === true),
+      Refresh({ refreshing: !this.snapshot.flow?.cover && !this.snapshot.postOperationLoading && (this.snapshot.refreshing === true || this.phase() === 'section' && this.snapshot.flow?.refreshing === true),
         builder: this.boardRefreshPlaceholder }) {
-      Scroll(this.contentScroll()) {
+      Scroll(this.splitCoverScrolling() ? this.coverHostScroller : this.contentScroll()) {
         Column({ space: 16 }) {
           if (this.snapshot.flow?.phase === 'archive') {
             if (this.snapshot.flow.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
@@ -1685,7 +1767,6 @@ struct PinmonyBoardSurface {
           } else if (this.snapshot.ready && this.snapshot.pins.length === 0 && this.phase() !== 'ideas' && this.phase() !== 'section') {
             Text(this.uiText("pm_no_saved_pins_yet_24c645e0")).fontSize(17).fontColor($r('app.color.primary_text')).margin({ top: 64 })
           } else {
-            ForEach([this.contentColumnsTemplate() + ':' + this.density.toString() + ':' + (this.phase() === 'section' ? this.snapshot.flow?.sectionId || '' : this.phase())], (layout: string) => {
             WaterFlow() {
               ForEach((this.phase() === 'ideas' || this.phase() === 'section') ? this.snapshot.flow?.pins || [] : this.snapshot.pins, (pin: PinmonyBoardPin) => {
                 FlowItem() {
@@ -1698,7 +1779,6 @@ struct PinmonyBoardSurface {
             .columnsTemplate(this.contentColumnsTemplate())
             .columnsGap(12)
             .rowsGap(12)
-            }, (layout: string): string => layout)
           }
           if (this.phase() === 'ideas') {
             this.flowContent()
@@ -1717,19 +1797,22 @@ struct PinmonyBoardSurface {
           const width: number = Number(area.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
         })
-        .padding({ left: 16, right: 16, top: this.titleContentInset() + 18, bottom: this.modernBoardActions() ? 132 : 40 })
+        .padding({ left: 16, right: 16, top: this.titleContentInset() + 18, bottom: this.splitCoverScrolling() ? 0 : this.modernBoardActions() ? 132 : 40 })
       }
       .width('100%').height('100%').scrollBar(BarState.Off)
+      .scrollable(this.splitCoverScrolling() ? ScrollDirection.None : ScrollDirection.Vertical)
       .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
-      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+      .edgeEffect(this.snapshot.flow?.cover ? EdgeEffect.None : EdgeEffect.Spring, { alwaysEnabled: !this.snapshot.flow?.cover })
       .onDidScroll(() => {
-        if(this.restoringScroll)return;
+        if(this.restoringScroll || this.splitCoverScrolling())return;
         const offset: number = this.contentScroll().currentOffset().yOffset;
         this.scrollOffsets.set(this.scrollScope(),offset);this.headerScrolled = offset > 180;
+        if (!this.phase()) this.onContentPosition?.(offset);
       })
       .align(Alignment.TopStart)
       .onReachEnd(() => {
         if (this.snapshot.flow?.cover) {
+          if(this.splitCoverScrolling())return;
           if(this.snapshot.flow.cover.hasMore && !this.snapshot.flow.cover.loading && !this.snapshot.flow.cover.error && !this.snapshot.flow.busy && !this.snapshot.flow.uncertain)this.act('coverMore');
         }
         else if (this.phase() === 'section') this.act('sectionMore');
@@ -1740,11 +1823,13 @@ struct PinmonyBoardSurface {
       }
       .width('100%').height('100%')
       .pullToRefresh((!this.phase() || this.phase() === 'section') && this.snapshot.ready && !this.snapshot.flow?.busy)
+      .maxPullDownDistance(this.snapshot.flow?.cover ? 0 : undefined)
       .onStateChange((state: RefreshStatus): void => {
-        this.boardRefreshActive = state === RefreshStatus.Drag || state === RefreshStatus.OverDrag ||
-          state === RefreshStatus.Refresh;
+        // Touching the top/reversing a scroll can briefly enter Drag without a refresh intent.
+        this.boardRefreshActive = !this.snapshot.flow?.cover && (state === RefreshStatus.OverDrag || state === RefreshStatus.Refresh);
       })
       .onRefreshing(() => {
+        if(this.snapshot.flow?.cover)return;
         PinmonyRuntimeLog.info('BoardRefreshTrace: stage=gesture');
         if (this.onRefresh) this.onRefresh();
       })
@@ -1861,7 +1946,7 @@ struct PinmonyBoardSurface {
       .navDestination(this.boardDestination)
       .backgroundColor($r('app.color.page_background'))
       .accessibilityLevel(this.organizeLoading() || this.snapshot.postOperationLoading || this.discoveryLoadingMask() ? 'no-hide-descendants' : 'auto')
-      if (this.snapshot.flow?.cover && ((this.snapshot.flow.cover.loading &&
+      if (this.snapshot.flow?.cover && ((this.snapshot.flow.cover.loading && !this.snapshot.flow.cover.refreshing &&
         (this.snapshot.flow.cover.adjusting || this.snapshot.flow.cover.pins.length === 0)) || this.coverPreviewLoading)) {
         Stack({ alignContent: Alignment.Center }) {
           LoadingProgress().color($r('app.color.accent')).width(32).height(32)
@@ -1933,6 +2018,11 @@ struct PinmonyBoardSurface {
     .onAreaChange((_old: Area, area: Area) => {
       const width: number = Number(area.width);
       if (width > 0) this.sectionMotionWidth = width;
+      const height: number = Number(area.height);
+      if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+        this.editViewportWidth = width;
+        this.editViewportHeight = height;
+      }
     })
   }
 }

@@ -23,7 +23,7 @@ export default class PreferencesTask extends StartupTask {
     }
     try { PinmonyI18n.initialize(context); }
     catch (_) { PinmonyRuntimeLog.warn('LanguagePreference: restore failed'); PinmonyI18n.syncSystemLanguage(); }
-    PinmonyRuntimeLog.info('LanguagePreference: restored=' + (AppStorage.get<string>('pinmonyLanguagePreference') || 'system') +
+    PinmonyRuntimeLog.info('LanguagePreference: restored=' + (AppStorage.get<string>('pinmonyLanguagePreference') || 'account') +
       ' effective=' + (AppStorage.get<string>('pinmonyLanguage') || 'unknown'));
     PersistentStorage.persistProp('profileLegacyLayout', false);
     PinmonyProfileLayoutPreference.initialize(context);

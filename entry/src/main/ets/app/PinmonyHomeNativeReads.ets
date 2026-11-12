@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeStore, PinmonyHomeSnapshot, PinmonyHomePin, PinmonyHomeTab, PinmonyHomeBoard } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyVideo, PinmonyVideoSource } from 'common_ui';
 import { PinmonyRuntimeLog } from 'common_foundation';
 

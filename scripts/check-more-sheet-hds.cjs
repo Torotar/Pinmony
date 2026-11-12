@@ -1,22 +1,25 @@
 const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
 const ts=require(process.argv[2]||'typescript');
-const sheet=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyMoreSheet.ets','utf8');
+const PinmonyHdsTitleBar=require('./modal-style-test-fixture.cjs')(ts);
+const detail=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyMoreSheet.ets','utf8');
+const sheet=fs.readFileSync('common_ui/src/main/ets/components/PinmonyOptionsNavigation.ets','utf8');
+assert(detail.includes('PinmonyOptionsNavigation({') && !detail.includes('HdsNavigation()'), 'detail uses shared options implementation');
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function compile(body,globals={}) {return vm.runInNewContext(ts.transpileModule('class Host {'+body+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,globals);}
 const Title=compile(sheet.slice(sheet.indexOf('  private titleOptions()'),sheet.indexOf('  build()')),
- {$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:2},IconStyleMode:{SMALL:1},Color:{Transparent:'transparent'},PinmonyImmersiveLight:{effect:mode=>mode==='off'?undefined:{mode}}});
+ {PinmonyHdsTitleBar,$r:x=>x,SymbolGlyphModifier:class{fontColor(){return this;}},BlurStrategy:{ENABLE:1,DISABLE:0},ScrollEffectType:{IMMERSIVE_GRADIENT_BLUR:2},IconStyleMode:{SMALL:1},Color:{Transparent:'transparent'},PinmonyImmersiveLight:{effect:mode=>mode==='off'?undefined:{mode}}});
 for(const mode of ['off','gentle','immersive','exquisite'])for(const language of ['zh','en']){
- let closed=0;const h=new Title();Object.assign(h,{immersiveLightMode:mode,uiText:key=>language+':'+key,onClose(){closed++;}});
+ let closed=0;const h=new Title();Object.assign(h,{titleText:language+':pm_options_bb7486f4',immersiveLightMode:mode,uiText:key=>language+':'+key,onClose(){closed++;}});
  const o=h.titleOptions();assert.equal(o.enableComponentSafeArea,true);assert.equal(o.avoidLayoutSafeArea,false);
- assert.equal(o.style.scrollEffectOpts.enableScrollEffect,mode!=='off');assert.equal(o.style.scrollEffectOpts.scrollEffectType,2);
- assert.equal(o.style.scrollEffectStyle.backgroundStyle.blurRadius,mode==='off'?0:18);
- assert.equal(o.style.blurStrategy,mode==='off'?0:1);assert.equal(o.content.title.mainTitle,language+':pm_options_bb7486f4');
+ assert.equal(o.style.scrollEffectOpts.enableScrollEffect,false);assert.equal(o.style.scrollEffectOpts.scrollEffectType,3);
+ assert.equal(o.style.originalStyle.backgroundStyle.blurRadius,0);assert.equal(o.style.scrollEffectStyle,undefined);
+ assert.equal(o.style.blurStrategy,mode==='off'?0:2);assert.equal(o.content.title.mainTitle,language+':pm_options_bb7486f4');
  o.content.menu.value[0].content.action();assert.equal(closed,1);
 }
 assert(sheet.includes('Scroll(this.menuScroller)')&&sheet.includes('.bindToScrollable([this.menuScroller])'));
 assert(sheet.includes('.edgeEffect(EdgeEffect.None)'), 'menu body has no overscroll spring');
 assert(!sheet.includes('EdgeEffect.Spring')&&!sheet.includes('alwaysEnabled: true'), 'neither short nor long menu content enables body rebound');
-assert(sheet.includes('.clip(false)'), 'scroll content can still draw beneath the HDS gradient blur title');
+assert(!/\.clip\(|\.zIndex\(/.test(sheet), 'official full navigation owns title and body without custom clipping or layering');
 assert.equal((sheet.match(/Scroll\(/g)||[]).length,1,'loading, empty, error and menu share the same scroll scope');
 assert(sheet.includes('.titleMode(HdsNavigationTitleMode.MODAL)'));
 const Measurement=compile(sheet.slice(sheet.indexOf('  private bodyHeight()'),sheet.indexOf("  @StorageLink('pinmonyLanguage')")));
@@ -25,7 +28,7 @@ for(const [content,expected] of [[180,180],[420,420],[850,520],[92,92],[20,20]])
  measured.updateContentHeight({height:content});assert.equal(measured.bodyHeight(),expected,'grows and shrinks with actual menu content');
 }
 measured.updateContentHeight({height:NaN});assert.equal(measured.bodyHeight(),20,'invalid measurements cannot break layout');
-assert(sheet.includes('.height(this.bodyHeight() + 64)')&&sheet.includes('.height(this.bodyHeight())'));
+assert(sheet.includes('.height(this.bodyHeight() + 64)')&&sheet.includes("}.width('100%').height('100%')"),'whole navigation fits content; scroll viewport follows actual available height');
 assert(sheet.includes('this.updateContentHeight(current)'),'measure the intrinsic body, not the constrained HDS root');
 const controller=fs.readFileSync('feature_pin/src/main/ets/controllers/PinmonySharePanelsController.ets','utf8');
 const Pause=compile(controller.slice(controller.indexOf('  pause('),controller.indexOf('  private current(')),{PinmonyI18n:{message:key=>key}});

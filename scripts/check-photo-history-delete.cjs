@@ -1,5 +1,5 @@
 const fs = require('fs'), vm = require('vm'), assert = require('assert/strict'), ts = require(process.argv[2]);
-const transpile = code => ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText;
+const transpile = code => require('./native-network-test-fixture.cjs').transpile(ts, code, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText;
 const bytes = value => { const b = Buffer.from(JSON.stringify(value)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 const success = () => bytes({ resource_response: { status: 'success', code: 0, endpoint_name: 'v3_delete_lens_histories', data: null } });
 const photo = id => ({ id, imageUrl: 'https://i.pinimg.com/test.jpg', width: 200, height: 300 });
@@ -19,11 +19,17 @@ const UI = vm.runInNewContext(transpile('class UI {' + ['visibleItems', 'deleteP
 const networkSource = fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets', 'utf8');
 const requests = [];
 let response = { statusCode: 200, body: success(), headers: {} };
-const Network = vm.runInNewContext(transpile('class Network {' + method(networkSource, 'deletePhotoHistory') + '} Network;'), {
-  PIN_BUSINESS_PIN_READ_ENABLED: true, Priority: { NORMAL: 0 },
-  rcp: { Request: class { constructor(url, method, headers, body) { Object.assign(this, { url, method, headers, body }); } } },
-  NetworkManager: { enqueue: (_, call) => call(), getSession: () => ({ fetch: async request => { requests.push(request); return response; } }) }
-});
+const { createArktsLoader } = require('./arkts-module-loader.cjs');
+const loader = createArktsLoader(ts, {
+  common_foundation: {PinmonyRuntimeLog:{info(){},warn(){}}},
+  common_session: {PinmonySessionCredentials:class {}},
+  '@kit.RemoteCommunicationKit': {rcp: {Request: class {constructor(url,method,headers,body){Object.assign(this,{url,method,headers,body});}}, MultipartForm: class {constructor(fields){this.fields=fields;}}}},
+  '@kit.BasicServicesKit': {}
+}, {PinmonyTestTransportOnly:true});
+const core=loader.loadFile('common_network/src/main/ets/PinmonyNativeNetwork.ets');
+core.NetworkManager.enqueue=(_,call)=>call();core.NetworkManager.requestRemainingMs=()=>0;
+core.NetworkManager.getSession=()=>({fetch:async request=>{requests.push(request); return response;}});
+const {PinmonyBusinessNetwork:Network}=loader.loadFile('entry/src/main/ets/app/PinmonyBusinessNetwork.ets');
 (async () => {
   const origin = 'https://www.pinterest.com', session = { authenticated: true, accountId: 'synthetic-account', generation: 1, origin, userAgent: 'test-agent' };
   const network = new Network();
@@ -94,7 +100,9 @@ const Network = vm.runInNewContext(transpile('class Network {' + method(networkS
   assert(uiSource.includes('curve: Curve.EaseOut }), TransitionEffect.IDENTITY'), 'existing incoming-only transition contract');
   assert(!uiSource.includes('onRestore'), 'no invented restore transport');
   assert(!uiSource.includes('sys.symbol.checkmark'), 'no checkmark remains');
-  assert(uiSource.slice(uiSource.indexOf('.titleBar({')).includes("icon: new SymbolGlyphModifier($r('sys.symbol.trash'))"), 'trash action occupies title menu');
+  const titleStart = uiSource.indexOf('.titleBar(PinmonyHdsTitleBar.resolve(');
+  assert(titleStart >= 0, 'history title uses the shared theme-aware resolver');
+  assert(uiSource.slice(titleStart).includes("icon: new SymbolGlyphModifier($r('sys.symbol.trash'))"), 'trash action occupies title menu');
   assert(!uiSource.includes('Blank().layoutWeight(1)'), 'body toolbar removed');
   console.log('Photo history delete: captured transport, session/ID gates, validated results, duplicates/uncertain/stale writes, card feedback and complete pagination passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

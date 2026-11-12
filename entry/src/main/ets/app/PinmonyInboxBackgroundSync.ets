@@ -1,6 +1,6 @@
 import { notificationManager } from '@kit.NotificationKit';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
-import { PinmonyNativeNetwork } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyInboxStore } from 'feature_inbox';
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';

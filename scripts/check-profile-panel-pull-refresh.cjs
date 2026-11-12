@@ -29,7 +29,7 @@ for (const mode of ['followers', 'following']) {
   const h = fixture(mode);
   for (const state of Object.values(RefreshStatus)) {
     h.panelRefreshState = state;
-    assert.equal(h.showPanelRefreshIndicator(), state === RefreshStatus.Drag || state === RefreshStatus.OverDrag);
+    assert.equal(h.showPanelRefreshIndicator(), state === RefreshStatus.OverDrag || state === RefreshStatus.Refresh);
   }
   const before = requests; h.requestPanelRefresh(); assert.equal(requests, before + 1);
   h.snapshot.refreshing = true; h.panelRefreshState = RefreshStatus.Inactive;

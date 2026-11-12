@@ -10,6 +10,8 @@ function load(file, require) {
 }
 const lru = load('common_foundation/src/main/ets/cache/LruCache.ets');
 class Disk {
+  async getWithMetadataAsync(key, maxAge, current) { return current() ? this.getWithMetadata(key, maxAge) : { value: null, status: 'miss', ageMs: -1 }; }
+  async putAsync(key, value, current) { if (!current()) throw Error('invalidated'); this.put(key, value); }
   getWithMetadata(key, maxAge) {
     const ageMs = now - savedAt;
     return ageMs >= maxAge ? { value: null, status: 'expired', ageMs } : { value: saved, status: 'hit', ageMs };

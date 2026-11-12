@@ -6,7 +6,7 @@ const source = fs.readFileSync('entry/src/main/ets/app/PinmonyInboxMessageNotice
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText;
 let now = Date.parse('2026-11-07T08:00:00Z');
 class TestDate extends Date { static now() { return now; } }
-function fixture() {
+function fixture(recovery, earlyWant) {
   let active = true, background = false, visible = '', viewed = '', enabled = true, language = 'zh', permissionCalls = 0, failPublish = false, failCancel = false;
   let session = { authenticated: true, accountId: 'self', generation: 1, origin: 'https://www.pinterest.com' };
   let permissionGate, wantGate, publishGate;
@@ -21,9 +21,10 @@ function fixture() {
     requestEnableNotification: async () => { permissionCalls++; if (permissionGate) await permissionGate; },
     publish: async request => { if (failPublish) throw Error('synthetic'); published.push({...request}); if (publishGate) await publishGate; }
   };
-  vm.runInNewContext(compiled, { exports, Date: TestDate, require: name => name === './PinmonyInboxNoticeAvatar' ? { PinmonyInboxNoticeAvatar: class { cancel() {} async read(url) { if(!url)return;avatarReads.push(url); if(avatarGate)await avatarGate;return avatarResult; } } } : name === './PinmonyInboxNoticeTap' ? tapExports : name === '@kit.NotificationKit' ? { notificationManager: manager } : name === '@kit.AbilityKit' ? {
+  vm.runInNewContext(compiled, { exports, Date: TestDate, require: name => name === './PinmonyInboxNoticeAvatar' ? { PinmonyInboxNoticeAvatar: class { cancel() {} async read(url) { if(!url)return;avatarReads.push(url); if(avatarGate)await avatarGate;return avatarResult; } } } : name === './PinmonyInboxNoticeRecovery' ? { PinmonyInboxNoticeRecovery: recovery || { save: async()=>{}, read: async()=>undefined, consume(){}, clear(){} } } : name === './PinmonyInboxNoticeTap' ? tapExports : name === '@kit.NotificationKit' ? { notificationManager: manager } : name === '@kit.AbilityKit' ? {
     wantAgent: { getWantAgent: async info => { if (wantGate) await wantGate; return info; }, OperationType: { START_ABILITY: 0 }, WantAgentFlags: { UPDATE_PRESENT_FLAG: 0 } }
   } : name === 'common_foundation' ? { PinmonyRuntimeLog: { info() {}, warn() {} }, PinmonyI18n: { format: (key,args) => { assert.equal(key,'pm_board_invitation_notice_body'); assert.equal(args.length,1); return language === 'zh' ? '邀请你在'+args[0]+'上进行合作' : 'Invited you to collaborate on '+args[0]; }, message: () => language === 'zh' ? '新消息' : 'New message' } } : {} });
+  if(earlyWant)tapExports.PinmonyInboxNoticeTap.receive(earlyWant);
   const notice = new exports.PinmonyInboxMessageNotice({ session: () => session, active: () => active, deliveryActive: () => background, username: () => 'self', visibleConversation: () => visible, viewedConversation:()=>viewed, context: () => ({ applicationInfo: { name: 'com.synthetic.pinmony' } }),visibleInvitationBoard:()=>visibleBoard,openInvitation:item=>{if(!canOpen)return false;openedInvitations.push(item);return true;},openChat:id=>{if(!canOpen)return false;opened.push(id);return true;} });
   return { notice, published, cancelled, setActive: v => active = v, setVisible: v => visible = v, setEnabled: v => enabled = v,
     setSession: v => session = v, setLanguage: v => language = v, setBackground: v => background = v, permissionCalls: () => permissionCalls,

@@ -40,7 +40,7 @@ export struct PinmonyHomeMenuSheet {
         ForEach(this.sharePages(), (page: PinmonyHomeMenuOption[]) => {
           Row({ space: 8 }) {
           ForEach(page, (option: PinmonyHomeMenuOption) => {
-            Button({ type: ButtonType.Normal }) {
+            Button({ type: ButtonType.Normal, stateEffect: false }) {
               Column({ space: 8 }) {
                 Image(this.platformIcon(option.label)).width(56).height(56).objectFit(ImageFit.Contain)
                 Text(option.label === '短信' ? this.uiText("pm_messages_4da199fa") : option.label)
@@ -72,7 +72,7 @@ export struct PinmonyHomeMenuSheet {
       } else {
         Column() {
         ForEach(this.menu.actions.filter((option: PinmonyHomeMenuOption): boolean => option.id !== 'home-favorite'), (option: PinmonyHomeMenuOption) => {
-          Button({ type: ButtonType.Normal }) {
+          Button({ type: ButtonType.Normal, stateEffect: false }) {
             Row({ space: 14 }) {
               if (option.id === 'board-menu-move') {
                 SymbolGlyph($r('sys.symbol.arrow_right'))

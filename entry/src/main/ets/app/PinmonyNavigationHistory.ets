@@ -2,6 +2,7 @@ const HOME_URL: string = 'https://www.pinterest.com/';
 
 // Native back navigation confirms the destination before removing its child.
 export class PinmonyNavigationHistory {
+  snapshot(): string[] { return this.pages.slice(); }
   private pages: string[] = [HOME_URL];
   private pendingTarget: string = '';
 

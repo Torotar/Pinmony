@@ -1,3 +1,4 @@
+import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -48,7 +49,7 @@ export struct PinmonyVisibilitySettingsPage {
         this.dismissErrorSnack();
         this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
       }
-    }, { duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
+    }, { backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK, blurStrategy: BlurStrategy.ENABLE, duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
   private title(): string { return this.uiText("pm_profile_visibility_6fedc091"); }
   private available(): boolean { return !!this.store.data?.ready && !this.store.loading && !this.store.busy && !this.store.error; }
@@ -140,7 +141,11 @@ export struct PinmonyVisibilitySettingsPage {
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        if (this.store.busy) {
+          PinmonyLoadingOverlay({ showMessage: false })
+        } else {
+          LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        }
       }
       }.width('100%').height('100%')
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)
@@ -161,7 +166,12 @@ export struct PinmonyVisibilitySettingsPage {
   private presentedPrivacySheet() {
     PinmonyModalNavigation({ titleText: this.uiText(this.store.pendingPrivate ? 'pm_make_profile_private_5d577229' : 'pm_make_profile_public_147d123a'), fillContent: true,
       closeEnabled: !this.store.busy, onClose: () => { if (!this.store.busy) this.store.confirmOpen = false; } }) {
-      this.privacySheet()
+      Stack({ alignContent: Alignment.Center }) {
+        this.privacySheet()
+        if (this.store.busy) {
+          PinmonyLoadingOverlay({ showMessage: false })
+        }
+      }.width('100%').height('100%')
     }
   }
 

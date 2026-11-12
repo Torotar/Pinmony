@@ -64,7 +64,7 @@ export struct PinmonyInboxNewsPage {
         if(card.title) { Text(card.title).width('100%').fontSize(13).fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({overflow:TextOverflow.Ellipsis}).onClick(() => this.act('newsOpen',card.id)) }
         Row() {
           Blank()
-          Button({type:ButtonType.Circle}) { Image($r('app.media.lucide_ellipsis')).width(20).height(20).fillColor($r('app.color.primary_text')) }
+          Button({ type: ButtonType.Circle, stateEffect: false }) { Image($r('app.media.lucide_ellipsis')).width(20).height(20).fillColor($r('app.color.primary_text')) }
             .width(36).height(30).backgroundColor(Color.Transparent).accessibilityText(this.text('pm_more_actions_9f07d2ce'))
             .onClick(() => {if(this.active){this.saveScroll();this.onMenu?.(card.target);}})
         }.width('100%')

@@ -49,7 +49,10 @@ Object.assign(host, { traceLoading: false, visible: true, tracePhases: new Set()
   loadTrace: { record() { records++; } } });
 host.auditImage('node-mounted'); assert.equal(records, 0, 'untraced callers do not collect statistics');
 host.traceLoading = true; host.visible = false; host.auditImage('node-mounted'); assert.equal(records, 0);
-host.visible = true; host.auditImage('node-mounted'); host.auditImage('node-mounted'); assert.equal(records, 1);
+host.visible = true; host.auditImage('node-mounted'); host.auditImage('node-unmounted'); host.auditImage('node-mounted');
+assert.equal(records, 3, 'same-generation image mount cycles must remain observable during slow scrolling');
+host.auditImage('native-decoded'); host.auditImage('native-decoded'); assert.equal(records, 4, 'completion phases remain deduplicated');
+assert(component.includes("this.auditImage('host-disposed')") && component.includes("this.auditImage('node-unmounted')"));
 host.loadTrace.record = () => { throw new Error('instrumentation failure'); };
 assert.doesNotThrow(() => host.auditImage('native-decoded'), 'diagnostic failure cannot interrupt image completion');
 const callback = component.slice(component.indexOf('.onComplete((event)'), component.indexOf('  build()'));

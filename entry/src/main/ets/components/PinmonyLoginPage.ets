@@ -13,6 +13,8 @@ export interface PinmonyLoginView {
   scripts: ScriptItem[];
   lifecycle: PinmonyWebLifecycleCoordinator;
   visible: boolean;
+  loading: boolean;
+  onLoadingChanged: (loading: boolean) => void;
   authenticated: boolean;
   presentationOnly: boolean;
   captureEnvironment: () => void;
@@ -49,8 +51,8 @@ export function PinmonyBuildLoginPage(view: PinmonyLoginView) {
             })
             .runJavaScriptOnDocumentStart(view.scripts)
             .onControllerAttached(() => { if(view.isCurrent?.(view.controller) === false)return;view.captureEnvironment(); view.lifecycle.controllerAttached(); })
-            .onPageBegin((event) => { if(view.isCurrent?.(view.controller) === false)return;view.captureEnvironment(); view.lifecycle.pageBegin(event.url); })
-            .onPageEnd(() => { if(view.isCurrent?.(view.controller) === false)return;view.captureEnvironment(); view.lifecycle.pageEnd(); })
+            .onPageBegin((event) => { if(view.isCurrent?.(view.controller) === false)return;view.onLoadingChanged(true);view.captureEnvironment(); view.lifecycle.pageBegin(event.url); })
+            .onPageEnd(() => { if(view.isCurrent?.(view.controller) === false)return;view.onLoadingChanged(false);view.captureEnvironment(); view.lifecycle.pageEnd(); })
             .onConsole((event) => {
               if(view.isCurrent?.(view.controller) === false)return false;
               if (!event) return false;
@@ -89,6 +91,14 @@ export function PinmonyBuildLoginPage(view: PinmonyLoginView) {
             })
             .width('100%')
           .height('100%')
+          if (view.visible && !view.authenticated && view.loading) {
+            Stack({ alignContent: Alignment.Center }) {
+              LoadingProgress().width(36).height(36).color($r('app.color.accent'))
+            }
+            .width('100%').height('100%')
+            .backgroundColor($r('app.color.page_background'))
+            .hitTestBehavior(HitTestMode.Block)
+          }
         }
         .width('100%')
         .height('100%')

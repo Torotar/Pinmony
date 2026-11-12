@@ -1,7 +1,8 @@
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyInboxStore, PinmonyInboxItem, PinmonyInboxFlowSnapshot, PinmonyInboxNewsCard } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 interface InboxNewsImage { url: string; width?: number; height?: number; }
 interface InboxNewsObject { id: string; type: string; term?: string; images?: Record<string,InboxNewsImage>; grid_title?: string; title?: string; is_promoted?: boolean; ad_data?: Object; pin_promotion_id?: string | number; }
 interface InboxNewsContent { content_object?: InboxNewsObject; }

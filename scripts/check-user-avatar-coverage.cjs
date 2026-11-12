@@ -3,7 +3,7 @@ const ts = require(process.argv[2] || 'typescript');
 const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 function load(file) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file, 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,
     {exports,require:withLocalMessages(() => ({})),setTimeout,clearTimeout,console});
   return exports;
 }
@@ -12,7 +12,7 @@ function methods(file, names) {
   const ast = ts.createSourceFile('avatar.ts',source,ts.ScriptTarget.Latest,true), bodies=[];
   function visit(node) {if(ts.isMethodDeclaration(node) && names.includes(node.name.getText(ast)))bodies.push(node.getText(ast));ts.forEachChild(node,visit);} visit(ast);
   assert.equal(bodies.length,names.length,file);
-  return vm.runInNewContext(ts.transpileModule('class Host {'+bodies.join('\n')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{$r:x=>x,inheritUserAvatarColor:load('entry/src/main/ets/app/PinmonyUserAvatarMetadata.ets').inheritUserAvatarColor});
+  return vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Host {'+bodies.join('\n')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{$r:x=>x,inheritUserAvatarColor:load('entry/src/main/ets/app/PinmonyUserAvatarMetadata.ets').inheritUserAvatarColor});
 }
 const source = fs.readFileSync('common_ui/src/main/ets/components/PinmonyUserAvatar.ets','utf8');
 assert.match(source,/websiteFallback: boolean = true/);

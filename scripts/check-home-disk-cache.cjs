@@ -39,11 +39,11 @@ assert.match(fs.readFileSync('entry/src/main/ets/app/PinmonySessionCoordinator.e
 assert.match(index, /HomeCache: clear scope=memory-and-disk filesRemoved=/);
 assert.match(index, /homeActionsReady = false/);
 assert.match(index, /clearRootTabCaches\(clearPersistentCache: boolean = true\)/);
-assert.match(index, /this\.homeApiCache\.clear\(\)/);
+assert.match(index, /this\.homeApiCache\??\.clearAsync\(\)/);
 assert.match(index, /PINWEB_HOME_OFFLINE_MARKER/);
 assert.match(index, /PINWEB_HOME_OFFLINE_MARKER_CACHE_KEY/);
 assert.match(index, /OfflineCache: marker lookup status=/);
-assert.match(index, /homeApiCache\.put\(PINWEB_HOME_OFFLINE_MARKER_CACHE_KEY/);
+assert.match(index, /homeApiCache\.putAsync\(PINWEB_HOME_OFFLINE_MARKER_CACHE_KEY/);
 assert.match(index, /OfflineCache: marker loaded/);
 assert.match(index, /OfflineCache: preview entered actionsReady=false/);
 assert.match(homeBusiness, /OfflineCache: expired/);

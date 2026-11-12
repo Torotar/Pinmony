@@ -2,7 +2,7 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const ts = require(process.argv[2] || 'typescript');
 function load(path) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path, 'utf8'), {
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   }).outputText, { exports, require: name => name === 'common_foundation' ? { PinmonyI18n: { message: key => key } } : {}, setTimeout, clearTimeout });
   return exports;

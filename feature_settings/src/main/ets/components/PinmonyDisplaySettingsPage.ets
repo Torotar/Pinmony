@@ -1,3 +1,4 @@
+import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { HdsSnackBar } from '@kit.UIDesignKit';
@@ -26,7 +27,7 @@ export struct PinmonyDisplaySettingsPage {
   @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
   @StorageLink('profileAvatarRight') private avatarRight: boolean = false;
   @StorageLink('themePreference') private themePreference: string = 'system';
-  @StorageLink('pinmonyLanguagePreference') private languagePreference: string = 'system';
+  @StorageLink('pinmonyLanguagePreference') private languagePreference: string = 'account';
   @StorageLink('screenOrientationPreference') private orientationPreference: string = 'system';
   @StorageLink('detailPhotoFitEnabled') private detailPhotoFitEnabled: boolean = false;
   @State private orientationBusy: boolean = false;
@@ -61,7 +62,7 @@ export struct PinmonyDisplaySettingsPage {
         this.dismissErrorSnack();
         this.request(this.store.screen === 'recommend' ? this.store.recommendationTab === 'ai' ? 'aiRead' : 'activityRead' : 'read');
       }
-    }, { duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
+    }, { backgroundBlurStyle: BlurStyle.COMPONENT_ULTRA_THICK, blurStrategy: BlurStrategy.ENABLE, duration: 4000, pressBackCallback: () => { this.dismissErrorSnack(); if (this.onBack) this.onBack(); return true; } });
   }
   private title(): string { return this.store.screen === 'theme' ? this.uiText("pm_theme_788db1cf") : this.uiText("pm_display_settings_32e62ed0"); }
   private themeLabel(): string { return this.themePreference === 'dark' ? this.uiText("pm_dark_a6b75d06") : this.themePreference === 'light' ? this.uiText("pm_light_aa0819df") : this.uiText("pm_follow_system_217cfe7d"); }
@@ -90,7 +91,7 @@ export struct PinmonyDisplaySettingsPage {
       this.themePreference = value;
     } catch (_) {
       this.themePreference = previous;
-      try { this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_theme_please_retry_e0cd6314"), duration: 3000 }); }
+      try { this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_change_theme_please_retry_e0cd6314"), duration: 3000 })); }
       catch (_) { PinmonyRuntimeLog.warn('Settings: theme failure feedback unavailable'); }
     }
   }
@@ -109,7 +110,7 @@ export struct PinmonyDisplaySettingsPage {
       this.orientationPreference = value;
     } catch (_) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 });
+        this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 }));
       } catch (_) { PinmonyRuntimeLog.warn('OrientationPreference: failure feedback unavailable'); }
     } finally { this.orientationBusy = false; }
   }
@@ -151,9 +152,9 @@ export struct PinmonyDisplaySettingsPage {
       Text(this.uiText("pm_language_9f6fee1a")).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
-        Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }, { value: 'Português (Brasil)' }])
-        .selected(Math.max(0, ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].indexOf(this.languagePreference)))
-        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.languagePreference === 'pt_BR' ? 'Português (Brasil)' : this.uiText("pm_follow_system_217cfe7d"))
+        Select([{ value: this.uiText("pm_follow_account") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }, { value: 'Português (Brasil)' }])
+        .selected(Math.max(0, ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].indexOf(this.languagePreference)))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.languagePreference === 'pt_BR' ? 'Português (Brasil)' : this.uiText("pm_follow_account"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
         .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
@@ -163,11 +164,11 @@ export struct PinmonyDisplaySettingsPage {
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
           if (index >= 0 && index < 9) {
-            const value: string = ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'][index];
+            const value: string = ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'][index];
             try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
             catch (_) {
               PinmonyRuntimeLog.warn('LanguagePreference: save failed');
-              this.getUIContext().getPromptAction().showToast({ message: this.uiText("pm_unable_to_change_language_please_retry_f77e9a24") });
+              this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_change_language_please_retry_f77e9a24") }));
             }
           }
         })
@@ -308,7 +309,11 @@ export struct PinmonyDisplaySettingsPage {
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        if (this.store.busy) {
+          PinmonyLoadingOverlay({ showMessage: false })
+        } else {
+          LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        }
       }
       }.width('100%').height('100%')
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)

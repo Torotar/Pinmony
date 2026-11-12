@@ -1,3 +1,4 @@
+import { PinmonyScrollRecovery } from 'common_foundation';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyUiCommitQueue } from 'common_ui';
 import { PinmonyCdnImage } from 'common_ui';
@@ -114,6 +115,12 @@ class PinmonyDetailFlowSource implements IDataSource {
 
 @Component
 export struct PinmonyDetailPage {
+  @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
+  private applyRecoveredPosition(): void {
+    const offset: number | undefined = PinmonyScrollRecovery.offset('pin', this.displayedDetail().pinUrl);
+    if (offset !== undefined) { this.initialScrollOffset = offset; this.restoreScrollPosition(); }
+  }
+
   private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
   @StorageProp('detailPhotoFitEnabled') @Watch('queuePhotoFitAudit') private detailPhotoFitEnabled: boolean = false;
   @StorageProp('gestureBarHeightPx') @Watch('queuePhotoFitAudit') private gestureBarHeightPx: number = 0;

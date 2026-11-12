@@ -155,6 +155,15 @@ struct PinmonyOrganizeSurface {
 
   private selected(pin: PinmonyCreatedPin): boolean { return this.state.selectedIds.includes(pin.id); }
 
+  private selectedPins(): PinmonyCreatedPin[] {
+    const pins: PinmonyCreatedPin[] = [];
+    for (const id of this.state.selectedIds) {
+      const pin: PinmonyCreatedPin | undefined = this.pins.find((item: PinmonyCreatedPin): boolean => item.id === id);
+      if (pin) pins.push(pin);
+    }
+    return pins;
+  }
+
   @State private contentWidth: number = 360;
 
   private contentColumns(): number {
@@ -210,11 +219,10 @@ struct PinmonyOrganizeSurface {
       }
       ForEach(this.rows(), (start: number) => {
         Row({ space: 12 }) {
-          this.thumb(this.pins[start])
-          if (start + 1 < this.pins.length) { this.thumb(this.pins[start + 1]) }
-          else { Blank().layoutWeight(1) }
-          if (start + 2 < this.pins.length) { this.thumb(this.pins[start + 2]) }
-          else { Blank().layoutWeight(1) }
+          ForEach(this.columnSlots(), (column: number) => {
+            if (start + column < this.pins.length) { this.thumb(this.pins[start + column]) }
+            else { Blank().layoutWeight(1) }
+          }, (column: number) => column.toString() + ':' + this.uiLanguage)
         }.width('100%').alignItems(VerticalAlign.Top)
       }, (start: number) => this.contentColumns().toString() + ':' + start.toString())
       if (this.pinsLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
@@ -272,7 +280,7 @@ struct PinmonyOrganizeSurface {
       if (!this.suggestionTitle && this.state.selectedIds.length && this.state.phase !== 'create') {
         Scroll() {
           Row({ space: 8 }) {
-            ForEach(this.pins.filter((pin: PinmonyCreatedPin): boolean => this.selected(pin)), (pin: PinmonyCreatedPin) => {
+            ForEach(this.selectedPins(), (pin: PinmonyCreatedPin) => {
               Image(pin.imageUrl).width(42).height(58).objectFit(ImageFit.Cover).borderRadius(8)
             }, (pin: PinmonyCreatedPin) => pin.id)
           }.padding(12)
@@ -310,6 +318,10 @@ struct PinmonyOrganizeSurface {
           onSelect:() => this.act('createForm')})
       }
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+      .onAreaChange((_old: Area, area: Area) => {
+        const width: number = Number(area.width);
+        if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
+      })
   }
 
   @Builder

@@ -4,7 +4,7 @@ const fs = require('node:fs'), vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
 function load(file, deps = () => ({})) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions: {
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file, 'utf8'), {compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021
   }}).outputText, {exports, require: withLocalMessages(name => { const dependency = deps(name); return name.startsWith('./') && Object.keys(dependency).length === 0 ? load(require('node:path').resolve(require('node:path').dirname(file), name) + '.ets') : dependency; }), setTimeout, clearTimeout, console});
   return exports;

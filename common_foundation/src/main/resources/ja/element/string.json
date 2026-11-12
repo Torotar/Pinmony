@@ -1941,6 +1941,10 @@
       "value": "ライト"
     },
     {
+      "name": "pm_follow_account",
+      "value": "アカウントに合わせる"
+    },
+    {
       "name": "pm_follow_system_217cfe7d",
       "value": "システムに従う"
     },

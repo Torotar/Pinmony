@@ -1,11 +1,19 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),ts=require(process.argv[2]);
-const transpile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
+const transpile=s=>require('./native-network-test-fixture.cjs').transpile(ts, s,{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
 function method(source,name){const tree=ts.createSourceFile('s.ts',source.replace(/\bstruct\b/g,'class'),99,true);let found;function visit(n){if(ts.isMethodDeclaration(n)&&n.name.getText(tree)===name)found=n.getText(tree);ts.forEachChild(n,visit);}visit(tree);assert(found,name);return found;}
 const source=fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets','utf8');
 const requests=[];let body={success:true,status:'success',code:0,endpoint_name:'v3_create_lens_history',data:{}};
-const Network=vm.runInNewContext(transpile('class Network {'+['uploadPhoto','saveUploadedPhotoHistory'].map(n=>method(source,n)).join('\n')+'} Network;'),{
-  Priority:{NORMAL:0},rcp:{MultipartForm:class{constructor(fields){this.fields=fields;}},Request:class{constructor(url,method,headers,body){Object.assign(this,{url,method,headers,body});}}},
-  NetworkManager:{requestRemainingMs:()=>0,enqueue:(_,f)=>f(),getSession:()=>({fetch:async r=>{requests.push(r);return{statusCode:200,headers:{},toString:()=>JSON.stringify(body)};}})}});
+const { createArktsLoader } = require('./arkts-module-loader.cjs');
+const loader = createArktsLoader(ts, {
+  common_foundation: {PinmonyRuntimeLog:{info(){},warn(){}}},
+  common_session: {PinmonySessionCredentials:class {}},
+  '@kit.RemoteCommunicationKit': {rcp: {Request: class {constructor(url,method,headers,body){Object.assign(this,{url,method,headers,body});}}, MultipartForm: class {constructor(fields){this.fields=fields;}}}},
+  '@kit.BasicServicesKit': {}
+}, {PinmonyTestTransportOnly:true});
+const core=loader.loadFile('common_network/src/main/ets/PinmonyNativeNetwork.ets');
+core.NetworkManager.enqueue=(_,call)=>call();core.NetworkManager.requestRemainingMs=()=>0;
+core.NetworkManager.getSession=()=>({fetch:async request=>{requests.push(request);const text=JSON.stringify(body);return {statusCode:200,headers:{},body:new Uint8Array(Buffer.from(text)).buffer,toString:()=>text};}});
+const {PinmonyBusinessNetwork:Network}=loader.loadFile('entry/src/main/ets/app/PinmonyBusinessNetwork.ets');
 const session={authenticated:true,accountId:'test',generation:1,origin:'https://www.pinterest.com',userAgent:'test'};
 const jpeg=new Uint8Array(24);jpeg[0]=255;jpeg[1]=216;
 (async()=>{

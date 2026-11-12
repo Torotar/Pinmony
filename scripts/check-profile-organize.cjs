@@ -46,6 +46,10 @@ async function main() {
   assert.equal(h.read().pins.length, 3, 'pagination deduplicates saved Pin IDs');
   assert.equal(h.api.organizeAction('open'), true);
   assert.equal(h.api.organizeAction('next'), false, 'empty selection cannot advance');
+  h.api.organizeAction('toggle', '3'); h.api.organizeAction('toggle', '1');
+  assert.deepEqual(Array.from(h.read().organize.selectedIds), ['3', '1'], 'manual selection retains click order');
+  h.api.organizeAction('toggle', '3'); h.api.organizeAction('toggle', '3');
+  assert.deepEqual(Array.from(h.read().organize.selectedIds), ['1', '3'], 'reselected Pin is appended');
   h.api.organizeAction('all'); assert.equal(h.read().organize.selectedIds.length, 3);
   h.api.organizeAction('toggle', '2'); h.api.organizeAction('next');
   assert.match(h.requests[4].url, /BoardsResource/);

@@ -14,7 +14,7 @@ const keyStart=pageSource.indexOf('  private discoveryRowKey(');
 const keyMethod=pageSource.slice(keyStart,pageSource.indexOf('\n  @State',keyStart));
 const KeyHost=vm.runInNewContext(ts.transpileModule('class KeyHost {'+keyMethod+'} KeyHost;',
   {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
-const keyHost=new KeyHost();keyHost.discoveryColumns=()=>1;keyHost.uiLanguage='zh_CN';
+const keyHost=new KeyHost();keyHost.discoverySnapshot=()=>keyHost.snapshot;keyHost.discoveryColumns=()=>1;keyHost.uiLanguage='zh_CN';
 keyHost.snapshot={ideaSections:[{id:'first',actionId:'first',targetUrl:'a',items:[]}]};
 const oldKey=keyHost.discoveryRowKey(0);
 keyHost.snapshot={ideaSections:[{id:'second',actionId:'second',targetUrl:'b',items:[]}]};
@@ -68,6 +68,30 @@ async function main() {
   h.setActive(true); h.store.search.categories[0].targetUrl = 'https://untrusted.example/search/pins/?q=x';
   await host.performSearchAction('guide', 'category');
   assert.equal(h.events.length, beforeGuide, 'foreign guide URL is rejected');
+  for(const kind of ['idea','ideaSection']) {
+    const r=runtime.harness();r.setPage(page);
+    const parent={kind:'state',session:4,pageKey:page,query:'',placeholder:'',selectedCategory:'',categories:[],suggestions:[],heroes:[],ideaSections:[topic('return','art')],results:[],discoveryApi:true};
+    r.store.search=parent;r.store.searchScrollOffset=137;
+    const target=parent.ideaSections[0].targetUrl;
+    await r.controller.performSearchAction(kind==='idea'?'return-0':'return',kind);
+    r.setPage(target);r.store.search={...parent,pageKey:target,query:'art',ideaSections:[],discoveryApi:false};
+    const count=r.events.length;
+    assert.equal(r.controller.restoreCategorySearchParent(),false,'theme result must fall through to search history, not jump to discovery');
+    assert.equal(r.events.length,count,'back to history cannot call native navigation with a root URL');
+    assert.equal(r.store.search.pageKey,target,'result route stays current while history body opens');
+    assert.equal(r.store.searchCache.get(page).snapshot,parent,'discovery cache remains for the later history-to-root return');
+  }
+  const failed=runtime.harness({navigateSearch(){throw Error('navigation failed');}});failed.setPage(page);
+  failed.store.search={pageKey:page,query:'',discoveryApi:true,ideaSections:[topic('failure','art')],results:[]};
+  await failed.controller.performSearchAction('failure','ideaSection');failed.setPage(failed.store.search.ideaSections[0].targetUrl);
+  assert.equal(failed.controller.restoreCategorySearchParent(),false,'failed navigation releases its parent context');
+  const backIndex=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+  const backBlock=backIndex.slice(backIndex.indexOf('  private backFromSearch('),backIndex.indexOf('  private ',backIndex.indexOf('  private backFromSearch(')+1));
+  assert(backBlock.indexOf('restoreCategorySearchParent()')<backBlock.indexOf('searchOpenHistory()'),'existing category exceptions remain ahead of ordinary history; themes register no category shortcut');
+  const destination=pageSource.slice(pageSource.indexOf('  private searchRootDestination('),pageSource.indexOf('  private searchCategoriesTitleBar('));
+  const resultStart=destination.indexOf("this.searchMaterialContent('results')"), titleStart=destination.indexOf('.titleBar(');
+  assert(resultStart>=0 && destination.slice(resultStart,titleStart).includes("TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut })"),'theme slides only result body using the same entry/exit timing');
+  assert(!destination.slice(titleStart).includes('.transition('),'title is outside body transitions');
   host.invalidatePending();
   console.log('Topic URL retention, refreshed actions, section/card navigation and stale-page rejection passed');
 }

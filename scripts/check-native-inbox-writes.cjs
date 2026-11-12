@@ -1,6 +1,6 @@
 const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(name=>name==='feature_inbox'?load('feature_inbox/src/main/ets/services/PinmonyInboxHiddenConversations.ets'):deps(name)),setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(name=>name==='feature_inbox'?load('feature_inbox/src/main/ets/services/PinmonyInboxHiddenConversations.ets'):deps(name)),setTimeout,clearTimeout,console});return exports;}
 const logs=[],log={PinmonyRuntimeLog:{info:s=>logs.push(s)}},writesModule=load('entry/src/main/ets/app/PinmonyInboxNativeWrites.ets',n=>n==='common_foundation'?log:{}),Writer=writesModule.PinmonyInboxNativeWrites;
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
 const origin='https://www.pinterest.com',page=origin+'/inbox/',me={id:'1',username:'self',full_name:'Self'},peer={id:'2',username:'peer',full_name:'Peer'},peer3={id:'3',username:'third',full_name:'Third'};
@@ -49,13 +49,38 @@ console.log('Native inbox writes passed: six exact POST contracts, ownership and
 }
 function readerFixture(){
 const Reader=load('entry/src/main/ets/app/PinmonyInboxMessagesNativeReads.ets',n=>n==='./PinmonyInboxActivityNativeReads'?load('entry/src/main/ets/app/PinmonyInboxActivityNativeReads.ets'):n==='./PinmonyInboxNativeWrites'?writesModule:n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?log:{}).PinmonyInboxMessagesNativeReads;
-let active=true,session=fixture().session();const req=[],cancelled=[],feedback=[],store={inboxSession:0,inboxScrollOffset:20,inboxCache:{clear(){},get(){},put(){}}};const send=(job,...args)=>new Promise(resolve=>req.push({job,current:args.at(-1),resolveRaw:(body,status)=>resolve({body,status,error:''}),resolve:(data,endpoint='',viewer=me)=>resolve({body:response(data,endpoint,viewer),status:200,error:''})}));
+const Store=require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('feature_inbox/src/main/ets/stores/PinmonyInboxStore.ets').PinmonyInboxStore;
+let active=true,session=fixture().session();const req=[],cancelled=[],feedback=[],store=Object.assign(new Store(),{inboxSession:0,inboxScrollOffset:20,inboxCache:{clear(){},get(){},put(){}}});const send=(job,...args)=>new Promise(resolve=>req.push({job,current:args.at(-1),resolveRaw:(body,status)=>resolve({body,status,error:''}),resolve:(data,endpoint='',viewer=me)=>resolve({body:response(data,endpoint,viewer),status:200,error:''})}));
 const reader=new Reader({feedback:message=>feedback.push(message),store:()=>store,username:()=> 'self',session:()=>session,page:()=>page,active:()=>active,network:()=>({cancel:id=>cancelled.push(id),requestBusinessInboxActivity:async job=>({...job,status:200,error:'',body:JSON.stringify({resource_response:{status:'success',code:0,endpoint_name:'v3_get_inbox_social_relationships',data:[]}})}),requestBusinessInboxMessagesRead:send,requestBusinessInboxWrite:send}),settled(){}});
 return {reader,store,req,cancelled,feedback,setActive:v=>active=v,setSession:s=>session=s,session:()=>session};
 }
 async function start(f){const p=f.reader.demand();f.req[0].resolve([conversation()],'v3_get_conversations');f.req[1].resolve([{...peer,type:'user_share_suggestion'},{...peer3,type:'user_share_suggestion'}],'v3_user_contacts_suggestion');await p;}
 async function openChat(f,id='100',users=[me,peer],messages=[message()]){const p=f.reader.open('conversation:'+id);f.req.at(-1).resolve(conversation(id,users),'v3_get_conversation');await flush();f.req.at(-1).resolve(messages,'v3_get_conversation_messages');await p;}
 async function integration(){
+// Exercise the real message mapper, write identity, generic endpoint and confirmed read-back for every card type.
+const contentKinds = [{text:'hello'}, {text:'❤️'},
+  {text:'',pin:{id:'88',images:{orig:{url:'https://i.pinimg.com/originals/synthetic.jpg',width:400,height:600}}}},
+  {text:'',pin:{id:'88'}}, {text:'',board:{id:'20',name:'Board',url:'/peer/board/'}},
+  {text:'',user:peer3}];
+for (const sender of [me,peer]) for (const content of contentKinds) {
+  const all=readerFixture(); await start(all);
+  const row={...message('710',sender),...content}; await openChat(all,'100',[me,peer],[row]);
+  const mapped=all.store.inboxFlow.messages[0];
+  assert.equal(mapped.own,sender===me);
+  if(content.board) assert(mapped.board,'board card mapped');
+  if(content.user) assert(mapped.profile,'profile card mapped');
+  if(content.pin?.images) assert(mapped.image,'Pin image mapped');
+  const pending=all.reader.action('react','710|👍'), write=all.req.at(-1);
+  assert.equal(write.job.method,'POST',JSON.stringify(content));
+  assert(write.job.url.includes('/ApiResource/create/'));
+  write.resolve({id:'710'},endpoints.react); await pending;
+  assert.equal(all.req.at(-1).job.method,'GET','reaction uses authoritative refresh');
+  all.req.at(-1).resolve([{...row,reactions:[{'1':'👍'}]}],'v3_get_conversation_messages'); await flush();
+  assert.deepEqual(Array.from(all.store.inboxFlow.messages[0].reactions),['👍']);
+  if(content.board) assert(all.store.inboxFlow.messages[0].board,'read-back retains board');
+  if(content.user) assert(all.store.inboxFlow.messages[0].profile,'read-back retains profile');
+  all.reader.pause();
+}
 const follower=readerFixture();await start(follower);follower.reader.activity.rows=[{id:'activity:2',activityUserId:'2',title:'Peer',subtitle:'',imageUrl:'',enabled:true,usernames:['peer']}];
 let followerPending=follower.reader.open('activity-chat:2');assert.equal(follower.req.at(-1).job.method,'GET');follower.req.at(-1).resolve(conversation(),'v3_get_conversation');await flush();follower.req.at(-1).resolve([],'v3_get_conversation_messages');await followerPending;assert.equal(follower.store.inboxFlow.screen,'chat');assert.equal(follower.store.inboxFlow.conversationId,'100');follower.reader.pause();
 const newFollower=readerFixture();await start(newFollower);newFollower.reader.activity.rows=[{id:'activity:3',activityUserId:'3',title:'Peer three',subtitle:'',imageUrl:'',enabled:true,usernames:['peer3']}];
@@ -112,6 +137,6 @@ for(const item of [f,g,u,d])item.reader.pause();
 }
 async function webSuppression(){const source=fs.readFileSync('feature_inbox/src/main/ets/services/PinmonyInboxConversationScript.ets','utf8'),script=vm.runInNewContext(source.slice(source.indexOf(String.fromCharCode(96)),source.lastIndexOf(String.fromCharCode(96))+1));let fetches=0;const window={PinmonyInboxConversationsEnabled:true,PinmonyNativeInboxMessagesEnabled:true,PinmonyNativeInboxWritesEnabled:true};window.top=window;vm.runInNewContext(script,{window,location:{hostname:'www.pinterest.com',origin,pathname:'/inbox/'},URLSearchParams,AbortController,setTimeout,clearTimeout,fetch(){fetches++;throw Error('Web POST')},document:{get cookie(){throw Error('Web cookie')}}});for(const action of Object.keys(endpoints))assert.equal(window.PinmonyInboxConversations.action(action,values[action],0),false);assert.equal(fetches,0);assert(fs.readFileSync('entry/src/main/ets/app/PinmonyScriptRegistry.ets','utf8').includes('window.PinmonyNativeInboxWritesEnabled'));
 const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');assert(index.includes('this.inboxMenuNative.action(action) : this.inboxMessagesNativeReads.action(action,value)'));
-const ui=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxFlowPage.ets','utf8'),start=ui.indexOf('  private messageConfirmationKey('),end=ui.indexOf('\n  private ',start+1);const View=vm.runInNewContext(ts.transpileModule('class View {'+ui.slice(start,end)+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{}),v=new View();v.snapshot={pageUrl:page,conversationId:'100',nativeAccountGeneration:1,nativeToken:7,session:0};const key=v.messageConfirmationKey();v.snapshot.session=99;assert.equal(v.messageConfirmationKey(),key);v.snapshot.nativeToken++;assert.notEqual(v.messageConfirmationKey(),key);v.snapshot.nativeToken--;v.snapshot.nativeAccountGeneration++;assert.notEqual(v.messageConfirmationKey(),key);assert(ui.includes('epoch === this.messageMenuEpoch && this.messageConfirmationKey() === intent'));
+const ui=fs.readFileSync('feature_inbox/src/main/ets/components/PinmonyInboxFlowPage.ets','utf8'),start=ui.indexOf('  private messageConfirmationKey('),end=ui.indexOf('\n  private ',start+1);const View=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class View {'+ui.slice(start,end)+'} View;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{}),v=new View();v.snapshot={pageUrl:page,conversationId:'100',nativeAccountGeneration:1,nativeToken:7,session:0};const key=v.messageConfirmationKey();v.snapshot.session=99;assert.equal(v.messageConfirmationKey(),key);v.snapshot.nativeToken++;assert.notEqual(v.messageConfirmationKey(),key);v.snapshot.nativeToken--;v.snapshot.nativeAccountGeneration++;assert.notEqual(v.messageConfirmationKey(),key);assert(ui.includes('epoch === this.messageMenuEpoch && this.messageConfirmationKey() === intent'));
 }
 const watchdog=setTimeout(()=>{console.error('native inbox write checks timed out');process.exit(1)},20000);main().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1});

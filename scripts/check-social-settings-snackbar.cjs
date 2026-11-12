@@ -8,6 +8,7 @@ const Page = vm.runInNewContext(ts.transpileModule('class Page {' + methods + '}
 }).outputText, {
   HdsSnackBar: class { show(icon, message, operation, style) { shown.push({ icon, message, operation, style }); } dismiss() { dismissed++; } },
   $r: name => name, SnackBarIconType: { NORMAL: 1 }, SnackBarOperationType: { TEXT_ONLY: 0 },
+  BlurStyle: { COMPONENT_ULTRA_THICK: 6 }, BlurStrategy: { ENABLE: 1 },
   PinmonyI18n: { render: (message, language) => language + ':' + message, isUnconfirmed: () => false }
 });
 const page = new Page(); page.visible = true; page.uiLanguage = 'zh'; page.uiText = key => key;

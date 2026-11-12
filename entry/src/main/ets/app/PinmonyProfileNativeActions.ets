@@ -1,3 +1,4 @@
+import { readProfileAvatarStatus } from 'feature_profile';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileStore, PinmonyProfilePanel, PinmonyProfilePanelItem, PinmonyProfileSnapshot, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard, PIN_PROFILE_ORGANIZE_ENABLED, pickPublishPhotoUris, readProfileAvatarPhoto, PinmonyProfileAvatarPhoto } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -731,8 +732,8 @@ export class PinmonyProfileNativeActions {
             if (!tracking) throw new Error('avatar-unconfirmed');
             for (let attempt: number = 0; attempt < 10; attempt++) {
                 if (!current()) throw new Error('stale');
-                const status: number = await this.ports.network().readProfileAvatarStatus(tracking, page,
-                    (): PinmonyBusinessSessionContext => this.ports.session(), current, id);
+                const status: number = await readProfileAvatarStatus(tracking, page,
+                    (): PinmonyBusinessSessionContext => this.ports.session(), current, id, (job, context) => this.ports.network().request(job, context));
                 if (!current()) throw new Error('stale');
                 if (status === 5) throw new Error('avatar-rejected');
                 if (status === 4) return this.readCurrentAvatar(revision);

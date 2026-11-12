@@ -3,7 +3,8 @@ import { readShufflePresentation, PinmonyShuffleSnapshot } from 'feature_pin';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyVideo, PinmonyVideoSource, PinmonyCarousel, PinmonyCarouselItem,
   PinmonyImageCrop, PinmonyVisualResult, PinmonyRelatedPin, PIN_VIDEO_API_ENABLED, PIN_CAROUSEL_API_ENABLED, PIN_VISUAL_SEARCH_API_ENABLED } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 // Per-feature manual rollout; the transport safety gate is still mandatory.
 const PIN_NATIVE_DETAIL_AUXILIARY_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_DETAIL_AUXILIARY_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_DETAIL_AUXILIARY_ROLLOUT_ENABLED;

@@ -1,6 +1,7 @@
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 function diagnosticResourcePresent(body: string): boolean {
     try { const value: DraftDiagnostic = JSON.parse(body) as DraftDiagnostic; return !!value.resource_response; } catch (_) { return false; }
 }

@@ -19,7 +19,7 @@ const rcp = { Request: class { constructor(url, method) { Object.assign(this, { 
     sessions.push(session); return session;
   } };
 class Policy { acquire() { return { allowed: true }; } canSend() { return true; } finish() {} }
-const Host = vm.runInNewContext(ts.transpileModule(declarations.map(node => node.getText(ast).replace(/^export /, '')).join('\n') + '\nNetworkManager;', {
+const Host = vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, declarations.map(node => node.getText(ast).replace(/^export /, '')).join('\n') + '\nNetworkManager;', {
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText, { rcp, PinmonyRequestPolicy: Policy, PinmonyRuntimeLog: { info: msg => logs.push(msg), warn: msg => logs.push(msg) },
   priorityName: value => String(value), responseMetrics: () => '', Promise, setTimeout, clearTimeout, Date, Math, Error });

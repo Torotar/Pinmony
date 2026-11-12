@@ -2,7 +2,8 @@ import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, MoreSheetOption, PIN_EDIT_API_ENABLED, PIN_POST_API_ENABLED } from 'feature_pin';
 import { PinmonyHomeMenuState } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PIN_BUSINESS_PIN_READ_ENABLED, acceptsMediaFileUrl } from 'common_network';
+import { PinmonyNetworkJob, PIN_BUSINESS_PIN_READ_ENABLED, acceptsMediaFileUrl } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 // Per-feature manual rollout; the transport safety gate is still mandatory.
 const PIN_NATIVE_PIN_MENUS_ROLLOUT_ENABLED: boolean = true;

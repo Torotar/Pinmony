@@ -123,6 +123,7 @@ export interface PinmonyBoardCoverCrop {
 
 export interface PinmonyBoardCoverState {
   adjusting?: boolean;
+  refreshing?: boolean;
   pins: PinmonyBoardPin[];
   selected?: PinmonyBoardCoverCrop;
   loading: boolean;

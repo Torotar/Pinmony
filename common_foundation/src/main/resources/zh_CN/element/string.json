@@ -1941,6 +1941,10 @@
       "value": "浅色"
     },
     {
+      "name": "pm_follow_account",
+      "value": "跟随账号"
+    },
+    {
       "name": "pm_follow_system_217cfe7d",
       "value": "跟随系统"
     },

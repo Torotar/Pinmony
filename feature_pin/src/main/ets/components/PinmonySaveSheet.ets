@@ -1,6 +1,5 @@
-import { BlurStrategy, HdsNavigation, HdsNavigationTitleMode, HdsNavigationTitleBarOptions, ScrollEffectType } from '@kit.UIDesignKit';
-import { SymbolGlyphModifier } from '@kit.ArkUI';
-import { PinmonyHdsTitleBar, PinmonyImmersiveLight } from 'common_ui';
+import { HdsNavigation, HdsNavigationTitleMode, HdsNavigationTitleBarOptions, IconStyleMode } from '@kit.UIDesignKit';
+import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySaveBoard, PinmonySaveResult } from '../models/PinmonyComments';
@@ -10,7 +9,7 @@ import { PinmonyBoardPlaceholder, PinmonyBoardPickerRow, PinmonyBoardPickerFoote
 export struct PinmonySaveSheet {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
-  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'exquisite';
+  @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   private boardScroller: Scroller = new Scroller();
   private createScroller: Scroller = new Scroller();
@@ -57,24 +56,10 @@ export struct PinmonySaveSheet {
       content: {
         title: { mainTitle: this.uiText(this.creating ? 'pm_create_board_513babc9' : 'pm_save_to_board_0233a416') },
         menu: { value: [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
-          label: this.uiText('pm_close_3fd47edc'), action: () => this.onClose?.()
+          type: IconStyleMode.SMALL, isEnabled: !this.result.busy, label: this.uiText('pm_close_3fd47edc'), action: () => { if (!this.result.busy) this.onClose?.(); }
         } }] }
       },
-      style: {
-        blurStrategy: this.immersiveLightMode !== 'off' ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
-        thermoCtrl: this.immersiveLightMode !== 'off',
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        scrollEffectOpts: { enableScrollEffect: this.immersiveLightMode !== 'off', scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-        originalStyle: {
-          backgroundStyle: { backgroundColor: this.immersiveLightMode !== 'off' ? Color.Transparent : $r('app.color.page_background'), maskExtraHeight: 0 },
-          contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } }
-        },
-        scrollEffectStyle: {
-          backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: this.immersiveLightMode !== 'off' ? 18 : 0 },
-          contentStyle: { titleStyle: { mainTitleColor: $r('app.color.primary_text') }, menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') } }
-        }
-      }
+      style: PinmonyHdsTitleBar.modalStyle(this.immersiveLightMode)
     };
   }
 

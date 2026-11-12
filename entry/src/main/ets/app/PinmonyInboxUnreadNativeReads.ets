@@ -1,7 +1,8 @@
 import { PinmonyInboxStore, PinmonyInboxHiddenConversations } from 'feature_inbox';
 import { PinmonyInboxNoticeConversation } from './PinmonyInboxMessageNotice';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { INBOX_UPDATE_FIELDS, PIN_NATIVE_INBOX_UPDATES_ENABLED } from './PinmonyInboxUpdatesNativeReads';
 import { PIN_NATIVE_INBOX_MESSAGES_ENABLED } from './PinmonyInboxMessagesNativeReads';

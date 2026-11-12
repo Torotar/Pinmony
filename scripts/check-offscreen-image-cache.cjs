@@ -42,7 +42,42 @@ async function verifyHost(path, methods, mounted, pending, bitmap, load, sharedF
   for (let i = 0; i < 8; i++) await Promise.resolve();
   assert.equal(host[bitmap], undefined, 'late shared decode cannot replace the native source');
 }
+async function verifyNativeFallbackRetention() {
+  const source = read(process.argv[3] || 'common_ui/src/main/ets/components/PinmonyCdnImage.ets');
+  const leases = [];
+  const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
+    ['release', 'reload', 'loadingChanged', 'canRenderImage'].map(name => method(source, name)).join('\n') + '} Host;', {
+    compilerOptions: { target: ts.ScriptTarget.ES2021 }
+  }).outputText, { acceptsSoftwareJpeg: url => url.endsWith('.jpg'), PinmonyJpegDecode: { acquire() {
+    const lease = { release() {}, setActive() {} };
+    lease.ready = new Promise((resolve, reject) => Object.assign(lease, { resolve, reject }));
+    leases.push(lease); return lease;
+  } } });
+  const host = new Host();
+  Object.assign(host, { visible: true, loadingActive: true, viewportOnly: true, inViewport: false,
+    useSharedDecode: true, url: 'synthetic.webp', generation: 0, tracePhases: new Set(), uiCommits: { clear() {} } });
+  host.reload(); assert.equal(host.canRenderImage(), false, 'new offscreen native fallback still waits for viewport admission');
+  host.inViewport = true; host.loadingChanged(); assert.equal(host.canRenderImage(), true);
+  for (let i = 0; i < 4; i++) {
+    host.inViewport = false; host.loadingChanged();
+    assert.equal(host.canRenderImage(), true, 'admitted non-JPEG must not disappear at a slowly moving viewport edge');
+    host.inViewport = true; host.loadingChanged();
+  }
+  host.loadingActive = false; host.loadingChanged(); assert.equal(host.canRenderImage(), true, 'cover/background keeps native fallback node');
+  host.url = 'replacement.webp'; host.reload(); assert.equal(host.canRenderImage(), false, 'source replacement clears admission');
+  host.loadingActive = true; host.inViewport = true; host.url = 'synthetic.jpg'; host.reload();
+  assert.equal(host.pending, true); host.inViewport = false; host.loadingChanged();
+  leases[0].reject(Error('software decode unavailable'));
+  for (let i = 0; i < 8; i++) await Promise.resolve();
+  assert.equal(host.canRenderImage(), false, 'failed software decode cannot start a new native fallback while offscreen');
+  host.inViewport = true; host.loadingChanged(); assert.equal(host.canRenderImage(), true);
+  host.inViewport = false; host.loadingChanged();
+  assert.equal(host.canRenderImage(), true, 'admitted JPEG failure fallback stays mounted on subsequent viewport exits');
+  host.loadingActive = false; host.loadingChanged(); assert.equal(host.canRenderImage(), true);
+  host.visible = false; host.generation++; host.release(); assert.equal(host.canRenderImage(), false);
+}
 (async () => {
+  await verifyNativeFallbackRetention();
   await verifyHost('common_ui/src/main/ets/components/PinmonyCdnImage.ets', ['release', 'reload', 'loadingChanged', 'canRenderImage'],
     'visible', 'pending', 'bitmap', 'reload', 'lease');
   await verifyHost('common_ui/src/main/ets/components/SmartImage.ets', ['releaseDecode', 'loadDecodedImage', 'loadingChanged', 'decodeModeChanged', 'canRenderImage'],
@@ -50,15 +85,16 @@ async function verifyHost(path, methods, mounted, pending, bitmap, load, sharedF
   const home = read('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets');
   const detail = read('feature_pin/src/main/ets/components/PinmonyDetailPage.ets');
   const search = read('feature_search/src/main/ets/components/PinmonySearchPage.ets');
-  assert(home.includes('loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: true'),
-    'visible home cards retain current viewport-first admission');
+  assert(home.includes('loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false'),
+    'mounted home cache cards retain native decoding and admit offscreen sources while their page is active');
   assert(home.includes('PinmonyCdnImage({ url: url, useSharedDecode: false, viewportOnly: false,'),
     'explicit hidden prefetch uses native image cache without waiting for a visibility callback');
   assert.equal((detail.match(/loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false/g) || []).length, 2);
-  assert.equal((home.match(/cachedCount\(12, true\)/g) || []).length, 1);
+  assert.equal((home.match(/cachedCount\(this.cachedImageCount\(\), true\)/g) || []).length, 1);
   assert.equal((detail.match(/cachedCount\(12, true\)/g) || []).length, 1);
-  assert.equal((search.match(/cachedCount\(12, true\)/g) || []).length, 2);
-  assert(search.includes('Image(result.imageUrl)') && search.includes('Image(result.boardImages?.[0] || result.imageUrl)'));
+  assert.equal((search.match(/cachedCount\(this.cachedImageCount\(\), true\)/g) || []).length, 2);
+  assert(search.includes('PinmonyCdnImage({ url: result.imageUrl') && search.includes('Image(result.boardImages?.[0] || result.imageUrl)'),
+    'Pin photos retain the shared decode host while board covers retain their native source');
   const video = read('common_ui/src/main/ets/components/PinmonyVideoCard.ets');
   assert(video.includes('useSharedDecode: false, viewportOnly: false'));
   assert(video.includes('const enabled: boolean = this.active && this.visible;'), 'poster preload never starts offscreen playback');

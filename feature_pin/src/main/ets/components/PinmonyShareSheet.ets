@@ -1,6 +1,5 @@
-import { HdsNavigation, HdsNavigationTitleMode, HdsNavigationTitleBarOptions, BlurStrategy, IconStyleMode } from '@kit.UIDesignKit';
-import { SymbolGlyphModifier } from '@kit.ArkUI';
-import { PinmonyActionNotice, PinmonyImmersiveLight, PinmonyHdsTitleBar } from 'common_ui';
+import { HdsNavigation, HdsNavigationTitleMode, HdsNavigationTitleBarOptions, IconStyleMode } from '@kit.UIDesignKit';
+import { PinmonyActionNotice, PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore } from '../stores/PinmonyPinStore';
 import { ShareSheetOption } from '../models/PinmonySheets';
@@ -80,22 +79,10 @@ export struct PinmonyShareSheet {
 
   private closeTitleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: false, enableComponentSafeArea: true,
-      style: {
-        blurStrategy: BlurStrategy.DISABLE, thermoCtrl: false,
-        scrollEffectOpts: { enableScrollEffect: false },
-        systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-        originalStyle: {
-          backgroundStyle: { backgroundColor: $r('app.color.page_background'), maskExtraHeight: 0, blurRadius: 0 },
-          contentStyle: {
-            titleStyle: { mainTitleColor: $r('app.color.primary_text') },
-            menuStyle: { backgroundColor: this.immersiveLightMode === 'off' ? $r('app.color.input_surface') : undefined, iconColor: $r('app.color.primary_text') }
-          }
-        }
-      },
+      style: PinmonyHdsTitleBar.modalStyle(this.immersiveLightMode),
       content: {
         title: { mainTitle: this.titleText },
         menu: { value: [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, label: this.uiText('pm_close_3fd47edc'), action: () => this.onClose()
         } }] }
       }

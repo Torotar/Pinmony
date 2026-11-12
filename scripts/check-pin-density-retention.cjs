@@ -1,5 +1,9 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
+const transitionSource = fs.readFileSync('common_ui/src/main/ets/services/PinmonyPinViewTransition.ets','utf8');
+const transitionScope = {exports:{},Curve:{EaseOut:'ease-out'},require:()=>({})};
+vm.runInNewContext(ts.transpileModule(transitionSource,{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,transitionScope);
+const PinmonyPinViewTransition = transitionScope.exports.PinmonyPinViewTransition;
 const file = 'feature_profile/src/main/ets/components/PinmonyProfilePage.ets';
 const source = fs.readFileSync(file, 'utf8');
 const start = source.indexOf("} else if (this.profile.section === 'created' && this.profile.createdPins.length > 0)");
@@ -22,7 +26,7 @@ const methods = ['compactPinView', 'contentColumns', 'columnSlots', 'contentColu
 const saves = [], animations = [];
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + methods.join('\n') + '} Host;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
-  { Curve: { EaseOut: 'ease-out' }, PinmonyProfileLayoutPreference: { savePinDensity: n => saves.push(n) } });
+  { Curve: { EaseOut: 'ease-out' }, PinmonyPinViewTransition, PinmonyProfileLayoutPreference: { savePinDensity: n => saves.push(n) } });
 const pins = [{ id: 'a', imageUrl: 'a.jpg' }, { id: 'b', imageUrl: 'b.jpg' }];
 const h = Object.assign(new Host(), { modern: () => true, hubTab: 'pins', pinViewOpen: true,
   pinViewPage: 'profile', pinViewSession: 7, profile: { profileUrl: 'profile', session: 7, createdPins: pins },
@@ -41,4 +45,25 @@ for (const width of [360, 768, 1366]) {
 const count = saves.length; h.selectPinView(0); assert.equal(saves.length, count);
 h.profile.session = 8; h.selectPinView(1); assert.equal(saves.length, count, 'stale panel cannot change layout');
 assert(animations.every(options => options.duration === 280), 'retain the existing transition timing');
+const boardSource=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');
+const boardMethods=['contentColumns','columnSlots','contentColumnsTemplate','selectBoardDensity','pinCardKey'].map(name=>{
+  const start=boardSource.indexOf('  private '+name+'(');assert(start>=0,name);
+  return boardSource.slice(start,boardSource.indexOf('\n  }',start)+4);
+});
+const boardSaves=[],boardAnimations=[];
+let boardHost;
+const Board=vm.runInNewContext(ts.transpileModule('class Board {'+boardMethods.join('\n')+'} Board;',
+  {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyPinViewTransition,
+  PinmonyProfileLayoutPreference:{saveBoardDensity:value=>{boardSaves.push(value);boardHost.density=value;}}});
+boardHost=Object.assign(new Board(),{density:1,snapshot:{pins},uiLanguage:'en',modernBoardActions:()=>true,
+  boardViewLive:()=>true,getUIContext:()=>({animateTo(options,update){boardAnimations.push(options);update();}})});
+const keys=pins.map(pin=>boardHost.pinCardKey(pin));
+for(const width of [360,768,1366,360])for(const density of [0,1,2,1,0,2]) {
+  boardHost.contentWidth=width;boardHost.selectBoardDensity(density);
+  assert.equal(boardHost.snapshot.pins,pins);assert.deepEqual(pins.map(pin=>boardHost.pinCardKey(pin)),keys);
+  assert.equal(boardHost.contentColumnsTemplate().split(' ').length,boardHost.contentColumns());
+}
+const saved=boardSaves.length;boardHost.selectBoardDensity(2);assert.equal(boardSaves.length,saved);
+boardHost.boardViewLive=()=>false;boardHost.selectBoardDensity(0);assert.equal(boardSaves.length,saved);
+assert(boardAnimations.every(options=>options.duration===280&&options.curve==='ease-out'));
 console.log('Pin density retention: same WaterFlow, density-independent card keys, three modes at phone/tablet widths, unchanged data, duplicate and stale-session guards passed; device rendering excluded.');

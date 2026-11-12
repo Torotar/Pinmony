@@ -7,6 +7,7 @@ const rawLocalMessages = {
   message: resolve, text: resolve, render: source => source,
   translationAcceptLanguage: () => 'zh-CN,zh;q=0.9',
   syncAccountLanguage: () => {}, // Real locale persistence is covered by check-language.cjs.
+  clearAccountLanguage: () => {},
   format: (source, values) => resolve(source).replace(/\{(\d+)\}/g, (m,i) => values[i] === undefined ? m : String(values[i])),
   isText: (value, source) => value === resolve(source),
   includesText: (value, source) => value.includes(resolve(source)),

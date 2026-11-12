@@ -1,9 +1,25 @@
-import { uiMaterial } from '@kit.ArkUI';
+import { promptAction, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 
 export class PinmonyImmersiveLight {
+  public static toastOptions(options: promptAction.ShowToastOptions): promptAction.ShowToastOptions {
+    // ShowToastOptions.systemMaterial is available from API 26; keep API 24 options intact.
+    // Retain the official Toast material style (THICK), with the app's material switch.
+    if (deviceInfo.apiAvailable('26.0.0')) {
+      const mode: string = AppStorage.get<string>('immersiveLightMode') ?? 'immersive';
+      options.systemMaterial = mode !== 'off' && uiMaterial.isImmersiveMaterialSupported() ?
+        new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.THICK,
+          colorInvert: false, applyShadow: true
+        }) : uiMaterial.Material.empty;
+    }
+    return options;
+  }
+
   public static sheetOptions(options: SheetOptions, mode: string, enabled: boolean = true): SheetOptions {
+    // Modal menus share one dim level; interactive visual search retains its explicit transparent mask.
+    if (options.maskColor === undefined && options.enableOutsideInteractive !== true) options.maskColor = '#66000000';
     if (!enabled) return options;
     if (deviceInfo.apiAvailable('26.0.0')) {
       const active: boolean = mode !== 'off' && uiMaterial.isImmersiveMaterialSupported();

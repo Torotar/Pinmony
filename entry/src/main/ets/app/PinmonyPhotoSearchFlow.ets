@@ -1,4 +1,4 @@
-import { PinmonyNativeNetwork } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyImageCrop, PinmonyImageSearchOrigin } from 'common_ui';
 import { util } from '@kit.ArkTS';
 import { PinmonyPhotoHistoryItem, PinmonyPhotoHistoryPage, parsePhotoHistory } from 'feature_search';

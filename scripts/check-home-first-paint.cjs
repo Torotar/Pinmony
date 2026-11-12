@@ -29,7 +29,7 @@ const code = auth.replace(/export /g, '') + '\n' +
   'globalThis.Store=PinmonyHomeStore;globalThis.Native=Native;globalThis.Feed=Feed;globalThis.Categories=Categories;';
 const root = 'https://www.pinterest.com/';
 const timers = [];
-const context = { PINTEREST_URL: root, PinmonyRuntimeLog: { info() {}, warn() {} },
+const context = { PINTEREST_URL: root, PinmonyRuntimeLog: { info() {}, warn() {} }, PinmonyInboxNoticeRecovery:{clear(){}},
   setTimeout: callback => { timers.push(callback); return timers.length; } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
 
@@ -47,10 +47,10 @@ home.home = undefined;
 
 let address = root + 'inbox/';
 let warmupDisposals = 0;
-const native = new context.Native();
+const native = new context.Native(); native.pageRecovery={cancel(){}}; context.PinmonyPageRecovery={clear(){}};
 Object.assign(native, { homeStore: home, authStatus: 'authenticated', activeTab: 0, currentWebTab: 2,
   homeImageWarmup: { dispose() { warmupDisposals++; } },
-  pendingWebTab: 0, loadFailed: false, profileSettingsVisible: false, pinStore: {}, boardStore: {},
+  pendingWebTab: 0, loadFailed: false, profileSettingsVisible: false, pinStore: {}, boardStore: {scrollPositions:new Map()},
   profileStore: { origins: [], profileCache: { clear() {} } },
   inboxStore: { inboxCache: { clear() {} } }, searchStore: { searchCache: { clear() {} } },
   rootTabAddresses: new Map([[0, root]]), nativeDisplayAddress: () => address,

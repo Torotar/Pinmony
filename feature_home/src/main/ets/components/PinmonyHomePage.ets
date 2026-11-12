@@ -58,7 +58,7 @@ export struct PinmonyHomePage {
   onContentScroll?: (offset: number, state: ScrollState) => void;
   onScrollPosition?: (pageKey: string, offset: number, categoryId: string) => void;
   onVisiblePins?: (first: number, last: number) => void;
-  onPrefetchPins?: (first: number, last: number) => void;
+  onPrefetchPins?: (first: number, last: number, limit?: number) => void;
 
 
   private categoryId(snapshot: PinmonyHomeSnapshot): string {
@@ -301,6 +301,9 @@ export struct PinmonyHomePage {
                 .backgroundColor(this.categoryTabSelected(index, tab) ? $r('app.color.detail_save_accent') : $r('app.color.input_surface'))
                 .fontColor(this.categoryTabSelected(index, tab) ? Color.White : $r('app.color.primary_text'))
                 .attributeModifier(new PinmonyHomeCategoryMaterial(this.immersiveLightMode, this.categoryTabSelected(index, tab)))
+                .shadow({ radius: this.getUIContext().vp2px(6),
+                  color: this.systemDarkMode ? '#33000000' : '#14000000',
+                  offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
                 .enabled((this.interactionReady || this.offlinePreview) && tab.enabled)
                 .accessibilitySelected(this.categoryTabSelected(index, tab))
                 .onClick(() => {

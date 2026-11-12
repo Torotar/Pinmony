@@ -95,10 +95,10 @@ async function main() {
   assert.equal(authMessages.at(-1).epoch, 7);
   assert.equal(disconnected, true, 'evidence observation stops after confirmation');
   const page = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
-  const pageMethods = ['syncFirstImagePriority', 'releaseUnobservableImagePriority', 'onHomeChanged', 'onPrefetchAvailabilityChanged', 'prefetchVisibleDetails', 'feedStatusText'].map(name => {
+  const pageMethods = ['syncFirstImagePriority', 'releaseUnobservableImagePriority', 'onHomeChanged', 'onPrefetchAvailabilityChanged', 'prefetchVisibleDetails', 'feedStatusText', 'contentColumns', 'detailImagePrefetchCount'].map(name => {
     const start = page.indexOf('  private ' + name + '(');
     const rest = page.slice(start);
-    const end = rest.slice(1).search(/\n  (?:private |@Builder)/) + 1;
+    const end = rest.slice(1).search(/\n  (?:private |@Builder|@State|@Prop)/) + 1;
     return rest.slice(0, end);
   }).join('\n');
   const allowsSpeculativeReads = () => true;
@@ -106,7 +106,7 @@ async function main() {
   require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Feed { ' + pageMethods + '} globalThis.Feed = Feed;', { target: ts.ScriptTarget.ES2020 }), pageCtx);
   const feed = new pageCtx.Feed(), ranges = [];
   Object.assign(feed, { activeSession: 1, activePageKey: home, activeTab: 'all', visibleFirst: 10, visibleLast: 15,
-    firstImageSettled: true, firstImageSource: home + ':all:',
+    firstImageSettled: true, firstImageSource: home + ':all:', contentWidth: 360,
     paneMounted: true, paneActive: true, paginationWasActive: false, prefetchTimer: -1,
     paginationWindow: { pause() {}, observe() {} }, retryRecoveredImages() {},
     setHomeChromeCollapsed() {},

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
 const ts = require(process.argv[2] || 'typescript');
 function load(file, deps = () => ({})) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021}}).outputText,
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021}}).outputText,
     {exports, require: withLocalMessages(deps), setTimeout, clearTimeout, console});
   return exports;
 }
@@ -212,7 +212,7 @@ async function main() {
   pending=reader.refresh();requests[18].resolve(resource(board));await flush();requests[19].resolve(resource([rawPin(1)]));await pending;
   singleMovePage=page;pending=action('targets',['1']);requests[20].resolve(resource([{type:'board',id:'200',name:'Target',access:['write']}]));await pending;
   const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');const begin=index.indexOf('  private backFromBoard('),end=index.indexOf('\n  private ',begin+1);assert(begin>=0);
-  const Back=vm.runInNewContext(ts.transpileModule('class Back {'+index.slice(begin,end)+'} Back;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_BOARD_READS_ENABLED:true});
+  const Back=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Back {'+index.slice(begin,end)+'} Back;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_BOARD_READS_ENABLED:true});
   const back=new Back();back.boardStore=store;back.boardNativeReads=reader;back.boardOperation=(method,id)=>reader.handle(method,id);
   back.backFromBoard();await flush();assert.equal(store.boardDetail.flow.phase,'');assert.equal(singleMovePage,'');
   await action('select');pending=action('targets',['1']);requests[21].resolve(resource([{type:'board',id:'200',name:'Target',access:['write']}]));await pending;

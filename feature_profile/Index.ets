@@ -27,3 +27,7 @@ export { PinmonyProfileSearchPin, PinmonyProfileSearchSuggestion, PinmonyProfile
 export { PinmonyProfileSearchPage } from './src/main/ets/components/PinmonyProfileSearchPage';
 
 export { PinmonyBoardOrderPage } from './src/main/ets/components/PinmonyBoardOrderPage';
+
+export { readProfileAvatarStatus } from './src/main/ets/services/PinmonyProfileAvatarStatus';
+
+export { PinmonyProfileNetwork } from './src/main/ets/services/PinmonyProfileNetwork';

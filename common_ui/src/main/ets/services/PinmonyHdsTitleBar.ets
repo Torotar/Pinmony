@@ -1,10 +1,39 @@
 import { UIContext } from '@kit.ArkUI';
-import { HdsNavigationTitleBarOptions, HdsNavigationTitleBarStyle, HdsNavigationIconItemStyle } from '@kit.UIDesignKit';
+import { HdsNavigationTitleBarOptions, HdsNavigationTitleBarStyle, HdsNavigationIconItemStyle, TitleBarStyleOptions, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
+import { PinmonyImmersiveLight } from './PinmonyImmersiveLight';
 
 /** Resolve app colors in the host's current configuration before HDS builds its
  * alternate palette. Passing Resource objects there can select a stale adapter
  * on HarmonyOS 7. Keep callbacks, geometry, safe areas and material unchanged. */
 export class PinmonyHdsTitleBar {
+  /** Shared MODAL chrome. HDS owns title metrics and icon interaction;
+   * menus use an opaque backdrop; a real scrolling body can opt into immersion.
+   * This visual policy is project-specific, using SDK-supported HDS options. */
+  static modalStyle(mode: string, scrollable: boolean = false): TitleBarStyleOptions {
+    const immersiveScroll: boolean = scrollable && mode !== 'off';
+    return {
+      blurStrategy: mode === 'off' ? BlurStrategy.DISABLE :
+        immersiveScroll ? BlurStrategy.ENABLE : BlurStrategy.ADAPTIVE,
+      thermoCtrl: immersiveScroll,
+      systemMaterialEffect: PinmonyImmersiveLight.effect(mode),
+      scrollEffectOpts: { enableScrollEffect: immersiveScroll,
+        scrollEffectType: scrollable ? ScrollEffectType.IMMERSIVE_GRADIENT_BLUR : ScrollEffectType.GRADIENT_BLUR },
+      originalStyle: {
+        backgroundStyle: { backgroundColor: immersiveScroll ? undefined : $r('app.color.page_background'),
+          maskExtraHeight: 0, blurRadius: immersiveScroll ? 18 : 0 },
+        contentStyle: {
+          titleStyle: { mainTitleColor: $r('app.color.primary_text') },
+          menuStyle: { iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text'),
+            backgroundColor: mode === 'off' ? $r('app.color.input_surface') : undefined }
+        }
+      },
+      scrollEffectStyle: scrollable ? { backgroundStyle: {
+        backgroundColor: immersiveScroll ? undefined : $r('app.color.page_background'),
+        maskExtraHeight: 0, blurRadius: immersiveScroll ? 18 : 0
+      } } : undefined
+    };
+  }
+
   static resolve(context: UIContext, options: HdsNavigationTitleBarOptions,
     _darkMode: boolean): HdsNavigationTitleBarOptions {
     // The caller reads its StorageLink for every options evaluation. Do not

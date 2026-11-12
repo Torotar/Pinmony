@@ -84,8 +84,8 @@ async function main() {
   const pane = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
   assert.match(pane, /PinmonyCdnImage\(\{ url: url, useSharedDecode: false, viewportOnly: false,/,
     'home hidden prefetch uses native Image cache, not RCP/shared JPEG decode');
-  assert.match(pane, /useSharedDecode: false, viewportOnly: true/,
-    'visible cards retain viewport admission and independent decode/failure callbacks');
+  assert.match(pane, /useSharedDecode: false, viewportOnly: false/,
+    'cached cards allow offscreen admission with independent decode/failure callbacks');
   console.log('Home refresh images: progressive immediate commit, disk cache, independent photos, cursor, pagination, empty, read failure/retry, scroll/cancel/account isolation and native prefetch passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

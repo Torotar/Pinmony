@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const ts=require(process.argv[2]||'typescript');
 const {withLocalMessages}=require('./local-message-test-fixture.cjs');
 let timers=new Map(),timerId=0;
-function load(file,deps=()=>({})) {const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),console,setTimeout:fn=>{const id=++timerId;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});return exports;}
+function load(file,deps=()=>({})) {const exports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),console,setTimeout:fn=>{const id=++timerId;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)});return exports;}
 const {PinmonyAvatarColorSource:Source}=load('common_ui/src/main/ets/PinmonyAvatarColorSource.ets');
 const {PinmonyUserAvatarReads:Reads}=load('entry/src/main/ets/app/PinmonyUserAvatarReads.ets',name=>name==='common_ui'?{PinmonyAvatarColorSource:Source}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',name=>name==='common_session'?{PinmonySessionCredentials:class{}}:{});
@@ -17,7 +17,7 @@ function fixture(){let session={authenticated:true,accountId:'self',generation:1
 }
 function avatarClass(){const code=fs.readFileSync('common_ui/src/main/ets/components/PinmonyUserAvatar.ets','utf8').replace(/\bstruct\b/g,'class'),ast=ts.createSourceFile('avatar.ts',code,ts.ScriptTarget.Latest,true);const names=['aboutToAppear','aboutToDisappear','cancelColor','avatarIdentityChanged','resolveColor','fallbackBackground','fallbackInitial','resetImage'],methods=[];
  function visit(n){if(ts.isMethodDeclaration(n)&&names.includes(n.name.getText(ast)))methods.push(n.getText(ast));ts.forEachChild(n,visit);}visit(ast);assert.equal(methods.length,names.length);
- return vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyAvatarColorSource:Source,$r:x=>x});}
+ return vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyAvatarColorSource:Source,$r:x=>x});}
 async function main(){
  let f=fixture(),colors=[],other=[];const a=Source.read(f.identity(),c=>colors.push(c)),b=Source.read(f.identity(),c=>other.push(c));assert.equal(f.pending.length,1,'one shared read for two visible avatars');a();f.reply(0,7);await flush();assert.deepEqual(colors,[]);assert.deepEqual(other,[7]);
  let cached;Source.read(f.identity(),c=>cached=c);assert.equal(cached,7);assert.equal(f.pending.length,1);f.reader.dispose();
@@ -41,7 +41,7 @@ async function main(){
  // The product host actually clears both layers on reset and refreshes metadata after confirmation.
  const indexSource=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8'),indexAst=ts.createSourceFile('index.ts',indexSource.replace(/\bstruct\b/g,'class'),ts.ScriptTarget.Latest,true),hostMethods=[];
  function hostVisit(n){if(ts.isMethodDeclaration(n)&&['resetNativeBusinessSession','confirmBusinessSession'].includes(n.name.getText(indexAst)))hostMethods.push(n.getText(indexAst));ts.forEachChild(n,hostVisit);}hostVisit(indexAst);assert.equal(hostMethods.length,2);
- const ProductHost=vm.runInNewContext(ts.transpileModule('class Host {'+hostMethods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyI18n:{isText:()=>false},PIN_NATIVE_HOME_READS_ENABLED:false,PIN_NATIVE_SEARCH_DISCOVERY_ENABLED:false});
+ const ProductHost=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Host {'+hostMethods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyI18n:{isText:()=>false},PIN_NATIVE_HOME_READS_ENABLED:false,PIN_NATIVE_SEARCH_DISCOVERY_ENABLED:false});
  const effects=[],product=Object.assign(new ProductHost(),{boardInvitationNotice:{reset:()=>effects.push('invitation-reset')},imageViewer:{cancel:()=>effects.push('viewer-cancel')},inboxBackgroundSync:{stop:()=>effects.push('background-stop')},authStatus:'authenticated',networkNotice:'',homeCacheAccountId:'self',authenticatedProfileUrl:origin+'/self/',sessionEnvironment:{userAgent:()=> 'synthetic'},businessSession:{reset:()=>effects.push('session-reset'),confirm:()=>effects.push('confirm')},userAvatarReads:{reset:()=>effects.push('avatar-reset'),sessionChanged:()=>effects.push('avatar-confirm')},inboxUnreadNativeReads:{poll:()=>{}}});
  product.resetNativeBusinessSession();product.confirmBusinessSession();assert.equal(effects.join(','),'invitation-reset,viewer-cancel,background-stop,session-reset,avatar-reset,confirm,avatar-confirm');
  // Actual native permit, plus tamper/epoch/method tests; no real network is used.

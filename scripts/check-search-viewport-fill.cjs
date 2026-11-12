@@ -7,14 +7,14 @@ function method(name) {
 }
 const timers = [], logs = [];
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' +
-  ['fillInitialViewport', 'discoveryPrefetch', 'discoveryEndVisible', 'resultsReachEnd', 'resultsAreaChanged', 'resultsVisible'].map(method).join('\n') + '} Host;',
+  ['fillInitialViewport', 'discoveryPrefetch', 'discoveryEndVisible', 'resultsReachEnd', 'resultsAreaChanged', 'resultsVisible', 'updateResultImagePrefetch', 'imagePrefetchCount', 'contentColumns'].map(method).join('\n') + '} Host;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
   { setTimeout: fn => timers.push(fn), PinmonyRuntimeLog: { info: value => logs.push(value) } });
 function harness(atEnd, offset = 0) {
-  const h = new Host(); let calls = 0;
-  Object.assign(h, { automaticLoadingEnabled: true, actionsReady: true, loading: false,
+  const h = new Host();h.discoverySnapshot=()=>h.snapshot; let calls = 0;
+  Object.assign(h, { imagePrefetch: { update() {} }, automaticLoadingEnabled: true, actionsReady: true, loading: false,
     initialFillCount: 0, initialFillScheduled: false, initialFillResultsCount: -1, fillGeneration: 0,
-    resultsViewportReady: true, restoringResultsScroll: false,
+    resultsViewportReady: true, restoringResultsScroll: false, contentWidth: 360, pagePresent: true,
     snapshot: { pageKey: 'synthetic-search', query: 'test', api: true, results: [1, 2, 3] },
     resultsScroller: { isAtEnd: () => atEnd, offset: () => ({ yOffset: offset }) },
     onLoadMore: () => calls++ });

@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardFlow, PinmonyBoardCoverState, PinmonyBoardCoverCrop, PinmonyBoardPin, boardCoverCrop, boardCoverPreview } from 'feature_board';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 
 export interface PinmonyBoardCoverIdentity { page: string; boardId: string; viewerId: string; ownerId: string; intent: number; }
 interface CoverSourceImage { url: string; width: number; height: number; }
@@ -53,7 +54,7 @@ export class PinmonyBoardCoverNativeFlow {
     const f: PinmonyBoardFlow | undefined = this.ports.state();
     if(f?.cover){if(f.busy){f.cover.status = 'uncertain';f.uncertain = true;f.cover.error = PinmonyI18n.message('pm_board_cover_unconfirmed');}
       else if(f.cover.loading)f.cover.error = PinmonyI18n.message('pm_loading_interrupted_please_retry_b469c1dd');
-      f.busy = false;f.cover.loading = false;this.publish(f);}
+      f.busy = false;f.cover.loading = false;f.cover.refreshing = false;this.publish(f);}
   }
   private safeImage(url: string | undefined): string { return typeof url === 'string' && url.length <= 2048 && /^https:\/\/i\.pinimg\.com\//.test(url) ? url : ''; }
   async handle(action: string, encoded: string = ''): Promise<void> {
@@ -78,6 +79,12 @@ export class PinmonyBoardCoverNativeFlow {
     const c: PinmonyBoardCoverState | undefined = f.cover;if(!c)return;
     if(action === 'coverCheck'){if(this.pending.has(key))await this.check(f,identity,session);return;}
     if(this.pending.has(key) || f.uncertain)return;
+    if(action === 'coverRefresh') {
+      if(c.adjusting)return;
+      this.cursor = '';this.cursors.clear();this.restore = undefined;
+      c.refreshing = true;
+      await this.load(f,identity,session,false);return;
+    }
     if(action === 'coverMore' || action === 'coverRetry') {
       if(action === 'coverMore' && (c.adjusting || !c.hasMore))return;
       await this.load(f,identity,session,!!this.cursor);return;
@@ -85,13 +92,13 @@ export class PinmonyBoardCoverNativeFlow {
     if(action === 'coverSelect') {
       if(c.adjusting)return;
       const pin: PinmonyBoardPin | undefined = c.pins.find((p: PinmonyBoardPin): boolean => p.id === encoded);
-      if(pin){c.selected = boardCoverCrop(pin,(pin.imageWidth-Math.min(pin.imageWidth,pin.imageHeight))/2,(pin.imageHeight-Math.min(pin.imageWidth,pin.imageHeight))/2);c.error = '';this.publish(f);}return;
+      if(pin){const crop: PinmonyBoardCoverCrop = boardCoverCrop(pin,0,0,5/3);c.selected = boardCoverCrop(pin,(pin.imageWidth-crop.width)/2,(pin.imageHeight-crop.height)/2,5/3);c.error = '';this.publish(f);}return;
     }
     if(action === 'coverCrop') {
       let crop: PinmonyBoardCoverCrop;try{crop = JSON.parse(encoded) as PinmonyBoardCoverCrop;}catch(_){return;}
       const pin: PinmonyBoardPin | undefined = c.pins.find((p: PinmonyBoardPin): boolean => p.id === crop.pinId && p.id === c.selected?.pinId);
       if(!pin || !Number.isFinite(crop.cropX) || !Number.isFinite(crop.cropY))return;
-      c.selected = boardCoverCrop(pin,crop.cropX,crop.cropY);this.publish(f);return;
+      c.selected = boardCoverCrop(pin,crop.cropX,crop.cropY,5/3);this.publish(f);return;
     }
     if(action === 'coverSave' && c.selected)await this.save(f,identity,session);
   }
@@ -137,7 +144,7 @@ export class PinmonyBoardCoverNativeFlow {
     if(this.live(identity,session,revision,f) && f.cover === state && state.adjusting && !state.selected && !state.error) {
       state.error = PinmonyI18n.message('pm_board_cover_image_failed');
     }
-    }finally{if(this.live(identity,session,revision,f) && f.cover === state){state.loading = false;this.publish(f);}}
+    }finally{if(this.live(identity,session,revision,f) && f.cover === state){state.loading = false;state.refreshing = false;this.publish(f);}}
   }
   private async read(f: PinmonyBoardFlow, identity: PinmonyBoardCoverIdentity, session: PinmonyBusinessSessionContext, append: boolean): Promise<void> {
     const c: PinmonyBoardCoverState | undefined = f.cover;if(!c)return;
@@ -165,13 +172,15 @@ export class PinmonyBoardCoverNativeFlow {
       const saved: CoverSavedPin | undefined = this.restore;
       const source: PinmonyBoardPin | undefined = pins.find((pin: PinmonyBoardPin): boolean => pin.id === saved?.pin_id);
       if(c.adjusting && !c.selected && source && saved?.crop?.length === 2 && saved.size?.length === 2) {
-        const crop: PinmonyBoardCoverCrop = boardCoverCrop(source,saved.crop[0],saved.crop[1]);
+        const crop: PinmonyBoardCoverCrop = boardCoverCrop(source,saved.crop[0],saved.crop[1],saved.size[0] === saved.size[1] ? 1 : 5/3);
         if(Number.isFinite(saved.crop[0]) && Number.isFinite(saved.crop[1]) && crop.cropX === saved.crop[0] && crop.cropY === saved.crop[1] &&
           crop.width === saved.size[0] && crop.height === saved.size[1] && typeof saved.scale === 'number' && Math.abs(crop.scale-saved.scale) < 0.000001)c.selected = crop;
       }
       const next: string = body.resource_response.bookmark || body.resource?.options?.bookmarks?.[0] || '';
       c.hasMore = typeof next === 'string' && !!next && next !== '-end-' && next.length <= 4096 && !this.cursors.has(next) && rows.length > 0 && pins.length < 500;
-      c.pins = pins.slice(0,500);if(c.hasMore){this.cursor = next;this.cursors.add(next);}else this.cursor = '';
+      c.pins = pins.slice(0,500);
+      if(c.refreshing && c.selected && !c.pins.some((pin: PinmonyBoardPin): boolean => pin.id === c.selected?.pinId))c.selected = undefined;
+      if(c.hasMore){this.cursor = next;this.cursors.add(next);}else this.cursor = '';
     }catch(_){if(live())c.error = PinmonyI18n.message(c.status === 'uncertain' ? 'pm_board_cover_unconfirmed' : 'pm_unable_to_load_please_retry_b22c1af1');}
     finally{if(live())this.publish(f);}
   }

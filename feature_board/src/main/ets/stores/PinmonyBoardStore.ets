@@ -3,6 +3,7 @@ import { PinmonyBoardCollaborators } from '../models/PinmonyBoardCollaborators';
 
 @Observed
 export class PinmonyBoardStore {
+  readonly scrollPositions: Map<string, number> = new Map<string, number>();
   collaborators: PinmonyBoardCollaborators | undefined = undefined;
   collaboratorsToken: number = 0;
   onNavigationChange: (() => void) | undefined = undefined;

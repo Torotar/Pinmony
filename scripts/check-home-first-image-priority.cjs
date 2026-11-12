@@ -4,13 +4,13 @@ const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomeFeedPane.ets', 'utf8');
 function method(name) {
-  const match = source.match(new RegExp('  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'));
+  const match = source.match(new RegExp('  private ' + name + '\\([^\\n]*?\\{[^\\n]*?\\}|  private ' + name + '\\([\\s\\S]*?\\r?\\n  \\}'));
   assert(match, name);
   return match[0];
 }
 let allowed = true;
 const methods = ['syncFirstImagePriority', 'settleFirstImage', 'releaseUnobservableImagePriority', 'prefetchNextScreen', 'loadNearEnd',
-  'prefetchVisibleDetails', 'uniquePrefetchImages', 'loadNextPageAtEnd'];
+  'prefetchVisibleDetails', 'uniquePrefetchImages', 'loadNextPageAtEnd', 'detailImagePrefetchCount', 'contentColumns'];
 const Host = vm.runInNewContext(ts.transpileModule('class Host { ' + methods.map(method).join('\n') + '} Host;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
   { Date, allowsSpeculativeReads: () => allowed });
@@ -18,7 +18,7 @@ const pin = { id: 'one', imageUrl: 'https://i.pinimg.com/474x/one.jpg' };
 function fixture() {
   const h = new Host(), calls = [];
   Object.assign(h, { paneMounted: true, paneActive: true, feedActive: true, imageLoadingActive: true,
-    firstImageSettled: false, firstImageSource: '', visibleFirst: 0, visibleLast: 1,
+    firstImageSettled: false, firstImageSource: '', visibleFirst: 0, visibleLast: 1, contentWidth: 360,
     home: { pageKey: 'home', session: 1, selectedTab: 'all', pins: [pin], dataSource: 'api' },
     prefetchedImageUrls: [pin.imageUrl, 'detail', 'detail'], recoveredSources: {}, failedImages: [],
     actionsReady: true, paginationReady: true, restoreDone: true, prefetchNotBefore: 0,
@@ -88,10 +88,10 @@ allowed = false;
 const disabled = fixture(); disabled.h.firstImageSettled = true;
 disabled.h.prefetchNextScreen(); disabled.h.prefetchVisibleDetails();
 assert.deepEqual(disabled.calls, [], 'existing speculative-read switch remains authoritative');
-assert.match(source, /useSharedDecode: false, viewportOnly: true/, 'cards keep native decoding with viewport admission');
+assert.match(source, /useSharedDecode: false, viewportOnly: false/, 'cards keep native decoding and allow bounded cache items to load offscreen');
 for (const event of ['onDecoded', 'onFailure']) {
   const callback = source.slice(source.indexOf(event + ': () =>') >= 0 ? source.indexOf(event + ': () =>') : source.indexOf(event + ': (code: number) =>'));
   assert(callback.indexOf('session !== this.home.session') < callback.indexOf('this.settleFirstImage(pin)'), 'session guard precedes ' + event);
   assert(callback.indexOf('imageRevision !==') < callback.indexOf('this.settleFirstImage(pin)'), 'source revision guard precedes ' + event);
 }
-console.log('Home first-image priority: parallel feed pagination, viewport admission, detail/image prefetch gating, success/failure wiring, source/category reset, retained session, hidden and disposed states passed');
+console.log('Home first-image priority: parallel feed pagination, cached-image admission, detail/image prefetch gating, success/failure wiring, source/category reset, retained session, hidden and disposed states passed');

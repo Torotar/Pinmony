@@ -32,7 +32,7 @@ const story={uploadDraftImage:async()=>({uploadId:'303',signature,width:600,heig
  const klass=tree.statements.find(n=>ts.isClassDeclaration(n)&&n.name?.text==='PinmonyNativeNetwork');
  const method=klass.members.find(n=>ts.isMethodDeclaration(n)&&n.name?.getText(tree)==='requestBusinessSharePublish');
  const scope={exports:{},PIN_BUSINESS_PIN_READ_ENABLED:true};
- vm.runInNewContext(ts.transpileModule('export class Gate{'+method.getText(tree)+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,scope);
+ vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'export class Gate{'+method.getText(tree)+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,scope);
  const gate=new scope.exports.Gate(),session={authenticated:true,accountId:'1',generation:1,origin:'https://www.pinterest.com',userAgent:'test'};
  let allowed=false;gate.request=async(job,context)=>{allowed=context().authenticated;return {status:0};};
  bad=false;await savePinmonyDraft(client,story,{...owner},flow,'synthetic-image',()=>true);const record=calls[0];
@@ -49,7 +49,7 @@ const story={uploadDraftImage:async()=>({uploadId:'303',signature,width:600,heig
  const action=nativeClass.members.find(n=>ts.isMethodDeclaration(n)&&n.name?.getText(nativeTree)==='action');
  let finish,done=0;
  const nativeScope={exports:{},PinmonyDraftNotSubmittedError,PinmonyRuntimeLog:{warn(){}},PinmonyI18n:{message:key=>key},savePinmonyDraft:()=>new Promise(resolve=>{finish=resolve;})};
- vm.runInNewContext(ts.transpileModule('export class Flow{'+action.getText(nativeTree)+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,nativeScope);
+ vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'export class Flow{'+action.getText(nativeTree)+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,nativeScope);
  const native=new nativeScope.exports.Flow();
  Object.assign(native,{flow:{...flow,token:1,kind:'photo',phase:'select',boards:[{id:'2',enabled:true}],selectedIds:['photo'],draftExitRequested:true},candidates:[{pin:{id:'photo'},base64:'synthetic'}],viewer:'1',current:()=>true,owner:()=>({...owner}),commit(){},ports:{done(){done++;}},unknown:new Set()});
  native.loadDrafts=async()=>{};

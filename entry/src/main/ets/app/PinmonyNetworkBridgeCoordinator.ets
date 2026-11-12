@@ -1,6 +1,7 @@
 import { PinmonyPinStore, PinmonyDetailTrace, PinmonyDetailReadCache } from 'feature_pin';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED, acceptsNetworkJob, NetworkManager } from 'common_network';
+import { PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED, acceptsNetworkJob, NetworkManager } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyNavigationHistory } from '../app/PinmonyNavigationHistory';
 

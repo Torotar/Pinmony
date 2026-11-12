@@ -1,5 +1,6 @@
 {
   "color": [
+    { "name": "immersive_interaction_light", "value": "#D9828E" },
     { "name": "shuffle_card_glass", "value": "#B3ECEFF1" },
     {
       "name": "shuffle_visit_background",

@@ -12,3 +12,5 @@ export { PinmonyBoardCollaboratorsPage } from './src/main/ets/components/Pinmony
 
 export { PinmonyBoardStateController, PinmonyBoardStatePorts } from './src/main/ets/controllers/PinmonyBoardStateController';
 export { PinmonyBoardOperationsController, PinmonyBoardOperationsPorts } from './src/main/ets/controllers/PinmonyBoardOperationsController';
+
+export { PinmonyBoardNetwork } from './src/main/ets/services/PinmonyBoardNetwork';

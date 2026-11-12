@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const ts=require(process.argv[2]||'typescript');
-const transpile=path=>ts.transpileModule(fs.readFileSync(path,'utf8').replace(/^import .*;\r?$/gm,''),{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText;
+const transpile=path=>require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(path,'utf8').replace(/^import .*;\r?$/gm,''),{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText;
 const page='https://www.pinterest.com/sample/',ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
 function harness({host='https://pinterest-media-upload.s3.amazonaws.com/',owner='1',extra=false,late=false,uploadStatus=204}={}){
  const uploads=[],jobs=[],context={authenticated:true,epoch:1,page,userAgent:'synthetic'};

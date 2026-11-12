@@ -20,3 +20,5 @@ export { PinmonyInboxListPage } from './src/main/ets/components/PinmonyInboxList
 
 export { PinmonyInboxNewsCard } from './src/main/ets/models/PinmonyInboxFlow';
 export { PinmonyInboxHiddenConversations } from './src/main/ets/services/PinmonyInboxHiddenConversations';
+
+export { PinmonyInboxNetwork } from './src/main/ets/services/PinmonyInboxNetwork';

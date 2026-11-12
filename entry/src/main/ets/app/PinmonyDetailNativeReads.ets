@@ -2,7 +2,8 @@ import { inheritUserAvatarColor, PinmonyAvatarUserMetadata } from './PinmonyUser
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyPinStore, PinmonyDetailSnapshot, PinmonyRelatedPin, readRelatedPresentation, RelatedPresentation, PinmonyComment, PinmonyCommentResult } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, Priority } from 'common_network';
+import { PIN_BUSINESS_PIN_READ_ENABLED, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, Priority } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyRouteParser } from './PinmonyRouteParser';
 import { PinmonyTranslationDiagnostics } from './PinmonyTranslationDiagnostics';

@@ -264,12 +264,13 @@ export class PinmonyDetailPrefetch {
   }
 
   offer(pinUrls: string[], scope: string, read: DetailReader,
-    current: () => boolean, cancel: (id: string) => void): void {
+    current: () => boolean, cancel: (id: string) => void, limit: number = 6): void {
     if (!current()) { this.pause(); return; }
     if (scope !== this.scope) { this.pause(); this.scope = scope; }
     this.cancelRequest = cancel;
     // Replace waiting work when the viewport moves; at most two reads in flight.
-    this.queued = pinUrls.slice(0, 6).filter((pin: string): boolean =>
+    const budget: number = Number.isFinite(limit) ? Math.max(6, Math.min(18, Math.floor(limit))) : 6;
+    this.queued = pinUrls.slice(0, budget).filter((pin: string): boolean =>
       /^https:\/\/(?:www|uk)\.pinterest\.com\/pin\/\d+\/$/.test(pin) && !this.get(pin) && !this.attempted.has(pin));
     const token: number = this.generation;
     const pump = (): void => {

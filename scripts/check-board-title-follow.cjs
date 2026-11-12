@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 let now=1000;
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,Date:{now:()=>now},require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,Date:{now:()=>now},require: require('./local-message-test-fixture.cjs').withLocalMessages(deps),console});return exports;}
 const {PinmonyBoardFollowNativeWrites:Follow}=load('entry/src/main/ets/app/PinmonyBoardFollowNativeWrites.ets', require('./local-message-test-fixture.cjs').withLocalMessages(() => ({})));
 const {PinmonyNativeNetwork:Network}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',name=>name==='common_session'?{PinmonySessionCredentials:class{}}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 function fixture(){

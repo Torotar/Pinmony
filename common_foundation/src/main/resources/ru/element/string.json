@@ -1941,6 +1941,10 @@
       "value": "Свет"
     },
     {
+      "name": "pm_follow_account",
+      "value": "Как в аккаунте"
+    },
+    {
       "name": "pm_follow_system_217cfe7d",
       "value": "Следуйте системе"
     },

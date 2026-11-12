@@ -6,7 +6,7 @@ const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=loader.loadFile('common_n
 const client=loader.loadFile('entry/src/main/ets/app/PinmonyBusinessAuxiliaryClient.ets');
 let now=1000000;class Clock extends Date{static now(){return now;}}
 const exportsObject={};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/app/PinmonyBoardInvitationNotice.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:exportsObject,Date:Clock,require:n=>n.includes('BusinessAuxiliaryClient')?client:n.includes('UpdatesNativeReads')?{PIN_NATIVE_INBOX_UPDATES_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){},warn(){}}}:{}});
+vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync('entry/src/main/ets/app/PinmonyBoardInvitationNotice.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:exportsObject,Date:Clock,require:n=>n.includes('BusinessAuxiliaryClient')?client:n.includes('UpdatesNativeReads')?{PIN_NATIVE_INBOX_UPDATES_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){},warn(){}}}:{}});
 assert.equal(exportsObject.PIN_BOARD_INVITATION_NOTICE_POLL_MS,5000);
 const invite=(id='81',extra={})=>({status:'new',board:{id,url:'/peer/art/',name:'原图板名称'},invited_user:{id:'41'},invited_by_user:{id:'42',username:'peer',full_name:'原邀请者',image_medium_url:'https://i.pinimg.com/avatar.jpg',avatar_color_index:3},...extra});
 function fixture(){let session={authenticated:true,accountId:'synthetic',generation:1,origin:'https://www.pinterest.com'},active=true;const jobs=[],cancelled=[],shown=[];

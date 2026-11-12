@@ -13,6 +13,10 @@ interface CommentPhotoSize { key: string; url: string; width: number; height: nu
 
 @Component
 export struct PinmonyCommentsSheet {
+  listScroller: Scroller = new Scroller();
+  // HDS MODAL main-title backdrop: 56vp title + 8vp top padding.
+  // This inset scrolls away with the list, exposing content to the title blur.
+  private readonly titleBackdropHeight: number = 64;
   @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
@@ -235,16 +239,15 @@ export struct PinmonyCommentsSheet {
 
   build() {
     Column({ space: 12 }) {
-      Divider().color($r('app.color.secondary_text')).opacity(0.2)
-      if (this.result.actionError) {
-        PinmonyActionNotice({ message: PinmonyI18n.render(this.result.actionError, this.uiLanguage) })
-      }
-      if (this.result.items.length === 0 && this.result.loading) {
-        LoadingProgress().color($r('app.color.accent')).width(32).height(32)
-        Text(this.uiText("pm_loading_comments_dded3fba")).fontColor($r('app.color.secondary_text'))
-        Blank().layoutWeight(1)
-      } else {
-        List({ space: 18 }) {
+        List({ space: 18, scroller: this.listScroller }) {
+          ListItem() {
+            Column({ space: 12 }) {
+              Divider().color($r('app.color.secondary_text')).opacity(0.2)
+              if (this.result.actionError) {
+                PinmonyActionNotice({ message: PinmonyI18n.render(this.result.actionError, this.uiLanguage) })
+              }
+            }.width('100%')
+          }
           ForEach(this.result.items, (item: PinmonyComment) => {
             ListItem() {
               Column({ space: 6 }) {
@@ -287,6 +290,9 @@ export struct PinmonyCommentsSheet {
                 } })
               } else if (this.result.loading) {
                 LoadingProgress().color($r('app.color.accent')).width(28).height(28)
+                if (this.result.items.length === 0) {
+                  Text(this.uiText("pm_loading_comments_dded3fba")).fontColor($r('app.color.secondary_text'))
+                }
               } else if (this.result.items.length === 0) {
                 Text(this.uiText("pm_write_a_comment_share_feedback_or_send_a_high_five_2ef32875")).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
                   .margin({ top: 140 })
@@ -295,10 +301,12 @@ export struct PinmonyCommentsSheet {
             }.width('100%')
           }
         }.width('100%').layoutWeight(1)
+          .contentStartOffset(this.titleBackdropHeight + 12)
+          .scrollBarMargin({ start: LengthMetrics.vp(this.titleBackdropHeight) })
           .onReachEnd(() => { if (!this.result.loading && !this.result.error && !this.result.ended && this.onMore) this.onMore(); })
-      }
       this.composer()
-    }.width('100%').height('100%').padding({ left: 16, right: 16, top: 12, bottom: 20 })
+    }.width('100%').height('100%').padding({ left: 16, right: 16, bottom: 20 })
+      .expandSafeArea([SafeAreaType.KEYBOARD], [SafeAreaEdge.BOTTOM])
       .backgroundColor($r('app.color.page_background'))
       .bindSheet($$this.menuOpen, this.presentedCommentMenu(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),

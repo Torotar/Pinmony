@@ -1929,6 +1929,10 @@
       "value": "淺色"
     },
     {
+      "name": "pm_follow_account",
+      "value": "跟隨帳號"
+    },
+    {
       "name": "pm_follow_system_217cfe7d",
       "value": "跟隨係統"
     },

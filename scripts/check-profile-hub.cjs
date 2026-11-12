@@ -1,6 +1,6 @@
 const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),ts=require(process.argv[2]||'typescript');
-function load(file,deps=()=>({})){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
+function load(file,deps=()=>({})){const exports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),setTimeout,clearTimeout,console});return exports;}
 const {PinmonyProfileCache:Cache}=load('feature_profile/src/main/ets/services/PinmonyProfileCache.ets');
 const {PinmonyProfileNativeReads:Reader}=load('entry/src/main/ets/app/PinmonyProfileNativeReads.ets',n=>n==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:n==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',n=>n==='common_session'?{PinmonySessionCredentials:class{}}:{});
@@ -135,7 +135,7 @@ async function main(){
  dp=drafts.reader.refresh();drafts.requests[di++].resolve(userBody());await flush();drafts.requests[di++].resolve(body([{...draft,images:{}}]));await dp;assert(drafts.store.profile.contentError,'malformed drafts remain a failure, not empty success');
  const profileUi=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets','utf8');
  const snapshotStart=profileUi.indexOf('  private hubSnapshot('),snapshotEnd=profileUi.indexOf('\n  @Builder',snapshotStart);
- const snapshotExports={};vm.runInNewContext(ts.transpileModule('export class Snapshot {'+profileUi.slice(snapshotStart,snapshotEnd)+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,{exports:snapshotExports});
+ const snapshotExports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'export class Snapshot {'+profileUi.slice(snapshotStart,snapshotEnd)+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS}}).outputText,{exports:snapshotExports});
  const view=new snapshotExports.Snapshot();view.profile={profileUrl:page,session:1,hubMode:'boards',boards:[{id:'1',pinCount:'9'}]};view.hubSnapshots=[{...view.profile,boards:[{id:'1',pinCount:'5'}]}];
  assert.equal(view.hubSnapshot('boards').boards[0].pinCount,'9','active pane uses current readback before retained snapshots');
  assert.match(profileUi,/boardGroup\(\$\$: PinmonyProfileBoardGroupArgs\)/,'filtered board arrays must bind by reference');

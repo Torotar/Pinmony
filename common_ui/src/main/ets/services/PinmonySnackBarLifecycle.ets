@@ -1,5 +1,5 @@
 import { HdsSnackBar, SnackBarIconOptions, SnackBarMessageOptions, SnackBarOperationOptions,
-  SnackBarStyleOptions } from '@kit.UIDesignKit';
+  SnackBarStyleOptions, BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
 // Keep the official HDS UI. Some native implementations may return a completion
@@ -22,6 +22,9 @@ export class PinmonySnackBarLifecycle {
 
   static show(snack: HdsSnackBar, icon: SnackBarIconOptions, message: SnackBarMessageOptions,
     operation: SnackBarOperationOptions, style: SnackBarStyleOptions): void {
+    // Use the official background-blur options; HdsSnackBar has no systemMaterial interface.
+    style.backgroundBlurStyle = BlurStyle.COMPONENT_ULTRA_THICK;
+    style.blurStrategy = BlurStrategy.ENABLE;
     const previous: HdsSnackBar | undefined = PinmonySnackBarLifecycle.current;
     if (previous) PinmonySnackBarLifecycle.dismiss(previous);
     const revision: number = ++PinmonySnackBarLifecycle.revision;

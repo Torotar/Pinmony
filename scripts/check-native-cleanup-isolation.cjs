@@ -22,7 +22,7 @@ async function scenario(master, local) {
     'closeBoardCollaborators', 'updateShareSheet', 'dismissShareSheet'];
   const Host = vm.runInNewContext(ts.transpileModule('class Host { accountPort() { return ' + accountBinding[1] + '; }\n' +
     names.map(method).join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText,
-  { ...flags, PinmonyRuntimeLog: { info() {}, warn(message) { throw Error(message); } } });
+  { ...flags, PinmonyInboxNoticeRecovery: {clear(){}}, PinmonyRuntimeLog: { info() {}, warn(message) { throw Error(message); } } });
   const calls = [], forbidden = () => { throw Error('unexpected legacy work'); };
   const host = new Host();
   Object.assign(host, { nativeBusinessRoutesEnabled: true, activeSheetKind: 'share', showNativeSheet: true,
@@ -80,9 +80,12 @@ async function scenario(master, local) {
   host.dismissShareSheet(); assert.equal(host.homeStore.customHomeMenu, undefined);
   assert.equal(host.showNativeSheet, false); assert.equal(host.homeStore.customHomeMenuToken, 1);
   const resetNames = ['businessSession', 'boardNativeReads', 'profileNativeReads', 'inboxUpdatesNativeReads',
-    'inboxMessagesNativeReads', 'searchDiscoveryNativeReads', 'searchNativeReads', 'homeNativeReads'];
+    'inboxMessagesNativeReads', 'inboxUnreadNativeReads', 'inboxMessageNotice', 'searchDiscoveryNativeReads', 'searchNativeReads', 'homeNativeReads'];
   const resets = [];
   for (const name of resetNames) host[name] = { reset: () => resets.push(name) };
+  host.homeCacheIoEpoch = 0;
+  host.resetNativeBusinessSession = () => host.businessSession.reset();
+  host.resetNoticeChats = () => {};
   const setAccount = host.accountPort();
   assert.equal(setAccount('new'), 'new'); assert.deepEqual(resets, resetNames);
   setAccount('new'); assert.equal(resets.length, resetNames.length, 'unchanged identity is a no-op');

@@ -18,7 +18,7 @@ const snapshot = { pageKey: 'discovery', heroes: [{ id: 'a' }, { id: 'b' }, { id
 cache.rememberHero(snapshot, 'b'); cache.rememberHero(snapshot, 'invalid');
 assert.equal(cache.heroPosition('discovery'), 'b');
 function remount() {
-  const host = new Host();
+  const host = new Host();host.discoverySnapshot=()=>host.snapshot;
   Object.assign(host, { active: true, currentHeroIndex: 0, currentHeroId: '', initialHeroId: cache.heroPosition('discovery'), snapshot,
     wideDiscoveryLayout: () => false, updateHeroBackground() {},
     onHeroPosition: (page, id) => cache.rememberHero(snapshot, id) });
@@ -33,7 +33,7 @@ host.snapshot = { ...snapshot, heroes: [{ id: 'a' }] }; host.restoreHeroPosition
 cache.clear(); assert.equal(cache.heroPosition('discovery'), '', 'existing session cache clear removes retained hero');
 console.log('Hero return: recreation, identity reordering, transient loading, inactive changes, invalid IDs and session clear passed');
 const AdmissionHost=vm.runInNewContext(ts.transpileModule('class AdmissionHost {'+method('heroImageLoadingEnabled(')+'} AdmissionHost;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
-const admission=new AdmissionHost();Object.assign(admission,{active:true,mediaActive:true,inputEditing:false,heroCarouselInViewport:true,currentHeroIndex:0,heroTransitionIndex:-1,snapshot:{heroes:[{id:'a'},{id:'b'},{id:'c'},{id:'d'},{id:'e'},{id:'f'}]}});
+const admission=new AdmissionHost();admission.discoverySnapshot=()=>admission.snapshot;admission.committedQuery=()=>'';Object.assign(admission,{active:true,mediaActive:true,inputEditing:false,heroCarouselInViewport:true,currentHeroIndex:0,heroTransitionIndex:-1,snapshot:{heroes:[{id:'a'},{id:'b'},{id:'c'},{id:'d'},{id:'e'},{id:'f'}]}});
 const admitted=()=>admission.snapshot.heroes.filter(hero=>admission.heroImageLoadingEnabled(hero)).map(hero=>hero.id);
 assert.deepEqual(admitted(),['a','b','c','f'],'current, previous and two upcoming slides form a bounded warm window');
 admission.currentHeroIndex=1;assert.deepEqual(admitted(),['a','b','c','d'],'prefetch window advances without changing image identities');
@@ -46,7 +46,7 @@ assert.match(source,/loadingActive: this\.heroImageLoadingEnabled\(hero\)[\s\S]{
 assert.match(source,/this\.heroCarouselInViewport = visible && ratio > 0/);
 console.log('Carousel prefetch: bounded current/next, wraparound, single/empty, hidden/history/offscreen pause passed');
 const ColorHost=vm.runInNewContext(ts.transpileModule('class ColorHost {'+method('updateHeroBackground(')+'} ColorHost;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info(){}}});
-const colors=new ColorHost();colors.active=true;colors.heroBackgrounds={};colors.snapshot={heroes:[{imageUrl:'red'},{imageUrl:'blue'}]};
+const colors=new ColorHost();colors.discoverySnapshot=()=>colors.snapshot;colors.active=true;colors.heroBackgrounds={};colors.snapshot={heroes:[{imageUrl:'red'},{imageUrl:'blue'}]};
 colors.updateHeroBackground({imageUrl:'red'},200,40,20);colors.updateHeroBackground({imageUrl:'blue'},20,40,200);
 assert.notEqual(colors.heroBackgrounds.red,colors.heroBackgrounds.blue,'different photos produce different backgrounds');
 colors.updateHeroBackground({imageUrl:'removed'},100,100,100);assert.equal(colors.heroBackgrounds.removed,undefined);

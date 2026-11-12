@@ -4,7 +4,8 @@ import { mapPrefetchedDetail, readRelatedPresentation, RelatedPresentation } fro
 import { PinmonyPinStore } from 'feature_pin';
 import { PinmonyDetailTrace, PinmonyDetailReadCache } from 'feature_pin';
 import { PinmonyHomeStore } from 'feature_home';
-import { PinmonyNativeNetwork, PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED, Priority } from 'common_network';
+import { PinmonyNetworkContext, PinmonyNetworkJob, PinmonyNetworkReply, PIN_NATIVE_NETWORK_ENABLED, Priority } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog, PinmonyTaskRegistry } from 'common_foundation';
 import { PinmonyAuthStatus, PinmonyBusinessSessionContext } from 'common_session';
 import { allowsSpeculativeReads } from 'common_foundation';
@@ -43,6 +44,9 @@ export interface PinmonyDetailOpeningCoordinatorPorts {
   pinStore: () => PinmonyPinStore;
 }
 export class PinmonyDetailOpeningCoordinator {
+  private homeImagePrefetchLimit: number = 6;
+  private homeImagePrefetchFirst: number = 0;
+  private homeImagePrefetchLast: number = -1;
   private shufflePreviewScope: string = '';
   private readonly shufflePrefetch: PinmonyDetailPrefetch = new PinmonyDetailPrefetch('detail_prefetch_shuffle_');
   pauseShufflePreviews(): void { this.shufflePrefetch.clear(); }
@@ -207,7 +211,11 @@ startOpeningDetailRead(pinUrl: string, token: number): void {
     });
 }
 
-prefetchHomePinDetails(first: number, last: number): void {
+prefetchHomePinDetails(first: number, last: number, limit: number = 6): void {
+    if (first < 0 || last < first) return;
+    this.homeImagePrefetchLimit = limit;
+    this.homeImagePrefetchFirst = first;
+    this.homeImagePrefetchLast = last;
     if (!allowsSpeculativeReads())
         return;
     // Prefetch remains gated by !this.pinStore.detailOpeningPin; an opening detail has priority.
@@ -217,11 +225,11 @@ prefetchHomePinDetails(first: number, last: number): void {
         return;
     this.ports.setDetailPrefetchTimer(this.ports.pageTasks().timeout(() => {
         this.ports.setDetailPrefetchTimer(-1);
-        this.prefetchHomePinDetailsNow(first, last);
+        this.prefetchHomePinDetailsNow(this.homeImagePrefetchFirst, this.homeImagePrefetchLast, this.homeImagePrefetchLimit);
     }, 700));
 }
 
-prefetchHomePinDetailsNow(first: number, last: number): void {
+prefetchHomePinDetailsNow(first: number, last: number, limit: number = 6): void {
     if (!allowsSpeculativeReads())
         return;
     const home: PinmonyHomeSnapshot | undefined = this.homeStore.home;
@@ -240,7 +248,8 @@ prefetchHomePinDetailsNow(first: number, last: number): void {
             this.homeStore.homeActionsReady && !this.homeStore.homeLoading && !this.homeStore.homeRefreshing &&
             !this.homeStore.pendingHomeTab && this.homeStore.home?.session === session && this.homeStore.home?.selectedTab === tab;
     };
-    const urls: string[] = home.pins.slice(Math.max(0, first), Math.min(home.pins.length, first + 6, last + 1))
+    const count: number = Number.isFinite(limit) ? Math.max(6, Math.min(18, Math.floor(limit))) : 6;
+    const urls: string[] = home.pins.slice(Math.max(0, first), Math.min(home.pins.length, first + count, last + 1))
         .map((pin: PinmonyHomePin): string => pin.pinUrl);
     this.pinStore.detailPrefetch.onReady = (_detail: PinmonyDetailSnapshot) => {
         if (!current())
@@ -259,6 +268,6 @@ prefetchHomePinDetailsNow(first: number, last: number): void {
         if (!ownerCurrent() || reply.error || reply.status !== 200)
             throw new Error('prefetch-unavailable');
         return reply.body;
-    }, current, (id: string) => this.ports.detailReadNetwork().cancel(id));
+    }, current, (id: string) => this.ports.detailReadNetwork().cancel(id), count);
 }
 }

@@ -17,10 +17,19 @@ const origin = 'https://www.pinterest.com';
 function body() {
   return { client_context: { is_authenticated: true, user: { id: '123', username: 'fixture_user' }, app_version: 'fixture.1' },
     resource_response: { status: 'success', code: 0, endpoint_name: 'v3_get_user_settings',
-      data: { type: 'user_settings', id: '123', username: 'fixture_user' } } };
+      data: { type: 'user_settings', id: '123', username: 'fixture_user', locale: 'ja-JP' } } };
 }
 const parse = (b, status = 200, site = origin) => session.parseSessionVerification(site, status, JSON.stringify(b));
 assert.equal(parse(body()).status, 'authenticated');
+assert.equal(parse(body()).accountLanguage, 'ja-JP');
+for (const locale of ['ru-RU', 'pt_BR', 'zh-TW', 'en-GB', 'fr-FR']) {
+  const b = body(); b.resource_response.data.locale = locale; assert.equal(parse(b).accountLanguage, locale);
+}
+for (const locale of [undefined, 42, '', 'x'.repeat(17), '<bad>']) {
+  const b = body(); b.resource_response.data.locale = locale;
+  assert.equal(parse(b).status, 'authenticated', 'locale cannot change authentication evidence');
+  assert.equal(parse(b).accountLanguage, '');
+}
 assert.equal(parse(body(), 200, 'https://uk.pinterest.com').profileUrl, 'https://uk.pinterest.com/fixture_user/');
 assert.equal(parse(body(), 200, 'https://example.com').status, 'unknown');
 for (const status of [0, 302, 401, 403, 429, 500]) assert.equal(parse(body(), status).status, 'unknown');
@@ -55,19 +64,20 @@ const policy = compile('common_network/src/main/ets/PinmonyRequestPolicy.ets', (
 const { PinmonyNativeNetwork, NetworkManager } = compile('common_network/src/main/ets/PinmonyNativeNetwork.ets', name =>
   name === 'common_session' ? { PinmonySessionCredentials: Credentials } : name === 'common_foundation' ?
     { PinmonyRuntimeLog: log } : name === './PinmonyRequestPolicy' ? policy : { rcp });
+const accountLocales = [];
 const { PinmonySessionVerification } = compile('entry/src/main/ets/app/PinmonySessionVerification.ets', name =>
-  name === 'common_session' ? session : { PinmonyRuntimeLog: log });
+  name === 'common_session' ? session : { PinmonyRuntimeLog: log, PinmonyI18n: { syncAccountLanguage: locale => accountLocales.push(locale) } });
 const retryPolicies = [], originalRetry = NetworkManager.requestWithRetry;
 NetworkManager.requestWithRetry = (...args) => { retryPolicies.push([args[2], args[3]]); return originalRetry(...args); };
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function reply() { return { statusCode: 200, headers: { 'set-cookie': 'fixture=synthetic; Path=/; Secure' },
   toString: () => JSON.stringify(body()) }; }
-function fixture() {
+function fixture(acceptIdentity = true) {
   let status = 'checking', epoch = 1, page = origin + '/', active = true, profile = '';
   const accepted = [], network = new PinmonyNativeNetwork();
   const verifier = new PinmonySessionVerification({ network: () => network, status: () => status, profile: () => profile,
     epoch: () => epoch, page: () => page, userAgent: () => 'fixture-agent', active: () => active,
-    accept: m => { accepted.push(m); status = m.status; } });
+    accept: m => { accepted.push(m); status = m.status; if (acceptIdentity) profile = m.profileUrl; } });
   return { verifier, network, accepted, setStatus: s => status = s, setEpoch: e => epoch = e,
     setPage: p => page = p, setActive: a => active = a, setProfile: p => profile = p,
     web(status, profileUrl = '', overrides = {}) {
@@ -79,6 +89,10 @@ async function main() {
   let f = fixture(); await f.verifier.demand();
   assert.equal(f.accepted.length, 1, 'startup checking does not require prior authenticated business state');
   assert.equal(f.accepted[0].appVersion, 'fixture.1');
+  assert.equal(accountLocales.at(-1), 'ja-JP', 'startup applies locale only after accepting current identity');
+  const beforeRejectedIdentity = accountLocales.length;
+  const rejectedIdentity = fixture(false); await rejectedIdentity.verifier.demand();
+  assert.equal(accountLocales.length, beforeRejectedIdentity, 'Rejected account identity cannot update language');
   const request = sent.at(-1), url = new URL(request.url), envelope = JSON.parse(url.searchParams.get('data'));
   assert.equal(request.method, 'GET'); assert.equal(envelope.options.url, '/v3/users/settings/');
   assert.equal(url.pathname, '/resource/ApiResource/get/'); assert.equal(url.searchParams.get('source_url'), '/settings/');
@@ -98,8 +112,9 @@ async function main() {
     x => { x.setStatus('authenticated'); x.setProfile(origin + '/fixture_user/'); }, x => x.setStatus('unauthenticated'),
     x => { x.setActive(false); x.verifier.cancel(); }, x => x.network.invalidateDocument()]) {
     response = undefined; f = fixture(); const pending = f.verifier.demand(); await flush();
-    const beforeWrites = writes; change(f); resolveFetch(reply()); await pending;
+    const beforeWrites = writes, beforeLocales = accountLocales.length; change(f); resolveFetch(reply()); await pending;
     assert.equal(f.accepted.length, 0); assert.equal(writes, beforeWrites, 'stale evidence cannot update Cookie store');
+    assert.equal(accountLocales.length, beforeLocales, 'Stale or cancelled evidence cannot update account language');
   }
   response = undefined; f = fixture(); const pending = f.verifier.demand(); await flush();
   const count = sent.length; await f.verifier.demand(); assert.equal(sent.length, count, 'same document probe is single-flight');

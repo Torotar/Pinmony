@@ -5,7 +5,8 @@ import { PinmonyBoardSectionNativeWrites, BoardSectionWriteIdentity } from './Pi
 import { PinmonyBoardFollowNativeWrites, PinmonyBoardFollowNativeWritesPorts } from './PinmonyBoardFollowNativeWrites';
 import { boardCoverPreview, PinmonyBoardCreator, PinmonyBoardStore, PinmonyBoardDetail, PinmonyBoardPin, PinmonyBoardFlow, PinmonyBoardSection, PinmonyBoardTarget, PinmonyBoardCollaborators, PinmonyBoardCollaborator } from 'feature_board';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBoardContentNativeWrites, PinmonyBoardContentIdentity } from './PinmonyBoardContentNativeWrites';
 import { PinmonyBoardManagementNativeWrites, PinmonyBoardManagementIdentity } from './PinmonyBoardManagementNativeWrites';

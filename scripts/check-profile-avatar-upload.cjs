@@ -19,10 +19,13 @@ function fixture() {
     common_foundation:{PinmonyRuntimeLog:{info(){},warn(){}}},
     common_network:{PIN_BUSINESS_PIN_READ_ENABLED:true},common_session:{PinmonySessionCredentials:class {async read(){reads++;return 'csrftoken=synthetic'}async update(...args){updates.push(args)}}},
     '@kit.RemoteCommunicationKit':kits,'@kit.BasicServicesKit':{},
-    feature_profile:{PIN_PROFILE_ORGANIZE_ENABLED:true,pickPublishPhotoUris:async count=>{picks++;assert.equal(count,1);return choose()},readProfileAvatarPhoto:async()=>{photoReads++;return photo}}
+    feature_profile:{readProfileAvatarStatus:(...args)=>loader.profileStatus(...args),PIN_PROFILE_ORGANIZE_ENABLED:true,pickPublishPhotoUris:async count=>{picks++;assert.equal(count,1);return choose()},readProfileAvatarPhoto:async()=>{photoReads++;return photo}}
   },{setTimeout:(fn,ms)=>setTimeout(fn,ms>100?0:ms)});
   const {PinmonyNativeNetwork,NetworkManager}=loader.loadFile('common_network/src/main/ets/PinmonyNativeNetwork.ets');
   const net=new PinmonyNativeNetwork();
+  const {readProfileAvatarStatus}=loader.loadFile('feature_profile/src/main/ets/services/PinmonyProfileAvatarStatus.ets');
+  net.readProfileAvatarStatus=(...args)=>readProfileAvatarStatus(...args,(job,context)=>net.request(job,context));
+  loader.profileStatus=readProfileAvatarStatus;
   NetworkManager.getSession=()=>({fetch:async r=>{uploads.push(r);return fetchHook(r)},cancel:r=>cancels.push(r)});
   net.request=async(job,context)=>{
     jobs.push(job);assert(context().authenticated,'owner checked before read');

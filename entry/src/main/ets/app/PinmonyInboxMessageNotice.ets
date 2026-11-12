@@ -3,6 +3,7 @@ import { common, wantAgent, WantAgent, Want } from '@kit.AbilityKit';
 import { image } from '@kit.ImageKit';
 import { PinmonyInboxNoticeAvatar } from './PinmonyInboxNoticeAvatar';
 import { PinmonyInboxNoticeTap } from './PinmonyInboxNoticeTap';
+import { PinmonyInboxNoticeRecovery } from './PinmonyInboxNoticeRecovery';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBoardInvitation } from 'feature_inbox';
@@ -39,6 +40,9 @@ export class PinmonyInboxMessageNotice {
   private pendingConversation: string = '';
   private pendingIdentity: string = '';
   private pendingInvitation: PinmonyBoardInvitation | undefined = undefined;
+  private recoveryToken: string = '';
+  private pendingToken: string = '';
+  private recovering: boolean = false;
   private readonly invitations: Map<string, PinmonyBoardInvitation> = new Map<string, PinmonyBoardInvitation>();
   private delivery: number = 0;
   private publishedConversation: string = '';
@@ -58,9 +62,13 @@ export class PinmonyInboxMessageNotice {
     this.ports = ports;
     PinmonyInboxNoticeTap.bind((token: string): void => {
       if(token === this.tapToken && token.length > 0) {
+        this.pendingToken = token;
         this.pendingTap = true; this.pendingConversation = this.tapConversation; this.pendingIdentity = this.tapIdentity;
         this.pendingInvitation = this.invitations.get(this.tapConversation);
         this.tapToken = ''; this.avatar.cancel(); this.delivery++;
+        this.consumeTap();
+      } else {
+        this.recoveryToken = token;
         this.consumeTap();
       }
     });
@@ -69,6 +77,9 @@ export class PinmonyInboxMessageNotice {
     PinmonyInboxNoticeTap.receive(want);
   }
   consumeTap(): void {
+    if (this.recoveryToken && !this.recovering && this.ports.active() && this.ports.session().authenticated) {
+      this.recoverTap().catch((): void => {});
+    }
     if(!this.pendingTap || !this.ports.active())return;
     const session: PinmonyBusinessSessionContext = this.ports.session();
     const identity: string = session.accountId + '|' + session.generation.toString() + '|' + session.origin;
@@ -76,9 +87,31 @@ export class PinmonyInboxMessageNotice {
     const opened: boolean = this.pendingConversation.startsWith('invite:') ?
       !!this.pendingInvitation && this.ports.openInvitation?.(this.pendingInvitation) === true : this.ports.openChat?.(this.pendingConversation) === true;
     if(opened) {
+      PinmonyInboxNoticeRecovery.consume(this.pendingToken);
+      this.pendingToken = '';
       this.pendingTap = false; this.pendingConversation = ''; this.pendingIdentity = ''; this.pendingInvitation = undefined;
     }
   }
+  private async recoverTap(): Promise<void> {
+    const token: string = this.recoveryToken;
+    const revision: number = this.revision;
+    const session: PinmonyBusinessSessionContext = this.ports.session();
+    const account: string = session.accountId, generation: number = session.generation, origin: string = session.origin;
+    this.recovering = true;
+    try {
+      const record = await PinmonyInboxNoticeRecovery.read(token, account, origin);
+      const current: PinmonyBusinessSessionContext = this.ports.session();
+      if (this.recoveryToken !== token || revision !== this.revision || !current.authenticated ||
+        current.accountId !== account || current.generation !== generation || current.origin !== origin) return;
+      this.recoveryToken = '';
+      if (!record) return;
+      this.pendingToken = token;
+      this.pendingTap = true; this.pendingConversation = record.target; this.pendingInvitation = record.invitation;
+      this.pendingIdentity = account + '|' + generation.toString() + '|' + origin;
+      this.consumeTap();
+    } finally { this.recovering = false; }
+  }
+  dispose(): void { PinmonyInboxNoticeTap.unbind(); this.reset(); }
   pause(): void { this.revision++; this.avatar.cancel(); }
   dismissForeground(): void {
     // Invalidate background deliveries before cancelling the shared local slot.
@@ -258,6 +291,10 @@ export class PinmonyInboxMessageNotice {
         content:{notificationContentType:notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
           normal:{title:title,text:this.noticeText(conversation,text,fallback)}}
       };
+      // Commit the opaque target before publishing; a process can exit immediately after delivery.
+      await PinmonyInboxNoticeRecovery.save(token, this.ports.session().accountId,
+        this.ports.session().origin, conversation, this.invitations.get(conversation));
+      if (!this.currentDelivery(identity,revision,conversation,viewRevision)) return;
       await notificationManager.publish(request);
       this.publishedConversation = conversation; this.publishedIdentity = identity; this.publishedDelivery = delivery;
       if(!this.currentDelivery(identity,revision,conversation,viewRevision)) {

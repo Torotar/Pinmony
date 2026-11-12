@@ -32,12 +32,33 @@ const status = { Drag: 1, OverDrag: 2, Refresh: 3, Done: 4, Inactive: 5 };
 const callback = source.match(/\.onStateChange\(\(state: RefreshStatus\): void => \{([\s\S]*?)\n      \}\)/);
 assert(callback);
 const update = vm.runInNewContext(ts.transpileModule('(function(state: RefreshStatus) {' + callback[1] + '})', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, { RefreshStatus: status });
-const host = {};
-for (const state of [status.Drag, status.OverDrag, status.Refresh]) { update.call(host, state); assert.equal(host.boardRefreshActive, true); }
-for (const state of [status.Done, status.Inactive]) { update.call(host, state); assert.equal(host.boardRefreshActive, false); }
+const host = {snapshot:{}};
+for (const state of [status.OverDrag, status.Refresh]) { update.call(host, state); assert.equal(host.boardRefreshActive, true); }
+for (const state of [status.Drag, status.Done, status.Inactive]) { update.call(host, state); assert.equal(host.boardRefreshActive, false); }
+for (const state of [status.Drag, status.Inactive, status.Drag, status.Inactive]) {
+  update.call(host, state);
+  assert.equal(host.boardRefreshActive, false, 'reaching the top and immediately scrolling again must not show a spinner');
+}
+for (const state of [status.OverDrag, status.Drag, status.Inactive]) {
+  update.call(host, state);
+  assert.equal(host.boardRefreshActive, state === status.OverDrag, 'pulling back below the threshold clears the armed spinner');
+}
 let refreshes = 0;
 const refreshCallback = source.match(/\.onRefreshing\(\(\) => \{([\s\S]*?)\n      \}\)/);
 assert(refreshCallback);
 const refresh = vm.runInNewContext('(function() {' + refreshCallback[1] + '})', { PinmonyRuntimeLog: { info() {} } });
-refresh.call({ onRefresh() { refreshes++; } }); assert.equal(refreshes, 1);
+refresh.call({ snapshot:{}, onRefresh() { refreshes++; } }); assert.equal(refreshes, 1);
+for(const adjusting of [false,true]) {
+  host.snapshot={flow:{cover:{adjusting}}};
+  for(const state of Object.values(status)){update.call(host,state);assert.equal(host.boardRefreshActive,false,'cover never shows a whole-page pull spinner');}
+  refresh.call({snapshot:host.snapshot,onRefresh(){refreshes++;}});
+}
+assert.equal(refreshes,1,'cover cannot invoke the whole-board refresh callback');
+const distance=source.match(/\.maxPullDownDistance\((this\.snapshot\.flow\?\.cover \? 0 : undefined)\)/);
+assert(distance,'cover disables outer drag distance instead of only disabling the refresh trigger');
+const maxDistance=vm.runInNewContext('(function(){return '+distance[1]+';})');
+assert.equal(maxDistance.call(host),0);
+assert.equal(maxDistance.call({snapshot:{}}),undefined,'normal board keeps native pull distance');
+assert.match(source,/if \(this.snapshot.flow\?\.cover\) \{\s*Row\(\).height\(0\)/,'cover removes the outer indicator area');
+assert.match(source,/edgeEffect\(this.snapshot.flow\?\.cover \? EdgeEffect.None : EdgeEffect.Spring/,'cover host cannot spring downward');
 console.log('Board refresh: native drag/hold/rebound movement retained, indicator lifecycle and refresh callback passed');

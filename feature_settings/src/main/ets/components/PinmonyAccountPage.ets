@@ -1,3 +1,4 @@
+import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -62,7 +63,7 @@ export struct PinmonyAccountPage {
   }
   @Builder
   private row(label: string, value: string = '', target: string = '', subtitle: string = '') {
-    Button({ type: ButtonType.Normal }) {
+    Button({ type: ButtonType.Normal, stateEffect: false }) {
       Column({ space: 8 }) {
         Row({ space: 12 }) {
           Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
@@ -155,7 +156,7 @@ export struct PinmonyAccountPage {
               TextInput({ text: this.query, placeholder: this.uiText("pm_search_countries_regions_79d74e48") }).fontColor($r('app.color.primary_text'))
                 .placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted')).onChange((v: string) => { this.query = v; })
               ForEach(this.store.data.countries.filter((c: PinmonyCountry) => (c.name + c.key).toLowerCase().includes(this.query.toLowerCase())).sort((a: PinmonyCountry, b: PinmonyCountry) => a.key === this.store.data?.country ? -1 : b.key === this.store.data?.country ? 1 : 0), (c: PinmonyCountry) => {
-                Button({ type: ButtonType.Normal }) {
+                Button({ type: ButtonType.Normal, stateEffect: false }) {
                   Row({ space: 12 }) {
                     Text(PinmonyI18n.render(c.name, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
                     if (c.key === this.store.data?.country) { SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(24).fontColor([$r('app.color.accent')]) }
@@ -172,7 +173,11 @@ export struct PinmonyAccountPage {
         .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       if (this.store.loading || this.store.busy) {
-        LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        if (this.store.busy) {
+          PinmonyLoadingOverlay({ showMessage: false })
+        } else {
+          LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
+        }
       }
       }.width('100%').height('100%')
     }.titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.options(), this.hdsDarkMode)).titleMode(HdsNavDestinationTitleMode.MINI).hideBackButton(false)

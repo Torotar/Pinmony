@@ -1,5 +1,6 @@
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob } from 'common_network';
+import { PinmonyNetworkJob } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 export interface PinmonyAuxiliaryPorts { session: () => PinmonyBusinessSessionContext; network: () => PinmonyNativeNetwork; }
 interface Envelope { options: Object; context: Record<string,string>; }
 export class PinmonyAuxiliaryNotSent extends Error {}

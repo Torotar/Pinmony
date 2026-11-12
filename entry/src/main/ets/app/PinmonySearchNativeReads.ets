@@ -4,7 +4,8 @@ import { PinmonySearchBoardFollow, PinmonySearchBoardFollowPorts } from './Pinmo
 import { PinmonySearchNativeAuxiliary, PinmonySearchAuxiliaryPorts } from './PinmonySearchNativeAuxiliary';
 import { PinmonySearchStore, PinmonySearchSnapshot, PinmonySearchResult, PinmonySearchCategory, PinmonySearchSuggestion, PinmonySearchFilterOption } from 'feature_search';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED, readNativeSearchProductRoute, PinmonySearchProductRoute } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED, readNativeSearchProductRoute, PinmonySearchProductRoute } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyVideo, PinmonyVideoSource } from 'common_ui';
 // Per-feature manual rollout; the transport safety gate is still mandatory.

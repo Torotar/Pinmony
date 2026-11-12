@@ -1,6 +1,7 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyProfileStore, PinmonyProfileSearchSnapshot, PinmonyProfileSearchPin, PinmonyProfileSearchSuggestion } from 'feature_profile';
 
 interface SearchImage { url: string; }

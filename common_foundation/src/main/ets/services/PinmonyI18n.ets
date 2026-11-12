@@ -17,6 +17,7 @@ export class PinmonyI18n {
   private static russian: resourceManager.ResourceManager | undefined = undefined;
   private static brazilianPortuguese: resourceManager.ResourceManager | undefined = undefined;
   private static resourceColorMode: number = -2;
+  private static accountLanguage: string = '';
   static resolve(preference: string, systemLanguage: string): string {
     if (preference === 'zh' || preference === 'zh_TW' || preference === 'en' || preference === 'en_GB' || preference === 'ja' || preference === 'ko' || preference === 'ru' || preference === 'pt_BR') return preference;
     if (/^zh[-_]TW(?:[-_]|$)/i.test(systemLanguage)) return 'zh_TW';
@@ -68,20 +69,24 @@ export class PinmonyI18n {
     PinmonyI18n.russian = context.resourceManager.getOverrideResourceManager(russianConfig);
     PinmonyI18n.brazilianPortuguese = context.resourceManager.getOverrideResourceManager(brazilianPortugueseConfig);
     // Read disk before any component can create the AppStorage defaults.
-    const previous: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'system';
+    const previous: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'account';
     let saved: preferences.ValueType;
+    let account: preferences.ValueType;
     try {
       PinmonyI18n.storage = preferences.getPreferencesSync(context, { name: 'pinmony_local_display' });
       saved = PinmonyI18n.storage.getSync('language', previous);
+      account = PinmonyI18n.storage.getSync('accountLanguage', '');
     } catch (_) { throw new Error('language-storage-read-unavailable'); }
-    const value: string = typeof saved === 'string' && ['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(saved) ? saved : 'system';
+    const value: string = typeof saved === 'string' && ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(saved) ? saved : 'account';
+    PinmonyI18n.accountLanguage = typeof account === 'string' && ['zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(account) ? account : '';
     AppStorage.setOrCreate('pinmonyLanguagePreference', value);
     PinmonyI18n.syncSystemLanguage();
   }
 
   static syncSystemLanguage(): void {
-    const preference: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'system';
-    const language: string = PinmonyI18n.resolve(preference, i18n.System.getSystemLanguage());
+    const preference: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'account';
+    const language: string = (preference === 'account' || preference === 'system') && PinmonyI18n.accountLanguage ?
+      PinmonyI18n.accountLanguage : PinmonyI18n.resolve(preference, i18n.System.getSystemLanguage());
     AppStorage.setOrCreate('pinmonyLanguage', language);
   }
 
@@ -107,29 +112,53 @@ export class PinmonyI18n {
   }
 
   static select(preference: string): void {
-    if (!['system', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(preference)) return;
+    const value: string = preference === 'system' ? 'account' : preference;
+    if (!['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(value)) return;
     if (!PinmonyI18n.storage) throw new Error('Language storage unavailable');
+    let previous: preferences.ValueType = 'account';
+    let hasPrevious: boolean = false;
     try {
-      PinmonyI18n.storage.putSync('language', preference);
+      previous = PinmonyI18n.storage.getSync('language', 'account');
+      hasPrevious = true;
+      PinmonyI18n.storage.putSync('language', value);
       PinmonyI18n.storage.flushSync();
-    } catch (_) { throw new Error('language-storage-write-unavailable'); }
-    AppStorage.setOrCreate('pinmonyLanguagePreference', preference);
+    } catch (_) {
+      if (hasPrevious) try { PinmonyI18n.storage.putSync('language', previous); } catch (_) {}
+      throw new Error('language-storage-write-unavailable');
+    }
+    AppStorage.setOrCreate('pinmonyLanguagePreference', value);
     PinmonyI18n.syncSystemLanguage();
   }
 
-  // Account locale is authoritative when the server returns a supported locale.
+  // Account locale drives only the account-following preference, never manual choices.
   // Unknown account locales deliberately fall back to US English; an absent
   // locale is left untouched so a partial settings response cannot reset UI.
   static syncAccountLanguage(locale: string): void {
-    if (!locale) return;
+    if (!locale || locale.length > 16 || !/^[A-Za-z]{2,3}(?:[-_][A-Za-z]{2,4})?$/.test(locale)) return;
     const normalized: string = locale.replace('_', '-').toLowerCase();
     const preference: string = normalized === 'zh-cn' || normalized === 'zh' ? 'zh' :
       normalized === 'zh-tw' ? 'zh_TW' : normalized === 'en-gb' ? 'en_GB' :
       normalized === 'en-us' || normalized === 'en' ? 'en' : normalized === 'ja-jp' || normalized === 'ja' ? 'ja' :
       normalized === 'ko-kr' || normalized === 'ko' ? 'ko' : normalized === 'ru-ru' || normalized === 'ru' ? 'ru' :
       normalized === 'pt-br' || normalized === 'pt' ? 'pt_BR' : 'en';
-    try { PinmonyI18n.select(preference); }
-    catch (_) { console.warn('LanguagePreference: account locale sync unavailable'); }
+    if (PinmonyI18n.accountLanguage !== preference) {
+      PinmonyI18n.accountLanguage = preference;
+      try {
+        PinmonyI18n.storage?.putSync('accountLanguage', preference);
+        PinmonyI18n.storage?.flushSync();
+      } catch (_) { console.warn('LanguagePreference: account locale cache unavailable'); }
+    }
+    PinmonyI18n.syncSystemLanguage();
+  }
+
+  static clearAccountLanguage(): void {
+    if (!PinmonyI18n.accountLanguage) return;
+    PinmonyI18n.accountLanguage = '';
+    try {
+      PinmonyI18n.storage?.putSync('accountLanguage', '');
+      PinmonyI18n.storage?.flushSync();
+    } catch (_) { console.warn('LanguagePreference: account locale cache reset unavailable'); }
+    PinmonyI18n.syncSystemLanguage();
   }
 
   static text(source: string, language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {

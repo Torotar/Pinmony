@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyInboxItem } from 'feature_inbox';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 
 interface PinmonyActivityUser { avatar_color_index?: number; id: string; username: string; full_name?: string; image_large_url?: string; }
 interface PinmonyActivityRelationship { relationship_type: number; followed_by_me: boolean; last_action_time: string; user: PinmonyActivityUser; }

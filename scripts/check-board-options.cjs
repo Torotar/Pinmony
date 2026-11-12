@@ -42,7 +42,7 @@ function harness(pinIds = ['111']) {
 async function main() {
   if (process.argv[2]) {
     const ts = require(process.argv[2]), exports = {};
-    vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets','utf8'),
+    vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets','utf8'),
       { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText,
       { exports, require: () => ({}) });
     const context = { authenticated: true, epoch: 1, page: 'https://www.pinterest.com/sample/board/', userAgent: '' };

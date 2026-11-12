@@ -4,6 +4,7 @@ export interface PinmonySessionVerificationResult {
   status: PinmonySessionVerificationStatus;
   profileUrl: string;
   appVersion: string;
+  accountLanguage?: string;
 }
 
 interface VerificationUser { id?: string; username?: string; }
@@ -12,7 +13,7 @@ interface VerificationContext {
   user?: VerificationUser;
   app_version?: string;
 }
-interface VerificationSettings { id?: string; username?: string; type?: string; }
+interface VerificationSettings { id?: string; username?: string; type?: string; locale?: string; }
 interface VerificationResource {
   status?: string;
   code?: number;
@@ -46,6 +47,7 @@ export function parseSessionVerification(origin: string, status: number, text: s
         typeof user.username !== 'string' || !/^[A-Za-z0-9_]{1,100}$/.test(user.username) ||
         !data || data.type !== 'user_settings' || data.id !== user.id || data.username !== user.username) return unknown;
     const version: string = typeof c.app_version === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(c.app_version) ? c.app_version : '';
-    return { status: 'authenticated', profileUrl: origin + '/' + user.username + '/', appVersion: version };
+    const locale: string = typeof data.locale === 'string' && data.locale.length <= 16 && /^[A-Za-z]{2,3}(?:[-_][A-Za-z]{2,4})?$/.test(data.locale) ? data.locale : '';
+    return { status: 'authenticated', profileUrl: origin + '/' + user.username + '/', appVersion: version, accountLanguage: locale };
   } catch (_) { return unknown; }
 }

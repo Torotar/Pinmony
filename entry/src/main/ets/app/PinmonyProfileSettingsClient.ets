@@ -1,6 +1,7 @@
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 // Per-feature manual rollout; the transport safety gate is still mandatory.
 const PIN_NATIVE_PROFILE_SETTINGS_ROLLOUT_ENABLED: boolean = true;
 export const PIN_NATIVE_PROFILE_SETTINGS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENABLED && PIN_NATIVE_PROFILE_SETTINGS_ROLLOUT_ENABLED;

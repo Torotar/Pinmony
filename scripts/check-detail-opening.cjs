@@ -12,7 +12,7 @@ const response = id => JSON.stringify({ client_context: { ignored: 'not retained
 const log = { info() {}, warn() {} };
 function compile(path, deps = () => ({}), transform = source => source) {
   const exports = {};
-  require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(transform(fs.readFileSync(path, 'utf8')), {
+  require('./product-coordination-harness.cjs').run(ts,require('./native-network-test-fixture.cjs').transpile(ts, transform(fs.readFileSync(path, 'utf8')), {
     compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
   }).outputText, { exports, require: require('./local-message-test-fixture.cjs').withLocalMessages(deps), console, setTimeout, clearTimeout });
   return exports;
@@ -35,7 +35,7 @@ function method(name) { const begin = index.indexOf(`  private ${name}`); const 
 const context = { PIN_DETAIL_API_ENABLED: true, PIN_NATIVE_NETWORK_ENABLED: true, PIN_NATIVE_DETAIL_READS_ENABLED: false, // This fixture verifies retained legacy prefetch and bridge adoption.
   PINTEREST_URL: 'https://www.pinterest.com/', acceptsNetworkJob,
   PinmonyRuntimeLog: log, readRelatedPresentation: () => undefined, setTimeout() {}, clearTimeout() {} };
-require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Native {
+require('./product-coordination-harness.cjs').run(ts,require('./native-network-test-fixture.cjs').transpile(ts, `class Native {
   selectDetailEntryMotion() {}
   ${method('beginDetailOpening')}
   ${method('supersedeRootPreparationForDetail')}

@@ -9,3 +9,5 @@ export { PinmonyHomeStore } from './src/main/ets/stores/PinmonyHomeStore';
 export { PinmonyHomeController } from './src/main/ets/controllers/PinmonyHomeController';
 export { PinmonyHomePorts } from './src/main/ets/models/PinmonyHomePorts';
 export { readHomeCache, writeHomeCache, readHomeImageConnectionSeed } from './src/main/ets/services/PinmonyHomeCache';
+
+export { PinmonyHomeNetwork } from './src/main/ets/services/PinmonyHomeNetwork';

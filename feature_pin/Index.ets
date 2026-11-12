@@ -55,3 +55,5 @@ export { PinmonyShuffleEffect, PinmonyShuffleItem, PinmonyShuffleSnapshot } from
 export { readShufflePresentation } from './src/main/ets/services/PinmonyShufflePresentation';
 export { PinmonyImageViewerRequest, PinmonyImageViewerSession } from './src/main/ets/services/PinmonyImageViewerSession';
 export { PinmonyImageViewerHost } from './src/main/ets/components/PinmonyImageViewerHost';
+
+export { PinmonyPinNetwork } from './src/main/ets/services/PinmonyPinNetwork';

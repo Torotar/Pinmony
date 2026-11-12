@@ -193,6 +193,7 @@ async openCustomHomeMenu(pinUrl: string, pageKey: string, inboxAction: string = 
 }
 
 async performCustomHomeAction(id: string): Promise<void> {
+    if (!this.ports.showNativeSheet() || this.ports.activeSheetKind() !== 'share') return;
     if (this.ports.rejectOfflineAction('home menu action'))
         return;
     const menu: PinmonyHomeMenuState | undefined = this.homeStore.customHomeMenu;

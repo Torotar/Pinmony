@@ -35,7 +35,7 @@ export class PinmonyHomeCategoryMaterial implements AttributeModifier<ButtonAttr
         materialColor: tint,
         applyShadow: false,
         interactive: true,
-        lightEffect: {}
+        lightEffect: { color: $r('app.color.immersive_interaction_light') }
       }));
     }
   }

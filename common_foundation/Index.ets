@@ -13,3 +13,5 @@ export { isProductPin } from './src/main/ets/PinmonyProductPin';
 
 export { PinmonyProfileLayoutPreference } from './src/main/ets/services/PinmonyProfileLayoutPreference';
 export { PinmonyDetailDisplayPreference } from './src/main/ets/services/PinmonyDetailDisplayPreference';
+
+export { PinmonyScrollRecovery } from './src/main/ets/cache/PinmonyScrollRecovery';

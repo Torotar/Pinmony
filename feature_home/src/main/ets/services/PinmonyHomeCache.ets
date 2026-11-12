@@ -5,10 +5,10 @@ interface PinmonyHomeCacheKeyParams { pageKey: string; }
 
 // An older thumbnail can prepare the downloader, but cannot become live feed
 // content or extend the five-minute presentation cache/session permissions.
-export function readHomeImageConnectionSeed(cache: ApiCache, accountId: string, pageKey: string): string {
+export async function readHomeImageConnectionSeed(cache: ApiCache, accountId: string, pageKey: string): Promise<string> {
   if (!accountId || !/^https:\/\/(?:www\.)?pinterest\.com\/$/i.test(pageKey)) return '';
   try {
-    const result = cache.getWithMetadata<PinmonyHomeCacheRecord>(homeCacheKey(accountId, pageKey), 24 * 60 * 60 * 1000);
+    const result = await cache.getWithMetadataAsync<PinmonyHomeCacheRecord>(homeCacheKey(accountId, pageKey), 24 * 60 * 60 * 1000);
     if (!result.value) return '';
     const normalized: PinmonyHomeCacheRecord | undefined = normalizeHomeCacheRecord(result.value, pageKey);
     if (!normalized) return '';
@@ -64,10 +64,10 @@ export function normalizeHomeCacheRecord(record: PinmonyHomeCacheRecord, pageKey
     return { snapshot: snapshot };
   }
 
-export function readHomeCache(cache: ApiCache, accountId: string, pageKey: string, trigger: string): PinmonyHomeSnapshot | undefined {
+export async function readHomeCache(cache: ApiCache, accountId: string, pageKey: string, trigger: string): Promise<PinmonyHomeSnapshot | undefined> {
   try {
     const lookupStartedAt: number = Date.now();
-    const result = cache.getWithMetadata<PinmonyHomeCacheRecord>(homeCacheKey(accountId, pageKey), CACHE_TTL.homeFeed);
+    const result = await cache.getWithMetadataAsync<PinmonyHomeCacheRecord>(homeCacheKey(accountId, pageKey), CACHE_TTL.homeFeed);
     PinmonyRuntimeLog.info('HomeCache: lookup trigger=' + trigger + ' status=' + result.status +
       ' ageMs=' + result.ageMs.toString() + ' elapsedMs=' + (Date.now() - lookupStartedAt).toString());
     if (!result.value) {
@@ -76,7 +76,7 @@ export function readHomeCache(cache: ApiCache, accountId: string, pageKey: strin
     }
     const normalized: PinmonyHomeCacheRecord | undefined = normalizeHomeCacheRecord(result.value, pageKey);
     if (!normalized) {
-      cache.remove(homeCacheKey(accountId, pageKey));
+      await cache.removeAsync(homeCacheKey(accountId, pageKey));
       PinmonyRuntimeLog.warn('HomeCache: snapshot rejected reason=invalid-shape');
       return undefined;
     }
@@ -89,14 +89,16 @@ export function readHomeCache(cache: ApiCache, accountId: string, pageKey: strin
   }
 }
 
-export function writeHomeCache(cache: ApiCache, accountId: string, snapshot: PinmonyHomeSnapshot, onStored: () => void): void {
+export async function writeHomeCache(cache: ApiCache, accountId: string, snapshot: PinmonyHomeSnapshot, onStored: () => void, current: () => boolean = (): boolean => true): Promise<boolean> {
   const record: PinmonyHomeCacheRecord | undefined = normalizeHomeCacheRecord({ snapshot: snapshot }, snapshot.pageKey);
-  if (!record) return;
+  if (!record) return false;
   try {
     const writeStartedAt: number = Date.now();
-    cache.put(homeCacheKey(accountId, snapshot.pageKey), record, CACHE_TTL.homeFeed);
+    await cache.putAsync(homeCacheKey(accountId, snapshot.pageKey), record, CACHE_TTL.homeFeed, current);
+    if (!current()) return false;
     onStored();
     PinmonyRuntimeLog.info('HomeCache: snapshot persisted pins=' + record.snapshot.pins.length.toString() +
       ' elapsedMs=' + (Date.now() - writeStartedAt).toString() + ' ttlMs=' + CACHE_TTL.homeFeed.toString());
-  } catch (_) { PinmonyRuntimeLog.warn('HomeCache: disk snapshot write failed'); }
+    return true;
+  } catch (_) { PinmonyRuntimeLog.warn('HomeCache: disk snapshot write failed'); return false; }
 }

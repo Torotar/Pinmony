@@ -25,7 +25,7 @@ export class PinmonySearchHeaderMaterial {
           colorInvert: false,
           applyShadow: false,
           interactive: true,
-          lightEffect: { color: Color.White }
+          lightEffect: { color: $r('app.color.immersive_interaction_light') }
         }) : uiMaterial.Material.empty);
     }
   }

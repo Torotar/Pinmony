@@ -1,12 +1,9 @@
-import { PinmonyHdsTitleBar } from 'common_ui';
+import { PinmonyHdsTitleBar, PinmonyImmersiveLight } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
-import { BlurStrategy } from '@kit.UIDesignKit';
-import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
-import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { HdsNavigation, HdsNavigationTitleMode, IconStyleMode } from '@kit.UIDesignKit';
 
 @Component
 export struct PinmonyBoardSectionPage {
@@ -47,7 +44,7 @@ export struct PinmonyBoardSectionPage {
       if (this.busy) { LoadingProgress().color($r('app.color.accent')).width(24).height(24) }
       if (!this.ready && !this.busy && !this.error) { Text(this.uiText("pm_restoring_board_please_wait_9e819a8a")).fontColor($r('app.color.secondary_text')).fontSize(14) }
       if (this.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.error, this.uiLanguage) }) }
-    }.width('100%').padding({ left: 20, right: 20, top: 68, bottom: 28 })
+    }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
   @Builder
   private nextButton() {
@@ -69,39 +66,22 @@ export struct PinmonyBoardSectionPage {
       Column() {
         Scroll(this.scroller) { this.sectionForm() }
           .width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
-          .scrollBarMargin({start:LengthMetrics.vp(56)})
+          .scrollBarMargin({start:LengthMetrics.vp(0)})
         Column() { this.nextButton() }
           .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
       }.width('100%').height('100%')
     }.mode(NavigationMode.Stack).width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.scroller])
-      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { enableComponentSafeArea: false,
-        style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
-          scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-          systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-          originalStyle: {
-            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
-            contentStyle: {
-              menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
-              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
-            }
-          },
-          scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
-            contentStyle: {
-              menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
-              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
-            }
-          }
-        },
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: false, enableComponentSafeArea: true,
+        style: PinmonyHdsTitleBar.modalStyle(this.immersiveLightMode),
         content: { title: { mainTitle: this.uiText("pm_add_section_779008ec") }, menu: { value: [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, isEnabled: !this.busy, label: this.uiText("pm_close_3fd47edc"), action: () => this.requestClose()
         } }] } } }, this.hdsDarkMode))
       .backgroundColor($r('app.color.page_background'))
   }
   build() {
     Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
-      .bindSheet($$this.visible, this.sectionSheet(), {
+      .bindSheet($$this.visible, this.sectionSheet(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
         onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyBoardSectionPage.visible radius=uniform-32vp'); },
@@ -113,6 +93,6 @@ export struct PinmonyBoardSectionPage {
           if (this.busy) return;
           this.requestClose(); action.dismiss();
         }
-      })
+      }, this.immersiveLightMode, false))
   }
 }

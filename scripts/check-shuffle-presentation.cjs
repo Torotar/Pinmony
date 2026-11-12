@@ -9,7 +9,7 @@ assert.match(source,/motionEffect/);
 console.log('Shuffle presentation parser: contract guards present');
 function load(text, deps = {}) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(text,{compilerOptions:{target:99,module:1}}).outputText,
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, text,{compilerOptions:{target:99,module:1}}).outputText,
     {exports,require:n=>deps[n] || {},console,JSON,Date,setTimeout,clearTimeout});
   return exports;
 }
@@ -46,7 +46,7 @@ function method(file,name) {
 }
 const networkMethod=method('common_network/src/main/ets/PinmonyNativeNetwork.ets','requestBusinessShuffleRead');
 // The production constant is injected only into this isolated read-policy fixture.
-const compiled=ts.transpileModule('class Guard {'+networkMethod+'} Guard;',{compilerOptions:{target:99}}).outputText;
+const compiled=require('./native-network-test-fixture.cjs').transpile(ts, 'class Guard {'+networkMethod+'} Guard;',{compilerOptions:{target:99}}).outputText;
 const GuardClass=vm.runInNewContext(compiled,{PIN_BUSINESS_PIN_READ_ENABLED:true});
 const guard=new GuardClass();guard.request=async(job,context)=>context().authenticated;
 const session=()=>({origin:'https://www.pinterest.com',authenticated:true,accountId:'fixture-account',generation:1,userAgent:''});
@@ -76,7 +76,7 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
    assert.equal(await guard.requestBusinessShuffleRead({...job,...patch},session,pin,'303',()=>true),false);
  assert.equal(await guard.requestBusinessShuffleRead(job,session,pin,'303',()=>false),false);
  const open=method('entry/src/main/ets/pages/Index.ets','openShufflePin');
- const Open=vm.runInNewContext(ts.transpileModule('class Open {'+open+'} Open;',{compilerOptions:{target:99}}).outputText);
+ const Open=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Open {'+open+'} Open;',{compilerOptions:{target:99}}).outputText);
  const owner=new Open(), opens=[];let cached='';
  owner.detailOpeningCoordinator={prefetchShufflePins:(urls)=>{owner.previewUrls=urls}};
  Object.assign(owner,{authStatus:'authenticated',businessSuspended:false,activeSheetKind:'',pinStore:{videoForeground:true,detailNativeReadsReady:true,detailPreparing:false,detailScrollOffset:30,detailOpeningPin:'',detail:{pinUrl:pin,shuffleId:'303',imageUrl:image.url,shuffle:result},detailCache:{put:(id)=>cached=id}},detailNativeReads:{owned:()=>true},currentPinUrl:()=>pin,nativeBusinessSessionContext:session,pinIdentity:s=>s.split('/pin/')[1].split('/')[0],beginDetailOpening:(...args)=>opens.push(args)});
@@ -115,7 +115,7 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  assert.match(canvas,/\.onClick\([\s\S]*?\}, 8\)/);
  assert.doesNotMatch(canvas,/\.gesture\(/,'item clicks must yield to the parent scroll recognizer');
  const root=method('entry/src/main/ets/pages/Index.ets','detailRootIdentity');
- const Identity=vm.runInNewContext(ts.transpileModule('class Identity {'+root+'} Identity;',{compilerOptions:{target:99}}).outputText);
+ const Identity=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Identity {'+root+'} Identity;',{compilerOptions:{target:99}}).outputText);
  const retained=new Identity();Object.assign(retained,{pinStore:{detail:{pinUrl:pin}},pinIdentity:s=>s,shuffleParentDetail:{pinUrl:'parent'},shuffleSelectedImage:image.url,collageDetailPinUrl:pin});
  const before=retained.detailRootIdentity();retained.pinStore.detail={pinUrl:'child2'};retained.collageDetailPinUrl='child2';
  assert.equal(retained.detailRootIdentity(),before,'sibling selection must not remount the carousel');
@@ -126,15 +126,15 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  assert.match(page,/\.disableSwipe\(!this.videoActive \|\| this\.shuffleFlightActive\)/,'swiping is disabled during the image flight');
  owner.authStatus='anonymous';owner.openShufflePin('item-1');assert.equal(opens.length,3);
  const fullMethod=method('entry/src/main/ets/pages/Index.ets','openShuffleDetail');
- const Full=vm.runInNewContext(ts.transpileModule('class Full {'+fullMethod+'} Full;',{compilerOptions:{target:99}}).outputText);
+ const Full=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Full {'+fullMethod+'} Full;',{compilerOptions:{target:99}}).outputText);
  const full=new Full();Object.assign(full,{shuffleSelectedImage:image.url,shuffleSelectedPin:pin,shuffleSelectedIndex:2,shuffleSiblingItems:[second],shuffleParentDetail:{pinUrl:'parent'},pinStore:{detail:{pinUrl:pin},videoForeground:true,detailNativeReadsReady:true,detailPreparing:false},currentPinUrl:()=>pin,authStatus:'authenticated',businessSuspended:false,detailNativeReads:{owned:()=>true},activeSheetKind:''});
  full.openShuffleDetail(pin);assert.equal(full.shuffleFullDetail,true);assert.equal(full.shuffleSelectedIndex,2);assert.equal(full.shuffleParentDetail.pinUrl,'parent');assert.equal(full.shuffleSelectedImage,image.url);
  const back=method('entry/src/main/ets/pages/Index.ets','backFromDetail');
- const Back=vm.runInNewContext(ts.transpileModule('class Back {'+back+'} Back;',{compilerOptions:{target:99}}).outputText,{PinmonyRuntimeLog:{info:()=>{}},Date});
+ const Back=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Back {'+back+'} Back;',{compilerOptions:{target:99}}).outputText,{PinmonyRuntimeLog:{info:()=>{}},Date});
  Object.setPrototypeOf(full,Back.prototype);full.pageHistory={isPending:()=>false};full.pinStore.shareBackHandledUntil=0;await full.backFromDetail();assert.equal(full.shuffleFullDetail,false);assert.equal(full.shuffleSelectedIndex,2,'back restores the same selected content');
  const layoutFile='feature_pin/src/main/ets/components/PinmonyDetailPage.ets';
  const detailMethod=method(layoutFile,'displayedDetail')+method(layoutFile,'fallbackDetail')+method(layoutFile,'shufflePhotoUrl');
- const Retained=vm.runInNewContext(ts.transpileModule('class Retained {'+detailMethod+method(layoutFile,'shuffleImageReady')+method(layoutFile,'shuffleViewerVisible')+method(layoutFile,'closeShuffleViewer')+method(layoutFile,'onShuffleSelectionChanged')+method(layoutFile,'action')+'} Retained;',{compilerOptions:{target:99}}).outputText,{setTimeout:()=>0,clearTimeout:()=>{}});
+ const Retained=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Retained {'+detailMethod+method(layoutFile,'shuffleImageReady')+method(layoutFile,'shuffleViewerVisible')+method(layoutFile,'closeShuffleViewer')+method(layoutFile,'onShuffleSelectionChanged')+method(layoutFile,'action')+'} Retained;',{compilerOptions:{target:99}}).outputText,{setTimeout:()=>0,clearTimeout:()=>{}});
  const retainedView=new Retained(),parentSnapshot={pinUrl:'parent',shuffle:result,actions:[{kind:'save',id:'parent-save'}],imageUrl:'collage.jpg'},childSnapshot={pinUrl:'child',actions:[{kind:'save',id:'child-save'}]};
  Object.assign(retainedView,{currentDetail:childSnapshot,shuffleParentDetail:parentSnapshot,shuffleSelectedImage:'cutout.png',shuffleBackdrop:'collage.jpg',shuffleItems:[{imageUrl:'thumb.jpg'}],shuffleIndex:0,shuffleReadyImages:[],shuffleReadyBackdrop:'',shuffleViewerPresented:false,shuffleFullDetail:false});
  assert.equal(retainedView.displayedDetail(),parentSnapshot,'underlying collage keeps its complete snapshot while child reads update');
@@ -159,7 +159,7 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  retainedView.shuffleSelectedImage='cutout.png';retainedView.shuffleViewerPresented=true;
  retainedView.closeShuffleViewer('selected');assert.equal(viewerBacks,2,'reopening permits exactly one new viewer close');
  assert.match(page,/if \(this.shuffleSelectedImage && this.shuffleItems.length > 0\)/,'returned collage removes the viewer hit targets');
- const Strip=vm.runInNewContext(ts.transpileModule('class Strip {'+method(layoutFile,'shuffleThumbnailWidth')+method(layoutFile,'shuffleReturnOffset')+'} Strip;',{compilerOptions:{target:99}}).outputText);
+ const Strip=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Strip {'+method(layoutFile,'shuffleThumbnailWidth')+method(layoutFile,'shuffleReturnOffset')+'} Strip;',{compilerOptions:{target:99}}).outputText);
  const strip=new Strip();strip.displayedDetail=()=>strip.snapshot;strip.snapshot={shuffle:{items:Array.from({length:10},(_,i)=>({...result.items[0],id:'thumb-'+i,imageWidth:80,imageHeight:100,imageUrl:image.url}))}};strip.shuffleReturnItem='thumb-9';assert.equal(strip.shuffleReturnOffset(),9*92,'returning from tenth content reveals its actual strip position');
  strip.snapshot.shuffle.items[0].hidden=true;assert.equal(strip.shuffleReturnOffset(),8*92,'hidden items occupy no strip space');
  strip.shuffleReturnItem='missing';assert.equal(strip.shuffleReturnOffset(),-1,'unknown return item cannot move the strip');
@@ -202,14 +202,14 @@ assert(canonicalHit);assert.equal(canonicalHit.u,0.5);assert.equal(canonicalHit.
  const Limited=load(fs.readFileSync('feature_pin/src/main/ets/services/PinmonyShuffleHitMasks.ets','utf8'),{'@kit.ImageKit':{image:imageApi},common_network:{PinmonyImageDownload:LimitedImageRead}}).PinmonyShuffleHitMasks;
  const limited=new Limited();const attempts=[0,1,2].map(i=>limited.opaque({...maskHit,item:{...maskHit.item,cutoutUrl:'https://i.pinimg.com/originals/concurrency-'+i+'.png'}},()=>true));
  assert.equal(readsInFlight,2,'at most two mask reads');releaseReads[0]();await new Promise(r=>setTimeout(r,0));assert.equal(readsInFlight,3);releaseReads[1]();releaseReads[2]();await Promise.all(attempts);
- const Hit=vm.runInNewContext(ts.transpileModule('class Hit {'+method('feature_pin/src/main/ets/components/PinmonyShuffleCanvas.ets','openAt')+'} Hit;',{compilerOptions:{target:99}}).outputText,{shuffleHitCandidates,PinmonyShuffleHitTest_1:{shuffleHitCandidates},PinmonyRuntimeLog:{info:()=>{}},common_foundation_1:{PinmonyRuntimeLog:{info:()=>{}}}});
+ const Hit=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Hit {'+method('feature_pin/src/main/ets/components/PinmonyShuffleCanvas.ets','openAt')+'} Hit;',{compilerOptions:{target:99}}).outputText,{shuffleHitCandidates,PinmonyShuffleHitTest_1:{shuffleHitCandidates},PinmonyRuntimeLog:{info:()=>{}},common_foundation_1:{PinmonyRuntimeLog:{info:()=>{}}}});
  const click=new Hit();const picked=[];Object.assign(click,{shuffle:scene,canvasWidthVp:200,canvasHeightVp:100,hitRevision:0,interactionReady:true,hitMasks:{cancel:()=>{},opaque:async hit=>hit.item.id!=='top'},onPin:id=>picked.push(id)});
  await click.openAt(100,50);assert.equal(picked[0],'bottom','transparent pixels pass to the visible Pin underneath');
  click.hitMasks.opaque=async()=>true;await click.openAt(100,50);assert.equal(picked.pop(),'top','opaque foreground blocks lower Pin');
  click.hitMasks.opaque=async()=>undefined;await click.openAt(100,50);assert.equal(picked.length,1,'unavailable mask cannot select transparent content by rectangle');assert.equal(click.hitMaskUnavailable,true);assert.equal(click.hitLoading,false);
  click.hitMasks.opaque=async()=>{click.hitRevision++;return true};await click.openAt(100,50);assert.equal(picked.length,1,'late mask cannot navigate');
  const auxFile='entry/src/main/ets/app/PinmonyDetailNativeAuxiliary.ets';
- const Reader=vm.runInNewContext(ts.transpileModule('class Reader {'+method(auxFile,'readShuffle')+'} Reader;',{compilerOptions:{target:99}}).outputText,
+ const Reader=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Reader {'+method(auxFile,'readShuffle')+'} Reader;',{compilerOptions:{target:99}}).outputText,
    {PinmonyShufflePresentation:{},feature_pin_1:{readShufflePresentation},common_foundation_1:{PinmonyI18n:{message:key=>key}},readShufflePresentation,PinmonyI18n:{message:key=>key},JSON,Date});
  const reader=new Reader();let respond;
  const response=new Promise(resolve=>respond=resolve);
@@ -219,7 +219,7 @@ assert(canonicalHit);assert.equal(canonicalHit.u,0.5);assert.equal(canonicalHit.
  reader.revision++;reader.store.detail={pinUrl:'https://www.pinterest.com/pin/404/',shuffleId:'404'};
  respond({status:200,body:body()});await pending;
  assert.equal(reader.store.detail.pinUrl,'https://www.pinterest.com/pin/404/');assert.equal(reader.store.detail.shuffle,undefined,'late parent response must not replace child');
- const Motion=vm.runInNewContext(ts.transpileModule('class Motion {'+
+ const Motion=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Motion {'+
    method(layoutFile,'shuffleItemOrigin')+method(layoutFile,'startShuffleFlight')+
    method(layoutFile,'failShuffleFlight')+method(layoutFile,'shufflePress')+'} Motion;',
    {compilerOptions:{target:99}}).outputText,{Curve:{EaseOut:1}});

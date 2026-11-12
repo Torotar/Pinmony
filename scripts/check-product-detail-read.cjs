@@ -5,7 +5,7 @@ const ts = require(process.argv[2] || 'typescript');
 const network = fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets', 'utf8');
 const method = network.slice(network.indexOf('  async requestBusinessProductRead('), network.indexOf('  async requestBusinessPinRead('));
 const context = { exports: {}, PIN_BUSINESS_PIN_READ_ENABLED: true };
-vm.runInNewContext(ts.transpileModule('export class Guard { ' + method + ' }', { compilerOptions: {
+vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'export class Guard { ' + method + ' }', { compilerOptions: {
   module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021
 } }).outputText, context);
 const guard = new context.exports.Guard();

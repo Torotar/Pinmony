@@ -213,6 +213,7 @@ export class PinmonySettingsNativeFlow {
             return;
         if(this.uncertain.size > 0 && !this.value.error){this.value.error = PinmonyI18n.message("pm_previous_save_still_not_confirmed_current_settings_loaded_do_not_4ddc2e92");this.store.error = this.value.error;}
         this.store.data = JSON.parse(JSON.stringify(this.value)) as PinmonyAccountSettings;
+        if (this.value.ready && !this.value.error) PinmonyI18n.syncAccountLanguage(this.value.accountLanguage);
         this.store.writeUncertain = this.uncertain.size > 0;
     }
     private empty(): PinmonyAccountSettings { return { page: this.page, token: this.token, loading: false, error: '', saved: false, ready: false, email: '', confirmedEmail: false, birthdate: '', gender: '', customGender: '', country: '', accountLanguage: '', countries: [], privateProfile: false, searchPrivacy: false, canChangePrivacy: false, canEditSearchPrivacy: false, topics: [], activities: [], activityBookmark: '', activityHasMore: false }; }
@@ -243,7 +244,7 @@ export class PinmonySettingsNativeFlow {
         v.gender = (account.gender || '').slice(0, 30);
         v.customGender = (account.custom_gender || '').slice(0, 500);
         v.country = (account.country || '').slice(0, 2);
-        v.accountLanguage = typeof account.locale === 'string' && /^(?:zh|en|ja|ko)(?:[-_][A-Z]{2})?$/.test(account.locale) ? account.locale : '';
+        v.accountLanguage = typeof account.locale === 'string' && account.locale.length <= 16 && /^[A-Za-z]{2,3}(?:[-_][A-Za-z]{2,4})?$/.test(account.locale) ? account.locale : '';
         v.privateProfile = account.opt_in_private_account === true;
         v.searchPrivacy = typeof account.search_privacy_enabled === 'boolean' ? account.search_privacy_enabled : account.exclude_from_search === true;
         v.canChangePrivacy = account.allow_switch_between_private_and_public_profile === true && account.is_parental_control_passcode_enabled !== true && account.is_parental_control_passcode_verification_pending !== true;

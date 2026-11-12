@@ -12,7 +12,7 @@ async function until(predicate) {
 }
 function compiled(file, requireFn) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'), {
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   }).outputText, { exports, require: requireFn, console, Promise, setTimeout, clearTimeout, Math });
   return exports;

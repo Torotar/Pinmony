@@ -1,3 +1,4 @@
+import { PinmonyScrollRecovery } from 'common_foundation';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyUiCommitQueue } from 'common_ui';
 import { PinmonyInboxActivityRow } from './PinmonyInboxActivityRow';
@@ -26,6 +27,12 @@ interface PinmonyInboxUpdatesGroupOptions {
 
 @Component
 export struct PinmonyInboxPage {
+  @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
+  private applyRecoveredPosition(): void {
+    const offset: number | undefined = PinmonyScrollRecovery.offset('inbox', this.snapshot.pageUrl);
+    if (offset !== undefined) { this.initialScrollOffset = offset; this.restoreScroll(); }
+  }
+
   private readonly uiCommits: PinmonyUiCommitQueue = new PinmonyUiCommitQueue();
   private queueRefreshState(state: RefreshStatus): void {
     const session: number = this.snapshot.session;
@@ -398,7 +405,7 @@ export struct PinmonyInboxPage {
             }.alignItems(HorizontalAlign.End)
           }
           if (this.snapshot.section === 'updates' || item.moreId) {
-            Button({ type: ButtonType.Circle }) {
+            Button({ type: ButtonType.Circle, stateEffect: false }) {
               Row({ space: 3 }) {
                 ForEach([0, 1, 2], (dot: number) => {
                   Circle().width(3).height(3).foregroundColor(this.snapshot.section === 'updates' ?
@@ -498,6 +505,10 @@ export struct PinmonyInboxPage {
                 this.selectSection(index === 0 ? 'updates' : 'messages');
               }
             }).width('100%')
+              .borderRadius(24)
+              .shadow({ radius: this.getUIContext().vp2px(6),
+                color: this.hdsDarkMode ? '#33000000' : '#14000000',
+                offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
           } else {
           CapsuleSegmentButtonV2({
             items: this.segmentItems,
@@ -510,6 +521,10 @@ export struct PinmonyInboxPage {
             }
           })
           .width('100%')
+          .borderRadius(24)
+          .shadow({ radius: this.getUIContext().vp2px(6),
+            color: this.hdsDarkMode ? '#33000000' : '#14000000',
+            offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
           }
           if (this.updatesUnread) {
             Row() {
@@ -533,12 +548,16 @@ export struct PinmonyInboxPage {
       this.inboxRefreshState === RefreshStatus.OverDrag || this.inboxRefreshState === RefreshStatus.Refresh;
   }
 
+  private showInboxRefreshIndicator(): boolean {
+    return this.refreshing || this.inboxRefreshState === RefreshStatus.OverDrag ||
+      this.inboxRefreshState === RefreshStatus.Refresh;
+  }
+
   @Builder
   private inboxRefreshIndicator() {
     Column() {
       LoadingProgress().width(24).height(24).color($r('app.color.accent'))
-      .visibility(this.refreshing || this.inboxRefreshState === RefreshStatus.Drag ||
-        this.inboxRefreshState === RefreshStatus.OverDrag ? Visibility.Visible : Visibility.Hidden)
+      .visibility(this.showInboxRefreshIndicator() ? Visibility.Visible : Visibility.Hidden)
     }.width('100%').height(64).justifyContent(FlexAlign.Center)
       .offset({ y: this.inboxTopInset() })
       .hitTestBehavior(HitTestMode.None)

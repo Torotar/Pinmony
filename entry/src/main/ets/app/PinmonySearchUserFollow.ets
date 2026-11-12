@@ -1,7 +1,8 @@
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchResult } from 'feature_search';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
+import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 interface FollowOptions { url: string; data?: Record<string, string>; }
 interface FollowEnvelope { options: FollowOptions; context: Record<string, string>; }
 interface FollowData { id: string; type: string; username: string; }

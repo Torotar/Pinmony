@@ -75,7 +75,8 @@ const flush=async()=>{for(let n=0;n<16;n++)await Promise.resolve();};
     compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Promise,acceptsSoftwareJpeg:output.acceptsSoftwareJpeg,
       PinmonyJpegDecode:{acquire:url=>{const lease={url,releases:0};lease.ready=new Promise((resolve,reject)=>Object.assign(lease,{resolve,reject}));
         lease.release=()=>lease.releases++;imageLeases.push(lease);return lease;}}});
-  const hero=new ImageHost();Object.assign(hero,{visible:true,generation:0,url:url('hero-a')});hero.reload();
+  const hero=new ImageHost();Object.assign(hero,{visible:true,generation:0,url:url('hero-a'),
+    uiCommits:{clear(){}},tracePhases:new Set()});hero.reload();
   hero.url=url('hero-b');hero.reload();assert.equal(imageLeases[0].releases,1);
   imageLeases[0].resolve({old:true});await flush();assert.equal(hero.bitmap,undefined);
   imageLeases[1].resolve({current:true});await flush();assert(hero.bitmap.current);assert.equal(hero.pending,false);

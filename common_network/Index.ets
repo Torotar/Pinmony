@@ -7,3 +7,4 @@ export { readNativeSearchProductRoute, PinmonySearchProductRoute, PinmonyPublish
 export { PinmonyMediaFile, PinmonyMediaFileLease, acceptsMediaFileUrl } from './src/main/ets/PinmonyMediaFile';
 export { PIN_REQUEST_PROTECTION_ENABLED, PIN_RATE_LIMIT_BASE_MS, PinmonyRequestPolicy } from './src/main/ets/PinmonyRequestPolicy';
 export { PinmonyPinLinkResolver } from './src/main/ets/PinmonyPinLinkResolver';
+export { PinmonyTransferJob, PinmonyTransferReply, PinmonyTransferFile } from './src/main/ets/PinmonyNativeNetwork';

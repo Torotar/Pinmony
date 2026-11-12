@@ -17,3 +17,6 @@ export { PinmonySearchPorts } from './src/main/ets/models/PinmonySearchPorts';
 export { searchProfileLink } from './src/main/ets/services/PinmonySearchPinLink';
 
 export { PinmonySearchFilterSheet } from './src/main/ets/components/PinmonySearchFilterSheet';
+
+export { PinmonySearchNetwork } from './src/main/ets/services/PinmonySearchNetwork';
+export { PhotoSearchRegion } from './src/main/ets/services/PinmonySearchNetwork';

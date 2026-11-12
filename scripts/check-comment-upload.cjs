@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 let ts; try { ts = require('typescript'); } catch (_) { ts = require(process.argv[2]); }
 const text = fs.readFileSync('common_network/src/main/ets/PinmonyNativeNetwork.ets', 'utf8').replace(/^import .*;\r?$/gm, '');
-const code = ts.transpileModule(text, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
+const code = require('./native-network-test-fixture.cjs').transpile(ts, text, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
 const pin = 'https://www.pinterest.com/pin/101/';
 function harness(uploadHost = 'https://pinterest-media-upload.s3.amazonaws.com/', onUpload = () => {}) {
   const uploads = [], reads = [], context = { authenticated: true, epoch: 1, page: pin, userAgent: 'test' };
@@ -12,7 +12,7 @@ function harness(uploadHost = 'https://pinterest-media-upload.s3.amazonaws.com/'
       Request: class { constructor(url, method, headers, body) { Object.assign(this, { url, method, headers, body }); } },
       createSession: () => ({ fetch: async request => { uploads.push(request); onUpload(request); return { statusCode: 204 }; }, close() {}, cancel() {} }) } };
   const policyScope = { exports: {}, PinmonyRuntimeLog: scope.PinmonyRuntimeLog };
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync('common_network/src/main/ets/PinmonyRequestPolicy.ets', 'utf8').replace(/^import .*;\r?$/gm, ''), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, policyScope);
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync('common_network/src/main/ets/PinmonyRequestPolicy.ets', 'utf8').replace(/^import .*;\r?$/gm, ''), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, policyScope);
   scope.PinmonyRequestPolicy = policyScope.exports.PinmonyRequestPolicy;
   vm.runInNewContext(code, scope);
   const network = new scope.exports.PinmonyNativeNetwork();

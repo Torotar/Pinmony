@@ -1,15 +1,13 @@
-import { PinmonyHdsTitleBar } from 'common_ui';
+import { PinmonyHdsTitleBar, PinmonyImmersiveLight } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyBoardPickerRow, PinmonyActionNotice } from 'common_ui';
 import { BlurStrategy } from '@kit.UIDesignKit';
-import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyCreatedPin, PinmonyOrganizeSnapshot, PinmonyOrganizeBoard } from '../models/PinmonyProfile';
 import { PinmonyOrganizePage } from './PinmonyOrganizePage';
 import { PinmonyPublishFlow } from '../models/PinmonyPublishFlow';
-import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
-import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleMode, IconStyleMode, ScrollEffectType } from '@kit.UIDesignKit';
 
 // Publish owns this entry point so its board flow can evolve independently
 // from the profile's ordinary "整理到图板" flow.
@@ -75,7 +73,7 @@ export struct PinmonyPublishBoardPage {
       }.width('100%')
       if (this.state.error) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.error, this.uiLanguage) }) }
       if (this.state.loading || this.state.busy) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
-    }.width('100%').padding({ left: 20, right: 20, top: 68, bottom: 28 })
+    }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
   }
 
   @Builder
@@ -91,33 +89,16 @@ export struct PinmonyPublishBoardPage {
       Column() {
         Scroll(this.createScroller) { this.createForm() }
           .width('100%').layoutWeight(1).align(Alignment.TopStart).scrollBar(BarState.Off)
-          .scrollBarMargin({start:LengthMetrics.vp(56)})
+          .scrollBarMargin({start:LengthMetrics.vp(0)})
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
         Column() { this.createButton() }
           .width('100%').padding({ left: 20, right: 20, top: 12, bottom: 28 })
       }.width('100%').height('100%')
     }.mode(NavigationMode.Stack).width('100%').height('100%')
       .titleMode(HdsNavigationTitleMode.MODAL).bindToScrollable([this.createScroller])
-      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { enableComponentSafeArea: false,
-        style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'),
-          scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
-          systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
-          originalStyle: {
-            backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
-            contentStyle: {
-              menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
-              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
-            }
-          },
-          scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 },
-            contentStyle: {
-              menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') },
-              titleStyle: { mainTitleColor: $r('app.color.primary_text') }
-            }
-          }
-        },
+      .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), { avoidLayoutSafeArea: false, enableComponentSafeArea: true,
+        style: PinmonyHdsTitleBar.modalStyle(this.immersiveLightMode),
         content: { title: { mainTitle: this.uiText("pm_create_board_513babc9") }, menu: { value: [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.xmark')).fontColor([$r('app.color.primary_text')]),
           type: IconStyleMode.SMALL, label: this.uiText("pm_close_3fd47edc"), isEnabled: !this.state.busy,
           action: () => this.requestCreateClose()
         } }] } } }, this.hdsDarkMode))
@@ -156,7 +137,7 @@ export struct PinmonyPublishBoardPage {
     else
     if (this.state.phase === 'create') {
       Column().width('100%').height('100%').backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.None)
-        .bindSheet($$this.createVisible, this.createSheet(), {
+        .bindSheet($$this.createVisible, this.createSheet(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
       preferType: this.sheetWindowWidthVp >= 600 ? SheetType.CENTER : undefined,
           onWillAppear: (): void => { PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyPublishBoardPage.createVisible radius=uniform-32vp'); },
@@ -168,7 +149,7 @@ export struct PinmonyPublishBoardPage {
             if (this.state.busy) return;
             this.requestCreateClose(); action.dismiss();
           }
-        })
+        }, this.immersiveLightMode, false))
     } else {
       PinmonyOrganizePage({ state: this.state, pins: this.pins, pinsLoading: this.pinsLoading,
         publishing: true, standaloneBoard: false, onAction: this.onAction })

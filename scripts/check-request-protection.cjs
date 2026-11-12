@@ -6,7 +6,7 @@ const logs = [];
 const foundation = { PinmonyRuntimeLog: { info: x => logs.push(x), warn: x => logs.push(x) } };
 function compiled(file, requireFn, source) {
   const exports = {};
-  vm.runInNewContext(ts.transpileModule(source ?? fs.readFileSync(file, 'utf8'), {
+  vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, source ?? fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
   }).outputText, { exports, require: requireFn, Promise, setTimeout, clearTimeout, console });
   return exports;
@@ -167,7 +167,7 @@ function modeChecks() {
   }
   for (const speculative of [false, true]) {
     const ctx = { allowsSpeculativeReads: () => speculative, Date, setTimeout };
-    vm.runInNewContext(ts.transpileModule('class Home {' +
+    vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Home {' +
       method('prefetchNextScreen') + method('loadNextPageAtEnd') + '} globalThis.Home = Home;', {
       compilerOptions: {target: ts.ScriptTarget.ES2021}
     }).outputText, ctx);
