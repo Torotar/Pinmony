@@ -81,7 +81,7 @@ SDK 不在默认位置时，可通过 `-SdkHome '<HarmonyOS SDK 目录>'` 指定
 
 输出文件为 `release/Pinmony-release-unsigned.hap`。脚本会验证包内为 Release 模式、`debug=false`，且不含 Debug 源码映射；签名和真机测试仍需另行完成。
 
-### debug模构建
+### debug模块构建
 
 ```powershell
 $env:DEVECO_SDK_HOME = '<HarmonyOS SDK 目录>'

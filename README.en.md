@@ -79,7 +79,7 @@ If the SDK is installed elsewhere, add `-SdkHome '<HarmonyOS SDK directory>'`. T
 
 The output is `release/Pinmony-release-unsigned.hap`. The script verifies Release mode, `debug=false`, and the absence of Debug source maps. Signing and physical-device testing are separate steps.
 
-### Debug Build
+### Debug Module Build
 
 ```powershell
 $env:DEVECO_SDK_HOME = '<HarmonyOS SDK directory>'
