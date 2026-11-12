@@ -117,14 +117,16 @@ struct PinmonyBoardCollaboratorsSurface {
         if (invite) { Text(user.username).fontSize(13).fontColor($r('app.color.secondary_text')) }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (invite && !user.status) {
-        Button(this.uiText("pm_invite_1955b265")).type(ButtonType.Normal).borderRadius(16).backgroundColor($r('app.color.accent')).fontColor(Color.White)
-          .width(88).height(40)
+        Button({ type: ButtonType.Normal }) {
+          Text(this.uiText("pm_invite_1955b265")).fontSize(16).fontColor(Color.White).wordBreak(WordBreak.BREAK_WORD).textAlign(TextAlign.Center)
+        }.borderRadius(16).backgroundColor($r('app.color.accent'))
+          .constraintSize({ minWidth: 88, maxWidth: '50%', minHeight: 40 }).padding({ left: 12, right: 12, top: 8, bottom: 8 }).flexShrink(0)
           .enabled(!this.snapshot.busy && !this.snapshot.uncertain)
           .onClick(() => this.onAction('send', user.id))
       } else {
         Text(user.status === 'owner' ? this.uiText("pm_owner_43a7f4b4") : user.status === 'accepted' ? this.uiText("pm_collaborator_59fa99bc") : this.uiText("pm_invited_b43e8a99"))
           .fontSize(14).fontColor($r('app.color.secondary_text'))
-          .width(88).height(40).textAlign(TextAlign.Center)
+          .constraintSize({ minWidth: 88, maxWidth: '50%', minHeight: 40 }).padding({ top: 8, bottom: 8 }).wordBreak(WordBreak.BREAK_WORD).textAlign(TextAlign.Center).flexShrink(0)
       }
     }.width('100%').alignItems(VerticalAlign.Center).padding({ top: 10, bottom: 10 })
   }

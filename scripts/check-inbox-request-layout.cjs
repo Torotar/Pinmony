@@ -8,7 +8,10 @@ const row = source.slice(source.indexOf('ForEach('), source.indexOf('if (this.al
 assert(row.indexOf('.layoutWeight(1)') < row.indexOf('pm_decline_136de7a8'));
 assert(row.indexOf('pm_accept_329fcec6') < row.indexOf('Text(this.invitationTime(item))'));
 assert(row.includes('this.onAccept(item)'), 'accept uses its own write callback');
-assert.equal((row.match(/padding\(\{left:16,right:16,top:12,bottom:12\}\)\.constraintSize\(\{maxWidth:128\}\)/g) || []).length, 2, 'both actions use greeting padding with natural text width');
+assert.equal((row.match(/padding\(\{left:16,right:16,top:12,bottom:12\}\)\.layoutWeight\(1\)/g) || []).length, 2, 'both actions share a dedicated full-width row and wrap without a width cap');
+const actions = row.slice(row.indexOf('Row({ space: 6 })'), row.indexOf('Text(this.invitationTime(item))'));
+assert(!/maxWidth|maxLines/.test(actions), 'localized actions have no truncation limit');
+assert(row.startsWith('ForEach(') && row.includes('Column({ space: 12 })'), 'actions sit below the preview instead of squeezing its title');
 assert(!row.includes('minWidth:72'), 'short action labels do not inherit greeting minimum width');
 assert.equal((row.match(/borderRadius\(16\)\.backgroundColor\(\$r\('app.color.surface_muted'\)\)/g) || []).length, 1, 'decline uses muted surface');
 assert.equal((row.match(/borderRadius\(16\)\.backgroundColor\(\$r\('app.color.accent'\)\)/g) || []).length, 1, 'accept uses red accent with matching radius');
@@ -20,7 +23,7 @@ assert(!source.includes('.width(36).height(36)'), 'no extra arrow box shifting i
 assert(source.includes('this.snapshot.loading && !this.refreshing && this.snapshot.items.length === 0'), 'refresh keeps existing rows without section spinner');
 assert(root.includes('refreshing: this.refreshing'), 'root refresh state reaches request component');
 assert(row.includes('.alignItems(VerticalAlign.Center)'));
-assert(row.includes('.alignSelf(ItemAlign.Center)'));
+assert(row.includes('.textAlign(TextAlign.End).width(\'100%\')'), 'time has its own line with no fixed height');
 assert(row.includes('this.onPreview(item)'));
 assert(row.includes("Text(this.all ? item.inviter : this.uiText('pm_board_invitations_c4c41664'))"), 'root shows fixed category; full list shows inviter');
 assert(row.includes('Text(item.boardName)'), 'board name stays on second line');
@@ -73,4 +76,4 @@ for (const language of ['zh', 'en', 'ja', 'ko', 'ru', 'pt']) {
   host.uiLanguage = language;
   assert.match(host.invitationTime({createdAt: '2025-01-02T09:22:00Z'}), /\n\d{2}:\d{2}$/);
 }
-console.log('Inbox requests: shared preview/full list, right-side actions/time, loading/error, connected decline, language and valid/invalid dates passed');
+console.log('Inbox requests: shared preview/full list, wrapping actions below preview, separate time, loading/error, connected decline, language and valid/invalid dates passed');

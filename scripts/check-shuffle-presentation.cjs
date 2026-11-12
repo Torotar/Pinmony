@@ -44,11 +44,11 @@ function method(file,name) {
   const text=fs.readFileSync(file,'utf8'), ast=ts.createSourceFile('test.ts',text.replace(/\bstruct\b/g,'class'),99,true);
   let found=''; function visit(n){if(ts.isMethodDeclaration(n)&&n.name.getText(ast)===name)found=n.getText(ast);ts.forEachChild(n,visit);} visit(ast);assert(found,name);return found;
 }
-const networkMethod=method('common_network/src/main/ets/PinmonyNativeNetwork.ets','requestBusinessShuffleRead');
+const networkMethod=method('feature_pin/src/main/ets/services/PinmonyPinNetwork.ets','requestBusinessShuffleRead');
 // The production constant is injected only into this isolated read-policy fixture.
 const compiled=require('./native-network-test-fixture.cjs').transpile(ts, 'class Guard {'+networkMethod+'} Guard;',{compilerOptions:{target:99}}).outputText;
 const GuardClass=vm.runInNewContext(compiled,{PIN_BUSINESS_PIN_READ_ENABLED:true});
-const guard=new GuardClass();guard.request=async(job,context)=>context().authenticated;
+const guard=new GuardClass();guard.transport={request:async(job,context)=>context().authenticated};
 const session=()=>({origin:'https://www.pinterest.com',authenticated:true,accountId:'fixture-account',generation:1,userAgent:''});
 const pin='https://www.pinterest.com/pin/101/',path='/pin/101/';
 const fields=['shuffle.{id,items,effect_data}','shuffleitem.{id,pin,shuffle_item_image(),settings,item_type,text,offset,scale,rotation,effect_data,mask,bitmap_mask,shuffle_asset,shuffle_item_image,images[236x,736x,736x(heic),750x,750x(heic)]}','shuffleasset.{id,cutout_images[originals],source_images[236x]}'];
@@ -79,7 +79,12 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  const Open=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Open {'+open+'} Open;',{compilerOptions:{target:99}}).outputText);
  const owner=new Open(), opens=[];let cached='';
  owner.detailOpeningCoordinator={prefetchShufflePins:(urls)=>{owner.previewUrls=urls}};
- Object.assign(owner,{authStatus:'authenticated',businessSuspended:false,activeSheetKind:'',pinStore:{videoForeground:true,detailNativeReadsReady:true,detailPreparing:false,detailScrollOffset:30,detailOpeningPin:'',detail:{pinUrl:pin,shuffleId:'303',imageUrl:image.url,shuffle:result},detailCache:{put:(id)=>cached=id}},detailNativeReads:{owned:()=>true},currentPinUrl:()=>pin,nativeBusinessSessionContext:session,pinIdentity:s=>s.split('/pin/')[1].split('/')[0],beginDetailOpening:(...args)=>opens.push(args)});
+ Object.assign(owner,{authStatus:'authenticated',businessSuspended:false,activeSheetKind:'',pinStore:{videoForeground:true,detailNativeReadsReady:true,detailPreparing:false,detailScrollOffset:30,detailOpeningPin:'',detail:{pinUrl:pin,shuffleId:'303',imageUrl:image.url,shuffle:result},detailCache:{put:(id)=>cached=id}},detailNativeReads:{owned:()=>true},currentPinUrl:()=>pin,nativeBusinessSessionContext:session,pinIdentity:s=>s.split('/pin/')[1].split('/')[0],beginDetailOpening:(...args)=>{
+   assert.equal(owner.shuffleParentDetail.pinUrl,pin,'parent must be installed before child opening mutates the store');
+   assert.equal(owner.shuffleSelectedPin,args[0],'selection must already match the next child');
+   assert(owner.shuffleSelectedImage,'retained viewer artwork must exist before opening');
+   opens.push(args);
+ }});
  owner.openShufflePin('missing');assert.equal(opens.length,0);
  owner.openShufflePin('item-1');assert.equal(opens.length,1);assert.equal(opens[0][0],'https://www.pinterest.com/pin/202/');assert.equal(opens[0][1],pin);assert.equal(cached,'101');
  const second={...result.items[0],id:'item-2',pinId:'505'};
@@ -134,13 +139,13 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  Object.setPrototypeOf(full,Back.prototype);full.pageHistory={isPending:()=>false};full.pinStore.shareBackHandledUntil=0;await full.backFromDetail();assert.equal(full.shuffleFullDetail,false);assert.equal(full.shuffleSelectedIndex,2,'back restores the same selected content');
  const layoutFile='feature_pin/src/main/ets/components/PinmonyDetailPage.ets';
  const detailMethod=method(layoutFile,'displayedDetail')+method(layoutFile,'fallbackDetail')+method(layoutFile,'shufflePhotoUrl');
- const Retained=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Retained {'+detailMethod+method(layoutFile,'shuffleImageReady')+method(layoutFile,'shuffleViewerVisible')+method(layoutFile,'closeShuffleViewer')+method(layoutFile,'onShuffleSelectionChanged')+method(layoutFile,'action')+'} Retained;',{compilerOptions:{target:99}}).outputText,{setTimeout:()=>0,clearTimeout:()=>{}});
+ const Retained=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Retained {'+detailMethod+method(layoutFile,'shuffleImageReady')+method(layoutFile,'commitShuffleImageReady')+method(layoutFile,'shuffleViewerVisible')+method(layoutFile,'closeShuffleViewer')+method(layoutFile,'onShuffleSelectionChanged')+method(layoutFile,'action')+'} Retained;',{compilerOptions:{target:99}}).outputText,{setTimeout:()=>0,clearTimeout:()=>{}});
  const retainedView=new Retained(),parentSnapshot={pinUrl:'parent',shuffle:result,actions:[{kind:'save',id:'parent-save'}],imageUrl:'collage.jpg'},childSnapshot={pinUrl:'child',actions:[{kind:'save',id:'child-save'}]};
- Object.assign(retainedView,{currentDetail:childSnapshot,shuffleParentDetail:parentSnapshot,shuffleSelectedImage:'cutout.png',shuffleBackdrop:'collage.jpg',shuffleItems:[{imageUrl:'thumb.jpg'}],shuffleIndex:0,shuffleReadyImages:[],shuffleReadyBackdrop:'',shuffleViewerPresented:false,shuffleFullDetail:false});
+ Object.assign(retainedView,{heroVisible:true,uiCommits:{post:(_key,commit)=>commit()},currentDetail:childSnapshot,shuffleParentDetail:parentSnapshot,shuffleSelectedImage:'cutout.png',shuffleBackdrop:'collage.jpg',shuffleItems:[{imageUrl:'thumb.jpg'}],shuffleIndex:0,shuffleReadyImages:[],shuffleReadyBackdrop:'',shuffleViewerPresented:false,shuffleFullDetail:false});
  assert.equal(retainedView.displayedDetail(),parentSnapshot,'underlying collage keeps its complete snapshot while child reads update');
  assert.equal(retainedView.action('save').id,'child-save','viewer actions must target the current child, not the retained parent');
  retainedView.shuffleSourceOnCanvas=true;retainedView.shuffleItems[0].cutoutUrl='cutout.png';
- retainedView.shuffleImageReady('photo:cutout.png');retainedView.shuffleImageReady('card:thumb.jpg');assert.equal(retainedView.shuffleViewerVisible(),false,'photo alone must not expose an empty backdrop');
+ retainedView.shuffleImageReady('photo:cutout.png');retainedView.shuffleImageReady('card:thumb.jpg');assert.equal(retainedView.shuffleViewerVisible(),true,'selected photo opens independently of background and card');
  retainedView.shuffleReadyBackdrop='collage.jpg';retainedView.shuffleImageReady('backdrop');assert.equal(retainedView.shuffleViewerVisible(),true,'viewer reveals with current photo, thumbnail and backdrop ready');
  retainedView.shuffleSourceOnCanvas=false;retainedView.shuffleViewerPresented=false;retainedView.shuffleReadyImages=[];
  retainedView.shuffleImageReady('photo:cutout.png');retainedView.shuffleImageReady('card:thumb.jpg');

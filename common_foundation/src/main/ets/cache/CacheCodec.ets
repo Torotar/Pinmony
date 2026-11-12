@@ -14,9 +14,13 @@ function encodeCacheJson(data: Object | string | number | boolean | null): Array
 }
 
 export async function parseCacheJson<T>(text: string): Promise<T> {
-  return await taskpool.execute(new taskpool.Task(decodeCacheJson, text), taskpool.Priority.LOW) as T;
+  try {
+    return await taskpool.execute(new taskpool.Task(decodeCacheJson, text), taskpool.Priority.LOW) as T;
+  } catch (_) { throw new Error('cache-json-decode-failed'); }
 }
 
 export async function stringifyCacheJson(data: Object | string | number | boolean | null): Promise<ArrayBuffer> {
-  return await taskpool.execute(new taskpool.Task(encodeCacheJson, data), taskpool.Priority.LOW) as ArrayBuffer;
+  try {
+    return await taskpool.execute(new taskpool.Task(encodeCacheJson, data), taskpool.Priority.LOW) as ArrayBuffer;
+  } catch (_) { throw new Error('cache-json-encode-failed'); }
 }

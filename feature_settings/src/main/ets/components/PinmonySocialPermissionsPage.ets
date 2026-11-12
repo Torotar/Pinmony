@@ -1,12 +1,15 @@
 import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
-import { LengthMetrics } from '@kit.ArkUI';
+import { LengthMetrics, ChipGroup, ChipGroupItemOptions } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { BlurStrategy, HdsNavigation, ScrollEffectType, hdsMaterial, HdsNavDestination, HdsNavDestinationTitleMode, HdsSnackBar, SnackBarIconType, SnackBarOperationType } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySettingsStore } from '../stores/PinmonySettingsStore';
+import { PinmonySocialMessageMaterial } from './PinmonySocialMessageMaterial';
 import { SocialBlockedUser, SocialMessageGroup, SocialMessageChoice } from '../models/PinmonySocialPermissions';
+interface PinmonySocialMessageChipMetrics { width: number; height: number; }
 @Component
 export struct PinmonySocialPermissionsPage {
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
@@ -61,6 +64,20 @@ export struct PinmonySocialPermissionsPage {
     return this.uiText(id === -1 ? 'pm_social_business_tab' : id === 0 ? 'pm_social_friends' : id === 1 ? 'pm_social_followers' : id === 2 ? 'pm_social_following' : 'pm_social_others_short');
   }
   private messageTabIds(): number[] { return this.store.social.business ? [-1,0,1,2,4] : [0,1,2,4]; }
+  private hasMessageTabs(): boolean { return this.pageScreen() === 'socialMessages' && (this.store.social.personal || this.store.social.business); }
+  private messageChipMetrics(): PinmonySocialMessageChipMetrics {
+    let textWidth: number = 0;
+    let textHeight: number = 0;
+    this.messageTabIds().forEach((id: number): void => {
+      const measured: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+        textContent: this.messageTabLabel(id), fontSize: $r('sys.float.chip_normal_font_size'), fontWeight: FontWeight.Bold
+      });
+      textWidth = Math.max(textWidth, this.getUIContext().px2vp(Number(measured.width)));
+      textHeight = Math.max(textHeight, this.getUIContext().px2vp(Number(measured.height)));
+    });
+    return { width: Math.ceil(textWidth) + 40, height: Math.max(36, Math.ceil(textHeight) + 16) };
+  }
+  private messageChipBarHeight(): number { return this.messageChipMetrics().height + 12; }
   aboutToAppear(): void { this.visible = true; this.myPhraseDraftActive = false; this.otherPhraseDraftActive = false; this.stack.pushPath({ name: 'social' }, false); this.syncErrorSnack(); }
   aboutToDisappear(): void { this.visible = false; this.confirming = false; this.myPhraseDraftActive = false; this.otherPhraseDraftActive = false; this.dismissErrorSnack(); }
   private available(): boolean { return this.visible && this.active !== false && !this.store.busy && !this.store.loading && !this.store.writeUncertain && !this.confirming; }
@@ -210,22 +227,34 @@ export struct PinmonySocialPermissionsPage {
     }.width('100%')
   }
   @Builder
+  private messageTabControls() {
+    Column() {
+    if (deviceInfo.apiAvailable('26.0.0')) {
+      ChipGroup({ items: this.messageChipItems(), multiple: false,
+        selectedIndexes: [Math.max(0, this.messageTabIds().indexOf(this.store.socialMessageGroup))],
+        itemStyle: PinmonySocialMessageMaterial.itemStyle(this.immersiveLightMode, this.messageChipMetrics()),
+        backgroundSystemMaterial: PinmonySocialMessageMaterial.create(this.immersiveLightMode, false),
+        selectedBackgroundSystemMaterial: PinmonySocialMessageMaterial.create(this.immersiveLightMode, true),
+        chipGroupSpace: { itemSpace: 8, startSpace: 0, endSpace: 0 }, chipGroupPadding: { top: 6, bottom: 6 },
+        onChange: (indexes: number[]): void => { if (indexes.length === 1) this.selectMessageTab(indexes[0]); }
+      }).width('100%').height(this.messageChipBarHeight())
+      .enabled(this.visible && this.active !== false && !this.store.busy && !this.store.loading && !this.confirming)
+    } else {
+      ChipGroup({ items: this.messageChipItems(), multiple: false,
+        selectedIndexes: [Math.max(0, this.messageTabIds().indexOf(this.store.socialMessageGroup))],
+        itemStyle: PinmonySocialMessageMaterial.itemStyle('off', this.messageChipMetrics()),
+        chipGroupSpace: { itemSpace: 8, startSpace: 0, endSpace: 0 }, chipGroupPadding: { top: 6, bottom: 6 },
+        onChange: (indexes: number[]): void => { if (indexes.length === 1) this.selectMessageTab(indexes[0]); }
+      }).width('100%').height(this.messageChipBarHeight())
+        .enabled(this.visible && this.active !== false && !this.store.busy && !this.store.loading && !this.confirming)
+    }
+    }.width('100%').height(this.messageChipBarHeight()).padding({ left: 20, right: 20 })
+  }
+  private messageChipItems(): ChipGroupItemOptions[] {
+    return this.messageTabIds().map((id: number): ChipGroupItemOptions => ({ label: { text: this.messageTabLabel(id) }, allowClose: false }));
+  }
+  @Builder
   private messageTabs() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Scroll() {
-        Row({ space:8 }) {
-          ForEach(this.messageTabIds(), (id: number, index: number) => {
-            Button(this.messageTabLabel(id), { type: ButtonType.Capsule })
-              .height(36).padding({left:20,right:20}).fontSize(14).fontWeight(FontWeight.Medium)
-              .backgroundColor(id === this.store.socialMessageGroup ? $r('app.color.accent') : $r('app.color.input_surface'))
-              .fontColor(id === this.store.socialMessageGroup ? Color.White : $r('app.color.primary_text'))
-              .enabled(!this.store.busy && !this.store.loading && !this.confirming)
-              .accessibilitySelected(id === this.store.socialMessageGroup)
-              .onClick(() => this.selectMessageTab(index))
-          }, (id: number): string => id + ':' + this.store.socialMessageGroup + ':' + this.store.busy + ':' + this.store.loading + ':' + this.uiLanguage)
-        }.height(36)
-      }.width('100%').height(36).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).align(Alignment.TopStart)
-        .margin({ top:this.titleContentInset() }).backgroundColor($r('app.color.page_background')).zIndex(1)
       Scroll(this.scroller) {
         Column({ space:16 }) {
           if (this.store.social.business && this.store.socialMessageGroup === -1) {
@@ -235,13 +264,12 @@ export struct PinmonySocialPermissionsPage {
           } else {
             this.messageChoices()
           }
-        }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:this.titleContentInset() + 52,bottom:28 })
+        }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:this.titleContentInset() + this.messageChipBarHeight() + 16,bottom:28 })
       }.width('100%').height('100%').align(Alignment.TopStart)
-        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset() + 52) }).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
+        .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset() + this.messageChipBarHeight()) }).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
         .parallelGesture(PanGesture({ direction: PanDirection.Horizontal, distance: 12 })
           .onActionStart(() => { this.suppressSwipeClick = true; })
           .onActionEnd((event: GestureEvent) => { this.swipeMessageTab(event.offsetX, event.offsetY); }))
-    }.width('100%').height('100%').padding({left:20,right:20,top:0})
       .onTouch((event: TouchEvent) => { if (event.type === TouchType.Down) this.suppressSwipeClick = false; })
   }
   @Builder
@@ -290,7 +318,7 @@ export struct PinmonySocialPermissionsPage {
   private body() {
     if (this.pageScreen() === 'social') {
       Text(this.uiText('pm_social_intro')).fontSize(16).fontColor($r('app.color.secondary_text'))
-      this.link('pm_social_message_settings',this.uiText('pm_social_message_settings_detail'),'socialMessages')
+      this.link('pm_social_messages',this.uiText('pm_social_message_settings_detail'),'socialMessages')
       this.link('pm_social_blocked',this.uiText('pm_social_blocked_detail'),'socialBlocked')
       this.link('pm_social_mentions',this.uiText('pm_social_mentions_detail'),'socialMentions')
       this.link('pm_social_comments_title',this.uiText('pm_social_comments_entry_detail'),'socialComments',true)
@@ -341,7 +369,7 @@ export struct PinmonySocialPermissionsPage {
     HdsNavDestination() {
       Stack({ alignContent: Alignment.Center }) {
         Column() {
-        if (this.pageScreen() === 'socialMessages' && (this.store.social.personal || this.store.social.business)) {
+        if (this.hasMessageTabs()) {
           this.messageTabs()
         } else {
         Scroll(this.scroller) {
@@ -367,7 +395,8 @@ export struct PinmonySocialPermissionsPage {
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode),
         scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
-      content: { title: { mainTitle: this.title() }, backIcon: { isEnabled: true, action: () => { if (this.active !== false && this.onBack) this.onBack(); } } } }, this.hdsDarkMode))
+      content: { title: { mainTitle: this.title() }, bottomBuilder: this.hasMessageTabs() ? { builder: (): void => { this.messageTabControls(); } } : undefined,
+        backIcon: { isEnabled: true, action: () => { if (this.active !== false && this.onBack) this.onBack(); } } } }, this.hdsDarkMode))
       .titleMode(HdsNavDestinationTitleMode.MINI).bindToScrollable([this.scroller])
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
       .onBackPressed(() => { if (this.active === false) return false; if (this.onBack) this.onBack(); return true; })

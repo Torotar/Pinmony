@@ -44,7 +44,7 @@ export struct PinmonyInboxPage {
   @StorageProp('statusBarHeightPx') private statusBarHeightPx: number = 0;
   @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
-  private inboxTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
+  private inboxTopInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + this.segmentBarHeight() + 8; }
   @State private inboxRefreshState: RefreshStatus = RefreshStatus.Inactive;
   @StorageLink('pinmonyRootScrollTop2') @Watch('onRootScrollTop') private rootScrollTop: number = 0;
   private onRootScrollTop(): void {
@@ -89,6 +89,25 @@ export struct PinmonyInboxPage {
     { text: this.uiText("pm_updates_3055a035") }, { text: this.uiText("pm_inbox_63a5e7b7") }
   ]);
 
+  private segmentBarMinWidth(): number {
+    let longest: number = 0;
+    [this.snapshot.updateLabel || PinmonyI18n.message('pm_updates_3055a035'),
+      this.snapshot.inboxLabel || PinmonyI18n.message('pm_inbox_63a5e7b7')].forEach((label: string): void => {
+      const measured: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+        textContent: PinmonyI18n.render(label, this.uiLanguage), fontSize: 16, fontWeight: FontWeight.Medium
+      });
+      longest = Math.max(longest, this.getUIContext().px2vp(Number(measured.width)));
+    });
+    return Math.ceil(longest + 32 + (this.updatesUnread || this.messagesUnread ? 72 : 0)) * 2 + 8;
+  }
+  private segmentBarHeight(): number {
+    const measured: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+      textContent: PinmonyI18n.render(this.snapshot.updateLabel || PinmonyI18n.message('pm_updates_3055a035'), this.uiLanguage) +
+        PinmonyI18n.render(this.snapshot.inboxLabel || PinmonyI18n.message('pm_inbox_63a5e7b7'), this.uiLanguage),
+      fontSize: 16, fontWeight: FontWeight.Medium
+    });
+    return Math.max(48, Math.ceil(this.getUIContext().px2vp(Number(measured.height))) + 24);
+  }
   private segmentBackgroundColor(): ColorMetrics | undefined {
     try {
       return ColorMetrics.resourceColor($r('app.color.surface_muted'));
@@ -491,11 +510,16 @@ export struct PinmonyInboxPage {
   @Builder
   private inboxSegments() {
     Column() {
+      Scroll() {
       if (this.snapshot.updateLabel && this.snapshot.inboxLabel) {
         Stack({ alignContent: Alignment.Start }) {
           if (deviceInfo.apiAvailable('26.0.0')) {
             CapsuleSegmentButtonV2({
               items: this.segmentItems,
+              itemFontSize: LengthMetrics.vp(16), itemSelectedFontSize: LengthMetrics.vp(16),
+              itemFontWeight: FontWeight.Medium, itemSelectedFontWeight: FontWeight.Medium,
+              itemMinHeight: LengthMetrics.vp(this.segmentBarHeight() - 8),
+              itemPadding: { start: LengthMetrics.vp(16), end: LengthMetrics.vp(16), top: LengthMetrics.vp(8), bottom: LengthMetrics.vp(8) },
               buttonBackgroundColor: PinmonyInboxSegmentMaterial.enabled(this.immersiveLightMode) ? undefined : this.segmentBackgroundColor(),
               buttonBackgroundBlurStyle: BlurStyle.NONE,
               backgroundSystemMaterial: PinmonyInboxSegmentMaterial.create(this.immersiveLightMode),
@@ -512,6 +536,10 @@ export struct PinmonyInboxPage {
           } else {
           CapsuleSegmentButtonV2({
             items: this.segmentItems,
+            itemFontSize: LengthMetrics.vp(16), itemSelectedFontSize: LengthMetrics.vp(16),
+            itemFontWeight: FontWeight.Medium, itemSelectedFontWeight: FontWeight.Medium,
+            itemMinHeight: LengthMetrics.vp(this.segmentBarHeight() - 8),
+            itemPadding: { start: LengthMetrics.vp(16), end: LengthMetrics.vp(16), top: LengthMetrics.vp(8), bottom: LengthMetrics.vp(8) },
             buttonBackgroundColor: this.segmentBackgroundColor(),
             buttonBackgroundBlurStyle: BlurStyle.NONE,
             enableStateAnimation: true,
@@ -534,11 +562,12 @@ export struct PinmonyInboxPage {
           }
         }
         .width('100%')
-        .constraintSize({ maxWidth: 448 })
-        .height(48)
+        .constraintSize({ minWidth: this.segmentBarMinWidth(), maxWidth: Math.max(448, this.segmentBarMinWidth()) })
+        .height(this.segmentBarHeight())
         .accessibilityDescription(this.updatesUnread || this.messagesUnread ? PinmonyI18n.format('pm_inbox_unread_counts', [this.updatesUnreadCount, this.messagesUnreadCount], this.uiLanguage) : '')
       }
-    }.width('100%').height(56)
+      }.width('100%').height(this.segmentBarHeight()).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
+    }.width('100%').height(this.segmentBarHeight() + 8)
       .alignItems(HorizontalAlign.Center)
       .padding({ left: 20, right: 20, top: 4, bottom: 4 })
   }

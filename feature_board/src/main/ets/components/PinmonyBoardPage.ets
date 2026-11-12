@@ -676,6 +676,7 @@ struct PinmonyBoardSurface {
   private selectionPins(): PinmonyBoardPin[] { return this.snapshot.flow?.sectionId && this.selectingPins() || this.snapshot.flow?.sectionId && this.phase() === 'targets' ? this.snapshot.flow?.pins || [] : this.snapshot.pins; }
 
   @State private contentWidth: number = 360;
+  @State private boardActionBarWidth: number = 0;
   @State private editViewportWidth: number = 0;
   @State private editViewportHeight: number = 0;
 
@@ -1301,6 +1302,18 @@ struct PinmonyBoardSurface {
       (index !== 0 || !!(this.phase() === 'section' ? this.snapshot.flow?.pins.length : this.snapshot.pins.length));
   }
 
+  private boardActionBarHeight(): number {
+    const labelWidth: number = Math.max(1, (this.boardActionBarWidth || this.contentWidth) / 3 - 24);
+    let labelHeight: number = 0;
+    ['pm_organize_ff093473', 'pm_publish_b61f333b', 'pm_more_ideas_8f569818'].forEach((key: string): void => {
+      const measured: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+        textContent: this.uiText(key), fontSize: 11, fontWeight: FontWeight.Medium,
+        constraintWidth: labelWidth, wordBreak: WordBreak.BREAK_WORD
+      });
+      labelHeight = Math.max(labelHeight, this.getUIContext().px2vp(Number(measured.height)));
+    });
+    return Math.max(56, Math.ceil(labelHeight) + 34);
+  }
   @Builder
   private boardActionTab(label: string, icon: Resource, index: number) {
     Column({ space: 2 }) {
@@ -1309,9 +1322,14 @@ struct PinmonyBoardSurface {
       } else {
         SymbolGlyph(icon).fontSize(24).fontColor([$r('app.color.primary_text')])
       }
-      Text(this.uiText(label)).fontSize(11).lineHeight(14).height(14).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.primary_text')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-    }.width('100%').height(56).padding({top:4,bottom:4}).justifyContent(FlexAlign.Start)
+      Text(this.uiText(label)).fontSize(11).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Center)
+        .wordBreak(WordBreak.BREAK_WORD).flexShrink(0)
+    }.width('100%').height(this.boardActionBarHeight()).padding({top:4,bottom:4,left:12,right:12}).justifyContent(FlexAlign.Start)
+      .onSizeChange((_oldSize: SizeOptions, newSize: SizeOptions): void => {
+        const barWidth: number = Number(newSize.width) * 3;
+        if (barWidth > 0 && Math.abs(barWidth - this.boardActionBarWidth) > 1) this.boardActionBarWidth = barWidth;
+      })
       .opacity(this.boardActionEnabled(index) ? 1 : 0.4).accessibilityText(this.uiText(label))
   }
 
@@ -1324,7 +1342,7 @@ struct PinmonyBoardSurface {
         .tabBar(this.boardActionTab('pm_publish_b61f333b', $r('sys.symbol.plus'), 1))
       TabContent() { Column() }
         .tabBar(this.boardActionTab('pm_more_ideas_8f569818', $r('sys.symbol.square_grid_2x2'), 2))
-    }.width('100%').height('100%').barHeight(56).barMode(BarMode.Fixed)
+    }.width('100%').height('100%').barHeight(this.boardActionBarHeight()).barMode(BarMode.Fixed)
       .scrollable(false).barOverlap(true).animationDuration(0)
       .barBackgroundColor((this.immersiveLightMode !== 'off') ? Color.Transparent : $r('app.color.surface_muted'))
       .barFloatingStyle({barBottomMargin:28,systemMaterialEffect:PinmonyImmersiveLight.effect(this.immersiveLightMode)})
@@ -1455,15 +1473,17 @@ struct PinmonyBoardSurface {
       }.width('100%').layoutWeight(1)
       if ((targetSheet || this.phase() === 'targets') && !this.creatingTarget && !this.creatingBoardTarget && !this.snapshot.flow?.targetBoardId) {
         Row({ space: 12 }) {
-          Button(this.uiText('pm_create_board_513babc9'), { type: ButtonType.Normal })
-            .layoutWeight(1).height(52).borderRadius(16)
+          Button({ type: ButtonType.Normal }) {
+            Text(this.uiText('pm_create_board_513babc9')).fontSize(16).fontColor($r('app.color.primary_text')).wordBreak(WordBreak.BREAK_WORD).textAlign(TextAlign.Center)
+          }.layoutWeight(1).constraintSize({ minHeight: 52 }).padding(12).borderRadius(16)
             .fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent)
             .enabled(!this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && !this.snapshot.flow?.loading && !this.snapshot.flow?.error)
             .onClick(() => this.beginTargetCreate(true))
           Divider().vertical(true).height(24).strokeWidth(0.5)
             .color($r('app.color.secondary_text')).opacity(0.35)
-          Button(this.uiText('pm_add_section_779008ec'), { type: ButtonType.Normal })
-            .layoutWeight(1).height(52).borderRadius(16)
+          Button({ type: ButtonType.Normal }) {
+            Text(this.uiText('pm_add_section_779008ec')).fontSize(16).fontColor($r('app.color.primary_text')).wordBreak(WordBreak.BREAK_WORD).textAlign(TextAlign.Center)
+          }.layoutWeight(1).constraintSize({ minHeight: 52 }).padding(12).borderRadius(16)
             .fontColor($r('app.color.primary_text')).backgroundColor(Color.Transparent)
             .enabled(!this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && !this.snapshot.flow?.loading && !this.snapshot.flow?.error)
             .onClick(() => this.beginTargetCreate(false))
@@ -1797,7 +1817,7 @@ struct PinmonyBoardSurface {
           const width: number = Number(area.width);
           if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
         })
-        .padding({ left: 16, right: 16, top: this.titleContentInset() + 18, bottom: this.splitCoverScrolling() ? 0 : this.modernBoardActions() ? 132 : 40 })
+        .padding({ left: 16, right: 16, top: this.titleContentInset() + 18, bottom: this.splitCoverScrolling() ? 0 : this.modernBoardActions() ? 132 + this.boardActionBarHeight() - 56 : 40 })
       }
       .width('100%').height('100%').scrollBar(BarState.Off)
       .scrollable(this.splitCoverScrolling() ? ScrollDirection.None : ScrollDirection.Vertical)

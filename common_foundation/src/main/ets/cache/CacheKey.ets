@@ -21,20 +21,25 @@ export function stableSerialize(params: Object | string | number | boolean | nul
 }
 
 export function hashCacheString(text: string): string {
-  try {
-  const bytes: Uint8Array = new util.TextEncoder().encodeInto(text);
-  const md = cryptoFramework.createMd('MD5');
-  md.updateSync({ data: bytes });
-  const digest: Uint8Array = md.digestSync().data;
-  let hash: string = '';
-  for (let index: number = 0; index < digest.length; index++) {
-    hash += digest[index].toString(16).padStart(2, '0');
+  if (canIUse('SystemCapability.Security.CryptoFramework.MessageDigest')) {
+    try {
+      const bytes: Uint8Array = new util.TextEncoder().encodeInto(text);
+      // Runtime MessageDigest gate above handles the SDK's versioned syscap declaration.
+      // @SuppressWarnings syscap
+      const md = cryptoFramework.createMd('MD5');
+      md.updateSync({ data: bytes });
+      const digest: Uint8Array = md.digestSync().data;
+      let hash: string = '';
+      for (let index: number = 0; index < digest.length; index++) {
+        hash += digest[index].toString(16).padStart(2, '0');
+      }
+      return hash;
+    } catch (_) {
+      // Fail closed: never replace a failed hash with a shared or empty cache key.
+      throw new Error('cache-hash-unavailable');
+    }
   }
-  return hash;
-  } catch (_) {
-    // Fail closed: never replace a failed hash with a shared or empty cache key.
-    throw new Error('cache-hash-unavailable');
-  }
+  throw new Error('cache-hash-unavailable');
 }
 
 export function buildCacheKey(accountId: string, resourceType: string,

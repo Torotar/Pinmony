@@ -368,6 +368,12 @@ export struct PinmonyPublishPhotoEditor {
       }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + 16,bottom:28})
     }.width('100%').height('100%').align(Alignment.TopStart).scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset())}).edgeEffect(EdgeEffect.Spring,{alwaysEnabled:true})
   }
+  private productTabBarHeight(): number {
+    const measured: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+      textContent: this.text('pm_publish_search_pins') + this.text('pm_publish_use_link'), fontSize: 17, fontWeight: FontWeight.Bold
+    });
+    return Math.max(56, Math.ceil(this.getUIContext().px2vp(Number(measured.height))) + 32);
+  }
   @Builder
   private tagTabs() {
     Tabs({index:this.productTab}) {
@@ -376,7 +382,7 @@ export struct PinmonyPublishPhotoEditor {
         Column({ space: 20 }) {
           Row() { Text(this.query || this.text('pm_publish_product_search')).fontSize(17).fontColor($r('app.color.secondary_text')) }.width('100%').height(48).padding(12).borderRadius(16).backgroundColor($r('app.color.surface_muted')).onClick(() => this.onAction('openProductSearch','',false))
           if(!this.query.trim()) { Text(this.text('pm_publish_product_recommendations')).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).width('100%') }
-        }.width('100%').padding(16).margin({top:this.titleContentInset() + 56}).backgroundColor($r('app.color.page_background')).zIndex(1)
+        }.width('100%').padding(16).margin({top:this.titleContentInset() + this.productTabBarHeight()}).backgroundColor($r('app.color.page_background')).zIndex(1)
           .onAreaChange((_old:Area,area:Area) => {this.productHeaderHeight = Number(area.height);})
           this.productResults(false)
         }.width('100%').height('100%')
@@ -394,12 +400,12 @@ export struct PinmonyPublishPhotoEditor {
           if(this.state.productLoading) { LoadingProgress().color($r('app.color.accent')).width(28).height(28) }
           if(this.state.productError) { PinmonyActionNotice({ message: PinmonyI18n.render(this.state.productError,this.uiLanguage) }) }
           if(this.state.productMode === 'link' && !this.state.productLoading && !(this.state.productResults || []).length) { Text(this.text('pm_publish_product_empty')).fontColor($r('app.color.secondary_text')) }
-        }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + 72,bottom:16})
+        }.width('100%').padding({left:16,right:16,top:this.titleContentInset() + this.productTabBarHeight() + 16,bottom:16})
         }.width('100%').height('100%').align(Alignment.TopStart)
-          .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + 56)})
+          .scrollBarMargin({start:LengthMetrics.vp(this.titleContentInset() + this.productTabBarHeight())})
       }.tabBar(SubTabBarStyle.of(this.text('pm_publish_use_link')).padding({top:this.titleContentInset() + 16,bottom:16,left:16,right:16}).indicator({ color: $r('app.color.primary_text'), height: 2, borderRadius: 0 })
         .labelStyle({ selectedColor: $r('app.color.primary_text'), unselectedColor: $r('app.color.primary_text'), font: { size: 17, weight: FontWeight.Bold } }))
-    }.barMode(BarMode.Fixed).barHeight(this.titleContentInset() + 56).barOverlap(true).barBackgroundColor(Color.Transparent).width('100%').height('100%').animationDuration(0)
+    }.barMode(BarMode.Scrollable).barHeight(this.titleContentInset() + this.productTabBarHeight()).barOverlap(true).barBackgroundColor(Color.Transparent).width('100%').height('100%').animationDuration(0)
       .onChange((index: number): void => {
         if(index === this.productTab)return;
         this.productTab = index;this.viewState.productTab = index;

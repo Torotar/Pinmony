@@ -148,10 +148,10 @@ assert(page.includes('.opacity(this.shuffleViewerVisible() && !this.shuffleFligh
 assert(!page.includes('.opacity(this.shuffleOverlayVisible() ? 1 : 0)'),'outer overlay must not abruptly gate the animated backdrop');
 const overlay=page.slice(page.indexOf('private shuffleOverlay()'),page.indexOf('private detailContent()'));
 const underlying=page.slice(page.indexOf('private detailContent()'),page.indexOf('private videoRetryNotice()'));
-assert(overlay.includes("this.shuffleImageReady('backdrop')"),'actual displayed background owns readiness');
-assert(!underlying.includes("this.shuffleImageReady('backdrop')"),'underlying image cannot prematurely unlock the overlay fade');
+assert(overlay.includes("this.shuffleImageReady('backdrop', backdropUrl)"),'actual displayed background owns source-checked readiness');
+assert(!underlying.includes("this.shuffleImageReady('backdrop'"),'underlying image cannot prematurely unlock the overlay fade');
 assert.match(page,/Scroll\(\) \{ this.shuffleSelectedCard\(item\) \}.width\('100%'\).height\(188\)\s*\.opacity\(this.shuffleBackdropOpacity\)/,'information cards fade continuously rather than disappearing at flight start');
-assert.match(overlay,/\.blur\(80 \* this.shuffleBackdropOpacity\)\s*\.opacity\(0\.5 \* this.shuffleBackdropOpacity\)/,'photo filter and its own alpha start at zero and reverse with the same flight progress');
+assert.match(overlay,/\.blur\(80 \* this.shuffleBackdropOpacity\)\s*\.opacity\(0\.5 \* this.shuffleBackdropOpacity \* this.shuffleBackdropImageOpacity\)/,'filter and alpha follow flight progress, including the late background reveal');
 assert(!underlying.includes('.blur(80)'), 'retained collage cannot introduce a second full-strength background');
 assert(page.includes('.backgroundEffect({radius:28 * this.shuffleBackdropOpacity,'), 'card material blur also follows the flight instead of mounting at full strength');
 assert(!page.includes('.opacity(this.shuffleOverlayVisible() ? 0 : this.entryOpacity)'), 'underlying page stays drawn beneath transparent backdrop');

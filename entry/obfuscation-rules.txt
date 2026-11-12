@@ -17,10 +17,9 @@
 # -keep-property-name: specifies property names that you want to keep
 # -keep-global-name: specifies names that you want to keep in the global scope
 
--enable-property-obfuscation
--enable-toplevel-obfuscation
--enable-filename-obfuscation
--enable-export-obfuscation
+# Keep public names and file paths stable for ArkWeb bridges, HAR exports and startup profiles.
+# Use local identifier obfuscation and whitespace compaction only.
+-compact
 
 # AppStartup profile entries are loaded by their configured paths.
 -keep-file-name

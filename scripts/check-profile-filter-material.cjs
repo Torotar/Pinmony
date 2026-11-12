@@ -205,7 +205,12 @@ console.log('Profile filter material passed: five actual header modifier chains 
 
 const dragFilterStrip = source.slice(source.indexOf('private hubFilters(tab: string)'), source.indexOf('private hubSearchContent()'));
 assert(dragFilterStrip.includes('.scrollable(ScrollDirection.Horizontal)'));
-assert(dragFilterStrip.includes('.enableScrollInteraction(false)'), 'Filter rows must not accept horizontal touch scrolling');
+assert(dragFilterStrip.includes('.enableScrollInteraction(true)'), 'Overflow filter rows accept horizontal touch scrolling');
+assert(dragFilterStrip.includes('.scrollable(ScrollDirection.Horizontal)'), 'Filter strip scrolls horizontally');
+assert(dragFilterStrip.includes('.width(\'100%\')'), 'Filter viewport stays within the available page width');
+for (const kind of ['favorite','created','groups','secret','following','collage-created','collage-drafts']) {
+  assert(dragFilterStrip.includes("'" + kind + "'"), `Shared scrollable strip retains ${kind}`);
+}
 assert(dragFilterStrip.includes('.edgeEffect(EdgeEffect.None)'), 'Filter rows must not rebound during horizontal drag');
 for (const kind of ['collage-created', 'collage-drafts', 'favorite', 'groups']) assert(dragFilterStrip.includes("'" + kind + "'"));
 console.log('Profile filter strip: horizontal touch scrolling and rebound disabled for collage, Pin and board filters passed');

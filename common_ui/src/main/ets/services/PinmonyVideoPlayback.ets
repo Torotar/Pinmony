@@ -156,7 +156,13 @@ export class PinmonyVideoPlayback {
     this.wanted = true;
     if (!player || this.state.phase === 'error') { if (this.surface) this.openInitial(); return; }
     if (player.state === 'prepared' || player.state === 'paused' || player.state === 'completed') {
-      if (player.state === 'completed') player.seek(0, media.SeekMode.SEEK_CLOSEST);
+      if (canIUse('SystemCapability.Multimedia.Media.Core')) {
+        if (player.state === 'completed') {
+          // SDK namespace syscap contains a version suffix; runtime Core gate is authoritative.
+          // @SuppressWarnings syscap
+          player.seek(0, media.SeekMode.SEEK_CLOSEST);
+        }
+      }
       const token: number = this.generation;
       if (!this.state.rendered) this.armTimer(token, 'first-frame');
       player.play().catch((error: BusinessError) => this.playerError(token, 'play', error.code));
@@ -164,9 +170,15 @@ export class PinmonyVideoPlayback {
   }
 
   seek(position: number): void {
+    if (canIUse('SystemCapability.Multimedia.Media.Core')) {
     const player: media.AVPlayer | undefined = this.player;
     if (player && ['prepared', 'playing', 'paused', 'completed'].includes(player.state) && this.state.duration > 0) {
-      try { player.seek(Math.max(0, Math.min(position, this.state.duration)), media.SeekMode.SEEK_CLOSEST); } catch (_) {}
+      try {
+        // Runtime Core gate above covers the versioned media namespace declaration.
+        // @SuppressWarnings syscap
+        player.seek(Math.max(0, Math.min(position, this.state.duration)), media.SeekMode.SEEK_CLOSEST);
+      } catch (_) {}
+    }
     }
   }
 
@@ -231,7 +243,34 @@ export class PinmonyVideoPlayback {
     });
   }
 
+  private async createPlayer(): Promise<media.AVPlayer> {
+    if (canIUse('SystemCapability.Multimedia.Media.AVPlayer')) {
+      try {
+        // open() checks Media.Core as well; SDK namespace has a versioned syscap tag.
+        // @SuppressWarnings syscap
+        return await media.createAVPlayer();
+      } catch (error) {
+        const failure: Error = new Error('video-player-create-failed');
+        (failure as BusinessError).code = (error as BusinessError).code;
+        throw failure;
+      }
+    }
+    throw new Error('video-capability-unavailable');
+  }
+
   private async open(index: number, useFile: boolean = false): Promise<void> {
+    if (!canIUse('SystemCapability.Multimedia.Media.Core') ||
+        !canIUse('SystemCapability.Multimedia.Media.AVPlayer') ||
+        !canIUse('SystemCapability.Multimedia.Audio.Core') ||
+        !canIUse('SystemCapability.Multimedia.Audio.Renderer')) {
+      this.record('event=failed stage=capability');
+      this.state.phase = 'error';
+      this.state.error = PinmonyI18n.message('pm_video_playback_failed_retry_or_reload_the_url_fac62be1');
+      this.wanted = false;
+      this.clearTimer(); this.clearErrorTimer();
+      this.generation++; this.disposePlayer(); this.notify();
+      return;
+    }
     const video: PinmonyVideo | undefined = this.video;
     if (!video || !video.sources[index] || !this.surface) return;
     const token: number = ++this.generation;
@@ -254,16 +293,20 @@ export class PinmonyVideoPlayback {
         this.record('event=file-source-ready bytes=' + lease.size.toString());
       }
       this.armTimer(token, 'create');
-      const player: media.AVPlayer = await media.createAVPlayer();
+      const player: media.AVPlayer = await this.createPlayer();
       if (token !== this.generation) { await player.release(); return; }
       this.player = player;
       this.waiting('initialize');
       player.on('audioInterrupt', (event: audio.InterruptEvent) => {
         if (token !== this.generation) return;
+        if (canIUse('SystemCapability.Multimedia.Audio.Renderer')) {
+        // open() checks Audio.Core and Renderer; SDK namespace has a versioned syscap tag.
+        // @SuppressWarnings syscap
         if (event.hintType === audio.InterruptHint.INTERRUPT_HINT_PAUSE || event.hintType === audio.InterruptHint.INTERRUPT_HINT_STOP) {
           if (this.state.phase === 'loading') { this.stop(); return; }
           this.wanted = false; this.clearTimer();
           if (player.state === 'playing') player.pause().catch(() => {});
+        }
         }
       });
       player.on('error', (error: BusinessError) => this.playerError(token, 'player', error.code));
@@ -280,8 +323,13 @@ export class PinmonyVideoPlayback {
       });
       player.on('bufferingUpdate', (type: media.BufferingInfoType, _value: number) => {
         if (token !== this.generation) return;
-        if (type === media.BufferingInfoType.BUFFERING_START) this.state.buffering = true;
-        if (type === media.BufferingInfoType.BUFFERING_END) this.state.buffering = false;
+        if (canIUse('SystemCapability.Multimedia.Media.Core')) {
+          // SDK namespace tag is versioned; this branch already checks Media.Core.
+          // @SuppressWarnings syscap
+          if (type === media.BufferingInfoType.BUFFERING_START) this.state.buffering = true;
+          // @SuppressWarnings syscap
+          if (type === media.BufferingInfoType.BUFFERING_END) this.state.buffering = false;
+        }
         this.notify();
       });
       player.on('stateChange', (phase: string) => {
@@ -296,7 +344,11 @@ export class PinmonyVideoPlayback {
           } catch (error) { this.playerError(token, 'surface', (error as BusinessError).code); }
         } else if (phase === 'prepared') {
           this.state.duration = player.duration > 0 ? player.duration : video.duration;
-          player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+          if (canIUse('SystemCapability.Multimedia.Media.Core')) {
+            // SDK namespace tag is versioned; this branch already checks Media.Core.
+            // @SuppressWarnings syscap
+            player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+          }
           try { player.setVolume(this.state.muted ? 0 : 1); } catch (_) {}
           this.state.phase = 'prepared';
           if (this.wanted && this.active) {

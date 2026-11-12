@@ -147,9 +147,12 @@ export struct PinmonyImageViewer {
   }
   private sourceRadius(): number {
     const image: ImageFlightRect = this.sourceRect();
-    // Contain images with letterboxing do not reach the rounded container corners.
+    // Narrow fill still intersects the source's rounded corner area. Match
+    // the detail photo policy instead of discarding its radius for any inset.
+    const horizontalInset: number = Math.abs(image.width - this.origin.width) / 2;
+    const verticalInset: number = Math.abs(image.height - this.origin.height) / 2;
     return this.origin.width > 0 && this.origin.height > 0 &&
-      Math.abs(image.width - this.origin.width) < 0.5 && Math.abs(image.height - this.origin.height) < 0.5 ? this.originRadius : 0;
+      horizontalInset < this.originRadius && verticalInset < this.originRadius ? this.originRadius : 0;
   }
   private setFrame(rect: ImageFlightRect): void {
     this.frameX = rect.x; this.frameY = rect.y;

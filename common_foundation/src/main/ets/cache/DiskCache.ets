@@ -141,6 +141,8 @@ export class DiskCache {
       await fs.rename(temporaryPath, path);
       // Invalidation may have happened while rename was executing.
       if (!current()) { await fs.unlink(path); throw new Error('cache-invalidated'); }
+    } catch (_) {
+      throw new Error('cache-write-failed');
     } finally {
       if (file) try { await fs.close(file); } catch (_) {}
       try { await fs.unlink(temporaryPath); } catch (_) {}

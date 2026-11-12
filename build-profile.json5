@@ -32,10 +32,7 @@
       "srcPath": "./common_network",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -44,10 +41,7 @@
       "srcPath": "./common_foundation",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -56,10 +50,7 @@
       "srcPath": "./common_session",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -68,10 +59,7 @@
       "srcPath": "./common_ui",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -80,10 +68,7 @@
       "srcPath": "./feature_home",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -92,10 +77,7 @@
       "srcPath": "./feature_search",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -104,10 +86,7 @@
       "srcPath": "./feature_inbox",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -116,10 +95,7 @@
       "srcPath": "./feature_profile",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -128,10 +104,7 @@
       "srcPath": "./feature_pin",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -140,10 +113,7 @@
       "srcPath": "./feature_board",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },
@@ -152,10 +122,7 @@
       "srcPath": "./feature_settings",
       "targets": [
         {
-          "name": "default",
-          "applyToProducts": [
-            "default"
-          ]
+          "name": "default"
         }
       ]
     },

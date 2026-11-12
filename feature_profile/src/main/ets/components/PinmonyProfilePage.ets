@@ -1491,9 +1491,9 @@ export struct PinmonyProfilePage {
         Row({ space: 10 }) {
           Image($r('app.media.inbox_search_outline')).width(20).height(20).fillColor($r('app.color.primary_text'))
           Text(this.uiText('pm_profile_content_search')).fontSize(16).fontColor($r('app.color.secondary_text'))
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+            .wordBreak(WordBreak.BREAK_WORD).layoutWeight(1)
         }.width('100%').padding({ left: 14, right: 14 })
-      }.layoutWeight(1).height(48).borderRadius(18).backgroundColor($r('app.color.input_surface'))
+      }.layoutWeight(1).constraintSize({ minHeight: 48 }).padding({ top: 12, bottom: 12 }).borderRadius(18).backgroundColor($r('app.color.input_surface'))
         .shadow({ radius: this.getUIContext().vp2px(6), color: this.hdsDarkMode ? '#33000000' : '#14000000', offsetX: 0, offsetY: this.getUIContext().vp2px(1), fill: false })
         .enabled(this.interactionReady).accessibilityText(this.uiText('pm_profile_search_your_pins'))
         .onClick(() => { if (this.onSearch) this.onSearch(); })
@@ -1781,7 +1781,7 @@ export struct PinmonyProfilePage {
         }
       }.padding({left:16,right:16,top:6,bottom:6})
     }.width('100%').scrollable(ScrollDirection.Horizontal).align(Alignment.TopStart).scrollBar(BarState.Off)
-      .enableScrollInteraction(false)
+      .enableScrollInteraction(true)
       .edgeEffect(EdgeEffect.None)
   }
   @Builder

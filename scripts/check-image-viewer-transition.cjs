@@ -53,6 +53,36 @@ originalOnly.imageDecoded(1,true,800,400);assert.equal(originalHandoffs,1,'origi
 const disposedUpgrade=awaitingOriginal();disposedUpgrade.aboutToDisappear();disposedUpgrade.imageDecoded(1,true,800,400);assert.equal(disposedUpgrade.originalReady,false);
 console.log('Viewer handoff: rendered preview before source hide, rendered original before preview hide, mid-animation data-only upgrade, original-only and disposed callbacks passed');
 
+// Narrow side fill uses the same rounded-photo policy as the detail source.
+// Exercise production transitionChanged so the radius shares the photo animation.
+const roundedReturn=awaitingOriginal(); roundedReturn.originRadius=18;
+roundedReturn.naturalWidth=300; roundedReturn.naturalHeight=400;
+roundedReturn.origin={x:12,y:90,width:324,height:400};
+assert.equal(roundedReturn.sourceRadius(),18,'12vp side fill must retain the rounded detail photo');
+roundedReturn.frameRadius=18;
+roundedReturn.transitionChanged();
+assert.equal(roundedReturn.frameRadius,0,'opening ends at square full-screen artwork');
+animations.at(-1).onFinish();
+let returnRadiusBefore=-1,returnRadiusAfter=-1;
+roundedReturn.getUIContext=()=>({animateTo:(options,change)=>{
+  returnRadiusBefore=roundedReturn.frameRadius;
+  change(); returnRadiusAfter=roundedReturn.frameRadius; animations.push(options);
+}});
+roundedReturn.closing=true; roundedReturn.transitionChanged();
+assert.equal(returnRadiusBefore,0,'return starts square');
+assert.equal(returnRadiusAfter,18,'return animates to rounded corners inside the geometry transaction');
+assert.equal(animations.at(-1).duration,400,'existing reverse motion timing is retained');
+roundedReturn.origin.width=336;
+assert.equal(roundedReturn.sourceRadius(),0,'18vp side fill remains square at the detail threshold');
+roundedReturn.origin.width=335.8;
+assert.equal(roundedReturn.sourceRadius(),18,'side fill just below 18vp is rounded');
+roundedReturn.origin.width=324;roundedReturn.originRadius=0;
+assert.equal(roundedReturn.sourceRadius(),0,'an explicitly square source remains square');
+roundedReturn.origin={x:0,y:0,width:0,height:0};roundedReturn.originRadius=18;
+assert.equal(roundedReturn.sourceRadius(),0,'missing geometry cannot invent rounded source corners');
+assert.match(source,/\.borderRadius\(this\.frameRadius\)\.clip\(this\.transitioning\)/,'animated radius clips the moving photo');
+console.log('Narrow blur viewer: square-to-rounded return in geometry animation, opening, threshold, square source and missing geometry passed');
+
 const detailFile=ts.createSourceFile('detail.ts',page.replace(/\bstruct\b/g,'class'),99,true);let prepare='';
 function findPrepare(n){if(ts.isMethodDeclaration(n)&&n.name.getText(detailFile)==='prepareViewerReturn')prepare=n.getText(detailFile);ts.forEachChild(n,findPrepare);}findPrepare(detailFile);
 const ReturnHost=vm.runInNewContext(ts.transpileModule('class ReturnHost {'+prepare+'} ReturnHost;',{compilerOptions:{target:99}}).outputText);

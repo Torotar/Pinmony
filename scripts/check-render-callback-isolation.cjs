@@ -39,7 +39,8 @@ detail.heroVisible = true; detail.onImageLayerChanged(); detail.uiCommits.dispos
 const shuffle = host('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', ['shuffleImageReady']);
 let ready = 0;
 Object.assign(shuffle, {heroVisible:true, displayedDetail:()=>({pinUrl:'a', imageUrl:'backdrop'}),
-  shuffleSelectedImage:'photo-a', shuffleBackdrop:'backdrop', commitShuffleImageReady:()=>ready++});
+  shuffleSelectedImage:'photo-a', shuffleBackdrop:'backdrop', shuffleItems:[{imageUrl:'b'}],
+  shufflePhotoUrl:item=>item.imageUrl, commitShuffleImageReady:()=>ready++});
 shuffle.shuffleImageReady('backdrop', 'old-backdrop'); commits.flush(); assert.equal(ready, 0);
 shuffle.shuffleImageReady('backdrop', 'backdrop'); assert.equal(ready, 0); commits.flush();
 assert.equal(ready, 1); assert.equal(shuffle.shuffleReadyBackdrop, 'backdrop');

@@ -42,6 +42,7 @@ const method = name => detail.match(new RegExp('  private ' + name + '\\([\\s\\S
 const context = {};
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class Page { displayedDetail() { return this.detail; }
   ${method('onPinChanged')}
+  ${method('commitPinPresentation')}
   ${method('heroRenderKey')}
   ${method('heroImageSources')}
   ${method('retryHeroImage')}

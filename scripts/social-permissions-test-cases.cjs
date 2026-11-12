@@ -58,7 +58,7 @@ module.exports=async function({fixture,loader,ts,flush,page}){
  }
  store.screen=account.st.screen;store.back();assert.equal(store.screen,'social');
  }
- assert(!ui.includes('CapsuleSegmentButtonV2'));assert(ui.includes('ButtonType.Capsule'));assert(ui.includes('app.color.accent'));assert(ui.includes('selectMessageTab'));assert(ui.includes('pm_social_others_short'));
+ assert(!ui.includes('CapsuleSegmentButtonV2'));assert(ui.includes('ChipGroup({ items: this.messageChipItems()'));assert(ui.includes('selectedBackgroundSystemMaterial:'));assert(ui.includes('app.color.accent'));assert(ui.includes('selectMessageTab'));assert(ui.includes('pm_social_others_short'));
  store.screen='socialBlocked';store.error='read failure';store.writeUncertain=false;store.back();assert.equal(store.screen,'social');assert.equal(store.error,'','child read errors do not leak to parent');store.screen='socialBlocked';store.error='unknown write';store.writeUncertain=true;store.back();assert.equal(store.error,'unknown write','unconfirmed write warning survives back');
  const root=fs.readFileSync('feature_settings/src/main/ets/components/PinmonySettingsPage.ets','utf8');assert(root.includes("'social', 'notifications'"));assert(ui.includes('.bindToScrollable([this.scroller])'));assert(ui.includes('HdsNavDestinationTitleMode.MINI'));assert(!ui.includes('Web('));
  console.log('Social permissions: native reads/writes, eligible levels, mentions, blocked/unblock, guards, unknown/stale results, confirmation and hierarchical back passed');

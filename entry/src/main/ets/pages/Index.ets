@@ -6432,11 +6432,11 @@ struct Index {
     const siblings: PinmonyShuffleItem[] = parent.shuffle.items.filter((entry: PinmonyShuffleItem): boolean =>
       entry.tappable && !entry.hidden && entry.alpha > 0 && !!entry.pinId && /^\d{1,30}$/.test(entry.pinId) && !!entry.imageUrl);
     if (!sibling) this.pinStore.detailCache.put(this.pinIdentity(parent.pinUrl),parent,this.pinStore.detailScrollOffset);
-    this.beginDetailOpening(target,parent.pinUrl,false,true);
     this.shuffleParentDetail = parent;
     this.shuffleSiblingItems = siblings;
     this.shuffleSelectedIndex = siblings.findIndex((entry: PinmonyShuffleItem): boolean => entry.id === id);
     this.shuffleSelectedPin = target; this.shuffleSelectedImage = item.cutoutUrl || item.imageUrl; this.shuffleSelectedBackdrop = parent.imageUrl;
+    this.beginDetailOpening(target,parent.pinUrl,false,true);
     this.pinStore.detailScrollOffset = 0;
     const origin: string = this.nativeBusinessSessionContext().origin;
     const neighbors: PinmonyShuffleItem[] = siblings.slice(Math.max(0,this.shuffleSelectedIndex - 2),this.shuffleSelectedIndex + 3);

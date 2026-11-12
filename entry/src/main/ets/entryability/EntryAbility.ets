@@ -81,7 +81,8 @@ export default class EntryAbility extends UIAbility {
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    this.context.setRestoreEnabled(true);
+    try { this.context.setRestoreEnabled(true); }
+    catch (_) { PinmonyRuntimeLog.warn('PageRecovery: restore-enable-unavailable'); }
     PinmonyPageRecovery.receive(want.parameters, launchParam.launchReason === AbilityConstant.LaunchReason.APP_RECOVERY && !want.uri);
     PinmonyInboxNoticeRecovery.initialize(this.context);
     PinmonyInboxNoticeTap.receive(want);

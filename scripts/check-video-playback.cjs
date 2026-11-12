@@ -36,7 +36,7 @@ function harness(delayed = false, config = {}) {
   const media = { createAVPlayer: () => delayed ? new Promise(resolve => pending.push(() => resolve(player()))) : Promise.resolve(player()),
     SeekMode: { SEEK_CLOSEST: 0 }, VideoScaleType: { VIDEO_SCALE_TYPE_FIT: 0 }, BufferingInfoType: { BUFFERING_START: 1, BUFFERING_END: 2 } };
   const audio = { InterruptHint: { INTERRUPT_HINT_PAUSE: 1, INTERRUPT_HINT_STOP: 2 } };
-  const exports = {}; vm.runInNewContext(code, { exports, require: name => name === 'common_foundation' ? {PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages} : ({ media, audio }), ...timerApi });
+  const exports = {}; vm.runInNewContext(code, { exports, canIUse: capability => capability !== config.missingCapability, require: name => name === 'common_foundation' ? {PinmonyI18n: require('./local-message-test-fixture.cjs').rawLocalMessages} : ({ media, audio }), ...timerApi });
   const playback = new exports.PinmonyVideoPlayback(state => states.push(state), event => traces.push(event), config.fileReader);
   const video = { pinId: '123', duration: 4600, sources: [{ url: 'hls', kind: 'hls' }, { url: 'mp4', kind: 'mp4' }] };
   playback.setVideo(video); playback.setSurface('surface');
@@ -44,6 +44,15 @@ function harness(delayed = false, config = {}) {
     fireTimers(delay) { for (const [id, timer] of Array.from(timers)) if (timer.delay === delay) { timers.delete(id); timer.fn(); } } };
 }
 async function main() {
+  for (const missingCapability of ['SystemCapability.Multimedia.Media.Core', 'SystemCapability.Multimedia.Media.AVPlayer',
+    'SystemCapability.Multimedia.Audio.Core', 'SystemCapability.Multimedia.Audio.Renderer']) {
+    const unsupported = harness(false, { missingCapability, fakeTime: true });
+    unsupported.playback.start(); await flush();
+    assert.equal(unsupported.players.length, 0, 'unsupported devices never create a player');
+    assert.equal(unsupported.states.at(-1).phase, 'error', 'missing capabilities expose an actual failure state');
+    assert.equal(unsupported.timers.size, 0, 'unsupported devices do not retain playback timers');
+    unsupported.playback.release();
+  }
   const reenter = harness(true);
   reenter.playback.start(); await flush();
   assert.equal(reenter.pending.length, 1);

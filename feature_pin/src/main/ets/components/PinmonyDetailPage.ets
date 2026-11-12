@@ -113,6 +113,8 @@ class PinmonyDetailFlowSource implements IDataSource {
   }
 }
 
+interface PinmonyImageSearchLabelSize { width: number; height: number; }
+
 @Component
 export struct PinmonyDetailPage {
   @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
@@ -164,6 +166,17 @@ export struct PinmonyDetailPage {
   private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
+  private imageSearchLabelSize(): PinmonyImageSearchLabelSize {
+    const measured: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+      textContent: this.uiText('pm_search_image_8f938fb8'), fontSize: 14
+    });
+    const labelWidth: number = Math.min(Math.ceil(this.getUIContext().px2vp(Number(measured.width))) + 2,
+      Math.max(1, this.detailMediaWidth() - 60));
+    const wrapped: SizeOptions = this.getUIContext().getMeasureUtils().measureTextSize({
+      textContent: this.uiText('pm_search_image_8f938fb8'), fontSize: 14, constraintWidth: labelWidth, wordBreak: WordBreak.BREAK_WORD
+    });
+    return { width: labelWidth, height: Math.ceil(this.getUIContext().px2vp(Number(wrapped.height))) };
+  }
   @Prop @Watch('onPinChanged') currentDetail: PinmonyDetailSnapshot = {} as PinmonyDetailSnapshot;
   @Prop shuffleParentDetail: PinmonyDetailSnapshot | undefined = undefined;
   private fallbackDetail(): PinmonyDetailSnapshot {
@@ -190,6 +203,7 @@ export struct PinmonyDetailPage {
   @Prop @Watch('onShuffleSelectionChanged') shuffleReturnItem: string = '';
   @State private shuffleReadyImages: string[] = [];
   @State private shuffleReadyBackdrop: string = '';
+  @State private shuffleBackdropImageOpacity: number = 0;
   @State @Watch('onShuffleViewerPresentedChanged') private shuffleViewerPresented: boolean = false;
   @State private shuffleFlightActive: boolean = false;
   @State private shuffleFlightClosing: boolean = false;
@@ -213,6 +227,7 @@ export struct PinmonyDetailPage {
     return this.shuffleFlightActive || this.shuffleViewerVisible() && !this.shuffleFlightPreparing;
   }
   private shuffleFlightItem: string = '';
+  private shuffleOpenStartedAt: number = 0;
   private shuffleFlightRevision: number = 0;
   private shuffleFlightTimer: number = -1;
   private shuffleSourceOnCanvas: boolean = false;
@@ -272,10 +287,12 @@ export struct PinmonyDetailPage {
     if (!this.videoActive || !this.readsReady || this.shuffleFlightActive || this.shuffleFlightPreparing || this.shuffleSelectedImage) return;
     const item: PinmonyShuffleItem | undefined = this.displayedDetail().shuffle?.items.find((entry: PinmonyShuffleItem): boolean => entry.id === itemId);
     if (!item || !item.tappable) return;
+    this.shuffleOpenStartedAt = Date.now();
     this.shuffleFlightRevision++;
     this.shuffleLayoutAttempts = 0;
     this.shuffleBackdropOpacity = 0;
     this.shuffleReadyBackdrop = '';
+    this.shuffleBackdropImageOpacity = 0;
     this.shuffleFlightItem = itemId;
     this.shuffleSourceOnCanvas = canvas;
     this.shuffleFlightImage = this.shufflePhotoUrl(item);
@@ -358,6 +375,8 @@ export struct PinmonyDetailPage {
     this.shuffleFlightStarted = true;
     const revision: number = this.shuffleFlightRevision;
     const closing: boolean = this.shuffleFlightClosing;
+    if (!closing && this.shuffleOpenStartedAt > 0) PinmonyRuntimeLog.info('ShuffleViewerTrace: phase=flight-start elapsedMs=' +
+      (Date.now() - this.shuffleOpenStartedAt).toString());
     const target: ImageFlightRect = this.shuffleFlightTarget;
     this.getUIContext().animateTo({ duration: closing ? 280 : 320, curve: Curve.EaseInOut, onFinish: () => {
       if (revision !== this.shuffleFlightRevision) return;
@@ -445,23 +464,43 @@ export struct PinmonyDetailPage {
     this.onBack?.();
   }
   private shuffleImageReady(key: string, backdropUrl: string = ''): void {
-    const pin: string = this.displayedDetail().pinUrl;
-    const selection: string = this.shuffleSelectedImage;
-    const backdrop: string = this.shuffleBackdrop || this.displayedDetail().imageUrl;
-    if (backdropUrl && backdropUrl !== backdrop) return;
-    this.uiCommits.post('shuffle-ready-' + key, (): void => {
-      if (!this.heroVisible || pin !== this.displayedDetail().pinUrl || selection !== this.shuffleSelectedImage ||
-        backdrop !== (this.shuffleBackdrop || this.displayedDetail().imageUrl)) return;
-      if (key === 'backdrop') this.shuffleReadyBackdrop = backdrop;
+    const backdrop: string = backdropUrl || this.shuffleBackdrop || this.displayedDetail().imageUrl;
+    this.uiCommits.post('shuffle-ready-' + key + (key === 'backdrop' ? ':' + backdrop : ''), (): void => {
+      if (!this.heroVisible) return;
+      // Decode readiness belongs to a source, not a transient child Pin/selection
+      // prop. Resolve membership after the complete prop batch has arrived.
+      if (key === 'backdrop') {
+        if (backdrop !== (this.shuffleBackdrop || this.displayedDetail().imageUrl)) return;
+        if (this.shuffleReadyBackdrop !== backdrop) {
+          if (this.shuffleBackdropOpacity > 0) {
+            this.getUIContext().animateTo({ duration: 320, curve: Curve.EaseOut }, () => {
+              this.shuffleBackdropImageOpacity = 1;
+            });
+          } else this.shuffleBackdropImageOpacity = 1;
+        }
+        this.shuffleReadyBackdrop = backdrop;
+      } else if (!this.shuffleItems.some((item: PinmonyShuffleItem): boolean =>
+        key === 'photo:' + this.shufflePhotoUrl(item) || key === 'card:' + (item.imageUrl || ''))) return;
       this.commitShuffleImageReady(key);
     });
   }
   private commitShuffleImageReady(key: string): void {
-    if (!this.shuffleReadyImages.includes(key)) this.shuffleReadyImages = this.shuffleReadyImages.concat(key).slice(-64);
+    // Bound by the current validated collage (at most two keys per item), never
+    // evict the selected photo because other Swiper children finish first.
+    const ready: string[] = this.shuffleReadyImages.filter((source: string): boolean =>
+      this.shuffleItems.some((item: PinmonyShuffleItem): boolean =>
+        source === 'photo:' + this.shufflePhotoUrl(item) || source === 'card:' + (item.imageUrl || '')));
+    if (key !== 'backdrop' && !ready.includes(key)) ready.push(key);
+    this.shuffleReadyImages = ready;
     const item: PinmonyShuffleItem | undefined = this.shuffleItems[this.shuffleIndex];
-    if (this.shuffleSelectedImage && item && this.shuffleReadyBackdrop === (this.shuffleBackdrop || this.displayedDetail().imageUrl) &&
-        this.shuffleReadyImages.includes('photo:' + this.shufflePhotoUrl(item)) &&
-        this.shuffleReadyImages.includes('card:' + (item.imageUrl || ''))) this.shuffleViewerPresented = true;
+    // The photo owns entry readiness. Background, card thumbnail and metadata
+    // may finish independently without holding the tapped artwork in place.
+    if (this.shuffleSelectedImage && item &&
+        this.shuffleReadyImages.includes('photo:' + this.shufflePhotoUrl(item))) {
+      if (!this.shuffleViewerPresented && this.shuffleOpenStartedAt > 0) PinmonyRuntimeLog.info('ShuffleViewerTrace: phase=photo-available elapsedMs=' +
+        (Date.now() - this.shuffleOpenStartedAt).toString());
+      this.shuffleViewerPresented = true;
+    }
   }
   private readonly shuffleStripScroller: Scroller = new Scroller();
   private readonly shuffleHitMasks: PinmonyShuffleHitMasks = new PinmonyShuffleHitMasks();
@@ -712,6 +751,15 @@ export struct PinmonyDetailPage {
   onScrollPosition?: (pinUrl: string, offset: number) => void;
 
   private onPinChanged(): void {
+    // Watched props arrive separately. Resolve the retained parent and entry
+    // state only after this render has delivered the complete presentation.
+    this.uiCommits.post('pin-presentation', (): void => {
+      if (this.heroVisible) this.commitPinPresentation();
+    });
+  }
+
+  private commitPinPresentation(): void {
+    if (this.entryResumed && !this.entryClosing && !this.entryMotionComplete) this.resetEntryMotion();
     if (this.activePin !== this.displayedDetail().pinUrl) {
       const owner: string = this.viewerOwner();
       this.uiCommits.post('viewer-pin-change', (): void => { this.onViewerCancel?.(owner); });
@@ -1377,11 +1425,13 @@ export struct PinmonyDetailPage {
             Button({ type: ButtonType.Normal }) {
               Row() {
                 Text(this.uiText("pm_search_image_8f938fb8")).fontSize(14).fontColor(Color.White)
-                  .width(this.searchLabelVisible ? 64 : 0).opacity(this.searchLabelVisible ? 1 : 0)
-                  .maxLines(1).clip(true).animation({ duration: 240, curve: Curve.EaseInOut })
+                  .wordBreak(WordBreak.BREAK_WORD)
+                  .width(this.searchLabelVisible ? this.imageSearchLabelSize().width : 0).opacity(this.searchLabelVisible ? 1 : 0)
+                  .clip(true).animation({ duration: 240, curve: Curve.EaseInOut })
                 SymbolGlyph($r('sys.symbol.circle_viewfinder')).fontSize(24).fontColor([Color.White])
               }
-            }.width(this.searchLabelVisible ? 108 : 44).height(44).padding({ left: 10, right: 10 })
+            }.width(this.searchLabelVisible ? this.imageSearchLabelSize().width + 44 : 44)
+              .height(this.searchLabelVisible ? Math.max(44, this.imageSearchLabelSize().height + 20) : 44).padding({ left: 10, right: 10 })
               .animation({ duration: 240, curve: Curve.EaseInOut }).borderRadius(16).margin(8)
               .backgroundColor('#77303030').enabled(this.actionsReady || this.auxiliaryReady || this.deferredActions)
               .onClick(() => { if (this.onImageLayer) this.onImageLayer('search'); })
@@ -1792,8 +1842,9 @@ export struct PinmonyDetailPage {
   private shuffleViewerContent() {
       Stack() {
         Swiper() {
-          ForEach(this.shuffleItems, (item: PinmonyShuffleItem) => {
+          ForEach(this.shuffleItems, (item: PinmonyShuffleItem, index: number) => {
             Column({space:16}) {
+              if (this.shuffleViewerItemMounted(index)) {
               Image(this.shufflePhotoUrl(item)).width('100%').layoutWeight(1).objectFit(ImageFit.Contain)
                 .opacity(this.shufflePageOpacity(item.id))
                 .id('pinmony-shuffle-photo-' + this.traceId + '-' + item.id)
@@ -1805,6 +1856,7 @@ export struct PinmonyDetailPage {
                 }, 8)
               Scroll() { this.shuffleSelectedCard(item) }.width('100%').height(188)
                 .opacity(this.shuffleBackdropOpacity)
+              }
             }.width('100%').height('100%').padding({top:16,bottom:16})
           }, (item: PinmonyShuffleItem): string => item.id + ':' + this.uiLanguage)
         }.width('100%').height('100%').index(this.shuffleIndex).loop(false).indicator(false)
@@ -1822,6 +1874,10 @@ export struct PinmonyDetailPage {
       }.width('100%').height('100%').clip(true)
   }
 
+  private shuffleViewerItemMounted(index: number): boolean {
+    return index >= 0 && index < this.shuffleItems.length && Math.abs(index - this.shuffleIndex) <= 1;
+  }
+
   @Builder
   private shuffleOverlay() {
     Stack() {
@@ -1832,9 +1888,9 @@ export struct PinmonyDetailPage {
         ForEach([this.shuffleBackdrop || this.displayedDetail().imageUrl], (backdropUrl: string) => {
         Image(backdropUrl).width('100%').height('100%')
           .objectFit(ImageFit.Cover).blur(80 * this.shuffleBackdropOpacity)
-          .opacity(0.5 * this.shuffleBackdropOpacity)
+          .opacity(0.5 * this.shuffleBackdropOpacity * this.shuffleBackdropImageOpacity)
           .onComplete((event) => {
-            if (event?.loadingStatus !== 0 && event?.loadingStatus !== 1) return;
+            if (event?.loadingStatus !== 1) return;
             this.shuffleImageReady('backdrop', backdropUrl);
           })
           .onError(() => {
