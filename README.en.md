@@ -8,7 +8,7 @@
   <a href="./README.zh-CN.md">中文</a> | <a href="./README.en.md">English</a>
 </p>
 
-Pinmony is a personal-interest HarmonyOS app built for learning, technical research, interface exploration, and mobile experience testing. Sign-in uses ArkWeb, while business screens after sign-in use native ArkUI. Some features depend on the active login session and Pinterest's internal same-origin resources, which are not official public APIs.
+Pinmony is a personal-interest HarmonyOS app built for learning, technical research, interface exploration, and mobile experience testing. Sign-in uses ArkWeb, while business screens after sign-in use native ArkUI. Some features depend on the active login session and Pinterest's internal same-origin resources.
 
 ## Features
 
@@ -20,25 +20,27 @@ Pinmony is a personal-interest HarmonyOS app built for learning, technical resea
 - **Messages and contacts**: read chat messages, search contacts, and send Pins; copy or delete messages and manage conversations with swipe actions. Unread indicators highlight new messages. When the app reads new messages while in the foreground, it can send system notifications that open the corresponding chat.
 - **Notifications and following activity**: view inbox updates and notification details, and browse recommended Pins and topics. Use the activity list to view following activity, follow back, open profiles, or say hello.
 - **Recommendations and privacy**: browse recent activity by date and manage related recommendations, notifications, message permissions, mentions, and blocked accounts.
-- **Display and playback**: configure immersive title bar lighting, light and dark themes, and display preferences, with separate video autoplay controls for mobile data and Wi-Fi.
-- **Languages and devices**: UI resources for Simplified Chinese, Traditional Chinese, US English, UK English, Japanese, Korean, Russian, and Brazilian Portuguese, with phone and tablet layouts.
+- **Display and playback**: configure immersive title bar lighting, light and dark themes, new or classic profile layouts, and full-photo display in Pin details. Adjust screen orientation on tablets and foldable devices, and control video autoplay separately for mobile data and Wi-Fi.
+- **Languages and devices**: UI resources for Simplified Chinese, Traditional Chinese, US English, UK English, Japanese, Korean, Russian, and Brazilian Portuguese, with layouts adapted for phones, tablets, and wide-screen foldable devices.
 
 ## Requirements
 
 | Requirement | Details |
 | --- | --- |
-| Device and system | HarmonyOS 6.1.1 (API 24) or later |
+| Device and system | HarmonyOS 6.1.1 (API 24) or later; API 26 or later is recommended. |
 | Network and account | Access to Pinterest and sign-in with an account and password in the app. Google sign-in is currently unavailable. |
 
-Tablet layouts have been adapted but have not been tested on physical tablets. Correct layout and content display on all pages cannot be guaranteed. Please report display, overlap, or interaction issues through [GitHub Issues](https://github.com/Torotar/Pinmony/issues), including the device model, system version, screenshots, and steps to reproduce.
+Layouts have been adapted for tablets and wide-screen foldable devices. Please report display, overlap, or interaction issues through [GitHub Issues](https://github.com/Torotar/Pinmony/issues), including the device model, system version, screenshots, and steps to reproduce.
 
 ## Common Tasks
 
-- **Open content links**: paste a Pin URL, a `pin.it` short link, or a profile URL into the search box and submit it to open the corresponding content. Keywords continue to use regular search.
-- **Search with photos**: select a photo from the search page or reuse one from photo history, then adjust the image recognition region to view related results. The image recognition option in Pin details also supports searching within a selected region.
-- **Change profile layout and language**: go to Settings → Display Settings to switch between the new and classic profile layouts, adjust immersive lighting, or change the interface language. Choose a language manually or follow the system.
-- **View messages and activity**: use the inbox to view updates, messages, contacts, and following activity. System message notifications require notification permission; tap a notification to open its chat.
+- **Open content links**: paste a Pin URL or a profile URL into the search box and submit it to open the corresponding content.
+- **Search with photos**: select a photo from the search page or reuse one from photo history, then adjust the image recognition region to view related results.
+- **Change profile layout and language**: go to Settings → Display Settings to switch between the new and classic profile layouts, adjust immersive lighting, or change the interface language.
+- **View messages and activity**: use the inbox to view updates, messages, contacts, and following activity. System message notifications require notification permission.
 - **Manage the chat list**: swipe a conversation and choose “Delete chat.” This only hides the current account’s conversation entry on this device; it does not delete messages from the server.
+- **Adjust photo display and screen orientation**: enable “Show full photos in Pin details” under Settings → Display Settings to fit detail photos within the available area.
+- **Check for updates**: check the version under Settings → About, then use the update option to open the Huawei AppGallery testing page.
 
 ## Architecture
 
@@ -51,7 +53,7 @@ Tablet layouts have been adapted but have not been tested on physical tablets. C
 - `feature_inbox`: inbox updates, notification details, messages, contacts, following activity, and chat list state
 - `feature_settings`: settings, account information, language, notifications, social permissions, autoplay, display preferences, and sign-out flow
 - `common_session`: login evidence, session, and credential adaptation
-- `common_network`: native RCP transport and request lifecycle
+- `common_network`: native RCP transport, request admission, scheduling, cancellation, and lifecycle
 - `common_ui`: reusable UI components and shared presentation state
 - `common_foundation`: multilingual resources and preferences, caching, logging, task registration, and base runtime capabilities
 
@@ -62,6 +64,8 @@ App-owned copy uses stable resource names in `common_foundation/src/main/resourc
 Choose a language or follow the system under Settings → Display Settings. When a supported account language is read, the app synchronizes its UI language.
 
 Some translations may be inaccurate or unnatural. Please report translation, text truncation, or display issues through [GitHub Issues](https://github.com/Torotar/Pinmony/issues), including the language and affected page.
+
+## Build and Validation
 
 ### Release Build
 
@@ -75,13 +79,15 @@ If the SDK is installed elsewhere, add `-SdkHome '<HarmonyOS SDK directory>'`. T
 
 The output is `release/Pinmony-release-unsigned.hap`. The script verifies Release mode, `debug=false`, and the absence of Debug source maps. Signing and physical-device testing are separate steps.
 
-### Standard Module Build
+### Debug Build
 
 ```powershell
 $env:DEVECO_SDK_HOME = '<HarmonyOS SDK directory>'
 $env:JAVA_HOME = '<DevEco Studio installation directory>\jbr'
 & '<DevEco Studio installation directory>\tools\hvigor\bin\hvigorw.bat' --mode module -p module=entry assembleHap --no-daemon
 ```
+
+Local regression checks use the relevant scripts under `scripts/check-*.cjs`. Some scripts require the path to the TypeScript module bundled with DevEco Studio. Record local checks, HAP builds, signing, installation, physical-device interaction, and Pinterest online service validation separately; a successful build does not establish that actual usage has been verified.
 
 ## Privacy and Sessions
 
