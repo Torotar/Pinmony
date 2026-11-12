@@ -6007,6 +6007,10 @@
     {
       "name": "pm_message_reaction_title",
       "value": "반응"
+    },
+    {
+      "name": "pm_qq_community_group",
+      "value": "QQ 커뮤니티 그룹"
     }
   ]
 }

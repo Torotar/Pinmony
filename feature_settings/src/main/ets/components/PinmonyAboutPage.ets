@@ -1,3 +1,4 @@
+import { pasteboard } from '@kit.BasicServicesKit';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyUpdateNotice } from '../services/PinmonyUpdateNotice';
@@ -111,6 +112,17 @@ export struct PinmonyAboutPage {
       }
     } finally { this.openingLink = false; }
   }
+  private async copyQqGroup(): Promise<void> {
+    let message: string = 'pm_copied_8f6f8d97';
+    try {
+      await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, '1132346187'));
+    } catch (_) {
+      message = 'pm_unable_to_copy_please_retry_86ee2899';
+    }
+    if (!this.visible) return;
+    try { this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText(message), duration: 3000 })); }
+    catch (_) { PinmonyRuntimeLog.warn('About: copy feedback unavailable'); }
+  }
   private async openUpdateDownload(): Promise<void> {
     await this.openLink('https://appgallery.huawei.com/apptest/CfRhJnKdQS');
   }
@@ -163,6 +175,11 @@ export struct PinmonyAboutPage {
           Column() {
             PinmonyAboutInfoRow({ icon: $r('sys.symbol.info_circle'), title: this.uiText("pm_about_the_project_224e0b60"), description:
               this.uiText("pm_an_unofficial_pinterest_client_for_harmonyos_with_a_native_arkui_5990368f") })
+            Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
+            Button({ type: ButtonType.Normal }) {
+              PinmonyAboutInfoRow({ icon: $r('sys.symbol.person_2'), title: this.uiText('pm_qq_community_group'), description: '1132346187' })
+            }.width('100%').backgroundColor(Color.Transparent)
+              .onClick(() => { this.copyQqGroup(); })
             Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
             Button({ type: ButtonType.Normal }) {
               PinmonyAboutInfoRow({ icon: $r('sys.symbol.link'), title: this.uiText("pm_source_code_606a4e58"), description: 'github.com/Torotar/Pinmony', link: true })
