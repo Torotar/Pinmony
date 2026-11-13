@@ -13,6 +13,6 @@ assert.deepEqual(keys.call({store:{screen:'socialMessages'}}),['social','socialM
 assert(page.includes("retainedAccount: screen === 'account' && this.store.screen === 'personal'"));
 assert(page.includes(".hitTestBehavior(_screen !== this.store.screen ? HitTestMode.None : HitTestMode.Default)"));
 assert(page.includes(".accessibilityLevel(_screen !== this.store.screen ? 'no-hide-descendants' : 'auto')"));
-assert.equal((account.match(/this\.retainedAccount \|\| this\.store\.screen === 'account'/g)||[]).length,3,'retained parent keeps its own title, loading body and content');
+assert.equal((account.match(/this\.retainedAccount \|\| this\.store\.screen === 'account'/g)||[]).length,4,'retained parent keeps its own title, loading body, content and email status');
 assert(page.includes("TransitionEffect.translate({x:'100%'}).animation({duration:180,curve:Curve.EaseOut})"));
 console.log('Account to personal: stable parent key/title/body, incoming animation and underlying interaction isolation passed');

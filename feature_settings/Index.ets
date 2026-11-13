@@ -14,3 +14,10 @@ export { PinmonyUpdateNotice } from './src/main/ets/services/PinmonyUpdateNotice
 export { PinmonyBoardRecoveryPage } from './src/main/ets/components/PinmonyBoardRecoveryPage';
 
 export { PinmonySettingsNetwork } from './src/main/ets/services/PinmonySettingsNetwork';
+
+export { PinmonySessionAccount } from './src/main/ets/models/PinmonySessionAccount';
+export { PinmonySessionAccounts, PinmonySessionAccountsPorts } from './src/main/ets/services/PinmonySessionAccounts';
+
+export { PinmonyAccountEntryMemory } from './src/main/ets/services/PinmonyAccountEntryMemory';
+
+export { PinmonyLoggedOutAccounts, PinmonyLoggedOutAccountPorts } from './src/main/ets/services/PinmonyLoggedOutAccounts';

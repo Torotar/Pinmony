@@ -1,3 +1,4 @@
+import { PinmonySessionAccount } from '../models/PinmonySessionAccount';
 import { PinmonyAccountSettings, PinmonyRecommendationBoard } from '../models/PinmonyAccountSettings';
 import { NotificationGroup } from '../models/PinmonyNotifications';
 import { SocialPermissions, emptySocialPermissions } from '../models/PinmonySocialPermissions';
@@ -5,6 +6,14 @@ export interface PinmonyRecoverableBoard { id: string; name: string; imageUrl: s
 @Observed
 export class PinmonySettingsStore {
   screen: string = 'root';
+  sessionAccounts: PinmonySessionAccount[] = [];
+  sessionAccountsReady: boolean = false;
+  sessionAccountSwitchMode: boolean = false;
+  onAccountEntryChange?: (switchMode: boolean) => void;
+  rememberAccountEntry(switchMode: boolean): void { this.sessionAccountSwitchMode = switchMode; this.onAccountEntryChange?.(switchMode); }
+  sessionAccountsLoading: boolean = false;
+  sessionAccountError: string = '';
+  sessionSwitchUncertain: boolean = false;
   recoverableBoards: PinmonyRecoverableBoard[] = [];
   boardRecoveryReady: boolean = false;
   boardRecoveryFromProfile: boolean = false;
@@ -25,7 +34,7 @@ export class PinmonySettingsStore {
   writeUncertain: boolean = false;
   error: string = '';
   token: number = 0;
-  reset(preserveScroll: boolean = false): void { if (!preserveScroll) this.rootScrollOffset = 0; this.token++; this.recommendationBoards = []; this.recommendationBoardsReady = false; this.recommendationBoardCursor = ''; this.notifications = []; this.recoverableBoards = []; this.boardRecoveryReady = false; this.boardRecoveryFromProfile = false; this.social = emptySocialPermissions(); this.socialMessageGroup = 0; this.screen = 'root'; this.confirmOpen = false; this.recommendationTab = 'ai'; this.data = undefined; this.loading = false; this.busy = false; this.writeUncertain = false; this.error = ''; }
+  reset(preserveScroll: boolean = false): void { if (!preserveScroll) this.rootScrollOffset = 0; this.token++; this.sessionAccounts = []; this.sessionAccountsReady = false; this.sessionAccountsLoading = false; this.sessionAccountError = ''; this.sessionSwitchUncertain = false; this.recommendationBoards = []; this.recommendationBoardsReady = false; this.recommendationBoardCursor = ''; this.notifications = []; this.recoverableBoards = []; this.boardRecoveryReady = false; this.boardRecoveryFromProfile = false; this.social = emptySocialPermissions(); this.socialMessageGroup = 0; this.screen = 'root'; this.confirmOpen = false; this.recommendationTab = 'ai'; this.data = undefined; this.loading = false; this.busy = false; this.writeUncertain = false; this.error = ''; }
   back(): boolean {
     if (this.busy) return true;
     if (this.confirmOpen) { this.confirmOpen = false; return true; }

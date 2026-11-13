@@ -1,5 +1,23 @@
 {
   "string": [
+    {"name": "pm_login_other_account", "value": "登录其他账户"},
+    {"name": "pm_logout_current_account", "value": "退出当前账户"},
+    {"name": "pm_logout_stay_on_login", "value": "退出后将停留在登录页，不会自动登录其他账户。"},
+
+    {"name": "pm_switch_accounts", "value": "切换账户"},
+    {"name": "pm_add_account", "value": "添加账户"},
+    {"name": "pm_session_current", "value": "目前登录账户"},
+    {"name": "pm_session_other", "value": "其他账户"},
+    {"name": "pm_session_personal", "value": "个人"},
+    {"name": "pm_session_business", "value": "企业"},
+    {"name": "pm_session_accounts_description", "value": "切换账户和管理登录。你稍后随时可以在账户设置中更改账户类型或转换账户。"},
+    {"name": "pm_session_accounts_failed", "value": "无法读取账户列表，请重试"},
+    {"name": "pm_session_switch_unknown", "value": "无法确认账户切换结果，请先校验当前会话。不会重复发送切换请求。"},
+    {"name": "pm_session_verify", "value": "校验当前账户"},
+
+    {"name": "pm_email_confirmed", "value": "已确认"},
+    {"name": "pm_email_confirmation_notice", "value": "确认你的电子邮箱，以防你需要帐户方面的帮助"},
+
     {
       "name": "pm_remove_chat_window",
       "value": "删除聊天"
@@ -2086,7 +2104,7 @@
     },
     {
       "name": "pm_log_out_e7677436",
-      "value": "退出账号"
+      "value": "退出账户"
     },
     {
       "name": "pm_logs_7dbac1c2",
@@ -6011,6 +6029,22 @@
     {
       "name": "pm_qq_community_group",
       "value": "QQ 交流群"
+    },
+    {
+      "name": "pm_session_logout_title",
+      "value": "退出账户"
+    },
+    {
+      "name": "pm_session_logout_message",
+      "value": "确定要退出此账户吗？"
+    },
+    {
+      "name": "pm_session_logout_action",
+      "value": "退出账户"
+    },
+    {
+      "name": "pm_session_logout_unknown",
+      "value": "无法确认退出结果，请先校验当前会话。不会自动重复退出。"
     }
   ]
 }

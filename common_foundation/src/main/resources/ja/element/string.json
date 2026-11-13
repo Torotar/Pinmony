@@ -1,5 +1,23 @@
 {
   "string": [
+    {"name": "pm_login_other_account", "value": "別のアカウントでログイン"},
+    {"name": "pm_logout_current_account", "value": "現在のアカウントからログアウト"},
+    {"name": "pm_logout_stay_on_login", "value": "ログアウト後はログイン画面に留まります。別のアカウントに自動でログインすることはありません。"},
+
+    {"name": "pm_switch_accounts", "value": "アカウントを切り替える"},
+    {"name": "pm_add_account", "value": "アカウントを追加"},
+    {"name": "pm_session_current", "value": "ログイン中のアカウント"},
+    {"name": "pm_session_other", "value": "その他のアカウント"},
+    {"name": "pm_session_personal", "value": "個人"},
+    {"name": "pm_session_business", "value": "ビジネス"},
+    {"name": "pm_session_accounts_description", "value": "アカウントを切り替えてログインを管理します。アカウントの種類や設定は後から変更できます。"},
+    {"name": "pm_session_accounts_failed", "value": "アカウントを読み込めませんでした。もう一度お試しください。"},
+    {"name": "pm_session_switch_unknown", "value": "切り替え結果を確認できません。現在のセッションを確認してください。切り替えリクエストは再送信されません。"},
+    {"name": "pm_session_verify", "value": "現在のアカウントを確認"},
+
+    {"name": "pm_email_confirmed", "value": "確認済み"},
+    {"name": "pm_email_confirmation_notice", "value": "アカウントのサポートが必要になった場合に備えて、メールアドレスを確認してください"},
+
     {
       "name": "pm_remove_chat_window",
       "value": "チャットを削除"
@@ -6011,6 +6029,22 @@
     {
       "name": "pm_qq_community_group",
       "value": "QQ 交流グループ"
+    },
+    {
+      "name": "pm_session_logout_title",
+      "value": "アカウントからログアウト"
+    },
+    {
+      "name": "pm_session_logout_message",
+      "value": "このアカウントからログアウトしますか？"
+    },
+    {
+      "name": "pm_session_logout_action",
+      "value": "ログアウト"
+    },
+    {
+      "name": "pm_session_logout_unknown",
+      "value": "ログアウトの結果を確認できません。まず現在のセッションを確認してください。ログアウトは自動で再実行されません。"
     }
   ]
 }

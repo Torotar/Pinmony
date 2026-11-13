@@ -157,10 +157,13 @@ async function check() {
   assert.equal(native.authWebVisible(), false, 'authenticated state never exposes website UI');
   native.authStatus = 'unauthenticated'; assert.equal(native.authWebVisible(), true);
   native.navigationAddress = 'https://www.pinterest.com/'; assert.equal(native.authWebVisible(), false);
-  let resetCount = 0, currentUrl = message.pageUrl;
+  let resetCount = 0, avatarChanges = 0, unreadPolls = 0, currentUrl = message.pageUrl;
   const loaded = [];
   Object.assign(native, {
     authEpoch: 3, authStatus: 'authenticated', authCheckTimer: -1,
+    resetNativeBusinessSession() { this.businessSession.reset(); },
+    restoreRecoveredPage() {}, userAvatarReads: { sessionChanged() { avatarChanges++; } },
+    inboxUnreadNativeReads: { reset() {}, poll() { unreadPolls++; } },
     controller: { getUrl: () => currentUrl, loadUrl: url => loaded.push(url), runJavaScript: async () => 'true' },
     homeCacheAccountIdFromProfileUrl: value => value || '', homePageKeyFromAddress: () => '',
     tryRestoreAuthenticatedHome() { }, profileUrlFromAddress: value => value || '',
@@ -175,6 +178,7 @@ async function check() {
   currentUrl = context.PINTEREST_LOGIN_URL;
   native.updateAuthState(JSON.stringify({ ...message, pageUrl: currentUrl }));
   assert.equal(native.authStatus, 'authenticated'); assert.equal(loaded.at(-1), context.PINTEREST_URL);
+  assert(avatarChanges > 0 && unreadPolls > 0, 'confirmed authentication notifies dependent native readers');
   let clearedDetails = 0, clearedCache = 0, clearedPrefetch = 0;
   Object.assign(native, {
     homeCacheAccountId: 'old-account', clearOfflineHomeMarker() { }, clearRootTabCaches() { },
@@ -197,7 +201,7 @@ async function check() {
   assert.equal(loaded.length, beforeRetry + 1, 'rapid manual retry loads the session page once');
   assert.match(fs.readFileSync('entry/src/main/ets/components/PinmonyLoginPage.ets', 'utf8'), /\.hitTestBehavior\(view.visible \? HitTestMode.Default : HitTestMode.None\)/);
   const tabsStart = source.indexOf('  private buildRootTabs()');
-  const tabsEnd = source.indexOf('  build()', tabsStart);
+  const tabsEnd = source.indexOf('\n  }', tabsStart) + 5;
   assert.ok(tabsStart >= 0 && tabsEnd > tabsStart);
   const tabs = source.slice(tabsStart, tabsEnd);
   assert.equal((tabs.match(/TabContent\(\)/g) || []).length, 4);

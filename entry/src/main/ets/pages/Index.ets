@@ -1,3 +1,6 @@
+import { PinmonyLoggedOutAccounts, PinmonyLoggedOutAccountPorts } from 'feature_settings';
+import { PinmonyAccountEntryMemory, PinmonySessionAccount, PinmonySessionAccounts, PinmonySessionAccountsPorts } from 'feature_settings';
+import { PinmonySessionVerificationResult } from 'common_session';
 import { PinmonyHomeTab } from 'feature_home';
 import { PinmonyScrollRecovery } from 'common_foundation';
 import { PinmonyPageRecovery, PinmonyRecoveryState, PinmonyRecoveryRoute } from '../app/PinmonyPageRecovery';
@@ -121,7 +124,7 @@ import { webview } from '@kit.ArkWeb';
 import { connection } from '@kit.NetworkKit';
 import { PinmonyDetailNativeAuxiliary, PIN_NATIVE_DETAIL_AUXILIARY_ENABLED, PinmonyDetailNativeAuxiliaryPorts } from '../app/PinmonyDetailNativeAuxiliary';
 import { PIN_NATIVE_DETAIL_READS_ENABLED, PinmonyDetailNativeReads, PinmonyDetailNativeReadsPorts } from '../app/PinmonyDetailNativeReads';
-import { PinmonyBusinessSession, PinmonySessionEnvironment, PinmonyBusinessSessionContext, PinmonyAuthStatus, PinmonyAuthMessage, PIN_AUTH_BRIDGE_SCRIPT, PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, isPinterestAuthRoute, PINTEREST_LOGIN_URL } from 'common_session';
+import { PinmonyBusinessSession, PinmonySessionEnvironment, PinmonyBusinessSessionContext, PinmonyAuthStatus, PinmonyAuthMessage, PIN_AUTH_BRIDGE_SCRIPT, PIN_ADD_ACCOUNT_LOGIN_SCRIPT, PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, isPinterestAuthRoute, PINTEREST_LOGIN_URL } from 'common_session';
 import { PinmonySessionVerification, PIN_NATIVE_LOGIN_LIFECYCLE_ENABLED } from '../app/PinmonySessionVerification';
 
 import { PinmonyStatusPage, PinmonyModalNavigation, PinmonyOptionsNavigation } from 'common_ui';
@@ -201,6 +204,8 @@ struct Index {
   }
   private readonly loginScripts: ScriptItem[] = [{ script: PIN_AUTH_BRIDGE_SCRIPT, scriptRules: ['*'] },
     { script: PIN_GOOGLE_LOGIN_UNAVAILABLE_SCRIPT, scriptRules: ['*'] }];
+  private readonly addAccountLoginScripts: ScriptItem[] = [{ script: PIN_ADD_ACCOUNT_LOGIN_SCRIPT, scriptRules: ['*'] },
+    ...this.loginScripts];
   private readonly documentStartScripts: ScriptItem[] = pinWebDocumentStartScripts();
   // Native presentation and routing are product invariants, independent of request rollout gates.
   private readonly nativeBusinessRoutesEnabled: boolean = true;
@@ -946,7 +951,19 @@ struct Index {
     page: (): string => this.sessionDocumentUrl(),
     userAgent: (): string => this.sessionEnvironment.userAgent(),
     active: (): boolean => !this.businessSuspended,
-    accept: (message: PinmonyAuthMessage): void => this.sessionCoordinator.updateAuthState(JSON.stringify(message), this.nativeLoginEnabled),
+    accept: (message: PinmonyAuthMessage): void => {
+      if (message.status === 'authenticated' && this.loggedOutAccounts?.acceptsWebLogin() === false) {
+        this.nativeVerificationPending = false; this.authStatus = 'unauthenticated'; this.loginPageVisible = true; return;
+      }
+      if (this.nativeAddAccountFlow && this.loginHostMounted && message.status === 'authenticated' &&
+          !this.isDifferentAddingAccount(message.profileUrl)) {
+        this.nativeVerificationPending = false; this.nativeLoginEvidenceKey = '';
+        this.authStatus = 'unauthenticated'; this.loginPageVisible = true;
+        PinmonyRuntimeLog.info('AddAccount: native existing identity ignored');
+        return;
+      }
+      this.sessionCoordinator.updateAuthState(JSON.stringify(message), this.nativeLoginEnabled);
+    },
   });
 
   private readonly sessionCoordinator: PinmonySessionCoordinator = new PinmonySessionCoordinator({
@@ -955,6 +972,11 @@ struct Index {
     loginRequired: (): void => {if(!this.loginHostMounted)this.openNativeLogin();},
     releaseLogin: (): void => { void this.releaseNativeLogin(); },
     verifyLoginEvidence: (message: PinmonyAuthMessage): void => {
+      if (this.loggedOutAccounts?.acceptsWebLogin() === false) return;
+      if (this.nativeAddAccountFlow && this.loginHostMounted && !this.isDifferentAddingAccount(message.profileUrl)) {
+        PinmonyRuntimeLog.info('AddAccount: web previous or incomplete identity ignored');
+        return;
+      }
       const origin: RegExpMatchArray | null = message.pageUrl.match(/^https:\/\/(?:www|uk)\.pinterest\.com(?=\/)/);
       if(!origin)return;
       const key: string = this.authEpoch.toString() + ':' + message.profileUrl;
@@ -1341,6 +1363,51 @@ struct Index {
     loginFailed: (message: string): void => { this.authStatus = 'error'; this.failureDetails = message; }
   } as PinmonyLogoutPorts);
 
+  private logoutPreparing: boolean = false;
+  @State private loggedOutAccounts: PinmonyLoggedOutAccounts = new PinmonyLoggedOutAccounts({
+    network: (): PinmonyNativeNetwork => this.nativeNetwork,
+    available: (): boolean => this.nativeLoginEnabled && this.loginHostMounted && this.authStatus !== 'authenticated' && !this.businessSuspended && !this.loadFailed,
+    epoch: (): number => this.nativeSessionEpoch,
+    userAgent: (): string => this.sessionEnvironment.userAgent(),
+    confirmed: (result: PinmonySessionVerificationResult): void => {
+      this.sessionVerification.cancel('other-account-confirmed');
+      this.nativeSessionEpoch++; this.authEpoch++; this.authStatus = 'checking';
+      this.sessionCoordinator.updateAuthState(JSON.stringify({ status: 'authenticated', profileUrl: result.profileUrl,
+        appVersion: result.appVersion, epoch: this.nativeSessionEpoch, pageUrl: this.nativeSessionOrigin + '/' }), true);
+      PinmonyI18n.syncAccountLanguage(result.accountLanguage || '');
+    }
+  } as PinmonyLoggedOutAccountPorts);
+
+  private accountSwitchPending: boolean = false;
+  private nativeAddingAccountProfile: string = '';
+  private nativeAddAccountFlow: boolean = false;
+  private readonly sessionAccounts: PinmonySessionAccounts = new PinmonySessionAccounts(this.settingsStore, {
+    profile: (): string => this.authenticatedProfileUrl,
+    session: (): PinmonyBusinessSessionContext => this.businessSession.context(this.authStatus),
+    network: (): PinmonyNativeNetwork => this.nativeNetwork,
+    active: (): boolean => PIN_NATIVE_NETWORK_ENABLED && this.nativeLoginEnabled && !this.businessSuspended,
+    visible: (): boolean => this.profileSettingsVisible && ['root', 'sessionAccounts'].includes(this.settingsStore.screen),
+    beginSwitch: (): void => {
+      this.accountSwitchPending = true;
+      this.sessionVerification.cancel('account-switch');
+      this.nativeNetwork.invalidate(); this.detailReadNetwork.invalidate(); this.inboxBackgroundSync.stop();
+    },
+    expired: (): void => { this.resetAuthenticatedContent(); this.accountSwitchPending = false; this.openNativeLogin(); },
+    confirmed: (result: PinmonySessionVerificationResult): void => {
+      this.sessionVerification.cancel('account-switch-confirmed');
+      this.resetAuthenticatedContent(); this.accountSwitchPending = false;
+      this.nativeSessionEpoch++; this.authEpoch++; this.authStatus = 'checking';
+      this.sessionCoordinator.updateAuthState(JSON.stringify({ status: 'authenticated', profileUrl: result.profileUrl,
+        appVersion: result.appVersion, epoch: this.nativeSessionEpoch, pageUrl: this.nativeSessionOrigin + '/' }), true);
+      PinmonyI18n.syncAccountLanguage(result.accountLanguage || '');
+    },
+    loggedOut: (accounts: PinmonySessionAccount[], origin: string): void => {
+      this.loggedOutAccounts.stage(accounts, origin);
+      this.accountSwitchPending = false;
+      this.completeLogout();
+    }
+  } as PinmonySessionAccountsPorts);
+
   private lifecycleRegistry: PinmonyControllerLifecycle | undefined = undefined;
   private controllerLifecycle(): PinmonyControllerLifecycle {
     if (!this.lifecycleRegistry) {
@@ -1360,6 +1427,7 @@ struct Index {
         if (this.rootPullKind) this.finishRootPull(this.rootPullKind);
         if (this.homeStore.customHomeMenu) this.dismissShareSheet();
       }, [
+        { name: 'session-accounts', pause: (): void => this.sessionAccounts.pause(), resume: (): void => { if (this.settingsStore.screen === 'sessionAccounts' && !this.settingsStore.sessionAccountsReady) void this.sessionAccounts.read(); }, reset: (): void => { this.sessionAccounts.reset(); this.accountSwitchPending = false; } },
         { name: 'detail-autoplay', pause: (): void => this.detailNativeReads.invalidateAutoplay(),
           reset: (): void => this.detailNativeReads.invalidateAutoplay() },
         { name: 'profile-search', pause: (): void => this.profileSearchReads.pause(),
@@ -1748,7 +1816,7 @@ struct Index {
     visitor: (): boolean => this.profileStore.origins.length > 0,
     initialBoardsHub: (): boolean => !this.profileLegacyLayout && this.profileStore.origins.length === 0,
     selected: (): boolean => this.usesNativeProfileReads(),
-    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && (this.activeTab === 3 || this.profileStore.origins.length > 0) && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.boardStore.boardDetail && !this.boardStore.pendingBoardUrl && !this.profileStore.profileWebFlow,
+    active: (): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && (this.activeTab === 3 || this.profileStore.origins.length > 0 || this.profileSettingsVisible && this.settingsProfileDepth < 0) && !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.boardStore.boardDetail && !this.boardStore.pendingBoardUrl && !this.profileStore.profileWebFlow,
     network: (): PinmonyNativeNetwork => this.nativeNetwork,
     document: (): string => this.sessionDocumentUrl(), documentEpoch: (): number => this.authEpoch,
     recordAddress: (address: string): void => {if(this.profileStore.origins.length > 0){this.navigationAddress = address;this.nativeBackTarget = address;}else this.rootTabAddresses.set(3,address);},
@@ -2394,6 +2462,8 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    this.settingsStore.onAccountEntryChange = (switchMode: boolean): void => PinmonyAccountEntryMemory.save(switchMode);
+    this.settingsStore.sessionAccountSwitchMode = PinmonyAccountEntryMemory.initialize(this.getUIContext().getHostContext() as common.UIAbilityContext);
     PinmonyPageRecovery.bind((): PinmonyRecoveryState | undefined => this.captureRecoveryState());
     this.inboxBackgroundSync.install();
     this.userAvatarReads.install();
@@ -2650,8 +2720,17 @@ struct Index {
     catch (_) { throw new Error('session-navigation-unavailable'); }
   }
 
+  private isDifferentAddingAccount(profileUrl: string): boolean {
+    const previous: RegExpMatchArray | null = this.nativeAddingAccountProfile.match(/^https:\/\/(?:www|uk)\.pinterest\.com\/([A-Za-z0-9_]{1,100})\/$/i);
+    const candidate: RegExpMatchArray | null = profileUrl.match(/^https:\/\/(?:www|uk)\.pinterest\.com\/([A-Za-z0-9_]{1,100})\/$/i);
+    return !!previous && !!candidate && previous[1].toLowerCase() !== candidate[1].toLowerCase();
+  }
+
   private startNativeVerification(): void {
     if(!this.nativeLoginEnabled || this.businessSuspended || this.nativeVerificationPending)return;
+    if (AppStorage.get<boolean>('pinmonyManualLoginRequired') === true && !this.loggedOutAccounts?.active) {
+      this.loggedOutAccounts.arm();
+    }
     try {
       if (!connection.hasDefaultNetSync()) {
         this.sessionVerification.cancel('offline'); this.nativeSessionEpoch++;
@@ -2698,11 +2777,13 @@ struct Index {
     this.nativeRootOnly = false;this.navigationAddress = this.loginStartUrl;
     if(this.loginHostMounted)this.loadSessionDocument(this.loginStartUrl);
     else {this.controller = new webview.WebviewController();this.loginHostMounted = true;}
+    if (this.nativeAddAccountFlow) PinmonyRuntimeLog.info('AddAccount: secondary login route state enabled');
     PinmonyRuntimeLog.info('NativeSession: login host mounted');
   }
 
   private async releaseNativeLogin(): Promise<void> {
     if(!this.nativeLoginEnabled || this.authStatus !== 'authenticated')return;
+    this.loggedOutAccounts?.reset();
     const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
     if(!session.authenticated || !session.origin)return;
     const epoch: number = this.nativeSessionEpoch;
@@ -2721,6 +2802,19 @@ struct Index {
     if (!PinmonySessionHistory.save(true)) PinmonyRuntimeLog.warn('NativeSession: history persistence unavailable');
     this.nativeVerificationPending = false;this.nativeSessionEpoch++;this.authEpoch++;
     this.logoutAwaitingLogin = false;this.nativeLoginEvidenceKey = '';this.loginHostMounted = false;
+    const addedAccount: boolean = this.nativeAddAccountFlow && this.isDifferentAddingAccount(this.authenticatedProfileUrl);
+    this.nativeAddingAccountProfile = '';
+    if (this.nativeAddAccountFlow) {
+      this.nativeAddAccountFlow = false;
+      if (addedAccount) this.settingsStore.rememberAccountEntry(true);
+      const confirmedEpoch: number = this.nativeSessionEpoch;
+      const confirmedProfile: string = this.authenticatedProfileUrl;
+      this.coordinatorTasks.timeout((): void => {
+        if (this.businessSuspended || this.authStatus !== 'authenticated' || this.nativeSessionEpoch !== confirmedEpoch ||
+            this.authenticatedProfileUrl !== confirmedProfile) return;
+        this.openProfileSettings();
+      }, 0);
+    }
     PinmonyRuntimeLog.info('NativeSession: native account confirmed webMounted=false');
   }
 
@@ -2785,7 +2879,9 @@ struct Index {
 
   private resetNativeBusinessSession(): void { this.boardInvitationNotice.reset(); this.imageViewer.cancel(); this.inboxBackgroundSync.stop(); this.businessSession.reset(); this.userAvatarReads.reset(); }
   private nativeBusinessSessionContext(): PinmonyBusinessSessionContext {
-    return this.businessSession.context(this.authStatus);
+    const context: PinmonyBusinessSessionContext = this.businessSession.context(this.authStatus);
+    if (this.accountSwitchPending) context.authenticated = false;
+    return context;
   }
 
   private nativeNetworkContext(): PinmonyNetworkContext {
@@ -2838,7 +2934,7 @@ struct Index {
   private resetAuthenticatedContent(): void { this.inboxBackgroundSync.stop(); this.chatProfileTransition = false; this.chatProfileVisible = false; this.chatProfileDepth = -1; this.chatProfileParentActive = false; this.profileChatActive = false; this.profileChatOpening = false; this.retainedProfilePanel = undefined; this.panelProfileVisible = false; this.panelProfileDepth = -1; this.detailEntryPhotos.clear(); this.detailEntryCards.clear(); this.detailSearchParents = []; this.homeEntryResumed = false; this.boardRecoveryVisible = false; this.controllerLifecycle().resetHost(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
 
   private updateAuthState(value: string): void {
-    if(this.nativeLoginEnabled && !this.loginHostMounted)return;
+    if(this.nativeLoginEnabled && (!this.loginHostMounted || this.loadFailed))return;
     this.sessionCoordinator.updateAuthState(value);
     if(!this.nativeLoginEnabled)this.sessionVerification?.observeWebEvidence(value);
   }
@@ -2853,7 +2949,17 @@ struct Index {
   }
 
   private retryLogin(): void {
-    if(this.nativeLoginEnabled){this.nativeVerificationPending = false;this.startNativeVerification();return;}
+    if(this.nativeLoginEnabled){
+      if (this.businessSuspended || this.authStatus === 'authenticated') return;
+      if (this.loginHostMounted) {
+        if (this.loginDocumentLoading || !this.loadFailed && this.authStatus !== 'error') return;
+        PinmonyRuntimeLog.info('LoginRetry: phase=requested target=login-document');
+        try { this.openNativeLogin(); }
+        catch (_) { this.handleMainFrameFailure(this.loginStartUrl, -1, 'navigation-unavailable'); }
+        return;
+      }
+      this.nativeVerificationPending = false;this.startNativeVerification();return;
+    }
     return this.sessionCoordinator.retryLogin();
   }
 
@@ -5009,7 +5115,18 @@ struct Index {
 
   private scheduleInterruptedHomeRecovery(): void { return this.failureRecoveryCoordinator.scheduleInterruptedHomeRecovery(); }
 
-  private handleMainFrameFailure(url: string, code: number, info: string): void { return this.failureRecoveryCoordinator.handleMainFrameFailure(url, code, info); }
+  private handleMainFrameFailure(url: string, code: number, info: string): void {
+    if (this.nativeLoginEnabled && this.loginHostMounted && this.authStatus !== 'authenticated') {
+      this.sessionVerification.cancel('login-document-failed'); this.nativeVerificationPending = false;
+      this.nativeSessionEpoch++; this.authEpoch++; this.nativeLoginEvidenceKey = '';
+      this.loginDocumentLoading = false; this.webPageLoading = false; this.offlineCacheLoading = false;
+      this.authStatus = 'error'; this.loadFailed = true;
+      this.failureDetails = this.describeFailure(this.loginStartUrl, code);
+      PinmonyRuntimeLog.warn('LoginRetry: phase=failed code=' + code.toString() + ' manualRetry=true');
+      return;
+    }
+    return this.failureRecoveryCoordinator.handleMainFrameFailure(url, code, info);
+  }
 
   private describeFailure(url: string, code: number): string { return this.failureRecoveryCoordinator.describeFailure(url, code); }
 
@@ -7258,12 +7375,31 @@ struct Index {
     this.systemActions.installDownloadDelegate(this.controller);
   }
 
-  private cancelAccountSettings(): void { this.settingsController.cancel(); }
+  private cancelAccountSettings(): void { this.sessionAccounts.pause(); this.settingsController.cancel(); }
   private async readNotifications(): Promise<void> { await this.settingsController.readNotifications(); }
 
-  private async logoutAccount(): Promise<void> { await this.logoutCoordinator.logout(); }
+  private async logoutAccount(): Promise<void> {
+    if (this.logoutPreparing || this.authStatus !== 'authenticated' || !this.profileSettingsVisible ||
+        this.settingsStore.screen !== 'root' || this.settingsStore.busy || this.settingsStore.loading || this.settingsStore.sessionAccountsLoading) return;
+    this.logoutPreparing = true;
+    const epoch: number = this.nativeSessionEpoch, token: number = this.settingsStore.token;
+    try {
+      await this.sessionAccounts.read();
+      if (epoch !== this.nativeSessionEpoch || token !== this.settingsStore.token || this.authStatus !== 'authenticated' || this.businessSuspended ||
+          !this.profileSettingsVisible || this.settingsStore.screen !== 'root') return;
+      if (!this.settingsStore.sessionAccountsReady) {
+        this.settingsStore.error = this.settingsStore.sessionAccountError || PinmonyI18n.message('pm_session_accounts_failed'); return;
+      }
+      this.loggedOutAccounts.stage(this.settingsStore.sessionAccounts, this.nativeBusinessSessionContext().origin);
+      await this.logoutCoordinator.logout();
+      if (!this.loggedOutAccounts.active) this.loggedOutAccounts.reset();
+    } finally { this.logoutPreparing = false; }
+  }
 
   private completeLogout(): void {
+    if (!PinmonySessionHistory.requireManualLogin()) PinmonyRuntimeLog.warn('NativeSession: explicit logout intent persistence unavailable');
+    this.loggedOutAccounts.arm();
+    this.settingsStore.rememberAccountEntry(false);
     this.resetAuthenticatedContent();
     this.authEpoch++;
     this.authStatus = 'unauthenticated';
@@ -7280,6 +7416,16 @@ struct Index {
   private startOpeningDetailRead(pinUrl: string, token: number): void { return this.detailOpeningCoordinator.startOpeningDetailRead(pinUrl, token); }
 
   private async requestAccountSettings(action: string, value: string): Promise<void> {
+    if (action === 'sessionAccounts') { await this.sessionAccounts.read(); return; }
+    if (action === 'logoutSessionAccount') { await this.sessionAccounts.logoutSelected(value); return; }
+    if (action === 'switchAccount') { await this.sessionAccounts.switchTo(value); return; }
+    if (action === 'verifySwitchAccount') { await this.sessionAccounts.verifyUncertain(); return; }
+    if (action === 'addAccount') {
+      if (!this.nativeLoginEnabled || this.authStatus !== 'authenticated' || this.businessSuspended || !this.profileSettingsVisible ||
+          this.settingsStore.busy || this.settingsStore.sessionSwitchUncertain || this.accountSwitchPending) return;
+      this.nativeAddingAccountProfile = this.authenticatedProfileUrl; this.nativeAddAccountFlow = true;
+      this.resetAuthenticatedContent(); this.openNativeLogin(); return;
+    }
     if (action === 'logout') { await this.logoutAccount(); return; }
     await this.settingsController.request(action, value);
   }
@@ -7296,6 +7442,7 @@ struct Index {
     this.rootContextCoordinator.notify();
   }
   private closeProfileSettings(): void {
+    if (this.accountSwitchPending) return;
     if (this.pinStore.detail || this.pinStore.detailOpeningPin) { this.backFromDetail(); return; }
     if (Date.now() < this.nativeChildBackUntil) return;
     try {
@@ -7310,13 +7457,24 @@ struct Index {
     const recoveredFromProfile: boolean = this.settingsStore.boardRecoveryFromProfile && this.settingsStore.recoverableBoards.some((board): boolean => board.restored);
     this.cancelAccountSettings(); this.settingsStore.reset(true);
     this.nativeChildBackUntil = Date.now() + 220;
-    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => { this.profileSettingsVisible = false; });
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+      this.profileSettingsVisible = false;
+      if (this.nativeBusinessRoutesEnabled && this.activeTab === 0) void this.homeNativeReads.demand();
+    });
     if (recoveredFromProfile) { this.profileStore.profileCache.clear(); this.profileNativeReads.refresh(); }
    } finally { this.rootContextCoordinator.notify(); } }
 
   private rootExitBackAt: number = 0;
   private rootExitBackHandled: boolean = false;
   onBackPress(): boolean {
+    if (this.accountSwitchPending && this.profileSettingsVisible) return true;
+    if (this.nativeAddAccountFlow && this.authStatus !== 'authenticated') {
+      this.loginHostMounted = false; this.loginPageVisible = false;
+      this.sessionVerification.cancel('add-account-back'); this.nativeVerificationPending = false;
+      this.nativeSessionEpoch++; this.authEpoch++; this.authStatus = 'checking';
+      void this.sessionVerification.demand(); return true;
+    }
+
     this.pageRecovery.cancel(); PinmonyPageRecovery.clear();
     if (this.imageViewer.visible) { this.imageViewer.close(); return true; }
     if(this.noticeChats.length) { this.noticeChatAction(this.noticeChats[this.noticeChats.length - 1],'back'); return true; }
@@ -7329,7 +7487,8 @@ struct Index {
     if (this.profileChatActive) { if (this.inboxStore.inboxFlow) void this.inboxFlowAction('back'); else this.profileChatActive = false; return true; }
     if (this.boardOrderVisible) { if (!this.boardOrderBusy) this.boardOrderBackRequest++; return true; }
     if (this.boardRecoveryVisible) { if (!this.settingsStore.busy) this.boardRecoveryVisible = false; return true; }
-    if (this.authStatus !== 'authenticated' && !this.offlinePreviewMode && !this.authWebVisible()) {
+    if (this.authStatus !== 'authenticated' && !this.offlinePreviewMode &&
+        (!this.authWebVisible() || this.loggedOutAccounts?.active)) {
       return this.handleRootExitBack();
     }
     this.rootExitBackHandled = false;
@@ -7709,6 +7868,8 @@ struct Index {
     if (this.authStatus === 'authenticated') {
       this.settingsProfileReturning = false;
       this.getUIContext().animateTo({ duration: 260, curve: Curve.EaseOut }, () => { this.profileSettingsVisible = true; });
+      if (this.activeTab === 0) this.homeNativeReads.pause();
+      if (this.nativeBusinessRoutesEnabled) void this.profileNativeReads.demand();
     }
   }
 
@@ -7914,12 +8075,15 @@ struct Index {
         }
         if (!this.nativeLoginEnabled || this.loginHostMounted) {
         PinmonyBuildLoginPage({
-          controller: this.controller, bridge: this.shareBridge, scripts: this.nativeLoginEnabled ? this.loginScripts : this.documentStartScripts,
+          controller: this.controller, bridge: this.shareBridge, scripts: this.nativeLoginEnabled ? (this.nativeAddAccountFlow || this.loggedOutAccounts.active ? this.addAccountLoginScripts : this.loginScripts) : this.documentStartScripts,
           url: this.nativeLoginEnabled ? this.loginStartUrl : PINTEREST_URL,
           isCurrent: (controller: webview.WebviewController): boolean => !this.nativeLoginEnabled || this.loginHostMounted && controller === this.controller,
           lifecycle: this.webLifecycleCoordinator, visible: this.authWebVisible(),
-          loading: this.loginDocumentLoading,
-          onLoadingChanged: (loading: boolean): void => { this.loginDocumentLoading = loading; },
+          loading: this.loginDocumentLoading, otherAccounts: this.loggedOutAccounts,
+          onLoadingChanged: (loading: boolean): void => {
+            this.loginDocumentLoading = loading;
+            if (!loading && this.loggedOutAccounts.active && !this.nativeAddAccountFlow) void this.loggedOutAccounts.restore(this.nativeSessionOrigin);
+          },
           authenticated: this.authStatus === 'authenticated', presentationOnly: this.pinStore.detailPresentationOnly,
           onUnsupportedLogin: (): void => this.showUnsupportedLogin(),
           captureEnvironment: (): void => {

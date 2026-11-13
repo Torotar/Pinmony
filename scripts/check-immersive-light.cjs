@@ -7,6 +7,7 @@ const start = source.indexOf('  private options()');
 const end = source.indexOf('  @Builder', start);
 assert(start >= 0 && end > start);
 const context = { $r: value => value, Color: { Transparent: 'transparent' }, BlurStrategy: { ENABLE: 1, DISABLE: 0 }, ScrollEffectType: { IMMERSIVE_GRADIENT_BLUR: 1 },
+  deviceInfo: { apiAvailable: () => false },
   hdsMaterial: { MaterialType: { IMMERSIVE: 1, NONE: 0, ADAPTIVE: 100 }, getSystemMaterialTypes: () => [1], MaterialLevel: { GENTLE: 1, SMOOTH: 2, EXQUISITE: 0 } } };
 const helper = fs.readFileSync('common_ui/src/main/ets/services/PinmonyImmersiveLight.ets', 'utf8').replace(/^import .*;\r?\n/gm, '').replace(/export /g, '');
 vm.runInNewContext(ts.transpileModule(helper + '; globalThis.PinmonyImmersiveLight = PinmonyImmersiveLight;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);

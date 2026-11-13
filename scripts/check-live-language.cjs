@@ -11,11 +11,33 @@ module.exports = function checkLiveLanguage(ts, i18n) {
       const classSource=ts.createSourceFile(file,source.replace(/\bstruct\b/g,'class'),ts.ScriptTarget.Latest,true);
       const languageHelpers=new Set();
       function collect(n){if(ts.isMethodDeclaration(n)&&n.name&&n.body?.getText(classSource).includes('this.uiLanguage'))languageHelpers.add(n.name.getText(classSource));ts.forEachChild(n,collect);}collect(classSource);
+      function languageAwareList(n) {
+        const key=n.arguments[2]?.getText(sf)||'';
+        const helper=key.match(/this\.(\w+)\(/)?.[1];
+        return key.includes('uiLanguage') || (n.arguments[0]?.getText(sf)||'').includes('uiLanguage') || languageHelpers.has(helper);
+      }
+      function unprotectedListBody(body) {
+        if (!body) return '';
+        // A stable media shell may contain its own language-keyed text list.
+        // Only skip that protected subtree; sibling localized text still needs
+        // the outer list to invalidate, and unkeyed inner lists still fail.
+        const ranges=[];
+        function find(n) {
+          if (ts.isCallExpression(n) && n.expression.getText(sf)==='ForEach' && languageAwareList(n)) {
+            ranges.push([n.getStart(sf)-body.getStart(sf),n.end-body.getStart(sf)]);
+            return;
+          }
+          ts.forEachChild(n,find);
+        }
+        ts.forEachChild(body,find);
+        let text=body.getText(sf);
+        for (const [start,end] of ranges.sort((a,b)=>b[0]-a[0])) text=text.slice(0,start)+text.slice(end);
+        return text;
+      }
       function visit(n) {
-        if (ts.isCallExpression(n) && n.expression.getText(sf)==='ForEach' && /uiText|PinmonyI18n|PinmonyNotificationCopy|optionLabel|this\.(selection|row|field|buildShareActionRow)/.test(n.arguments[1]?.getText(sf)||'')) {
+        if (ts.isCallExpression(n) && n.expression.getText(sf)==='ForEach' && /uiText|PinmonyI18n|PinmonyNotificationCopy|optionLabel|this\.(selection|row|field|buildShareActionRow)/.test(unprotectedListBody(n.arguments[1]))) {
           const key=n.arguments[2]?.getText(sf)||'';
-          const helper=key.match(/this\.(\w+)\(/)?.[1];
-          assert(key.includes('uiLanguage') || n.arguments[0].getText(sf).includes('uiLanguage') || languageHelpers.has(helper), `Localized list must invalidate on language change: ${file}:${sf.getLineAndCharacterOfPosition(n.pos).line+1}`);
+          assert(languageAwareList(n), `Localized list must invalidate on language change: ${file}:${sf.getLineAndCharacterOfPosition(n.pos).line+1}`);
           checked++;
           if (/PinmonySearchFilterSheet|PinmonyNotificationsPage/.test(file) && ts.isArrowFunction(n.arguments[2])) keyCases.push(n.arguments[2].getText(sf));
         }

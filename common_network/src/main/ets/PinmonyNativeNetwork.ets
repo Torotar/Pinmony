@@ -130,12 +130,44 @@ export function acceptsNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetwor
   return acceptsCanonicalNetworkJob(canonicalJob, canonicalContext);
 }
 
+interface PinmonyAccountBatchFields { fields: string; }
+interface PinmonyAccountBatchRequest { uri: string; method: string; params: PinmonyAccountBatchFields; }
+interface PinmonyAccountRequestEnvelope { options: Record<string, Object | null>; context: Record<string, string>; }
+function acceptsSessionAccountJob(job: PinmonyNetworkJob): boolean {
+  try {
+    const source: string = '/switch_account/';
+    if (job.method !== 'POST' || job.page !== 'https://www.pinterest.com' + source ||
+        job.headers['X-Pinterest-Pws-Handler'] !== 'www/switch_account.js' || job.headers['X-Pinterest-Source-Url'] !== source ||
+        job.headers['X-Requested-With'] !== 'XMLHttpRequest' || job.headers['Content-Type'] !== 'application/x-www-form-urlencoded') return false;
+    const parts: RegExpMatchArray | null = job.body.match(/^source_url=([^&]+)&data=([^&]+)$/);
+    if (!parts || decodeURIComponent(parts[1]) !== source) return false;
+    const e: PinmonyAccountRequestEnvelope = JSON.parse(decodeURIComponent(parts[2])) as PinmonyAccountRequestEnvelope;
+    if (!e || Object.keys(e).length !== 2 || !e.context || Array.isArray(e.context) || Object.keys(e.context).length || !e.options || Array.isArray(e.options)) return false;
+    const o: Record<string, Object | null> = e.options, keys: string[] = Object.keys(o);
+    if (job.url === 'https://www.pinterest.com/resource/UserSessionResource/create/') {
+      if (keys.length === 1 && o['session_accounts'] === true) return true;
+      return keys.length === 8 && o['get_user'] === true && typeof o['switch_account'] === 'string' && /^[1-9]\d{0,39}$/.test(o['switch_account'] as string) &&
+        o['app_type_from_client'] === 6 && o['ui_component'] === 'undefined.SwitchAccountPage' && o['handler'] === 'www/switch_account.js' &&
+        o['visited_pages_before_login'] === '[]' && o['arkoseSessionToken'] === null && o['recaptchaV3Token'] === null;
+    }
+    if (job.url !== 'https://www.pinterest.com/resource/ApiResource/create/' || keys.length !== 2 || o['url'] !== '/v3/batch/') return false;
+    const data: Record<string, Object> = o['data'] as Record<string, Object>;
+    if (!data || Array.isArray(data) || Object.keys(data).length !== 1 || typeof data['requests'] !== 'string') return false;
+    const requests: PinmonyAccountBatchRequest[] = JSON.parse(data['requests'] as string) as PinmonyAccountBatchRequest[];
+    return Array.isArray(requests) && requests.length > 0 && requests.length <= 20 &&
+      new Set<string>(requests.map((item: PinmonyAccountBatchRequest): string => item.uri)).size === requests.length &&
+      requests.every((item: PinmonyAccountBatchRequest): boolean => !!item && Object.keys(item).length === 3 && item.method === 'GET' &&
+        /^v3\/users\/[1-9]\d{0,39}\/$/.test(item.uri) && !!item.params && Object.keys(item.params).length === 1 && item.params.fields === 'partner.biz_ownership_email,partner.business_name,partner.contact_email,partner.contact_phone,partner.contact_phone_country(),partner.enable_profile_address,partner.enable_profile_message,partner.is_boost_a_pin_partner,partner.is_linked_business,partner.profile_place(),place.country,place.extra_street,place.locality,place.postal_code,place.region,place.street,user.businesses(),user.email,user.fast_advertiser_info_has_any_managed_advertisers,user.full_name,user.id,user.image_medium_url,user.owners(),user.partner(),user.username');
+  } catch (_) { return false; }
+}
+
 function acceptsCanonicalNetworkJob(job: PinmonyNetworkJob, context: PinmonyNetworkContext): boolean {
   if (!job || !context.authenticated || job.epoch !== context.epoch || job.page !== context.page ||
       !/^https:\/\/www\.pinterest\.com\//.test(job.page) || !/^[a-zA-Z0-9_-]{1,96}$/.test(job.id) ||
       typeof job.url !== 'string' || job.url.length > 65536 || typeof job.body !== 'string' ||
       job.body.length > (job.url === 'https://www.pinterest.com/resource/PinResource/create/' ? 34 * 1024 * 1024 : 262144) || (job.method !== 'GET' && job.method !== 'POST') ||
       !job.headers || typeof job.headers !== 'object' || Array.isArray(job.headers)) return false;
+  if (job.id.startsWith('native_account_switch_')) return acceptsSessionAccountJob(job);
   const match: RegExpMatchArray | null = job.url.match(/^https:\/\/www\.pinterest\.com\/resource\/([A-Za-z]+Resource)\/(get|create|update|delete)\/(?:\?[^#]*)?$/);
   if (match) {
     if (!RESOURCES.includes(match[1])) return false;

@@ -48,9 +48,12 @@ console.log('Board/search entry capture: exact source ownership, dimensions, win
 const page=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
 assert(page.includes('this.entryPhoto && (!this.entryMotionComplete || this.entryClosing)'), 'finished entry overlay must leave the hit-test tree');
 const media=page.slice(page.indexOf('private detailMedia()'),page.indexOf('private detailInformation()'));
-assert.match(media,/PinmonyCdnImage\(\{ url: this\.backdropImageUrl\(\), useSharedDecode: false \}\)[\s\S]{0,180}\.blur\(28 \* this\.entryBackdropProgress \* \(1 - this\.viewerBackdropProgress\)\)[\s\S]{0,120}HitTestMode\.None/,'photo backdrop retains viewer animation outside the entry-hidden clear photo');
+assert.match(media,/PinmonyCdnImage\(\{ url: this\.backdropImageUrl\(\), useSharedDecode: false \}\)[\s\S]{0,180}\.blur\(28 \* this\.entryBackdropProgress \* \(1 - this\.viewerBackdropProgress\)\)[\s\S]{0,220}HitTestMode\.None/,'photo backdrop retains viewer animation outside the entry-hidden clear photo');
+assert(media.includes('(this.coverBackdropVisible() ? 1 : 0)'), 'rendered carousel handoff controls cover visibility without replacing its source');
 assert(media.indexOf('.blur(')<media.indexOf('    Column() {'),'backdrop is a sibling of the clear media group');
-assert(media.includes("}.width('100%').opacity(this.entryPhotoHidden ? 0 : 1)"),'entry flight hides only clear media');
+assert.match(media, /opacity\(this.entryPhotoHidden &&\s*\(!this.displayedDetail\(\).carousel \|\| this.displayedDetail\(\).carousel\?\.freeScroll\) \? 0 : 1\)/, 'ordinary carousel keeps its slot blur mounted during entry; other media retain the original hidden group');
+const carouselMedia=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets','utf8');
+assert(carouselMedia.includes('.opacity(this.entryPhotoHidden || this.imageHidden ? 0 : 1)'), 'entry flight hides carousel clear media separately from its blur');
 const pageAst=ts.createSourceFile('page.ts',page.replace(/\bstruct\b/g,'class'),99,true);let reveal;
 function findReveal(n){if(ts.isPropertyAssignment(n)&&n.name.getText(pageAst)==='onReveal')reveal=n.initializer.getText(pageAst);ts.forEachChild(n,findReveal);}findReveal(pageAst);
 assert(reveal);const revealHost={entryOpacity:0,entryScale:1,entryPhotoHidden:false};let transition;
@@ -97,10 +100,10 @@ let activeChanged='';
 function findActiveChanged(n){if(ts.isMethodDeclaration(n)&&n.name.getText(searchFile)==='activeChanged')activeChanged=n.getText(searchFile);ts.forEachChild(n,findActiveChanged);}findActiveChanged(searchFile);
 const pendingVisibility=[];
 const SearchLifecycle=vm.runInNewContext(ts.transpileModule('class SearchLifecycle {'+activeChanged+'} SearchLifecycle;',{compilerOptions:{target:99}}).outputText,{Promise:{resolve:()=>({then:fn=>pendingVisibility.push(fn)})}});
-const lifecycle=new SearchLifecycle();let clears=0;
+const lifecycle=new SearchLifecycle();let clears=0,prefetchSyncs=0;
 const uiCommits = require('./ui-commit-harness.cjs').createUiCommitHarness(ts);
 lifecycle.uiCommits = new uiCommits.Queue();
-Object.assign(lifecycle,{pagePresent:true,active:false,detailReturnPreview:false,closePhotoSearch:()=>{},restoreHeroPosition:()=>{},ensureSearchDestination:()=>{},tracePresentation:()=>{},searchPathStack:{clear:()=>clears++}});
+Object.assign(lifecycle,{pagePresent:true,active:false,detailReturnPreview:false,syncImagePrefetchActivity:()=>prefetchSyncs++,closePhotoSearch:()=>{},restoreHeroPosition:()=>{},ensureSearchDestination:()=>{},tracePresentation:()=>{},searchPathStack:{clear:()=>clears++}});
 lifecycle.activeChanged();assert.equal(clears,0,'active prop must not clear search before retained prop arrives');
 lifecycle.detailReturnPreview=true;lifecycle.activeChanged();pendingVisibility.shift()();
 assert.equal(clears,0,'same-frame preview handoff retains the original WaterFlow destination');
@@ -108,6 +111,7 @@ lifecycle.detailReturnPreview=false;lifecycle.activeChanged();pendingVisibility.
 assert.equal(clears,1,'ordinary inactive search still releases its destination');
 lifecycle.activeChanged();lifecycle.pagePresent=false;pendingVisibility.shift()();
 assert.equal(clears,1,'disposed page ignores late visibility work');
+assert.equal(prefetchSyncs,4,'all active-state changes synchronize existing prefetch admission');
 console.log('Search watched-prop handoff: no intermediate pop, inactive cleanup and disposal passed');
 
 const scrolled=fixture();scrolled.decoded=true;scrolled.closing=true;

@@ -20,7 +20,11 @@ for (const screen of ['account', 'personal', 'country']) {
   }
 }
 assert(condition(account, accountPattern, { retainedAccount: true, store: { screen: 'personal', loading: true } }), 'retained account remains visible');
-assert(account.includes("this.store.data?.email || ''"), 'first-load account has no fabricated identity');
+const emailPattern = /if \((emailRow && this\.store\.data\?\.email)\) \{/;
+for (const data of [undefined, {}, { email: '' }]) {
+  assert(!vm.runInNewContext('(function(){ const emailRow = true; return ' + account.match(emailPattern)[1] + '; }).call(state)', { state: { store: { data } } }), 'missing email never fabricates identity');
+}
+assert(account.includes('Text(this.store.data.email)'), 'email renders the current reactive account value');
 const visibilityPattern = /if \(([^\n]+)\) \{ this\.visibilityContent\(\) \}/;
 assert(condition(visibility, visibilityPattern, { store: { loading: true } }), 'visibility fields appear on cold load');
 assert(!condition(visibility, visibilityPattern, { store: { loading: false } }), 'failed cold load is not shown as valid settings');

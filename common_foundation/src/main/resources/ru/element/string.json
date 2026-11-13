@@ -1,5 +1,23 @@
 {
   "string": [
+    {"name": "pm_login_other_account", "value": "Войти в другой аккаунт"},
+    {"name": "pm_logout_current_account", "value": "Выйти из текущего аккаунта"},
+    {"name": "pm_logout_stay_on_login", "value": "После выхода останется страница входа. Автоматического входа в другие аккаунты не будет."},
+
+    {"name": "pm_switch_accounts", "value": "Сменить аккаунт"},
+    {"name": "pm_add_account", "value": "Добавить аккаунт"},
+    {"name": "pm_session_current", "value": "Текущий аккаунт"},
+    {"name": "pm_session_other", "value": "Другие аккаунты"},
+    {"name": "pm_session_personal", "value": "Личный"},
+    {"name": "pm_session_business", "value": "Бизнес"},
+    {"name": "pm_session_accounts_description", "value": "Переключайте аккаунты и управляйте входом. Тип аккаунта можно изменить позже в настройках."},
+    {"name": "pm_session_accounts_failed", "value": "Не удалось загрузить аккаунты. Повторите попытку."},
+    {"name": "pm_session_switch_unknown", "value": "Не удалось подтвердить смену аккаунта. Сначала проверьте текущий сеанс. Запрос не будет отправлен повторно."},
+    {"name": "pm_session_verify", "value": "Проверить текущий аккаунт"},
+
+    {"name": "pm_email_confirmed", "value": "Подтверждено"},
+    {"name": "pm_email_confirmation_notice", "value": "Подтвердите адрес электронной почты на случай, если вам понадобится помощь с аккаунтом"},
+
     {
       "name": "pm_remove_chat_window",
       "value": "Удалить чат"
@@ -6011,6 +6029,22 @@
     {
       "name": "pm_qq_community_group",
       "value": "Группа сообщества QQ"
+    },
+    {
+      "name": "pm_session_logout_title",
+      "value": "Выйти из аккаунта"
+    },
+    {
+      "name": "pm_session_logout_message",
+      "value": "Вы уверены, что хотите выйти из этого аккаунта?"
+    },
+    {
+      "name": "pm_session_logout_action",
+      "value": "Выйти"
+    },
+    {
+      "name": "pm_session_logout_unknown",
+      "value": "Не удалось подтвердить результат выхода. Сначала проверьте текущий сеанс. Выход не будет повторён автоматически."
     }
   ]
 }

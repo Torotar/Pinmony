@@ -19,17 +19,29 @@ assert(!index.includes('Web({'), 'Web layout belongs to the login host');
 for (const expected of ['.opacity(view.visible ? 1 : 0)', '.accessibilityLevel(view.visible', '.hitTestBehavior(view.visible',
   '.javaScriptProxy(', '.runJavaScriptOnDocumentStart(view.scripts)', '.onErrorReceive(', '.onOverrideUrlLoading(', '.onLoadIntercept('])
   assert(host.includes(expected), expected);
-const calls = [];
-const view = { captureEnvironment: () => calls.push('metadata'), lifecycle: { controllerAttached: () => calls.push('attach'),
+const calls = [], loading = [];
+const view = { onLoadingChanged: value => loading.push(value), captureEnvironment: () => calls.push('metadata'), lifecycle: { controllerAttached: () => calls.push('attach'),
   pageBegin: url => calls.push(url), pageEnd: () => calls.push('end') } };
 for (const event of ['onControllerAttached', 'onPageBegin', 'onPageEnd']) {
   const callback = host.match(new RegExp('\\.' + event + '\\(([^\\n]+)\\)'))[1];
   const fn = vm.runInNewContext('(' + callback + ')', { view }); fn({ url: 'fixture-page' });
 }
 assert.deepEqual(calls, ['metadata', 'attach', 'metadata', 'fixture-page', 'metadata', 'end']);
-const confirm = index.match(/  private confirmBusinessSession\([\s\S]*?(?=\n  private nativeBusinessSessionContext)/)[0];
+assert.deepEqual(loading, [true, false], 'login begin/end forwards loading state');
+view.isCurrent = () => false;
+for (const event of ['onControllerAttached', 'onPageBegin', 'onPageEnd']) {
+  const callback = host.match(new RegExp('\\.' + event + '\\(([^\\n]+)\\)'))[1];
+  vm.runInNewContext('(' + callback + ')', { view })({ url: 'stale-page' });
+}
+assert.deepEqual(loading, [true, false], 'stale login host cannot change loading state');
+assert.deepEqual(calls, ['metadata', 'attach', 'metadata', 'fixture-page', 'metadata', 'end'], 'stale login host cannot advance lifecycle');
+
+const confirm = index.match(/  private confirmBusinessSession\([\s\S]*?(?=\r?\n  private )/)[0];
 assert(!confirm.includes('this.controller'), 'business session confirmation no longer calls the Web controller');
-const native = { authStatus: 'authenticated', sessionEnvironment: environment, businessSession: new PinmonyBusinessSession(),
+const followups = [], phases = [];
+const native = { coordinatorTasks: { timeout: callback => followups.push(callback) },
+  restoreRecoveredPage: () => phases.push('recovery'), userAvatarReads: { sessionChanged: () => phases.push('avatars') },
+  inboxUnreadNativeReads: { poll: () => phases.push('unread') }, authStatus: 'authenticated', sessionEnvironment: environment, businessSession: new PinmonyBusinessSession(),
   homeCacheAccountId: 'synthetic-account', authenticatedProfileUrl: 'https://uk.pinterest.com/fixture_user/',
   controller: { getUserAgent() { throw Error('controller detached'); } } };
 vm.runInNewContext(ts.transpileModule('function confirm(appVersion: string = "") {' + confirm.split('{').slice(1).join('{').replace(/}\s*$/, '') + '}', {
@@ -37,4 +49,6 @@ vm.runInNewContext(ts.transpileModule('function confirm(appVersion: string = "")
 }).outputText + ';confirm.call(native, "fixture.1");', { native, PinmonyI18n:require('./local-message-test-fixture.cjs').rawLocalMessages, PIN_NATIVE_HOME_READS_ENABLED: false, PIN_NATIVE_SEARCH_DISCOVERY_ENABLED: false });
 assert.equal(native.businessSession.context('authenticated').userAgent, 'fixture-agent');
 assert.equal(native.businessSession.context('authenticated').appVersion, 'fixture.1');
+assert.deepEqual(phases, ['avatars', 'unread'], 'confirmed business session refreshes dependent readers');
+assert.equal(followups.length, 1); followups[0](); assert.equal(phases.at(-1), 'recovery');
 console.log('Login host: hidden/accessibility contract, lifecycle capture and controller-independent business confirmation passed');

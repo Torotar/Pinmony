@@ -1,5 +1,23 @@
 {
   "string": [
+    {"name": "pm_login_other_account", "value": "Log in to another account"},
+    {"name": "pm_logout_current_account", "value": "Log out of current account"},
+    {"name": "pm_logout_stay_on_login", "value": "You will stay on the login page. Other accounts will not log in automatically."},
+
+    {"name": "pm_switch_accounts", "value": "Switch accounts"},
+    {"name": "pm_add_account", "value": "Add account"},
+    {"name": "pm_session_current", "value": "Currently signed in"},
+    {"name": "pm_session_other", "value": "Other accounts"},
+    {"name": "pm_session_personal", "value": "Personal"},
+    {"name": "pm_session_business", "value": "Business"},
+    {"name": "pm_session_accounts_description", "value": "Switch accounts and manage logins. You can change account types or convert an account later in account settings."},
+    {"name": "pm_session_accounts_failed", "value": "Unable to load accounts. Please try again."},
+    {"name": "pm_session_switch_unknown", "value": "Unable to confirm the account switch. Verify the current session first. The switch request will not be repeated."},
+    {"name": "pm_session_verify", "value": "Verify current account"},
+
+    {"name": "pm_email_confirmed", "value": "Confirmed"},
+    {"name": "pm_email_confirmation_notice", "value": "Confirm your email in case you need help with your account"},
+
     {
       "name": "pm_remove_chat_window",
       "value": "Delete chat"
@@ -6011,6 +6029,22 @@
     {
       "name": "pm_qq_community_group",
       "value": "QQ community group"
+    },
+    {
+      "name": "pm_session_logout_title",
+      "value": "Log out of account"
+    },
+    {
+      "name": "pm_session_logout_message",
+      "value": "Are you sure you want to log out of this account?"
+    },
+    {
+      "name": "pm_session_logout_action",
+      "value": "Log out"
+    },
+    {
+      "name": "pm_session_logout_unknown",
+      "value": "Unable to confirm the logout result. Verify the current session first. Logout will not be repeated automatically."
     }
   ]
 }

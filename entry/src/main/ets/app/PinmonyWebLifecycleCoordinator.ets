@@ -414,6 +414,11 @@ private currentDocumentIs(url: string): boolean {
 pageEnd(): void {
     if(this.ports.nativeBusinessOnly?.() && this.ports.authStatus() === 'authenticated'){this.ports.setWebPageLoading(false);this.ports.setWebPageLoadFinishedAt(Date.now());this.ports.syncAuthentication();return;}
     this.ports.logPageLifecycle('web-page-end');
+    if (this.ports.nativeBusinessOnly?.() && this.ports.authStatus() !== 'authenticated' && this.ports.loadFailed()) {
+        this.ports.setWebPageLoading(false);
+        PinmonyRuntimeLog.info('Web: failed document end ignored');
+        return;
+    }
     try {
         if (this.ports.ignoreSupersededDetailDocument(this.ports.controller().getUrl())) {
             this.ports.setWebPageLoading(false);

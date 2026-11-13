@@ -24,7 +24,8 @@ function extract(code, name) {
 for (const [module, page, methods] of pages) {
   const source = fs.readFileSync(`${module}/src/main/ets/components/${page}.ets`, 'utf8');
   assert(!source.includes('immersiveLightEnabled'), page + ': custom struct accessor must not gate blur');
-  const output = ts.transpileModule('class Host {' + methods.map(name => extract(source, name)).join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText;
+  const helpers = page === 'PinmonySearchPage' ? [extract(source, 'showingSearchHistory')] : [];
+  const output = ts.transpileModule('class Host {' + methods.map(name => extract(source, name)).concat(helpers).join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText;
   const Host = vm.runInNewContext(output, {
     BlurStrategy: { ENABLE: 1, DISABLE: 0 }, ScrollEffectType: { IMMERSIVE_GRADIENT_BLUR: 3 },
     PinmonyImmersiveLight: { effect: mode => mode }, Color: { Transparent: 'transparent' }, $r: name => name
@@ -37,6 +38,24 @@ for (const [module, page, methods] of pages) {
       hubTitleBottomHeight: () => 136 });
     for (const method of methods) {
       const options = host[method]();
+      if (method === 'searchTitleBarOptions') {
+        const categories = () => {}, empty = () => {};
+        Object.assign(host, { categoriesTitleBuilder: categories, emptyCategoriesTitleBuilder: empty });
+        for (const [name, editing, closing, retained, count, expected] of [
+          ['search-results', false, false, false, 1, 54],
+          ['search-results', false, false, false, 0, 0],
+          ['search-history', true, false, true, 1, 0],
+          ['search-history', false, true, true, 1, 0],
+          ['search-results', false, false, true, 1, 0]
+        ]) {
+          Object.assign(host, { inputEditing: editing, historyDestinationClosing: closing,
+            historyDestinationRetained: retained, historyBodyDestination: 'search-history',
+            visibleCategories: () => Array(count).fill('pins') });
+          const content = host.searchTitleBarOptions(name).content;
+          assert.equal(content.bottomBuilder.height, expected, 'history/retained/empty title slot');
+          assert.equal(content.bottomBuilder.builder, expected ? categories : count ? empty : categories);
+        }
+      }
       const style = options.style;
       if (method === 'hubTitleBarOptions') {
         assert.equal(host.titleUpdated, true, 'title options synchronize retained content');

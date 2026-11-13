@@ -1,4 +1,4 @@
-import { PinmonyActionNotice } from 'common_ui';
+import { PinmonyActionNotice, PinmonyCdnImage } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyCarousel, PinmonyCarouselItem } from '../models/PinmonyDetail';
 import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
@@ -15,6 +15,9 @@ export struct PinmonyCarouselView {
   @Prop sourceId: string = '';
   @Prop previewUrl: string = '';
   @Prop imageHidden: boolean = false;
+  @Prop entryPhotoHidden: boolean = false;
+  @Prop entryBackdropProgress: number = 1;
+  @Prop viewerBackdropProgress: number = 0;
   @Prop hiddenImageUrl: string = '';
   @Prop @Watch('viewerPhotoChanged') viewerImageUrl: string = '';
   @Prop productOffset: number = 0;
@@ -30,10 +33,12 @@ export struct PinmonyCarouselView {
   @State private page: number = 0;
   @State private failed: string[] = [];
   @State private revision: number = 0;
+  @State private backdropRetryVersions: Map<string, number> = new Map<string, number>();
   @State private firstRenderedKey: string = '';
   onImageTap?: (imageUrl: string) => void;
   onPageChanged?: (index: number) => void;
   onFirstImageSettled?: (failed: boolean) => void;
+  onFirstBackdropReady?: () => void;
   private identity: string = '';
   private alive: boolean = false;
   private controller: SwiperController = new SwiperController();
@@ -59,6 +64,7 @@ export struct PinmonyCarouselView {
     this.identity = this.carousel.pinId;
     this.page = 0;
     this.failed = [];
+    this.backdropRetryVersions.clear();
     this.firstRenderedKey = '';
     this.controller.changeIndex(0, false);
   }
@@ -95,6 +101,39 @@ export struct PinmonyCarouselView {
     if (item.video || this.carousel.freeScroll || item.imageWidth <= 0 || item.imageHeight <= 0) return 18;
     const sideInset: number = (this.contentWidth - this.mediaHeight() * item.imageWidth / item.imageHeight) / 2;
     return sideInset < 18 ? 18 : 0;
+  }
+
+  private slotNeedsBackdrop(item: PinmonyCarouselItem): boolean {
+    return !item.video && item.imageWidth > 0 && item.imageHeight > 0 &&
+      this.contentWidth * item.imageHeight / item.imageWidth > this.mediaHeight() + 0.5;
+  }
+
+  private slotKey(item: PinmonyCarouselItem): string {
+    return this.carousel.pinId + ':' + item.id + ':' + item.imageUrl;
+  }
+
+  private backdropRenderKey(item: PinmonyCarouselItem): string {
+    return this.slotKey(item) + ':' + (this.backdropRetryVersions.get(this.slotKey(item)) ?? 0).toString();
+  }
+
+  private backdropLoadingActive(index: number): boolean {
+    return this.alive && this.active && index >= 0 && index < this.carousel.items.length &&
+      Math.abs(index - this.page) <= 1;
+  }
+
+  private notifyBackdropReady(item: PinmonyCarouselItem, index: number): void {
+    if (!this.alive || this.identity !== this.carousel.pinId || index !== 0 ||
+        this.carousel.items[0]?.id !== item.id || this.carousel.items[0]?.imageUrl !== item.imageUrl) return;
+    this.onFirstBackdropReady?.();
+  }
+
+  private retryImage(item: PinmonyCarouselItem, index: number): void {
+    if (!this.alive || this.identity !== this.carousel.pinId || !this.failed.includes(item.id) ||
+        this.carousel.items[index]?.id !== item.id || this.carousel.items[index]?.imageUrl !== item.imageUrl) return;
+    this.failed = this.failed.filter((id: string): boolean => id !== item.id);
+    const key: string = this.slotKey(item);
+    this.backdropRetryVersions.set(key, (this.backdropRetryVersions.get(key) ?? 0) + 1);
+    this.revision++;
   }
 
   private videoSlotMounted(index: number): boolean {
@@ -149,6 +188,23 @@ export struct PinmonyCarouselView {
       Swiper(this.controller) {
         ForEach(this.carousel.items, (item: PinmonyCarouselItem, index: number) => {
           Stack({ alignContent: Alignment.Center }) {
+            // The immutable slide source travels with its clear photo. Changing
+            // the selected index must not reload or unmount the outgoing blur.
+            if (this.slotNeedsBackdrop(item)) {
+              ForEach([this.backdropRenderKey(item)], (backdropKey: string) => {
+              Stack() {
+                PinmonyCdnImage({ url: item.imageUrl, useSharedDecode: false,
+                  loadingActive: this.backdropLoadingActive(index),
+                  onDecoded: () => this.notifyBackdropReady(item, index) })
+                  .width('100%').height('100%')
+                  .blur(28 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress))
+                  .opacity(0.72 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress))
+              }.width('100%').height('100%').borderRadius(18).clip(true)
+                .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+              }, (backdropKey: string): string => backdropKey)
+            }
+            ForEach([this.revision.toString() + ':' + this.uiLanguage], (foregroundKey: string) => {
+            Stack({ alignContent: Alignment.Center }) {
             // Keep the already decoded entry cover under the first slot until
             // the actual carousel image has produced a drawable frame.
             if (index === 0 && !item.video && !this.failed.includes(item.id) && this.previewUrl &&
@@ -167,10 +223,7 @@ export struct PinmonyCarouselView {
                 } }).width('100%').height('100%')
             } else if (this.failed.includes(item.id)) {
               Column({ space: 12 }) {
-                PinmonyActionNotice({ active: this.active, message: this.uiText("pm_image_failed_to_load_572993f5"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => {
-                  this.failed = this.failed.filter((id: string): boolean => id !== item.id);
-                  this.revision++;
-                } })
+                PinmonyActionNotice({ active: this.active, message: this.uiText("pm_image_failed_to_load_572993f5"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.retryImage(item, index) })
               }
             } else {
               Image(item.imageUrl).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(index === 0).borderRadius(this.photoRadius(item)).clip(true)
@@ -184,13 +237,16 @@ export struct PinmonyCarouselView {
                 .onClick(() => { if (!item.video && this.onImageTap) this.onImageTap(item.imageUrl); })
                 .accessibilityText(this.uiFormat("pm_image_value_of_value_value_66dd48e8", [index + 1, this.carousel.items.length, item.title]))
             }
+            }.width('100%').height('100%')
+              .opacity(this.entryPhotoHidden || this.imageHidden ? 0 : 1)
+            }, (foregroundKey: string): string => foregroundKey)
           }.width('100%').height('100%')
-        }, (item: PinmonyCarouselItem): string => (`${this.carousel.pinId}:${item.id}:${item.imageUrl}:${this.revision}`) + ':' + this.uiLanguage)
+        }, (item: PinmonyCarouselItem): string => this.slotKey(item))
       }
       .width('100%').height(this.mediaHeight()).loop(false).autoPlay(false)
       .indicator(this.indicatorController)
-      .borderRadius(this.carousel.items[this.page] ? this.photoRadius(this.carousel.items[this.page]) : 18).clip(true)
-      .id(this.sourceId).opacity(this.imageHidden ? 0 : 1)
+      .borderRadius(18).clip(true)
+      .id(this.sourceId)
       .onChange((index: number) => { this.page = index; this.onPageChanged?.(index); })
       .accessibilityText(this.uiFormat("pm_image_value_of_value_2349ba46", [this.page + 1, this.carousel.items.length]))
       IndicatorComponent(this.indicatorController)
@@ -198,6 +254,7 @@ export struct PinmonyCarouselView {
         .style(Indicator.dot().itemWidth(7).itemHeight(7).selectedItemWidth(7).selectedItemHeight(7)
           .color($r('app.color.secondary_text')).selectedColor($r('app.color.primary_text')))
         .width('100%').height(28)
+        .opacity(this.entryPhotoHidden ? 0 : 1)
       }
     }.width('100%').height(this.mediaHeight() + (this.carousel.freeScroll ? 0 : 28)).justifyContent(FlexAlign.Start)
   }

@@ -47,14 +47,20 @@ export class PinmonyImmersiveLight {
   public static effect(mode: string): SystemMaterialParams | undefined {
     if (mode === 'off') return undefined;
     let materialType: hdsMaterial.MaterialType = hdsMaterial.MaterialType.ADAPTIVE;
+    let api26: boolean = false;
     if (mode !== 'gentle') {
       try {
-        if (hdsMaterial.getSystemMaterialTypes().includes(hdsMaterial.MaterialType.IMMERSIVE)) {
+        // HDS chrome accepts SystemMaterialParams, not ArkUI ImmersiveMaterial.
+        // On API 26 honor both capability reports; never probe uiMaterial on API 24/25.
+        api26 = typeof deviceInfo.apiAvailable === 'function' && deviceInfo.apiAvailable('26.0.0');
+        if ((!api26 || uiMaterial.isImmersiveMaterialSupported()) &&
+          hdsMaterial.getSystemMaterialTypes().includes(hdsMaterial.MaterialType.IMMERSIVE)) {
           materialType = hdsMaterial.MaterialType.IMMERSIVE;
         }
       } catch (_) { /* Use the system adaptive material when capability lookup is unavailable. */ }
     }
-    return { materialType: materialType, materialLevel: mode === 'gentle' ? hdsMaterial.MaterialLevel.SMOOTH :
+    return { materialType: materialType, materialLevel: mode === 'gentle' ||
+      (api26 && materialType !== hdsMaterial.MaterialType.IMMERSIVE) ? hdsMaterial.MaterialLevel.SMOOTH :
       mode === 'exquisite' ? hdsMaterial.MaterialLevel.EXQUISITE : hdsMaterial.MaterialLevel.GENTLE };
   }
 }

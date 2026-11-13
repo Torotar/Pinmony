@@ -359,7 +359,13 @@ export struct PinmonyProfilePage {
     return this.hubContentInset();
   }
   private profileBodyHeight(): Length {
-    return this.modern() && !this.hubPane && this.profileViewportHeight > 0 ? this.profileViewportHeight : '100%';
+    return !this.onBack && this.profile.isOwn === true && !this.hubPane && !this.legacyContentPane && this.profileViewportHeight > 0 ? this.profileViewportHeight : '100%';
+  }
+  private updateProfileViewport(height: number): void {
+    if (this.onBack || this.profile.isOwn !== true || this.hubPane || this.legacyContentPane ||
+      !Number.isFinite(height) || height <= 0 || Math.abs(height - this.profileViewportHeight) <= 1) return;
+    this.profileViewportHeight = height;
+    PinmonyRuntimeLog.info('ProfileViewportTrace: phase=measured legacy=' + this.legacyProfile.toString() + ' heightVp=' + height.toFixed(1));
   }
   private updateHubChrome(offset: number, state: ScrollState, position: number): void {
     if (!this.modern() || !this.interactionReady || this.refreshing || this.loading || this.sortVisible) return;
@@ -420,6 +426,9 @@ export struct PinmonyProfilePage {
     if (settle && target >= 0) this.hubChromeOffset = target;
   }
   private layoutChanged(): void {
+    if (!this.hubPane && !this.legacyContentPane && !this.onBack && this.profile.isOwn === true) {
+      PinmonyRuntimeLog.info('ProfileViewportTrace: phase=layout-switch legacy=' + this.legacyProfile.toString() + ' heightVp=' + this.profileViewportHeight.toFixed(1));
+    }
     if(this.hubPane)return;
     this.hubRequested = false;
     if(this.modern())this.requestHub();else if(this.profile.hubMode && this.onTab)this.onTab('saved');
@@ -1363,9 +1372,7 @@ export struct PinmonyProfilePage {
     }
     }.width('100%').height(this.legacyContentPane ? 'auto' : '100%')
       .onAreaChange((_old: Area, area: Area) => {
-        if (!this.modern() || this.hubPane || this.legacyContentPane) return;
-        const height: number = Number(area.height);
-        if (height > 0 && Math.abs(height - this.profileViewportHeight) > 1) this.profileViewportHeight = height;
+        this.updateProfileViewport(Number(area.height));
       })
   }
 
@@ -2052,7 +2059,7 @@ export struct PinmonyProfilePage {
 
       height: '75%', showClose: false, backgroundColor: $r('app.color.page_background') }, this.sheetMaterialMode, false))
     }.width('100%').height('100%')
-      .height(this.profileBodyHeight())
+      .height(this.profileBodyHeight()).flexShrink(this.profileBodyHeight() === '100%' ? 1 : 0)
       .ignoreLayoutSafeArea(this.modern() && !this.hubPane ? [LayoutSafeAreaType.SYSTEM] : [], [LayoutSafeAreaEdge.TOP])
   }
 

@@ -1,5 +1,23 @@
 {
   "string": [
+    {"name": "pm_login_other_account", "value": "登入其他帳戶"},
+    {"name": "pm_logout_current_account", "value": "登出目前帳戶"},
+    {"name": "pm_logout_stay_on_login", "value": "登出後將停留在登入頁，不會自動登入其他帳戶。"},
+
+    {"name": "pm_switch_accounts", "value": "切換帳戶"},
+    {"name": "pm_add_account", "value": "新增帳戶"},
+    {"name": "pm_session_current", "value": "目前登入帳戶"},
+    {"name": "pm_session_other", "value": "其他帳戶"},
+    {"name": "pm_session_personal", "value": "個人"},
+    {"name": "pm_session_business", "value": "商業"},
+    {"name": "pm_session_accounts_description", "value": "切換帳戶及管理登入。你隨時可以在帳戶設定中變更帳戶類型或轉換帳戶。"},
+    {"name": "pm_session_accounts_failed", "value": "無法讀取帳戶清單，請重試"},
+    {"name": "pm_session_switch_unknown", "value": "無法確認帳戶切換結果，請先驗證目前工作階段。不會重複傳送切換請求。"},
+    {"name": "pm_session_verify", "value": "驗證目前帳戶"},
+
+    {"name": "pm_email_confirmed", "value": "已確認"},
+    {"name": "pm_email_confirmation_notice", "value": "確認你的電子郵件，以便在需要帳戶協助時使用"},
+
     {
       "name": "pm_remove_chat_window",
       "value": "刪除聊天"
@@ -6011,6 +6029,22 @@
     {
       "name": "pm_qq_community_group",
       "value": "QQ 交流群組"
+    },
+    {
+      "name": "pm_session_logout_title",
+      "value": "登出帳戶"
+    },
+    {
+      "name": "pm_session_logout_message",
+      "value": "確定要登出此帳戶嗎？"
+    },
+    {
+      "name": "pm_session_logout_action",
+      "value": "登出帳戶"
+    },
+    {
+      "name": "pm_session_logout_unknown",
+      "value": "無法確認登出結果，請先驗證目前工作階段。不會自動重複登出。"
     }
   ]
 }

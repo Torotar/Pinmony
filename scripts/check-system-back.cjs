@@ -5,12 +5,16 @@ const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 const start = source.indexOf('  onBackPress(): boolean');
 const end = source.indexOf('\n  @Builder', start);
-const sandbox = { Date, PinmonyRuntimeLog: { info() {} } };
+const sandbox = { Date, PinmonyRuntimeLog: { info() {} }, PinmonyPageRecovery: { clear() {} }, PinmonyI18n: { message: key => key } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpileModule('class Page {' + source.slice(start, end) +
   '} globalThis.Page = Page;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, sandbox);
 function page() {
   return Object.assign(new sandbox.Page(), {
     rootExitBackAt: 0, showMessage() {},
+    pageRecovery: { cancel() {} }, imageViewer: { visible: false }, noticeChats: [],
+    searchController: { cancelSubmittedPin: () => false }, restoreInboxNewsSearchParent: () => false,
+    nativeBoardVisible: () => false,
+    profileChatActive: false,
     getUIContext: () => ({ getHostContext: () => ({ terminateSelf: () => Promise.resolve() }) }),
     nativeChildBackUntil: 0, authStatus: 'authenticated', profileSettingsVisible: false, authWebVisible: () => false,
     pinStore: { shareBackHandledUntil: 0 }, inboxStore: {}, profileStore: { origins: [] }, searchStore: {}, boardStore: {},
@@ -27,6 +31,19 @@ for (const activeTab of [0, 1, 2, 3]) {
 }
 const login = page(); login.authStatus = 'checking'; login.authWebVisible = () => true; login.nativeRootTabsVisible = () => false;
 assert.equal(login.onBackPress(), false, 'visible login screen delegates back');
+for (const authStatus of ['unauthenticated', 'checking', 'error']) {
+  const loggedOut = page(); let exits = 0, prompts = 0;
+  loggedOut.authStatus = authStatus; loggedOut.authWebVisible = () => true;
+  loggedOut.nativeRootTabsVisible = () => false; loggedOut.loggedOutAccounts = { active: true };
+  loggedOut.showMessage = () => prompts++;
+  loggedOut.getUIContext = () => ({ getHostContext: () => ({ terminateSelf: () => { exits++; return Promise.resolve(); } }) });
+  assert.equal(loggedOut.onBackPress(), true); assert.equal(prompts, 1); assert.equal(exits, 0);
+  assert.equal(loggedOut.onBackPress(), true); assert.equal(exits, 1, 'explicit-logout login root exits only on second back');
+  const timeout = page(); timeout.authStatus = authStatus; timeout.loggedOutAccounts = { active: true };
+  timeout.authWebVisible = () => true; timeout.rootExitBackAt = Date.now() - 2100;
+  timeout.showMessage = () => prompts++;
+  timeout.onBackPress(); assert.equal(prompts, 2, 'outside two seconds prompts again');
+}
 const sheet = page(); let closed = 0;
 sheet.activeSheetKind = 'comments'; sheet.dismissApiComments = () => { closed++; sheet.activeSheetKind = ''; };
 assert.equal(sheet.onBackPress(), true); assert.equal(closed, 1);

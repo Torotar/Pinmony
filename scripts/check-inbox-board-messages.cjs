@@ -58,7 +58,18 @@ function navigationChecks() {
   const failed = harness(); failed.n.controller.loadUrl = () => { throw Error('fixture'); };
   failed.n.openInboxBoard('301'); assert.equal(failed.n.boardStore.boardDetail, undefined);
   assert.equal(failed.n.inboxStore.retainedChat, undefined); assert.equal(failed.n.boardStore.pendingBoardUrl, '');
-  assert(index.includes('&& !this.nativeBoardVisible() && this.inboxStore.inboxFlow'), 'chat cannot cover board');
+  const chatHost = index.slice(index.indexOf('PinmonyInboxFlowPage({ onUser:'), index.indexOf("if (this.inboxStore.inboxFlow?.screen === 'settings'"));
+  const active = chatHost.match(/active: ([\s\S]*?),\s*restoreOffset:/);
+  assert(active, 'retained chat has an explicit interaction gate');
+  const isActive = new Function('return ' + active[1]);
+  for (const boardVisible of [false, true]) for (const profileChatActive of [false, true]) {
+    const host = {noticeChats: [], chatProfileTransition: false, pinStore: {}, nativeBoardVisible: () => boardVisible,
+      profileChatActive, profileStore: {origins: []}, chatSettingsUnderlay: false,
+      inboxStore: {inboxFlow: {screen: 'chat', pageUrl: inbox}}, currentInboxUrl: () => inbox};
+    assert.equal(isActive.call(host), !boardVisible, 'child board disables retained chat in both entry modes');
+  }
+  assert.match(chatHost, /\.hitTestBehavior\([\s\S]*?this\.nativeBoardVisible\(\)[\s\S]*?HitTestMode\.None/, 'covered chat cannot intercept board touch');
+  assert(index.indexOf('if (this.boardStore.boardDetail && this.nativeBoardVisible())') > index.indexOf('PinmonyInboxFlowPage({ onUser:'), 'board is rendered above retained chat');
   const navSource = fs.readFileSync('entry/src/main/ets/app/PinmonyNavigationCoordinator.ets', 'utf8');
   const backStart = navSource.indexOf('onBackPress(): boolean');
   const backMethod = navSource.slice(backStart, navSource.lastIndexOf('\n}'));

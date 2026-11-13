@@ -18,7 +18,7 @@ function runtime(ts, globals = {}) {
     runtimes.set(original, loader);
     return loader;
 }
-function stores(native, loader, globals = {}) {
+function stores(native, loader, globals = {}, ts) {
     native.homeImageWarmup ||= new (loader.loadFile('entry/src/main/ets/app/PinmonyHomeImageWarmup.ets').PinmonyHomeImageWarmup)();
     native.usesNativeProfileReads ||= () => globals.PIN_NATIVE_PROFILE_READS_ENABLED === true;
     native.uiText ||= source => require('./local-message-test-fixture.cjs').rawLocalMessages.text(source);
@@ -34,7 +34,7 @@ function stores(native, loader, globals = {}) {
     if (!native.nativeBusinessSessionContext) {
       const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
       const body = index.match(/private nativeBusinessSessionContext\(\): PinmonyBusinessSessionContext \{([\s\S]*?)\n  \}/)[1];
-      native.nativeBusinessSessionContext = Function(body);
+      native.nativeBusinessSessionContext = vm.runInNewContext(ts.transpileModule('(function() {' + body + '\n})', { compilerOptions: { target: 99 } }).outputText);
     }
     for (const feature of ['home', 'pin', 'board', 'search', 'profile', 'inbox', 'settings']) {
         const field = feature + 'Store', name = 'Pinmony' + feature[0].toUpperCase() + feature.slice(1) + 'Store';
@@ -50,15 +50,23 @@ function stores(native, loader, globals = {}) {
         }
     }
 
+    if (!native.sessionAccounts) {
+        const source = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
+        const match = source.match(/private readonly sessionAccounts:[^=]+ = new PinmonySessionAccounts\(this.settingsStore, \{([\s\S]*?)\} as PinmonySessionAccountsPorts\);/);
+        if (!match) throw Error('Missing session accounts ports');
+        const { PinmonySessionAccounts } = loader.loadFile('feature_settings/src/main/ets/services/PinmonySessionAccounts.ets');
+        const bindAccounts = vm.runInNewContext(ts.transpileModule('(function(){this.sessionAccounts = new PinmonySessionAccounts(this.settingsStore, {' + match[1] + '});})', { compilerOptions: { target: 99 } }).outputText, { ...globals, PinmonySessionAccounts });
+        bindAccounts.call(native);
+    }
 }
 function createHost(Type, ts, globals = {}) {
     const native = new Type();
-    stores(native, runtime(ts, globals), globals);
+    stores(native, runtime(ts, globals), globals, ts);
     return native;
 }
 function bind(native, ts, globals = {}, groups) {
     const loader = runtime(ts, globals);
-    stores(native, loader, globals);
+    stores(native, loader, globals, ts);
     if (groups?.includes('Session') && !native.inboxMessagesNativeReads) bind(native, ts, globals, ['NativeInboxMessages']);
     if (groups?.includes('Session') && !native.inboxUpdatesNativeReads) bind(native, ts, globals, ['NativeInboxUpdates']);
     if (groups?.includes('Session') && !native.searchNativeReads) bind(native, ts, globals, ['NativeSearchReads']);
@@ -145,7 +153,7 @@ function run(ts, code, context = {}, options) {
             const fn = original[name];
             if (name !== 'constructor' && typeof fn === 'function' && !fn.toString().includes('bind(this')) {
                 original[name] = function (...args) {
-                    stores(this, runtime(ts, context), context);
+                    stores(this, runtime(ts, context), context, ts);
                     if (fn.toString().includes('this.boardNativeReads.')) bind(this, ts, context, ['NativeBoardReads']);
                     if (fn.toString().includes('this.profileNativeReads.')) bind(this, ts, context, ['NativeProfileReads']);
                     if (fn.toString().includes('this.inboxMessagesNativeReads.')) bind(this, ts, context, ['NativeInboxMessages']);

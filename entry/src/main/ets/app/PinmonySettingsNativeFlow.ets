@@ -216,7 +216,7 @@ export class PinmonySettingsNativeFlow {
         if (this.value.ready && !this.value.error) PinmonyI18n.syncAccountLanguage(this.value.accountLanguage);
         this.store.writeUncertain = this.uncertain.size > 0;
     }
-    private empty(): PinmonyAccountSettings { return { page: this.page, token: this.token, loading: false, error: '', saved: false, ready: false, email: '', confirmedEmail: false, birthdate: '', gender: '', customGender: '', country: '', accountLanguage: '', countries: [], privateProfile: false, searchPrivacy: false, canChangePrivacy: false, canEditSearchPrivacy: false, topics: [], activities: [], activityBookmark: '', activityHasMore: false }; }
+    private empty(): PinmonyAccountSettings { return { page: this.page, token: this.token, loading: false, error: '', saved: false, ready: false, email: '', confirmedEmail: undefined, birthdate: '', gender: '', customGender: '', country: '', accountLanguage: '', countries: [], privateProfile: false, searchPrivacy: false, canChangePrivacy: false, canEditSearchPrivacy: false, topics: [], activities: [], activityBookmark: '', activityHasMore: false }; }
     private emptyOptions(): Record<string, string> { return {}; }
     private async request(name: string, verb: string, options: Object, source: string, revision: number): Promise<ProfileSettingsResponse> { return this.client.request(this.page, name, verb, options, source, (): boolean => this.current(revision)); }
     private date(v: string | undefined): string {
@@ -233,7 +233,7 @@ export class PinmonySettingsNativeFlow {
             throw new Error('identity');
         const v: PinmonyAccountSettings = this.value!;
         v.email = (account.email || '').slice(0, 320);
-        v.confirmedEmail = account.has_confirmed_email === true;
+        v.confirmedEmail = typeof account.has_confirmed_email === 'boolean' ? account.has_confirmed_email : undefined;
         v.businessAccount = typeof account.is_partner === 'boolean' ? account.is_partner : undefined;
         v.birthdate = this.date(account.birthdate);
         if (!v.birthdate && Number.isSafeInteger(account.birthday) && account.birthday! > 0) {

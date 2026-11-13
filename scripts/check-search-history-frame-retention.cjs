@@ -8,6 +8,22 @@ function method(name) {
   return source.slice(a, b < 0 ? source.lastIndexOf('\n}') : b).replace(/\s*@Builder\s*$/, '');
 }
 const destination = method('searchRootDestination');
+const header = method('searchHeaderContent');
+const filterCondition = [...header.slice(0, header.indexOf("SymbolGlyph($r('sys.symbol.slider_horizontal_2'))")).matchAll(/if \(([^\n]+)\) \{/g)].at(-1);
+assert(filterCondition, 'result filter visibility condition must exist');
+// Evaluate the actual builder condition across both underlying root and history hosts.
+const filterVisible = new Function('editing', 'historyPage', 'return ' + filterCondition[1]);
+for (const editing of [false, true]) {
+  for (const historyPage of [false, true]) {
+    for (const retained of [false, true]) {
+      for (const query of ['', 'theme']) {
+        assert.equal(filterVisible.call({ committedQuery: () => query, historyDestinationRetained: retained }, editing, historyPage),
+          !editing && !!query && (historyPage || !retained),
+          'only the current result header may show filters; retained discovery must not show camera and filters together');
+      }
+    }
+  }
+}
 assert(destination.includes("if (name !== 'search-history') {"), 'landing must stay mounted through direct recommendation results');
 assert(destination.includes('.visibility(this.rootDiscoveryVisible() ? Visibility.Visible : Visibility.Hidden)'), 'hide the retained landing without destroying its carousel');
 assert(destination.includes(".onDisAppear(() => { if (name === 'search-history') this.finishSearchHistoryClose(); })"), 'root dispatch waits for outgoing destination removal');

@@ -279,18 +279,55 @@ export class PinmonyPublishNativeFlow {
         this.candidates = [];
         this.writeKey = '';
         this.viewer = '';
+        if (this.flow) { this.flow.accountCommentsEnabled = undefined; this.flow.accountShoppingRecommendationsEnabled = undefined; }
         if (!this.flow)
             return false;
         const revision: number = this.revision;
+        let stage: string = "identity";
         try {
             await this.identity(revision, false);
             if (!this.current(revision))
                 return false;
-            if (this.flow.kind === 'photo') {
+            this.flow.loading = false;
+            this.commit();
+            if (this.flow.kind === 'photo' && this.flow.phase === 'photo') this.loadDrafts(revision);
+            return true;
+        }
+        catch (_) {
+            PinmonyRuntimeLog.warn('PublishAccountTrace: phase=failed stage=' + stage + ' current=' + this.current(revision).toString());
+            if (this.current(revision)) {
+                this.flow.loading = false;
+                this.flow.error = PinmonyI18n.message("pm_unable_to_verify_account_go_back_refresh_and_retry_94555b9f");
+                this.commit();
+            }
+            return false;
+        }
+    }
+    private async preparePhotoAccount(revision: number): Promise<boolean> {
+        if (!this.flow || !this.current(revision)) return false;
+        if (typeof this.flow.accountCommentsEnabled === 'boolean' && typeof this.flow.accountShoppingRecommendationsEnabled === 'boolean') return true;
+        let stage: string = 'account-settings-request';
+        this.flow.loading = true; this.flow.error = ''; this.commit();
+        try {
+                stage = 'account-settings-request';
                 const options: PublishAccountOptions = { url: '/v3/users/settings/', data: {} };
                 const raw: string = await this.client.request(this.owner('photo', this.flow.page), 'ApiResource', 'get', options, '/settings/permissions/', 'www/settings/permissions.js', (): boolean => this.current(revision));
                 const settings: PublishAccountResponse = JSON.parse(raw) as PublishAccountResponse;
                 if (!this.current(revision)) return false;
+                stage = 'account-settings-validation';
+                const resource: PublishAccountResource | undefined = settings.resource_response;
+                const accountData: PublishAccountSettings | undefined = resource?.data;
+                PinmonyRuntimeLog.info('PublishAccountTrace: phase=validation resourcePresent=' + (!!resource).toString() +
+                    ' statusOk=' + (resource?.status === 'success').toString() + ' codeZero=' + (resource?.code === 0).toString() +
+                    ' errorPresent=' + (!!resource?.error).toString() + ' dataPresent=' + (!!accountData).toString() +
+                    ' endpointMatch=' + (resource?.endpoint_name === 'v3_get_user_settings').toString() +
+                    ' authenticatedFalse=' + (settings.client_context?.is_authenticated === false).toString() +
+                    ' viewerPresent=' + (!!settings.client_context?.user).toString() +
+                    ' viewerMatch=' + (settings.client_context?.user?.id === this.viewer).toString() +
+                    ' accountMatch=' + (accountData?.id === this.viewer).toString() +
+                    ' commentsType=' + typeof accountData?.comments_disabled +
+                    ' commentsValid=' + ([1, 2].includes(accountData?.comments_disabled || 0)).toString() +
+                    ' shoppingType=' + typeof accountData?.shopping_rec_disabled);
                 if (!settings.resource_response || settings.resource_response.status !== 'success' || settings.resource_response.code !== 0 || settings.resource_response.error || !settings.resource_response.data || settings.client_context?.is_authenticated === false || settings.client_context?.user && settings.client_context.user.id !== this.viewer) throw new Error('publish-account-settings');
                 const account: PublishAccountSettings = settings.resource_response.data;
                 if (settings.resource_response.endpoint_name !== 'v3_get_user_settings' || account.id !== this.viewer || ![1, 2].includes(account.comments_disabled || 0) || typeof account.shopping_rec_disabled !== 'boolean') throw new Error('publish-account-settings');
@@ -298,19 +335,14 @@ export class PinmonyPublishNativeFlow {
                 this.flow.accountShoppingRecommendationsEnabled = account.shopping_rec_disabled === false;
                 if (!this.flow.accountCommentsEnabled) this.flow.allowComments = false;
                 if (!this.flow.accountShoppingRecommendationsEnabled) this.flow.allowShopping = false;
-            }
-            this.flow.loading = false;
-            this.commit();
-            if (this.flow.kind === 'photo' && this.flow.phase === 'photo') this.loadDrafts(revision);
+
             return true;
-        }
-        catch (_) {
-            if (this.current(revision)) {
-                this.flow.loading = false;
-                this.flow.error = PinmonyI18n.message("pm_unable_to_verify_account_go_back_refresh_and_retry_94555b9f");
-                this.commit();
-            }
+        } catch (_) {
+            PinmonyRuntimeLog.warn('PublishAccountTrace: phase=failed stage=' + stage + ' current=' + this.current(revision).toString());
+            if (this.current(revision)) this.flow.error = PinmonyI18n.message('pm_publishing_not_ready_close_and_retry_ba174c2b');
             return false;
+        } finally {
+            if (this.current(revision)) { this.flow.loading = false; this.commit(); }
         }
     }
     private mapDraft(row: DraftData): PinmonyPublishDraft | undefined {
@@ -361,7 +393,7 @@ export class PinmonyPublishNativeFlow {
     }
     private async loadDrafts(revision: number): Promise<void> {
         const f: PinmonyPublishFlow = this.flow!; const sequence = ++this.draftSequence;
-        f.draftLoading = true; f.draftError = ''; this.commit();
+        f.draftLoading = true; f.draftError = ''; f.error = ''; this.commit();
         try {
             const options: DraftRequestOptions = { url: '/v3/users/' + this.viewer + '/storypins/drafts/', redux_normalize_feed: true, data: { fields: ['storypinimageblock.block_style','storypinimageblock.block_type','storypinimageblock.c2pa_parent_tracking_id','storypinimageblock.image[750x, 1200x, orig]','storypinimageblock.image_signature','storypinimageblock.type','storypinvideoblock.block_style','storypinvideoblock.block_type','storypinvideoblock.type','storypinvideoblock.video[V_720P]','storypinvideoblock.video_signature','storypindata.id','storypindata.mentioned_users()','storypindata.metadata','storypindata.page_count','storypindata.pages','storypindata.type','storypindata.draft()'], page_size: 50, user: this.viewer } };
             const raw: string = await this.client.request(this.owner('photo', f.page), 'ApiResource','get',options,'/pin-creation-tool/','www/pin-creation-tool.js',(): boolean => this.current(revision) && sequence === this.draftSequence && f.phase === 'photo');
@@ -669,6 +701,9 @@ export class PinmonyPublishNativeFlow {
         const f: PinmonyPublishFlow | undefined = this.flow, revision: number = this.revision;
         if (!f || !this.current(revision) || !this.viewer || f.loading && !(action === 'back' && f.phase === 'sections') || f.busy || f.uncertain)
             return;
+        if (f.kind === 'photo' && (typeof f.accountCommentsEnabled !== 'boolean' || typeof f.accountShoppingRecommendationsEnabled !== 'boolean') && !['back', 'loadDrafts', 'deleteDraft', 'websiteFromPhoto'].includes(action)) {
+            if (!await this.preparePhotoAccount(revision) || !this.current(revision)) return;
+        }
         if (f.kind === 'photo' && f.phase === 'select' && ['saveDraft','saveDraftExit'].includes(action)) {
             if (!f.selectedBoardId || !f.boards.some((board: PinmonyOrganizeBoard): boolean => board.id === f.selectedBoardId && board.enabled)) {
                 f.draftExitRequested = false; f.error = PinmonyI18n.message('pm_publish_draft_choose_board'); this.commit(); return;

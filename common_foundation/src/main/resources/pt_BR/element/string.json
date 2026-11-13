@@ -1,5 +1,23 @@
 {
   "string": [
+    {"name": "pm_login_other_account", "value": "Entrar em outra conta"},
+    {"name": "pm_logout_current_account", "value": "Sair da conta atual"},
+    {"name": "pm_logout_stay_on_login", "value": "Você permanecerá na página de login. Outras contas não serão conectadas automaticamente."},
+
+    {"name": "pm_switch_accounts", "value": "Trocar de conta"},
+    {"name": "pm_add_account", "value": "Adicionar conta"},
+    {"name": "pm_session_current", "value": "Conta conectada"},
+    {"name": "pm_session_other", "value": "Outras contas"},
+    {"name": "pm_session_personal", "value": "Pessoal"},
+    {"name": "pm_session_business", "value": "Comercial"},
+    {"name": "pm_session_accounts_description", "value": "Troque de conta e gerencie seus acessos. Você pode alterar o tipo da conta nas configurações a qualquer momento."},
+    {"name": "pm_session_accounts_failed", "value": "Não foi possível carregar as contas. Tente novamente."},
+    {"name": "pm_session_switch_unknown", "value": "Não foi possível confirmar a troca de conta. Verifique a sessão atual. A solicitação não será reenviada."},
+    {"name": "pm_session_verify", "value": "Verificar conta atual"},
+
+    {"name": "pm_email_confirmed", "value": "Confirmado"},
+    {"name": "pm_email_confirmation_notice", "value": "Confirme seu email caso precise de ajuda com sua conta"},
+
     {
       "name": "pm_remove_chat_window",
       "value": "Excluir conversa"
@@ -6011,6 +6029,22 @@
     {
       "name": "pm_qq_community_group",
       "value": "Grupo da comunidade no QQ"
+    },
+    {
+      "name": "pm_session_logout_title",
+      "value": "Sair da conta"
+    },
+    {
+      "name": "pm_session_logout_message",
+      "value": "Tem certeza de que deseja sair desta conta?"
+    },
+    {
+      "name": "pm_session_logout_action",
+      "value": "Sair"
+    },
+    {
+      "name": "pm_session_logout_unknown",
+      "value": "Não foi possível confirmar a saída. Verifique a sessão atual primeiro. A saída não será repetida automaticamente."
     }
   ]
 }

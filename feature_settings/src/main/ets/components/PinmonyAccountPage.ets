@@ -62,18 +62,47 @@ export struct PinmonyAccountPage {
         } }] : [] } } };
   }
   @Builder
-  private row(label: string, value: string = '', target: string = '', subtitle: string = '') {
+  private row(label: string, value: string = '', target: string = '', subtitle: string = '', emailRow: boolean = false) {
     Button({ type: ButtonType.Normal, stateEffect: false }) {
       Column({ space: 8 }) {
         Row({ space: 12 }) {
-          Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-          if (value) { Text(PinmonyI18n.render(value, this.uiLanguage)).fontSize(15).fontColor($r('app.color.secondary_text')).maxLines(2) }
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.primary_text')])
+          Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(emailRow ? 0 : 1).flexShrink(0)
+          if (emailRow && this.store.data?.email) {
+            Text(this.store.data.email).fontSize(15).fontColor($r('app.color.secondary_text'))
+              .layoutWeight(1).textAlign(TextAlign.End).wordBreak(WordBreak.BREAK_ALL)
+          } else if (value) { Text(PinmonyI18n.render(value, this.uiLanguage)).fontSize(15).fontColor($r('app.color.secondary_text')).maxLines(2) }
+          if (target) { SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.primary_text')]) }
         }.width('100%')
         if (subtitle) { Text(PinmonyI18n.render(subtitle, this.uiLanguage)).width('100%').fontSize(14).fontColor($r('app.color.secondary_text')) }
+        if (emailRow && this.emailConfirmationState() === 'confirmed') { this.emailConfirmedBadge() }
       }.width('100%').padding({ top: 16, bottom: 16 }).alignItems(HorizontalAlign.Start)
     }.width('100%').backgroundColor(Color.Transparent).enabled(!this.store.loading && !this.store.busy)
       .onClick(() => { if (target) this.open(target); }).accessibilityText(label)
+  }
+  private emailConfirmationState(): string {
+    if (!this.store.data?.ready || this.store.loading || this.store.error || !this.store.data.email ||
+      !(this.retainedAccount || this.store.screen === 'account')) return '';
+    return this.store.data.confirmedEmail === true ? 'confirmed' : this.store.data.confirmedEmail === false ? 'unconfirmed' : '';
+  }
+  @Builder
+  private emailConfirmationNotice() {
+    Row({ space: 12 }) {
+      SymbolGlyph($r('sys.symbol.exclamationmark_circle_fill')).fontSize(24)
+        .fontColor([$r('app.color.account_email_warning_text')])
+      Text(this.uiText('pm_email_confirmation_notice')).fontSize(16).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.primary_text')).layoutWeight(1)
+    }.width('100%').padding(16).borderRadius(16)
+      .backgroundColor($r('app.color.account_email_warning_surface')).margin({ bottom: 12 })
+  }
+  @Builder
+  private emailConfirmedBadge() {
+    Row({ space: 6 }) {
+      SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(14)
+        .fontColor([$r('app.color.account_email_confirmed_text')])
+      Text(this.uiText('pm_email_confirmed')).fontSize(13).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.account_email_confirmed_text'))
+    }.padding({ left: 10, right: 10, top: 5, bottom: 5 }).borderRadius(8)
+      .backgroundColor($r('app.color.account_email_confirmed_surface'))
   }
   private birthday(): string {
     const p: string[] = (this.store.data?.birthdate || '').split('-');
@@ -118,17 +147,12 @@ export struct PinmonyAccountPage {
           }
           if (this.store.data?.ready || (this.store.loading && (this.retainedAccount || this.store.screen === 'account'))) {
             if ((this.retainedAccount || this.store.screen === 'account')) {
+              if (this.emailConfirmationState() === 'unconfirmed') { this.emailConfirmationNotice() }
               Text(this.uiText("pm_your_account_d80b3d08")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 12 })
               this.row(this.uiText("pm_personal_information_640803d8"), '', 'personal')
-              this.row(this.uiText("pm_email_1b2714b8"), this.store.data?.email || '')
+              this.row(this.uiText("pm_email_1b2714b8"), '', '', '', true)
               this.row(this.uiText("pm_password_a621ab60"), this.uiText("pm_change_password_946e28f6"))
               this.row(this.uiText("pm_phone_number_8e87c0dd"), this.uiText("pm_add_number_9d820e33"))
-              if (this.store.data?.businessAccount === false) {
-                this.row(this.uiText("pm_convert_to_a_business_account_4935be59"), '', '', this.uiText("pm_a_business_account_gives_you_tools_such_as_ads_and_analytics_to__50598c20"))
-              }
-              Text(this.uiText("pm_deactivation_and_deletion_75be0aea")).fontSize(14).fontColor($r('app.color.secondary_text')).margin({ top: 20 })
-              this.row(this.uiText("pm_deactivate_your_account_06052a52"), '', '', this.uiText("pm_temporarily_hide_your_profile_pins_and_boards_a6d31140"))
-              this.row(this.uiText("pm_delete_your_data_and_account_ff4cef48"), '', '', this.uiText("pm_permanently_delete_your_data_and_everything_associated_with_your_2cb85273"))
             } else if (this.store.data?.ready && this.store.screen === 'personal') {
               if (this.birthday()) { this.row(this.uiText("pm_date_of_birth_1c54caca"), this.birthday()) }
               this.row(this.uiText("pm_gender_a752a7d8"), this.gender())

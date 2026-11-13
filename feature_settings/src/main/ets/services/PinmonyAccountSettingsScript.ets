@@ -19,7 +19,7 @@ export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
     if (d.username.toLowerCase() !== username.toLowerCase()) throw Error('identity');
     identity = String(d.id);
     state.businessAccount = typeof d.is_partner === 'boolean' ? d.is_partner : undefined;
-    state.email = text(d.email, 320); state.confirmedEmail = d.has_confirmed_email === true;
+    state.email = text(d.email, 320); state.confirmedEmail = typeof d.has_confirmed_email === 'boolean' ? d.has_confirmed_email : undefined;
     state.birthdate = birthdate(d.birthdate);
     if (!state.birthdate && typeof d.birthday === 'number' && Number.isSafeInteger(d.birthday) && d.birthday > 0) {
       var birthdayDate = new Date(d.birthday * 1000);
@@ -57,7 +57,7 @@ export const PIN_ACCOUNT_SETTINGS_SCRIPT: string = `
       if (abort) return;
       active = page;
       var g = ++generation, previous = state;
-      state = {page: page, token: token, loading: true, error: '', saved: false, ready: false, email: '', confirmedEmail: false,
+      state = {page: page, token: token, loading: true, error: '', saved: false, ready: false, email: '', confirmedEmail: undefined,
         birthdate: '', gender: '', customGender: '', country: '', accountLanguage: '', privateProfile: false, searchPrivacy: false, canChangePrivacy: false, canEditSearchPrivacy: false, topics: previous && previous.page === page ? previous.topics : [], activities: [], activityBookmark: '', activityHasMore: false, countries: previous && previous.page === page ? previous.countries : []};
       var a = new AbortController(); abort = a;
       var timer = setTimeout(function () { a.abort(); }, 15000), sent = false;

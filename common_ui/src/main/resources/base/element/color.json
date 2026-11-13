@@ -1,5 +1,10 @@
 {
   "color": [
+    {"name": "account_email_warning_surface", "value": "#FFECDD"},
+    {"name": "account_email_warning_text", "value": "#A33F00"},
+    {"name": "account_email_confirmed_surface", "value": "#E4F4E8"},
+    {"name": "account_email_confirmed_text", "value": "#146B35"},
+
     { "name": "immersive_interaction_light", "value": "#D9828E" },
     { "name": "shuffle_card_glass", "value": "#B3ECEFF1" },
     {

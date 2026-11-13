@@ -40,7 +40,7 @@ assert(binding, 'Index binds the real logout coordinator through explicit ports'
 const coordinator = require('./arkts-module-loader.cjs').createArktsLoader(ts, {
   common_foundation: { PinmonyRuntimeLog: { info() {}, warn() {} } }
 }).loadFile('entry/src/main/ets/app/PinmonyLogoutCoordinator.ets');
-const context = { ...api, ...coordinator, Date, PINTEREST_LOGIN_URL: login,
+const context = { ...api, ...coordinator, Date, PinmonySessionHistory: { requireManualLogin: () => true }, PINTEREST_LOGIN_URL: login,
   PIN_NATIVE_NETWORK_ENABLED: true, PinmonyRuntimeLog: { info() {}, warn() {} } };
 require('./product-coordination-harness.cjs').run(ts,ts.transpile('class Native {' + method + complete +
   ' bindLogout(){this.logoutCoordinator=new PinmonyLogoutCoordinator(this.settingsStore,{' + binding[1] + '});}} globalThis.Native=Native;',
@@ -49,7 +49,9 @@ function harness() {
   context.Native.prototype.uiText = require('./local-message-test-fixture.cjs').rawLocalMessages.text;
   const native = new context.Native(), calls = [], loads = []; let resolve, reject;
   Object.assign(native, { authStatus: 'authenticated', authEpoch: 7, profileSettingsVisible: true,
-    settingsStore: { screen: 'root', busy: false, loading: false, token: 1, error: '' },
+    settingsStore: { screen: 'root', busy: false, loading: false, token: 1, error: '', sessionAccountsReady: true, sessionAccounts: [], rememberAccountEntry() {} },
+    nativeSessionEpoch: 7, sessionAccounts: { async read() {} },
+    loggedOutAccounts: { active: false, stage() {}, arm() { this.active = true; }, reset() { this.active = false; } },
     nativeBusinessSessionContext: () => ({authenticated:native.authStatus === 'authenticated',accountId:'synthetic',generation:native.authEpoch,origin,userAgent:'synthetic'}), nativeNetworkContext: () => { throw Error('hidden document must not gate logout'); }, nativeNetwork: { request(request) { calls.push(request); return new Promise((done, fail) => { resolve = done; reject = fail; }); } },
     resetAuthenticatedContent() { this.cleared = true; this.settingsStore.token++; this.settingsStore.busy = false; },
     controller: { loadUrl(url) { loads.push(url); } } });
@@ -57,7 +59,7 @@ function harness() {
   return { native, calls, loads, reply(value) { resolve(value); }, fail() { reject(Error('synthetic network failure')); } };
 }
 async function main() {
-  const success = harness(); const pending = success.native.logoutAccount();
+  const success = harness(); const pending = success.native.logoutAccount(); await new Promise(setImmediate);
   assert.equal(success.calls[0].url,origin+'/resource/UserSessionResource/delete/');
   await success.native.logoutAccount(); assert.equal(success.calls.length, 1, 'repeated click cannot dispatch another write');
   assert.equal(success.native.authStatus, 'authenticated', 'dispatch is not logout success');
@@ -66,13 +68,13 @@ async function main() {
   assert.deepEqual(success.loads, [login]);
   for (const response of [{ status: 200, body: '{}', error: '' }, { status: 429, body: '', error: '' },
     { status: 0, body: '', error: 'network-unavailable' }]) {
-    const failed = harness(); const request = failed.native.logoutAccount(); failed.reply(response); await request;
+    const failed = harness(); const request = failed.native.logoutAccount(); await new Promise(setImmediate); failed.reply(response); await request;
     assert.equal(failed.calls.length, 1); assert.equal(failed.native.authStatus, 'authenticated');
     assert.equal(failed.native.cleared, undefined); assert.deepEqual(failed.loads, []);
     assert.equal(failed.native.settingsStore.busy, false); assert.ok(failed.native.settingsStore.error);
     await failed.native.logoutAccount();assert.equal(failed.calls.length,1,'unconfirmed logout cannot be replayed on another click');
   }
-  const stale = harness(); const request = stale.native.logoutAccount(); stale.native.authEpoch++;
+  const stale = harness(); const request = stale.native.logoutAccount(); await new Promise(setImmediate); stale.native.authEpoch++;
   stale.reply({ status: 200, body: confirmedBody, error: '' }); await request;
   assert.equal(stale.native.cleared, undefined); assert.deepEqual(stale.loads, [], 'late response cannot log out another session');
   const disabled = harness(); context.PIN_LOGOUT_API_ENABLED = false; await disabled.native.logoutAccount();
@@ -82,23 +84,23 @@ async function main() {
   for (const change of [host => { host.settingsStore.token++; },
     host => { host.nativeBusinessSessionContext = () => ({ authenticated: true, accountId: 'another', generation: host.authEpoch, origin }); },
     host => { host.nativeBusinessSessionContext = () => ({ authenticated: true, accountId: 'synthetic', generation: host.authEpoch, origin: origin === 'https://www.pinterest.com' ? 'https://uk.pinterest.com' : 'https://www.pinterest.com' }); }]) {
-    const changed = harness(); const pending = changed.native.logoutAccount(); change(changed.native);
+    const changed = harness(); const pending = changed.native.logoutAccount(); await new Promise(setImmediate); change(changed.native);
     changed.reply({ status: 200, body: confirmedBody, error: '' }); await pending;
     assert.equal(changed.native.cleared, undefined, 'stale token, account or origin cannot confirm logout');
   }
   for (const error of ['request-unavailable', 'background']) {
-    const unsent = harness(); const pending = unsent.native.logoutAccount(); unsent.reply({ status: 0, body: '', error }); await pending;
-    const retry = unsent.native.logoutAccount(); assert.equal(unsent.calls.length, 2, 'only a known unsent write permits manual retry');
+    const unsent = harness(); const pending = unsent.native.logoutAccount(); await new Promise(setImmediate); unsent.reply({ status: 0, body: '', error }); await pending;
+    const retry = unsent.native.logoutAccount(); await new Promise(setImmediate); assert.equal(unsent.calls.length, 2, 'only a known unsent write permits manual retry');
     unsent.reply({ status: 200, body: confirmedBody, error: '' }); await retry;
   }
   const unavailable = harness(); unavailable.native.controller.loadUrl = () => { throw Error('synthetic login load failure'); };
-  const loginPending = unavailable.native.logoutAccount(); unavailable.reply({ status: 200, body: confirmedBody, error: '' }); await loginPending;
+  const loginPending = unavailable.native.logoutAccount(); await new Promise(setImmediate); unavailable.reply({ status: 200, body: confirmedBody, error: '' }); await loginPending;
   assert.equal(unavailable.native.authStatus, 'error'); assert.ok(unavailable.native.failureDetails);
-  const rejected = harness(); const rejectedPending = rejected.native.logoutAccount();
+  const rejected = harness(); const rejectedPending = rejected.native.logoutAccount(); await new Promise(setImmediate);
   rejected.fail(); await rejectedPending;
   assert.equal(rejected.native.authStatus, 'authenticated'); assert.ok(rejected.native.settingsStore.error);
   await rejected.native.logoutAccount(); assert.equal(rejected.calls.length, 1, 'thrown transport error does not replay a possibly sent write');
-  const staleFailure = harness(); const stalePending = staleFailure.native.logoutAccount(); staleFailure.native.authEpoch++;
+  const staleFailure = harness(); const stalePending = staleFailure.native.logoutAccount(); await new Promise(setImmediate); staleFailure.native.authEpoch++;
   staleFailure.fail(); await stalePending;
   assert.equal(staleFailure.native.settingsStore.error, '', 'late transport rejection cannot write an error into a later session');
 

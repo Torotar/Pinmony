@@ -1,3 +1,4 @@
+import { PinmonySwitchAccountPage } from './PinmonySwitchAccountPage';
 import { PinmonyLoadingOverlay } from 'common_ui';
 import { PinmonyUserAvatar, PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -107,9 +108,9 @@ export struct PinmonySettingsPage {
     } finally { this.clearingLog = false; }
   }
   private readonly contentScroller: Scroller = new Scroller();
-  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'logout', 'logs', 'about'];
+  private readonly options: string[] = ['profile', 'account', 'visibility', 'recommend', 'display', 'social', 'notifications', 'sessionAccounts', 'logout', 'logs', 'about'];
   private optionLabel(id: string): string {
-    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', 'pm_social_title', '通知', '退出账号', '日志', '关于'];
+    const labels: string[] = ['编辑个人资料', '帐户管理', '个人资料可见性', '优化你的推荐', '显示设置', 'pm_social_title', '通知', this.store.sessionAccountSwitchMode ? 'pm_switch_accounts' : 'pm_add_account', 'pm_log_out_e7677436', '日志', '关于'];
     return this.uiText(labels[this.options.indexOf(id)] || '');
   }
 
@@ -120,13 +121,13 @@ export struct PinmonySettingsPage {
   }
   aboutToDisappear(): void { this.pageVisible = false; }
   private confirmLogout(): void {
-    if (this.logoutConfirmOpen || this.store.busy || this.store.loading || !this.onRequest) return;
+    if (this.logoutConfirmOpen || this.store.busy || this.store.loading || this.store.sessionAccountsLoading || !this.onRequest) return;
     const token: number = this.store.token;
     this.logoutConfirmOpen = true;
     this.getUIContext().showAlertDialog(PinmonyImmersiveLight.alertOptions({
-      title: this.uiText("pm_log_out_e7677436"), message: this.uiText("pm_log_out_of_this_account_ad88739b"),
+      title: this.uiText("pm_logout_current_account"), message: this.uiText("pm_logout_stay_on_login"),
       primaryButton: { value: this.uiText("pm_cancel_2cd0f3be"), action: () => { this.logoutConfirmOpen = false; } },
-      secondaryButton: { value: this.uiText("pm_log_out_e7677436"), action: () => {
+      secondaryButton: { value: this.uiText("pm_logout_current_account"), action: () => {
         this.logoutConfirmOpen = false;
         if (this.pageVisible && this.store.screen === 'root' && token === this.store.token &&
             !this.store.busy && !this.store.loading && this.onRequest) this.onRequest('logout', '');
@@ -212,6 +213,10 @@ export struct PinmonySettingsPage {
               if (id === 'display') { this.store.screen = 'display'; if (this.onRequest) this.onRequest('read', ''); }
               if (id === 'recommend' || id === 'visibility') { this.store.screen = id === 'recommend' ? 'recommend' : 'visibility'; if (this.onRequest) this.onRequest(id === 'recommend' ? this.store.recommendationTab === 'boards' ? 'recommendBoardsRead' : this.store.recommendationTab === 'activity' ? 'activityRead' : 'aiRead' : 'read', ''); }
               if (id === 'account') { this.store.screen = 'account'; if (this.onRequest) this.onRequest('read', ''); }
+              if (id === 'sessionAccounts' && this.onRequest) {
+                if (!this.store.sessionAccountSwitchMode) { this.onRequest('addAccount', ''); }
+                else { this.store.screen = 'sessionAccounts'; this.onRequest('sessionAccounts', ''); }
+              }
               if (id === 'logout') this.confirmLogout();
               if (id === 'logs') this.exportLog();
               if (id === 'about') this.store.screen = 'about'; })
@@ -225,8 +230,8 @@ export struct PinmonySettingsPage {
       .onDidScroll(() => this.captureRootScroll())
       .contentEndOffset(this.getUIContext().px2vp(this.gestureBarHeightPx) + 12)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-      if (this.store.loading || this.store.busy) {
-        if (this.store.busy) {
+      if (this.store.loading || this.store.busy || this.store.sessionAccountsLoading) {
+        if (this.store.busy || this.store.sessionAccountsLoading) {
           PinmonyLoadingOverlay({ showMessage: false })
         } else {
           LoadingProgress().width(40).height(40).color($r('app.color.accent')).hitTestBehavior(HitTestMode.None)
@@ -249,6 +254,8 @@ export struct PinmonySettingsPage {
       PinmonyBoardRecoveryPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
     } else if (this.store.screen === 'about') {
       PinmonyAboutPage({ onBack: this.onBack, onOpenExternalLink: this.onOpenExternalLink })
+    } else if (this.store.screen === 'sessionAccounts') {
+      PinmonySwitchAccountPage({ store: this.store, onRequest: this.onRequest, onBack: this.onBack })
     } else if (this.store.screen.startsWith('social')) {
       PinmonySocialPermissionsPage({ store: this.store, routeScreen: screen, active: screen === this.store.screen,
         onRequest: this.onRequest, onBack: this.onBack })

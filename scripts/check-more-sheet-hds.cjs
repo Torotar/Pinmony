@@ -11,7 +11,7 @@ const Title=compile(sheet.slice(sheet.indexOf('  private titleOptions()'),sheet.
 for(const mode of ['off','gentle','immersive','exquisite'])for(const language of ['zh','en']){
  let closed=0;const h=new Title();Object.assign(h,{titleText:language+':pm_options_bb7486f4',immersiveLightMode:mode,uiText:key=>language+':'+key,onClose(){closed++;}});
  const o=h.titleOptions();assert.equal(o.enableComponentSafeArea,true);assert.equal(o.avoidLayoutSafeArea,false);
- assert.equal(o.style.scrollEffectOpts.enableScrollEffect,false);assert.equal(o.style.scrollEffectOpts.scrollEffectType,3);
+ assert.equal(o.style.scrollEffectOpts.enableScrollEffect,false);assert.equal(o.style.scrollEffectOpts.scrollEffectType,2,'non-scrolling MODAL uses GRADIENT_BLUR from the shared fixture');
  assert.equal(o.style.originalStyle.backgroundStyle.blurRadius,0);assert.equal(o.style.scrollEffectStyle,undefined);
  assert.equal(o.style.blurStrategy,mode==='off'?0:2);assert.equal(o.content.title.mainTitle,language+':pm_options_bb7486f4');
  o.content.menu.value[0].content.action();assert.equal(closed,1);

@@ -1,3 +1,6 @@
+import { PinmonyLoggedOutAccounts } from 'feature_settings';
+import { PinmonyLoadingOverlay } from 'common_ui';
+import { PinmonyOtherAccountsLogin } from './PinmonyOtherAccountsLogin';
 import { webview } from '@kit.ArkWeb';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyShareBridge } from '../app/PinmonyShareBridge';
@@ -19,6 +22,7 @@ export interface PinmonyLoginView {
   presentationOnly: boolean;
   captureEnvironment: () => void;
   onUnsupportedLogin: () => void;
+  otherAccounts?: PinmonyLoggedOutAccounts;
 }
 
 export function notifyUnsupportedLogin(view: PinmonyLoginView): void {
@@ -37,6 +41,7 @@ export function rejectGoogleLoginNavigation(view: PinmonyLoginView, url: string,
 @Builder
 export function PinmonyBuildLoginPage(view: PinmonyLoginView) {
         Stack() {
+          Column() {
           Web({ src: view.url || PINTEREST_URL, controller: view.controller })
             .javaScriptAccess(true)
             .domStorageAccess(true)
@@ -89,8 +94,18 @@ export function PinmonyBuildLoginPage(view: PinmonyLoginView) {
               }
               catch (_) { return view.authenticated; }
             })
-            .width('100%')
-          .height('100%')
+            .onTouch((event: TouchEvent): void => { if (event.type === TouchType.Down && view.visible && !view.loading) view.otherAccounts?.allowManualLogin(); })
+            .onKeyEvent((event: KeyEvent): void => { if (event.type === KeyType.Down && view.visible && !view.loading) view.otherAccounts?.allowManualLogin(); })
+            .enabled(!view.otherAccounts?.busy && !view.otherAccounts?.uncertain)
+            .width('100%').layoutWeight(1)
+          if (view.visible && !view.authenticated && view.otherAccounts?.active &&
+            (view.otherAccounts.accounts.length > 0 || view.otherAccounts.error || view.otherAccounts.uncertain)) {
+            PinmonyOtherAccountsLogin({ accounts: view.otherAccounts, loading: view.loading })
+          }
+          }.width('100%').height('100%')
+          if (view.visible && view.otherAccounts?.busy) {
+            PinmonyLoadingOverlay({ showMessage: false })
+          }
           if (view.visible && !view.authenticated && view.loading) {
             Stack({ alignContent: Alignment.Center }) {
               LoadingProgress().width(36).height(36).color($r('app.color.accent'))

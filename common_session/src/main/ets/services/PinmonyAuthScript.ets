@@ -107,7 +107,7 @@ export const PIN_AUTH_BRIDGE_SCRIPT: string = `
     else if (last && acknowledged !== last) last = '';
     epoch = requestedEpoch;
     scanInitial();
-    if (!evidence && /^\\/(?:login|signup|logout)(?:\\/|$)/i.test(location.pathname)) {
+    if (!evidence && /^\\/(?:login|signup|logout|add-account)(?:\\/|$)/i.test(location.pathname)) {
       evidence = { status: 'unauthenticated', profileUrl: '' };
     }
     publish(); return true;

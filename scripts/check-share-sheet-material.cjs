@@ -15,7 +15,7 @@ const Host=vm.runInNewContext(code,{PinmonyHdsTitleBar,$r:x=>x,SymbolGlyphModifi
 for(const mode of ['off','gentle','immersive','exquisite']){
  let closed=0;const h=new Host();Object.assign(h,{immersiveLightMode:mode,titleText:'share',uiText:x=>x,onClose:()=>closed++});const o=h.closeTitleOptions();
  assert.equal(o.style.blurStrategy,mode==='off'?0:2);assert.equal(o.style.thermoCtrl,false);assert.equal(o.style.scrollEffectOpts.enableScrollEffect,false);
- assert.equal(o.style.scrollEffectOpts.scrollEffectType,3,'share close uses official material-compatible style without scrolling blur');
+ assert.equal(o.style.scrollEffectOpts.scrollEffectType,2,'share close uses GRADIENT_BLUR from the shared fixture without enabling scrolling blur');
  assert.equal(o.style.originalStyle.backgroundStyle.blurRadius,0);assert.equal(o.style.originalStyle.backgroundStyle.backgroundColor,'app.color.page_background');
  assert.equal(o.style.systemMaterialEffect===undefined,mode==='off');o.content.menu.value[0].content.action();assert.equal(closed,1);
 }

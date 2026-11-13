@@ -2,20 +2,51 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const ts = require(process.argv[2] || 'typescript');
 const source = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePage.ets', 'utf8');
 const ast = ts.createSourceFile('profile.ts', source.replace(/\bstruct\b/g, 'class'), ts.ScriptTarget.Latest, true);
-const wanted = ['hubTitlePosition', 'hubTitlePaneVisible', 'hubTitleBottomHeight', 'hubTitleSearchOpacity', 'hubHeaderBackgroundOpacity', 'hubPaneChromeOffset', 'hubHeaderInset', 'hubChromeHeight', 'hubCollapseHeight', 'hubContentInset', 'profileBodyHeight'];
+const wanted = ['hubTitlePosition', 'hubTitlePaneVisible', 'hubTitleBottomHeight', 'hubTitleSearchOpacity', 'hubHeaderBackgroundOpacity', 'hubPaneChromeOffset', 'hubHeaderInset', 'hubChromeHeight', 'hubCollapseHeight', 'hubContentInset', 'profileBodyHeight', 'updateProfileViewport'];
 const methods = [];
 function visit(node) { if (ts.isMethodDeclaration(node) && wanted.includes(node.name.getText(ast))) methods.push(node.getText(ast)); ts.forEachChild(node, visit); }
 visit(ast); assert.equal(methods.length, wanted.length);
-const Host = vm.runInNewContext(ts.transpileModule('class Host {' + methods.join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
+const Host = vm.runInNewContext(ts.transpileModule('const PinmonyRuntimeLog = { info() {} }; class Host {' + methods.join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText);
 const h = new Host(); Object.assign(h, { hubTab: 'boards', hubPagerPosition: -1, hubChromeOffset: 0,
   hubPaneChromeOffsets: new Map([['pins', 112], ['collages', 52]]), statusBarHeightPx: 24,
-  getUIContext: () => ({ px2vp: n => n }), modern: () => true, hubPane: true });
+  profile: { isOwn: true }, legacyContentPane: false, getUIContext: () => ({ px2vp: n => n }), modern: () => true, hubPane: true });
 assert.equal(h.profileBodyHeight(), '100%');
 h.hubPane = false;
 for (const height of [650, 900, 480]) {
   h.profileViewportHeight = height;
   assert.equal(h.profileBodyHeight(), height, 'root body must use measured full viewport, not reduced HDS percentage constraint');
 }
+// Both layouts use the stable outer viewport; nested panes and visited profiles do not.
+for (const legacy of [true, false, true, false]) {
+  h.modern = () => !legacy; h.hubPane = false; h.profileViewportHeight = 800;
+  assert.equal(h.profileBodyHeight(), 800, 'layout switching must retain the measured root viewport');
+}
+for (const field of ['hubPane', 'legacyContentPane', 'onBack']) {
+  h[field] = true; assert.equal(h.profileBodyHeight(), '100%'); h[field] = false;
+}
+h.profile.isOwn = false; assert.equal(h.profileBodyHeight(), '100%'); h.profile.isOwn = true;
+h.modern = () => true;
+const viewportObserver = source.slice(source.indexOf("}.width('100%').height(this.legacyContentPane ? 'auto' : '100%')"), source.indexOf('private rootCompactTitle()'));
+assert(!viewportObserver.includes('!this.modern()'), 'legacy root must also measure its outer viewport');
+assert(viewportObserver.includes('this.updateProfileViewport(Number(area.height))'), 'outer measurement invokes validated handler');
+assert(source.includes(".height(this.profileBodyHeight()).flexShrink(this.profileBodyHeight() === '100%' ? 1 : 0)"), 'only measured roots prevent shrink');
+h.profileViewportHeight = 800;
+for (const height of [0, -1, NaN, Infinity, 800.5]) {
+  h.updateProfileViewport(height); assert.equal(h.profileViewportHeight, 800);
+}
+for (const legacy of [true, false, true]) {
+  h.legacyProfile = legacy; h.modern = () => !legacy;
+  for (const height of [650, 900, 480]) {
+    h.updateProfileViewport(height); assert.equal(h.profileViewportHeight, height);
+    assert.equal(h.profileBodyHeight(), height);
+  }
+}
+for (const field of ['hubPane', 'legacyContentPane', 'onBack']) {
+  h[field] = true; h.updateProfileViewport(999); assert.equal(h.profileViewportHeight, 480); h[field] = false;
+}
+h.profile.isOwn = false; h.updateProfileViewport(999); assert.equal(h.profileViewportHeight, 480); h.profile.isOwn = true;
+h.modern = () => true;
+assert(source.includes('ProfileViewportTrace: phase=layout-switch'), 'switch diagnostics exist even when size is unchanged');
 h.profileViewportHeight = 0; assert.equal(h.profileBodyHeight(), '100%');
 h.hubPane = true;
 assert(source.includes('.height(this.profileBodyHeight())'));

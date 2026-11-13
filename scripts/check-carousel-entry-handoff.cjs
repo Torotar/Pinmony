@@ -18,7 +18,7 @@ const first = { id: 'slot-1', imageUrl: 'https://i.pinimg.com/first.jpg' };
 const second = { id: 'slot-2', imageUrl: 'https://i.pinimg.com/second.jpg' };
 const host = new Host(), events = [];
 Object.assign(host, { carousel: { pinId: 'pin-1', items: [first, second] }, revision: 0,
-  firstRenderedKey: '', failed: [], controller: { changeIndex() {} }, onFirstImageSettled: failed => events.push(failed) });
+  firstRenderedKey: '', failed: [], backdropRetryVersions: new Map(), controller: { changeIndex() {} }, onFirstImageSettled: failed => events.push(failed) });
 host.aboutToAppear();
 host.settleFirstImage(first, 0, 0);
 assert.equal(host.firstRenderedKey, '', 'data-ready must retain the cover');

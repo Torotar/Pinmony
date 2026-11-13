@@ -513,6 +513,7 @@ export struct PinmonyDetailPage {
   @State private entryOpacity: number = 1;
   @State private entryBackdropProgress: number = 1;
   @State private carouselBackdropIndex: number = 0;
+  @State private carouselBackdropReady: boolean = false;
   @State private entryScale: number = 1;
   @State private entryPhotoHidden: boolean = false;
   @State private entryMotionComplete: boolean = false;
@@ -809,6 +810,7 @@ export struct PinmonyDetailPage {
     this.entryOpacity = this.entryPhoto && !this.entryResumed ? 0 : 1;
     this.entryBackdropProgress = this.entryOpacity;
     this.carouselBackdropIndex = 0;
+    this.carouselBackdropReady = false;
     this.entryScale = 1;
     this.entryPhotoHidden = false;
   }
@@ -1122,7 +1124,18 @@ export struct PinmonyDetailPage {
   }
 
   private backdropImageUrl(): string {
-    return this.displayedDetail().carousel?.items[this.carouselBackdropIndex]?.imageUrl || this.displayedDetail().imageUrl;
+    return this.displayedDetail().imageUrl;
+  }
+
+  private needsCoverBackdrop(): boolean {
+    const detail: PinmonyDetailSnapshot = this.displayedDetail();
+    return !detail.isVideo && !detail.carousel?.freeScroll && detail.imageWidth > 0 && detail.imageHeight > 0 &&
+      this.detailMediaWidth() * detail.imageHeight / detail.imageWidth > this.heroHeight() + 0.5;
+  }
+
+  private coverBackdropVisible(): boolean {
+    return !this.displayedDetail().carousel ||
+      this.carouselBackdropIndex === 0 && !this.carouselBackdropReady && this.needsPhotoBackdrop();
   }
 
   private heroHeight(): number {
@@ -1332,13 +1345,14 @@ export struct PinmonyDetailPage {
   private detailMedia() {
     Stack({ alignContent: Alignment.TopStart }) {
       // Keep the backdrop visible while the clear photo belongs to the entry flight.
-      if (this.needsPhotoBackdrop() && this.displayedDetail().imageUrl &&
+      if (this.needsCoverBackdrop() && this.displayedDetail().imageUrl &&
         (((this.displayedDetail().mediaLoading || this.mediaReadBusy) && !this.displayedDetail().video) ||
           this.displayedDetail().mediaKind === 'carousel' || !this.displayedDetail().isVideo)) {
         Stack() {
           PinmonyCdnImage({ url: this.backdropImageUrl(), useSharedDecode: false }).width('100%').height(this.heroHeight())
             .blur(28 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress))
-            .opacity(0.72 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress)).hitTestBehavior(HitTestMode.None)
+            .opacity(0.72 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress) *
+              (this.coverBackdropVisible() ? 1 : 0)).hitTestBehavior(HitTestMode.None)
         }.width('100%').height(this.heroHeight()).borderRadius(18).clip(true).hitTestBehavior(HitTestMode.None)
       }
     Column() {
@@ -1346,6 +1360,10 @@ export struct PinmonyDetailPage {
             PinmonyCarouselView({ carousel: this.displayedDetail().carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
               maxMediaHeightVp: this.fitPhotoToScreen() ? this.heroHeight() : 0,
               previewUrl: this.displayedDetail().imageUrl,
+              entryPhotoHidden: this.entryPhotoHidden,
+              entryBackdropProgress: this.entryBackdropProgress,
+              viewerBackdropProgress: this.viewerBackdropProgress,
+              onFirstBackdropReady: () => { this.carouselBackdropReady = true; },
               onPageChanged: (index: number) => { this.carouselBackdropIndex = index; },
               productOffset: this.productGalleryOffset,
               onProductOffset: (offset: number) => { this.productGalleryOffset = offset; },
@@ -1440,7 +1458,8 @@ export struct PinmonyDetailPage {
             .backgroundColor(this.displayedDetail().imageUrl ? Color.Transparent : $r('app.color.surface_muted')).borderRadius(this.detailPhotoRadius()).clip(true)
           }
 
-    }.width('100%').opacity(this.entryPhotoHidden ? 0 : 1)
+    }.width('100%').opacity(this.entryPhotoHidden &&
+      (!this.displayedDetail().carousel || this.displayedDetail().carousel?.freeScroll) ? 0 : 1)
     }.width(this.detailMediaWidth()).id('pinmony-entry-target-' + this.traceId.toString())
       .margin({ left: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0,
         right: this.displayedDetail().carousel?.freeScroll && !this.wideDetail() ? -18 : 0 })

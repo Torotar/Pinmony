@@ -22,7 +22,9 @@ x.scaleValue=3;x.dx=100;x.closing=true;x.transitionChanged();const old=animation
 const originalOrigin=x.origin;x.origin={x:0,y:0,width:336,height:168};x.originRadius=18;assert.equal(x.sourceRadius(),18,'filled rounded source retains its corners');x.originRadius=10;assert.equal(x.sourceRadius(),10,'comment source retains its actual corner radius');x.originRadius=18;x.origin=originalOrigin;
 assert.equal(x.frameY + x.frameHeight / 2, x.origin.y + x.origin.height / 2, 'close targets actual contained photo bounds rather than letterboxed frame');
 const carousel=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets','utf8');
-assert.match(carousel,/\.id\(this.sourceId\)\.opacity\(this.imageHidden \? 0 : 1\)/);
+assert.match(carousel,/\.id\(this.sourceId\)\s*\.onChange/,'measured source remains the media viewport without the indicator');
+assert(carousel.includes('.opacity(this.entryPhotoHidden || this.imageHidden ? 0 : 1)'), 'viewer handoff hides clear media while retaining animated blur');
+assert(carousel.includes('.blur(28 * this.entryBackdropProgress * (1 - this.viewerBackdropProgress))'), 'carousel blur shares viewer flight progress');
 assert.match(page,/sourceId: 'pinmony-photo-source-' \+ this.traceId.toString\(\)/);
 assert(!page.includes(".id('pinmony-photo-source-' + this.traceId.toString()).opacity(this.viewerMounted && this.viewerImageReady ? 0 : 1)\n          } else if"), 'carousel indicator must not be part of measured or hidden photo frame');
 x.closing=false;x.transitionChanged();old.onFinish();assert.equal(closed,0,'interrupted close cannot remove reopened viewer');

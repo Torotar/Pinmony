@@ -40,14 +40,49 @@ function harness() {
     failWrite() { failWrite = true; }, wrongAck() { wrongAck = true; }, delay(fn) { delayed = fn; } };
 }
 async function main() {
+  for (const value of [false, true, undefined, 'false', null]) {
+    const typed = harness(); typed.account.has_confirmed_email = value;
+    await typed.api.start(page, 1, 'read', '');
+    assert.equal(typed.api.read().confirmedEmail, typeof value === 'boolean' ? value : undefined);
+    assert.equal(typed.writes.length, 0, 'email status read must not send verification');
+  }
+
   for (const value of [false, true, undefined, 'false']) {
     const typed=harness(); typed.account.is_partner=value;
     await typed.api.start(page,1,'read','');
     assert.equal(typed.api.read().businessAccount,typeof value==='boolean'?value:undefined);
   }
   const ui=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyAccountPage.ets','utf8');
-  assert.match(ui,/if \(this\.store\.data\?\.businessAccount === false\) \{\s*this\.row\(this\.uiText\("pm_convert_to_a_business_account/);
+  assert.doesNotMatch(ui, /pm_convert_to_a_business_account|pm_deactivate_your_account|pm_delete_your_data_and_account|pm_deactivation_and_deletion/, 'account management hides conversion, deactivation, deletion and their empty heading for every account');
 
+  assert(ui.includes('.layoutWeight(emailRow ? 0 : 1).flexShrink(0)'), 'email label only occupies its intrinsic width');
+  assert(ui.includes('.layoutWeight(1).textAlign(TextAlign.End).wordBreak(WordBreak.BREAK_ALL)'), 'email uses all remaining width before wrapping');
+  const statusBody = ui.match(/private emailConfirmationState\(\): string \{([\s\S]*?)\r?\n  \}/)[1];
+  const status = new Function(statusBody);
+  const emailState = { retainedAccount: false, store: { screen: 'account', loading: false, error: '', data: { ready: true, email: 'synthetic@example.invalid', confirmedEmail: true } } };
+  assert.equal(status.call(emailState), 'confirmed');
+  emailState.store.data.confirmedEmail = false; assert.equal(status.call(emailState), 'unconfirmed');
+  emailState.store.data.confirmedEmail = undefined; assert.equal(status.call(emailState), '');
+  emailState.store.data.confirmedEmail = true;
+  for (const [key, value] of [['loading', true], ['error', 'failure'], ['screen', 'personal']]) {
+    const before = emailState.store[key]; emailState.store[key] = value; assert.equal(status.call(emailState), ''); emailState.store[key] = before;
+  }
+  emailState.store.data.ready = false; assert.equal(status.call(emailState), ''); emailState.store.data.ready = true;
+  emailState.store.data.email = ''; assert.equal(status.call(emailState), '');
+  const notice = ui.slice(ui.indexOf('private emailConfirmationNotice()'), ui.indexOf('private emailConfirmedBadge()'));
+  assert(!/Button\(|\.onClick\(/.test(notice), 'email notice has no confirmation action');
+
+  const nativeLoader = require('./arkts-module-loader.cjs').createArktsLoader(ts, {
+    common_foundation: { PinmonyRuntimeLog: { info() {}, warn() {} } },
+    common_network: {}, common_session: {}, '@kit.RemoteCommunicationKit': { rcp: {} }
+  });
+  const { PinmonySettingsNativeFlow } = nativeLoader.loadFile('entry/src/main/ets/app/PinmonySettingsNativeFlow.ets');
+  const native = Object.create(PinmonySettingsNativeFlow.prototype);
+  native.client = { viewer: '123' }; native.origin = new URL(page).origin; native.page = page; native.value = native.empty(); native.uncertain = new Map();
+  for (const value of [true, false, undefined, 'false', null]) {
+    native.map({ id: '123', username: 'synthetic', email: 'synthetic@example.invalid', has_confirmed_email: value });
+    assert.equal(native.value.confirmedEmail, typeof value === 'boolean' ? value : undefined);
+  }
   const h = harness();
   await h.api.start(page, 1, 'read', '');
   assert.equal(h.api.read().birthdate, '2000-01-01');

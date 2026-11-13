@@ -1640,7 +1640,7 @@ export struct PinmonySearchPage {
           .enabled(this.interactionReady && !this.photoBusy)
           .onClick(() => { this.photoMenu(); })
         }
-        if (!editing && !!this.committedQuery()) {
+        if (!editing && !!this.committedQuery() && (historyPage || !this.historyDestinationRetained)) {
           Button({ type: ButtonType.Circle }) {
             Stack() {
               SymbolGlyph($r('sys.symbol.slider_horizontal_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
