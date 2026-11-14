@@ -1,4 +1,7 @@
+import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyScrollRecovery } from 'common_foundation';
+import { common } from '@kit.AbilityKit';
+import { PinmonyViewerSystemBars } from '../services/PinmonyViewerSystemBars';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyUiCommitQueue } from 'common_ui';
 import { PinmonyCdnImage } from 'common_ui';
@@ -7,7 +10,7 @@ import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyImageSearchSelection } from 'common_ui';
 import { ImageFlightRect, imageContainRect, measureImageFlightOrigin } from '../services/PinmonyImageTransition';
 import { BlurStrategy } from '@kit.UIDesignKit';
-import { PinmonyImmersiveLight } from 'common_ui';
+import { PinmonyImmersiveLight, PinmonyBackToTopButton } from 'common_ui';
 import { PinmonyUserAvatar } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyImageViewerRequest } from '../services/PinmonyImageViewerSession';
@@ -195,20 +198,56 @@ export struct PinmonyDetailPage {
   @Prop entryResumed: boolean = false;
   @Prop entryClosing: boolean = false;
   @Prop disableImageZoom: boolean = false;
-  @Prop @Watch('onShuffleSelectionChanged') shuffleSelectedImage: string = '';
+  @Prop @Watch('onShuffleStatusSelectionChanged') shuffleSelectedImage: string = '';
   @Prop shuffleBackdrop: string = '';
   @Prop shuffleItems: PinmonyShuffleItem[] = [];
   @Prop shuffleIndex: number = 0;
-  @Prop @Watch('onPinChanged') shuffleFullDetail: boolean = false;
+  @Prop @Watch('onShuffleStatusDetailChanged') shuffleFullDetail: boolean = false;
   @Prop @Watch('onShuffleSelectionChanged') shuffleReturnItem: string = '';
   @State private shuffleReadyImages: string[] = [];
   @State private shuffleReadyBackdrop: string = '';
   @State private shuffleBackdropImageOpacity: number = 0;
-  @State @Watch('onShuffleViewerPresentedChanged') private shuffleViewerPresented: boolean = false;
+  @State @Watch('onShuffleStatusPresentedChanged') private shuffleViewerPresented: boolean = false;
   @State private shuffleFlightActive: boolean = false;
-  @State private shuffleFlightClosing: boolean = false;
+  @State @Watch('syncShuffleStatusBar') private shuffleFlightClosing: boolean = false;
   @State private shuffleFlightPreparing: boolean = false;
-  @State private shuffleBackdropOpacity: number = 0;
+  @State @Watch('syncShuffleStatusBar') private shuffleBackdropOpacity: number = 0;
+  private shuffleStatusBarOwner: number = 0;
+  private shuffleStatusBarContext: common.Context | undefined = undefined;
+
+  private syncShuffleStatusBar(): void {
+    const covered: boolean = this.heroVisible && this.shuffleViewerVisible() &&
+      !this.shuffleFlightClosing && this.shuffleBackdropOpacity > 0;
+    if (covered) {
+      if (this.shuffleStatusBarOwner !== 0) return;
+      const context: common.Context | undefined = this.getUIContext().getHostContext();
+      if (!context) return;
+      this.shuffleStatusBarContext = context;
+      this.shuffleStatusBarOwner = PinmonyViewerSystemBars.acquire(context);
+    } else {
+      const context: common.Context | undefined = this.shuffleStatusBarContext;
+      if (context && this.shuffleStatusBarOwner !== 0) {
+        PinmonyViewerSystemBars.release(this.shuffleStatusBarOwner, context);
+      }
+      this.shuffleStatusBarOwner = 0;
+      this.shuffleStatusBarContext = undefined;
+    }
+  }
+
+  private onShuffleStatusPresentedChanged(): void {
+    this.syncShuffleStatusBar();
+    this.onShuffleViewerPresentedChanged();
+  }
+
+  private onShuffleStatusSelectionChanged(): void {
+    this.onShuffleSelectionChanged();
+    this.syncShuffleStatusBar();
+  }
+
+  private onShuffleStatusDetailChanged(): void {
+    this.onPinChanged();
+    this.syncShuffleStatusBar();
+  }
   @State private shuffleFlightFrame: ImageFlightRect = { x: 0, y: 0, width: 0, height: 0 };
   @State private shuffleFlightRotation: number = 0;
   @State private shuffleFlightScale: number = 1;
@@ -730,11 +769,12 @@ export struct PinmonyDetailPage {
   }
   private readonly detailPathStack: NavPathStack = new NavPathStack();
   private lastReportedScrollOffset: number = 0;
+  @State private backToTopVisible: boolean = false;
   private measuredHeaderHeight: number = 0;
   private lastRecommendAuditKey: string = '';
   private activePin: string = '';
   private restoredPaginationAllowed: boolean = true;
-  private restoringScroll: boolean = false;
+  @State private restoringScroll: boolean = false;
   onBack?: () => void;
   onCoveredBack?: () => boolean;
   onUser?: (url: string) => void;
@@ -846,6 +886,7 @@ export struct PinmonyDetailPage {
     this.shuffleFlightClosing = false;
     this.shuffleHitMasks.clear();
     this.heroVisible = false;
+    this.syncShuffleStatusBar();
     clearTimeout(this.searchLabelTimer);
   }
 
@@ -938,6 +979,7 @@ export struct PinmonyDetailPage {
   }
 
   private restoreScrollPosition(): void {
+    this.backToTopVisible = false;
     const offset: number = Math.max(0, this.initialScrollOffset);
     this.restoredPaginationAllowed = offset <= 0;
     this.restoringScroll = true;
@@ -946,6 +988,7 @@ export struct PinmonyDetailPage {
       if (this.displayedDetail().pinUrl !== pin) return;
       try {
         this.detailScroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
+        this.backToTopVisible = (this.detailScroller.offset()?.yOffset || 0) > 180;
         this.lastReportedScrollOffset = offset;
         this.shuffleRevealedKey = '';
         this.revealShuffleReturn();
@@ -956,12 +999,24 @@ export struct PinmonyDetailPage {
     }, 0);
   }
 
+  private canBackToTop(): boolean {
+    return this.pageActive && !this.restoringScroll && !this.searchMounted && !this.imageLayer &&
+      !this.viewerMounted && !this.shuffleFlightPreparing && !this.shuffleOverlayVisible() && !this.entryClosing &&
+      (!this.entryPhoto || this.entryMotionComplete);
+  }
+
+  private backToTop(): void {
+    if (!this.canBackToTop()) return;
+    this.detailScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true });
+  }
+
   private reportScrollPosition(force: boolean = false): void {
     if (this.restoringScroll) return;
     try {
       const position = this.detailScroller.offset();
       if (!position) return;
       const offset: number = Math.max(0, position.yOffset);
+      this.backToTopVisible = offset > 180;
       if (!force && Math.abs(offset - this.lastReportedScrollOffset) < 8) return;
       this.lastReportedScrollOffset = offset;
       if (this.onScrollPosition) this.onScrollPosition(this.displayedDetail().pinUrl, offset);
@@ -1183,6 +1238,16 @@ export struct PinmonyDetailPage {
     return item.kind === 'like' && item.selected || this.acceptsActionIntent(item);
   }
 
+  private parsedDescriptionSource: string = '';
+  private parsedDescriptionParts: PinmonyDescriptionPart[] = [];
+  private descriptionParts(description: string): PinmonyDescriptionPart[] {
+    if (description !== this.parsedDescriptionSource) {
+      this.parsedDescriptionSource = description;
+      this.parsedDescriptionParts = splitDescriptionTags(description);
+    }
+    return this.parsedDescriptionParts;
+  }
+
   @Builder
   private iconAction(item: PinmonyDetailAction) {
     Row({ space: 2 }) {
@@ -1227,7 +1292,7 @@ export struct PinmonyDetailPage {
     Button({ type: ButtonType.Normal }) {
       Column({ space: 8 }) {
         SmartImage({ images: pin.images || {}, url: pin.imageUrl, widthVp: this.recommendCardWidth(),
-          loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false, loadPriority: 2,
+          loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false, loadPriority: 2, fadeInOnLoad: false,
           heightVp: this.recommendCardHeight(this.recommendCardWidth(), pin),
           targetPx: this.recommendCardWidth() * this.recommendDensity(), borderRadiusVp: RECOMMEND_CARD_RADIUS_VP,
           onLoaded: () => {
@@ -1245,6 +1310,7 @@ export struct PinmonyDetailPage {
           .width('100%')
           .height(this.recommendCardHeight(this.recommendCardWidth(), pin))
           .id('pinmony-related-photo-' + this.displayedDetail().pinUrl + '-' + pin.pinUrl)
+          .overlay(this.pinCountBadge(pin.mediaCount || 0), { align: Alignment.TopStart })
         if (pin.title.length > 0) {
           Text(PinmonyI18n.render(pin.title, this.uiLanguage))
             .fontSize(15)
@@ -1262,7 +1328,7 @@ export struct PinmonyDetailPage {
     .padding(0)
     .width('100%')
     .backgroundColor(Color.Transparent)
-    .stateEffect(false)
+    .stateEffect(true)
     .onClick(() => {
       if (((this.readsReady || this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().relatedRetained) || this.deferredActions) && this.onRelated)
         this.onRelated(pin.pinUrl);
@@ -1301,7 +1367,7 @@ export struct PinmonyDetailPage {
         Button({ type: ButtonType.Normal }) {
           Stack() {
             SmartImage({ url: topic.imageUrl, images: {}, widthVp: this.recommendCardWidth(),
-              loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false, loadPriority: 2,
+              loadingActive: this.videoActive, useSharedDecode: false, viewportOnly: false, loadPriority: 2, fadeInOnLoad: false,
               heightVp: 96, targetPx: this.recommendCardWidth() * this.recommendDensity(), borderRadiusVp: 16 })
               .width('100%').height(96)
             Column().width('100%').height(96).backgroundColor('#66000000')
@@ -1309,12 +1375,18 @@ export struct PinmonyDetailPage {
               .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.Center).padding(10)
           }.width('100%').height(96).borderRadius(16).clip(true)
         }.width('100%').padding(0).backgroundColor(Color.Transparent).borderRadius(16)
-          .enabled(this.videoActive && !this.contentError)
+          // Covered pages keep their artwork; Button.enabled would dim it during navigation.
+          .hitTestBehavior(this.canOpenRelatedTopic() ? HitTestMode.Default : HitTestMode.None)
+          .accessibilityLevel(this.canOpenRelatedTopic() ? 'auto' : 'no-hide-descendants')
           .onClick(() => {
-            if (this.videoActive && !this.contentError && this.onRelatedTopic) this.onRelatedTopic(module.id, topic.id, this.displayedDetail().pinUrl);
+            if (this.canOpenRelatedTopic() && this.onRelatedTopic) this.onRelatedTopic(module.id, topic.id, this.displayedDetail().pinUrl);
           }).accessibilityText(topic.title)
       }, (topic: PinmonyRelatedTopic) => topic.id + ':' + topic.imageUrl + ':' + topic.targetUrl)
     }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  private canOpenRelatedTopic(): boolean {
+    return this.pageActive && this.videoActive && !this.contentError;
   }
 
   @Builder
@@ -1603,7 +1675,7 @@ export struct PinmonyDetailPage {
             }
             if (this.displayedDetail().description.length > 0) {
               Text() {
-                ForEach(splitDescriptionTags(this.displayedDetail().description), (part: PinmonyDescriptionPart) => {
+                ForEach(this.descriptionParts(this.displayedDetail().description), (part: PinmonyDescriptionPart) => {
                   Span(part.text)
                     .fontColor(part.query ? $r('app.color.link_text') : $r('app.color.primary_text'))
                     .onClick(() => {
@@ -1625,6 +1697,7 @@ export struct PinmonyDetailPage {
               Row() {
                 Blank()
               Button(this.expanded ? this.uiText("pm_show_less_afd4b783") : this.uiText("pm_see_more_92b2b2de"))
+                .stateEffect(false)
                 .height(32)
                 .padding(0)
                 .backgroundColor(Color.Transparent)
@@ -1650,7 +1723,7 @@ export struct PinmonyDetailPage {
                 Text(this.uiText("pm_view_all_comments_11ef17e2")).fontSize(13).lineHeight(18).fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.primary_text')).width('100%')
               }.width('100%').alignItems(HorizontalAlign.Start)
-            }.width('100%').padding(0).borderRadius(0).backgroundColor(Color.Transparent)
+            }.stateEffect(false).width('100%').padding(0).borderRadius(0).backgroundColor(Color.Transparent)
               .enabled((this.readsReady || (this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().commentsRetained) || this.deferredActions))
               .onClick(() => { if (this.onComments) this.onComments(); })
 
@@ -2051,6 +2124,9 @@ export struct PinmonyDetailPage {
       Stack() {
         Column() { this.detailContent() }.width('100%').height('100%')
           .hitTestBehavior(this.searchMounted ? HitTestMode.None : HitTestMode.Default)
+        PinmonyBackToTopButton({ showButton: this.backToTopVisible && this.canBackToTop(),
+          bottomInset: Math.max(80, this.getUIContext().px2vp(this.gestureBarHeightPx) + 64),
+          onBackToTop: () => this.backToTop() })
       if (this.searchMounted) {
         Column() {
         PinmonyVisualSearchView({ pin: this.displayedDetail().pinUrl, imageUrl: this.displayedDetail().imageUrl || this.displayedDetail().originalImageUrl,
@@ -2058,6 +2134,7 @@ export struct PinmonyDetailPage {
           presentationActive: this.pageActive,
           animatePhoto: true, originX: this.searchOrigin.x, originY: this.searchOrigin.y,
           originWidth: this.searchOrigin.width, originHeight: this.searchOrigin.height, closing: this.searchClosing,
+          originRadius: this.detailPhotoRadius(),
           onPhotoFrame: (x: number, y: number, width: number, height: number, radius: number, duration: number, chrome: number) => {
             this.updateSearchFlightFrame(x, y, width, height, radius, duration, chrome);
           },
@@ -2100,6 +2177,11 @@ export struct PinmonyDetailPage {
     .backgroundColor($r('app.color.page_background'))
   }
 
+  @Builder
+  private pinCountBadge(mediaCount: number) {
+    PinmonyPinCountBadge({ mediaCount: mediaCount }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+  }
+
   build() {
     Stack() {
       HdsNavigation(this.detailPathStack) {
@@ -2112,7 +2194,9 @@ export struct PinmonyDetailPage {
       .opacity(this.entryOpacity)
       .scale({ x: this.entryScale, y: this.entryScale })
       if (this.searchMounted) {
-        // Fixed local artwork: only its common parent transforms during flight.
+        // Clip in display coordinates so corner radius animates in vp, independent
+        // of the fixed artwork's scale. Image and selection still share one transform.
+        Stack({ alignContent: Alignment.TopStart }) {
         Stack({ alignContent: Alignment.TopStart }) {
         Image(this.displayedDetail().imageUrl || this.displayedDetail().originalImageUrl)
           .width(this.searchFlightBaseWidth).height(this.searchFlightBaseHeight).objectFit(ImageFit.Contain)
@@ -2122,10 +2206,11 @@ export struct PinmonyDetailPage {
           .opacity(this.searchFlightChrome)
           .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         }.width(this.searchFlightBaseWidth).height(this.searchFlightBaseHeight)
-          .borderRadius(this.searchFlightRadius).clip(true)
-          .position({ x: 0, y: 0 })
           .scale({ x: this.searchFlightFrame.width / this.searchFlightBaseWidth,
             y: this.searchFlightFrame.height / this.searchFlightBaseHeight, centerX: 0, centerY: 0 })
+        }.width(this.searchFlightFrame.width).height(this.searchFlightFrame.height)
+          .borderRadius(this.searchFlightRadius).clip(true)
+          .position({ x: 0, y: 0 })
           .translate({ x: this.searchFlightFrame.x, y: this.searchFlightFrame.y })
           .opacity(this.searchImageReady && this.searchPhotoFlying ? 1 : 0)
           .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
@@ -2140,6 +2225,9 @@ export struct PinmonyDetailPage {
           imageWidth: this.displayedDetail().imageWidth, imageHeight: this.displayedDetail().imageHeight,
           targetRadius: this.detailPhotoRadius(),
           restoredOffset: this.initialScrollOffset,
+          // Flow header padding + detailHeader padding place media 16vp below the title inset.
+          mediaContentTop: this.titleContentInset() + 16, visibleTopInset: this.titleContentInset(),
+          currentScrollOffset: (): number => this.detailScroller.offset()?.yOffset ?? this.initialScrollOffset,
           bottomInset: !this.displayedDetail().carousel?.freeScroll &&
             (this.displayedDetail().mediaKind === 'carousel' || !!this.displayedDetail().carousel) ? 28 : 0, closing: this.entryClosing,
           onReveal: (closing: boolean, pageExit: boolean) => {

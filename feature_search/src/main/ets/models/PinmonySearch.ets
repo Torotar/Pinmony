@@ -35,6 +35,7 @@ export interface PinmonySearchSuggestion {
 }
 
 export interface PinmonySearchResult {
+  mediaCount?: number;
   avatarColorIndex?: number;
   userId?: string;
   followerCount?: number;

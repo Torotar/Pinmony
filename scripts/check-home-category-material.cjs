@@ -23,7 +23,8 @@ for (const device of [{ apiAvailable: () => false }]) {
   assert.equal(h.calls.length, 0, 'API 24/25 must never access new material methods');
   assert.equal(h.effects.length, 0);
 }
-const h = boot({ apiAvailable: version => { assert.equal(version, '26.0.0'); return true; } });
+let capabilityChecks = 0;
+const h = boot({ apiAvailable: version => { capabilityChecks++; assert.equal(version, '26.0.0'); return true; } });
 for (const mode of ['gentle', 'immersive', 'exquisite']) {
   for (const selected of [true, false]) {
     new h.Host(mode, selected).applyNormalAttribute(h.button);
@@ -40,15 +41,36 @@ for (const selected of [true, false]) {
   assert.deepEqual(h.calls.at(-1), ['background', selected ? 'app.color.detail_save_accent' : 'app.color.input_surface']);
 }
 const failedColor = boot({ apiAvailable: () => true }, true);
+assert.equal(capabilityChecks, 8, 'each material application has a direct API version guard recognized by the compiler');
 new failedColor.Host('immersive', true).applyNormalAttribute(failedColor.button);
 assert.equal(failedColor.effects.length, 0);
 assert.equal(failedColor.calls[0][1], undefined);
 assert.deepEqual(failedColor.calls[1], ['background', 'app.color.detail_save_accent']);
-assert(page.includes('.attributeModifier(new PinmonyHomeCategoryMaterial(this.immersiveLightMode, this.categoryTabSelected(index, tab)))'));
-assert(page.includes('.enabled((this.interactionReady || this.offlinePreview) && tab.enabled)'));
-assert(page.includes('.accessibilitySelected(this.categoryTabSelected(index, tab))'));
+assert(page.includes('.attributeModifier(this.categoryMaterial(id))'));
+assert(page.includes('.enabled((this.interactionReady || this.offlinePreview) && this.currentCategory(id).enabled)'));
+assert(page.includes('.accessibilitySelected(this.categorySelected(id))'));
 const profile = fs.readFileSync('build-profile.json5', 'utf8');
 assert(profile.includes('"compileSdkVersion": "26.0.0"'));
 assert(profile.includes('"compatibleSdkVersion": "6.1.1(24)"'));
 assert(profile.includes('"targetSdkVersion": "6.1.1(24)"'));
 console.log('Home category material passed: API 24/25 fallback, API 26 modes, selected tint, live off/reset and existing readiness/accessibility binding.');
+
+// A material belongs to one stable button; repeat application must still reach native attributes.
+const reuse = new h.Host('immersive', true, false);
+const beforeReuse = h.effects.length;
+for (let i = 0; i < 120; i++) reuse.applyNormalAttribute(h.button);
+assert.equal(h.effects.length, beforeReuse + 1);
+const firstMaterial = h.calls.at(-1)[1];
+assert.equal(h.calls.at(-2)[1], firstMaterial);
+for (const [mode, selected, dark] of [['gentle',true,false],['exquisite',true,false],['immersive',false,false],['immersive',false,true],['immersive',true,true]]) {
+  const count = h.effects.length;
+  reuse.update(mode, selected, dark); reuse.applyNormalAttribute(h.button);
+  assert.equal(h.effects.length, count + 1, 'mode, selection and theme invalidate per-button material');
+  reuse.update(mode, selected, dark); reuse.applyNormalAttribute(h.button);
+  assert.equal(h.effects.length, count + 1, 'equivalent inputs reuse material');
+}
+reuse.update('off', true, true); reuse.applyNormalAttribute(h.button);
+assert.equal(h.calls.at(-2)[1], undefined);
+const count = h.effects.length;
+reuse.update('immersive', true, true); reuse.applyNormalAttribute(h.button);
+assert.equal(h.effects.length, count + 1, 'off to on recreates material');

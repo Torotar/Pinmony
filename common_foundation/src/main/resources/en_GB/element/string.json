@@ -6045,6 +6045,30 @@
     {
       "name": "pm_session_logout_unknown",
       "value": "Unable to confirm the logout result. Verify the current session first. Logout will not be repeated automatically."
+    },
+    {
+      "name": "pm_language_arabic",
+      "value": "Arabic"
+    },
+    {
+      "name": "pm_birthdate_year",
+      "value": "Year"
+    },
+    {
+      "name": "pm_back_to_top",
+      "value": "Back to top"
+    },
+    {
+      "name": "pm_board_invite_link_share",
+      "value": "Share invitation link"
+    },
+    {
+      "name": "pm_board_invite_link_copying",
+      "value": "Copying…"
+    },
+    {
+      "name": "pm_board_invite_link_copy_failed",
+      "value": "Unable to copy the invitation link. Please try again."
     }
   ]
 }

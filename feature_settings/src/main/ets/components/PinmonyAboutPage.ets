@@ -30,7 +30,7 @@ struct PinmonyAboutInfoRow {
         Text(PinmonyI18n.render(this.description, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text')).width('100%')
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       if (this.link) {
-        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16)
+        SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(16)
           .fontColor([$r('app.color.secondary_text')]).accessibilityLevel('no')
       }
     }.width('100%').padding(18)
@@ -158,7 +158,7 @@ export struct PinmonyAboutPage {
                 else this.checkUpdate();
               })
             if (this.hasUpdate && this.release) {
-              Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
+              Divider().color($r('app.color.surface_muted')).margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 18 : 78, right: PinmonyI18n.isRtl(this.uiLanguage) ? 78 : 18 })
               Button({ type: ButtonType.Normal }) {
                 PinmonyAboutInfoRow({ icon: $r('sys.symbol.arrow_down'), title: this.uiText("pm_download_55c561dc"), description: this.uiText("pm_open_releases_in_browser_5cb655da"), link: true })
               }.width('100%').backgroundColor(Color.Transparent).enabled(!this.openingLink)
@@ -175,24 +175,24 @@ export struct PinmonyAboutPage {
           Column() {
             PinmonyAboutInfoRow({ icon: $r('sys.symbol.info_circle'), title: this.uiText("pm_about_the_project_224e0b60"), description:
               this.uiText("pm_an_unofficial_pinterest_client_for_harmonyos_with_a_native_arkui_5990368f") })
-            Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
+            Divider().color($r('app.color.surface_muted')).margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 18 : 78, right: PinmonyI18n.isRtl(this.uiLanguage) ? 78 : 18 })
             Button({ type: ButtonType.Normal }) {
               PinmonyAboutInfoRow({ icon: $r('sys.symbol.person_2'), title: this.uiText('pm_qq_community_group'), description: '1132346187' })
             }.width('100%').backgroundColor(Color.Transparent)
               .onClick(() => { this.copyQqGroup(); })
-            Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
+            Divider().color($r('app.color.surface_muted')).margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 18 : 78, right: PinmonyI18n.isRtl(this.uiLanguage) ? 78 : 18 })
             Button({ type: ButtonType.Normal }) {
               PinmonyAboutInfoRow({ icon: $r('sys.symbol.link'), title: this.uiText("pm_source_code_606a4e58"), description: 'github.com/Torotar/Pinmony', link: true })
             }.width('100%').backgroundColor(Color.Transparent).enabled(!this.openingLink)
               .onClick(() => { this.openLink('https://github.com/Torotar/Pinmony'); })
               .accessibilityText(this.uiText("pm_source_code_open_the_pinmony_github_repository_491e45d7"))
-            Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
+            Divider().color($r('app.color.surface_muted')).margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 18 : 78, right: PinmonyI18n.isRtl(this.uiLanguage) ? 78 : 18 })
             Button({ type: ButtonType.Normal }) {
               PinmonyAboutInfoRow({ icon: $r('sys.symbol.exclamationmark_circle'), title: this.uiText("pm_feedback_55a2ce13"), description: this.uiText("pm_submit_on_github_issues_e4865aa9"), link: true })
             }.width('100%').backgroundColor(Color.Transparent).enabled(!this.openingLink)
               .onClick(() => { this.openLink('https://github.com/Torotar/Pinmony/issues'); })
               .accessibilityText(this.uiText("pm_feedback_open_github_issues_3c152b53"))
-            Divider().color($r('app.color.surface_muted')).margin({ left: 78, right: 18 })
+            Divider().color($r('app.color.surface_muted')).margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 18 : 78, right: PinmonyI18n.isRtl(this.uiLanguage) ? 78 : 18 })
             PinmonyAboutInfoRow({ icon: $r('sys.symbol.doc_text'), title: this.uiText("pm_open_source_license_038ad816"), description: 'Apache License 2.0' })
           }.width('100%').backgroundColor($r('app.color.input_surface')).borderRadius(20).clip(true)
         }.width('100%').padding({ left: 20, right: 20, bottom: 28 })

@@ -6045,6 +6045,30 @@
     {
       "name": "pm_session_logout_unknown",
       "value": "Не удалось подтвердить результат выхода. Сначала проверьте текущий сеанс. Выход не будет повторён автоматически."
+    },
+    {
+      "name": "pm_language_arabic",
+      "value": "Арабский"
+    },
+    {
+      "name": "pm_birthdate_year",
+      "value": "Год"
+    },
+    {
+      "name": "pm_back_to_top",
+      "value": "Наверх"
+    },
+    {
+      "name": "pm_board_invite_link_share",
+      "value": "Поделиться ссылкой-приглашением"
+    },
+    {
+      "name": "pm_board_invite_link_copying",
+      "value": "Копирование…"
+    },
+    {
+      "name": "pm_board_invite_link_copy_failed",
+      "value": "Не удалось скопировать ссылку-приглашение. Повторите попытку."
     }
   ]
 }

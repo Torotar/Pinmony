@@ -108,7 +108,7 @@ async function notificationSupplement(){
  const ui=fs.readFileSync('feature_settings/src/main/ets/components/PinmonyNotificationsPage.ets','utf8');assert(ui.includes("this.store.token === token"));assert(ui.includes('notificationGlobal(choice.type, choice.section, choice.option) || value'));assert(ui.includes('cancel: () => { this.confirmationOpen = false; }'));
  const method=ui.slice(ui.indexOf('  private channelEnabled('),ui.indexOf('  private retry('))+ui.slice(ui.indexOf('  private change('),ui.indexOf('  @Builder'));
  const js=require('./native-network-test-fixture.cjs').transpile(ts, 'class NotificationInteraction {'+method+'}',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
- const Interaction=vm.runInNewContext(js+';NotificationInteraction',{notificationGlobal:model.notificationGlobal,DialogAlignment:{Bottom:1},$r:v=>v});
+ const Interaction=vm.runInNewContext(js+';NotificationInteraction',{PinmonyImmersiveLight:{alertOptions:options=>options},notificationGlobal:model.notificationGlobal,DialogAlignment:{Bottom:1},$r:v=>v});
  let dialog;const requests=[];const x=new Interaction();x.pageVisible=true;x.confirmationOpen=false;x.store={token:1,screen:'notifications',busy:false,loading:false,writeUncertain:false};x.uiText=s=>s;x.getUIContext=()=>({showAlertDialog:d=>dialog=d});x.onRequest=(a,v)=>requests.push([a,JSON.parse(v)]);
  const channel={channel:'push',section:'settings_push_everything',option:'NO_PUSH',value:true,editable:true};
  x.change(channel,false);assert(dialog);assert.equal(requests.length,0,'opening confirmation never writes');dialog.primaryButton.action();assert.equal(requests.length,0,'cancel never writes');assert(!x.confirmationOpen);
@@ -155,7 +155,13 @@ async function followPanelRefresh(){
  const desired=!before;f.hold().resolve({data:{[desired?'v3FollowUserMethodMutation':'v3UnfollowUserMethodMutation']:{data:{id:relay('2'),explicitlyFollowedByMe:desired}}}});await pending;
  assert.equal(f.ps.panel.items[0].following,desired,'confirmed result updates the current panel even if the snapshot was replaced');
  const source=fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePanelPage.ets','utf8');
- assert.equal(source.split("this.uiLanguage + ':' + item.following + ':' + item.canFollow").length - 1,3,'user, board and search lists rebuild changed follow buttons');
+ assert(source.includes("this.uiLanguage + ':' + item.following + ':' + item.canFollow"),'inline user rows refresh confirmed follow state');
+ for(const builder of ['boardCard','searchPanelItem']) {
+   const start=source.indexOf('private '+builder+'('),end=source.indexOf('\n  @Builder',start+1);
+   const body=source.slice(start,end<0?undefined:end);
+   assert(body.includes('$$.item.following') && body.includes('$$.item.canFollow'),'reactive '+builder+' reads current follow state and permission');
+   assert(source.includes('this.'+builder+'({ item: this.panelItem(item) })'),'reactive '+builder+' receives the latest panel item');
+ }
 }
 async function followersPaging(){
  const f=fixture();await f.profile.open('followers','users');f.bad(true);await f.profile.moreFollowers();assert(f.ps.panel.moreError);assert.equal(f.ps.panel.items.length,1);assert(f.ps.panel.hasMore);f.bad(false);await f.profile.moreFollowers();assert.equal(f.ps.panel.items.length,2);assert(!f.ps.panel.moreError);
@@ -196,7 +202,7 @@ async function policy(){const f=fixture();await f.settings.requestAction('privat
  const w={PinmonyNativeProfileSettingsEnabled:true,addEventListener(){}};w.top=w;const ctx={window:w,location:{origin,href:page},fetch(){throw Error('Old Web request');}};for(const [p,k] of [['feature_settings/src/main/ets/services/PinmonyAccountSettingsScript.ets','PIN_ACCOUNT_SETTINGS_SCRIPT'],['feature_settings/src/main/ets/services/PinmonyNotificationsScript.ets','PIN_NOTIFICATIONS_READ_SCRIPT'],['feature_profile/src/main/ets/services/PinmonyProfilePanelScript.ets','PIN_PROFILE_PANEL_SCRIPT']])vm.runInNewContext(loader.loadFile(p)[k],ctx);assert.equal(w.PinmonyAccountSettings,undefined);assert.equal(await w.PinmonyProfilePanel.open(page,'edit','users',1),false);assert.equal(w.PinmonyProfilePanel.follow(page,'2'),false);
 }
 const watchdog=setTimeout(()=>{console.error('Native profile/settings timed out');process.exit(1)},20000);
-(async()=>{await require('./autoplay-settings-test-cases.cjs')({fixture,flush,page});await require('./social-permissions-test-cases.cjs')({fixture,loader,ts,flush,page});await notificationSupplement();await notificationsWrites();await settings();await profiles();await followersPaging();await followPanelRefresh();await boardFollowing();await boardFollowPolicy();await production();renameRoute();await avatarPreview();await policy();console.log('Native profile/settings: actual requests and Index bindings without Web, identity/permissions, edit/conflict, follows, organize, preferences/readback, cancellation, unknown results and stale responses passed');})().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1;});
+(async()=>{await require('./autoplay-settings-test-cases.cjs')({fixture,flush,page});await require('./social-permissions-test-cases.cjs')({fixture,loader,ts,flush,page});await notificationSupplement();await notificationsWrites();await settings();console.log('Native settings: autoplay, social permissions, notifications, account/privacy/recommendation writes, readback, cancellation and uncertain-write guards passed');if(process.argv.includes('--settings-only'))return;await profiles();await followersPaging();await followPanelRefresh();await boardFollowing();await boardFollowPolicy();await production();renameRoute();await avatarPreview();await policy();console.log('Native profile/settings: actual requests and Index bindings without Web, identity/permissions, edit/conflict, follows, organize, preferences/readback, cancellation, unknown results and stale responses passed');})().then(()=>clearTimeout(watchdog)).catch(e=>{clearTimeout(watchdog);console.error(e);process.exitCode=1;});
 const settingsHandoffSource = require('node:fs').readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert(settingsHandoffSource.includes('if (this.profileSettingsVisible || this.settingsProfileDepth >= 0)'), 'settings remains mounted during profile entry');
 assert(settingsHandoffSource.includes('.hitTestBehavior(this.settingsProfileDepth >= 0 ? HitTestMode.None : HitTestMode.Default)'), 'retained settings does not intercept profile input');

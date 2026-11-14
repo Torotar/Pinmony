@@ -1,4 +1,5 @@
 export interface PinmonyProfileSearchPin {
+  mediaCount?: number;
   id: string;
   image: string;
   title: string;

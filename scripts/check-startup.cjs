@@ -19,6 +19,8 @@ const modules = {
     PinmonyI18n: { initialize: () => { if (languageFails) throw Error(); events.push('language'); }, syncSystemLanguage: () => events.push('language-fallback') },
     PinmonyProfileLayoutPreference: { initialize: () => events.push('profile-layout') },
     PinmonyPublishAnchor: { initialize: () => events.push('anchor') },
+    PinmonyImmersiveLightPreference: { initialize: () => events.push('immersive-light') },
+    PinmonyDisplayPreference: { initialize: () => events.push('display-preferences'), applyTheme: (ctx, mode) => ctx.getApplicationContext().setColorMode(mode === 'dark' ? 0 : mode === 'light' ? 1 : -1) },
     PinmonyDetailDisplayPreference: { initialize: () => events.push('detail-display') }
   },
   '@kit.ArkWeb': { webview: { BackForwardCacheSupportedFeatures: class {}, WebviewController: {
@@ -27,14 +29,17 @@ const modules = {
     initializeWebEngine: () => events.push('engine')
   } } }
 };
-function load(task) {
+function load(task, runtimeState = state, disk) {
   const source = fs.readFileSync('entry/src/main/' + task.srcEntry, 'utf8').replace('@Sendable', '')
     .replace(/import lazy \{/g, 'import {');
   const exports = {};
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText, {
     exports, require: name => { assert(name in modules); return modules[name]; },
-    AppStorage: { get: key => state.get(key) },
-    PersistentStorage: { persistProp: (key, value) => { if (!state.has(key)) state.set(key, value); } }
+    AppStorage: { get: key => runtimeState.get(key) },
+    PersistentStorage: { persistProp: (key, value) => {
+      if (!runtimeState.has(key)) runtimeState.set(key, disk?.has(key) ? disk.get(key) : value);
+      if (disk) disk.set(key, runtimeState.get(key));
+    } }
   });
   return new exports.default();
 }
@@ -46,10 +51,11 @@ function load(task) {
     await load(task).init(context);
     done.add(task.name);
   }
-  assert.deepEqual(events, ['log', 'theme:0', 'language', 'profile-layout', 'inbox-local', 'anchor', 'detail-display', 'retention', 'engine']);
+  assert.deepEqual(events, ['log', 'display-preferences', 'language', 'profile-layout', 'inbox-local', 'anchor', 'immersive-light', 'detail-display', 'retention', 'engine']);
   assert.equal(state.get('immersiveLightMode'), 'off', 'legacy disabled setting survives migration');
   assert.equal(state.get('themePreference'), 'dark', 'saved preference survives default registration');
   assert.equal(state.get('pinmonySessionConfirmed'), false);
+  require('./check-immersive-preference.cjs');
   languageFails = true;
   await load(profile.startupTasks[1]).init(context);
   assert(events.includes('language-fallback'));

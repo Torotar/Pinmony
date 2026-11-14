@@ -1,3 +1,5 @@
+import { PinmonySubmittedLinkTarget, PinmonyBoardInviteLink } from 'common_network';
+
 export interface PinmonySearchPorts {
   nativeSearch?: () => boolean;
   nativeSearchApply?: () => void;
@@ -9,6 +11,7 @@ export interface PinmonySearchPorts {
   nativeSearchFollowBoard?: (id: string) => Promise<void>;
   nativeSearchDeleteHistory?: (id: string) => Promise<void>;
   nativeSearchInput?: (term: string, immediate: boolean) => Promise<void>;
+  clearSubmittedLinkInput?: () => void;
   nativeSearchCancelFilters?: (preservePresentation?: boolean) => void;
   nativeSearchFilters?: () => Promise<void>;
   nativeSearchFilterTarget?: (id: string) => string;
@@ -34,6 +37,8 @@ export interface PinmonySearchPorts {
   openSubmittedPin?: (pinId: string, source: string) => void;
   openSubmittedProfile?: (url: string, source: string) => void;
   resolveSubmittedPin?: (link: string, current: () => boolean) => Promise<string>;
+  resolveSubmittedLink?: (link: string, current: () => boolean) => Promise<PinmonySubmittedLinkTarget>;
+  openSubmittedBoardInvite?: (link: PinmonyBoardInviteLink, source: string, current: () => boolean) => Promise<void>;
   cancelSubmittedPin?: () => void;
   cancelNavigation: (clearRetained: boolean) => void;
   clearOpeningDetail: () => void;

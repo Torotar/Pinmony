@@ -19,6 +19,7 @@ export interface PinmonyRelatedTopic {
 }
 
 export interface PinmonyRelatedPin {
+  mediaCount?: number;
   kind?: string;
   topics?: PinmonyRelatedTopic[];
   id: string;

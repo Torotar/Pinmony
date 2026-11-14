@@ -16,6 +16,7 @@ export interface PinmonyHomeBoard {
 }
 
 export interface PinmonyHomePin {
+  mediaCount?: number;
   id: string;
   pinUrl: string;
   imageUrl: string;

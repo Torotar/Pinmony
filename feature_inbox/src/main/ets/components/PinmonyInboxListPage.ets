@@ -42,14 +42,15 @@ export struct PinmonyInboxListPage {
   private conversationSwipeActive: boolean = false;
   private readonly searchScroller: ListScroller = new ListScroller();
   private readonly paths: NavPathStack = new NavPathStack();
-  private readonly segments: SegmentButtonV2Items = new SegmentButtonV2Items([
+  private segments: SegmentButtonV2Items = new SegmentButtonV2Items([
     { text: this.text('pm_messages_4da199fa') }, { text: this.text('pm_contacts_3303b569') }
   ]);
 
   private text(key: string): string { return PinmonyI18n.text(key, this.uiLanguage); }
   private syncLabels(): void {
-    this.segments[0].text = this.text('pm_messages_4da199fa');
-    this.segments[1].text = this.text('pm_contacts_3303b569');
+    this.segments = new SegmentButtonV2Items([
+      { text: this.text('pm_messages_4da199fa') }, { text: this.text('pm_contacts_3303b569') }
+    ]);
   }
   aboutToAppear(): void {
     this.syncLabels(); this.paths.pushPath({ name: 'inbox-list' }, false);
@@ -115,7 +116,7 @@ export struct PinmonyInboxListPage {
     Row({ space: 14 }) {
       Button({ type: ButtonType.Normal }) {
         PinmonyUserAvatar({ profileUrl: item.profileUrl || '', image: item.imageUrl, colorIndex: item.avatarColorIndex || 0, name: item.title, avatarSize: 48 })
-      }.padding(0).borderRadius(24).backgroundColor(Color.Transparent).stateEffect(false).enabled(!!item.profileUrl)
+      }.padding(0).borderRadius(24).backgroundColor(Color.Transparent).stateEffect(true).enabled(!!item.profileUrl)
         .accessibilityText(item.title).onClick(() => this.openItemAvatar(item))
       Button({ type: ButtonType.Normal }) {
       Row({ space: 14 }) {
@@ -137,10 +138,10 @@ export struct PinmonyInboxListPage {
           }.alignItems(HorizontalAlign.End).flexShrink(0)
         }
         if (this.section === 'contacts') {
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
+          SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
         }
       }.width('100%').alignItems(VerticalAlign.Center)
-      }.layoutWeight(1).padding(0).backgroundColor(Color.Transparent).stateEffect(false)
+      }.layoutWeight(1).padding(0).backgroundColor(Color.Transparent).stateEffect(true)
         .accessibilityText(item.title + ' ' + item.subtitle).onClick(() => this.onAction(item.id))
     }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 12 })
       .backgroundColor(Color.Transparent).enabled(this.actionsReady && item.enabled)
@@ -188,6 +189,7 @@ export struct PinmonyInboxListPage {
   @Builder
   private listSegments() {
     if (this.section !== 'activity') {
+      ForEach([this.uiLanguage], (_language: string) => {
       Row() {
         if (deviceInfo.apiAvailable('26.0.0')) {
           CapsuleSegmentButtonV2({
@@ -208,6 +210,7 @@ export struct PinmonyInboxListPage {
         }
       }.width('100%').height(this.listHeaderHeight).justifyContent(FlexAlign.Center)
         .padding({ left: 20, right: 20, top: 12, bottom: 12 })
+      }, (language: string): string => language)
     }
   }
 

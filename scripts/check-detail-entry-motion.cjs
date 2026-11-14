@@ -11,7 +11,7 @@ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n
  {imageContainRect,PinmonyRuntimeLog:{info:()=>{}},Curve:{EaseOut:0},setTimeout:(fn,delay)=>{if(delay===500){preparationTimers.push(fn);return -1000-preparationTimers.length;}timers.push(fn);return timers.length;},clearTimeout:()=>{}});
 let opened=0,closed=0,revealed=0;
 function fixture(HostType=Host){const x=new HostType(); Object.assign(x,{photo:{x:20,y:130,width:160,height:200},targetId:'target',rootId:'root',imageWidth:400,imageHeight:500,targetRadius:18,bottomInset:28,restoredOffset:0,
-  decoded:false,rendered:true,measured:true,started:false,version:0,closing:false,showing:false,layoutAttempts:0,preparationExpired:false,
+  decoded:false,rendered:true,measured:true,started:false,version:0,closing:false,showing:false,layoutAttempts:0,preparationExpired:false,visibleTopInset:56,mediaContentTop:120,
   onOpened:()=>opened++,onClosed:()=>closed++,onReveal:()=>revealed++,getUIContext:()=>({px2vp:n=>n,getComponentUtils:()=>({
     getRectangleById:id=>id==='root'?{windowOffset:{x:0,y:30},size:{width:360,height:800}} :{windowOffset:{x:18,y:110},size:{width:324,height:433}}
   }),animateTo:(opts,fn)=>{animations.push(opts);fn();}})});x.aboutToAppear();return x;}
@@ -105,12 +105,14 @@ const uiCommits = require('./ui-commit-harness.cjs').createUiCommitHarness(ts);
 lifecycle.uiCommits = new uiCommits.Queue();
 Object.assign(lifecycle,{pagePresent:true,active:false,detailReturnPreview:false,syncImagePrefetchActivity:()=>prefetchSyncs++,closePhotoSearch:()=>{},restoreHeroPosition:()=>{},ensureSearchDestination:()=>{},tracePresentation:()=>{},searchPathStack:{clear:()=>clears++}});
 lifecycle.activeChanged();assert.equal(clears,0,'active prop must not clear search before retained prop arrives');
-lifecycle.detailReturnPreview=true;lifecycle.activeChanged();pendingVisibility.shift()();
+lifecycle.detailReturnPreview=true;lifecycle.activeChanged();uiCommits.flush();
 assert.equal(clears,0,'same-frame preview handoff retains the original WaterFlow destination');
-lifecycle.detailReturnPreview=false;lifecycle.activeChanged();pendingVisibility.shift()();
-assert.equal(clears,1,'ordinary inactive search still releases its destination');
-lifecycle.activeChanged();lifecycle.pagePresent=false;pendingVisibility.shift()();
-assert.equal(clears,1,'disposed page ignores late visibility work');
+lifecycle.detailReturnPreview=false;lifecycle.activeChanged();uiCommits.flush();
+assert.equal(clears,0,'covered search retains its destination and scroll state');
+let photoCloses=0;lifecycle.closePhotoSearch=()=>photoCloses++;
+lifecycle.activeChanged();lifecycle.pagePresent=false;uiCommits.flush();
+assert.equal(clears,0,'disposed page cannot clear the retained destination');
+assert.equal(photoCloses,0,'disposed page ignores queued photo visibility work');
 assert.equal(prefetchSyncs,4,'all active-state changes synchronize existing prefetch admission');
 console.log('Search watched-prop handoff: no intermediate pop, inactive cleanup and disposal passed');
 
@@ -151,6 +153,7 @@ for(const offset of [1,28,160]){
  timers.shift()();assert.equal(pageMode,false,'visible restored carousel keeps photo flight');animations.at(-1).onFinish();
 }
 console.log('Visible restored detail: nonzero scroll offsets retain photo entry while offscreen restoration stays page-only passed');
+
 
 const pageFile=ts.createSourceFile('page.ts',page.replace(/\bstruct\b/g,'class'),99,true);let anchorMethod='';
 function findAnchor(n){if(ts.isMethodDeclaration(n)&&n.name.getText(pageFile)==='preserveRelatedAnchor')anchorMethod=n.getText(pageFile);ts.forEachChild(n,findAnchor);}findAnchor(pageFile);

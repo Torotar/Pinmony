@@ -4,7 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
-const locales = ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'];
+const locales = ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar'];
 const tables = locales.map(locale => JSON.parse(read(`common_foundation/src/main/resources/${locale}/element/string.json`)).string);
 const names = tables[0].map(row => row.name).sort();
 const simplifiedChinese = new Map(tables[1].map(row => [row.name, row.value]));
@@ -29,6 +29,15 @@ for (let i = 0; i < tables.length; i++) {
 for (const localeIndex of [3, 4]) {
   for (const row of tables[localeIndex]) assert(!/[\u3400-\u9fff]/.test(row.value), `Chinese in English resource: ${locales[localeIndex]}:${row.name}`);
 }
+// Arabic copy may retain brands, protocol names and placeholders, but a whole
+// sentence must not silently fall back to Chinese or Latin-only application copy.
+const arabicSharedNames = new Set(['Pinmony', 'Pinterest', 'HarmonyOS', 'ArkUI', 'GitHub', 'Google', 'Shuffles', 'Wi-Fi', 'QQ', 'PNG', 'JPEG', 'WebP', 'SMS', 'HTTP', 'HTTPS']);
+for (const row of tables[locales.indexOf('ar')]) {
+  const copy = row.value.replace(/\{(?:\d+|[A-Za-z_]\w*)\}/g, '');
+  assert(!/[\u3400-\u9fff]/.test(copy), `Chinese in Arabic resource: ${row.name}`);
+  assert(!/[A-Za-z]/.test(copy) || /[\u0621-\u064a]/.test(copy) || arabicSharedNames.has(copy.trim()),
+    `Latin-only application copy in Arabic resource: ${row.name}`);
+}
 // Intentional shared terminology is allowed; untranslated English copy is not.
 const sharedEnglishKeys = new Set([
   'pm_sms_81a4ceb7', 'pm_pins_0a89904f', 'pm_photos_7b50017a',
@@ -36,7 +45,7 @@ const sharedEnglishKeys = new Set([
   'pm_profile_hub_pins', 'pm_publish_link'
 ]);
 const english = new Map(tables[3].map(row => [row.name, row.value]));
-for (const locale of ['ja', 'ko', 'ru', 'pt_BR']) {
+for (const locale of ['ja', 'ko', 'ru', 'pt_BR', 'ar']) {
   for (const row of tables[locales.indexOf(locale)]) {
     const portugueseTimeUnit = locale === 'pt_BR' && ['pm_h_3b6fefc5', 'pm_d_49da61ce'].includes(row.name);
     assert(!(/[A-Za-z]/.test(row.value) && row.value === english.get(row.name)) || sharedEnglishKeys.has(row.name) || portugueseTimeUnit,
@@ -70,7 +79,7 @@ for (const module of modules) {
     }
     if (/[\\/](components|pages)[\\/]/.test(file)) {
       for (const match of source.matchAll(/\b(?:Text|Button|accessibilityText|accessibilityDescription)\(\s*(['"])([^'"\r\n]+)\1/g)) {
-        if (/[\u3400-\u9fffA-Za-z]/.test(match[2]) && match[2] !== 'Pinmony' && match[2] !== 'www.pinterest.com/') report(match.index, 'Inline UI copy must use language resources');
+        if (/[\u3400-\u9fff\u0621-\u064aA-Za-z]/.test(match[2]) && match[2] !== 'Pinmony' && match[2] !== 'www.pinterest.com/') report(match.index, 'Inline UI copy must use language resources');
       }
     }
   }

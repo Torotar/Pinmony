@@ -37,6 +37,7 @@ export class PinmonyBottomBarCoordinator {
   private lastScrollAt: number = 0;
   private lastAnimationAt: number = 0;
   private pendingScrollAnimation: number = -1;
+  private foregroundRevision: number = 0;
   // Application request spacing, not an assumed HDS animation duration.
   private readonly scrollAnimationSpacingMs: number = 320;
   private readonly scrollDirectionThresholdVp: number = 20;
@@ -124,9 +125,11 @@ export class PinmonyBottomBarCoordinator {
 
   resumeAfterForeground(): void {
     this.resetScrollMotion();
+    const revision: number = ++this.foregroundRevision;
     ++this.floatingTabsMotionToken;
     this.coordinatorTasks.timeout(() => {
-      if (!this.floatingTabsMounted) return;
+      if (revision !== this.foregroundRevision || !this.floatingTabsMounted ||
+          this.ports.foreground?.() === false) return;
       if (this.authStatus === 'authenticated' && this.nativeRootTabsVisible() &&
           !this.pinStore.detailOpeningPin && !this.ports.searchResultsVisible?.()) {
         this.rootTabsScrollHidden[this.activeTab] = false;
@@ -137,7 +140,18 @@ export class PinmonyBottomBarCoordinator {
       // The HDS animation can be interrupted while the app is backgrounded;
       // the local boolean alone cannot confirm the platform's visual state.
       this.setBottomBarHidden(this.floatingTabsHidden, HdsAnimationMode.CLICK_ANIMATION, true);
+      if (!this.floatingTabsHidden) {
+        // Route visibility and scroll collapse have separate animation modes.
+        // A restored visible flag must also reset an interrupted scroll motion.
+        this.setBottomBarHidden(false, HdsAnimationMode.SCROLL_ANIMATION, true);
+      }
     }, 0);
+  }
+
+  suspendForBackground(): void {
+    ++this.foregroundRevision;
+    ++this.floatingTabsMotionToken;
+    this.resetScrollMotion();
   }
 
   onBottomBarScrollSettingChanged(): void {
@@ -155,6 +169,20 @@ export class PinmonyBottomBarCoordinator {
     if (this.childBottomBarRootTab === 2) this.childBottomBarRestoreHidden = false;
     if (this.authStatus === 'authenticated' && this.activeTab === 2 && this.nativeRootTabsVisible()) {
       this.setBottomBarHidden(false, HdsAnimationMode.CLICK_ANIMATION);
+    }
+  }
+
+  expandAfterBackToTop(): void {
+    if (!this.floatingTabsMounted || this.authStatus !== 'authenticated' ||
+        this.ports.foreground?.() === false || !this.nativeRootTabsVisible() ||
+        this.pinStore.detailOpeningPin || this.ports.searchResultsVisible?.() ||
+        (this.activeTab !== 0 && this.activeTab !== 1)) return;
+    this.resetScrollMotion();
+    this.rootTabsScrollHidden[this.activeTab] = false;
+    // Cancel queued collapse even when already expanded, without replaying show.
+    // A collapsed bar still expands immediately through the scroll animation path.
+    if (this.floatingTabsHidden) {
+      this.setBottomBarHidden(false, HdsAnimationMode.SCROLL_ANIMATION, true);
     }
   }
 

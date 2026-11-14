@@ -8,7 +8,24 @@ export struct PinmonyImageSearchSelection {
   @Prop crop: PinmonyImageCrop = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
 
   private selectionRadius(): number {
-    return Math.min(12, this.crop.w * this.photoWidth / 2, this.crop.h * this.photoHeight / 2);
+    return this.cornerSize() * 12 / 28;
+  }
+
+  private cornerSize(): number {
+    // Reserve half the short edge per handle, including very narrow crops.
+    return Math.min(28, this.crop.w * this.photoWidth / 2, this.crop.h * this.photoHeight / 2);
+  }
+
+  private cornerX(index: number): number {
+    // The 28-unit SVG stroke sits at 3 (25 after rotation), not its center.
+    const right: boolean = index === 1 || index === 3;
+    return (this.crop.x + (right ? this.crop.w : 0)) * this.photoWidth -
+      this.cornerSize() * (right ? 25 : 3) / 28;
+  }
+
+  private cornerY(index: number): number {
+    return (this.crop.y + (index > 1 ? this.crop.h : 0)) * this.photoHeight -
+      this.cornerSize() * (index > 1 ? 25 : 3) / 28;
   }
 
   private maskCommands(): string {
@@ -31,10 +48,9 @@ export struct PinmonyImageSearchSelection {
 
   @Builder
   private corner(index: number) {
-    Image($r('app.media.image_crop_corner')).width(28).height(28)
+    Image($r('app.media.image_crop_corner')).width(this.cornerSize()).height(this.cornerSize())
       .rotate({ angle: index === 0 ? 0 : index === 1 ? 90 : index === 2 ? 270 : 180 })
-      .position({ x: (this.crop.x + (index === 1 || index === 3 ? this.crop.w : 0)) * this.photoWidth - 14,
-        y: (this.crop.y + (index > 1 ? this.crop.h : 0)) * this.photoHeight - 14 })
+      .position({ x: this.cornerX(index), y: this.cornerY(index) })
   }
 
   build() {

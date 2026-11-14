@@ -1,10 +1,11 @@
+import { PinmonyCardCarouselData } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonySearchUserFollow, PinmonySearchUserFollowPorts } from './PinmonySearchUserFollow';
 import { PinmonySearchBoardFollow, PinmonySearchBoardFollowPorts } from './PinmonySearchBoardFollow';
 import { PinmonySearchNativeAuxiliary, PinmonySearchAuxiliaryPorts } from './PinmonySearchNativeAuxiliary';
 import { PinmonySearchStore, PinmonySearchSnapshot, PinmonySearchResult, PinmonySearchCategory, PinmonySearchSuggestion, PinmonySearchFilterOption } from 'feature_search';
 import { PinmonyBusinessSessionContext } from 'common_session';
-import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED, readNativeSearchProductRoute, PinmonySearchProductRoute } from 'common_network';
+import { PinmonyNetworkJob, PinmonyNetworkReply, PIN_BUSINESS_PIN_READ_ENABLED, readNativeSearchProductRoute, PinmonySearchProductRoute, hasBoardInviteLinkContext } from 'common_network';
 import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyVideo, PinmonyVideoSource } from 'common_ui';
@@ -24,7 +25,7 @@ interface SearchBoardOwner { full_name?: string; username?: string; }
 interface SearchOffer { price?: string; standard_price?: string; }
 interface SearchProduct { offer_summary?: SearchOffer; }
 interface SearchRichSummary { site_name?: string; products?: SearchProduct[]; }
-interface Item { avatar_color_index?: number; section_count?: number; owner?: SearchBoardOwner; board_order_modified_at?: string; rich_summary?: SearchRichSummary; image_cover_url?: string; image_cover_hd_url?: string; pin_thumbnail_urls?: string[]; follower_count?: number; explicitly_followed_by_me?: boolean; blocked_by_me?: boolean; followed_by_me?: boolean; is_promoted?: boolean; ad_data?: Object; pin_promotion_id?: string; id?: string; type?: string; name?: string; full_name?: string; username?: string; url?: string; pin_count?: number; grid_title?: string; title?: string; description?: string; images?: Record<string, ImageData>; image_large_url?: string; image_medium_url?: string; videos?: Videos; }
+interface Item { carousel_data?: PinmonyCardCarouselData; avatar_color_index?: number; section_count?: number; owner?: SearchBoardOwner; board_order_modified_at?: string; rich_summary?: SearchRichSummary; image_cover_url?: string; image_cover_hd_url?: string; pin_thumbnail_urls?: string[]; follower_count?: number; explicitly_followed_by_me?: boolean; blocked_by_me?: boolean; followed_by_me?: boolean; is_promoted?: boolean; ad_data?: Object; pin_promotion_id?: string; id?: string; type?: string; name?: string; full_name?: string; username?: string; url?: string; pin_count?: number; grid_title?: string; title?: string; description?: string; images?: Record<string, ImageData>; image_large_url?: string; image_medium_url?: string; videos?: Videos; }
 interface Guide { term?: string; display?: string; image_medium_url?: string; dominant_color?: string; }
 interface Display { display_text?: string; }
 interface FilterAction { type?: string; feed_url?: string; filters?: FilterItem[]; title?: string; }
@@ -298,7 +299,7 @@ export class PinmonySearchNativeReads {
     const offer: SearchOffer | undefined = item.rich_summary?.products?.[0]?.offer_summary;
     const title: string = typeof item.grid_title === 'string' && item.grid_title.trim() ? item.grid_title : typeof item.title === 'string' && item.title.trim() ? item.title : typeof item.description === 'string' ? item.description : '';
     const merchant: string | undefined = typeof item.rich_summary?.site_name === 'string' ? item.rich_summary.site_name.slice(0, 180) : undefined;
-    return { merchant: merchant, price: typeof offer?.price === 'string' ? offer.price.slice(0, 80) : undefined, standardPrice: typeof offer?.standard_price === 'string' ? offer.standard_price.slice(0, 80) : undefined, id: 'api-pin-' + item.id, kind: 'pin', title: title.trim().slice(0,180), subtitle: '', targetUrl: /^\d+$/.test(String(item.id)) ? this.origin + '/pin/' + item.id + '/' : '', imageUrl: cover.url, imageWidth: cover.width, imageHeight: cover.height, enabled: /^\d+$/.test(String(item.id)), video: video };
+    return { merchant: merchant, price: typeof offer?.price === 'string' ? offer.price.slice(0, 80) : undefined, standardPrice: typeof offer?.standard_price === 'string' ? offer.standard_price.slice(0, 80) : undefined, mediaCount: (Array.isArray(item.carousel_data?.carousel_slots) ? item.carousel_data?.carousel_slots?.length || 0 : 0), id: 'api-pin-' + item.id, kind: 'pin', title: title.trim().slice(0,180), subtitle: '', targetUrl: /^\d+$/.test(String(item.id)) ? this.origin + '/pin/' + item.id + '/' : '', imageUrl: cover.url, imageWidth: cover.width, imageHeight: cover.height, enabled: /^\d+$/.test(String(item.id)), video: video };
   }
   private async request(endpoint: string, data: Object, post: boolean, live: () => boolean, pagination: boolean = false): Promise<PinmonyNetworkReply> {
     const id: string = 'native_search_read_' + (++this.sequence).toString(); this.requests.add(id);
@@ -402,6 +403,9 @@ export class PinmonySearchNativeReads {
     const version: number = ++this.suggestionRevision; const revision: number = this.revision;
     if (this.suggestionId) this.ports.network().cancel(this.suggestionId); if (this.suggestionTimer >= 0) clearTimeout(this.suggestionTimer);
     this.term = term; this.suggestions = []; this.suggestionError = ''; this.suggestionBusy = true; this.apply();
+    if (hasBoardInviteLinkContext(term)) {
+      this.suggestionBusy = false; this.apply(); return;
+    }
     const live = (): boolean => this.owned() && revision === this.revision && version === this.suggestionRevision && term === this.term;
     const load = async (): Promise<void> => {
       this.suggestionTimer = -1; if (!live()) return;
@@ -415,6 +419,13 @@ export class PinmonySearchNativeReads {
       finally { if (live()) { this.suggestionBusy = false; this.apply(); } }
     };
     if (immediate || !term) await load(); else this.suggestionTimer = setTimeout((): void => { load(); },250);
+  }
+  clearSubmittedLinkInput(): void {
+    this.suggestionRevision++;
+    if (this.suggestionId) this.ports.network().cancel(this.suggestionId);
+    if (this.suggestionTimer >= 0) clearTimeout(this.suggestionTimer);
+    this.suggestionTimer = -1; this.suggestionId = ''; this.term = this.query(this.page);
+    this.suggestions = []; this.suggestionBusy = false; this.suggestionError = ''; this.apply();
   }
   private async readHint(): Promise<void> {
     const revision: number = this.revision; const live = (): boolean => revision === this.revision && this.owned();

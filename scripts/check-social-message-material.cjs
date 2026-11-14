@@ -28,6 +28,7 @@ const options = page.slice(start, end);
 const light = fs.readFileSync('common_ui/src/main/ets/services/PinmonyImmersiveLight.ets', 'utf8').replace(/^import .*;\r?\n/gm, '').replace('export class', 'class');
 let texts = new Map();
 const context = { PinmonyI18n: { text: key => texts.get(key) || key }, $r: key => key,
+  deviceInfo: { apiAvailable: () => false },
   FontWeight: { Bold: 'bold' }, Color: { Transparent: 'transparent' },
   hdsMaterial: { MaterialType: { ADAPTIVE: 'adaptive', IMMERSIVE: 'immersive' }, MaterialLevel: { SMOOTH: 'smooth', GENTLE: 'gentle', EXQUISITE: 'exquisite' }, getSystemMaterialTypes: () => ['immersive'] },
   BlurStrategy: { ENABLE: true, DISABLE: false }, ScrollEffectType: { IMMERSIVE_GRADIENT_BLUR: 'gradient' } };

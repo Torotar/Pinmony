@@ -1,6 +1,12 @@
 import { PinmonyHomeMenuState } from '../models/PinmonyHomeMenu';
 import { PinmonyHomeSnapshot, PinmonyHomeImageRecovery, PinmonyHomeTab } from '../models/PinmonyHome';
 
+// Scroll restoration is bookkeeping, not presentation state. Keep per-frame
+// writes below the observed boundary so retained roots do not rerender.
+class PinmonyHomeScrollPosition {
+  offset: number = 0;
+}
+
 @Observed
 export class PinmonyHomeStore {
   imageRecovery: PinmonyHomeImageRecovery | undefined = undefined;
@@ -25,7 +31,9 @@ export class PinmonyHomeStore {
   homeDetailMoreToken: number = 0;
   home: PinmonyHomeSnapshot | undefined = undefined;
   cachedHome: PinmonyHomeSnapshot | undefined = undefined;
-  cachedHomeScrollOffset: number = 0;
+  private readonly scrollPosition: PinmonyHomeScrollPosition = new PinmonyHomeScrollPosition();
+  get cachedHomeScrollOffset(): number { return this.scrollPosition.offset; }
+  set cachedHomeScrollOffset(value: number) { this.scrollPosition.offset = value; }
   homePresentationEpoch: number = 0;
   private readonly categoryScrollOffsets: Map<string, number> = new Map<string, number>();
 
@@ -37,7 +45,7 @@ export class PinmonyHomeStore {
     if (!pageKey || !categoryId || !Number.isFinite(offset)) return;
     this.categoryScrollOffsets.set(pageKey + '|' + categoryId, Math.max(0, offset));
     const selected: string = this.cachedHome?.tabs.find((tab: PinmonyHomeTab): boolean => tab.selected)?.id || '';
-    if (this.cachedHome?.pageKey === pageKey && selected === categoryId) this.cachedHomeScrollOffset = Math.max(0, offset);
+    if (this.cachedHome?.pageKey === pageKey && selected === categoryId) this.scrollPosition.offset = Math.max(0, offset);
   }
 
   clearCategoryPositions(): void {

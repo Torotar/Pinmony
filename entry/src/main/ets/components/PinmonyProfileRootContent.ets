@@ -47,9 +47,9 @@ export interface PinmonyProfileRootView {
 @Builder
 export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
           if ((view.profileStore.profile || view.profileStore.profileLoading || view.profileStore.profileError) &&
-              !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource || view.detailProfileEntry) && !view.loadFailed) {
+              !view.profileStore.profileWebFlow && !view.loadFailed) {
             Stack() {
-              if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && (!view.pinStore.detail || view.retainPinSource) && !view.loadFailed) {
+              if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && !view.loadFailed) {
                 PinmonyProfilePage({
                   onCoveredBack: () => view.coveredBack(),
                   backActive: !view.coveredByBoard && !view.coveredByPin && !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible &&

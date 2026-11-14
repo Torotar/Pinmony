@@ -3,6 +3,7 @@ import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
 interface ProductVariables { isAuth: boolean; isAuthDesktop: boolean; isDesktop: boolean; isUnauth: boolean; pinId: string; shouldDefer: boolean; shouldFetchAIInsight: boolean; shouldFetchDesktopShoppingModule: boolean; shouldFetchMobileShoppingModule: boolean; shouldFetchUnauthAmazonModule: boolean; shouldShowSeoDrawerOption: boolean; }
 interface NativeSearchEnvelope { options: Record<string, Object | null>; context: Record<string,string>; }
+interface InviteLinkJsonEnvelope { source_url: string; data: NativeSearchEnvelope; }
 interface PinmonyGraphQuery {
   queryHash: string;
   variables: Object;
@@ -296,13 +297,15 @@ async requestBusinessAuxiliary(job: PinmonyNetworkJob,session: () => PinmonyBusi
     try {
       const get: boolean = job.method === 'GET',fields: string = get ? job.url.split('?')[1] || '' : job.body;
       const source: RegExpMatchArray | null = fields.match(/^source_url=([^&]+)&data=([^&]+)$/);
-      const e: NativeSearchEnvelope = JSON.parse(decodeURIComponent(source ? source[2] : '')) as NativeSearchEnvelope;
+      const json: boolean = mode === 'invite-link' && job.method === 'POST' && job.url === captured.origin + '/resource/ApiResource/create/' && job.headers['Content-Type'] === 'application/json';
+      const jsonEnvelope: InviteLinkJsonEnvelope | undefined = json ? JSON.parse(job.body) as InviteLinkJsonEnvelope : undefined;
+      const e: NativeSearchEnvelope = jsonEnvelope ? jsonEnvelope.data : JSON.parse(decodeURIComponent(source ? source[2] : '')) as NativeSearchEnvelope;
       const o: Record<string,Object | null> = e.options,keys: string[] = Object.keys(o),path: string = job.page.slice(captured.origin.length);
       const exact = (allowed: string[]): boolean => keys.length === allowed.length && keys.every((k: string): boolean => allowed.includes(k));
       const basic: boolean = PIN_BUSINESS_PIN_READ_ENABLED && captured.authenticated && !!captured.accountId && ownerCurrent() &&
         job.id.startsWith('native_aux_') && job.epoch === captured.generation && job.page.startsWith(captured.origin + '/') && path.length <= 4096 && !path.includes('#') &&
-        !!source && decodeURIComponent(source[1]) === path && Object.keys(e).length === 2 && !!e.context && !Array.isArray(e.context) && Object.keys(e.context).length === 0 && !!o && !Array.isArray(o) &&
-        (get ? job.body === '' : job.method === 'POST') && job.headers['Accept'] === 'application/json' && job.headers['Content-Type'] === 'application/x-www-form-urlencoded' &&
+        (jsonEnvelope ? Object.keys(jsonEnvelope).length === 2 && jsonEnvelope.source_url === path : !!source && decodeURIComponent(source[1]) === path) && Object.keys(e).length === 2 && !!e.context && !Array.isArray(e.context) && Object.keys(e.context).length === 0 && !!o && !Array.isArray(o) &&
+        (get ? job.body === '' : job.method === 'POST') && job.headers['Accept'] === 'application/json' && job.headers['Content-Type'] === (json ? 'application/json' : 'application/x-www-form-urlencoded') &&
         job.headers['X-Requested-With'] === 'XMLHttpRequest' && job.headers['X-Pinterest-Source-Url'] === path &&
         job.headers['X-Pinterest-Pws-Handler'] === (mode === 'quiz' ? 'www/search/[scope].js' : mode === 'invites' && job.url === captured.origin + '/resource/BoardInviteResource/delete/' ? 'www/inbox.js' : 'www/index.js');
       const endpoint: string = job.url.split('?')[0].slice(captured.origin.length);
@@ -327,6 +330,19 @@ async requestBusinessAuxiliary(job: PinmonyNetworkJob,session: () => PinmonyBusi
       }else if(mode === 'news' && /^\/(?:inbox|messages|updates|notifications)\/$/.test(path) && !get && /^\d{1,40}$/.test(target) && exact(['url','data']) && !!data) {
         if(endpoint === '/resource/ApiResource/update/')permitted = basic && o['url'] === '/v3/news_hub/hide/batch/' && Object.keys(data).length === 2 && JSON.stringify(data['news_ids']) === JSON.stringify([target]) && typeof data['should_hide'] === 'boolean';
         if(endpoint === '/resource/ApiResource/create/')permitted = basic && o['url'] === '/v3/settings/notifications/objects/' && Object.keys(data).length === 1 && JSON.stringify(data['object_ids_to_unsubscribe']) === JSON.stringify([target]);
+      }else if(mode === 'invite-link' && /^\/[A-Za-z0-9_]+\/[^/?#]+\/$/.test(path)) {
+        const digits = (value: Object | null): boolean => typeof value === 'string' && /^\d{1,30}$/.test(value as string);
+        const code = (value: Object | null): boolean => typeof value === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(value as string);
+        if (get && endpoint === '/resource/BoardResource/get/') permitted = basic && exact(['username','slug','field_set_key','is_mobile_fork']) &&
+          o['username'] === path.split('/')[1] && o['slug'] === decodeURIComponent(path.split('/')[2]) && o['field_set_key'] === 'profile_grid_item' && o['is_mobile_fork'] === true && target === '';
+        if (get && endpoint === '/resource/BoardInviteResource/get/') permitted = basic && exact(['board_id','invited_user_id','field_set_key','invite_code']) &&
+          digits(o['board_id']) && digits(o['invited_user_id']) && target === o['board_id'] + ':' + o['invited_user_id'] && o['field_set_key'] === 'boardBanner' && code(o['invite_code']);
+        if (get && endpoint === '/resource/ApiResource/get/') permitted = basic && exact(['url','data']) && o['url'] === '/v3/users/invite/external/' &&
+          !!data && Object.keys(data).length === 2 && data['object_id'] === target && digits(data['object_id']) &&
+          data['invite_type'] === '{"invite_category":3,"invite_object":2,"invite_channel":10}';
+        if (!get && endpoint === '/resource/ApiResource/create/') permitted = basic && exact(['url','data','send_as_json']) &&
+          o['url'] === '/v3/invite_code/attribution/land/' && o['send_as_json'] === true && !!data && Object.keys(data).length === 1 &&
+          code(data['invite_code']) && data['invite_code'] === target;
       }else if(mode === 'invites' && (/^\/(?:inbox|messages|updates|notifications)\/$/.test(path) || /^\/[A-Za-z0-9_]+\/[^/?#]+\/$/.test(path))) {
         if(get && endpoint === '/resource/BoardInvitesResource/get/')permitted = basic && exact(['current_user','field_set_key']) && o['current_user'] === true && o['field_set_key'] === 'news';
         if(endpoint === '/resource/BoardInviteResource/' + (get ? 'get/' : 'update/') || !get && endpoint === '/resource/BoardInviteResource/delete/' && path === '/inbox/')permitted = basic && exact(get ? ['board_id','invited_user_id','field_set_key'] : ['board_id','invited_user_id']) && /^\d{1,30}$/.test(o['board_id'] as string) && /^\d{1,30}$/.test(o['invited_user_id'] as string) && target === o['board_id'] + ':' + o['invited_user_id'] && (!get || o['field_set_key'] === 'boardEdit');

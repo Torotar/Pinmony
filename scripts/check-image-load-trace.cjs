@@ -6,8 +6,9 @@ const source = fs.readFileSync('common_ui/src/main/ets/services/PinmonyImageLoad
 const component = fs.readFileSync('common_ui/src/main/ets/components/PinmonyCdnImage.ets', 'utf8');
 let now = 1000, reads = 0, enabled = 0, queryFails = false, info;
 const logs = [];
+const quiet = [], warnings = [];
 const sandbox = { exports: {}, Date: { now: () => now },
-  PinmonyRuntimeLog: { info: line => logs.push(line) },
+  PinmonyRuntimeLog: { info: line => logs.push(line), diagnostic: line => { quiet.push(line); logs.push(line); }, warn: line => { warnings.push(line); logs.push(line); } },
   cacheDownload: { setDownloadInfoListSize: size => { assert.equal(size, 32); enabled++; },
     getDownloadInfo: () => { reads++; if (queryFails) throw new Error('private-url'); return info; } } };
 vm.runInNewContext(ts.transpileModule(source.replace(/^import[^\n]*\n/gm, ''), {
@@ -37,6 +38,9 @@ assert.match(logs.at(-1), /evidence=error-callback currentRequestConfirmed=true/
 queryFails = true; record('native-data-ready', 4);
 assert.match(logs.at(-1), /availability=query-failed/);
 assert.equal(enabled, 1, 'download statistics list is configured once per process');
+assert(quiet.some(line => line.includes('phase=decoded') && line.includes('callbackQueueMs=5')));
+assert(warnings.some(line => line.includes('phase=native-failed') && line.includes('currentRequestConfirmed=true')));
+assert(!quiet.some(line => /phase=(failed|native-failed)\b/.test(line)), 'failures must retain the mirrored warning channel');
 assert(!logs.join('\n').match(/private-image|must-not-log|private-ip|private-dns|private-url/));
 assert(!source.match(/\.download\(|\.prefetch\(|\.fetch\(|setInterval|setTimeout/), 'diagnostics cannot add traffic or timers');
 const audit = component.match(/  private auditImage\([\s\S]*?\r?\n  \}/)[0];

@@ -31,15 +31,15 @@ export interface PinmonyInboxRootView {
 @Builder
 export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
           if ((view.inboxStore.inbox || view.inboxStore.inboxLoading || view.inboxStore.inboxError) && !view.inboxStore.inboxWebFlow &&
-              !view.pinStore.detail && !view.activeSheetKind && !view.loadFailed) {
+              !view.activeSheetKind && !view.loadFailed) {
             PinmonyInboxPage({ updatesUnread: view.inboxStore.inboxUpdatesUnread, messagesUnread: view.inboxStore.inboxMessagesUnread, updatesUnreadCount: view.inboxStore.inboxUpdatesUnreadCount, messagesUnreadCount: view.inboxStore.inboxMessagesUnreadCount, onUser: (url: string) => view.openUserProfile(url),
-              interactionReady: view.activeTab === 2 && view.authStatus === 'authenticated' && !view.inboxStore.inboxFlow && !view.inboxStore.listSection,
+              interactionReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.activeTab === 2 && view.authStatus === 'authenticated' && !view.inboxStore.inboxFlow && !view.inboxStore.listSection,
               onScrollAvailability: (scrollable: boolean) => view.updateInboxScrollAvailability(scrollable),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
               snapshot: view.inboxStore.inbox || view.inboxPlaceholder(),
-              actionsReady: view.activeTab === 2 && (view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady || view.inboxStore.inboxNativeUpdatesReady) &&
+              actionsReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.activeTab === 2 && (view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady || view.inboxStore.inboxNativeUpdatesReady) &&
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),
-              sectionReady: view.activeTab === 2 && view.inboxStore.inboxSectionReady &&
+              sectionReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && view.activeTab === 2 && view.inboxStore.inboxSectionReady &&
                 view.inboxStore.inbox?.pageUrl === view.currentInboxUrl(),
               retainedContent: view.inboxStore.inboxRetainedContent,
               invitations: view.inboxStore.boardInvitations, onInvitationPreview: (item: PinmonyBoardInvitation) => view.previewBoardInvitation(item),
@@ -49,9 +49,9 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
               onInvitationAll: () => { view.inboxStore.invitationAllVisible = true; },
               initialScrollOffset: view.inboxStore.inboxScrollOffset,
               onScrollPosition: (url: string, section: string, offset: number) => {
-                if (!view.inboxStore.inbox || view.inboxStore.inbox.pageUrl !== url || view.inboxStore.inbox.section !== section ||
+                if (view.pinStore.detail || view.pinStore.detailOpeningPin || !view.inboxStore.inbox || view.inboxStore.inbox.pageUrl !== url || view.inboxStore.inbox.section !== section ||
                     view.currentInboxUrl() !== url) return;
-                view.inboxStore.inboxScrollOffset = offset;
+                view.inboxStore.rememberScrollOffset(offset);
                 if ((view.inboxStore.inboxActionsReady || view.inboxStore.inboxNativeMessagesReady) && !view.inboxStore.inboxLoading && !view.inboxStore.inboxError) view.inboxStore.inboxCache.put(view.inboxStore.inbox, offset);
               },
               loading: view.inboxStore.inboxLoading,
@@ -69,7 +69,8 @@ export function PinmonyBuildInboxRootContent(view: PinmonyInboxRootView) {
             .width('100%')
             .height('100%')
             .visibility(view.activeTab === 2 ? Visibility.Visible : Visibility.Hidden)
-            .hitTestBehavior(view.activeTab === 2 && !view.inboxStore.inboxFlow && !view.inboxStore.listSection ? HitTestMode.Default : HitTestMode.None)
+            .hitTestBehavior(!view.pinStore.detail && !view.pinStore.detailOpeningPin && view.activeTab === 2 && !view.inboxStore.inboxFlow && !view.inboxStore.listSection ? HitTestMode.Default : HitTestMode.None)
+            .accessibilityLevel(!view.pinStore.detail && !view.pinStore.detailOpeningPin && view.activeTab === 2 && !view.inboxStore.inboxFlow && !view.inboxStore.listSection ? 'auto' : 'no-hide-descendants')
           }
 
 

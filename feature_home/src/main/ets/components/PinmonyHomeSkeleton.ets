@@ -67,6 +67,7 @@ export struct PinmonyHomeSkeleton {
       }
       .width('100%')
       .padding({ left: 16, right: 16 })
+      .margin({ top: 16 })
       .accessibilityText(this.uiText("pm_loading_home_content_8884d492"))
       Row({ space: 12 }) {
         ForEach(this.columnSlots(), (column: number) => {

@@ -164,6 +164,7 @@ export struct SmartImage {
   @Prop heightVp: number = 0;
   @Prop @Watch('resetImage') targetPx: number = 0;
   @Prop borderRadiusVp: number = RECOMMEND_CARD_RADIUS_VP;
+  @Prop fadeInOnLoad: boolean = true;
   @Prop @Watch('loadingChanged') loadingActive: boolean = true;
   @Prop @Watch('loadingChanged') viewportOnly: boolean = false;
   @Prop loadPriority: number = 1;
@@ -321,8 +322,10 @@ export struct SmartImage {
           .objectFit(ImageFit.Cover)
           // The finite source tier already bounds decoding. A card-sized
           // sourceSize stretches the decoded bitmap before Cover can crop it.
-          .opacity(this.phase === 'loaded' ? 1 : 0)
-          .animation({ duration: 180, curve: Curve.EaseOut })
+          // Detail entry already animates the page. Native cached images must
+          // not be hidden and faded in a second time after their render callback.
+          .opacity(this.phase === 'loaded' || (!this.fadeInOnLoad && this.phase === 'loading') ? 1 : 0)
+          .animation({ duration: this.fadeInOnLoad ? 180 : 0, curve: Curve.EaseOut })
           .onComplete((event) => this.completeImage(revision, event?.loadingStatus ?? -1))
           .onError((event) => this.failImage(revision, event?.error?.code || 0))
       }

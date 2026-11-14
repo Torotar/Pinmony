@@ -24,11 +24,11 @@ assert.equal(f.memory.get('pinmonyLanguagePreference'), 'account', 'Account sync
 assert.equal(f.memory.get('pinmonyLanguage'), 'ja'); assert.equal(disk.get('accountLanguage'), 'ja');
 f.system('en-GB'); f.api.syncSystemLanguage(); assert.equal(f.memory.get('pinmonyLanguage'), 'ja');
 f = boot('en-US'); assert.equal(f.memory.get('pinmonyLanguage'), 'ja', 'Retain the last verified account language across offline restart');
-for (const [locale, language] of Object.entries({ 'zh-CN': 'zh', zh_TW: 'zh_TW', en_US: 'en', 'en-GB': 'en_GB', 'ja-JP': 'ja', 'ko-KR': 'ko', 'ru-RU': 'ru', pt_BR: 'pt_BR' })) {
+for (const [locale, language] of Object.entries({ 'zh-CN': 'zh', zh_TW: 'zh_TW', en_US: 'en', 'en-GB': 'en_GB', 'ja-JP': 'ja', 'ko-KR': 'ko', 'ru-RU': 'ru', pt_BR: 'pt_BR', 'ar-SA': 'ar', ar_EG: 'ar' })) {
   f.api.syncAccountLanguage(locale); assert.equal(f.memory.get('pinmonyLanguage'), language);
   assert.equal(f.memory.get('pinmonyLanguagePreference'), 'account');
 }
-for (const language of ['zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR']) {
+for (const language of ['zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar']) {
   f.api.select(language); f.api.syncAccountLanguage('ja-JP');
   assert.equal(f.memory.get('pinmonyLanguage'), language, 'Server updates preserve explicit manual selection');
   f = boot('zh-CN'); assert.equal(f.memory.get('pinmonyLanguagePreference'), language);
@@ -67,7 +67,7 @@ assert(selector.includes('pm_follow_account')); assert(!selector.includes('pm_fo
 assert.equal((selector.match(/\['account', 'zh'/g) || []).length, 2, 'Display index and selection action agree');
 assert(page.includes("private languagePreference: string = 'account'"));
 assert(page.includes('Select([{ value: this.uiText("pm_follow_system_217cfe7d") }, { value: this.uiText("pm_light_aa0819df") }'), 'Theme keeps its system label');
-for (const locale of ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR']) {
+for (const locale of ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar']) {
   const rows = JSON.parse(fs.readFileSync(`common_foundation/src/main/resources/${locale}/element/string.json`, 'utf8')).string;
   assert(rows.find(row => row.name === 'pm_follow_account')?.value);
   assert(rows.find(row => row.name === 'pm_follow_system_217cfe7d')?.value);

@@ -63,7 +63,7 @@ export struct PinmonyAccountPage {
   }
   @Builder
   private row(label: string, value: string = '', target: string = '', subtitle: string = '', emailRow: boolean = false) {
-    Button({ type: ButtonType.Normal, stateEffect: false }) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
       Column({ space: 8 }) {
         Row({ space: 12 }) {
           Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(emailRow ? 0 : 1).flexShrink(0)
@@ -71,7 +71,7 @@ export struct PinmonyAccountPage {
             Text(this.store.data.email).fontSize(15).fontColor($r('app.color.secondary_text'))
               .layoutWeight(1).textAlign(TextAlign.End).wordBreak(WordBreak.BREAK_ALL)
           } else if (value) { Text(PinmonyI18n.render(value, this.uiLanguage)).fontSize(15).fontColor($r('app.color.secondary_text')).maxLines(2) }
-          if (target) { SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.primary_text')]) }
+          if (target) { SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.primary_text')]) }
         }.width('100%')
         if (subtitle) { Text(PinmonyI18n.render(subtitle, this.uiLanguage)).width('100%').fontSize(14).fontColor($r('app.color.secondary_text')) }
         if (emailRow && this.emailConfirmationState() === 'confirmed') { this.emailConfirmedBadge() }
@@ -112,15 +112,15 @@ export struct PinmonyAccountPage {
   private accountLanguage(): string {
     const locale: string = this.store.data?.accountLanguage || '';
     const key: string = locale === 'zh-CN' || locale === 'zh_CN' ? 'pm_language_simplified_chinese' : locale === 'zh-TW' || locale === 'zh_TW' ? 'pm_language_traditional_chinese' : locale === 'en-GB' || locale === 'en_GB' ? 'pm_language_english_uk' : locale === 'en-US' || locale === 'en_US' || locale === 'en' ? 'pm_language_english' : locale === 'ja-JP' || locale === 'ja_JP' || locale === 'ja' ? 'pm_language_japanese' : locale === 'ko-KR' || locale === 'ko_KR' || locale === 'ko' ? 'pm_language_korean' : locale === 'pt-BR' || locale === 'pt_BR' || locale === 'pt' ? 'pm_language_portuguese_brazil' : '';
-    return key ? this.uiText(key) : locale;
+    return /^ar(?:[-_]|$)/i.test(locale) ? this.uiText('pm_language_arabic') : key ? this.uiText(key) : locale;
   }
   @Builder
   private dateField(field: string, value: string) {
     Column({ space: 6 }) {
-      Text(this.uiText(field === 'year' ? "pm_y_62ef900a" : field === 'month' ? "pm_month_1625179b" : "pm_day_85217f7a")).fontSize(13).fontColor($r('app.color.secondary_text'))
+      Text(this.uiText(field === 'year' ? "pm_birthdate_year" : field === 'month' ? "pm_month_1625179b" : "pm_day_85217f7a")).fontSize(13).fontColor($r('app.color.secondary_text'))
       TextInput({ text: value }).type(InputType.Number).maxLength(field === 'year' ? 4 : 2).fontColor($r('app.color.primary_text'))
-        .backgroundColor(Color.Transparent).enabled(!this.store.busy).accessibilityText(this.uiText(field === 'year' ? "pm_y_62ef900a" : field === 'month' ? "pm_month_1625179b" : "pm_day_85217f7a"))
-        .onChange((v: string) => { if (field === 'year') this.year = v; else if (field === 'month') this.month = v; else this.day = v; })
+        .backgroundColor(Color.Transparent).enabled(!this.store.busy).accessibilityText(this.uiText(field === 'year' ? "pm_birthdate_year" : field === 'month' ? "pm_month_1625179b" : "pm_day_85217f7a"))
+        .onChange((v: string) => { const normalized: string = PinmonyI18n.numericInput(v); if (field === 'year') this.year = normalized; else if (field === 'month') this.month = normalized; else this.day = normalized; })
     }.layoutWeight(1).padding(10).border({ width: 1, color: $r('app.color.secondary_text'), radius: 14 }).alignItems(HorizontalAlign.Start)
   }
   @Builder
@@ -180,7 +180,7 @@ export struct PinmonyAccountPage {
               TextInput({ text: this.query, placeholder: this.uiText("pm_search_countries_regions_79d74e48") }).fontColor($r('app.color.primary_text'))
                 .placeholderColor($r('app.color.secondary_text')).backgroundColor($r('app.color.surface_muted')).onChange((v: string) => { this.query = v; })
               ForEach(this.store.data.countries.filter((c: PinmonyCountry) => (c.name + c.key).toLowerCase().includes(this.query.toLowerCase())).sort((a: PinmonyCountry, b: PinmonyCountry) => a.key === this.store.data?.country ? -1 : b.key === this.store.data?.country ? 1 : 0), (c: PinmonyCountry) => {
-                Button({ type: ButtonType.Normal, stateEffect: false }) {
+                Button({ type: ButtonType.Normal, stateEffect: true }) {
                   Row({ space: 12 }) {
                     Text(PinmonyI18n.render(c.name, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1).textAlign(TextAlign.Start)
                     if (c.key === this.store.data?.country) { SymbolGlyph($r('sys.symbol.checkmark_circle_fill')).fontSize(24).fontColor([$r('app.color.accent')]) }

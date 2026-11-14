@@ -157,7 +157,7 @@ export struct PinmonyEditPinSheet {
             .onClick(() => this.confirmDelete())
 
               }
-            }.width('100%').padding({ right: 28 })
+            }.width('100%').padding({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 28 : 0, right: PinmonyI18n.isRtl(this.uiLanguage) ? 0 : 28 })
             }
           }.width('100%').layoutWeight(1).clip(true)
             .listDirection(Axis.Vertical).scrollBar(BarState.Auto)

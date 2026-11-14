@@ -21,7 +21,7 @@ const navigation = new Proxy({}, {get: (_object, key) => (...args) => {
   if (key === 'bindToScrollable') bound = args[0];
 }});
 const Host = vm.runInNewContext(ts.transpileModule(hostCode, {compilerOptions: {target: ts.ScriptTarget.ES2021}}).outputText, {
-  HdsNavigation: navigation, NavPathStack: class {}, HdsNavigationTitleMode: {MINI: 0},
+  HdsNavigation: navigation, NavigationMode: {Stack: 0}, NavPathStack: class {}, HdsNavigationTitleMode: {MINI: 0},
   LayoutSafeAreaType: {SYSTEM: 0}, LayoutSafeAreaEdge: {TOP: 0},
   BlurStrategy: {ENABLE: 1, DISABLE: 0}, ScrollEffectType: {IMMERSIVE_GRADIENT_BLUR: 1},
   PinmonyImmersiveLight: {effect: mode => mode}, PinmonyHdsTitleBar: {resolve: (_ctx, options) => options}

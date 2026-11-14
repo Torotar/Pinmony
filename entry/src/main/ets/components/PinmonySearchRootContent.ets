@@ -25,6 +25,7 @@ export interface PinmonySearchRootView {
   activeSheetKind: string;
   currentPinUrl: () => string;
   handleRootContentScroll: (offset: number, state: ScrollState) => void;
+  expandBottomBarAfterBackToTop: () => void;
   searchPlaceholder: () => PinmonySearchSnapshot;
   currentSearchPageKey: () => string;
   syncFloatingTabsMotion: () => void;
@@ -50,7 +51,7 @@ export interface PinmonySearchRootView {
 
 @Builder
 export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
-          if ((view.shouldKeepSearchRootMounted() && !view.pinStore.detail || view.preparingDetailReturn ||
+          if ((view.shouldKeepSearchRootMounted() || view.preparingDetailReturn ||
             view.searchStore.photoSearchVisible && view.activeTab === 1 && view.authStatus === 'authenticated') && !view.loadFailed) {
             PinmonySearchPage({
               quizCloseRequest: view.quizCloseRequest,
@@ -68,10 +69,11 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               active: view.nativeSearchPageVisible(),
               retainPhotoSearch: view.searchStore.photoSearchVisible && view.activeTab === 1 && view.authStatus === 'authenticated',
               detailReturnPreview: view.preparingDetailReturn,
-              interactionReady: !view.preparingDetailReturn && view.activeTab === 1 && view.authStatus === 'authenticated',
-              automaticLoadingEnabled: !view.searchStore.searchInputFocused && !view.searchStore.searchFilterOpen && !view.preparingDetailReturn && view.activeTab === 1 && (!view.nativeRootOnly || view.rootContentInteracted),
+              interactionReady: !view.pinStore.detail && !view.pinStore.detailOpeningPin && !view.preparingDetailReturn && view.activeTab === 1 && view.authStatus === 'authenticated',
+              automaticLoadingEnabled: !view.pinStore.detail && !view.pinStore.detailOpeningPin && !view.searchStore.searchInputFocused && !view.searchStore.searchFilterOpen && !view.preparingDetailReturn && view.activeTab === 1 && (!view.nativeRootOnly || view.rootContentInteracted),
               mediaActive: view.activeTab === 1 && view.pinStore.videoForeground && !view.activeSheetKind && !view.pinStore.detail && !view.currentPinUrl(),
               onContentScroll: (offset: number, state: ScrollState) => view.handleRootContentScroll(offset, state),
+              onBackToTop: () => view.expandBottomBarAfterBackToTop(),
               snapshot: view.searchStore.search || view.searchPlaceholder(),
               initialHeroId: view.searchStore.searchCache.heroPosition(view.searchStore.search?.pageKey || ''),
               onHeroPosition: (pageKey: string, id: string) => {
@@ -88,6 +90,7 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
                 view.searchStore.rememberScrollPosition(pageKey, offset);
               },
               loading: view.searchStore.searchLoading,
+              submittedLinkLoading: view.searchStore.submittedPinLoading,
               error: view.searchStore.searchError,
               onQueryChange: (value: string, refreshSuggestions?: boolean) => view.updateSearchQuery(value, refreshSuggestions === true),
               onSubmit: (value: string) => view.submitSearch(value),

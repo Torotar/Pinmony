@@ -190,7 +190,7 @@ export struct PinmonyCommentsSheet {
                 this.hasCurrentTranslation(item) ? this.uiText("pm_show_translation_7cd62999") : item.translationError ? this.uiText("pm_translate_again_496b5f08") : this.uiText("pm_translate_a52a0833"))
                 .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
             }
-          }.height(32).padding({ left: 0, right: 4 }).backgroundColor(Color.Transparent)
+          }.stateEffect(false).height(32).padding({ left: 0, right: 4 }).backgroundColor(Color.Transparent)
             .enabled(!item.translationLoading && !this.result.loading && !this.result.busy && !this.result.uncertain)
             .onClick(() => { if (this.onTranslate) this.onTranslate(item.id); })
             .accessibilityText(item.translationVisible && this.hasCurrentTranslation(item) ? this.uiText("pm_show_original_comment_373f6052") : this.uiText("pm_translate_comment_8a5fdd65"))
@@ -259,7 +259,7 @@ export struct PinmonyCommentsSheet {
                       Text(item.repliesOpen ? this.uiText("pm_hide_replies_c6edf966") : PinmonyI18n.format("pm_view_comment_replies", [item.replyCount], this.uiLanguage))
                         .fontSize(12).fontWeight(FontWeight.Medium).fontColor($r('app.color.primary_text'))
                     }
-                  }.height(32).padding(0).backgroundColor(Color.Transparent).margin({ left: 42 })
+                  }.height(32).padding(0).backgroundColor(Color.Transparent).margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 0 : 42, right: PinmonyI18n.isRtl(this.uiLanguage) ? 42 : 0 })
                     .enabled(!item.repliesLoading)
                     .onClick(() => { if (this.onReplies) this.onReplies(item.id); })
                 }
@@ -276,7 +276,7 @@ export struct PinmonyCommentsSheet {
                     } else if (!item.repliesLoading && !(item.replies || []).length) {
                       Text(this.uiText("pm_no_replies_yet_1ff6ef41")).fontSize(12).fontColor($r('app.color.secondary_text'))
                     }
-                  }.width('100%').padding({ left: 42 }).alignItems(HorizontalAlign.Start)
+                  }.width('100%').padding({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 0 : 42, right: PinmonyI18n.isRtl(this.uiLanguage) ? 42 : 0 }).alignItems(HorizontalAlign.Start)
                 }
               }.alignItems(HorizontalAlign.Start).width('100%')
             }

@@ -30,7 +30,7 @@ for (const [file, profile] of pages) {
   });
   for (const mode of ['immersive', 'gentle', 'exquisite', 'off']) {
     const host = { immersiveLightMode: mode, snapshot: { mode: 'edit' }, store: { screen: 'account' },
-      title: () => '', text: () => '', uiText: () => '', canSave: () => false, canRestore: () => false };
+      hasMessageTabs: () => false, messageTabControls: () => {}, title: () => '', text: () => '', uiText: () => '', canSave: () => false, canRestore: () => false };
     const options = evaluate.call(host);
     assert.equal(options.enableComponentSafeArea, false, file);
     assert.equal(options.style.blurStrategy, mode === 'off' ? 0 : 1, file);
@@ -51,7 +51,12 @@ for (const [file, profile] of pages) {
   }
 }
 const social = fs.readFileSync(settings + 'PinmonySocialPermissionsPage.ets', 'utf8');
-assert(social.includes('LengthMetrics.vp(this.titleContentInset() + 52)'), 'message scrollbar clears fixed tabs');
+assert(social.includes('LengthMetrics.vp(this.titleContentInset() + this.messageChipBarHeight())'), 'message scrollbar clears measured fixed tabs');
+assert(social.includes('top:this.titleContentInset() + this.messageChipBarHeight() + 16'), 'message body and scrollbar share measured tab clearance');
+const measuredHeight = social.match(/private messageChipBarHeight\(\): number \{([^}]+)\}/);
+assert(measuredHeight, 'shared message chip height helper exists');
+const tabHeight = vm.runInNewContext(ts.transpileModule('function height(): number {' + measuredHeight[1] + '} height;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+for (const height of [36, 40, 56]) assert.equal(tabHeight.call({messageChipMetrics:()=>({height})}), height + 12, 'tab clearance follows actual chip metrics');
 const recovery = fs.readFileSync(settings + 'PinmonyBoardRecoveryPage.ets', 'utf8');
 assert(recovery.includes('return this.panelMode ? 0 :'), 'sheet mode has no full-page title inset');
 console.log('Settings title blur: nine page configurations, four modes, edit-only scope, scrollbar margins and optional compiled checks passed');

@@ -1,3 +1,4 @@
+import { PinmonySearchControlMaterial, PinmonySearchControlModifier } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -61,7 +62,7 @@ export struct PinmonyBoardCollaboratorsPage {
 struct PinmonyBoardCollaboratorsSurface {
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('statusBarHeightPx') private statusBarHeightPx: number = 0;
-  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56; }
+  private titleContentInset(): number { return this.getUIContext().px2vp(this.statusBarHeightPx) + 56 + (this.snapshot.phase === 'invite' ? 76 : 0); }
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
@@ -83,11 +84,12 @@ struct PinmonyBoardCollaboratorsSurface {
     if (this.snapshot.phase === 'members' || this.snapshot.uncertain) this.onClose();
     else this.onAction('members', '');
   }
+  private readonly invitationSearchBuilder: () => void = (): void => { this.invitationSearch(); };
   private titleOptions(): HdsNavigationTitleBarOptions {
     return { avoidLayoutSafeArea: true, enableComponentSafeArea: false,
       style: { blurStrategy: (this.immersiveLightMode !== 'off') ? BlurStrategy.ENABLE : BlurStrategy.DISABLE, thermoCtrl: (this.immersiveLightMode !== 'off'), scrollEffectOpts: { enableScrollEffect: (this.immersiveLightMode !== 'off'), scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR },
         systemMaterialEffect: PinmonyImmersiveLight.effect(this.immersiveLightMode), scrollEffectStyle: { backgroundStyle: { backgroundColor: $r('app.color.immersive_title_scrolled'), maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 }, contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } } }, originalStyle: { contentStyle: { backIconStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text') }, menuStyle: { backgroundColor: this.immersiveLightMode === 'off' || this.immersiveLightMode === 'gentle' ? Color.Transparent : undefined, iconColor: $r('app.color.primary_text'), textColor: $r('app.color.primary_text') }, titleStyle: { mainTitleColor: $r('app.color.primary_text'), subTitleColor: $r('app.color.secondary_text') } },  backgroundStyle: { backgroundColor: Color.Transparent, maskExtraHeight: 0, blurRadius: (this.immersiveLightMode !== 'off') ? 18 : 0 } } },
-      content: { title: { mainTitle: this.snapshot.phase === 'invite' ? this.uiText("pm_invite_collaborators_d6dc0e1e") :
+      content: { bottomBuilder: this.snapshot.phase === 'invite' ? { builder: this.invitationSearchBuilder, height: 76 } : undefined, title: { mainTitle: this.snapshot.phase === 'invite' ? this.uiText("pm_invite_collaborators_d6dc0e1e") :
         this.snapshot.phase === 'permissions' ? this.uiText("pm_collaborators_can_82551ec5") :
           this.snapshot.users.filter((user: PinmonyBoardCollaborator): boolean => user.status === 'owner' || user.status === 'accepted').length.toString() + this.uiText("pm_collaborators_7b9e7279") },
         backIcon: { isEnabled: !this.snapshot.busy, action: () => this.back() },
@@ -96,6 +98,21 @@ struct PinmonyBoardCollaboratorsSurface {
           label: this.uiText("pm_done_c0b3fbff"), isEnabled: !this.snapshot.busy && !this.snapshot.uncertain && this.snapshot.owner === true &&
             (this.allowInvites !== this.snapshot.invites || this.selectedPermission !== this.snapshot.permission),
           action: () => this.onAction('save', JSON.stringify({ permission: this.selectedPermission, invites: this.allowInvites })) } }] : [] } } };
+  }
+  @Builder private invitationSearch() {
+    Row() {
+      Search({ value: this.query, placeholder: this.uiText("pm_search_by_name_or_username_59fb9fda") })
+        .width('100%').height(44)
+        .backgroundColor(PinmonySearchControlMaterial.active(this.immersiveLightMode) ? Color.Transparent : $r('app.color.surface_muted'))
+        .fontColor($r('app.color.primary_text'))
+        .placeholderColor($r('app.color.secondary_text'))
+        .attributeModifier(new PinmonySearchControlModifier(this.immersiveLightMode, this.hdsDarkMode))
+        .borderRadius(24)
+        .shadow({ radius: this.getUIContext().vp2px(6),
+          color: this.hdsDarkMode ? '#33000000' : '#14000000',
+          offsetX: 0, offsetY: this.getUIContext().vp2px(1) })
+        .onChange((value: string) => { this.query = value; })
+    }.width('100%').height(76).padding({ left: 24, right: 24, top: 16, bottom: 16 })
   }
   @Builder private permissionOption(value: number, title: string, description: string) {
     Row({ space: 12 }) {
@@ -126,6 +143,8 @@ struct PinmonyBoardCollaboratorsSurface {
       } else {
         Text(user.status === 'owner' ? this.uiText("pm_owner_43a7f4b4") : user.status === 'accepted' ? this.uiText("pm_collaborator_59fa99bc") : this.uiText("pm_invited_b43e8a99"))
           .fontSize(14).fontColor($r('app.color.secondary_text'))
+          .backgroundColor(user.status === 'owner' || user.status === 'accepted' ? Color.Transparent : $r('app.color.surface_muted'))
+          .borderRadius(16)
           .constraintSize({ minWidth: 88, maxWidth: '50%', minHeight: 40 }).padding({ top: 8, bottom: 8 }).wordBreak(WordBreak.BREAK_WORD).textAlign(TextAlign.Center).flexShrink(0)
       }
     }.width('100%').alignItems(VerticalAlign.Center).padding({ top: 10, bottom: 10 })
@@ -145,12 +164,11 @@ struct PinmonyBoardCollaboratorsSurface {
                   Row() {
                     Text(this.snapshot.permission === 0 ? this.uiText("pm_do_almost_everything_15d2faac") : this.uiText("pm_save_and_comment_90e113d5")).fontSize(19).fontWeight(FontWeight.Bold)
                       .fontColor($r('app.color.primary_text')).layoutWeight(1)
-                    SymbolGlyph($r('sys.symbol.chevron_right')).fontColor([$r('app.color.primary_text')])
+                    SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontColor([$r('app.color.primary_text')])
                   }.width('100%').enabled(this.snapshot.owner !== false).onClick(() => { this.allowInvites = this.snapshot.invites; this.selectedPermission = this.snapshot.permission; this.onAction('permissions', ''); })
                   Text(this.uiText("pm_add_move_or_delete_pins_and_sections_comment_and_react_fd71094d")).fontSize(15).fontColor($r('app.color.secondary_text'))
                   ForEach(this.snapshot.users, (user: PinmonyBoardCollaborator) => { this.userRow(user, false) }, (user: PinmonyBoardCollaborator) => user.id + ':' + user.status)
                 } else if (this.snapshot.phase === 'invite') {
-                  Search({ value: this.query, placeholder: this.uiText("pm_search_by_name_or_username_59fb9fda") }).onChange((value: string) => { this.query = value; })
                   ForEach(this.snapshot.suggestions.filter((user: PinmonyBoardCollaborator): boolean =>
                     (user.name + ' ' + user.username).toLowerCase().includes(this.query.trim().toLowerCase())),
                     (user: PinmonyBoardCollaborator) => { this.userRow(user, true) }, (user: PinmonyBoardCollaborator) => user.id + ':' + user.status)
@@ -169,7 +187,7 @@ struct PinmonyBoardCollaboratorsSurface {
                   Text(this.uiText("pm_collaborators_can_invite_others_to_this_board_ccf60f85")).fontColor($r('app.color.secondary_text'))
                 }
               }
-            }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:this.titleContentInset() + 20,bottom:20 })
+            }.width('100%').alignItems(HorizontalAlign.Start).padding({ left:20,right:20,top:this.titleContentInset() + (this.snapshot.phase === 'invite' ? 0 : 20),bottom:20 })
           }.layoutWeight(1).width('100%').align(Alignment.Top)
             .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
             .scrollBarMargin({ start: LengthMetrics.vp(this.titleContentInset()) })

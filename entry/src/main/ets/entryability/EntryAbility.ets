@@ -3,7 +3,7 @@ import { PinmonyInboxNoticeTap } from '../app/PinmonyInboxNoticeTap';
 import { PinmonyPageRecovery } from '../app/PinmonyPageRecovery';
 import { PinmonyInboxNoticeRecovery } from '../app/PinmonyInboxNoticeRecovery';
 import { PinmonyInboxBackgroundLifecycle } from '../app/PinmonyInboxBackgroundLifecycle';
-import { PinmonyI18n } from 'common_foundation';
+import { PinmonyI18n, PinmonyDisplayPreference } from 'common_foundation';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want, errorManager } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -132,6 +132,8 @@ export default class EntryAbility extends UIAbility {
       ' content=' + this.contentLoaded.toString() + ' colorMode=' +
       (typeof newConfig.colorMode === 'number' ? newConfig.colorMode.toString() : 'undefined'));
     this.syncSystemColorMode(newConfig.colorMode);
+    AppStorage.setOrCreate<number>('pinmonyThemeConfigurationRevision',
+      (AppStorage.get<number>('pinmonyThemeConfigurationRevision') || 0) + 1);
   }
 
   private canConfigureOrientation(): boolean {
@@ -193,6 +195,11 @@ export default class EntryAbility extends UIAbility {
       }
       hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
       this.contentLoaded = true;
+      // Reapply after content creation as required by ApplicationContext.setColorMode.
+      try { PinmonyDisplayPreference.applyTheme(this.context, AppStorage.get<string>('themePreference') || 'system'); }
+      catch (_) { PinmonyRuntimeLog.warn('Settings: saved theme unavailable after content load'); }
+      this.syncSystemColorMode();
+      PinmonyI18n.attachLayoutContext(this.context);
       const loadMs: number = this.contentLoadStartedAt > 0 ? Date.now() - this.contentLoadStartedAt : -1;
       this.logLifecycle('content-load-complete', 'loadMs=' + loadMs.toString() +
         ' windowStage=' + this.windowStageReady.toString());
@@ -305,6 +312,9 @@ export default class EntryAbility extends UIAbility {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
     this.syncSystemColorMode();
     this.syncStatusBarHeight();
+    // Page onPageShow may run before the window's foreground lifecycle.
+    const revision: number = AppStorage.get<number>('pinmonyAbilityForegroundRevision') || 0;
+    AppStorage.setOrCreate<number>('pinmonyAbilityForegroundRevision', revision + 1);
   }
 
   onMemoryLevel(level: AbilityConstant.MemoryLevel): void {

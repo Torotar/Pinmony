@@ -6045,6 +6045,30 @@
     {
       "name": "pm_session_logout_unknown",
       "value": "Não foi possível confirmar a saída. Verifique a sessão atual primeiro. A saída não será repetida automaticamente."
+    },
+    {
+      "name": "pm_language_arabic",
+      "value": "Árabe"
+    },
+    {
+      "name": "pm_birthdate_year",
+      "value": "Ano"
+    },
+    {
+      "name": "pm_back_to_top",
+      "value": "Voltar ao topo"
+    },
+    {
+      "name": "pm_board_invite_link_share",
+      "value": "Compartilhar link de convite"
+    },
+    {
+      "name": "pm_board_invite_link_copying",
+      "value": "Copiando…"
+    },
+    {
+      "name": "pm_board_invite_link_copy_failed",
+      "value": "Não foi possível copiar o link de convite. Tente novamente."
     }
   ]
 }

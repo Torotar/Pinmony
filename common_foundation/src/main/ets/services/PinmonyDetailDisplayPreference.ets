@@ -6,6 +6,7 @@ export class PinmonyDetailDisplayPreference {
   private static storage: preferences.Preferences | undefined = undefined;
 
   static initialize(context: common.Context): void {
+    PinmonyDetailDisplayPreference.storage = undefined;
     try {
       const storage: preferences.Preferences = preferences.getPreferencesSync(context, { name: 'pinmony_detail_display' });
       const fallback: boolean = AppStorage.get<boolean>('detailPhotoFitEnabled') === true;

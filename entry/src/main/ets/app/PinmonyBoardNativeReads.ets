@@ -1,3 +1,4 @@
+import { PinmonyCardCarouselData } from 'common_ui';
 import { inheritUserAvatarColor, PinmonyAvatarUserMetadata } from './PinmonyUserAvatarMetadata';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBoardCoverNativeFlow, PinmonyBoardCoverIdentity } from './PinmonyBoardCoverNativeFlow';
@@ -34,7 +35,7 @@ interface BoardVideos { video_list?: Record<string, BoardVideo>; }
 interface BoardStoryVideoBlock { block_type?: number; video?: BoardVideos; }
 interface BoardStoryVideoPage { blocks?: BoardStoryVideoBlock[]; }
 interface BoardStoryVideoData { is_deleted?: boolean; total_video_duration?: number; pages?: BoardStoryVideoPage[]; }
-interface BoardPinData { favorited_by_me?: boolean; type: string; id: string; images?: Record<string, BoardImage>; image_large_url?: string;
+interface BoardPinData { carousel_data?: PinmonyCardCarouselData; favorited_by_me?: boolean; type: string; id: string; images?: Record<string, BoardImage>; image_large_url?: string;
   image_medium_url?: string; image_large_size_pixels?: BoardDimensions; image_medium_size_pixels?: BoardDimensions;
   grid_title?: string; title?: string; description?: string; link?: string; pinner?: BoardUser; board?: BoardPinOwner; videos?: BoardVideos; story_pin_data?: BoardStoryVideoData; tracking_params?: string; }
 interface BoardPinOwner { id: string; section_count?: number; }
@@ -220,6 +221,7 @@ export class PinmonyBoardNativeReads {
       following:typeof b?.followed_by_me === 'boolean' ? b.followed_by_me : undefined,followBusy:this.followWrites.busy(b?.id || ''),
       canFollow:this.verified && this.ready && !own && !this.collection() && typeof b?.followed_by_me === 'boolean' && !this.followWrites.pending() && !this.followWrites.locked(b.id),
       editable:this.postOperationLoading && !this.verified ? existing?.editable === true : this.verified && own && !this.collection(),collaborator:member,canContribute:this.verified && !this.collection() && (own || member && !!b?.access?.includes('write')),
+      canInviteCollaborators:this.verified && this.ready && !this.collection() && (own || member && b?.collaborator_invites_enabled === true),
       featuredCreators:creators,featured:!!b?.featured_board_metadata,featuredCreator:tag !== undefined && /^\d+$/.test(tag.toString()) && Number.isInteger(Number(tag)) && Number(tag) >= 0,
       sponsored:b?.featured_board_metadata?.is_sponsored_content === true,ownerVerified:display?.verified_identity?.verified === true,
       sectionCount:Number.isInteger(b?.section_count) && (b?.section_count || 0) > 0 ? b?.section_count : 0,
@@ -797,7 +799,7 @@ export class PinmonyBoardNativeReads {
     if(!art) {const d: BoardDimensions | undefined = p.image_large_size_pixels || p.image_medium_size_pixels, url: string = this.image(p.image_large_url || p.image_medium_url); if(d && url && Number.isFinite(d.width) && d.width > 0 && Number.isFinite(d.height) && d.height > 0)art = {url:url,width:d.width,height:d.height};}
     if(!art)throw new Error('image');
     const duration: string = this.pinDuration(p);
-    return {favorite:p.favorited_by_me,id:p.id,pinUrl:this.origin + '/pin/' + p.id + '/',imageUrl:art.url,imageWidth:art.width,imageHeight:art.height,title:this.clean(p.grid_title || p.title),creatorName:this.clean(p.pinner?.full_name),duration:duration};
+    return {mediaCount:(Array.isArray(p.carousel_data?.carousel_slots) ? p.carousel_data?.carousel_slots?.length || 0 : 0),favorite:p.favorited_by_me,id:p.id,pinUrl:this.origin + '/pin/' + p.id + '/',imageUrl:art.url,imageWidth:art.width,imageHeight:art.height,title:this.clean(p.grid_title || p.title),creatorName:this.clean(p.pinner?.full_name),duration:duration};
   }
   private durationLabel(ms: number | undefined): string {
     if(typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0 || ms > 86400000)return '';

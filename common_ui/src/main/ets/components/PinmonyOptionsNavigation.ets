@@ -44,6 +44,7 @@ export struct PinmonyOptionsNavigation {
       .titleBar(PinmonyHdsTitleBar.resolve(this.getUIContext(), this.titleOptions(), this.hdsDarkMode))
       .bindToScrollable([this.menuScroller])
       .backgroundColor($r('app.color.page_background'))
+      .direction(PinmonyI18n.isRtl(this.uiLanguage) ? Direction.Rtl : Direction.Ltr)
   }
 
 }

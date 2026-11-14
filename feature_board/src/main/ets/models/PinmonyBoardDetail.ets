@@ -1,4 +1,5 @@
 export interface PinmonyBoardPin {
+  mediaCount?: number;
   favorite?: boolean;
   id: string;
   pinUrl: string;
@@ -25,6 +26,7 @@ export interface PinmonyBoardDetail {
   followBusy?: boolean;
   canFollow?: boolean;
   editable?: boolean;
+  canInviteCollaborators?: boolean;
   featured?: boolean;
   featuredCreators?: PinmonyBoardCreator[];
   featuredCreator?: boolean;

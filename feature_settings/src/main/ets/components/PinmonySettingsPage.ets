@@ -163,14 +163,14 @@ export struct PinmonySettingsPage {
         }
         if(!this.legacyProfile && this.onViewProfile) {
           ListItem() {
-            Button({type:ButtonType.Normal, stateEffect: false}) {
+            Button({type:ButtonType.Normal, stateEffect: true}) {
               Row({space:16}) {
                 PinmonyUserAvatar({ profileUrl: this.profileUrl, image: this.profileAvatar, name: this.profileName, colorIndex: this.profileAvatarColorIndex, avatarSize: 48 })
                 Column({space:4}) {
                   Text(this.profileName).fontSize(20).fontColor($r('app.color.primary_text'))
                   Text(this.uiText('pm_settings_view_profile')).fontSize(16).fontColor($r('app.color.secondary_text'))
                 }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+                SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
               }.width('100%').padding({left:20,right:20,top:20,bottom:24})
             }.width('100%').backgroundColor(Color.Transparent)
               .onClick(() => {this.captureRootScroll();if(this.onViewProfile)this.onViewProfile();})
@@ -183,7 +183,7 @@ export struct PinmonySettingsPage {
         }
         if (!this.store.loading) { ForEach(this.options, (id: string) => {
           ListItem() {
-            Button({ type: ButtonType.Normal, stateEffect: false }) {
+            Button({ type: ButtonType.Normal, stateEffect: true }) {
               Row({ space: 16 }) {
                 Text(id === 'logout' && this.store.busy ? this.uiText("pm_logging_out_0ae60dd3") : id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
                   .fontSize(17)
@@ -193,7 +193,7 @@ export struct PinmonySettingsPage {
                   style: { badgeSize: id === 'about' && this.updateUnread ? 6 : 0, fontSize: 0 } }) {
                   Row().width(1).height(16)
                 }.accessibilityLevel('no')
-                SymbolGlyph($r('sys.symbol.chevron_right'))
+                SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right'))
                   .fontSize(16)
                   .fontColor([$r('app.color.secondary_text')])
               }

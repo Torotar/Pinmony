@@ -23,6 +23,7 @@ export interface PinmonyBoard {
 }
 
 export interface PinmonyCreatedPin {
+  mediaCount?: number;
   collageDraft?: boolean;
   id: string;
   targetUrl?: string;

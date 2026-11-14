@@ -6,17 +6,33 @@ export class PinmonyHomeCategoryMaterial implements AttributeModifier<ButtonAttr
   private mode: string;
   private selected: boolean;
 
-  constructor(mode: string, selected: boolean) {
+  private dark: boolean = false;
+  private material: uiMaterial.ImmersiveMaterial | undefined = undefined;
+
+  constructor(mode: string, selected: boolean, dark: boolean = false) {
+    this.dark = dark;
     this.mode = mode;
     this.selected = selected;
+  }
+
+  update(mode: string, selected: boolean, dark: boolean): void {
+    if (mode !== this.mode || selected !== this.selected || dark !== this.dark) this.material = undefined;
+    this.mode = mode;
+    this.selected = selected;
+    this.dark = dark;
   }
 
   applyNormalAttribute(instance: ButtonAttribute): void {
     // Hvigor lowers this intrinsic to version-field comparisons, including on API 24.
     if (deviceInfo.apiAvailable('26.0.0')) {
       if (this.mode === 'off') {
+        this.material = undefined;
         instance.systemMaterial(undefined);
         instance.backgroundColor(this.selected ? $r('app.color.detail_save_accent') : $r('app.color.input_surface'));
+        return;
+      }
+      if (this.material) {
+        instance.systemMaterial(this.material);
         return;
       }
       let tint: ResourceColor | undefined = undefined;
@@ -30,13 +46,14 @@ export class PinmonyHomeCategoryMaterial implements AttributeModifier<ButtonAttr
           return;
         }
       }
-      instance.systemMaterial(new uiMaterial.ImmersiveMaterial({
+      this.material = new uiMaterial.ImmersiveMaterial({
         style: this.mode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.REGULAR,
         materialColor: tint,
         applyShadow: false,
         interactive: true,
         lightEffect: { color: $r('app.color.immersive_interaction_light') }
-      }));
+      });
+      instance.systemMaterial(this.material);
     }
   }
 }

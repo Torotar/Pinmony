@@ -1,6 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require(process.argv[2]||'typescript');
 const {createArktsLoader}=require('./arkts-module-loader.cjs');
-const loader=createArktsLoader(ts,{'common_network':{PIN_BUSINESS_PIN_READ_ENABLED:true},'common_session':{PinmonySessionCredentials:class{}},'common_foundation':{PinmonyRuntimeLog:{info(){},warn(){},error(){}}},'feature_search':{PIN_SEARCH_QUIZ_API_ENABLED:true},'feature_inbox':{},'@kit.RemoteCommunicationKit':{rcp:{}},'@kit.BasicServicesKit':{}});
+const networkExports={PIN_BUSINESS_PIN_READ_ENABLED:true};
+const loader=createArktsLoader(ts,{'common_network':networkExports,'common_session':{PinmonySessionCredentials:class{}},'common_foundation':{PinmonyRuntimeLog:{info(){},warn(){},error(){}}},'feature_search':{PIN_SEARCH_QUIZ_API_ENABLED:true},'feature_inbox':{},'@kit.RemoteCommunicationKit':{rcp:{}},'@kit.BasicServicesKit':{}});
+Object.assign(networkExports,loader.loadFile('common_network/src/main/ets/PinmonyBoardInviteLink.ets'));
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=loader.loadFile('common_network/src/main/ets/PinmonyNativeNetwork.ets');
 const {PinmonySearchNativeAuxiliary:Search}=loader.loadFile('entry/src/main/ets/app/PinmonySearchNativeAuxiliary.ets');
 const {PinmonyInboxMenuNative:Menu}=loader.loadFile('entry/src/main/ets/app/PinmonyInboxMenuNative.ets');

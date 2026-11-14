@@ -11,6 +11,9 @@ export interface PinmonyProfileHubTitleOptions {
   interactionEnabled: boolean;
   backdropOpacity: number;
   statusInsetVp: number;
+  titleTextColor: ResourceColor;
+  titleBackdropColor: ResourceColor;
+  titleIndicatorColor: ResourceColor;
   onTabSelected: (tab: string) => void;
   onSettings: () => void;
 }
@@ -21,7 +24,9 @@ export function buildPinmonyProfileHubTitle($$: PinmonyProfileHubTitleOptions) {
     profileUrl: $$.profileUrl, avatarUrl: $$.avatarUrl, avatarColorIndex: $$.avatarColorIndex,
     displayName: $$.displayName, selectedTab: $$.selectedTab, indicatorPosition: $$.indicatorPosition,
     interactionEnabled: $$.interactionEnabled, backdropOpacity: $$.backdropOpacity,
-    statusInsetVp: $$.statusInsetVp, onTabSelected: $$.onTabSelected, onSettings: $$.onSettings
+    statusInsetVp: $$.statusInsetVp, titleTextColor: $$.titleTextColor,
+    titleBackdropColor: $$.titleBackdropColor, titleIndicatorColor: $$.titleIndicatorColor,
+    onTabSelected: $$.onTabSelected, onSettings: $$.onSettings
   })
 }
 
@@ -36,6 +41,9 @@ struct PinmonyProfileHubTitle {
   @Prop interactionEnabled: boolean = false;
   @Prop backdropOpacity: number = 1;
   @Prop statusInsetVp: number = 0;
+  @Prop titleTextColor: ResourceColor = $r('app.color.primary_text');
+  @Prop titleBackdropColor: ResourceColor = $r('app.color.page_background');
+  @Prop titleIndicatorColor: ResourceColor = $r('app.color.detail_save_accent');
   onTabSelected: (tab: string) => void = (_tab: string): void => {};
   onSettings: () => void = (): void => {};
   @State private tabBarWidth: number = 0;
@@ -61,7 +69,7 @@ struct PinmonyProfileHubTitle {
     Stack({ alignContent: Alignment.TopStart }) {
       Column().width('100%').height(this.statusInsetVp + 80)
         .position({ x: 0, y: -this.statusInsetVp })
-        .backgroundColor($r('app.color.page_background')).opacity(this.backdropOpacity)
+        .backgroundColor(this.titleBackdropColor).opacity(this.backdropOpacity)
         .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
       Column() {
         Column({ space: 12 }) {
@@ -71,10 +79,10 @@ struct PinmonyProfileHubTitle {
               Stack({ alignContent: Alignment.BottomStart }) {
                 Row() {
                   ForEach(['pins', 'boards', 'collages'], (tab: string) => {
-                    Button({ type: ButtonType.Normal, stateEffect: false }) {
+                    Button({ type: ButtonType.Normal, stateEffect: true }) {
                       Column({ space: 12 }) {
                         Text(this.uiText('pm_profile_hub_' + tab)).fontSize(18).fontWeight(FontWeight.Bold)
-                          .fontColor($r('app.color.primary_text'))
+                          .fontColor(this.titleTextColor)
                         Row().height(2).width('100%').backgroundColor(Color.Transparent)
                       }.padding({ top: 12, bottom: 12 })
                     }.layoutWeight(1).height(64).backgroundColor(Color.Transparent).hoverEffect(HoverEffect.None)
@@ -82,7 +90,7 @@ struct PinmonyProfileHubTitle {
                       .onClick(() => this.onTabSelected(tab))
                   }, (tab: string): string => tab + ':' + this.uiLanguage)
                 }.width('100%').height(64)
-                Row().height(2).width(24).backgroundColor($r('app.color.detail_save_accent'))
+                Row().height(2).width(24).backgroundColor(this.titleIndicatorColor)
                   .translate({ x: this.indicatorPosition * this.tabBarWidth / 3 + (this.tabBarWidth / 3 - 24) / 2, y: -12 })
                   .hitTestBehavior(HitTestMode.None)
               }.width('100%').constraintSize({ maxWidth: 360 }).height(64)

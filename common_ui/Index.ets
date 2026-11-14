@@ -38,9 +38,16 @@ export { PinmonyImageCrop } from './src/main/ets/models/PinmonyImageSearch';
 export { PinmonyImageSearchOrigin } from './src/main/ets/models/PinmonyImageSearch';
 
 export { PinmonyDraggablePublishButton } from './src/main/ets/components/PinmonyDraggablePublishButton';
+export { PinmonyBackToTopButton } from './src/main/ets/components/PinmonyBackToTopButton';
 export { PinmonySnackBarLifecycle } from './src/main/ets/services/PinmonySnackBarLifecycle';
 
 export { PinmonyAvatarColorSource, PinmonyAvatarColorIdentity, PinmonyAvatarColorListener, PinmonyAvatarColorResolver } from './src/main/ets/PinmonyAvatarColorSource';
 
 export { PinmonyOptionsNavigation } from './src/main/ets/components/PinmonyOptionsNavigation';
 export { PinmonyPinViewTransition } from './src/main/ets/services/PinmonyPinViewTransition';
+
+export { PinmonySearchControlMaterial, PinmonySearchControlModifier } from './src/main/ets/services/PinmonySearchControlMaterial';
+
+export { PinmonyPinCountBadge, PinmonyCardCarouselData } from './src/main/ets/components/PinmonyPinCountBadge';
+
+export { PinmonyCardMediaBadge } from './src/main/ets/components/PinmonyCardMediaBadge';

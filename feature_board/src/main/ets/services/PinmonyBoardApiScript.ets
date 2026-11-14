@@ -123,7 +123,7 @@ export const PIN_BOARD_API_SCRIPT: string = `
     var video = pin.videos && pin.videos.video_list || {}, duration = '';
     Object.keys(video).some(function (k) { var ms = video[k] && video[k].duration; if (typeof ms !== 'number' || !isFinite(ms) || ms <= 0 || ms > 86400000) return false; var seconds = Math.floor(ms / 1000); duration = Math.floor(seconds / 60) + ':' + ('0' + seconds % 60).slice(-2); return true; });
     return { id: String(pin.id), pinUrl: location.origin + '/pin/' + pin.id + '/', imageUrl: art.url,
-      imageWidth: art.width, imageHeight: art.height, title: clean(pin.grid_title || pin.title), creatorName: clean((pin.pinner || {}).full_name), duration: duration };
+      mediaCount: Array.isArray(pin.carousel_data && pin.carousel_data.carousel_slots) ? pin.carousel_data.carousel_slots.length : 0, imageWidth: art.width, imageHeight: art.height, title: clean(pin.grid_title || pin.title), creatorName: clean((pin.pinner || {}).full_name), duration: duration };
   }
   function merge(data, next, append) {
     if (!Array.isArray(data)) throw new Error('invalid-feed');

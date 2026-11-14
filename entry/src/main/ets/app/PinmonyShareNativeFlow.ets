@@ -3,6 +3,12 @@ import { PinmonyPinStore, ShareSheetOption } from 'feature_pin';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PIN_NATIVE_SHARE_PUBLISH_ENABLED, PinmonySharePublishClient, PinmonySharePublishClientPorts, PinmonySharePublishOwner, PinmonyBusinessRejection } from './PinmonySharePublishClient';
+import { PinmonyBusinessAuxiliaryClient } from './PinmonyBusinessAuxiliaryClient';
+interface BoardInviteCopyOptions { url: string; data: BoardInviteCopyOptionsData; }
+interface BoardInviteCopyOptionsData { invite_type: string; object_id: string; }
+interface BoardInviteCopyResponse { resource_response: BoardInviteCopyResource; client_context?: Client; }
+interface BoardInviteCopyResource { status: string; code: number; error?: Object; endpoint_name: string; data: BoardInviteCopyData; }
+interface BoardInviteCopyData { invite_url: string; invite_code: string; }
 interface User {
     id: string;
     type?: string;
@@ -107,11 +113,13 @@ export interface PinmonyShareNativePorts extends PinmonySharePublishClientPorts 
     feedback: () => void;
     copy: (value: string) => Promise<void>;
     share: (value: string) => Promise<void>;
+    canInviteBoard?: (page: string, id: string) => boolean;
 }
 export class PinmonyShareNativeFlow {
     private readonly ports: PinmonyShareNativePorts;
     private readonly client: PinmonySharePublishClient;
     private readonly contactsClient: PinmonySharePublishClient;
+    private readonly boardInviteClient: PinmonyBusinessAuxiliaryClient;
     private readonly store: PinmonyPinStore;
     private revision: number = 0;
     private searchRevision: number = 0;
@@ -131,7 +139,7 @@ export class PinmonyShareNativeFlow {
     private pending: string = '';
     private unknown: Set<string> = new Set();
     private sent: Set<string> = new Set();
-    constructor(ports: PinmonyShareNativePorts) { this.ports = ports; this.store = ports.store(); this.client = new PinmonySharePublishClient(ports); this.contactsClient = new PinmonySharePublishClient(ports); }
+    constructor(ports: PinmonyShareNativePorts) { this.ports = ports; this.store = ports.store(); this.client = new PinmonySharePublishClient(ports); this.contactsClient = new PinmonySharePublishClient(ports); this.boardInviteClient = new PinmonyBusinessAuxiliaryClient({ session: ports.session, network: ports.network }); }
     private key(target: string): string { return JSON.stringify([this.mode, this.id, target]); }
     private current(revision: number): boolean { if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) return false; const s: PinmonyBusinessSessionContext = this.ports.session(); return revision === this.revision && s.authenticated && s.accountId === this.account && s.generation === this.generation && s.origin === this.origin && this.ports.visible() && this.store.shareSession === this.session && this.ports.current(this.mode, this.page, this.id); }
     private contacts(): void { this.store.shareContacts = this.users.map((u: User): ShareSheetOption => ({ username:/^[A-Za-z0-9_]+$/.test(u.username || '') ? u.username : undefined, avatarColorIndex: Number.isInteger(u.avatar_color_index) && u.avatar_color_index! >= 1 && u.avatar_color_index! <= 10 ? u.avatar_color_index : undefined, id: 'native-contact:' + u.id, label: ((u.full_name || u.label || u.username || '') + (u.username ? ' @' + u.username : '')).slice(0, 300), icon: /^https:\/\//.test(u.send_pin_image || u.image_medium_url || u.image || '') ? (u.send_pin_image || u.image_medium_url || u.image || '').slice(0, 4096) : '', enabled: !this.busy && !this.unknown.has(this.key(u.id)) && !this.sent.has(u.id) })); if (this.users.some((u: User): boolean => this.unknown.has(this.key(u.id))))
@@ -140,7 +148,8 @@ export class PinmonyShareNativeFlow {
     pause(preservePresentation: boolean = false): void { if (this.busy && this.pending) {
         this.unknown.add(this.pending);
         if (!preservePresentation) this.store.shareFeedback = PinmonyI18n.message("pm_send_result_not_confirmed_check_the_conversation_before_sending__cfb05238");
-    } this.busy = false; this.pending = ''; if (!preservePresentation) this.contacts(); this.revision++; this.searchRevision++; if (this.timer >= 0)
+    } this.boardInviteClient.pause(); this.store.shareBoardInviteBusy = false; this.store.shareBoardInviteFeedback = ''; this.store.shareBoardInviteVisible = false;
+    this.busy = false; this.pending = ''; if (!preservePresentation) this.contacts(); this.revision++; this.searchRevision++; if (this.timer >= 0)
         clearTimeout(this.timer); this.timer = -1; this.client.cancel(); this.contactsClient.cancel(); if (!preservePresentation && (this.store.shareLoading || PinmonyI18n.isText(this.store.shareFeedback, '正在加载联系人…'))) {
         this.store.shareLoading = false;
         this.store.shareFeedback = '';
@@ -188,6 +197,7 @@ export class PinmonyShareNativeFlow {
         this.store.ignoredShareSession = 0;
         this.store.sharePin = page;
         this.store.shareOnPinDetail = mode === 'pin';
+        this.store.shareBoardInviteVisible = mode === 'board' && this.ports.canInviteBoard?.(page, id) === true;
         this.store.shareTitle = PinmonyI18n.message("pm_share_7e564575");
         this.store.shareSectionLabel = mode === 'user' ? PinmonyI18n.message("pm_send_to_5cf7607a") : PinmonyI18n.message("pm_send_to_contacts_8760742d");
         this.store.shareSearchActive = true;
@@ -287,7 +297,7 @@ export class PinmonyShareNativeFlow {
         clearTimeout(this.timer); this.timer = setTimeout((): void => { this.timer = -1; if (this.current(revision))
         this.load(query, revision); }, 300); }
     async refresh(): Promise<void> { if (!this.current(this.revision) || this.busy)
-        return; if (this.timer >= 0)
+        return; this.store.shareBoardInviteVisible = this.mode === 'board' && this.ports.canInviteBoard?.(this.page, this.id) === true; if (this.timer >= 0)
         clearTimeout(this.timer); this.timer = -1; if (!this.id || this.mode === 'pin' && !this.tracking) {
         await this.open(this.mode, this.page, this.id);
         return;
@@ -297,6 +307,10 @@ export class PinmonyShareNativeFlow {
         const revision: number = this.revision;
         if (!this.current(revision) || this.busy)
             return;
+        if (id === 'native-board-invite-copy') {
+            await this.copyBoardInvitation(revision);
+            return;
+        }
         if (id === 'native-system-share') {
             if ((this.mode !== 'pin' && this.mode !== 'user') || this.mode === 'user' && !this.link || !this.store.shareActions.some((v: ShareSheetOption): boolean => v.id === id && v.enabled))
                 return;
@@ -373,6 +387,30 @@ export class PinmonyShareNativeFlow {
                 this.pending = '';
                 this.contacts();
             }
+        }
+    }
+
+    private async copyBoardInvitation(revision: number): Promise<void> {
+        const live = (): boolean => this.current(revision) && this.mode === 'board' && this.ports.canInviteBoard?.(this.page, this.id) === true;
+        if (!live() || !this.store.shareBoardInviteVisible || this.store.shareBoardInviteBusy) return;
+        this.store.shareBoardInviteBusy = true;
+        this.store.shareBoardInviteFeedback = '';
+        try {
+            const options: BoardInviteCopyOptions = { url: '/v3/users/invite/external/', data: { invite_type: '{"invite_category":3,"invite_object":2,"invite_channel":10}', object_id: this.id } };
+            const reply: BoardInviteCopyResponse = JSON.parse(await this.boardInviteClient.request(this.page, 'ApiResource', 'get',
+                options,
+                'invite-link', this.id, live)) as BoardInviteCopyResponse;
+            const r: BoardInviteCopyResource = reply.resource_response;
+            if (!live()) return;
+            if (r?.status !== 'success' || r.code !== 0 || r.error || r.endpoint_name !== 'v3_invite_user_external' ||
+                !/^https:\/\/pin\.it\/[A-Za-z0-9]{1,64}\/?$/.test(r.data?.invite_url || '') ||
+                !/^[A-Za-z0-9_-]{1,256}$/.test(r.data?.invite_code || '') || reply.client_context?.is_authenticated === false) throw new Error('invite-link');
+            await this.ports.copy(r.data.invite_url);
+            if (live()) this.store.shareBoardInviteFeedback = PinmonyI18n.message('pm_copied_8f6f8d97');
+        } catch (_) {
+            if (live()) this.store.shareBoardInviteFeedback = PinmonyI18n.message('pm_board_invite_link_copy_failed');
+        } finally {
+            if (revision === this.revision) this.store.shareBoardInviteBusy = false;
         }
     }
 }

@@ -6045,6 +6045,30 @@
     {
       "name": "pm_session_logout_unknown",
       "value": "无法确认退出结果，请先校验当前会话。不会自动重复退出。"
+    },
+    {
+      "name": "pm_language_arabic",
+      "value": "阿拉伯语"
+    },
+    {
+      "name": "pm_birthdate_year",
+      "value": "年"
+    },
+    {
+      "name": "pm_back_to_top",
+      "value": "回到顶部"
+    },
+    {
+      "name": "pm_board_invite_link_share",
+      "value": "分享邀请链接"
+    },
+    {
+      "name": "pm_board_invite_link_copying",
+      "value": "正在复制…"
+    },
+    {
+      "name": "pm_board_invite_link_copy_failed",
+      "value": "无法复制邀请链接，请重试"
     }
   ]
 }

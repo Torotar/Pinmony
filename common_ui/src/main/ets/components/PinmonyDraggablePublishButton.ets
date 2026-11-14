@@ -5,6 +5,7 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 @Component
 export struct PinmonyDraggablePublishButton {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @StorageProp('systemDarkMode') private systemDarkMode: boolean = false;
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   @Prop @Watch('resize') areaWidth: number = 0;
   @Prop @Watch('resize') areaHeight: number = 0;
@@ -140,6 +141,10 @@ export struct PinmonyDraggablePublishButton {
       .backgroundColor(Color.Transparent)
       .backgroundEffect({radius:20,saturation:1,brightness:1,color:$r('app.color.publish_button_glass')})
       .borderRadius(16).clip(true).fontColor($r('app.color.primary_text'))
+      .shadow({ radius: this.getUIContext().vp2px(8),
+        color: this.systemDarkMode ? '#40000000' : '#24000000',
+        offsetX: 0, offsetY: this.getUIContext().vp2px(3) })
+      .stateEffect(false)
       .position({ x: this.x, y: this.y })
       .enabled(this.actionEnabled)
       .visibility(this.areaWidth >= 56 && this.areaHeight >= 56 ? Visibility.Visible : Visibility.Hidden)

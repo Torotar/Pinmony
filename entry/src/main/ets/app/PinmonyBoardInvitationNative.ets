@@ -1,21 +1,115 @@
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonyBoardInviteLink, parseBoardInviteLink } from 'common_network';
 import { PinmonyInboxStore, PinmonyBoardInvitation, PinmonyBoardInvitations } from 'feature_inbox';
 import { PinmonyAuxiliaryPorts, PinmonyBusinessAuxiliaryClient, PinmonyAuxiliaryNotSent, PinmonyAuxiliaryRejected } from './PinmonyBusinessAuxiliaryClient';
 interface User { avatar_color_index?: number; id: string; username?: string; full_name?: string; image_medium_url?: string; image_large_url?: string; image_small_url?: string; }
 interface Board { id: string; url: string; name?: string; image_thumbnail_url?: string; image_cover_url?: string; }
-interface Invite { board: Board; invited_by_user: User; invited_user: User; status: string; created_at?: string; }
+interface Invite { board: Board; invited_by_user: User; invited_user: User; status: string; type?: string; created_at?: string; }
 interface Resource { status: string; code: number; error?: Object; endpoint_name?: string; data: Invite | Invite[]; }
 interface Response { resource_response: Resource;client_context?: Client; }
-interface Client {user?: User;}
+interface Client {user?: User;is_authenticated?: boolean;}
 interface Options {current_user?: boolean;field_set_key?: string;board_id?: string;invited_user_id?: string;}
+interface LinkBoardResponse { resource_response: LinkBoardResource; client_context?: Client; }
+interface LinkBoardResource { status: string; code: number; endpoint_name?: string; error?: Object; data: Board; }
+interface LinkLandResponse { resource_response: LinkLandResource; client_context?: Client; }
+interface LinkLandResource { status: string; code: number; endpoint_name: string; error?: Object; data: LinkLandData; }
+interface LinkLandData { type: string; board?: Board; from_user_id?: string; is_accepted?: boolean; }
+interface LinkBoardOptions { username: string; slug: string; field_set_key: string; is_mobile_fork: boolean; }
+interface LinkBannerOptions { board_id: string; field_set_key: string; invite_code: string; invited_user_id: string; }
+interface LinkLandOptions { url: string; data: LinkLandOptionsData; send_as_json: boolean; }
+interface LinkLandOptionsData { invite_code: string; }
 export interface PinmonyBoardInvitationNativePorts extends PinmonyAuxiliaryPorts {store: () => PinmonyInboxStore;page: () => string;active: () => boolean;username: () => string;avatar: () => string;feedback: (message: string) => void;}
 export class PinmonyBoardInvitationNative {
   private readonly ports: PinmonyBoardInvitationNativePorts;private readonly client: PinmonyBusinessAuxiliaryClient;
   private revision: number = 0;private account: string = '';private preview: boolean = false;private viewer: string = '';private page: string = '';private uncertain: Set<string> = new Set<string>();
   private declining: boolean = false;
   private reading: boolean = false;
-  constructor(ports: PinmonyBoardInvitationNativePorts){this.ports = ports;this.client = new PinmonyBusinessAuxiliaryClient(ports);}
-  pause(): void {this.revision++;this.client.pause();this.reading = false;this.ports.store().invitationReadPage = '';}
+  private linkClient: PinmonyBusinessAuxiliaryClient;
+  private linkRevision: number = 0;
+  private linkAccount: string = '';
+  private linkLands: Map<string, string> = new Map<string, string>();
+  constructor(ports: PinmonyBoardInvitationNativePorts){this.ports = ports;this.client = new PinmonyBusinessAuxiliaryClient(ports);this.linkClient = new PinmonyBusinessAuxiliaryClient(ports);}
+  cancelLink(): void { this.linkRevision++; this.linkClient.pause(); }
+  async resolveLink(link: PinmonyBoardInviteLink, current: () => boolean): Promise<PinmonyBoardInvitation> {
+    this.cancelLink();
+    const verified: PinmonyBoardInviteLink | undefined = parseBoardInviteLink(link.boardUrl + '?invite_code=' + encodeURIComponent(link.inviteCode) + '&board_collab_inviter=true&inviter_user_id=' + link.inviterUserId);
+    if (!verified || verified.boardUrl !== link.boardUrl) throw new Error('invite-link');
+    const generation: number = this.linkRevision, account: string = this.linkClient.key();
+    if (this.linkAccount !== account) { this.linkLands.clear(); this.linkAccount = account; }
+    const live = (): boolean => !!account && generation === this.linkRevision && account === this.linkClient.key() && current();
+    const page: string = this.ports.session().origin + link.boardUrl.slice('https://www.pinterest.com'.length);
+    const parts: string[] = page.slice(this.ports.session().origin.length).split('/');
+    const lookupOptions: LinkBoardOptions = { username: parts[1], slug: decodeURIComponent(parts[2]), field_set_key: 'profile_grid_item', is_mobile_fork: true };
+    const boardReply: LinkBoardResponse = JSON.parse(await this.linkClient.request(page, 'BoardResource', 'get',
+      lookupOptions,
+      'invite-link', '', live)) as LinkBoardResponse;
+    const resource: LinkBoardResource = boardReply.resource_response, board: Board | undefined = resource?.data;
+    const viewer: User | undefined = boardReply.client_context?.user;
+    if (!live() || boardReply.client_context?.is_authenticated === false || resource?.status !== 'success' || resource.code !== 0 || resource.error || !/^\d{1,30}$/.test(board?.id || '') ||
+      !/^\d{1,30}$/.test(viewer?.id || '') || viewer?.username?.toLowerCase() !== this.ports.username().toLowerCase()) throw new Error('invite-board');
+    const boardId: string = board!.id, viewerId: string = viewer!.id;
+    PinmonyRuntimeLog.info('BoardInviteLinkTrace: stage=board-ready');
+    const read = async (): Promise<PinmonyBoardInvitation> => {
+      const bannerOptions: LinkBannerOptions = { board_id: boardId, field_set_key: 'boardBanner', invite_code: link.inviteCode, invited_user_id: viewerId };
+      const reply: Response = JSON.parse(await this.linkClient.request(page, 'BoardInviteResource', 'get',
+        bannerOptions,
+        'invite-link', boardId + ':' + viewerId, live)) as Response;
+      const r: Resource = reply.resource_response, raw: Invite = r?.data as Invite;
+      if (!live() || reply.client_context?.is_authenticated === false || r?.status !== 'success' || r.code !== 0 || r.error || r.endpoint_name !== 'v3_get_user_board_invite' ||
+        raw?.board?.id !== boardId || raw.type !== 'collaboratorinvite' || raw.invited_user?.id !== viewerId || raw.invited_by_user?.id !== link.inviterUserId ||
+        reply.client_context?.user?.id !== viewerId) throw new Error('invite-status');
+      // boardBanner returns only board.id. Reuse this request's verified board lookup,
+      // while preserving any banner URL so conflicting server identities still fail closed.
+      const invitationBoard: Board = { id: boardId, url: raw.board.url || board?.url || page,
+        name: raw.board.name || board?.name, image_thumbnail_url: raw.board.image_thumbnail_url || board?.image_thumbnail_url,
+        image_cover_url: raw.board.image_cover_url || board?.image_cover_url };
+      const invitation: Invite = { board: invitationBoard, invited_by_user: raw.invited_by_user,
+        invited_user: raw.invited_user, status: raw.status, type: raw.type, created_at: raw.created_at };
+      const mapped: PinmonyBoardInvitation = this.map(invitation);
+      if (decodeURIComponent(mapped.boardUrl) !== decodeURIComponent(page)) throw new Error('invite-board-route');
+      PinmonyRuntimeLog.info('BoardInviteLinkTrace: stage=banner-ready');
+      return mapped;
+    };
+    let item: PinmonyBoardInvitation = await read();
+    this.ports.store().boardInvitations = undefined;
+    this.ports.store().invitationReadPage = '';
+    if (item.status === 'new' && this.linkLands.get(link.inviteCode) === 'pending') {
+      const options: Options = { current_user: true, field_set_key: 'news' };
+      const inbox: Response = JSON.parse(await this.linkClient.request(page, 'BoardInvitesResource', 'get', options, 'invites', '', live)) as Response;
+      const r: Resource = inbox.resource_response, items: Invite[] = r?.data as Invite[];
+      if (!live() || inbox.client_context?.is_authenticated === false || r?.status !== 'success' || r.code !== 0 || r.error || r.endpoint_name !== 'v3_user_board_invites' ||
+        inbox.client_context?.user?.id !== viewerId || !Array.isArray(items) || !items.some((v: Invite): boolean =>
+          v.board?.id === boardId && v.invited_user?.id === viewerId && v.invited_by_user?.id === link.inviterUserId && v.status === 'new')) throw new Error('invite-land-uncertain');
+      this.linkLands.set(link.inviteCode, 'confirmed');
+    }
+    if (item.status === 'new' && !this.linkLands.has(link.inviteCode)) {
+      if (this.linkLands.size >= 100) throw new Error('invite-land-limit');
+      const landOptions: LinkLandOptions = { url: '/v3/invite_code/attribution/land/', data: { invite_code: link.inviteCode }, send_as_json: true };
+      this.linkLands.set(link.inviteCode, 'pending');
+      let landed: LinkLandResponse;
+      try {
+        landed = JSON.parse(await this.linkClient.request(page, 'ApiResource', 'create', landOptions, 'invite-link', link.inviteCode, live)) as LinkLandResponse;
+      } catch (error) {
+        if (error instanceof PinmonyAuxiliaryNotSent && account === this.linkAccount) this.linkLands.delete(link.inviteCode);
+        throw new Error('invite-land-unconfirmed');
+      }
+      const r: LinkLandResource = landed.resource_response;
+      if (r?.status === 'failure' && typeof r.code === 'number' && r.code !== 0 && live()) this.linkLands.delete(link.inviteCode);
+      if (!live() || landed.client_context?.is_authenticated === false || r?.status !== 'success' || r.code !== 0 || r.error || r.endpoint_name !== 'v3_log_invite_land_attribution' ||
+        r.data?.type !== 'invitecode' || r.data.board?.id !== boardId || r.data.from_user_id !== link.inviterUserId || typeof r.data.is_accepted !== 'boolean') throw new Error('invite-land');
+      // Attribution and board collaboration have separate acceptance states.
+      // Only the subsequent BoardInviteResource response owns collaboration status.
+      this.linkLands.set(link.inviteCode, 'confirmed');
+      PinmonyRuntimeLog.info('BoardInviteLinkTrace: stage=land-confirmed');
+      item = await read();
+    }
+    if (!live()) throw new Error('invite-stale');
+    this.ports.store().boardInvitations = undefined;
+    this.ports.store().invitationReadPage = '';
+    PinmonyRuntimeLog.info('BoardInviteLinkTrace: stage=resolved');
+    return item;
+  }
+  pause(): void {this.cancelLink();this.revision++;this.client.pause();this.reading = false;this.ports.store().invitationReadPage = '';}
   private live(revision: number): boolean {return revision === this.revision && this.client.key() === this.account && this.ports.page() === this.page && this.ports.active();}
   private image(v: string | undefined): string {return typeof v === 'string' && v.length <= 2048 && /^https:\/\/i\.pinimg\.com\//i.test(v) ? v : '';}
   private map(v: Invite): PinmonyBoardInvitation {

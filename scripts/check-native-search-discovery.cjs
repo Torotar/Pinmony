@@ -2,7 +2,8 @@ const { withLocalMessages } = require('./local-message-test-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm');
 const ts=require(process.argv[2]||'typescript');
 function load(file,deps=()=>({})){const exports={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports,require:withLocalMessages(deps),console,setTimeout,clearTimeout});return exports;}
-const {PinmonySearchCache}=load('feature_search/src/main/ets/services/PinmonySearchCache.ets');
+const inviteLinks=load('common_network/src/main/ets/PinmonyBoardInviteLink.ets');
+const {PinmonySearchCache}=load('feature_search/src/main/ets/services/PinmonySearchCache.ets',name=>name==='common_network'?inviteLinks:{});
 const {PinmonySearchDiscoveryNativeReads:Reader}=load('entry/src/main/ets/app/PinmonySearchDiscoveryNativeReads.ets',name=>name==='common_network'?{PIN_BUSINESS_PIN_READ_ENABLED:true}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const {PinmonyNativeNetwork:Network,acceptsNetworkJob}=load('common_network/src/main/ets/PinmonyNativeNetwork.ets',name=>name==='common_session'?{PinmonySessionCredentials:class{}}:name==='common_foundation'?{PinmonyRuntimeLog:{info(){}}}:{});
 const firstHash='a0959c548d14cf06adbc04230c8151f3aec27082f8328131fbf4ac52af844041',moreHash='a53e4b9faaa4d08b5450d8a2f60945e513d19f0273c6175ed3a6560c70f22b4b';

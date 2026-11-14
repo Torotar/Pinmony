@@ -64,6 +64,25 @@ assert.equal(nested.host.restoreTopicSearchParent(),true);assert.equal(nested.ev
 assert.equal(nested.host.topicSearchReturns.length,1,'nested theme navigation preserves outer source');
 const tabStart=index.indexOf('  private selectNativeRootTab('),tabEnd=index.indexOf('\n  private ',tabStart+1);
 vm.runInNewContext(ts.transpileModule('class TabContext {'+index.slice(tabStart,tabEnd)+'} globalThis.TabContext=TabContext;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,context);
-const tab=new context.TabContext();Object.assign(tab,{topicSearchReturns:nav.topicSearchReturns.slice(),navigationCoordinator:{selectNativeRootTab(){}}});
+const tab=new context.TabContext();Object.assign(tab,{topicSearchReturns:nav.topicSearchReturns.slice(),restoreInboxNewsSearchRoot(){},navigationCoordinator:{selectNativeRootTab(){}}});
 tab.selectNativeRootTab(1);assert.equal(tab.topicSearchReturns.length,1);tab.selectNativeRootTab(0);assert.equal(tab.topicSearchReturns.length,0);
-console.log('Related topics: ordered module mapping, bounded images, safe query, cache and native navigation passed');
+const page=fs.readFileSync(root+'components/PinmonyDetailPage.ets','utf8');
+const topicStart=page.indexOf('  private relatedTopicModule('),topicEnd=page.indexOf('\n  private canOpenRelatedTopic(',topicStart);
+const topicUi=page.slice(topicStart,topicEnd);
+assert(!topicUi.includes('.enabled('),'topic artwork must not inherit disabled Button opacity during Pin transitions');
+assert(topicUi.includes('.hitTestBehavior(this.canOpenRelatedTopic() ? HitTestMode.Default : HitTestMode.None)'));
+assert(topicUi.includes(".accessibilityLevel(this.canOpenRelatedTopic() ? 'auto' : 'no-hide-descendants')"));
+assert(topicUi.includes('if (this.canOpenRelatedTopic() && this.onRelatedTopic)'), 'late clicks recheck the current presentation');
+assert(topicUi.includes(".backgroundColor('#66000000')"), 'retain the original text contrast layer');
+assert(topicUi.includes('loadingActive: this.videoActive'), 'retain image admission lifecycle independently of interaction');
+const gateStart=page.indexOf('  private canOpenRelatedTopic('),gateEnd=page.indexOf('\n  @Builder',gateStart);
+const gateExports={};
+vm.runInNewContext(ts.transpileModule('class TopicGate {'+page.slice(gateStart,gateEnd)+'} exports.TopicGate=TopicGate;',
+ {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{exports:gateExports});
+const gate=new gateExports.TopicGate();
+for(const pageActive of [true,false])for(const videoActive of [true,false])for(const contentError of ['','failed']){
+ Object.assign(gate,{pageActive,videoActive,contentError});
+ assert.equal(gate.canOpenRelatedTopic(),pageActive&&videoActive&&!contentError,'covered/error pages cannot open topics');
+}
+Object.assign(gate,{pageActive:true,videoActive:true,contentError:''});assert.equal(gate.canOpenRelatedTopic(),true,'restored page accepts topics again');
+console.log('Related topics: module mapping, cache/navigation, stable transition artwork, touch/accessibility gates, late clicks and restored interaction passed');

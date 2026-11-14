@@ -199,14 +199,15 @@ async function main() {
       assert.equal(accepted, newIdentity ? 2 : 1, 'explicit Back can restore the original account');
     }
   }
+  let saveCookies = async () => {};
   const release = method('entry/src/main/ets/pages/Index.ets', '  private async releaseNativeLogin(', '\n  private handleNativeSessionExpired(', 'async function()', {
-    webview: { WebCookieManager: { saveCookieAsync: async () => {} } }, AppStorage: { setOrCreate() {} },
+    webview: { WebCookieManager: { saveCookieAsync: () => saveCookies() } }, AppStorage: { setOrCreate() {} },
     PinmonySessionHistory: { save: () => true }, PinmonyRuntimeLog: { info() {}, warn() {} }
   });
-  for (const scenario of ['regular', 'canceled', 'same', 'added', 'backBeforeAdded', 'backBeforeSame', 'lateLogout', 'lateAccount', 'lateEpoch', 'background']) {
+  for (const scenario of ['regular', 'canceled', 'same', 'added', 'duplicate', 'backBeforeAdded', 'backBeforeSame', 'lateLogout', 'lateAccount', 'lateEpoch', 'background', 'cookieFailure']) {
     let reads = 0, opens = 0; const tasks = [];
     const h = { isDifferentAddingAccount: differentAccount, nativeLoginEnabled: true, authStatus: 'authenticated', nativeSessionEpoch: 1, authEpoch: 1,
-      nativeBusinessSessionContext: () => ({ authenticated: true, origin, generation: 1 }),
+      nativeBusinessSessionContext: () => ({ authenticated: h.authStatus === 'authenticated', origin, generation: h.authenticatedProfileUrl.endsWith('/fixture_c/') ? 2 : 1 }),
       nativeAddAccountFlow: scenario !== 'regular', nativeAddingAccountProfile: !['regular','canceled'].includes(scenario) ? origin + '/fixture_a/' : '',
       authenticatedProfileUrl: origin + (!['regular','canceled','same','backBeforeSame'].includes(scenario) ? '/fixture_b/' : '/fixture_a/'),
       settingsStore: { sessionAccountSwitchMode: false, rememberAccountEntry(value) { this.sessionAccountSwitchMode = value; } },
@@ -218,15 +219,24 @@ async function main() {
       assert.equal(h.nativeAddingAccountProfile, origin + '/fixture_a/', 'Back retains original identity while final native probe owns the result');
       h.authStatus = 'authenticated';
     }
-    await release.call(h);
-    assert.equal(h.settingsStore.sessionAccountSwitchMode, !['regular','canceled','same','backBeforeSame'].includes(scenario), 'actual added identity updates memory without waiting for network');
+    let finish;
+    saveCookies = () => new Promise(resolve => { finish = resolve; });
+    if (scenario === 'cookieFailure') saveCookies = async () => { throw Error('cookie-save'); };
+    const releasing = release.call(h);
     if (scenario === 'lateLogout') { h.authStatus = 'unauthenticated'; h.settingsStore.rememberAccountEntry(false); }
     if (scenario === 'lateAccount') h.authenticatedProfileUrl = origin + '/fixture_c/';
     if (scenario === 'lateEpoch') h.nativeSessionEpoch++;
     if (scenario === 'background') h.businessSuspended = true;
+    if (finish) finish(); await releasing;
+    const stale = ['lateLogout','lateAccount','lateEpoch','background','cookieFailure'].includes(scenario);
+    assert.equal(h.settingsStore.sessionAccountSwitchMode, !stale && !['regular','canceled','same','backBeforeSame'].includes(scenario), 'only the confirmed added identity updates memory');
+    if (scenario === 'duplicate') {
+      saveCookies = async () => {};
+      await release.call(h);
+    }
     tasks.forEach(task => task());
     assert.equal(reads, 0, 'settings presentation never triggers a session-account read');
-    assert.equal(opens, ['canceled','same','added','backBeforeAdded','backBeforeSame'].includes(scenario) ? 1 : 0, 'stale and background callbacks cannot reopen settings');
+    assert.equal(opens, !stale && ['canceled','same','backBeforeSame'].includes(scenario) ? 1 : 0, 'added accounts stay on home; canceled add restores settings; stale completion cannot open settings');
     if (scenario === 'lateLogout') assert.equal(h.settingsStore.sessionAccountSwitchMode, false, 'late task cannot overwrite logout memory');
   }
   assert(index.includes('if (this.accountSwitchPending) context.authenticated = false;'));

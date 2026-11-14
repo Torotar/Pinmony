@@ -15,3 +15,6 @@ export { PinmonyProfileLayoutPreference } from './src/main/ets/services/PinmonyP
 export { PinmonyDetailDisplayPreference } from './src/main/ets/services/PinmonyDetailDisplayPreference';
 
 export { PinmonyScrollRecovery } from './src/main/ets/cache/PinmonyScrollRecovery';
+
+export { PinmonyImmersiveLightPreference } from './src/main/ets/services/PinmonyImmersiveLightPreference';
+export { PinmonyDisplayPreference } from './src/main/ets/services/PinmonyDisplayPreference';

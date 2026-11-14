@@ -1,8 +1,10 @@
+import { PinmonyCardCarouselData } from 'common_ui';
 import { PinImageSources } from 'common_ui';
 import { PinmonyRelatedPin, PinmonyRelatedTopic } from '../models/PinmonyDetail';
 
 interface RelatedImage { url: string; width: number; height: number; }
 interface RelatedPin {
+  carousel_data?: PinmonyCardCarouselData;
   id: string; type: string; images: Record<string, RelatedImage>;
   title?: string; grid_title?: string; description?: string;
 }
@@ -82,7 +84,7 @@ export function readRelatedPresentation(body: string, pinUrl: string): RelatedPr
       if (!selected) continue;
       const title: string = typeof pin.grid_title === 'string' ? pin.grid_title :
         typeof pin.title === 'string' ? pin.title : typeof pin.description === 'string' ? pin.description : '';
-      pins.push({ id: 'api:' + pin.id, pinUrl: target, imageUrl: selected.url,
+      pins.push({ mediaCount: Array.isArray(pin.carousel_data?.carousel_slots) ? pin.carousel_data?.carousel_slots?.length || 0 : 0, id: 'api:' + pin.id, pinUrl: target, imageUrl: selected.url,
         imageWidth: selected.width, imageHeight: selected.height, images: images, title: title.trim().slice(0, 160) });
     }
     if (resource.data.length && pins.length === 0) return undefined;

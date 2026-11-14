@@ -76,6 +76,9 @@ export class PinmonyPinStore {
   shareActions: ShareSheetOption[] = [];
   shareContacts: ShareSheetOption[] = [];
   shareOnPinDetail: boolean = false;
+  shareBoardInviteVisible: boolean = false;
+  shareBoardInviteBusy: boolean = false;
+  shareBoardInviteFeedback: string = '';
   shareTitle: string = '';
   shareSectionLabel: string = '';
   shareSearchId: string = '';

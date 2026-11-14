@@ -1,4 +1,5 @@
 import { PinmonyI18n } from 'common_foundation';
+import { PinmonySubmittedLinkTarget, PinmonyBoardInviteLink, parseBoardInviteLink, hasBoardInviteLinkContext } from 'common_network';
 import { PinmonySearchCategory, PinmonySearchFilterOption, PinmonySearchFilterSnapshot,
   PinmonySearchHero, PinmonySearchIdea, PinmonySearchIdeaSection, PinmonySearchResult,
   PinmonySearchSnapshot, PinmonySearchSuggestion } from '../models/PinmonySearch';
@@ -629,34 +630,53 @@ export class PinmonySearchController {
     this.cancelSubmittedLink();
     let submittedPin: string = searchPinLinkIdentity(value);
     let submittedProfile: string = searchProfileLink(value);
+    let submittedInvite: PinmonyBoardInviteLink | undefined = parseBoardInviteLink(value);
     const shortLink: string = searchShortPinLink(value);
-    if (!submittedPin && !submittedProfile && value.length > 300) return;
+    if (hasBoardInviteLinkContext(value) && !submittedInvite && !submittedPin && !submittedProfile) {
+      this.ports.showMessage(PinmonyI18n.message('pm_unable_to_open_link_please_retry_99322633')); return;
+    }
+    if (!submittedPin && !submittedProfile && !submittedInvite && value.length > 300) return;
     this.searchStore.searchQueryClearPage = '';
     const intent: number = ++this.searchStore.searchIntentToken;
     this.searchStore.searchQueryToken++;
     if (!(this.ports.nativeSearch?.() || await this.ports.ensureContext(false)) || intent !== this.searchStore.searchIntentToken) return;
     const search: PinmonySearchSnapshot | undefined = this.searchStore.search;
     if (!search || !(this.searchStore.searchNativeInputReady || this.searchStore.searchInputReady || this.searchStore.searchActionsReady) || search.pageKey !== this.ports.currentPageKey()) return;
-    if (submittedPin || submittedProfile || shortLink) {
+    if (submittedPin || submittedProfile || shortLink || submittedInvite) {
       if (!this.ports.isActive() || this.ports.sheetKind() || !this.ports.openSubmittedPin ||
           (submittedProfile && !this.ports.openSubmittedProfile)) return;
       PinmonyRuntimeLog.info('PinLinkTrace: submit kind=' + (shortLink ? 'short' : 'complete'));
-      this.searchStore.searchCache.put(search, this.searchStore.searchScrollOffset);
+      this.ports.clearSubmittedLinkInput?.();
+      this.searchStore.searchCache.put(this.searchStore.search || search, this.searchStore.searchScrollOffset);
       this.invalidatePending();
       if (this.searchStore.searchInputStopEditing) this.searchStore.searchInputStopEditing();
       this.searchStore.searchInputFocused = false;
       this.searchStore.searchInputStopEditing = undefined;
       this.ports.markInteracted();
-      if (shortLink) {
+      if (shortLink || submittedInvite) {
         const generation: number = this.submittedLinkGeneration;
         this.searchStore.submittedPinLoading = true;
         const current = (): boolean => generation === this.submittedLinkGeneration &&
           this.ports.isActive() && !this.ports.sheetKind() && search.pageKey === this.ports.currentPageKey();
         try {
-          if (!this.ports.resolveSubmittedPin) throw new Error('pin-link-unavailable');
-          submittedPin = await this.ports.resolveSubmittedPin(shortLink, current);
+          if (shortLink) {
+            if (this.ports.resolveSubmittedLink) {
+              const resolved: PinmonySubmittedLinkTarget = await this.ports.resolveSubmittedLink(shortLink, current);
+              submittedPin = resolved.kind === 'pin' ? resolved.pinId || '' : '';
+              submittedProfile = resolved.kind === 'profile' ? resolved.profileUrl || '' : '';
+              submittedInvite = resolved.kind === 'board-invite' ? resolved.invitation : undefined;
+            } else {
+              if (!this.ports.resolveSubmittedPin) throw new Error('pin-link-unavailable');
+              submittedPin = await this.ports.resolveSubmittedPin(shortLink, current);
+              submittedProfile = searchProfileLink(submittedPin);
+            }
+          }
           if (!current()) return;
-          submittedProfile = searchProfileLink(submittedPin);
+          if (submittedInvite) {
+            if (!this.ports.openSubmittedBoardInvite) throw new Error('invite-link-unavailable');
+            await this.ports.openSubmittedBoardInvite(submittedInvite, search.pageKey, current);
+            return;
+          }
           if (!/^[0-9]{1,30}$/.test(submittedPin) && !submittedProfile) throw new Error('pin-link-unresolved');
           if (submittedProfile && !this.ports.openSubmittedProfile) throw new Error('profile-link-unavailable');
         } catch (_) {

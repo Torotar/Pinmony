@@ -99,7 +99,7 @@ async function main() {
   assert(source.includes('.priorityGesture(LongPressGesture({ repeat: false }).onAction(() => this.openMessageMenu(message)))'), 'message long press takes priority over card/child taps');
   assert(!source.includes('.parallelGesture(LongPressGesture()'), 'long press is not dispatched in parallel with card taps');
   const sideActions = method('messageSideActions');
-  assert.match(sideActions, /Button\(\{ type: ButtonType.Circle, stateEffect: false \}\) \{\s*if \(message\.reactions\?\.length\) \{\s*Text\(message\.reactions\.join\(' '\)\)[\s\S]*?\} else \{\s*Row\(\) \{\s*SymbolGlyph\(\$r\('sys.symbol.face_smiling'\)\)/, 'confirmed reactions replace the empty smile-plus entry content');
+  assert.match(sideActions, /Button\(\{ type: ButtonType.Circle, stateEffect: true \}\) \{\s*if \(message\.reactions\?\.length\) \{\s*Text\(message\.reactions\.join\(' '\)\)[\s\S]*?\} else \{\s*Row\(\) \{\s*SymbolGlyph\(\$r\('sys.symbol.face_smiling'\)\)/, 'confirmed reactions replace the empty smile-plus entry content');
   assert.equal((sideActions.match(/Text\(message\.reactions\.join/g) || []).length, 1, 'reactions render once inside the entry, not below it');
   assert(method('toggleReaction').includes("this.reactionMessageId === message.id ? '' : message.id"), 'reaction entry remains clickable after feedback');
   assert(!sideActions.includes('!message.board') && !sideActions.includes('!message.profile'), 'all card types expose reaction entry');
@@ -116,7 +116,7 @@ async function main() {
   assert(!menu.includes('!this.selectedMessage?.board') && !menu.includes('!this.selectedMessage?.profile'), 'long-press picker supports all card types');
   assert(menu.includes('sys.symbol.trash'));
   assert.equal((menu.match(/height\(48\)\.padding\(\{ left: 8, right: 8 \}\)/g) || []).length, 4, 'copy, save, share and delete share row height and padding');
-  const actionRows = menu.match(/Button\(\{ type: ButtonType.Normal, stateEffect: false \}\) \{[\s\S]*?\.accessibilityText\(this\.uiText\("[^"]+"\)\)/g) || [];
+  const actionRows = menu.match(/Button\(\{ type: ButtonType.Normal, stateEffect: true \}\) \{[\s\S]*?\.accessibilityText\(this\.uiText\("[^"]+"\)\)/g) || [];
   assert.equal(actionRows.length, 4, 'all four action rows disable press feedback');
   for (const key of ['pm_copy_63d90d97', 'pm_save_60a53514', 'pm_share_7e564575', 'pm_delete_2f9daa82']) {
     const row = actionRows.find(item => item.includes(key));
@@ -130,6 +130,6 @@ async function main() {
   }
   assert(menu.includes('epoch === this.messageMenuEpoch && this.messageConfirmationKey() === intent'));
   assert(menu.includes('.enabled(this.active && !this.messageMenuClosing)'));
-  console.log('Message Sheet: copy/save/share/delete row parity and no press feedback, deferred cleanup, close paths, block retention, reopen guard, clipboard failure/late result and session changes passed');
+  console.log('Message Sheet: copy/save/share/delete row parity and native press feedback, deferred cleanup, close paths, block retention, reopen guard, clipboard failure/late result and session changes passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -4,6 +4,7 @@ import { Priority } from './PinmonyNativeNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
 
 const CACHE_BYTES: number = 24 * 1024 * 1024;
+const CACHE_ENTRIES: number = 48;
 const MAX_DECODE_PIXELS: number = 3 * 1024 * 1024;
 const MAX_PIPELINE_PAYLOADS: number = 4;
 const MAX_CONCURRENT_DECODES: number = 2;
@@ -188,20 +189,24 @@ export class PinmonyJpegDecode {
   }
 
   private static trim(): void {
+    // Live owners already bound their own mounted/prefetch windows. Count only
+    // reusable idle pixels here, otherwise retained roots can evict every image
+    // as soon as WaterFlow recycles its card, forcing a new transfer on return.
     let bytes: number = 0;
-    PinmonyJpegDecode.entries.forEach((entry: PinmonyJpegEntry): void => { bytes += entry.bytes; });
     const idle: string[] = [];
     PinmonyJpegDecode.entries.forEach((entry: PinmonyJpegEntry, key: string): void => {
-      if (entry.refs === 0 && entry.bitmap) idle.push(key);
+      if (entry.refs === 0 && entry.bitmap) { idle.push(key); bytes += entry.bytes; }
     });
+    let count: number = idle.length;
     idle.sort((a: string, b: string): number =>
       (PinmonyJpegDecode.entries.get(a)?.touched || 0) - (PinmonyJpegDecode.entries.get(b)?.touched || 0));
     for (const key of idle) {
-      if (bytes <= CACHE_BYTES && PinmonyJpegDecode.entries.size <= 48) break;
+      if (bytes <= CACHE_BYTES && count <= CACHE_ENTRIES) break;
       const entry: PinmonyJpegEntry | undefined = PinmonyJpegDecode.entries.get(key);
       if (!entry || entry.refs !== 0) continue;
       PinmonyJpegDecode.entries.delete(key);
       bytes -= entry.bytes;
+      count--;
       entry.bitmap?.release().catch((): void => {});
     }
   }

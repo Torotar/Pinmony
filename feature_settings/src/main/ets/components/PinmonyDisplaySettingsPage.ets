@@ -4,8 +4,8 @@ import { LengthMetrics } from '@kit.ArkUI';
 import { HdsSnackBar } from '@kit.UIDesignKit';
 import { BlurStrategy } from '@kit.UIDesignKit';
 import { PinmonyImmersiveLight } from 'common_ui';
-import { PinmonyI18n, PinmonyProfileLayoutPreference, PinmonyDetailDisplayPreference } from 'common_foundation';
-import { common, ConfigurationConstant } from '@kit.AbilityKit';
+import { PinmonyI18n, PinmonyProfileLayoutPreference, PinmonyDetailDisplayPreference, PinmonyImmersiveLightPreference, PinmonyDisplayPreference } from 'common_foundation';
+import { common } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { display, window } from '@kit.ArkUI';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, SnackBarIconType, SnackBarOperationType, ScrollEffectType, hdsMaterial } from '@kit.UIDesignKit';
@@ -86,9 +86,14 @@ export struct PinmonyDisplaySettingsPage {
     const previous: string = this.themePreference;
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      // Publish the preference only after native configuration accepts it.
-      context.getApplicationContext().setColorMode(value === 'dark' ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK : value === 'light' ? ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT : ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-      this.themePreference = value;
+      // Commit before applying: configuration callbacks may run during setColorMode.
+      if (!PinmonyDisplayPreference.saveTheme(value)) throw new Error('theme persistence');
+      try { PinmonyDisplayPreference.applyTheme(context, value); }
+      catch (_) {
+        PinmonyDisplayPreference.saveTheme(previous);
+        try { PinmonyDisplayPreference.applyTheme(context, previous); } catch (_) {}
+        throw new Error('theme configuration');
+      }
     } catch (_) {
       this.themePreference = previous;
       try { this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_change_theme_please_retry_e0cd6314"), duration: 3000 })); }
@@ -100,15 +105,21 @@ export struct PinmonyDisplaySettingsPage {
     const values: string[] = ['system', 'auto', 'portrait', 'landscape'];
     const value: string = values[index];
     if (value === this.orientationPreference) return;
+    const previous: string = this.orientationPreference;
+    let mainWindow: window.Window | undefined = undefined;
+    const orientations: window.Orientation[] = [window.Orientation.AUTO_ROTATION_RESTRICTED,
+      window.Orientation.AUTO_ROTATION, window.Orientation.PORTRAIT, window.Orientation.LANDSCAPE];
     this.orientationBusy = true;
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      const mainWindow: window.Window = await window.getLastWindow(context);
-      const orientations: window.Orientation[] = [window.Orientation.AUTO_ROTATION_RESTRICTED,
-        window.Orientation.AUTO_ROTATION, window.Orientation.PORTRAIT, window.Orientation.LANDSCAPE];
+      mainWindow = await window.getLastWindow(context);
       await mainWindow.setPreferredOrientation(orientations[index]);
-      this.orientationPreference = value;
+      if (!PinmonyDisplayPreference.saveOrientation(value)) throw new Error('orientation persistence');
     } catch (_) {
+      if (mainWindow) {
+        try { await mainWindow.setPreferredOrientation(orientations[Math.max(0, values.indexOf(previous))]); }
+        catch (_) { PinmonyRuntimeLog.warn('OrientationPreference: rollback unavailable'); }
+      }
       try {
         this.getUIContext().getPromptAction().showToast(PinmonyImmersiveLight.toastOptions({ message: this.uiText("pm_unable_to_change_orientation_please_retry_c7c24220"), duration: 3000 }));
       } catch (_) { PinmonyRuntimeLog.warn('OrientationPreference: failure feedback unavailable'); }
@@ -152,9 +163,9 @@ export struct PinmonyDisplaySettingsPage {
       Text(this.uiText("pm_language_9f6fee1a")).fontSize(17)
         .fontColor($r('app.color.primary_text')).layoutWeight(1)
       ForEach([this.uiLanguage], (language: string) => {
-        Select([{ value: this.uiText("pm_follow_account") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }, { value: 'Português (Brasil)' }])
-        .selected(Math.max(0, ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].indexOf(this.languagePreference)))
-        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.languagePreference === 'pt_BR' ? 'Português (Brasil)' : this.uiText("pm_follow_account"))
+        Select([{ value: this.uiText("pm_follow_account") }, { value: '中文' }, { value: '繁體中文' }, { value: 'English' }, { value: 'English (UK)' }, { value: '日本語' }, { value: '한국어' }, { value: 'Русский' }, { value: 'Português (Brasil)' }, { value: 'العربية' }])
+        .selected(Math.max(0, ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar'].indexOf(this.languagePreference)))
+        .value(this.languagePreference === 'zh' ? '中文' : this.languagePreference === 'zh_TW' ? '繁體中文' : this.languagePreference === 'en' ? 'English' : this.languagePreference === 'en_GB' ? 'English (UK)' : this.languagePreference === 'ja' ? '日本語' : this.languagePreference === 'ko' ? '한국어' : this.languagePreference === 'ru' ? 'Русский' : this.languagePreference === 'pt_BR' ? 'Português (Brasil)' : this.languagePreference === 'ar' ? 'العربية' : this.uiText("pm_follow_account"))
         .font({ size: 15 }).fontColor($r('app.color.primary_text'))
         .backgroundColor($r('app.color.display_settings_control')).borderRadius(16)
         .selectedOptionBgColor($r('app.color.display_settings_control'))
@@ -163,8 +174,8 @@ export struct PinmonyDisplaySettingsPage {
         .attributeModifier(new PinmonyDisplaySelectMenuMaterial(this.immersiveLightMode))
         .accessibilityText(this.uiText("pm_language_9f6fee1a"))
         .onSelect((index: number) => {
-          if (index >= 0 && index < 9) {
-            const value: string = ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'][index];
+          if (index >= 0 && index < 10) {
+            const value: string = ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar'][index];
             try { PinmonyI18n.select(value); PinmonyRuntimeLog.info('LanguagePreference: saved=' + value); }
             catch (_) {
               PinmonyRuntimeLog.warn('LanguagePreference: save failed');
@@ -232,8 +243,7 @@ export struct PinmonyDisplaySettingsPage {
         .accessibilityText(this.uiText('pm_immersive_light'))
         .onSelect((index: number) => {
           if (index >= 0 && index < 4) {
-            this.immersiveLightMode = ['off', 'gentle', 'immersive', 'exquisite'][index];
-            this.logMaterialMode();
+            if (PinmonyImmersiveLightPreference.save(['off', 'gentle', 'immersive', 'exquisite'][index])) this.logMaterialMode();
           }
         })
       }, (language: string): string => language)
@@ -256,7 +266,7 @@ export struct PinmonyDisplaySettingsPage {
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Toggle({ type: ToggleType.Switch, isOn: this.collapseEnabled })
           .selectedColor($r('app.color.accent'))
-          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).onChange((value: boolean) => { this.collapseEnabled = value; })
+          .margin({ left: 12, right: 12, top: 8, bottom: 8 }).onChange((value: boolean) => { PinmonyDisplayPreference.saveCollapse(value); })
         .accessibilityText(this.uiText("pm_bottom_bar_collapse_animation_4b0bb564"))
     }.width('100%').constraintSize({ minHeight: 64 }).padding({ left: 16, right: 16, top: 8, bottom: 8 })
 

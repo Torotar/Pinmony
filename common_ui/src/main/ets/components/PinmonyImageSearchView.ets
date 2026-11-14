@@ -1,4 +1,5 @@
 import { PinmonyModalNavigation } from './PinmonyModalNavigation';
+import { PinmonyBackToTopButton } from './PinmonyBackToTopButton';
 import { PinmonyImmersiveLight } from '../services/PinmonyImmersiveLight';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from './PinmonyActionNotice';
@@ -21,8 +22,28 @@ export struct PinmonyImageSearchView {
   @Prop @Watch('presentationChanged') presentationActive: boolean = true;
   private relatedOpening: boolean = false;
   private resumeRelatedSheet: boolean = false;
-  private sheetAppearing: boolean = false;
+  @State private sheetAppearing: boolean = false;
   private resultScrollOffset: number = 0;
+  @State private backToTopVisible: boolean = false;
+  @StorageProp('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
+
+  private canBackToTop(): boolean {
+    return this.alive && this.presentationActive && this.sheetVisible && !this.closing &&
+      !this.relatedOpening && !this.sheetAppearing && !this.closeRequested;
+  }
+
+  private backToTop(): void {
+    if (!this.canBackToTop()) return;
+    this.resultScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true });
+  }
+
+  private reportResultsPosition(): void {
+    if (!this.canBackToTop()) return;
+    try {
+      this.resultScrollOffset = Math.max(0, this.resultScroller.offset()?.yOffset || 0);
+      this.backToTopVisible = this.resultScrollOffset > 180;
+    } catch (_) { this.backToTopVisible = false; }
+  }
   private openRelated(pin: PinmonyRelatedPin): void {
     if (!this.alive || this.presentationActive === false || this.relatedOpening || this.result.loading || pin.pinUrl === this.pin) return;
     this.relatedOpening = true;
@@ -43,6 +64,7 @@ export struct PinmonyImageSearchView {
       this.relatedOpening = false;
       this.resumeRelatedSheet = false;
     }
+    this.reportResultsPosition();
     PinmonyRuntimeLog.info('PhotoSheetTrace: event=appeared detent=' + (this.sheetHeight === SheetSize.LARGE ? 'large' : 'default'));
   }
   private updateSheetDetent(height: number): void {
@@ -72,6 +94,7 @@ export struct PinmonyImageSearchView {
   @Prop originY: number = 0;
   @Prop originWidth: number = 0;
   @Prop originHeight: number = 0;
+  @Prop originRadius: number = 18;
   @Prop @Watch('closeTransition') closing: boolean = false;
   onTransitionClosed?: () => void;
   onTransitionReady?: () => void;
@@ -150,6 +173,7 @@ export struct PinmonyImageSearchView {
     }
     this.frameX = this.sourceX; this.frameY = this.sourceY;
     this.frameWidth = this.sourceWidth; this.frameHeight = this.sourceHeight;
+    this.frameRadius = this.originRadius;
     this.publishPhotoFrame(true);
     this.onPhotoSelection?.(this.crop);
     this.photoFlightActive = true;
@@ -235,7 +259,7 @@ export struct PinmonyImageSearchView {
       } }, () => {
       this.frameX = closing ? this.sourceX : this.photoX(); this.frameY = closing ? this.sourceY : this.photoY();
       this.frameWidth = closing ? this.sourceWidth : this.photoWidth(); this.frameHeight = closing ? this.sourceHeight : this.photoHeight();
-      this.frameRadius = closing ? 18 : 0; this.backdrop = closing ? 0 : 1; this.chrome = closing ? 0 : 1;
+      this.frameRadius = closing ? this.originRadius : 0; this.backdrop = closing ? 0 : 1; this.chrome = closing ? 0 : 1;
     });
     // The host owns these animatable properties, so it starts its own transaction.
     this.publishPhotoFrame(closing, duration);
@@ -245,7 +269,7 @@ export struct PinmonyImageSearchView {
     if (source) {
       // The source belongs to the detail page before its title/safe-area change.
       this.onPhotoFrame(this.originX + (this.originWidth - this.sourceWidth) / 2,
-        this.originY + (this.originHeight - this.sourceHeight) / 2, this.sourceWidth, this.sourceHeight, 18, duration, 0);
+        this.originY + (this.originHeight - this.sourceHeight) / 2, this.sourceWidth, this.sourceHeight, this.originRadius, duration, 0);
       return;
     }
     try {
@@ -301,6 +325,7 @@ export struct PinmonyImageSearchView {
   private resultColumns(): number[] { return this.resultColumnCount() === 3 ? [0, 1, 2] : [0, 1]; }
   @Builder
   private resultsPanel() {
+    Stack({ alignContent: Alignment.BottomEnd }) {
     Column({ space: 12 }) {
       Scroll(this.resultScroller) {
         Column({ space: 12 }) {
@@ -324,15 +349,21 @@ export struct PinmonyImageSearchView {
           } else if (this.result.items.length === 0) {
             Text(this.uiText("pm_no_related_images_8c34996f")).fontColor($r('app.color.secondary_text')).fontSize(14)
           }
-        }.width('100%')
+        }.width('100%').padding({ top: 72, bottom: 16 })
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
+        .onDidScroll(() => this.reportResultsPosition())
+        .onScrollStop(() => this.reportResultsPosition())
         .onReachEnd(() => {
           if (this.alive && this.presentationActive && !this.relatedOpening && !this.sheetAppearing && !this.closing &&
             !this.result.loading && !this.result.error && !this.result.ended && this.result.items.length && this.onSearch)
             this.onSearch(this.crop, true, false);
         })
-    }.padding({ left: 10, right: 10, top: 8, bottom: 16 }).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
+    }.padding({ left: 10, right: 10 }).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+      PinmonyBackToTopButton({ showButton: this.backToTopVisible && this.canBackToTop(),
+        bottomInset: 16 + this.getUIContext().px2vp(this.gestureBarHeightPx),
+        onBackToTop: () => this.backToTop() })
+    }.width('100%').height('100%')
   }
   @Builder
   private searchContent() {
@@ -382,10 +413,11 @@ export struct PinmonyImageSearchView {
         const right: number = left + this.crop.w * this.photoWidth();
         const bottom: number = top + this.crop.h * this.photoHeight();
         this.dragCorner = -2;
-        if (Math.abs(x - left) <= 22 && Math.abs(y - top) <= 22) this.dragCorner = 0;
-        else if (Math.abs(x - right) <= 22 && Math.abs(y - top) <= 22) this.dragCorner = 1;
-        else if (Math.abs(x - left) <= 22 && Math.abs(y - bottom) <= 22) this.dragCorner = 2;
-        else if (Math.abs(x - right) <= 22 && Math.abs(y - bottom) <= 22) this.dragCorner = 3;
+        const cornerX: number = Math.abs(x - left) <= Math.abs(x - right) ? left : right;
+        const cornerY: number = Math.abs(y - top) <= Math.abs(y - bottom) ? top : bottom;
+        if (Math.abs(x - cornerX) <= 22 && Math.abs(y - cornerY) <= 22) {
+          this.dragCorner = (cornerX === right ? 1 : 0) + (cornerY === bottom ? 2 : 0);
+        }
         else if (x >= left && x <= right && y >= top && y <= bottom) this.dragCorner = -1;
       })
       .gesture(PanGesture().onActionStart(() => this.startDrag()).onActionUpdate((event: GestureEvent) => {
@@ -395,6 +427,7 @@ export struct PinmonyImageSearchView {
   @Builder
   private presentedResultsPanel() {
     PinmonyModalNavigation({ titleText: this.uiText("pm_more_pins_like_this_6e224087"), fillContent: true,
+      immersiveScroll: true, scrollControllers: [this.resultScroller],
       closeEnabled: true, onClose: () => { this.sheetVisible = false; if (this.alive && this.presentationActive && !this.relatedOpening && !this.closing && !this.closeRequested) { this.closeRequested = true; this.onClose?.(); } } }) {
       this.resultsPanel()
     }
@@ -409,6 +442,8 @@ export struct PinmonyImageSearchView {
         onWillAppear: (): void => { this.sheetAppearing = true; this.resultSheetMounted = true; PinmonyRuntimeLog.info('SheetTrace: event=will-appear source=PinmonyVisualSearchView.sheetVisible radius=uniform-32vp'); },
         onAppear: (): void => this.resultSheetAppeared(),
         height: this.sheetHeight, detents: ['40%', SheetSize.LARGE], showClose: false, dragBar: true,
+        // Overlay the native handle on HDS chrome instead of reserving an opaque strip above it.
+        enableFloatingDragBar: true,
         detentSelection: this.sheetHeight,
         scrollSizeMode: ScrollSizeMode.CONTINUOUS,
         backgroundColor: $r('app.color.page_background'), maskColor: Color.Transparent, enableOutsideInteractive: true,

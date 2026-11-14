@@ -545,7 +545,7 @@ async function main() {
   assert.equal(freshReads, 1, 'normal preview retry does not restart base');
   const relatedCard = page.slice(page.indexOf('private relatedCard('), page.indexOf('private relatedColumn('));
   assert(!relatedCard.includes('.enabled('), 'cached photographs must retain their colors while session actions prepare');
-  assert(relatedCard.includes('.stateEffect(false)'), 'related cards never show press feedback');
+  assert(relatedCard.includes('.stateEffect(true)'), 'related card buttons retain native press feedback');
   const cardStart = page.indexOf('private relatedCard(');
   const clickStart = page.indexOf('.onClick(() => {', cardStart) + '.onClick(() => {'.length;
   const clickBody = page.slice(clickStart, page.indexOf('})', clickStart));

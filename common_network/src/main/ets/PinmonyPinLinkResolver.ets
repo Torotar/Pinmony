@@ -1,6 +1,7 @@
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { NetworkManager, Priority } from './PinmonyNativeNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
+import { PinmonySubmittedLinkTarget, PinmonyBoardInviteLink, parseBoardInviteLink } from './PinmonyBoardInviteLink';
 
 export function shortPinToken(value: string): string {
   if (value.length > 128) return '';
@@ -24,8 +25,8 @@ export function redirectedProfileUrl(value: string): string {
 }
 
 // Public redirect resolution is isolated from authenticated website resources.
-// No ArkWeb cookies, CSRF, sender/invite parameters, response HTML or tracking
-// URLs are forwarded to a business request, logged, or persisted.
+// No ArkWeb credentials or response HTML enter public redirect requests. Only
+// explicitly parsed invitation fields may reach the invitation business flow.
 export class PinmonyPinLinkResolver {
   private generation: number = 0;
   private cancelTransfer: (() => void) | undefined = undefined;
@@ -45,6 +46,13 @@ export class PinmonyPinLinkResolver {
 
   // Returns a Pin identity or a canonical profile URL, never a tracking URL.
   async resolveTarget(value: string, current: () => boolean): Promise<string> {
+    const result: PinmonySubmittedLinkTarget = await this.resolveNavigationTarget(value, current);
+    if (result.kind === 'pin') return result.pinId || '';
+    if (result.kind === 'profile') return result.profileUrl || '';
+    throw new Error('pin-link-target');
+  }
+
+  async resolveNavigationTarget(value: string, current: () => boolean): Promise<PinmonySubmittedLinkTarget> {
     this.cancel();
     const token: string = shortPinToken(value);
     if (!token || !current()) throw new Error('pin-link-invalid');
@@ -87,9 +95,11 @@ export class PinmonyPinLinkResolver {
         const header: string | string[] | undefined = response.headers['location'] || response.headers['Location'];
         if (typeof header !== 'string') throw new Error('pin-link-location');
         const pin: string = redirectedPinIdentity(header);
-        if (pin) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready'); return pin; }
+        if (pin) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready'); return { kind: 'pin', pinId: pin }; }
         const profile: string = redirectedProfileUrl(header);
-        if (profile) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready kind=profile'); return profile; }
+        if (profile) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready kind=profile'); return { kind: 'profile', profileUrl: profile }; }
+        const invitation: PinmonyBoardInviteLink | undefined = parseBoardInviteLink(header);
+        if (invitation) return { kind: 'board-invite', invitation: invitation };
         // This exact intermediate path was observed for Pinterest shared links.
         // Never follow arbitrary hosts, relative links, query strings or redirects.
         const intermediate: string = 'https://api.pinterest.com/url_shortener/' + token + '/redirect/';

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
+const inviteParser = require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('common_network/src/main/ets/PinmonyBoardInviteLink.ets');
 const source = ts.transpileModule(fs.readFileSync('common_network/src/main/ets/PinmonyPinLinkResolver.ets','utf8'),
   {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;
 function fixture(responses, overrides = {}) {
@@ -14,6 +15,7 @@ function fixture(responses, overrides = {}) {
   const exports = {};
   vm.runInNewContext(source,{exports, Uint8Array, Promise, setTimeout: fn => {const id=++serial;timers.set(id,fn);return id;},
     clearTimeout: id=>timers.delete(id), require: name => name==='@kit.RemoteCommunicationKit' ? {rcp} :
+      name==='./PinmonyBoardInviteLink' ? inviteParser :
       name==='common_foundation' ? {PinmonyRuntimeLog:{info(){}}} :
       {Priority:{NORMAL:1},NetworkManager:{enqueue: async (_,job)=>job(),...overrides}}});
   return {reader:new exports.PinmonyPinLinkResolver(),...exports,requests,sessions,timers};
@@ -23,6 +25,14 @@ const pin = 'https://www.pinterest.com/pin/123/sent/?invite_code=example&sender=
 const reply = (status, location) => ({statusCode:status,headers:{location}});
 async function flush() {await new Promise(resolve=>setImmediate(resolve));}
 async function main() {
+  const inviteUrl = 'https://www.pinterest.com/owner/%E5%9B%BE%E6%9D%BF/?invite_code=synthetic&board_collab_inviter=True&inviter_user_id=42';
+  const invited = fixture([reply(308,middle),reply(302,inviteUrl)]);
+  const invitation = await invited.reader.resolveNavigationTarget('https://pin.it/Example',()=>true);
+  assert.equal(invitation.kind,'board-invite');
+  assert.equal(invitation.invitation.boardUrl,'https://www.pinterest.com/owner/%E5%9B%BE%E6%9D%BF/');
+  assert.equal(invitation.invitation.inviteCode,'synthetic');
+  const ambiguous = fixture([reply(302,inviteUrl+'&invite_code=other')]);
+  await assert.rejects(ambiguous.reader.resolveNavigationTarget('https://pin.it/Example',()=>true));
   const profile = 'https://www.pinterest.com/sample_user/';
   const profiles=fixture([reply(308,middle),reply(302,profile+'?tracking=example')]);
   assert.equal(await profiles.reader.resolveTarget('https://pin.it/Example',()=>true),profile);

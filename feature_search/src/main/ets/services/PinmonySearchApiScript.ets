@@ -81,7 +81,7 @@ export const PIN_SEARCH_API_SCRIPT: string = `
       seen[pin.id] = true;
       mapped.push({ id: 'api-pin-' + pin.id, kind: 'pin', title: title.trim().slice(0, 180),
         subtitle: '', targetUrl: /^\\d+$/.test(String(pin.id)) ? location.origin + '/pin/' + pin.id + '/' : '', imageUrl: image.url.slice(0, 2000),
-        video: video, imageWidth: image.width, imageHeight: image.height, enabled: /^\\d+$/.test(String(pin.id)) });
+        mediaCount: Array.isArray(pin.carousel_data && pin.carousel_data.carousel_slots) ? pin.carousel_data.carousel_slots.length : 0, video: video, imageWidth: image.width, imageHeight: image.height, enabled: /^\\d+$/.test(String(pin.id)) });
     });
     return mapped;
   }

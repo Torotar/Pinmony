@@ -10,14 +10,14 @@ for (const name of ['Settings', 'Account', 'DisplaySettings', 'RecommendationSet
   const ast = ts.createSourceFile(name + '.ts', source, ts.ScriptTarget.Latest, true);
   let branch;
   function visit(node) {
-    if (ts.isIfStatement(node) && node.expression.getText(ast) === 'this.store.loading || this.store.busy') branch = node;
+    if (ts.isIfStatement(node) && node.expression.getText(ast) === (name === 'Settings' ? 'this.store.loading || this.store.busy || this.store.sessionAccountsLoading' : 'this.store.loading || this.store.busy')) branch = node;
     ts.forEachChild(node, visit);
   }
   visit(ast);
   assert(branch && ts.isBlock(branch.thenStatement), name + ': retained read/write indicator host');
   const selection = branch.thenStatement.statements[0];
   assert(ts.isIfStatement(selection), name + ': separate read and write presentation');
-  assert.equal(selection.expression.getText(ast), 'this.store.busy');
+  assert.equal(selection.expression.getText(ast), name === 'Settings' ? 'this.store.busy || this.store.sessionAccountsLoading' : 'this.store.busy');
   assert(selection.thenStatement.getText(ast).includes('PinmonyLoadingOverlay({ showMessage: false })'), name);
   assert(!selection.thenStatement.getText(ast).includes('LoadingProgress('), name + ': one progress indicator during writes');
   assert(selection.elseStatement.getText(ast).includes('LoadingProgress('), name + ': retain ordinary read indicator');
@@ -27,6 +27,11 @@ for (const name of ['Settings', 'Account', 'DisplaySettings', 'RecommendationSet
   for (const [loading, busy, expected] of [[false, false, 'idle'], [true, false, 'read'], [false, true, 'write'], [true, true, 'write']]) {
     const host = { store: { loading, busy } };
     assert.equal(outerGate.call(host) ? writeGate.call(host) ? 'write' : 'read' : 'idle', expected, name);
+  }
+  if (name === 'Settings') {
+    const host = { store: { loading: false, busy: false, sessionAccountsLoading: true } };
+    assert(outerGate.call(host), 'account-list loading retains read indicator');
+    assert.equal(writeGate.call(host), true, 'account-list loading retains its existing blocking overlay');
   }
   const both = branch.getText(ast);
   assert.equal((both.match(/PinmonyLoadingOverlay\(/g) || []).length, 1, name + ': no duplicate write masks');

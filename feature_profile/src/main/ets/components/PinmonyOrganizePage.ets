@@ -1,3 +1,4 @@
+import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
@@ -187,10 +188,16 @@ struct PinmonyOrganizeSurface {
   }
 
   @Builder
+  private pinCountBadge(mediaCount: number) {
+    PinmonyPinCountBadge({ mediaCount: mediaCount }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+  }
+
+  @Builder
   private thumb(pin: PinmonyCreatedPin) {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Image(pin.imageUrl).width('100%').aspectRatio(pin.imageWidth > 0 && pin.imageHeight > 0 ?
         Math.max(0.5, Math.min(1.4, pin.imageWidth / pin.imageHeight)) : 0.7).objectFit(ImageFit.Cover)
+        .overlay(this.pinCountBadge(pin.mediaCount || 0), { align: Alignment.TopStart })
       if (this.selected(pin)) {
         Stack({ alignContent: Alignment.Center }) {
           SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18)

@@ -29,6 +29,16 @@ export struct PinmonyShareSheet {
   }
   @Builder
   private buildShareActionRow(option: ShareSheetOption) {
+    if (option.id === 'native-system-share') {
+      Column() {
+        Button(this.actionLabel(option))
+          .width('100%').height(48)
+          .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+          .enabled(option.enabled)
+          .accessibilityText(this.actionLabel(option))
+          .onClick(() => { if (option.enabled) this.onAction(option.id); })
+      }.width('100%').padding({ left: 20, right: 20, top: 12 }).flexShrink(0)
+    } else {
     Column() {
       Text(this.actionLabel(option))
         .fontSize(17)
@@ -53,6 +63,7 @@ export struct PinmonyShareSheet {
     .onClick(() => {
       if (option.enabled) this.onAction(option.id);
     })
+    }
   }
 
 
@@ -184,9 +195,12 @@ export struct PinmonyShareSheet {
 
       if (!this.pinStore.shareLoading && this.pinStore.shareActions.some((option: ShareSheetOption) =>
           !this.pinStore.shareOnPinDetail || !this.hasCopyLink() || !this.isCopyLink(option.label))) {
+        if (this.pinStore.shareActions.some((option: ShareSheetOption) => option.id !== 'native-system-share' &&
+            (!this.pinStore.shareOnPinDetail || !this.hasCopyLink() || !this.isCopyLink(option.label)))) {
         Divider()
           .color('#4D8A8A8A')
           .margin({ left: 20, right: 20, top: 12, bottom: 10 })
+        }
         ForEach(this.pinStore.shareActions.filter((option: ShareSheetOption) =>
           !this.pinStore.shareOnPinDetail || !this.hasCopyLink() ||
           !this.isCopyLink(option.label)), (option: ShareSheetOption) => {
@@ -203,6 +217,23 @@ export struct PinmonyShareSheet {
       if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) &&
           ['正在加载联系人…', '没有可用的联系人'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source))) {
         Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
+      }
+      if (this.pinStore.shareBoardInviteVisible) {
+        if (this.pinStore.shareLoading || !this.pinStore.shareSearchActive) {
+          Blank().layoutWeight(1)
+        }
+        Column({ space: 8 }) {
+          if (this.pinStore.shareBoardInviteFeedback) {
+            Text(PinmonyI18n.render(this.pinStore.shareBoardInviteFeedback, this.uiLanguage))
+              .fontSize(13).fontColor($r('app.color.secondary_text')).textAlign(TextAlign.Center)
+          }
+          Button(this.uiText(this.pinStore.shareBoardInviteBusy ? 'pm_board_invite_link_copying' : 'pm_board_invite_link_share'))
+            .width('100%').height(48)
+            .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.primary_text'))
+            .enabled(!this.pinStore.shareBoardInviteBusy)
+            .accessibilityText(this.uiText('pm_board_invite_link_share'))
+            .onClick(() => { if (!this.pinStore.shareBoardInviteBusy) this.onAction('native-board-invite-copy'); })
+        }.width('100%').padding({ left: 20, right: 20, top: 12 }).flexShrink(0)
       }
     }
     .width('100%')

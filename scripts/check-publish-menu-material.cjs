@@ -18,7 +18,8 @@ assert(source.includes("@StorageLink('immersiveLightMode')"), 'Retained menus fo
 const build = source.slice(source.indexOf('  build()'));
 assert(build.includes('.bindMenu(this.menuEnabled && this.menuOpen,this.boundMenuItems(),this.sourceMenuOptions())'));
 assert(build.includes(".backgroundEffect({radius:20,saturation:1,brightness:1,color:$r('app.color.publish_button_glass')})"));
-assert(!/systemMaterial|immersiveLightMode/.test(build), 'Floating button appearance remains independent from menu material');
+assert(!build.includes('PinmonyButtonInteractionModifier'), 'floating Button retains its original blur independently of menu material');
+assert(!/systemMaterial|new uiMaterial\.ImmersiveMaterial/.test(build), 'Menu configuration stays independent from the button modifier');
 function boot(api, mode = 'immersive', supported = true, fail = false) {
   let probes = 0;
   const empty = Symbol('empty');
@@ -94,4 +95,4 @@ for (const cancel of [host => { host.actionEnabled = false; host.syncMenuAvailab
   cancel(h.host); options.onDisappear();
   assert.equal(dispatched, 1, 'Disabled, hidden or disposed menus cancel pending actions');
 }
-console.log(`Publish menu material${compiled ? ' (compiled)' : ''} passed: API 24/25/26, four modes, capability failure, live off/reset, independent instances, unchanged button and guarded close-before-navigation.`);
+console.log(`Publish menu material${compiled ? ' (compiled)' : ''} passed: API 24/25/26, four modes, capability failure, live off/reset, independent menu instances, original floating-button blur and guarded close-before-navigation.`);

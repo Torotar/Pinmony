@@ -10,9 +10,10 @@ const Host = vm.runInNewContext(ts.transpileModule('class Host {' + method('rest
   compilerOptions: { target: ts.ScriptTarget.ES2021 }
 }).outputText);
 const cacheExports = {};
+const inviteLinks = require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('common_network/src/main/ets/PinmonyBoardInviteLink.ets');
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('feature_search/src/main/ets/services/PinmonySearchCache.ets', 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS }
-}).outputText, { exports: cacheExports });
+}).outputText, { exports: cacheExports, require: name => { assert.equal(name, 'common_network'); return inviteLinks; } });
 const cache = new cacheExports.PinmonySearchCache();
 const snapshot = { pageKey: 'discovery', heroes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] };
 cache.rememberHero(snapshot, 'b'); cache.rememberHero(snapshot, 'invalid');

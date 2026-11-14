@@ -3,6 +3,7 @@ import { PinmonyNetworkJob } from 'common_network';
 import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusinessNetwork';
 export interface PinmonyAuxiliaryPorts { session: () => PinmonyBusinessSessionContext; network: () => PinmonyNativeNetwork; }
 interface Envelope { options: Object; context: Record<string,string>; }
+interface JsonEnvelope { source_url: string; data: Envelope; }
 export class PinmonyAuxiliaryNotSent extends Error {}
 export class PinmonyAuxiliaryRejected extends Error {}
 export class PinmonyBusinessAuxiliaryClient {
@@ -18,8 +19,10 @@ export class PinmonyBusinessAuxiliaryClient {
     const path: string = page.slice(s.origin.length),envelope: Envelope = {options:options,context:{}};
     const fields: string = 'source_url=' + encodeURIComponent(path) + '&data=' + encodeURIComponent(JSON.stringify(envelope));
     const get: boolean = verb === 'get';
+    const json: boolean = mode === 'invite-link' && resource === 'ApiResource' && verb === 'create';
+    const jsonEnvelope: JsonEnvelope = { source_url: path, data: envelope };
     const job: PinmonyNetworkJob = {id:id,epoch:s.generation,page:page,url:s.origin + '/resource/' + resource + '/' + verb + '/' + (get ? '?' + fields : ''),
-      method:get ? 'GET' : 'POST',body:get ? '' : fields,headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':mode === 'quiz' ? 'www/search/[scope].js' : mode === 'invites' && verb === 'delete' ? 'www/inbox.js' : 'www/index.js','X-Pinterest-Source-Url':path}};
+      method:get ? 'GET' : 'POST',body:get ? '' : json ? JSON.stringify(jsonEnvelope) : fields,headers:{'Accept':'application/json','Content-Type':json ? 'application/json' : 'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','X-Pinterest-Pws-Handler':mode === 'quiz' ? 'www/search/[scope].js' : mode === 'invites' && verb === 'delete' ? 'www/inbox.js' : 'www/index.js','X-Pinterest-Source-Url':path}};
     this.requests.add(id);
     try {
       const reply = await this.ports.network().requestBusinessAuxiliary(job,(): PinmonyBusinessSessionContext => this.ports.session(),mode,target,(): boolean => !!account && account === this.key() && live());

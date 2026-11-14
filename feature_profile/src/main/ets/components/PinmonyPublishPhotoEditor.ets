@@ -166,7 +166,7 @@ export struct PinmonyPublishPhotoEditor {
         SymbolGlyph($r('sys.symbol.lock')).fontSize(16).fontColor([$r('app.color.secondary_text')]).accessibilityLevel('no')
       }
       if (this.rowValue(action)) { Text(this.rowValue(action)).fontSize(16).fontColor($r('app.color.secondary_text')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }) }
-      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.primary_text')]).accessibilityLevel('no')
+      SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.primary_text')]).accessibilityLevel('no')
     }.width('100%').constraintSize({ minHeight: 56 }).padding({ top: 12, bottom: 12 })
       .accessibilityText(this.text(this.rowLabel(action)))
   }
@@ -201,7 +201,7 @@ export struct PinmonyPublishPhotoEditor {
             .backgroundColor(Color.Transparent).fontColor($r('app.color.primary_text')).enabled(!this.state.busy && !this.state.uncertain)
             .onChange((value: string) => { this.description = value; this.fields(); })
         }.padding(16).border({ width: 1, color: $r('app.color.secondary_text') }).borderRadius(18)
-        Text(this.description.length.toString() + '/800').width('100%').textAlign(TextAlign.End).fontSize(13).fontColor($r('app.color.secondary_text')).padding({ right: 12 })
+        Text(this.description.length.toString() + '/800').width('100%').textAlign(TextAlign.End).fontSize(13).fontColor($r('app.color.secondary_text')).padding({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 12 : 0, right: PinmonyI18n.isRtl(this.uiLanguage) ? 0 : 12 })
       }
       Column({ space: 4 }) {
         Text(this.text('pm_publish_link')).fontSize(13).fontColor($r('app.color.primary_text')).width('100%')

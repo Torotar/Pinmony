@@ -200,7 +200,7 @@ export struct PinmonySocialPermissionsPage {
     Column() {
       Column({ space: 6 }) {
         Row() { Text(this.uiText(title)).fontSize(20).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text')).layoutWeight(1)
-          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
+          SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')])
         }.width('100%')
         if (detail) { Text(PinmonyI18n.render(detail, this.uiLanguage)).fontSize(16).fontColor($r('app.color.secondary_text')).width('100%') }
       }.width('100%').alignItems(HorizontalAlign.Start).padding({ top:12,bottom:12 })

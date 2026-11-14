@@ -6045,6 +6045,30 @@
     {
       "name": "pm_session_logout_unknown",
       "value": "無法確認登出結果，請先驗證目前工作階段。不會自動重複登出。"
+    },
+    {
+      "name": "pm_language_arabic",
+      "value": "阿拉伯語"
+    },
+    {
+      "name": "pm_birthdate_year",
+      "value": "年"
+    },
+    {
+      "name": "pm_back_to_top",
+      "value": "回到頂端"
+    },
+    {
+      "name": "pm_board_invite_link_share",
+      "value": "分享邀請連結"
+    },
+    {
+      "name": "pm_board_invite_link_copying",
+      "value": "正在複製…"
+    },
+    {
+      "name": "pm_board_invite_link_copy_failed",
+      "value": "無法複製邀請連結，請重試"
     }
   ]
 }

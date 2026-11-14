@@ -35,7 +35,7 @@ function fixture() {
   const host = { getApplicationContext: () => application };
   const Interaction = vm.runInNewContext(js + ';NotificationPermissionInteraction', {
     notificationManager, DialogAlignment: { Bottom: 1, Center: 2 }, $r: value => value,
-    PinmonyI18n: { message: key => key },
+    PinmonyI18n: { message: key => key }, PinmonyImmersiveLight: { alertOptions: options => options },
     notificationGlobal: (type, section, option) => type === 'news' && option === 'NONE_IN_APP' || type === 'push' && option === 'NO_PUSH'
   });
   const x = new Interaction();

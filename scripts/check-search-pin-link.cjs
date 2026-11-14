@@ -92,7 +92,7 @@ async function main() {
   const submit = ui.indexOf('.onSubmit(', change);
   assert(input >= 0 && change > input && submit > change);
   const callback = ui.slice(change + '.onChange('.length, submit).trim().replace(/\)$/, '');
-  const callbackCode = ts.transpileModule('(function() { return (' + callback + '); })',
+  const callbackCode = ts.transpileModule('(function(editing) { return (' + callback + '); })',
     {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText;
   const createOnChange = vm.runInNewContext(callbackCode);
   let finishRestore;
@@ -102,7 +102,7 @@ async function main() {
   let edits = 0;
   const view = {active:true,inputEditing:false,query:'https://pin.it/Example',
     onQueryChange(value) { edits++; return restored.h.controller.updateSearchQuery(value); }};
-  const onChange = createOnChange.call(view);
+  const onChange = createOnChange.call(view, true);
   onChange.call(view,'art');
   assert.equal(edits,0,'restoring an inactive input must not cancel link resolution');
   finishRestore('456'); await restoredPending;
@@ -156,9 +156,11 @@ async function main() {
   const backStart=hostSource.indexOf('  onBackPress(): boolean {');
   const backEnd=hostSource.indexOf('\n  private ',backStart);
   const backType=vm.runInNewContext(ts.transpileModule('class Host {'+hostSource.slice(backStart,backEnd)+'} Host;',
-    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
+    {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText, {PinmonyPageRecovery:{clear(){}}});
   const busyHost=new backType();
   busyHost.noticeChats=[];
+  busyHost.pageRecovery={cancel(){}};
+  busyHost.imageViewer={visible:false};
   busyHost.searchController={cancelSubmittedPin:()=>true};
   assert.equal(busyHost.onBackPress(),true,'host consumes pending-link back before underlying navigation');
   for(const action of ['edit','submit','page','inactive','invalidate']) {

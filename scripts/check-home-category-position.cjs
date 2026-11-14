@@ -12,7 +12,7 @@ function host(code,names,globals={}) {
 const Home=host(source,['categoryId','paneKey','retainSnapshot','snapshotFor','pageTabs','syncCategories','onHomeChanged','onPendingTabChanged','onOfflinePreviewChanged','rememberPosition','captureCurrentPosition','initialOffset','registerScroller','bindCurrentScroller','canShowFeed','requestCategory','selectTab']);
 const h=new Home(),calls=[],moves=[],saved=[];
 const tabs=(selected,disabled=false)=>['all','art','icons'].map(id=>({id,label:id,selected:id===selected,enabled:!(disabled&&id==='icons')}));
-Object.assign(h,{home:{pageKey:'home',kind:'state',pins:[{id:'art-pin'}],tabs:tabs('art',true)},categories:[],snapshots:[],selectedId:'art',pendingTabId:'',pagerIndex:1,presentationEpoch:1,paneScrollers:new Map(),paneOffsets:new Map(),paneChrome:new Map(),scrollerRevision:0,interactionReady:true,offlinePreview:false,initialScrollOffset:7,categorySwiper:{changeIndex:(...args)=>moves.push(args)},onTab:id=>calls.push([id,h.categories.find(t=>t.selected).id]),onScrollPosition:(...args)=>saved.push(args)});
+Object.assign(h,{categoryMaterials:new Map(),syncPagerChrome(){},home:{pageKey:'home',kind:'state',pins:[{id:'art-pin'}],tabs:tabs('art',true)},categories:[],snapshots:[],selectedId:'art',pendingTabId:'',pagerIndex:1,presentationEpoch:1,paneScrollers:new Map(),paneOffsets:new Map(),paneChrome:new Map(),scrollerRevision:0,interactionReady:true,offlinePreview:false,initialScrollOffset:7,categorySwiper:{changeIndex:(...args)=>moves.push(args)},onTab:id=>calls.push([id,h.categories.find(t=>t.selected).id]),onScrollPosition:(...args)=>saved.push(args)});
 h.onHomeChanged();assert.equal(h.categories.find(t=>t.selected).id,'art');assert.equal(h.canShowFeed(),true);
 h.selectTab(h.categories[1]);h.selectTab(h.categories[2]);assert.equal(moves.length,0,'current/disabled tabs do nothing');
 h.selectTab(h.categories[0]);assert.deepEqual(moves,[[0,true]],'click requests native Swiper animation');assert.equal(calls.length,0,'dispatch waits for committed page change');
@@ -46,7 +46,7 @@ p.restoringScroll=false;p.homeChromeCollapsed=true;offset=0;p.updateHomeChrome(0
 for(const gate of ['refreshing','restoringScroll']){p[gate]=true;p.updateHomeChrome(40,1);assert.equal(p.homeChromeCollapsed,false,gate+' blocks chrome motion');p[gate]=false;}
 p.feedActive=false;p.updateHomeChrome(40,1);assert.equal(p.homeChromeCollapsed,false,'inactive pane cannot drive chrome');assert(notifications>=3);
 assert(source.includes('if (current) this.selectTab(current);'),'click resolves current category metadata');
-assert(source.includes('HdsNavigation() { this.categoryFeed() }'));assert(source.includes('stackBuilder: (): void => { this.categoryButtons(); }'));
+assert(source.includes('HdsNavigation() { this.categoryFeed() }'));assert(source.includes('stackBuilder: this.categoryTitleBuilder'));assert(source.includes('private readonly categoryTitleBuilder: () => void = (): void => { this.categoryButtons(); };'));
 assert(source.includes('Swiper(this.categorySwiper)'),'native Swiper owns content motion');
 assert(source.includes('.hitTestBehavior(tab.id === this.selectedId ? HitTestMode.Default : HitTestMode.None)'));
 assert(source.includes(".accessibilityLevel(tab.id === this.selectedId ? 'auto' : 'no-hide-descendants')"));

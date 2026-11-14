@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]);
 const source=fs.readFileSync('feature_board/src/main/ets/components/PinmonyBoardPage.ets','utf8');function method(name){const a=source.indexOf('  private '+name+'('),b=source.indexOf('\n  private ',a+1);assert(a>=0);return source.slice(a,b);}
-class Scroller{constructor(){this.y=0;}scrollTo(v){this.y=v.yOffset;}}
+class Scroller{constructor(){this.y=0;}scrollTo(v){this.y=v.yOffset;}currentOffset(){return {yOffset:this.y};}}
 const queue=[],Host=vm.runInNewContext(ts.transpileModule('class Host {'+['scrollScope','contentScroll','restoreContentScroll','phase'].map(method).join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{Scroller,setTimeout:fn=>queue.push(fn)}),h=new Host();Object.assign(h,{snapshot:{pageKey:'https://www.pinterest.com/sample/board/',nativeAccountGeneration:1,session:0,loading:false},scrollOwner:'',visibleScrollScope:'',sectionScrollers:new Map(),scrollOffsets:new Map(),scrollRestoreToken:0,restoringScroll:false});
 const flush=()=>{while(queue.length)queue.shift()();};const parent=h.contentScroll();h.scrollOffsets.set(h.scrollScope(),240);h.restoreContentScroll();flush();assert.equal(parent.y,240);
 h.snapshot.flow={phase:'section',sectionId:'1',loading:false};const section=h.contentScroll();assert.notEqual(section,parent);h.restoreContentScroll();flush();assert.equal(section.y,0);h.scrollOffsets.set(h.scrollScope(),900);

@@ -3,6 +3,11 @@ import { PinmonyInboxCache } from '../services/PinmonyInboxCache';
 import { PinmonyInboxSnapshot, PinmonyInboxItem } from '../models/PinmonyInbox';
 import { PinmonyInboxFlowSnapshot } from '../models/PinmonyInboxFlow';
 
+// Scroll restoration is bookkeeping, not a render input on every gesture frame.
+class PinmonyInboxScrollPosition {
+  offset: number = 0;
+}
+
 @Observed
 export class PinmonyInboxStore {
   private readonly viewedConversations: Map<string, string> = new Map<string, string>();
@@ -105,7 +110,10 @@ export class PinmonyInboxStore {
   inboxActionsReady: boolean = false;
   inboxSectionReady: boolean = false;
   inboxRetainedContent: boolean = false;
-  inboxScrollOffset: number = 0;
+  private readonly scrollPosition: PinmonyInboxScrollPosition = new PinmonyInboxScrollPosition();
+  get inboxScrollOffset(): number { return this.scrollPosition.offset; }
+  set inboxScrollOffset(offset: number) { this.scrollPosition.offset = offset; }
+  rememberScrollOffset(offset: number): void { this.scrollPosition.offset = offset; }
   restoringInboxSection: string = '';
   onUnreadChange: ((updates: boolean, messages: boolean, updatesCount: number, messagesCount: number) => void) | undefined = undefined;
   private _inboxUpdatesUnreadCount: number = 0;

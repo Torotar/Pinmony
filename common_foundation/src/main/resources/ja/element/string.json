@@ -6045,6 +6045,30 @@
     {
       "name": "pm_session_logout_unknown",
       "value": "ログアウトの結果を確認できません。まず現在のセッションを確認してください。ログアウトは自動で再実行されません。"
+    },
+    {
+      "name": "pm_language_arabic",
+      "value": "アラビア語"
+    },
+    {
+      "name": "pm_birthdate_year",
+      "value": "年"
+    },
+    {
+      "name": "pm_back_to_top",
+      "value": "トップに戻る"
+    },
+    {
+      "name": "pm_board_invite_link_share",
+      "value": "招待リンクを共有"
+    },
+    {
+      "name": "pm_board_invite_link_copying",
+      "value": "コピー中…"
+    },
+    {
+      "name": "pm_board_invite_link_copy_failed",
+      "value": "招待リンクをコピーできません。もう一度お試しください。"
     }
   ]
 }

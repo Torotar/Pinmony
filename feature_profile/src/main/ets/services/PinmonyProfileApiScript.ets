@@ -154,7 +154,7 @@ export const PIN_PROFILE_API_SCRIPT: string = `
             target = key + 'pins/'; // HAR-confirmed public collection route.
           }
         }
-        card = { title: clean(item.title && (item.title.text || item.title.format), 300),
+        card = { mediaCount: Array.isArray(item.carousel_data && item.carousel_data.carousel_slots) ? item.carousel_data.carousel_slots.length : 0, title: clean(item.title && (item.title.text || item.title.format), 300),
           covers: (item.objects || []).map(function (pin) { return image(pin.image_medium_url); }).filter(Boolean).slice(0, 3),
           pinCount: info.pinCount !== null ? info.pinCount + ' 张 Pin 图' : '',
           updated: relativeTime(info.lastPinSaveTime) };

@@ -75,7 +75,7 @@ export struct PinmonyHomeMenuSheet {
           Button({ type: ButtonType.Normal, stateEffect: false }) {
             Row({ space: 14 }) {
               if (option.id === 'board-menu-move') {
-                SymbolGlyph($r('sys.symbol.arrow_right'))
+                SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.arrow_left') : $r('sys.symbol.arrow_right'))
                   .fontSize(28).fontColor([$r('app.color.primary_text')]).width(28).height(28)
               } else {
               Image(option.id === 'home-save' || option.id === 'board-menu-cancel-save' ? $r('app.media.lucide_bookmark') :

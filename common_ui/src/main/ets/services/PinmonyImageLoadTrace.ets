@@ -35,7 +35,7 @@ export class PinmonyImageLoadTrace {
     if (phase === 'native-failed') this.rawFailedAt = now;
     const rawAt: number = phase === 'data-ready' ? this.rawDataAt :
       phase === 'decoded' ? this.rawDecodedAt : phase === 'failed' ? this.rawFailedAt : -1;
-    PinmonyRuntimeLog.info('ImageLoadTrace: task=' + task.toString() + ' generation=' + generation.toString() +
+    this.log(phase, 'ImageLoadTrace: task=' + task.toString() + ' generation=' + generation.toString() +
       ' index=' + index.toString() + ' phase=' + phase + ' sinceSourceMs=' + Math.max(0, now - sourceAt).toString() +
       ' sinceMountMs=' + (this.mountedAt < 0 ? -1 : Math.max(0, now - this.mountedAt)).toString() +
       ' sinceNativeDataMs=' + (this.rawDataAt < 0 ? -1 : Math.max(0, now - this.rawDataAt)).toString() +
@@ -64,10 +64,15 @@ export class PinmonyImageLoadTrace {
         ' totalMs=' + this.metric(perf.totalTime) + ' redirectMs=' + this.metric(perf.redirectTime);
     }
     // The URL lookup has no request ID or timestamp: it cannot prove this generation's download or a cache hit.
-    PinmonyRuntimeLog.info('ImageDownloadTrace: task=' + task.toString() + ' generation=' + generation.toString() +
+    this.log(phase, 'ImageDownloadTrace: task=' + task.toString() + ' generation=' + generation.toString() +
       ' index=' + index.toString() + ' phase=' + phase + ' availability=' + availability +
       ' evidence=' + evidence + ' currentRequestConfirmed=' + (!!failureInfo).toString() +
       ' proxyRoute=unknown cacheHit=unknown' + metrics);
+  }
+
+  private log(phase: string, message: string): void {
+    if (phase === 'failed' || phase === 'native-failed') PinmonyRuntimeLog.warn(message);
+    else PinmonyRuntimeLog.diagnostic(message);
   }
 
   private metric(amount: number): string {

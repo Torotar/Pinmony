@@ -46,7 +46,7 @@ export const PIN_PROFILE_ORGANIZE_SCRIPT: string = `
     if (!p || p.type !== 'pin' || !/^\\d+$/.test(p.id || '') || !p.pinner || p.pinner.id !== s.userId) return null;
     var im = p.images && (p.images['736x'] || p.images['474x'] || p.images['236x'] || p.images.orig);
     if (!im || !image(im.url)) return null;
-    return { id: p.id, title: clean(p.grid_title || p.title), imageUrl: im.url,
+    return { mediaCount: Array.isArray(p.carousel_data && p.carousel_data.carousel_slots) ? p.carousel_data.carousel_slots.length : 0, id: p.id, title: clean(p.grid_title || p.title), imageUrl: im.url,
       imageWidth: Number(im.width) || 0, imageHeight: Number(im.height) || 0 };
   }
   function mapBoard(b) {

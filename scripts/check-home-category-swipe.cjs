@@ -11,7 +11,7 @@ assert(start>=0&&end>start);
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join(nl)+nl+'bind(mock){mock'+source.slice(start+1,end)+'}} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{TouchType:{Down:0,Up:1}});
 function boot(ready=true,offline=false){
   const h=new Host(),events={},calls=[],moves=[],tabs=[{id:'a',enabled:true},{id:'disabled',enabled:false},{id:'b',enabled:true},{id:'c',enabled:true}];
-  Object.assign(h,{categories:tabs,home:{tabs},selectedId:'b',pendingTabId:'',pagerIndex:1,pagerPosition:-1,pagerMoving:false,suppressSwipeClick:false,interactionReady:ready,offlinePreview:offline,captures:0,bindings:0,categoryId:()=> 'b',captureCurrentPosition(){this.captures++;},bindCurrentScroller(){this.bindings++;},categorySwiper:{changeIndex:(...args)=>moves.push(args)},onTab:id=>calls.push(id)});
+  Object.assign(h,{categoryMaterials:new Map(),syncPagerChrome(){},categories:tabs,home:{tabs},selectedId:'b',pendingTabId:'',pagerIndex:1,pagerPosition:-1,pagerMoving:false,suppressSwipeClick:false,interactionReady:ready,offlinePreview:offline,captures:0,bindings:0,categoryId:()=> 'b',captureCurrentPosition(){this.captures++;},bindCurrentScroller(){this.bindings++;},categorySwiper:{changeIndex:(...args)=>moves.push(args)},onTab:id=>calls.push(id)});
   h.syncCategories();
   const mock=new Proxy({},{get:(_target,name)=>(...args)=>{events[name]=args;return mock;}});
   h.bind(mock);return {h,events,calls,moves};

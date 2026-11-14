@@ -25,11 +25,11 @@ export struct PinmonyBoardPickerRow {
         if(this.secret || this.hasSections) {
           Row({space:4}) {
             if(this.secret) { Image($r('app.media.board_private_lock')).width(18).height(18).fillColor($r('app.color.secondary_text')) }
-            if(this.hasSections) { SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')]) }
+            if(this.hasSections) { SymbolGlyph(PinmonyI18n.isRtl(this.language) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('app.color.secondary_text')]) }
           }.alignItems(VerticalAlign.Center)
         }
       }.width('100%').alignItems(VerticalAlign.Center)
-    }.width('100%').constraintSize({minHeight:80}).padding({left:this.indented ? 24 : 0,right:0,top:8,bottom:8})
+    }.width('100%').constraintSize({minHeight:80}).padding({left:this.indented && !PinmonyI18n.isRtl(this.language) ? 24 : 0,right:this.indented && PinmonyI18n.isRtl(this.language) ? 24 : 0,top:8,bottom:8})
       .borderRadius(12).backgroundColor(Color.Transparent).enabled(this.actionEnabled)
       .opacity(this.actionEnabled ? 1 : 0.4).onClick(() => this.onSelect?.())
       .accessibilityText(PinmonyI18n.render(this.title,this.language) + (this.secret ? ' · ' + PinmonyI18n.text('pm_secret_board_afc1422a',this.language) : ''))
@@ -51,6 +51,7 @@ export struct PinmonyBoardPickerFooter {
         Stack({alignContent:Alignment.Center}) {
           SymbolGlyph(this.back ? $r('sys.symbol.chevron_left') : $r('sys.symbol.plus'))
             .fontSize(26).fontColor([$r('app.color.primary_text')])
+            .scale({ x: this.back && PinmonyI18n.isRtl(this.language) ? -1 : 1, y: 1 })
         }.width(44).height(44).backgroundColor($r('app.color.surface_muted')).borderRadius(16)
         Text(PinmonyI18n.text(this.labelKey,this.language)).fontSize(19).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.primary_text')).layoutWeight(1)

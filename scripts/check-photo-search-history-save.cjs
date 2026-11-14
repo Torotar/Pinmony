@@ -50,8 +50,20 @@ const jpeg=new Uint8Array(24);jpeg[0]=255;jpeg[1]=216;
  const historyBack=new HistoryBack();let delegated=0,historyPopped=0;Object.assign(historyBack,{interactionActive:false,onInactiveBack:()=>delegated++,back:()=>historyPopped++});assert.equal(historyBack.handleSystemBack(),true);assert.equal(delegated,1);assert.equal(historyPopped,0);historyBack.interactionActive=true;assert.equal(historyBack.handleSystemBack(),true);assert.equal(historyPopped,1);
  const callbackStart=ui.indexOf('if (this.onPhotoResult) this.onPhotoResult(id, origin);');assert(callbackStart>=0);const callback=ui.slice(callbackStart,callbackStart+130);assert(!callback.includes('closePhotoSearch'));
  const Active=vm.runInNewContext(transpile('class Active {'+method(ui,'activeChanged')+'} Active;'),{PinmonyRuntimeLog:{info(){}}});
- let closed=0,cleared=0;const active=new Active();Object.assign(active,{active:false,retainPhotoSearch:true,pagePresent:true,detailReturnPreview:false,closePhotoSearch:()=>closed++,searchPathStack:{clear:()=>cleared++},tracePresentation(){}});active.activeChanged();await Promise.resolve();assert.equal(closed,0);assert.equal(cleared,0);
- active.retainPhotoSearch=false;active.activeChanged();await Promise.resolve();assert.equal(closed,1);assert.equal(cleared,1);
+ const commitTimers=[];
+ const queueSource=fs.readFileSync('common_ui/src/main/ets/services/PinmonyUiCommitQueue.ets','utf8').replace('export class ','class ');
+ const CommitQueue=vm.runInNewContext(transpile(queueSource+'\nPinmonyUiCommitQueue;'),{
+   setTimeout:callback=>{commitTimers.push(callback);return commitTimers.length;},clearTimeout(){}
+ });
+ let closed=0,cleared=0,prefetchUpdates=0;const active=new Active();
+ Object.assign(active,{active:false,retainPhotoSearch:true,pagePresent:true,detailReturnPreview:false,
+   syncImagePrefetchActivity:()=>prefetchUpdates++,uiCommits:new CommitQueue(),inputFocusRevision:0,
+   closePhotoSearch:()=>closed++,searchPathStack:{clear:()=>cleared++},tracePresentation(){}});
+ active.activeChanged();assert.equal(commitTimers.length,1);commitTimers.shift()();assert.equal(closed,0);assert.equal(cleared,0);
+ active.retainPhotoSearch=false;active.activeChanged();assert.equal(closed,0,'visibility changes commit after rendering');
+ commitTimers.shift()();assert.equal(closed,1);assert.equal(cleared,0,'hidden destination nodes retain navigation and scroll state');
+ assert.equal(prefetchUpdates,2,'both visibility updates synchronize prefetch admission');
+ assert.equal(active.heroTransitionIndex,-1);assert.equal(active.pendingInputFocus,false);assert.equal(active.inputFocusRevision,2);
  const shared=fs.readFileSync('common_ui/src/main/ets/components/PinmonyImageSearchView.ets','utf8');
  const Sheet=vm.runInNewContext(transpile('class Sheet {'+['presentationChanged','resultSheetDisappeared','updateSheetDetent'].map(n=>method(shared,n)).join('\n')+'} Sheet;'),{clearTimeout(){},SheetSize:{LARGE:'large'},PinmonyRuntimeLog:{info(){}}});
  const sheet=new Sheet();Object.assign(sheet,{alive:true,presentationActive:false,sheetVisible:true,relatedOpening:true});sheet.presentationChanged();assert.equal(sheet.sheetVisible,false,'hidden results cannot cover Pin detail');
@@ -75,7 +87,7 @@ const jpeg=new Uint8Array(24);jpeg[0]=255;jpeg[1]=216;
  sheet.sheetAppearing=false;sheet.updateSheetDetent(600);assert.equal(sheet.sheetHeight,'40%','user can collapse after reappear');
  sheet.relatedOpening=true;sheet.sheetVisible=false;sheet.updateSheetDetent(0);assert.equal(sheet.sheetHeight,'40%','default detent is retained too');
  const index=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
- const preparation=index.match(/preparingDetailReturn: ([\s\S]*?),\r?\n      pinStore:/)[1];
+ const preparation=index.match(/preparingDetailReturn: ([\s\S]*?),\r?\n\s+\w+:/)[1];
  for(const detail of [undefined,{pinUrl:'pin'}]) {const host={pinStore:{detail},preservingSearchForPin:()=>false,searchEntryReturnPreparing:false,homeEntryClosing:true,homeEntryCardId:'pinmony-photo-result-one'};assert.equal(Function('return '+preparation).call(host),!!detail,'photo return preparation ends when detail is gone');}
  const Entry=vm.runInNewContext(transpile('class Entry {'+method(index,'openPhotoSearchPin')+'} Entry;'));
  const entry=new Entry();let openedMotion;
@@ -85,9 +97,14 @@ const jpeg=new Uint8Array(24);jpeg[0]=255;jpeg[1]=216;
  Object.assign(entry,{homeEntryClosing:true,homeEntryBackCommitted:true,searchEntryReturnPreparing:true,searchEntryReturnAttempts:7});entry.openPhotoSearchPin('pin-two','search',{id:'two',imageUrl:'image-two'});assert.equal(openedMotion.url,'pin-two','a different Pin resets the previous exit too');
  for(const [w,h] of [[736,1118],[1200,800],[900,900]]) {entry.openPhotoSearchPin('ratio','search',{id:'ratio',imageUrl:'image',imageWidth:w,imageHeight:h});assert.equal(openedMotion.photo.imageWidth,w);assert.equal(openedMotion.photo.imageHeight,h);assert.equal(openedMotion.photo.returnPageOnly,true);const contentWidth=320;assert.equal(contentWidth*openedMotion.photo.imageHeight/openedMotion.photo.imageWidth,contentWidth*h/w,'opening receives original image ratio');}
  assert(shared.includes('detentSelection: this.sheetHeight'),'restore the selected detent, not just the height');
- const Click=vm.runInNewContext(transpile('class Click {'+['openRelated','resultSheetDisappeared','resultSheetAppeared'].map(n=>method(shared,n)).join('\n')+'} Click;'),{SheetSize:{LARGE:'large'},PinmonyRuntimeLog:{info(){}}});
- const click=new Click();let dispatches=0;Object.assign(click,{alive:true,presentationActive:true,relatedOpening:false,result:{loading:false},uploadedPhoto:true,sheetVisible:true,onRelated:()=>dispatches++});click.openRelated({id:'one'});assert.equal(dispatches,1,'open immediately without waiting for Sheet disappearance');assert.equal(click.sheetVisible,false);click.resultSheetDisappeared();assert.equal(dispatches,1,'late disappearance cannot open a duplicate detail');click.openRelated({id:'two'});assert.equal(dispatches,1,'duplicate tap is ignored');
+ const Click=vm.runInNewContext(transpile('class Click {'+['openRelated','resultSheetDisappeared','resultSheetAppeared','reportResultsPosition','canBackToTop'].map(n=>method(shared,n)).join('\n')+'} Click;'),{SheetSize:{LARGE:'large'},PinmonyRuntimeLog:{info(){}}});
+ const click=new Click();let dispatches=0,restoredOffset;
+ Object.assign(click,{alive:true,pin:'current',presentationActive:true,relatedOpening:false,result:{loading:false},uploadedPhoto:true,sheetVisible:true,
+   resultScroller:{offset:()=>({yOffset:250}),scrollTo:options=>{restoredOffset=options.yOffset;}},onRelated:()=>dispatches++});
+ click.openRelated({id:'current',pinUrl:'current'});assert.equal(dispatches,0,'current Pin cannot reopen itself');
+ click.openRelated({id:'one',pinUrl:'other'});assert.equal(dispatches,1,'open immediately without waiting for Sheet disappearance');assert.equal(click.sheetVisible,false);click.resultSheetDisappeared();assert.equal(dispatches,1,'late disappearance cannot open a duplicate detail');click.openRelated({id:'two'});assert.equal(dispatches,1,'duplicate tap is ignored');
  Object.assign(click,{relatedOpening:true,resumeRelatedSheet:true,sheetVisible:true,presentationActive:true,sheetAppearing:true});click.resultSheetAppeared();assert.equal(click.relatedOpening,false);assert.equal(click.resumeRelatedSheet,false);click.openRelated({id:'two'});assert.equal(dispatches,2,'visible restored Sheet can open another Pin even if opening lock remained');
+ assert.equal(restoredOffset,250,'return restores the same result Scroller position');
  click.presentationActive=false;click.sheetVisible=false;click.resultSheetAppeared();assert.equal(click.relatedOpening,true,'late appear cannot unlock hidden detail visit');
  assert(index.includes("if (this.homeEntryCardId.startsWith('pinmony-photo-result-')) { this.homeEntryClosing = true; return; }"),'exit animates without waiting on hidden Sheet coordinates');
  console.log('Photo history save: captured multipart contract, business validation, single write, failure feedback and retained Pin return passed');

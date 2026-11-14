@@ -306,6 +306,13 @@ export struct PinmonyInboxFlowPage {
     const date: Date = new Date(value);
     if (!Number.isFinite(date.getTime())) return '';
     const today: Date = new Date();
+    if (this.uiLanguage === 'ar') {
+      const arabicTime: string = new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(date);
+      if (date.toDateString() === today.toDateString()) return arabicTime;
+      const yesterdayArabic: Date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+      return (date.toDateString() === yesterdayArabic.toDateString() ? this.uiText('pm_activity_yesterday') :
+        new Intl.DateTimeFormat('ar', { year: 'numeric', month: 'numeric', day: 'numeric' }).format(date)) + ' ' + arabicTime;
+    }
     const time: string = date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
     if (date.toDateString() === today.toDateString()) return time;
     const yesterday: Date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
@@ -370,7 +377,7 @@ export struct PinmonyInboxFlowPage {
   private reactionChoices() {
     Row({ space: 4 }) {
       ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
-        Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
           Text(PinmonyI18n.render(reaction, this.uiLanguage)).fontSize(24).textAlign(TextAlign.Center).width('100%')
         }.width(40).height(44).padding(0).backgroundColor(Color.Transparent)
           .enabled(this.canReactToMessage(this.reactionMessageId))
@@ -385,7 +392,7 @@ export struct PinmonyInboxFlowPage {
       if (this.selectedMessage && !this.selectedMessage.deleted) {
       Row() {
         ForEach(['❤️', '😂', '😍', '😮', '👍', '👎'], (reaction: string) => {
-          Button({ type: ButtonType.Circle, stateEffect: false }) {
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
             Text(PinmonyI18n.render(reaction, this.uiLanguage)).fontSize(24).textAlign(TextAlign.Center).width('100%')
           }.padding(0).width(44).height(44)
             .backgroundColor($r('app.color.surface_muted'))
@@ -399,7 +406,7 @@ export struct PinmonyInboxFlowPage {
       Divider().margin({ top: 8, bottom: 8 })
       }
       if (this.selectedMessage?.text && !this.selectedMessage.deleted && this.onCopyText) {
-        Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
           Row({ space: 10 }) {
             SymbolGlyph($r('sys.symbol.rectangle_on_rectangle')).fontSize(20)
               .fontColor([$r('app.color.primary_text')])
@@ -410,7 +417,7 @@ export struct PinmonyInboxFlowPage {
           .onClick(() => this.copyMessageText())
       }
       if (this.selectedMessage?.pinUrl) {
-        Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
           Row({ space: 10 }) {
             Image($r('app.media.lucide_bookmark')).width(20).height(20)
             Text(this.uiText("pm_save_60a53514")).fontSize(18).fontWeight(FontWeight.Medium)
@@ -419,7 +426,7 @@ export struct PinmonyInboxFlowPage {
         }.width('100%').height(48).padding({ left: 8, right: 8 })
           .backgroundColor(Color.Transparent).accessibilityText(this.uiText("pm_save_60a53514"))
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('save', this.selectedMessage.pinUrl); this.closeMessageMenu(); })
-        Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
           Row({ space: 10 }) {
             Image($r('app.media.lucide_share_2')).width(20).height(20)
               .fillColor($r('app.color.primary_text'))
@@ -431,7 +438,7 @@ export struct PinmonyInboxFlowPage {
           .onClick(() => { if (this.selectedMessage && this.onPinAction) this.onPinAction('share', this.selectedMessage.pinUrl); this.closeMessageMenu(); })
       }
       if (this.selectedMessage?.own) {
-        Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
           Row({ space: 10 }) {
             SymbolGlyph($r('sys.symbol.trash')).fontSize(20)
               .fontColor([$r('app.color.accent')])
@@ -526,7 +533,7 @@ export struct PinmonyInboxFlowPage {
     Column({ space: 8 }) {
       if (!message.deleted && message.image && message.pinUrl) { this.pinActions(message) }
       if (!message.deleted) {
-        Button({ type: ButtonType.Circle, stateEffect: false }) {
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
           if (message.reactions?.length) {
             Text(message.reactions.join(' ')).fontSize(18).fontColor($r('app.color.primary_text'))
           } else {
@@ -651,20 +658,20 @@ export struct PinmonyInboxFlowPage {
   private updatesMenuContent() {
     Column({ space: 4 }) {
       if (this.snapshot.canUnsubscribePin) {
-        Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
           Text(this.uiText("pm_turn_off_updates_for_this_pin_01676b9f")).fontSize(18).fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
         }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
           .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.unsubscribedPin)
           .onClick(() => this.act('unsubscribePin'))
       }
-      Button({ type: ButtonType.Normal, stateEffect: false }) {
+      Button({ type: ButtonType.Normal, stateEffect: true }) {
         Text(this.uiText("pm_delete_update_b051285c")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })
         .backgroundColor(Color.Transparent).enabled(!this.snapshot.messageBusy && !this.snapshot.sending && !this.snapshot.writeUncertain)
         .onClick(() => this.act('hideNews'))
-      Button({ type: ButtonType.Normal, stateEffect: false }) {
+      Button({ type: ButtonType.Normal, stateEffect: true }) {
         Text(this.uiText("pm_view_notification_settings_c3a6f9ff")).fontSize(18).fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary_text')).width('100%').textAlign(TextAlign.Start)
       }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8, top: 12, bottom: 12 })

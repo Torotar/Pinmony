@@ -23,6 +23,9 @@ assert(publishBody.includes(".backgroundColor($r('app.color.page_background'))")
 assert(!/Scroll\(|edgeEffect\(/.test(publishBody),'publish body damping remains disabled as requested');
 const index=fs.readFileSync(paths[0],'utf8');
 const nativeHost=index.slice(index.indexOf('.bindSheet($$this.showNativeSheet,'));
+assert(nativeHost.includes("radiusRenderStrategy: this.activeSheetKind === 'comments' ? RenderStrategy.OFFSCREEN : RenderStrategy.FAST"),'comments use the official offscreen Sheet radius rendering for blurred corner artifacts; other panels retain FAST');
+assert(index.includes("immersiveScroll: this.activeSheetKind === 'comments'"),'comments retain immersive title scrolling');
+assert(index.includes("scrollControllers: this.activeSheetKind === 'comments' ? [this.commentsScroller] : []"),'comments title remains bound to the actual list');
 assert(nativeHost.includes("backgroundColor: $r('app.color.page_background')"),'native Sheet retains theme fallback for API24/off/unsupported material');
 assert(nativeHost.includes('title: this.nativeSheetHasHdsTitle() ? undefined : { title: this.nativeModalLabel() }'),'native host selects one title owner');
 const save=fs.readFileSync('feature_pin/src/main/ets/components/PinmonySaveSheet.ets','utf8');assert(save.includes('.bindToScrollable([this.boardScroller, this.createScroller])'));assert(save.includes('Scroll(this.boardScroller)'));assert(save.includes('Scroll(this.createScroller)'));assert.equal((save.match(/\.clip\(false\)/g)||[]).length,2);assert(save.includes('style: PinmonyHdsTitleBar.modalStyle(this.immersiveLightMode)'));assert(save.includes('PinmonyHdsTitleBar.resolve('));

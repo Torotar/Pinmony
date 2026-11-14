@@ -13,19 +13,20 @@ export struct PinmonySearchFilterSheet {
   private dragStart: number = 0;
   private priceHandleOffset(upper: boolean): number {
     const span: number = this.searchStore.searchProductUpper - this.searchStore.searchProductLower;
-    return span > 0 ? Math.max(0, Math.min(1, (this.price(upper) - this.searchStore.searchProductLower) / span)) * this.trackWidth : 0;
+    const offset: number = span > 0 ? Math.max(0, Math.min(1, (this.price(upper) - this.searchStore.searchProductLower) / span)) * this.trackWidth : 0;
+    return PinmonyI18n.isRtl(this.uiLanguage) ? this.trackWidth - offset : offset;
   }
   @Builder
   private priceHandle(upper: boolean) {
     Stack() {
       Circle().width(16).height(16).foregroundColor($r('app.color.primary_text'))
     }.width(40).height(44).position({ x: this.priceHandleOffset(upper), y: 0 })
-      .accessibilityText((upper ? this.uiText("pm_maximum_price_dcb810cc") : this.uiText("pm_minimum_price_fc7533e3")) + this.price(upper).toString())
+      .accessibilityText((upper ? this.uiText("pm_maximum_price_dcb810cc") : this.uiText("pm_minimum_price_fc7533e3")) + PinmonyI18n.number(this.price(upper), this.uiLanguage))
       .gesture(PanGesture({ direction: PanDirection.Horizontal, distance: 0 })
         .onActionStart(() => { this.dragStart = this.price(upper); })
         .onActionUpdate((event: GestureEvent) => {
           const span: number = this.searchStore.searchProductUpper - this.searchStore.searchProductLower;
-          const value: number = Math.round(this.dragStart + event.offsetX / Math.max(1, this.trackWidth) * span);
+          const value: number = Math.round(this.dragStart + event.offsetX * (PinmonyI18n.isRtl(this.uiLanguage) ? -1 : 1) / Math.max(1, this.trackWidth) * span);
           if (upper) this.searchStore.searchProductMax = Math.max(this.price(false), Math.min(this.searchStore.searchProductUpper, value)).toString();
           else this.searchStore.searchProductMin = Math.min(this.price(true), Math.max(this.searchStore.searchProductLower, value)).toString();
           this.searchStore.searchProductError = '';
@@ -61,20 +62,20 @@ export struct PinmonySearchFilterSheet {
                 if(this.searchStore.searchProductPrices) {
                   Text(this.uiText("pm_price_range_e8debe5f")).fontSize(17).fontColor($r('app.color.primary_text')).width('100%')
                   Row() {
-                    Text(this.searchStore.searchProductCurrency + ' ' + this.price(false).toString())
+                    Text(this.searchStore.searchProductCurrency + ' ' + PinmonyI18n.number(this.price(false), this.uiLanguage))
                       .fontColor($r('app.color.primary_text')).fontWeight(FontWeight.Bold)
                     Blank()
-                    Text(this.searchStore.searchProductCurrency + ' ' + this.price(true).toString())
+                    Text(this.searchStore.searchProductCurrency + ' ' + PinmonyI18n.number(this.price(true), this.uiLanguage))
                       .fontColor($r('app.color.primary_text')).fontWeight(FontWeight.Bold)
                   }.width('100%')
                   Stack({ alignContent: Alignment.TopStart }) {
                     Row().width(this.trackWidth).height(4).backgroundColor($r('app.color.surface_muted'))
                       .position({ x: 20, y: 20 })
-                    Row().width(Math.max(0, this.priceHandleOffset(true) - this.priceHandleOffset(false))).height(4)
-                      .backgroundColor($r('app.color.primary_text')).position({ x: this.priceHandleOffset(false) + 20, y: 20 })
+                    Row().width(Math.abs(this.priceHandleOffset(true) - this.priceHandleOffset(false))).height(4)
+                      .backgroundColor($r('app.color.primary_text')).position({ x: Math.min(this.priceHandleOffset(false), this.priceHandleOffset(true)) + 20, y: 20 })
                     this.priceHandle(false)
                     this.priceHandle(true)
-                  }.width('100%').height(44)
+                  }.width('100%').height(44).direction(Direction.Ltr)
                     .onAreaChange((_old: Area, area: Area) => { this.trackWidth = Math.max(1, Number(area.width) - 40); })
                   Text(this.uiText("pm_drag_to_change_price_9c52f526")).fontSize(15).fontColor($r('app.color.secondary_text'))
                 }

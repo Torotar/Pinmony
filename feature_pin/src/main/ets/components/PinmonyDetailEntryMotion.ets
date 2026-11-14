@@ -12,6 +12,9 @@ export struct PinmonyDetailEntryMotion {
   @Prop targetRadius: number = 18;
   @Prop bottomInset: number = 0;
   @Prop restoredOffset: number = 0;
+  @Prop mediaContentTop: number = 0;
+  @Prop visibleTopInset: number = 56;
+  currentScrollOffset?: () => number;
   @Prop @Watch('closeChanged') closing: boolean = false;
   onReveal?: (closing: boolean, pageExit: boolean) => void;
   onTransition?: (expanded: number) => void;
@@ -74,14 +77,21 @@ export struct PinmonyDetailEntryMotion {
       const top: number = ui.px2vp(hero.windowOffset.y - root.windowOffset.y);
       const height: number = ui.px2vp(hero.size.height) - this.bottomInset;
       const viewport: number = ui.px2vp(root.size.height);
-      const visible: number = Math.max(0, Math.min(top + height, viewport) - Math.max(top, 56));
+      // A retained WaterFlow header may still report its last laid-out rectangle
+      // after scrolling offscreen. Its size alone is not evidence of visibility.
+      if (this.currentScrollOffset) {
+        const current: number = Math.max(0, this.currentScrollOffset());
+        // Opening can measure before the queued scroll restoration has committed.
+        const offset: number = this.closing ? current : Math.max(current, this.restoredOffset);
+        if (!Number.isFinite(offset) || this.mediaContentTop + height - offset <= this.visibleTopInset) return false;
+      }
+      const visible: number = Math.max(0, Math.min(top + height, viewport) - Math.max(top, this.visibleTopInset));
       return height > 0 && visible > 0;
     } catch (_) { return false; }
   }
   private begin(): void {
     if (!this.alive || this.started || !this.measured) return;
-    const pageOnly: boolean = this.photo.returnPageOnly === true || this.preparationExpired ||
-      !this.closing && this.restoredOffset > 0 && !this.heroVisible();
+    const pageOnly: boolean = this.photo.returnPageOnly === true || this.preparationExpired || !this.heroVisible();
     const target: ImageFlightRect | undefined = this.target();
     if (!target) {
       if (++this.layoutAttempts < 12) {
@@ -91,7 +101,8 @@ export struct PinmonyDetailEntryMotion {
         this.started = true;
         clearTimeout(this.preparationTimer);
         PinmonyRuntimeLog.info('DetailMotionTrace: event=layout-unavailable');
-        if (this.closing) this.move(true); else this.onOpened?.();
+        this.showing = false;
+        this.move(this.closing);
       }
       return;
     }
@@ -129,7 +140,6 @@ export struct PinmonyDetailEntryMotion {
   }
   private move(closing: boolean): void {
     const measuredTarget: ImageFlightRect | undefined = this.target();
-    if (!measuredTarget && !closing) { this.onOpened?.(); return; }
     const target: ImageFlightRect = measuredTarget || this.frame;
     const version: number = ++this.version;
     const pageExit: boolean = !measuredTarget || this.photo.returnPageOnly === true || !this.heroVisible() ||

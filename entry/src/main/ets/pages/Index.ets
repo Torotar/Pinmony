@@ -59,7 +59,7 @@ import { PinmonyNetworkBridgeCoordinator, PinmonyNetworkBridgeCoordinatorPorts }
 import { PinmonyFailureRecoveryCoordinator, PinmonyFailureRecoveryCoordinatorPorts } from '../app/PinmonyFailureRecoveryCoordinator';
 import { PinmonyBottomBarCoordinator, PinmonyBottomBarCoordinatorPorts } from '../app/PinmonyBottomBarCoordinator';
 import { PinmonyRouteParser } from '../app/PinmonyRouteParser';
-import { PinmonyPinLinkResolver } from 'common_network';
+import { PinmonyPinLinkResolver, PinmonySubmittedLinkTarget, PinmonyBoardInviteLink } from 'common_network';
 import { PinmonyVideoSource } from 'common_ui';
 import { searchProfileLink } from 'feature_search';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -1584,6 +1584,15 @@ struct Index {
 
 
   private businessSuspended: boolean = false;
+  @StorageProp('pinmonyAbilityForegroundRevision') @Watch('onAbilityForegroundChanged')
+  private abilityForegroundRevision: number = 0;
+
+  private onAbilityForegroundChanged(): void {
+    if (!this.businessSuspended && this.floatingTabsMounted) {
+      this.logPageLifecycle('bottom-bar-window-foreground');
+      this.bottomBarCoordinator.resumeAfterForeground();
+    }
+  }
 
   onPageShow(): void {
     this.inboxBackgroundSync.stop();
@@ -1626,6 +1635,7 @@ struct Index {
     this.searchController.invalidatePending();
     this.pinStore.videoForeground = false;
     this.businessSuspended = true;
+    this.bottomBarCoordinator.suspendForBackground();
     this.homeImageWarmup.dispose();
     this.nativeNetwork.setForeground(false); this.detailReadNetwork.setForeground(false); this.userAvatarReads.pause();
     this.tabRequestToken++; this.rootReadToken = -1; this.pendingWebTab = -1;
@@ -1977,6 +1987,7 @@ struct Index {
     undoSnack: (value: string,pin: string): void => {this.pinStore.saveUndoPin = '';this.pinStore.saveUndoId = '';this.showUndoSnack(value,pin,(): void => {this.undoMoreFeedback();});}
   } as PinmonyPinMenuNativePorts);
   private readonly shareNativeFlow: PinmonyShareNativeFlow = new PinmonyShareNativeFlow({
+    canInviteBoard: (page: string, id: string): boolean => this.boardStore.boardDetail?.pageKey === page && this.boardStore.boardDetail?.boardId === id && this.boardStore.boardDetail?.canInviteCollaborators === true,
     store: (): PinmonyPinStore => this.pinStore,session: (): PinmonyBusinessSessionContext => this.nativeBusinessSessionContext(),network: (): PinmonyNativeNetwork => this.nativeNetwork,
     current: (kind: string,page: string,id: string): boolean => this.authStatus === 'authenticated' && !this.businessSuspended && (kind === 'pin' ? (this.pinStore.detail?.pinUrl === page && this.currentPinUrl() === page || this.homeStore.homeMenuPin === page && this.isCurrentMorePin(page)) : kind === 'board' ? this.boardStore.boardDetail?.pageKey === page && this.boardStore.boardDetail?.boardId === id && this.boardStore.boardDetail?.nativeAccountGeneration === this.nativeBusinessSessionContext().generation && this.boardStore.boardDetail?.nativeReadsReady === true && this.boardStore.boardDetail?.ready === true && this.currentBoardUrl() === page : (this.activeTab === 3 || this.profileStore.origins.length > 0) && this.profileStore.profile?.profileUrl === page && this.currentProfileUrl() === page && !this.pinStore.detail && !this.boardStore.boardDetail),
     visible: (): boolean => this.activeSheetKind === 'share' && this.showNativeSheet,
@@ -2235,7 +2246,29 @@ struct Index {
       const target: string = this.nativeBusinessSessionContext().origin + profile.slice('https://www.pinterest.com'.length);
       this.openUserProfile(target);
     },
-    cancelSubmittedPin: (): void => this.submittedPinResolver.cancel(),
+    clearSubmittedLinkInput: (): void => this.searchNativeReads.clearSubmittedLinkInput(),
+    openSubmittedBoardInvite: async (link: PinmonyBoardInviteLink, source: string, current: () => boolean): Promise<void> => {
+      if (!PIN_NATIVE_BOARD_READS_ENABLED || this.activeTab !== 1 || this.currentSearchPageKey() !== source || !current()) throw new Error('invite-navigation');
+      const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+      const epoch: number = this.authEpoch;
+      const live = (): boolean => current() && this.activeTab === 1 && this.currentSearchPageKey() === source &&
+        epoch === this.authEpoch && session.authenticated && session.accountId === this.nativeBusinessSessionContext().accountId &&
+        session.generation === this.nativeBusinessSessionContext().generation && this.nativeSearchPageVisible();
+      const item: PinmonyBoardInvitation = await this.boardInvitationNative.resolveLink(link, live);
+      if (!live()) return;
+      this.pageHistory.visit(source, 'load');
+      this.previewBoardInvitation(item, true, source);
+    },
+    resolveSubmittedLink: (link: string, current: () => boolean): Promise<PinmonySubmittedLinkTarget> => {
+      const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+      const epoch: number = this.authEpoch;
+      return this.submittedPinResolver.resolveNavigationTarget(link, (): boolean => {
+        const now: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
+        return current() && session.authenticated && now.authenticated && session.accountId === now.accountId &&
+          session.generation === now.generation && epoch === this.authEpoch && !this.businessSuspended && this.nativeSearchPageVisible();
+      });
+    },
+    cancelSubmittedPin: (): void => { this.submittedPinResolver.cancel(); this.boardInvitationNative.cancelLink(); },
     resolveSubmittedPin: (link: string, current: () => boolean): Promise<string> => {
       const session: PinmonyBusinessSessionContext = this.nativeBusinessSessionContext();
       const epoch: number = this.authEpoch;
@@ -2807,13 +2840,15 @@ struct Index {
     if (this.nativeAddAccountFlow) {
       this.nativeAddAccountFlow = false;
       if (addedAccount) this.settingsStore.rememberAccountEntry(true);
-      const confirmedEpoch: number = this.nativeSessionEpoch;
-      const confirmedProfile: string = this.authenticatedProfileUrl;
-      this.coordinatorTasks.timeout((): void => {
-        if (this.businessSuspended || this.authStatus !== 'authenticated' || this.nativeSessionEpoch !== confirmedEpoch ||
-            this.authenticatedProfileUrl !== confirmedProfile) return;
-        this.openProfileSettings();
-      }, 0);
+      if (!addedAccount) {
+        const confirmedEpoch: number = this.nativeSessionEpoch;
+        const confirmedProfile: string = this.authenticatedProfileUrl;
+        this.coordinatorTasks.timeout((): void => {
+          if (this.businessSuspended || this.authStatus !== 'authenticated' || this.nativeSessionEpoch !== confirmedEpoch ||
+              this.authenticatedProfileUrl !== confirmedProfile) return;
+          this.openProfileSettings();
+        }, 0);
+      }
     }
     PinmonyRuntimeLog.info('NativeSession: native account confirmed webMounted=false');
   }
@@ -3330,6 +3365,8 @@ struct Index {
 
   private handleRootContentScroll(offset: number, state: ScrollState): void { return this.bottomBarCoordinator.handleRootContentScroll(offset, state); }
 
+  private expandBottomBarAfterBackToTop(): void { this.bottomBarCoordinator.expandAfterBackToTop(); }
+
   private syncBottomBarForPageDepth(): void { return this.bottomBarCoordinator.syncBottomBarForPageDepth(); }
 
   private syncFloatingTabsMotion(): void { return this.bottomBarCoordinator.syncFloatingTabsMotion(); }
@@ -3377,8 +3414,9 @@ struct Index {
 
   private shouldKeepSearchRootMounted(): boolean {
     const searchPage: string = this.searchStore.search?.pageKey || this.searchStore.retainedSearch?.pageKey || '';
-    return (this.nativeSearchPageVisible() || this.shouldKeepSearchPageMounted() || !!searchPage) && !this.pinStore.detail && !this.pinStore.detailWebFlow &&
-      !this.extractPinUrl(this.nativeDisplayAddress());
+    // Keep the source component while detail covers it. Its active/back gates
+    // route hidden navigation events to the current top-level presentation.
+    return (this.nativeSearchPageVisible() || this.shouldKeepSearchPageMounted() || !!searchPage) && !this.pinStore.detailWebFlow;
   }
 
   private preservingSearchForPin(): boolean {
@@ -5275,10 +5313,10 @@ struct Index {
 
   private pollBoardInvitations(token: number, preview: boolean): void { this.boardInvitationController.poll(token, preview); }
 
-  private previewBoardInvitation(item: PinmonyBoardInvitation, notice: boolean = false): void {
+  private previewBoardInvitation(item: PinmonyBoardInvitation, notice: boolean = false, sourcePage: string = ''): void {
     if (!this.boardInvitationController.preparePreview(item)) return;
     this.clearRootTabGuard('invitation-preview');
-    const source: string = notice ? this.rootPresentationAddress(this.activeTab) : this.currentInboxUrl();
+    const source: string = sourcePage || (notice ? this.rootPresentationAddress(this.activeTab) : this.currentInboxUrl());
     this.boardStore.boardReturnUrl = source; this.boardStore.boardReturnPage = item.boardUrl;
     this.boardStore.pendingBoardSource = source; this.boardStore.pendingBoardUrl = item.boardUrl;
     this.boardStore.presentationPage = item.boardUrl;
@@ -7747,6 +7785,7 @@ struct Index {
       activeSheetKind: this.activeSheetKind,
       currentPinUrl: (): string => this.currentPinUrl(),
       handleRootContentScroll: (offset: number, state: ScrollState): void => this.handleRootContentScroll(offset, state),
+      expandBottomBarAfterBackToTop: (): void => this.expandBottomBarAfterBackToTop(),
       homePlaceholder: (): PinmonyHomeSnapshot => this.homePlaceholder(),
       pendingWebTab: this.pendingWebTab,
       currentHomePageKey: (): string => this.currentHomePageKey(),
@@ -7802,6 +7841,7 @@ struct Index {
       activeSheetKind: this.activeSheetKind,
       currentPinUrl: (): string => this.currentPinUrl(),
       handleRootContentScroll: (offset: number, state: ScrollState): void => this.handleRootContentScroll(offset, state),
+      expandBottomBarAfterBackToTop: (): void => this.expandBottomBarAfterBackToTop(),
       searchPlaceholder: (): PinmonySearchSnapshot => this.searchPlaceholder(),
       currentSearchPageKey: (): string => this.currentSearchPageKey(),
       updateSearchQuery: (value: string, refreshSuggestions: boolean = false): Promise<void> => this.updateSearchQuery(value, refreshSuggestions),
@@ -8026,6 +8066,7 @@ struct Index {
             })
             .onDisAppear(() => {
               this.floatingTabsMounted = false;
+              this.bottomBarCoordinator.suspendForBackground();
               ++this.floatingTabsMotionToken;
               this.logPageLifecycle('root-tabs-disappear', 'tabsMounted=false');
             })
@@ -8621,6 +8662,8 @@ struct Index {
     })
     .bindSheet($$this.showNativeSheet, this.buildPresentedNativeSheet(), PinmonyImmersiveLight.sheetOptions({
       radius: LengthMetrics.vp(32),
+      // Official Sheet blur workaround for artifacts inside the top rounded corners (API 23+).
+      radiusRenderStrategy: this.activeSheetKind === 'comments' ? RenderStrategy.OFFSCREEN : RenderStrategy.FAST,
       preferType: this.nativeSheetWindowWidth >= 600 ? SheetType.CENTER :
         this.activeSheetKind === 'share' && !this.homeStore.customHomeMenu &&
         this.nativeSheetWindowHeight > this.nativeSheetWindowWidth ? SheetType.BOTTOM : undefined,
@@ -8726,6 +8769,7 @@ struct Index {
       }, (scene: PinmonyInboxNoticeChatSession): string => scene.key)
     }.width('100%').height('100%')
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      .direction(PinmonyI18n.isRtl(this.uiLanguage) ? Direction.Rtl : Direction.Ltr)
       .onTouch((event: TouchEvent): void => {
         if (event.type === TouchType.Down) { this.pageRecovery.cancel(); PinmonyPageRecovery.clear(); }
       })

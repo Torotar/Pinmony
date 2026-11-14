@@ -1,3 +1,4 @@
+import { PinmonyCardCarouselData } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeStore, PinmonyHomeSnapshot, PinmonyHomePin, PinmonyHomeTab, PinmonyHomeBoard } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -12,7 +13,7 @@ export const PIN_NATIVE_HOME_READS_ENABLED: boolean = PIN_BUSINESS_PIN_READ_ENAB
 interface HomeImage { url: string; width: number; height: number; }
 interface HomeVideo { video_list?: Record<string, HomeVideoSource>; }
 interface HomeVideoSource { url: string; width: number; height: number; duration: number; }
-interface HomeItem { id: string; type: string; images?: Record<string, HomeImage>; grid_title?: string; title?: string;
+interface HomeItem { carousel_data?: PinmonyCardCarouselData; id: string; type: string; images?: Record<string, HomeImage>; grid_title?: string; title?: string;
   description?: string; videos?: HomeVideo; is_video?: boolean; name?: string; }
 interface HomeResource { status: string; code?: number; error?: Object; data: HomeItem[]; bookmark?: string; }
 interface HomeResponse { resource_response: HomeResource; }
@@ -315,7 +316,7 @@ export class PinmonyHomeNativeReads {
       const video: PinmonyVideo | undefined = sources.length && info ? { pinId: String(item.id), sources: sources, width: info.width || 0,
         height: info.height || 0, duration: Math.max(0, Math.min(86400000, info.duration || 0)) } : undefined;
       pins.push({ id: String(item.id), pinUrl: this.origin + '/pin/' + item.id + '/', imageUrl: image.url, imageWidth: image.width, imageHeight: image.height,
-        video: video, isVideo: item.is_video === true || !!item.videos, title: title.trim().slice(0,160), hasMore: false, saved: this.ports.saved(String(item.id)) });
+        mediaCount: (Array.isArray(item.carousel_data?.carousel_slots) ? item.carousel_data?.carousel_slots?.length || 0 : 0), video: video, isVideo: item.is_video === true || !!item.videos, title: title.trim().slice(0,160), hasMore: false, saved: this.ports.saved(String(item.id)) });
     }); return pins;
   }
 }

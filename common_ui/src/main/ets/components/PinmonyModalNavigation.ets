@@ -61,6 +61,7 @@ export struct PinmonyModalNavigation {
       // Official main-title-only MODAL backdrop: 56vp + 8vp top padding.
       // Size the complete navigation, never an empty standalone title host.
       .mode(NavigationMode.Stack).width('100%').height(this.fillContent ? '100%' : this.contentHeight + 64)
+      .direction(PinmonyI18n.isRtl(this.uiLanguage) ? Direction.Rtl : Direction.Ltr)
       // The comments Sheet already resizes its viewport above the keyboard.
       // Retain that viewport instead of applying keyboard avoidance again inside it.
       .expandSafeArea(this.keyboardAvoidedBySheet ? [SafeAreaType.KEYBOARD] :

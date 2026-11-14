@@ -61,7 +61,7 @@ assert.equal((page.match(/\.backgroundColor\(\$r\('app.color.display_settings_co
 assert.equal((page.match(/\.selectedOptionBgColor\(\$r\('app.color.display_settings_control'\)\)/g) || []).length, 4);
 assert.equal((page.match(/\}, \(language: string\): string => language\)/g) || []).length, 4, 'localized options retain language-aware keys');
 assert(page.includes('this.selectTheme(') && page.includes('this.selectOrientation(index)') && page.includes('PinmonyI18n.select(value)'));
-assert(page.includes("this.immersiveLightMode = ['off', 'gentle', 'immersive', 'exquisite'][index]"));
+assert(page.includes("PinmonyImmersiveLightPreference.save(['off', 'gentle', 'immersive', 'exquisite'][index])"), 'material selection uses the durable preference service');
 assert(!source.includes('.backgroundColor(') && !source.includes('.systemMaterial('), 'modifier only changes popup-menu material');
 const profile = fs.readFileSync('build-profile.json5', 'utf8');
 assert(profile.includes('"compileSdkVersion": "26.0.0"'));

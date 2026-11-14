@@ -68,7 +68,7 @@ export class PinmonyNotificationCopy {
   }
   static summary(category: NotificationCategory, language: string): string {
     const english: boolean = language === 'en' || language === 'en_GB';
-    return category.channels.map((channel: NotificationChannel, index: number): string => (english && index > 0 ? PinmonyNotificationCopy.channel(channel, language).toLowerCase() : PinmonyNotificationCopy.channel(channel, language)) + ' ' + PinmonyI18n.text(channel.value ? 'pm_notify_on' : 'pm_notify_off', language)).join(english ? ', ' : '，');
+    return category.channels.map((channel: NotificationChannel, index: number): string => (english && index > 0 ? PinmonyNotificationCopy.channel(channel, language).toLowerCase() : PinmonyNotificationCopy.channel(channel, language)) + ' ' + PinmonyI18n.text(channel.value ? 'pm_notify_on' : 'pm_notify_off', language)).join(language === 'ar' ? '، ' : english ? ', ' : '，');
   }
   static description(category: NotificationCategory, language: string): string {
     const option: string = PinmonyNotificationCopy.option(category);

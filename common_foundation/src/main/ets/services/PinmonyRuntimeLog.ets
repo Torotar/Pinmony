@@ -73,6 +73,7 @@ export class PinmonyRuntimeLog {
   }
 
   static info(message: string): void { PinmonyRuntimeLog.record('INFO', message); }
+  static diagnostic(message: string): void { PinmonyRuntimeLog.record('INFO', message, false); }
   static warn(message: string): void { PinmonyRuntimeLog.record('WARN', message); }
   static error(message: string): void { PinmonyRuntimeLog.record('ERROR', message); }
 
@@ -80,11 +81,11 @@ export class PinmonyRuntimeLog {
     return PinmonyRuntimeLog.sessionStartedAt > 0 ? Date.now() - PinmonyRuntimeLog.sessionStartedAt : 0;
   }
 
-  private static record(level: string, message: string): void {
+  private static record(level: string, message: string, mirrorConsole: boolean = true): void {
     const stage: RegExpMatchArray | null = message.match(/^AsyncAction: stage=(share-close|more-close|snackbar-dismiss|snackbar-back|photo-menu-select|photo-menu-dismiss|notice-show|notice-dismiss|comment-action)(?: operation=(?:commentsMore|commentReplies|commentLike|commentTranslate|unsupported))?$/);
     if (stage) { PinmonyRuntimeLog.actionStage = stage[1]; PinmonyRuntimeLog.actionAt = Date.now(); }
     const safe: string = PinmonyRuntimeLog.sanitize(message);
-    console.info('PinmonyLog: ' + level + ' ' + safe);
+    if (mirrorConsole) console.info('PinmonyLog: ' + level + ' ' + safe);
     const line: string = new Date().toISOString() + ' ' + level + ' ' + safe;
     PinmonyRuntimeLog.lines.push(line);
     PinmonyRuntimeLog.snapshotDirty = true;

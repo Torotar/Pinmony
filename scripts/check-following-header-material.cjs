@@ -3,6 +3,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const page = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyProfilePanelPage.ets', 'utf8');
+const shared = fs.readFileSync('common_ui/src/main/ets/services/PinmonySearchControlMaterial.ets', 'utf8');
 const helper = fs.readFileSync('feature_profile/src/main/ets/components/PinmonyFollowingSegmentMaterial.ets', 'utf8');
 for (const api26 of [false, true]) for (const supported of [false, true]) {
   const material = { empty: 'empty' };
@@ -10,6 +11,8 @@ for (const api26 of [false, true]) for (const supported of [false, true]) {
     ColorMetrics: { resourceColor: v => v }, deviceInfo: { apiAvailable: () => api26 },
     uiMaterial: { Material: material, isImmersiveMaterialSupported: () => supported,
       ImmersiveStyle: { THICK: 'thick', REGULAR: 'regular', ULTRA_THIN: 'ultraThin' }, ImmersiveMaterial: class { constructor(options) { Object.assign(this, options); } } } };
+  vm.runInNewContext(ts.transpileModule(shared.replace(/^import .*;\r?\n/gm, ''), { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText, context);
+  context.PinmonySearchControlModifier = context.exports.PinmonySearchControlModifier;
   const code = ts.transpileModule(helper.replace(/^import .*;\r?\n/gm, ''), { compilerOptions: { target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS } }).outputText;
   vm.runInNewContext(code, context);
   const cls = context.exports.PinmonyFollowingSegmentMaterial;
@@ -72,7 +75,8 @@ assert(search.includes('Search({ value: this.followerQuery'), 'Official Search r
 assert(!search.includes('TextInput({ text: this.followerQuery'));
 assert(!page.includes('PinmonyFollowingSearchMaterialScope'));
 assert(searchOptions.includes('bottomBuilder: { builder: this.searchTitleInputBuilder, height: 76 }'));
-assert(helper.includes('AttributeModifier<SearchAttribute>'));
+assert(shared.includes('AttributeModifier<SearchAttribute>'));
+assert(helper.includes('extends PinmonySearchControlModifier'));
 assert(!helper.includes('Navigation()'));
 assert(search.includes(".height(76).padding({ left: 24, right: 24, top: 16, bottom: 16 })"));
 

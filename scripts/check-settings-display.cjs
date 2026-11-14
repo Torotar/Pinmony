@@ -33,8 +33,12 @@ native.context.resourceManager.getConfigurationSync = () => {throw Error('must n
 preference = 'light'; native.syncSystemColorMode(); assert.equal(state.get('systemDarkMode'),false);
 const changes = [], errors = [];
 native.themePreference = 'system';
+context.PinmonyDisplayPreference = {
+  saveTheme(value) { native.themePreference = value; preference = value; return true; },
+  applyTheme(ctx, value) { ctx.getApplicationContext().setColorMode(value === 'dark' ? 0 : value === 'light' ? 1 : -1); }
+};
 native.getUIContext = () => ({ getHostContext: () => ({ getApplicationContext: () => ({ setColorMode: mode => {
-  assert.equal(native.themePreference, changes.length === 0 ? 'system' : 'dark','native mode is applied before publishing preference');
+  assert.equal(native.themePreference, mode === 0 ? 'dark' : mode === 1 ? 'light' : 'system','configuration callbacks observe the newly committed theme');
   changes.push(mode);
 } }) }), getPromptAction: () => ({ showToast: value => errors.push(value) }) });
 native.selectTheme('dark'); assert.equal(native.themePreference, 'dark'); assert.equal(changes.at(-1), 0);

@@ -1,3 +1,4 @@
+import { PinmonyCardCarouselData } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyNetworkJob, PinmonyNetworkReply } from 'common_network';
@@ -5,7 +6,7 @@ import { PinmonyBusinessNetwork as PinmonyNativeNetwork } from './PinmonyBusines
 import { PinmonyProfileStore, PinmonyProfileSearchSnapshot, PinmonyProfileSearchPin, PinmonyProfileSearchSuggestion } from 'feature_profile';
 
 interface SearchImage { url: string; }
-interface SearchPin { id?: string; title?: string; grid_title?: string; description?: string; images?: Record<string, SearchImage>; }
+interface SearchPin { carousel_data?: PinmonyCardCarouselData; id?: string; title?: string; grid_title?: string; description?: string; images?: Record<string, SearchImage>; }
 interface Suggestion { type?: string; query?: string; pins?: SearchPin[]; }
 interface SearchData { items?: Suggestion[]; results?: SearchPin[]; }
 interface SearchResource { status: string; data: SearchData; bookmark?: string; }
@@ -139,7 +140,7 @@ export class PinmonyProfileSearchNativeReads {
     if (!raw || !/^\d{1,40}$/.test(raw.id || '')) return undefined;
     const image: string = raw.images?.['236x']?.url || raw.images?.['474x']?.url || raw.images?.['originals']?.url || '';
     if (!/^https:\/\/i\.pinimg\.com\//i.test(image) || image.length > 2048) return undefined;
-    return { id: raw.id!, image: image, title: (raw.grid_title || raw.title || raw.description || '').slice(0, 300) };
+    return { mediaCount: Array.isArray(raw.carousel_data?.carousel_slots) ? raw.carousel_data?.carousel_slots?.length || 0 : 0, id: raw.id!, image: image, title: (raw.grid_title || raw.title || raw.description || '').slice(0, 300) };
   }
   private async request(resource: string, page: string, options: PersonalTypeaheadOptions | PersonalResultOptions, revision: number): Promise<SearchResponse> {
     const id: string = 'native_profile_search_' + (++this.sequence).toString();

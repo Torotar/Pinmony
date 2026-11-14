@@ -71,7 +71,7 @@ export struct PinmonySwitchAccountPage {
 
   @Builder
   private accountRow($$: PinmonySessionAccountRow) {
-    Button({ type: ButtonType.Normal, stateEffect: false }) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
       Row({ space: 16 }) {
         PinmonyUserAvatar({ profileUrl: '', userId: $$.account.id, username: $$.account.username,
           image: $$.account.avatar, name: $$.account.name, avatarSize: 56 })
@@ -117,7 +117,7 @@ export struct PinmonySwitchAccountPage {
               }
             }
             if (this.store.sessionAccountsReady && !this.store.sessionAccountsLoading) {
-              ListItem() { Row() { Button(this.text('pm_add_account'), { type: ButtonType.Normal, stateEffect: false })
+              ListItem() { Row() { Button(this.text('pm_add_account'), { type: ButtonType.Normal, stateEffect: true })
                 .fontSize(17).fontWeight(FontWeight.Bold).fontColor(Color.White).backgroundColor($r('app.color.accent'))
                 .padding({ left: 24, right: 24 }).height(48).borderRadius(16).margin({ top: 24 }).alignSelf(ItemAlign.Center)
                 .enabled(!this.store.busy && !this.store.sessionSwitchUncertain).onClick(() => { this.request('addAccount'); })

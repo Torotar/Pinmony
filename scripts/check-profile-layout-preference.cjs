@@ -12,11 +12,11 @@ function boot(legacyDefault = false) {
   const preference = exports.PinmonyProfileLayoutPreference;preference.initialize({});return {preference,state};
 }
 let run=boot();assert.equal(run.state.get('profileAvatarRight'),false);
-assert(run.preference.saveAvatarRight(true));assert.equal(flushes,1);
+const beforeSaveFlushes=flushes;assert(run.preference.saveAvatarRight(true));assert.equal(flushes,beforeSaveFlushes+1);
 run=boot();assert.equal(run.state.get('profileAvatarRight'),true,'fresh runtime restores enabled preference');
 assert(run.preference.saveAvatarRight(false));run=boot();assert.equal(run.state.get('profileAvatarRight'),false,'disabled preference also survives restart');
 fail=true;assert.equal(run.preference.saveAvatarRight(true),false);assert.equal(run.state.get('profileAvatarRight'),false,'failed flush does not publish success');
-run=boot();assert.equal(run.state.get('profileAvatarRight'),false);
+fail=false;run=boot();assert.equal(run.state.get('profileAvatarRight'),false,'failed save remains unchanged after storage recovers and app restarts');
 console.log('Profile layout preference: default off, enable/disable across fresh runtimes and failed flush passed');
 
 fail=false;

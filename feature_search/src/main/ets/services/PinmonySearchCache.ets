@@ -1,4 +1,5 @@
 import { PinmonySearchSnapshot } from '../models/PinmonySearch';
+import { hasBoardInviteLinkContext } from 'common_network';
 
 export interface PinmonySearchCacheEntry {
   snapshot: PinmonySearchSnapshot;
@@ -20,6 +21,7 @@ export class PinmonySearchCache {
   heroPosition(pageKey: string): string { return this.heroPositions.get(pageKey) || ''; }
 
   put(snapshot: PinmonySearchSnapshot, scrollOffset: number): void {
+    if (hasBoardInviteLinkContext(snapshot.query)) return;
     if (snapshot.kind !== 'state' || !snapshot.pageKey || snapshot.apiError || snapshot.apiBusy ||
         snapshot.discoveryError || snapshot.discoveryBusy ||
         (snapshot.quiz && (snapshot.quiz.busy || !!snapshot.quiz.error))) return;

@@ -7,6 +7,7 @@ import { common } from '@kit.AbilityKit';
 // Only call text/format at the declaration of Pinmony-owned copy. Website
 // responses and user content must never pass through this catalog.
 export class PinmonyI18n {
+  private static readonly textCache: Map<string, string> = new Map<string, string>();
   private static storage: preferences.Preferences | undefined = undefined;
   private static chinese: resourceManager.ResourceManager | undefined = undefined;
   private static traditionalChinese: resourceManager.ResourceManager | undefined = undefined;
@@ -16,10 +17,14 @@ export class PinmonyI18n {
   private static korean: resourceManager.ResourceManager | undefined = undefined;
   private static russian: resourceManager.ResourceManager | undefined = undefined;
   private static brazilianPortuguese: resourceManager.ResourceManager | undefined = undefined;
+  private static arabic: resourceManager.ResourceManager | undefined = undefined;
+  private static layoutContext: common.ApplicationContext | undefined = undefined;
+  private static layoutLocale: string = '';
   private static resourceColorMode: number = -2;
   private static accountLanguage: string = '';
   static resolve(preference: string, systemLanguage: string): string {
-    if (preference === 'zh' || preference === 'zh_TW' || preference === 'en' || preference === 'en_GB' || preference === 'ja' || preference === 'ko' || preference === 'ru' || preference === 'pt_BR') return preference;
+    if (preference === 'zh' || preference === 'zh_TW' || preference === 'en' || preference === 'en_GB' || preference === 'ja' || preference === 'ko' || preference === 'ru' || preference === 'pt_BR' || preference === 'ar') return preference;
+    if (/^ar(?:[-_]|$)/i.test(systemLanguage)) return 'ar';
     if (/^zh[-_]TW(?:[-_]|$)/i.test(systemLanguage)) return 'zh_TW';
     if (/^zh(?:[-_]|$)/i.test(systemLanguage)) return 'zh';
     if (/^ja(?:[-_]|$)/i.test(systemLanguage)) return 'ja';
@@ -38,11 +43,13 @@ export class PinmonyI18n {
       case 'ko': return 'ko-KR,ko;q=0.9';
       case 'ru': return 'ru-RU,ru;q=0.9';
       case 'pt_BR': return 'pt-BR,pt;q=0.9';
+      case 'ar': return 'ar';
       default: return 'zh-CN,zh;q=0.9';
     }
   }
 
   static initialize(context: common.Context): void {
+    PinmonyI18n.textCache.clear();
     PinmonyI18n.resourceColorMode = -2;
     const chineseConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
     chineseConfig.locale = 'zh-CN';
@@ -60,6 +67,8 @@ export class PinmonyI18n {
     russianConfig.locale = 'ru-RU';
     const brazilianPortugueseConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
     brazilianPortugueseConfig.locale = 'pt-BR';
+    const arabicConfig: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
+    arabicConfig.locale = 'ar';
     PinmonyI18n.chinese = context.resourceManager.getOverrideResourceManager(chineseConfig);
     PinmonyI18n.traditionalChinese = context.resourceManager.getOverrideResourceManager(traditionalChineseConfig);
     PinmonyI18n.english = context.resourceManager.getOverrideResourceManager(englishConfig);
@@ -68,6 +77,7 @@ export class PinmonyI18n {
     PinmonyI18n.korean = context.resourceManager.getOverrideResourceManager(koreanConfig);
     PinmonyI18n.russian = context.resourceManager.getOverrideResourceManager(russianConfig);
     PinmonyI18n.brazilianPortuguese = context.resourceManager.getOverrideResourceManager(brazilianPortugueseConfig);
+    PinmonyI18n.arabic = context.resourceManager.getOverrideResourceManager(arabicConfig);
     // Read disk before any component can create the AppStorage defaults.
     const previous: string = AppStorage.get<string>('pinmonyLanguagePreference') || 'account';
     let saved: preferences.ValueType;
@@ -77,8 +87,8 @@ export class PinmonyI18n {
       saved = PinmonyI18n.storage.getSync('language', previous);
       account = PinmonyI18n.storage.getSync('accountLanguage', '');
     } catch (_) { throw new Error('language-storage-read-unavailable'); }
-    const value: string = typeof saved === 'string' && ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(saved) ? saved : 'account';
-    PinmonyI18n.accountLanguage = typeof account === 'string' && ['zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(account) ? account : '';
+    const value: string = typeof saved === 'string' && ['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar'].includes(saved) ? saved : 'account';
+    PinmonyI18n.accountLanguage = typeof account === 'string' && ['zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar'].includes(account) ? account : '';
     AppStorage.setOrCreate('pinmonyLanguagePreference', value);
     PinmonyI18n.syncSystemLanguage();
   }
@@ -88,6 +98,47 @@ export class PinmonyI18n {
     const language: string = (preference === 'account' || preference === 'system') && PinmonyI18n.accountLanguage ?
       PinmonyI18n.accountLanguage : PinmonyI18n.resolve(preference, i18n.System.getSystemLanguage());
     AppStorage.setOrCreate('pinmonyLanguage', language);
+    PinmonyI18n.syncLayoutLanguage();
+  }
+
+  // Attach only after loadContent succeeds. ApplicationContext.setLanguage
+  // updates Direction.Auto, HDS chrome and system controls without replacing pages.
+  static attachLayoutContext(context: common.Context): void {
+    PinmonyI18n.layoutContext = context.getApplicationContext();
+    PinmonyI18n.syncLayoutLanguage();
+  }
+
+  private static syncLayoutLanguage(): void {
+    if (!PinmonyI18n.layoutContext) return;
+    const locale: string = PinmonyI18n.locale();
+    if (locale === PinmonyI18n.layoutLocale) return;
+    const previous: string = PinmonyI18n.layoutLocale;
+    PinmonyI18n.layoutLocale = locale;
+    try { PinmonyI18n.layoutContext.setLanguage(locale); }
+    catch (_) {
+      PinmonyI18n.layoutLocale = previous;
+      console.warn('LanguagePreference: layout language sync unavailable');
+    }
+  }
+
+  static isRtl(language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): boolean {
+    return language === 'ar';
+  }
+
+  static locale(language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {
+    return language === 'zh' ? 'zh-CN' : language === 'zh_TW' ? 'zh-TW' :
+      language === 'en_GB' ? 'en-GB' : language === 'pt_BR' ? 'pt-BR' :
+      language === 'en' ? 'en-US' : language;
+  }
+
+  static number(value: number, language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {
+    return new Intl.NumberFormat(PinmonyI18n.locale(language), { useGrouping: false }).format(value);
+  }
+
+  // Normalize numeric form fields only; never rewrite website/user content.
+  static numericInput(value: string): string {
+    return value.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (digit: string): string =>
+      (digit.charCodeAt(0) - (digit.charCodeAt(0) >= 0x06F0 ? 0x06F0 : 0x0660)).toString());
   }
 
   // Locale overrides copy the full Configuration, including its color mode.
@@ -97,10 +148,11 @@ export class PinmonyI18n {
       const mode: number = context.resourceManager.getConfigurationSync().colorMode;
       if (mode !== resourceManager.ColorMode.DARK && mode !== resourceManager.ColorMode.LIGHT) return;
       if (mode === PinmonyI18n.resourceColorMode) return;
+      PinmonyI18n.textCache.clear();
       const managers: (resourceManager.ResourceManager | undefined)[] = [PinmonyI18n.chinese,
         PinmonyI18n.traditionalChinese, PinmonyI18n.english, PinmonyI18n.englishUk,
-        PinmonyI18n.japanese, PinmonyI18n.korean, PinmonyI18n.russian, PinmonyI18n.brazilianPortuguese];
-      const locales: string[] = ['zh-CN', 'zh-TW', 'en-US', 'en-GB', 'ja-JP', 'ko-KR', 'ru-RU', 'pt-BR'];
+        PinmonyI18n.japanese, PinmonyI18n.korean, PinmonyI18n.russian, PinmonyI18n.brazilianPortuguese, PinmonyI18n.arabic];
+      const locales: string[] = ['zh-CN', 'zh-TW', 'en-US', 'en-GB', 'ja-JP', 'ko-KR', 'ru-RU', 'pt-BR', 'ar'];
       managers.forEach((manager: resourceManager.ResourceManager | undefined, index: number): void => {
         if (!manager) return;
         const configuration: resourceManager.Configuration = context.resourceManager.getConfigurationSync();
@@ -113,7 +165,7 @@ export class PinmonyI18n {
 
   static select(preference: string): void {
     const value: string = preference === 'system' ? 'account' : preference;
-    if (!['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR'].includes(value)) return;
+    if (!['account', 'zh', 'zh_TW', 'en', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar'].includes(value)) return;
     if (!PinmonyI18n.storage) throw new Error('Language storage unavailable');
     let previous: preferences.ValueType = 'account';
     let hasPrevious: boolean = false;
@@ -140,7 +192,7 @@ export class PinmonyI18n {
       normalized === 'zh-tw' ? 'zh_TW' : normalized === 'en-gb' ? 'en_GB' :
       normalized === 'en-us' || normalized === 'en' ? 'en' : normalized === 'ja-jp' || normalized === 'ja' ? 'ja' :
       normalized === 'ko-kr' || normalized === 'ko' ? 'ko' : normalized === 'ru-ru' || normalized === 'ru' ? 'ru' :
-      normalized === 'pt-br' || normalized === 'pt' ? 'pt_BR' : 'en';
+      normalized === 'pt-br' || normalized === 'pt' ? 'pt_BR' : /^ar(?:-|$)/.test(normalized) ? 'ar' : 'en';
     if (PinmonyI18n.accountLanguage !== preference) {
       PinmonyI18n.accountLanguage = preference;
       try {
@@ -164,9 +216,17 @@ export class PinmonyI18n {
   static text(source: string, language: string = AppStorage.get<string>('pinmonyLanguage') || 'zh'): string {
     if (source.includes('\uE000')) return PinmonyI18n.render(source, language);
     const key: string = PINMONY_LOCAL_COPY_KEYS[source] || source;
-    const manager: resourceManager.ResourceManager | undefined = language === 'pt_BR' ? PinmonyI18n.brazilianPortuguese : language === 'ru' ? PinmonyI18n.russian : language === 'ko' ? PinmonyI18n.korean : language === 'ja' ? PinmonyI18n.japanese : language === 'zh_TW' ? PinmonyI18n.traditionalChinese : language === 'en_GB' ? PinmonyI18n.englishUk : language === 'en' ? PinmonyI18n.english : PinmonyI18n.chinese;
+    const manager: resourceManager.ResourceManager | undefined = language === 'ar' ? PinmonyI18n.arabic : language === 'pt_BR' ? PinmonyI18n.brazilianPortuguese : language === 'ru' ? PinmonyI18n.russian : language === 'ko' ? PinmonyI18n.korean : language === 'ja' ? PinmonyI18n.japanese : language === 'zh_TW' ? PinmonyI18n.traditionalChinese : language === 'en_GB' ? PinmonyI18n.englishUk : language === 'en' ? PinmonyI18n.english : PinmonyI18n.chinese;
     if (!manager || !key.startsWith('pm_')) return source;
-    try { return manager.getStringByNameSync(key); }
+    const cacheKey: string = language + ':' + key;
+    const cached: string | undefined = PinmonyI18n.textCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    try {
+      const translated: string = manager.getStringByNameSync(key);
+      if (PinmonyI18n.textCache.size >= 4096) PinmonyI18n.textCache.clear();
+      PinmonyI18n.textCache.set(cacheKey, translated);
+      return translated;
+    }
     catch (_) {
       console.warn('LanguagePreference: resource lookup unavailable');
       return source;
@@ -199,7 +259,11 @@ export class PinmonyI18n {
     // Replace in one pass so user text containing "{0}" remains literal.
     return template.replace(/\{(\d+)\}/g, (match: string, index: string): string => {
       const position: number = Number(index);
-      return position < values.length ? values[position].toString() : match;
+      if (position >= values.length) return match;
+      const value: string | number = values[position];
+      const rendered: string = typeof value === 'number' && language === 'ar' ? PinmonyI18n.number(value, language) : value.toString();
+      // Isolate embedded names, URLs and numbers from the Arabic sentence.
+      return language === 'ar' ? '\u2068' + rendered + '\u2069' : rendered;
     });
   }
 

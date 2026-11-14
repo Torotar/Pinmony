@@ -1,3 +1,4 @@
+import { PinmonySearchControlModifier } from 'common_ui';
 import { ColorMetrics, uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 
@@ -31,25 +32,5 @@ export class PinmonyFollowingSegmentMaterial {
   }
 }
 
-// Use the same capability gate and material mode as the Following capsule.
-export class PinmonyFollowingSearchMaterial implements AttributeModifier<SearchAttribute> {
-  private mode: string;
-
-  private dark: boolean;
-
-  constructor(mode: string, dark: boolean) { this.mode = mode; this.dark = dark; }
-
-  applyNormalAttribute(instance: SearchAttribute): void {
-    if (deviceInfo.apiAvailable('26.0.0')) {
-      instance.systemMaterial(PinmonyFollowingSegmentMaterial.enabled(this.mode) ?
-        new uiMaterial.ImmersiveMaterial({
-          style: this.mode === 'gentle' ? uiMaterial.ImmersiveStyle.THICK : uiMaterial.ImmersiveStyle.ULTRA_THIN,
-          materialColor: this.dark ? '#301C2022' : '#30FFFFFF',
-          colorInvert: false,
-          applyShadow: false,
-          interactive: true,
-          lightEffect: { color: $r('app.color.immersive_interaction_light') }
-        }) : uiMaterial.Material.empty);
-    }
-  }
-}
+// Shared Search material for Following and collaborator invitation.
+export class PinmonyFollowingSearchMaterial extends PinmonySearchControlModifier {}

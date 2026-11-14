@@ -143,7 +143,7 @@ export const PIN_HOME_API_SCRIPT: string = `
         duration: Math.max(0, Math.min(86400000, Number(info.duration) || 0)) } : undefined;
       seen[pin.id] = true;
       result.push({ id: String(pin.id), pinUrl: location.origin + '/pin/' + pin.id + '/',
-        imageUrl: image.url, video: video, isVideo: pin.is_video === true || !!pin.videos, imageWidth: image.width, imageHeight: image.height,
+        mediaCount: Array.isArray(pin.carousel_data && pin.carousel_data.carousel_slots) ? pin.carousel_data.carousel_slots.length : 0, imageUrl: image.url, video: video, isVideo: pin.is_video === true || !!pin.videos, imageWidth: image.width, imageHeight: image.height,
         title: title.trim().slice(0, 160), hasMore: false });
     });
     return result;

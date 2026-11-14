@@ -220,7 +220,7 @@ export struct PinmonyPublishPage {
           componentId: 'pinmony-draft-expiry-info',
           action: () => { this.toggleDraftExpiryTip(); }
         } }] : phase === 'website' ? [{ content: {
-          icon: new SymbolGlyphModifier($r('sys.symbol.arrow_right')).fontColor([$r('app.color.primary_text')]),
+          icon: new SymbolGlyphModifier(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.arrow_left') : $r('sys.symbol.arrow_right')).fontColor([$r('app.color.primary_text')]),
           label: this.uiText("pm_choose_image_9ad12a1a"), isEnabled: this.canReadWebsite(),
           action: () => { if (this.canReadWebsite()) this.submitWebsite(); }
         } }] : [] } } };
@@ -248,7 +248,11 @@ export struct PinmonyPublishPage {
           Column({space:6}) {
             Stack({alignContent:Alignment.BottomEnd}) {
               Image(draft.imageUrl).width('100%').aspectRatio(draft.imageWidth > 0 && draft.imageHeight > 0 ? draft.imageWidth / draft.imageHeight : 0.65).objectFit(ImageFit.Cover).borderRadius(16).onClick(() => this.onAction('openDraft',draft.id,false))
-              Button() { SymbolGlyph($r('sys.symbol.trash')).fontSize(22).fontColor([$r('app.color.primary_text')]) }.type(ButtonType.Normal).width(40).height(40).borderRadius(16).backgroundColor($r('app.color.page_background')).margin(8).accessibilityText(this.uiText('pm_delete_2f9daa82')).enabled(!this.state.busy && !this.state.uncertain && !this.state.draftLoading).onClick(() => this.confirmDeleteDraft(draft.id))
+              Button() { SymbolGlyph($r('sys.symbol.trash')).fontSize(22).fontColor([$r('app.color.primary_text')]) }.type(ButtonType.Circle).width(40).height(40).borderRadius(20)
+                .backgroundColor(Color.Transparent)
+                .backgroundEffect({radius:20,saturation:1,brightness:1,color:$r('app.color.publish_button_glass')})
+                .stateEffect(false)
+                .clip(true).margin(8).accessibilityText(this.uiText('pm_delete_2f9daa82')).enabled(!this.state.busy && !this.state.uncertain && !this.state.draftLoading).onClick(() => this.confirmDeleteDraft(draft.id))
             }.width('100%')
             if (draft.expiresAt) { Text(PinmonyI18n.format('pm_pin_drafts_days',[Math.max(0,Math.ceil((draft.expiresAt - Date.now()) / 86400000))],this.uiLanguage)).fontSize(16).fontColor($r('app.color.primary_text')).width('100%') }
           }.width('100%')

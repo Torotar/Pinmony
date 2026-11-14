@@ -287,8 +287,9 @@ export struct PinmonyInboxPage {
   private swipeSection(offsetX: number, offsetY: number): void {
     if(this.conversationSwipeActive)return;
     if (Math.abs(offsetX) < 48 || Math.abs(offsetX) <= Math.abs(offsetY)) return;
-    if (offsetX < 0 && this.snapshot.section === 'updates') this.selectSection('messages');
-    else if (offsetX > 0 && this.snapshot.section === 'messages') this.selectSection('updates');
+    const logicalOffset: number = this.uiLanguage === 'ar' ? -offsetX : offsetX;
+    if (logicalOffset < 0 && this.snapshot.section === 'updates') this.selectSection('messages');
+    else if (logicalOffset > 0 && this.snapshot.section === 'messages') this.selectSection('updates');
   }
 
   private timeText(item: PinmonyInboxItem): string {
@@ -297,6 +298,11 @@ export struct PinmonyInboxPage {
     const date: number = Date.parse(item.updatedAt);
     const minutes: number = Math.floor((Date.now() - date) / 60000);
     if (!Number.isFinite(date) || minutes < 0) return '';
+    if (this.uiLanguage === 'ar') {
+      if (minutes === 0) return this.uiText('pm_activity_now');
+      const count: number = minutes < 60 ? minutes : minutes < 1440 ? Math.floor(minutes / 60) : Math.floor(minutes / 1440);
+      return PinmonyI18n.format(minutes < 60 ? 'pm_activity_minutes' : minutes < 1440 ? 'pm_activity_hours' : 'pm_activity_days', [count], this.uiLanguage);
+    }
     if (minutes < 60) return minutes.toString() + this.uiText("pm_minutes_40de5434");
     if (minutes < 1440) return Math.floor(minutes / 60).toString() + this.uiText("pm_hours_8f82ece0");
     return Math.floor(minutes / 1440).toString() + this.uiText("pm_days_4ce3054e");
@@ -319,11 +325,11 @@ export struct PinmonyInboxPage {
       Row({ space: 8 }) {
         Text(PinmonyI18n.render(label, this.uiLanguage)).fontSize(18).fontWeight(FontWeight.Bold).fontColor($r('app.color.primary_text'))
           .layoutWeight(1).textAlign(TextAlign.Start)
-        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
-          .margin({ left: 8 })
+        SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(18).fontColor([$r('app.color.secondary_text')])
+          .margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 0 : 8, right: PinmonyI18n.isRtl(this.uiLanguage) ? 8 : 0 })
       }.width('100%')
     }.width('100%').backgroundColor(Color.Transparent).padding({ left: 20, right: 20, top: 16, bottom: 8 })
-      .stateEffect(false)
+      .stateEffect(true)
       .accessibilityText(label).onClick(() => { if (this.interactionReady && this.onList) this.onList(section); })
   }
 
@@ -424,7 +430,7 @@ export struct PinmonyInboxPage {
             }.alignItems(HorizontalAlign.End)
           }
           if (this.snapshot.section === 'updates' || item.moreId) {
-            Button({ type: ButtonType.Circle, stateEffect: false }) {
+            Button({ type: ButtonType.Circle, stateEffect: true }) {
               Row({ space: 3 }) {
                 ForEach([0, 1, 2], (dot: number) => {
                   Circle().width(3).height(3).foregroundColor(this.snapshot.section === 'updates' ?
@@ -441,10 +447,10 @@ export struct PinmonyInboxPage {
           }
         }.constraintSize({ minWidth: 40 }).flexShrink(0).alignItems(HorizontalAlign.End).alignSelf(ItemAlign.Center)
       } else if (contact && item.enabled) {
-        SymbolGlyph($r('sys.symbol.chevron_right'))
+        SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right'))
         .fontSize(18)
         .fontColor([$r('app.color.secondary_text')])
-        .margin({ left: 8 })
+        .margin({ left: PinmonyI18n.isRtl(this.uiLanguage) ? 0 : 8, right: PinmonyI18n.isRtl(this.uiLanguage) ? 8 : 0 })
         .onClick(() => { if (item.enabled && this.onAction) this.onAction(item.id); })
       }
     }
@@ -696,7 +702,7 @@ export struct PinmonyInboxPage {
                   .fontColor($r('app.color.primary_text'))
                   .layoutWeight(1)
                   .textAlign(TextAlign.Start)
-                SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18)
+                SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_left') : $r('sys.symbol.chevron_right')).fontSize(18)
                   .fontColor([$r('app.color.secondary_text')])
                   .accessibilityLevel('no')
               }
@@ -727,7 +733,7 @@ export struct PinmonyInboxPage {
             }
 
             if (this.snapshot.section === 'messages' && this.snapshot.items.length > 0) {
-              this.listTitle(PinmonyI18n.render(this.snapshot.messagesLabel || '', this.uiLanguage) || this.uiText("pm_messages_4da199fa"), 'messages')
+              this.listTitle(this.uiText("pm_messages_4da199fa"), 'messages')
             }
             }.width('100%').alignItems(HorizontalAlign.Start)
               .padding({ top: this.inboxTopInset() })
@@ -745,8 +751,7 @@ export struct PinmonyInboxPage {
           ListItem() {
             Column() {
             if (this.snapshot.section === 'messages' && this.snapshot.contacts.length > 0) {
-              this.listTitle(PinmonyI18n.render(this.snapshot.contactsLabel, this.uiLanguage) ||
-                this.uiText("pm_contacts_3303b569"), 'contacts')
+              this.listTitle(this.uiText("pm_contacts_3303b569"), 'contacts')
               ForEach(this.snapshot.contacts, (item: PinmonyInboxItem) => {
                 this.itemRow(item)
               }, (item: PinmonyInboxItem) => this.updateRowKey(item))

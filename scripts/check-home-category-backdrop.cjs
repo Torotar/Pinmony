@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('feature_home/src/main/ets/components/PinmonyHomePage.ets','utf8');
-const ast=ts.createSourceFile('page.ts',source.replace(/\bstruct\b/g,'class'),ts.ScriptTarget.Latest,true),names=['paneChromeOpacity','paneBackdropOpacity','categoryBackdropOpacity','updatePagerBackdrop','homeTitleBarOptions','scrollBinding','registerScroller'],methods=[];
+const ast=ts.createSourceFile('page.ts',source.replace(/\bstruct\b/g,'class'),ts.ScriptTarget.Latest,true),names=['paneChromeOpacity','paneBackdropOpacity','categoryBackdropOpacity','updatePagerBackdrop','homeTitleBarOptions','scrollBinding','registerScroller','syncPagerChrome'],methods=[];
 function visit(node){if(ts.isMethodDeclaration(node)&&names.includes(node.name.getText(ast)))methods.push(node.getText(ast));ts.forEachChild(node,visit);}visit(ast);
 assert.equal(methods.length,names.length);
 const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n')+'} Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{
@@ -8,7 +8,7 @@ const Host=vm.runInNewContext(ts.transpileModule('class Host {'+methods.join('\n
   PinmonyImmersiveLight:{effect:mode=>mode}
 });
 const tabs=[{id:'all'},{id:'board'},{id:'other'}],snapshots={all:{pins:[{}]},board:{board:{id:'1'},pins:[{}]},other:{board:{id:'2'},pins:[{}]}};
-const h=new Host();Object.assign(h,{pageTabs:()=>tabs,snapshotFor:id=>snapshots[id],paneKey:id=>id,paneChrome:new Map(),selectedId:'board',homeChromeCollapsed:false,pagerPosition:-1,pagerMoving:false,suppressSwipeClick:false});
+const h=new Host();Object.assign(h,{pageTabs:()=>tabs,snapshotFor:id=>snapshots[id],paneKey:id=>id,paneChrome:new Map(),selectedId:'board',homeChromeCollapsed:false,chromeState:{backdrop:{opacity:0,moving:false}},pagerBindingKey:'',pagerBindingRevision:0,pagerChromeIndex:-1,pagerPosition:-1,pagerMoving:false,suppressSwipeClick:false});
 assert.equal(h.categoryBackdropOpacity(),1,'expanded board keeps its normal solid header');
 for(const progress of [0,.1,.25,.5,.75,.9,1]){h.updatePagerBackdrop(1,1,progress);assert(Math.abs(h.categoryBackdropOpacity()-(1-progress))<1e-9,'board to all tracks every intermediate frame');}
 h.updatePagerBackdrop(0,0,-.25);assert.equal(h.categoryBackdropOpacity(),.25,'reverse swipe fades the solid header back in');
@@ -20,7 +20,8 @@ h.paneChrome.set('board',false);h.updatePagerBackdrop(1,1,-.5);assert.equal(h.ca
 h.paneChrome.set('other',true);assert.equal(h.categoryBackdropOpacity(),.5,'retained target scroll chrome participates before selection commits');
 h.selectedId='all';assert.equal(h.categoryBackdropOpacity(),.5,'selection callbacks do not jump the in-flight opacity');
 h.pagerPosition=-1;assert.equal(h.categoryBackdropOpacity(),0,'settling restores the selected endpoint');
-assert(source.includes('.opacity(this.categoryBackdropOpacity())'));
+assert(source.includes('PinmonyHomeCategoryBackdrop({ state: this.chromeState.backdrop, topInset: this.homeTopInset() })'));
+assert(source.includes('.opacity(this.state.opacity)'));
 assert(source.includes('this.updatePagerBackdrop(selected,index,position);'));
 assert(source.includes('if(this.pagerPosition < 0)this.pagerPosition = index'),'release animation preserves current drag progress');
 assert(source.includes('this.pagerPosition = -1; this.bindCurrentScroller();'),'settle releases the interpolation and keeps native scroller binding');

@@ -1,3 +1,4 @@
+import { PinmonyPinCountBadge, PinmonyCardMediaBadge } from 'common_ui';
 import { PinmonyScrollRecovery } from 'common_foundation';
 import { PinmonyActionNotice, PinmonyListDataSource, PinmonyCdnImage, PinmonyVideoSource } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
@@ -776,6 +777,7 @@ export struct PinmonyHomeFeedPane {
         PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady,
           loadingActive: this.imageLoadingActive && this.paneActive })
           .width('100%').height(this.imageHeight(pin))
+          .overlay(this.pinCountBadge(this.pinMediaCount(pin)), { align: Alignment.TopStart })
           .id(this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id)
           .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id); })
       } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
@@ -793,6 +795,7 @@ export struct PinmonyHomeFeedPane {
         .backgroundColor($r('app.color.surface_muted'))
         .justifyContent(FlexAlign.Center)
         .accessibilityText((pin.title || this.uiText("pm_pin_234ff540")) + this.uiText("pm_image_failed_to_load_open_details_8406e8c5"))
+        .overlay(this.pinCountBadge(this.pinMediaCount(pin)), { align: Alignment.TopStart })
         .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id); })
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
@@ -824,11 +827,9 @@ export struct PinmonyHomeFeedPane {
             .width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
             .accessibilityLevel('no')
             .onClick(() => { if (!this.suppressPinClick && this.onPin) this.onPin(pin.id, this.recoveredSources[pin.imageUrl] || pin.imageUrl); })
+          PinmonyPinCountBadge({ mediaCount: this.pinMediaCount(pin) }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
           if (pin.isVideo === true) {
-            Text(this.uiText('pm_videos_c20f7618')).fontSize(14).fontWeight(FontWeight.Medium)
-              .fontColor('#111111').padding({ left: 6, right: 6, top: 2, bottom: 2 })
-              .backgroundColor('#EFFFFFFF').borderRadius(7).margin({ left: 5, top: 5 })
-              .hitTestBehavior(HitTestMode.None)
+            PinmonyCardMediaBadge({ caption: this.uiText('pm_videos_c20f7618') }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
           }
           if (pin.saved === true) {
             Column() {
@@ -1068,6 +1069,15 @@ export struct PinmonyHomeFeedPane {
     .onAreaChange((_oldArea: Area, area: Area) => this.traceLayout('feed', area))
   }
 
+  private pinMediaCount(pin: PinmonyHomePin): number {
+    return this.home.pins.find((item: PinmonyHomePin): boolean => item.id === pin.id)?.mediaCount || 0;
+  }
+
+  @Builder
+  private pinCountBadge(mediaCount: number) {
+    PinmonyPinCountBadge({ mediaCount: mediaCount }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       this.feedContent()
@@ -1077,8 +1087,10 @@ export struct PinmonyHomeFeedPane {
             .width('100%').height(68)
             .flexShrink(0)
             .opacity(this.chromeOpacity)
+            .animation({ duration: 180, curve: Curve.EaseOut })
         }
           .width('100%').height(68 * this.chromeOpacity)
+          .animation({ duration: 180, curve: Curve.EaseOut })
           .position({ x: 0, y: this.homeTopInset() + 48 })
           .backgroundColor($r('app.color.page_background'))
           .clip(true)

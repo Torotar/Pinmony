@@ -14,20 +14,20 @@ function member(name) {
 let creates = 0, updates = 0, disposals = 0;
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + [
   'hubTopTitleContent', 'hubTopTitleKey', 'hubTitleSettings', 'hubTitleTabSelected', 'hubControlMaterials', 'hubMaterialConfiguration',
-  'updateHubTitleContent', 'aboutToDisappear'
+  'hubTitleColor', 'updateHubTitleContent', 'aboutToDisappear'
 ].map(member).join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, {
   ComponentContent: class {
     constructor(_ctx, _builder, options) { creates++; this.options = options; }
     update(options) { assert(!this.disposed); updates++; this.options = options; }
     dispose() { assert(!this.disposed); this.disposed = true; disposals++; }
-  }, wrapBuilder: builder => builder, buildPinmonyProfileHubTitle() {}
+  }, $r: name => ({id:name}), wrapBuilder: builder => builder, buildPinmonyProfileHubTitle() {}
 });
-let offset = 0, settings = 0, changedIndex = -1, animatedIndicator = -1, stopped = 0;
+let offset = 0, settings = 0, changedIndex = -1, animatedIndicator = -1, stopped = 0, dark = false;
 const page = Object.assign(new Host(), {
   profile: { profileUrl: 'profile-a', avatarUrl: 'avatar-a', avatarColorIndex: 3,
     displayName: 'A', handle: 'a', session: 1, suggestionWriting: false },
   hubTab: 'boards', hubIndicatorPosition: -1, interactionReady: true, statusBarHeightPx: 24,
-  getUIContext: () => ({ px2vp: px => px }), hubHeaderBackgroundOpacity: () => 1 - offset / 112,
+  getUIContext: () => ({ px2vp: px => px, getHostContext: () => ({resourceManager:{getColorSync: id => id + (dark ? '-dark' : '-light')}}) }), hubHeaderBackgroundOpacity: () => 1 - offset / 112,
   stopHubChromeAnimation() { stopped++; }, openSettings() { settings++; },
   animateProfileIndicator(target) { animatedIndicator = target; },
   hubSwiper: { changeIndex(target, animated) { assert.equal(animated, true); changedIndex = target; } }
@@ -46,6 +46,14 @@ for (const target of [112, 0, 112, 0]) {
   }
 }
 assert.equal(creates, 1); assert.equal(updates, 80);
+for (const next of [true,false,true,false]) {
+  dark = next; page.hdsDarkMode = next; page.themeConfigurationRevision = (page.themeConfigurationRevision || 0) + 1;
+  page.updateHubTitleContent();
+  assert.equal(page.hubTopTitleContent, retained, 'theme changes retain the title, avatar and navigation state');
+  assert.equal(retained.options.titleTextColor, 'app.color.primary_text' + (next ? '-dark' : '-light'));
+  assert.equal(retained.options.titleBackdropColor, 'app.color.page_background' + (next ? '-dark' : '-light'));
+}
+assert(title.includes('.fontColor(this.titleTextColor)') && title.includes('titleTextColor: $$.titleTextColor'));
 for (const [key, value] of [['avatarUrl', 'avatar-b'], ['avatarColorIndex', 7], ['displayName', 'B'], ['profileUrl', 'profile-b'], ['session', 2]]) {
   page.profile[key] = value; page.updateHubTitleContent();
   assert.equal(page.hubTopTitleContent, retained, 'validated profile changes update the retained content');
@@ -74,7 +82,8 @@ assert(source.includes('this.updateHubTitleContent();\n    return {'));
 assert(title.includes("@StorageLink('pinmonyLanguage')"));
 assert(title.includes("tab + ':' + this.uiLanguage"), 'language updates tab labels without replacing avatar ancestry');
 assert(title.includes("@StorageLink('profileAvatarRight')") && title.includes("@StorageLink('pinmonyUpdateUnread')"));
-assert(title.includes(".backgroundColor($r('app.color.page_background'))"));
+assert(title.includes('.backgroundColor(this.titleBackdropColor)'));
+assert(title.includes("@Prop titleBackdropColor: ResourceColor = $r('app.color.page_background')"));
 assert(title.includes('.height(56).clip(false)') && title.includes("}.width('100%').height(80)"));
 assert(title.includes('image: this.avatarUrl') && title.includes('profileUrl: this.profileUrl'));
 assert(!title.includes('.animation('), 'frame props must not acquire a second animation');

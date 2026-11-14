@@ -1,3 +1,4 @@
+import { PinmonyCardCarouselData } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyProfileCollaborator, PinmonyProfileStore, PinmonyProfileSnapshot, PinmonyProfileAction, PinmonyBoard, PinmonyCreatedPin } from 'feature_profile';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -12,7 +13,7 @@ interface ProfileImage { url?: string; width?: number; height?: number; }
 interface ProfileCover { source?: string; images?: Record<string,ProfileImage>; }
 interface ProfileBoardCoverPin { custom_cover?: boolean; image_url?: string; image_signature?: string; }
 interface ProfileUser { avatar_color_index?: number; is_private_profile?: boolean; profile_cover?: ProfileCover; should_show_messaging?: boolean; profile_reach?: number; id: string; type: string; username: string; full_name?: string; image_large_url?: string; image_medium_url?: string; image_small_url?: string; follower_count?: number; following_count?: number; pin_count?: number; last_pin_save_time?: string; is_partner?: boolean; about?: string; website_url?: string; explicitly_followed_by_me?: boolean; blocked_by_me?: boolean; }
-interface ProfileRow { has_custom_cover?: boolean; cover_pin?: ProfileBoardCoverPin; cover_images?: Record<string,ProfileImage>; names?: string[]; thumbnails?: Record<string,ProfileImage>[]; favorited_by_me?: boolean; access?: string[]; privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
+interface ProfileRow { carousel_data?: PinmonyCardCarouselData; has_custom_cover?: boolean; cover_pin?: ProfileBoardCoverPin; cover_images?: Record<string,ProfileImage>; names?: string[]; thumbnails?: Record<string,ProfileImage>[]; favorited_by_me?: boolean; access?: string[]; privacy?: string; id: string; type: string; url?: string; name?: string; title?: string | ProfileTitle; grid_title?: string; images?: Record<string,ProfileImage | ProfileImage[]>; image_cover_hd_url?: string; image_cover_url?: string; image_medium_url?: string; pin_count?: number; section_count?: number; board_order_modified_at?: string; is_collaborative?: boolean; owner?: ProfileUser; collaborating_users?: ProfileUser[]; story_type?: string; action?: ProfileAction; objects?: ProfileRow[]; pinner?: ProfileUser; }
 interface ProfileTitle { text?: string; format?: string; }
 interface ProfileAction { url?: string; }
 interface ProfileResource { status: string; code?: number; error?: Object; data: ProfileUser | ProfileRow | ProfileRow[]; endpoint_name?: string; bookmark?: string; }
@@ -435,7 +436,7 @@ export class PinmonyProfileNativeReads {
       if(m.kind === 'state' && Array.isArray(m.unorganizedPins) && m.unorganizedPins.length <= 500) {
         const pins: PinmonyCreatedPin[] = m.unorganizedPins;
         if(pins.every((p: PinmonyCreatedPin): boolean => /^\d{1,40}$/.test(p.id) && !!this.image(p.imageUrl))) {
-          this.unorganized.pins = pins.map((p: PinmonyCreatedPin): PinmonyCreatedPin => ({id:p.id,title:p.title,imageUrl:p.imageUrl,imageWidth:p.imageWidth,imageHeight:p.imageHeight,targetUrl:this.origin + '/pin/' + p.id + '/'}));
+          this.unorganized.pins = pins.map((p: PinmonyCreatedPin): PinmonyCreatedPin => ({mediaCount:p.mediaCount,id:p.id,title:p.title,imageUrl:p.imageUrl,imageWidth:p.imageWidth,imageHeight:p.imageHeight,targetUrl:this.origin + '/pin/' + p.id + '/'}));
           this.unorganized.error = m.unorganizedError || '';
           if(this.store.profile){ this.store.profile.organize = m.organize; this.store.profile.unorganizedFeedback = m.unorganizedFeedback; }
         }
@@ -458,7 +459,7 @@ export class PinmonyProfileNativeReads {
     if(row?.type !== 'pin' || typeof row.id !== 'string' || !/^\d{1,40}$/.test(row.id) || unorganized && row.pinner?.id !== this.info?.userId)return undefined;
     const img: ProfileImage | undefined = (row.images?.['736x'] || row.images?.['474x'] || row.images?.['236x'] || row.images?.['orig']) as ProfileImage | undefined;
     if(!this.image(img?.url))return undefined;
-    return {id:unorganized ? row.id : 'profile-api-native-' + row.id,targetUrl:this.origin + '/pin/' + row.id + '/',favorite:typeof row.favorited_by_me === 'boolean' ? row.favorited_by_me : undefined,title:this.clean(row.grid_title || (typeof row.title === 'string' ? row.title : '')),imageUrl:this.image(img?.url),imageWidth:img?.width || 0,imageHeight:img?.height || 0};
+    return {mediaCount:(Array.isArray(row.carousel_data?.carousel_slots) ? row.carousel_data?.carousel_slots?.length || 0 : 0),id:unorganized ? row.id : 'profile-api-native-' + row.id,targetUrl:this.origin + '/pin/' + row.id + '/',favorite:typeof row.favorited_by_me === 'boolean' ? row.favorited_by_me : undefined,title:this.clean(row.grid_title || (typeof row.title === 'string' ? row.title : '')),imageUrl:this.image(img?.url),imageWidth:img?.width || 0,imageHeight:img?.height || 0};
   }
   private collageDraft(row: ProfileRow): PinmonyCreatedPin | undefined {
     // The captured drawer response contains shuffle fields, without a Pin type or route.

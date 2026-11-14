@@ -92,4 +92,43 @@ one.originalStyle.backgroundStyle.blurRadius=99;assert.equal(two.originalStyle.b
 let color=0;const context={getHostContext:()=>({resourceManager:{getColorSync:()=>color}})};
 const options={content:{title:{mainTitle:'retained'}},style:{originalStyle:{backgroundStyle:{backgroundColor:{id:7}}}}};
 for(color of [0xffffff,0x111111,0xffffff]) assert.equal(PinmonyHdsTitleBar.resolve(context,options,true).style.originalStyle.backgroundStyle.backgroundColor,color);
-console.log('Panel style consistency: 19 hosts, six real title builders, four material modes, zh/en close, save busy gate, form safe areas and theme re-resolution passed; device geometry excluded.');
+// The photo and detail visual-search entrances share one scroll-driven result title.
+const photoResults = read('common_ui/src/main/ets/components/PinmonyImageSearchView.ets');
+const resultPanel = photoResults.slice(photoResults.indexOf('  private resultsPanel()'), photoResults.indexOf('  private searchContent()'));
+const presentedPanel = photoResults.slice(photoResults.indexOf('  private presentedResultsPanel()'), photoResults.indexOf('  build()'));
+const photoSheet = photoResults.slice(photoResults.indexOf('.bindSheet('));
+assert.match(photoSheet, /dragBar:\s*true,[\s\S]*?enableFloatingDragBar:\s*true/,
+  'native handle floats over the immersive title instead of reserving an opaque top strip');
+assert(!/\btitle\s*:/.test(photoSheet), 'a custom Sheet title would disable the native floating handle');
+assert.match(photoSheet, /detents:\s*\['40%',\s*SheetSize\.LARGE\]/, 'retain both interactive detents');
+assert.match(presentedPanel, /immersiveScroll:\s*true,\s*scrollControllers:\s*\[this\.resultScroller\]/);
+assert.match(resultPanel, /Scroll\(this\.resultScroller\)[\s\S]*?\.padding\(\{ top: 72, bottom: 16 \}\)[\s\S]*?\.layoutWeight\(1\)/,
+  '64vp title and 8vp gap scroll with content; bottom spacing cannot shrink the viewport');
+assert(!resultPanel.includes('left: 10, right: 10, top:') && !resultPanel.includes('right: 10, bottom:'),
+  'no fixed title or bottom spacer around the results viewport');
+assert(read('feature_search/src/main/ets/components/PinmonyPhotoSearchPage.ets').includes('PinmonyImageSearchView({'));
+assert(read('feature_pin/src/main/ets/components/PinmonyVisualSearchView.ets').includes('PinmonyImageSearchView as PinmonyVisualSearchView'));
+const modalSource = read(consumers[0][0]);
+const modalMethod = modalSource.slice(modalSource.indexOf('  private titleOptions()'), modalSource.indexOf('  build()'));
+const ImmersiveModal = vm.runInNewContext(ts.transpileModule('class Host {' + modalMethod + '} Host;', {
+  compilerOptions: { target: ts.ScriptTarget.ES2021 }
+}).outputText, { PinmonyHdsTitleBar, IconStyleMode: { SMALL: 1 }, PinmonyI18n: { text: (key, language) => language + ':' + key } });
+assert(modalSource.includes('.bindToScrollable(this.fillContent ? this.scrollControllers : [this.contentScroller])'));
+for (const mode of ['off', 'gentle', 'immersive', 'exquisite']) for (const language of ['zh', 'en']) {
+  const host = new ImmersiveModal(); let closed = 0;
+  Object.assign(host, { immersiveScroll: true, materialMode: mode, titleText: 'retained title',
+    uiLanguage: language, closeEnabled: true, onClose: () => closed++ });
+  const title = host.titleOptions();
+  assert.equal(title.enableComponentSafeArea, false, 'scrolling content owns its title inset');
+  assert.equal(title.style.scrollEffectOpts.enableScrollEffect, mode !== 'off');
+  assert.equal(title.style.scrollEffectOpts.scrollEffectType, 3);
+  for (const state of ['originalStyle', 'scrollEffectStyle']) {
+    assert.equal(title.style[state].backgroundStyle.blurRadius, mode === 'off' ? 0 : 18);
+    assert.equal(title.style[state].backgroundStyle.backgroundColor, mode === 'off' ? 'app.color.page_background' : undefined);
+  }
+  assert.equal(Boolean(title.style.systemMaterialEffect), mode !== 'off');
+  const close = title.content.menu.value[0].content;
+  assert.equal(close.label, language + ':pm_close_3fd47edc'); close.action(); assert.equal(closed, 1);
+  host.closeEnabled = false; host.titleOptions().content.menu.value[0].content.action(); assert.equal(closed, 1);
+}
+console.log('Panel style consistency: 19 hosts, six title builders, photo/detail shared Scroller and inset, four material modes, zh/en close, save busy gate, form safe areas and theme re-resolution passed; device geometry excluded.');

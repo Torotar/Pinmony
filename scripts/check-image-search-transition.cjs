@@ -14,7 +14,7 @@ const animations = []; let ready = 0, closed = 0;
 const x = new Host();
 Object.assign(x, { animatePhoto: true, alive: true, measured: true, decoded: false, started: false,
   widthValue: 360, heightValue: 720, imageWidth: 600, imageHeight: 800, originX: 18, originY: 200,
-  originWidth: 324, originHeight: 432, closing: false, transitionVersion: 0, sheetVisible: false,
+  originWidth: 324, originHeight: 432, originRadius: 18, closing: false, transitionVersion: 0, sheetVisible: false,
   onTransitionReady: () => ready++, onTransitionClosed: () => closed++, getUIContext: () => ({
     px2vp: n => n, getComponentUtils: () => ({ getRectangleById: () => ({ windowOffset: { x: 0, y: 100 } }) }),
     animateTo: (opts, fn) => { animations.push(opts); fn(); }
@@ -57,7 +57,7 @@ const frames = [], flights = [];
 const moving = new Host();
 Object.assign(moving, { animatePhoto: true, alive: true, measured: true, decoded: true, started: false,
   widthValue: 360, heightValue: 720, imageWidth: 600, imageHeight: 800, originX: 18, originY: 200,
-  originWidth: 324, originHeight: 432, closing: false, transitionVersion: 0,
+  originWidth: 324, originHeight: 432, originRadius: 18, closing: false, transitionVersion: 0,
   onPhotoFrame: (...frame) => frames.push(frame), onPhotoFlight: active => flights.push(active),
   getUIContext: () => ({ px2vp: n => n / 2,
     getComponentUtils: () => ({ getRectangleById: () => ({ windowOffset: { x: 0, y: searchRootPx } }) }),
@@ -80,7 +80,7 @@ const detail = new Detail(); detail.traceId = 1; const hostAnimations=[]; detail
 detail.updateSearchFlightFrame(...frames.at(-1));
 assert.equal(detail.searchFlightFrame.y, 170); assert.equal(detail.searchFlightFrame.y + 30, 200);
 assert.equal(detail.searchFlightFrame.x + 4, 18); assert.equal(detail.searchFlightFrame.height, 432);
-assert.match(detailPage, /if \(this.searchMounted\) \{\s*\/\/[^\n]*\n\s*Stack\(\{ alignContent: Alignment.TopStart \}\) \{\s*Image\(this.displayedDetail/,
+assert.match(detailPage, /if \(this.searchMounted\) \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*Stack\(\{ alignContent: Alignment.TopStart \}\) \{\s*Stack\(\{ alignContent: Alignment.TopStart \}\) \{\s*Image\(this.displayedDetail/,
   'flight Image remains mounted in the outer page plane for reverse handoff');
 console.log('Visual search return: moving HDS origin, stable window endpoint, density conversion and stationary crop handoff passed');
 
@@ -124,7 +124,8 @@ detail.updateSearchFlightFrame(36,120,288,384,0,240,1);
 assert.equal(detail.searchFlightBaseWidth,324);assert.equal(detail.searchFlightBaseHeight,432,'animation must not relayout selection artwork');
 assert.match(detailPage,/\.scale\(\{ x: this.searchFlightFrame.width \/ this.searchFlightBaseWidth,\s*y: this.searchFlightFrame.height \/ this.searchFlightBaseHeight, centerX: 0, centerY: 0 \}\)/);
 assert.match(detailPage,/\.translate\(\{ x: this.searchFlightFrame.x, y: this.searchFlightFrame.y \}\)/);
-assert(!detailPage.includes('.width(this.searchFlightFrame.width).height(this.searchFlightFrame.height)'), 'flight must transform a common fixed canvas rather than animate child layout');
+assert.match(detailPage,/\.scale\(\{ x: this.searchFlightFrame.width \/ this.searchFlightBaseWidth,[\s\S]*?centerY: 0 \}\)\s*\}.width\(this.searchFlightFrame.width\).height\(this.searchFlightFrame.height\)\s*\.borderRadius\(this.searchFlightRadius\).clip\(true\)/,
+ 'a separate display-sized clip animates radius while fixed image/selection artwork shares one inner transform');
 for(const p of [0,.1,.25,.5,.75,.9,1]) {
  const w=324+(288-324)*p,h=432+(384-432)*p,sx=w/detail.searchFlightBaseWidth,sy=h/detail.searchFlightBaseHeight;
  const crop={x:.1,y:.1,w:.8,h:.8};
@@ -144,7 +145,7 @@ assert(source.includes('this.sourceSelectionBorder ? 2 * (1 - this.chrome) : 0')
 const selectionSource=fs.readFileSync('common_ui/src/main/ets/components/PinmonyImageSearchSelection.ets','utf8');
 const selectionAst=ts.createSourceFile('selection.ts',selectionSource.replace(/\bstruct\b/g,'class'),99,true);
 const selectionMethods=[];
-function findSelectionMethods(n){if(ts.isMethodDeclaration(n)&&['selectionRadius','maskCommands'].includes(n.name.getText(selectionAst)))selectionMethods.push(n.getText(selectionAst));ts.forEachChild(n,findSelectionMethods);}
+function findSelectionMethods(n){if(ts.isMethodDeclaration(n)&&['selectionRadius','cornerSize','cornerX','cornerY','maskCommands'].includes(n.name.getText(selectionAst)))selectionMethods.push(n.getText(selectionAst));ts.forEachChild(n,findSelectionMethods);}
 findSelectionMethods(selectionAst);
 const Selection=vm.runInNewContext(ts.transpileModule('class Selection {'+selectionMethods.join('\n')+'} Selection;',{compilerOptions:{target:99}}).outputText);
 const artwork=new Selection();Object.assign(artwork,{photoWidth:300,photoHeight:450,crop:{x:.1,y:.1,w:.8,h:.8}});
@@ -165,7 +166,31 @@ for(const density of [1.5,2,3,3.5]) {
 }
 selectionDensity=1;
 artwork.crop={x:0,y:0,w:.08,h:1};artwork.photoWidth=100;
-assert.equal(artwork.selectionRadius(),4,'small selections clamp the radius to half their short side');
+assert.equal(artwork.selectionRadius(),4*12/28,'small selections scale their aperture with the handles');
+for(const [width,height,crop] of [
+ [300,450,{x:.1,y:.1,w:.8,h:.8}],
+ [24,800,{x:.1,y:.1,w:.8,h:.8}],
+ [800,24,{x:.1,y:.1,w:.8,h:.8}],
+ [100,100,{x:0,y:0,w:.08,h:.08}],
+ [100,100,{x:.92,y:.92,w:.08,h:.08}]
+]) {
+ Object.assign(artwork,{photoWidth:width,photoHeight:height,crop});
+ const size=artwork.cornerSize();
+ assert(size<=28 && size<=crop.w*width/2 && size<=crop.h*height/2,'opposing handles never overlap');
+ for(let index=0;index<4;index++) {
+  const right=index===1||index===3,bottom=index>1;
+  assert(Math.abs(artwork.cornerX(index)+size*(right?25:3)/28-(crop.x+(right?crop.w:0))*width)<1e-9,'rotated SVG vertical stroke stays on selection edge');
+  assert(Math.abs(artwork.cornerY(index)+size*(bottom?25:3)/28-(crop.y+(bottom?crop.h:0))*height)<1e-9,'rotated SVG horizontal stroke stays on selection edge');
+ }
+}
+const hitBody=source.match(/const cornerX: number = ([\s\S]*?)\n      \}\)/)[0].replace(/\n      \}\)$/,'');
+const hit= new Function('x','y','left','top','right','bottom',ts.transpile(hitBody));
+for(const [x,y,expected] of [[0,0,0],[8,0,1],[0,8,2],[8,8,3],[4,4,0]]) {
+ const target={dragCorner:-2};hit.call(target,x,y,0,0,8,8);
+ assert.equal(target.dragCorner,expected,'overlapping 44vp hit targets choose the nearest corner');
+}
+const interior={dragCorner:-2};hit.call(interior,50,50,0,0,100,100);assert.equal(interior.dragCorner,-1);
+const outside={dragCorner:-2};hit.call(outside,150,150,0,0,100,100);assert.equal(outside.dragCorner,-2);
 assert.match(selectionSource,/Path\(\).commands\(this.maskCommands\(\)\)/);
 assert.match(selectionSource,/borderRadius\(this.selectionRadius\(\)\)/,'mask and border share one radius');
 assert(!selectionSource.includes('Rect().fill'),'rectangular mask pieces must not leave square transparent corners');
@@ -181,3 +206,23 @@ for(const uploadedPhoto of [false,true]) {
  const lateIndex=timers.length;lateHost.aboutToAppear();lateHost.aboutToDisappear();timers[lateIndex]();
 }
 console.log('Image search startup: zero-delay dispatch, upload ownership and early-close cancellation passed');
+
+assert(detailPage.includes('originRadius: this.detailPhotoRadius()'), 'search uses the actual adaptive detail corner radius');
+for (const radius of [0,18,26]) {
+ const radiusFrames=[];
+ const rounded=new Host();
+ Object.assign(rounded,{...moving,alive:true,started:false,closing:false,originRadius:radius,
+   onPhotoFrame:(...frame)=>{radiusFrames.push(frame);detail.updateSearchFlightFrame(...frame);}});
+ const queued=timers.length;rounded.beginTransition();
+ assert.equal(rounded.frameRadius,radius,'source frame starts at actual detail radius');
+ assert.equal(radiusFrames[0][4],radius);assert.equal(detail.searchFlightRadius,radius);
+ timers.splice(queued,1)[0]();
+ assert.equal(rounded.frameRadius,0);assert.equal(detail.searchFlightRadius,0);
+ assert.equal(hostAnimations.at(-1).duration,240,'opening radius shares the frame animation duration');
+ rounded.runTransition(true);
+ assert.equal(rounded.frameRadius,radius);assert.equal(detail.searchFlightRadius,radius);
+ assert.equal(radiusFrames.at(-1)[4],radius,'return restores square or rounded source without a hardcoded endpoint');
+ assert.equal(hostAnimations.at(-1).duration,200,'return radius shares the frame animation duration');
+ rounded.alive=false;
+}
+console.log('Visual search corners: adaptive square/rounded endpoints, display-space clip and shared 240ms/200ms frame transactions passed');

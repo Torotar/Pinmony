@@ -1,3 +1,4 @@
+import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
@@ -30,7 +31,10 @@ export struct PinmonyProfileSearchPage {
   private submit(query: string): void { this.inputController.stopEditing(); this.scroller.scrollTo({ xOffset: 0, yOffset: 0 }); this.onSubmit(query); }
   @Builder private pin(pin: PinmonyProfileSearchPin) {
     Column({ space: 6 }) {
-      Image(pin.image).width('100%').aspectRatio(0.75).objectFit(ImageFit.Cover).borderRadius(14)
+      Stack({ alignContent: Alignment.TopStart }) {
+        Image(pin.image).width('100%').aspectRatio(0.75).objectFit(ImageFit.Cover).borderRadius(14)
+        PinmonyPinCountBadge({ mediaCount: pin.mediaCount || 0 }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+      }.width('100%')
       if (pin.title) { Text(PinmonyI18n.render(pin.title, this.uiLanguage)).fontSize(14).fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
     }.width('100%').onClick(() => this.onPin(pin.id)).accessibilityText(pin.title || this.text('pm_profile_search_your_pins'))
   }
