@@ -110,7 +110,7 @@ export struct PinmonyDetailHero {
         onDecoded: () => this.completeImage(1), onFailure: (code: number) => this.failImage(code) })
         .width('100%').height(this.heightVp).borderRadius(this.radiusVp).clip(true)
         .opacity(this.previewAvailable && this.imageState !== 'loaded' ? 0 : 1)
-        .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); })
+        .onClick(() => { if (this.isCurrent() && this.onTap) this.onTap(); }, 8)
         .accessibilityText(this.label || this.uiText("pm_pin_image_c269651e"))
       if (!this.blocked && !this.previewAvailable && this.imageState === 'loading') {
         LoadingProgress().width(28).height(28).color($r('app.color.accent'))

@@ -2,7 +2,7 @@
   "string": [
     {"name": "pm_login_other_account", "value": "다른 계정으로 로그인"},
     {"name": "pm_logout_current_account", "value": "현재 계정에서 로그아웃"},
-    {"name": "pm_logout_stay_on_login", "value": "로그아웃 후 로그인 화면에 머무릅니다. 다른 계정으로 자동 로그인되지 않습니다."},
+    {"name": "pm_logout_stay_on_login", "value": "현재 계정에서 로그아웃하시겠어요?"},
 
     {"name": "pm_switch_accounts", "value": "계정 전환"},
     {"name": "pm_add_account", "value": "계정 추가"},
@@ -1784,7 +1784,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "Huawei AppGallery 테스트 참여 페이지 열기"
+      "value": "GitHub 릴리스 페이지 열기"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6069,6 +6069,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "초대 링크를 복사할 수 없습니다. 다시 시도해 주세요."
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "첫 번째 핀입니다"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "마지막 핀입니다"
     }
   ]
 }

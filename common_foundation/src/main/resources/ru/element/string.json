@@ -2,7 +2,7 @@
   "string": [
     {"name": "pm_login_other_account", "value": "Войти в другой аккаунт"},
     {"name": "pm_logout_current_account", "value": "Выйти из текущего аккаунта"},
-    {"name": "pm_logout_stay_on_login", "value": "После выхода останется страница входа. Автоматического входа в другие аккаунты не будет."},
+    {"name": "pm_logout_stay_on_login", "value": "Выйти из текущего аккаунта?"},
 
     {"name": "pm_switch_accounts", "value": "Сменить аккаунт"},
     {"name": "pm_add_account", "value": "Добавить аккаунт"},
@@ -1784,7 +1784,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "Открыть страницу тестирования в Huawei AppGallery"
+      "value": "Открыть страницу релизов GitHub"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6069,6 +6069,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "Не удалось скопировать ссылку-приглашение. Повторите попытку."
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "Это первый пин"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "Это последний пин"
     }
   ]
 }

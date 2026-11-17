@@ -7,6 +7,7 @@ const source = fs.readFileSync('feature_settings/src/main/ets/components/Pinmony
 const methods = source.slice(source.indexOf('  private async readVersion'), source.indexOf('  @Builder'));
 const sandbox = { PinmonyI18n: rawLocalMessages, bundleManager: { BundleFlag: { GET_BUNDLE_INFO_DEFAULT: 0 },
   getBundleInfoForSelfSync: () => ({ versionName: '9.8.7', versionCode: 987 }) }, PinmonyRuntimeLog: { warn() {}, info() {} } };
+sandbox.PinmonyImmersiveLight = { toastOptions: options => options };
 sandbox.PinmonyUpdateNotice = { confirm() {} };
 vm.runInNewContext(ts.transpileModule('class About {' + methods + '} globalThis.About = About;',
   { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, sandbox);
@@ -53,7 +54,7 @@ Object.assign(storeExports, require('./arkts-module-loader.cjs').createArktsLoad
   assert(!source.includes('this.openLink(this.release.html_url)'), 'release metadata must not control download navigation');
   page.release = { html_url: 'https://github.com/Torotar/Pinmony/releases/tag/v99.0.0' };
   await page.openUpdateDownload();
-  assert.equal(links.at(-1), 'https://appgallery.huawei.com/apptest/CfRhJnKdQS', 'download opens the designated Huawei testing page');
+  assert.equal(links.at(-1), 'https://github.com/Torotar/Pinmony/releases', 'download opens the GitHub releases page');
   assert.equal(page.openingLink, false);
   page.onOpenExternalLink = async () => { throw Error('unavailable'); };
   await page.openLink('https://github.com/Torotar/Pinmony/issues'); assert.equal(messages.length, 1); assert.equal(page.openingLink, false);

@@ -4,6 +4,7 @@ import { PinmonyI18n } from 'common_foundation';
 export struct PinmonyBackToTopButton {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   @Prop @Watch('availabilityChanged') showButton: boolean = false;
+  @Prop @Watch('availabilityChanged') scrollOffsetVp: number = 0;
   @Prop bottomInset: number = 112;
   onBackToTop?: () => void;
   @State private hostWidth: number = 0;
@@ -22,7 +23,11 @@ export struct PinmonyBackToTopButton {
     this.resetFeedback(true);
   }
   private availabilityChanged(): void {
-    if (!this.showButton) this.resetFeedback(true);
+    if (!this.shouldShow()) this.resetFeedback(true);
+  }
+  private shouldShow(): boolean {
+    return this.showButton && Number.isFinite(this.scrollOffsetVp) && this.hostHeight > 0 &&
+      this.scrollOffsetVp >= this.hostHeight * 2;
   }
   private resetFeedback(cancelled: boolean = false): void {
     if (cancelled || this.pulled) this.suppressClickUntil = Date.now() + 400;
@@ -33,18 +38,21 @@ export struct PinmonyBackToTopButton {
   private updateHostArea(width: number, height: number): void {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width < 0 || height < 0) return;
     if (this.hostWidth !== width) this.hostWidth = width;
-    if (this.hostHeight !== height) this.hostHeight = height;
+    if (this.hostHeight !== height) {
+      this.hostHeight = height;
+      this.availabilityChanged();
+    }
   }
   private hitLeft(): number { return Math.max(0, this.hostWidth - 44 - 20); }
   private hitTop(): number { return Math.max(0, this.hostHeight - 44 - this.bottomInset); }
   private click(): void {
-    if (this.mounted && this.showButton && !this.pulled && Date.now() >= this.suppressClickUntil) {
+    if (this.mounted && this.shouldShow() && !this.pulled && Date.now() >= this.suppressClickUntil) {
       this.onBackToTop?.();
     }
   }
   private touch(event: TouchEvent): void {
     event.stopPropagation();
-    if (!this.mounted || !this.showButton) return;
+    if (!this.mounted || !this.shouldShow()) return;
     if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
       this.resetFeedback(event.type === TouchType.Cancel);
       return;
@@ -83,7 +91,7 @@ export struct PinmonyBackToTopButton {
           offsetX: 0, offsetY: this.getUIContext().vp2px(2) })
         .stateEffect(false)
         .margin({ right: 20, bottom: this.bottomInset })
-        .enabled(this.showButton)
+        .enabled(this.shouldShow())
         .accessibilityText(PinmonyI18n.text('pm_back_to_top', this.uiLanguage))
         .onClick(() => this.click())
         .onTouch((event: TouchEvent) => this.touch(event))
@@ -92,6 +100,6 @@ export struct PinmonyBackToTopButton {
       .onAreaChange((_old: Area, area: Area) => this.updateHostArea(Number(area.width), Number(area.height)))
       .responseRegion({ x: this.hitLeft(), y: this.hitTop(), width: 44, height: 44 })
       .hitTestBehavior(HitTestMode.Default)
-      .visibility(this.showButton ? Visibility.Visible : Visibility.Hidden)
+      .visibility(this.shouldShow() ? Visibility.Visible : Visibility.Hidden)
   }
 }

@@ -2,7 +2,7 @@
   "string": [
     {"name": "pm_login_other_account", "value": "別のアカウントでログイン"},
     {"name": "pm_logout_current_account", "value": "現在のアカウントからログアウト"},
-    {"name": "pm_logout_stay_on_login", "value": "ログアウト後はログイン画面に留まります。別のアカウントに自動でログインすることはありません。"},
+    {"name": "pm_logout_stay_on_login", "value": "現在のアカウントからログアウトしますか？"},
 
     {"name": "pm_switch_accounts", "value": "アカウントを切り替える"},
     {"name": "pm_add_account", "value": "アカウントを追加"},
@@ -1784,7 +1784,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "Huawei AppGalleryのテスト参加ページを開く"
+      "value": "GitHub のリリースページを開く"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6069,6 +6069,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "招待リンクをコピーできません。もう一度お試しください。"
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "最初のピンです"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "最後のピンです"
     }
   ]
 }

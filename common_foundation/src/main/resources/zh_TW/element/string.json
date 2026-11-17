@@ -2,7 +2,7 @@
   "string": [
     {"name": "pm_login_other_account", "value": "登入其他帳戶"},
     {"name": "pm_logout_current_account", "value": "登出目前帳戶"},
-    {"name": "pm_logout_stay_on_login", "value": "登出後將停留在登入頁，不會自動登入其他帳戶。"},
+    {"name": "pm_logout_stay_on_login", "value": "確定要登出目前的帳戶嗎？"},
 
     {"name": "pm_switch_accounts", "value": "切換帳戶"},
     {"name": "pm_add_account", "value": "新增帳戶"},
@@ -1772,7 +1772,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "開啟華為應用市場邀測頁面"
+      "value": "開啟 GitHub 發布頁面"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6069,6 +6069,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "無法複製邀請連結，請重試"
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "已到第一則"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "已到最後一則"
     }
   ]
 }

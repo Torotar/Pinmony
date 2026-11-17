@@ -4,6 +4,7 @@ import { PinmonyProfileStore, PinmonyProfilePage } from 'feature_profile';
 import { PinmonyAuthStatus } from 'common_session';
 
 export interface PinmonyProfileRootView {
+  rootViewportHeightVp: number;
   coveredByBoard: boolean;
   coveredByPin: boolean;
   profileStore: PinmonyProfileStore;
@@ -51,6 +52,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
             Stack() {
               if (view.profileStore.profile && !(view.profileStore.profile.nativeVersion !== undefined && view.profileStore.profile.business === undefined) && !view.profileStore.profileWebFlow && !view.loadFailed) {
                 PinmonyProfilePage({
+                  rootViewportHeightVp: view.rootViewportHeightVp,
                   onCoveredBack: () => view.coveredBack(),
                   backActive: !view.coveredByBoard && !view.coveredByPin && !view.profileChatActive && !view.profileStore.panel && !view.profileStore.searchVisible &&
                     (!view.pinStore.detail && !view.pinStore.detailOpeningPin || view.detailProfileEntry),

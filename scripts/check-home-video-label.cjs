@@ -1,9 +1,10 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
 const { createArktsLoader } = require('./arkts-module-loader.cjs');
+const carousel = createArktsLoader(ts).loadFile('common_ui/src/main/ets/models/PinmonyCardCarousel.ets');
 const loader = createArktsLoader(ts, {
   common_foundation: { PinmonyRuntimeLog: { info() {}, warn() {} } },
-  common_network: { PIN_BUSINESS_PIN_READ_ENABLED: true }, common_ui: {}, feature_home: {}
+  common_network: { PIN_BUSINESS_PIN_READ_ENABLED: true }, common_ui: carousel, feature_home: {}
 });
 const { PinmonyHomeNativeReads } = loader.loadFile('entry/src/main/ets/app/PinmonyHomeNativeReads.ets');
 const native = new PinmonyHomeNativeReads({ store: () => ({}), saved: () => false });
@@ -23,7 +24,7 @@ assert.equal(mapped[4].video, undefined, 'invalid playback host is still rejecte
 const api = fs.readFileSync('feature_home/src/main/ets/services/PinmonyHomeApiScript.ets', 'utf8');
 const script = Function('return `' + api.match(/= `([\s\S]*?)`;/)[1] + '`')();
 const context = { URL, location: { origin: native.origin } };
-vm.runInNewContext(script.slice(script.indexOf('  function mapPins('), script.indexOf('  function boardImage(')) + '\nglobalThis.mapPins = mapPins;', context);
+vm.runInNewContext(script.slice(script.indexOf('  function cardCarouselImages('), script.indexOf('  function boardImage(')) + '\nglobalThis.mapPins = mapPins;', context);
 assert.deepEqual(Array.from(context.mapPins(pins), pin => pin.isVideo), [true, true, false, true, true]);
 const { normalizeHomeCacheRecord } = loader.loadFile('feature_home/src/main/ets/services/PinmonyHomeCache.ets');
 const pageKey = 'https://www.pinterest.com/';

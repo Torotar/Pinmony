@@ -2,7 +2,7 @@
   "string": [
     {"name": "pm_login_other_account", "value": "Log in to another account"},
     {"name": "pm_logout_current_account", "value": "Log out of current account"},
-    {"name": "pm_logout_stay_on_login", "value": "You will stay on the login page. Other accounts will not log in automatically."},
+    {"name": "pm_logout_stay_on_login", "value": "Log out of the current account?"},
 
     {"name": "pm_switch_accounts", "value": "Switch accounts"},
     {"name": "pm_add_account", "value": "Add account"},
@@ -1784,7 +1784,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "Open the Huawei AppGallery testing page"
+      "value": "Open the GitHub releases page"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6069,6 +6069,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "Unable to copy the invitation link. Please try again."
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "You’ve reached the first Pin"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "You’ve reached the last Pin"
     }
   ]
 }

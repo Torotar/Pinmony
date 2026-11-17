@@ -1,3 +1,4 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyScrollRecovery } from 'common_foundation';
 import { PinmonyModalNavigation } from 'common_ui';
@@ -23,6 +24,29 @@ interface PinmonyProfileBoardGroupArgs {
 
 @Component
 export struct PinmonyProfilePage {
+  private sourceLifetime: number = 0;
+  private sourceIdentity(): string { return 'profile:' + this.profile.profileUrl + ':' + this.profile.session + ':' + this.profile.section + ':' + this.hubTab; }
+  private stageDetailSource(selected: PinmonyCreatedPin): void {
+    const identity: string = this.sourceIdentity();
+    const unorganized: boolean = !this.profile.createdPins.some((pin: PinmonyCreatedPin): boolean => pin.id === selected.id);
+    const lifetime: number = this.sourceLifetime;
+    PinmonyDetailSources.stage({ identity: identity + ':' + unorganized, pageUrl: this.profile.profileUrl, session: this.profile.session,
+      cards: (): PinmonyDetailSourceCard[] => {
+        if (lifetime !== this.sourceLifetime || identity !== this.sourceIdentity()) return [];
+        return (unorganized ? (this.profile.unorganizedPins || []).slice(0, 4) : this.profile.createdPins).filter((pin: PinmonyCreatedPin): boolean => !pin.collageDraft).map((pin: PinmonyCreatedPin): PinmonyDetailSourceCard => ({
+          pinUrl: pin.targetUrl || this.profile.profileUrl.split('/').slice(0, 3).join('/') + '/pin/' + pin.id + '/', cardId: 'pinmony-profile-photo-' + pin.id, imageUrl: pin.imageUrl,
+          imageWidth: pin.imageWidth, imageHeight: pin.imageHeight }));
+      },
+      locate: (card: PinmonyDetailSourceCard): void => {
+        const ui = this.getUIContext();
+        const rect = ui.getComponentUtils().getRectangleById(card.cardId);
+        const offset: number = this.scroller.currentOffset().yOffset;
+        this.scroller.scrollTo({ xOffset: 0, yOffset: Math.max(0, offset + ui.px2vp(rect.windowOffset.y) - 160), animation: false });
+      }, didLocate: (): void => {
+        try { this.onScrollPosition?.(this.profile.profileUrl, this.profile.section, Math.max(0, this.scroller.currentOffset().yOffset)); } catch (_) {}
+      } });
+  }
+
   @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
   private applyRecoveredPosition(): void {
     if (this.hubPane && !this.interactionReady) return;
@@ -59,12 +83,14 @@ export struct PinmonyProfilePage {
   @Prop loading: boolean = false;
   @Prop hubPane: boolean = false;
   @Prop legacyContentPane: boolean = false;
-  onLegacyContentHeight?: (height: number) => void;
+  onLegacyContentHeight?: (height: number, profileUrl: string, session: number) => void;
   private readonly legacySwiper: SwiperController = new SwiperController();
   @State private legacySnapshots: PinmonyProfileSnapshot[] = [];
+  private readonly legacyPendingSnapshots: Map<string, PinmonyProfileSnapshot> = new Map<string, PinmonyProfileSnapshot>();
   @State private legacyCreatedHeight: number = 240;
   @State private legacySavedHeight: number = 240;
   @State private legacyPaging: boolean = false;
+  private legacyPagingHeight: number = 0;
   @State private legacyIndicatorPosition: number = -1;
   private legacyIndicatorClickTarget: number = -1;
   @State private legacyCreatedCenter: number = 0;
@@ -115,6 +141,7 @@ export struct PinmonyProfilePage {
   onScrollPosition?: (profileUrl: string, section: string, offset: number) => void;
   @State private contentWidth: number = 360;
   @State private profileViewportHeight: number = 0;
+  @Prop rootViewportHeightVp: number = 0;
   private activeProfile: string = '';
   private activeSection: string = '';
   private backRequested: boolean = false;
@@ -188,13 +215,14 @@ export struct PinmonyProfilePage {
     });
   }
   private legacyPagerEnabled(): boolean {
-    return this.legacyProfile && !this.legacyContentPane && !this.profile.privateRestricted;
+    return !this.modern() && !this.legacyContentPane && !this.hubPane && !this.profile.privateRestricted;
   }
   private retainLegacySnapshot(): void {
+    this.legacyPendingSnapshots.clear();
     if (!this.legacyPagerEnabled()) return;
     if (this.legacySnapshots.some((item: PinmonyProfileSnapshot): boolean =>
       item.profileUrl !== this.profile.profileUrl || item.session !== this.profile.session)) {
-      this.legacyCreatedHeight = 240; this.legacySavedHeight = 240; this.legacyPaging = false;
+      this.legacyCreatedHeight = 240; this.legacySavedHeight = 240; this.legacyPaging = false; this.legacyPagingHeight = 0;
       this.legacyIndicatorPosition = -1; this.legacyIndicatorClickTarget = -1;
     }
     const retained: PinmonyProfileSnapshot[] = this.legacySnapshots.filter((item: PinmonyProfileSnapshot): boolean =>
@@ -206,11 +234,45 @@ export struct PinmonyProfilePage {
       this.legacySnapshots.find((item: PinmonyProfileSnapshot): boolean => item.section === section &&
         item.profileUrl === this.profile.profileUrl && item.session === this.profile.session);
     if (retained) return retained;
-    const pending: PinmonyProfileSnapshot = JSON.parse(JSON.stringify(this.profile)) as PinmonyProfileSnapshot;
-    pending.section = section; pending.boards = []; pending.createdPins = []; pending.unorganizedPins = [];
-    pending.contentLoading = true; pending.contentError = ''; pending.contentHasMore = false;
-    pending.unorganizedLoading = false; pending.unorganizedError = ''; pending.organize = undefined;
+    const cached: PinmonyProfileSnapshot | undefined = this.legacyPendingSnapshots.get(section);
+    if (cached) return cached;
+    const pending: PinmonyProfileSnapshot = {
+      kind: this.profile.kind, session: this.profile.session, profileUrl: this.profile.profileUrl, section,
+      nativeVersion: this.profile.nativeVersion, nativeOwn: this.profile.nativeOwn,
+      nativeInvalidation: this.profile.nativeInvalidation, contextEpoch: this.profile.contextEpoch,
+      displayName: this.profile.displayName, handle: this.profile.handle, avatarUrl: this.profile.avatarUrl,
+      avatarColorIndex: this.profile.avatarColorIndex, isOwn: this.profile.isOwn, business: this.profile.business,
+      followers: this.profile.followers, following: this.profile.following, actions: [],
+      boards: [], createdPins: [], unorganizedPins: [], contentLoading: true, contentLoadingMore: false,
+      contentError: '', contentHasMore: false, unorganizedLoading: false, unorganizedError: '', unorganizedHasMore: false
+    };
+    this.legacyPendingSnapshots.set(section, pending);
     return pending;
+  }
+  private legacyPagerHeight(): number {
+    if (this.legacyPaging && this.legacyPagingHeight > 0) return this.legacyPagingHeight;
+    return this.profile.section === 'saved' ? this.legacySavedHeight : this.legacyCreatedHeight;
+  }
+  private beginLegacyPaging(index: number): void {
+    if (this.legacyPaging || !this.interactionReady || !this.legacyPagerEnabled()) return;
+    this.legacyPagingHeight = index === 1 ? this.legacySavedHeight : this.legacyCreatedHeight;
+    this.legacyPaging = true;
+  }
+  private finishLegacyPaging(index: number): void {
+    if (!this.legacyPaging || !this.interactionReady || !this.legacyPagerEnabled()) return;
+    if (this.legacyIndicatorClickTarget >= 0 && index !== this.legacyIndicatorClickTarget) return;
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+      this.legacyPaging = false;
+      this.legacyPagingHeight = 0;
+    });
+    this.legacyIndicatorClickTarget = -1;
+    this.legacyIndicatorPosition = index;
+  }
+  private updateLegacyContentHeight(section: string, height: number, profileUrl: string, session: number): void {
+    if (profileUrl !== this.profile.profileUrl || session !== this.profile.session ||
+      !Number.isFinite(height) || height <= 0) return;
+    if (section === 'created' && Math.abs(height - this.legacyCreatedHeight) > 1) this.legacyCreatedHeight = height;
+    else if (section === 'saved' && Math.abs(height - this.legacySavedHeight) > 1) this.legacySavedHeight = height;
   }
   private selectLegacySection(section: string): void {
     if (!this.interactionReady || !this.onTab || this.profile.suggestionWriting || this.profile.section === section) return;
@@ -228,7 +290,7 @@ export struct PinmonyProfilePage {
       .onAreaChange((_old: Area, area: Area) => {
         const width: number = Number(area.width), height: number = Number(area.height);
         if (width > 0 && Math.abs(width - this.contentWidth) > 1) this.contentWidth = width;
-        if (height > 0 && this.onLegacyContentHeight) this.onLegacyContentHeight(height);
+        if (height > 0 && this.onLegacyContentHeight) this.onLegacyContentHeight(height, this.profile.profileUrl, this.profile.session);
       })
   }
   @Builder
@@ -247,10 +309,8 @@ export struct PinmonyProfilePage {
             loading: this.loading && this.profile.section === section,
             syncError: this.profile.section === section ? this.syncError : '',
             refreshing: this.refreshing && this.profile.section === section,
-            onLegacyContentHeight: (height: number) => {
-              if (section === 'created' && Math.abs(height - this.legacyCreatedHeight) > 1) this.legacyCreatedHeight = height;
-              else if (section === 'saved' && Math.abs(height - this.legacySavedHeight) > 1) this.legacySavedHeight = height;
-            },
+            onLegacyContentHeight: (height: number, profileUrl: string, session: number) =>
+              this.updateLegacyContentHeight(section, height, profileUrl, session),
             onBoard: this.onBoard, onPin: this.onPin, onPinMore: this.onPinMore,
             onScrollPosition: (_url: string, _section: string, _offset: number) => this.reportScroll(),
             onOrganize: this.onOrganize, onRetry: this.onRetry, onLoadMore: this.onLoadMore,
@@ -268,7 +328,7 @@ export struct PinmonyProfilePage {
       .onGestureRecognizerJudgeBegin((event: BaseGestureEvent, current: GestureRecognizer): GestureJudgeResult => this.judgeHubSwipe(event, current))
       .onChange((index: number) => this.selectLegacySection(index === 1 ? 'saved' : 'created'))
       .onAnimationStart((index: number) => {
-        this.legacyPaging = true;
+        this.beginLegacyPaging(index);
         if (this.legacyIndicatorPosition < 0) this.legacyIndicatorPosition = index;
       })
       .onContentDidScroll((selectedIndex: number, index: number, position: number, _mainAxisLength: number) => {
@@ -276,15 +336,9 @@ export struct PinmonyProfilePage {
           this.legacyIndicatorPosition = this.indicatorProgress(index, position, 1);
         }
       })
-      .onAnimationEnd((index: number) => {
-        if (this.legacyIndicatorClickTarget >= 0 && index !== this.legacyIndicatorClickTarget) return;
-        this.legacyPaging = false;
-        this.legacyIndicatorClickTarget = -1;
-        this.legacyIndicatorPosition = index;
-      })
+      .onAnimationEnd((index: number) => this.finishLegacyPaging(index))
       .width('100%').clip(true)
-      .height(this.legacyPaging ? Math.max(this.legacyCreatedHeight, this.legacySavedHeight) :
-        this.profile.section === 'saved' ? this.legacySavedHeight : this.legacyCreatedHeight)
+      .height(this.legacyPagerHeight())
   }
   private hubHeaderInset(): number {
     return this.getUIContext().px2vp(this.statusBarHeightPx) + 80;
@@ -361,7 +415,11 @@ export struct PinmonyProfilePage {
     return this.hubContentInset();
   }
   private profileBodyHeight(): Length {
-    return !this.onBack && this.profile.isOwn === true && !this.hubPane && !this.legacyContentPane && this.profileViewportHeight > 0 ? this.profileViewportHeight : '100%';
+    if (this.onBack || this.profile.isOwn !== true || this.hubPane || this.legacyContentPane) return '100%';
+    // The owning tab survives user-profile navigation; this component does not.
+    // Prefer its live viewport even if our first area event preceded snapshot restore.
+    if (Number.isFinite(this.rootViewportHeightVp) && this.rootViewportHeightVp > 0) return this.rootViewportHeightVp;
+    return this.profileViewportHeight > 0 ? this.profileViewportHeight : '100%';
   }
   private updateProfileViewport(height: number): void {
     if (this.onBack || this.profile.isOwn !== true || this.hubPane || this.legacyContentPane ||
@@ -574,7 +632,8 @@ export struct PinmonyProfilePage {
     if(!this.hubPane && this.modern() && !this.profile.hubMode)this.requestHub();
   }
 
-  aboutToDisappear(): void {
+  aboutToDisappear(): void { this.sourceLifetime++;
+    this.legacyPendingSnapshots.clear();
     this.stopHubChromeAnimation();
     this.hubControlMaterials.clear();this.hubMaterialConfiguration = '';
     this.hubTopTitleContent?.dispose(); this.hubTopTitleContent = undefined;
@@ -585,6 +644,7 @@ export struct PinmonyProfilePage {
     if (!this.interactionReady) {
       this.stopHubChromeAnimation();
       this.sortVisible = false;this.pinViewOpen = false;this.recoveryRequested = false;this.legacyPaging = false;
+      this.legacyPagingHeight = 0;
       this.legacyIndicatorClickTarget = -1;this.legacyIndicatorPosition = -1;
     }
   }
@@ -755,6 +815,7 @@ export struct PinmonyProfilePage {
           const target: number = section === 'saved' ? 1 : 0;
           if (this.legacyIndicatorPosition < 0) this.legacyIndicatorPosition = this.profile.section === 'saved' ? 1 : 0;
           this.legacyIndicatorClickTarget = target;
+          this.beginLegacyPaging(this.profile.section === 'saved' ? 1 : 0);
           this.animateProfileIndicator(target, true);
           this.legacySwiper.changeIndex(target, true);
         }
@@ -1093,7 +1154,7 @@ export struct PinmonyProfilePage {
         .border({width:0.5,color:$r('app.color.surface_muted'),radius:16})
         .id('pinmony-profile-photo-' + pin.id)
         .overlay(this.pinCountBadge(pin.mediaCount || 0), { align: Alignment.TopStart })
-        .onClick(() => { if (!pin.collageDraft && this.interactionReady && this.onPin) { this.reportScroll(); this.onPin(pin.id); } })
+        .onClick(() => { if (!pin.collageDraft && this.interactionReady && this.onPin) { this.reportScroll(); this.stageDetailSource(pin); this.onPin(pin.id); } })
       if (!this.compactPinView()) {
       Row({ space: 4 }) {
         if (pin.title.length > 0) {
@@ -1104,7 +1165,7 @@ export struct PinmonyProfilePage {
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
-            .onClick(() => { if (!pin.collageDraft && this.interactionReady && this.onPin) { this.reportScroll(); this.onPin(pin.id); } })
+            .onClick(() => { if (!pin.collageDraft && this.interactionReady && this.onPin) { this.reportScroll(); this.stageDetailSource(pin); this.onPin(pin.id); } })
         } else {
           Blank().layoutWeight(1)
         }

@@ -10,7 +10,7 @@
     },
     {
       "name": "pm_logout_stay_on_login",
-      "value": "ستبقى في صفحة تسجيل الدخول. لن يتم تسجيل الدخول إلى الحسابات الأخرى تلقائيًا."
+      "value": "هل تريد تسجيل الخروج من الحساب الحالي؟"
     },
     {
       "name": "pm_switch_accounts",
@@ -1826,7 +1826,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "فتح صفحة الاختبار في Huawei AppGallery"
+      "value": "فتح صفحة الإصدارات على GitHub"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6123,6 +6123,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "تعذّر نسخ رابط الدعوة. يُرجى المحاولة مرة أخرى."
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "لقد وصلت إلى أول منشور"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "لقد وصلت إلى آخر منشور"
     }
   ]
 }

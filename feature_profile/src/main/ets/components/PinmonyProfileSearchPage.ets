@@ -1,3 +1,4 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyActionNotice } from 'common_ui';
@@ -12,17 +13,41 @@ export struct PinmonyProfileSearchPage {
   @StorageLink('immersiveLightMode') private immersiveLightMode: string = 'immersive';
   private get immersiveLightEnabled(): boolean { return this.immersiveLightMode !== 'off'; }
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
+  @Prop sourcePageUrl: string = '';
   @Prop snapshot: PinmonyProfileSearchSnapshot;
   onResume: () => void = () => {};
   onPause: () => void = () => {};
-  aboutToDisappear(): void { this.onPause(); }
+  aboutToDisappear(): void { this.sourceLifetime++; this.onPause(); }
   onBack: () => void = () => {};
   onInput: (query: string) => void = () => {};
   onSubmit: (query: string) => void = () => {};
-  onPin: (id: string) => void = () => {};
+  onPin: (id: string, sourceId: string) => void = () => {};
   onMore: () => void = () => {};
   onRetry: () => void = () => {};
   onDeleteHistory: (query: string) => void = () => {};
+
+  private sourceLifetime: number = 0;
+  private openSourcePin(pin: PinmonyProfileSearchPin, group: string = ''): void {
+    const lifetime: number = this.sourceLifetime;
+    const query: string = this.snapshot.query;
+    const submitted: string = this.snapshot.submitted;
+    const editing: boolean = this.snapshot.editing;
+    const pins: () => PinmonyProfileSearchPin[] = (): PinmonyProfileSearchPin[] =>
+      lifetime === this.sourceLifetime && query === this.snapshot.query && submitted === this.snapshot.submitted && editing === this.snapshot.editing ?
+        group ? this.snapshot.suggestions.find((item: PinmonyProfileSearchSuggestion): boolean => item.query === group)?.pins || [] : this.snapshot.pins : [];
+    PinmonyDetailSources.stage({ identity: 'profile-search:' + submitted + ':' + query + ':' + group, pageUrl: this.sourcePageUrl, session: lifetime,
+      cards: (): PinmonyDetailSourceCard[] => pins().map((item: PinmonyProfileSearchPin): PinmonyDetailSourceCard => ({
+        pinUrl: this.sourcePageUrl.split('/').slice(0, 3).join('/') + '/pin/' + item.id + '/', cardId: this.sourceCardId(item.id, group),
+        imageUrl: item.image, imageWidth: 0, imageHeight: 0 })),
+      locate: (card: PinmonyDetailSourceCard): void => {
+        const ui = this.getUIContext();
+        const rect = ui.getComponentUtils().getRectangleById(card.cardId);
+        this.scroller.scrollTo({ xOffset: 0, yOffset: Math.max(0, this.scroller.currentOffset().yOffset + ui.px2vp(rect.windowOffset.y) - 160), animation: false });
+      } });
+    this.onPin(pin.id, this.sourceCardId(pin.id, group));
+  }
+  private sourceCardId(id: string, group: string = ''): string { return 'pinmony-profile-search-photo-' + encodeURIComponent(group) + '-' + id; }
+
   private paths: NavPathStack = new NavPathStack();
   private scroller: Scroller = new Scroller();
   private inputController: SearchController = new SearchController();
@@ -32,11 +57,11 @@ export struct PinmonyProfileSearchPage {
   @Builder private pin(pin: PinmonyProfileSearchPin) {
     Column({ space: 6 }) {
       Stack({ alignContent: Alignment.TopStart }) {
-        Image(pin.image).width('100%').aspectRatio(0.75).objectFit(ImageFit.Cover).borderRadius(14)
+        Image(pin.image).id(this.sourceCardId(pin.id)).width('100%').aspectRatio(0.75).objectFit(ImageFit.Cover).borderRadius(14)
         PinmonyPinCountBadge({ mediaCount: pin.mediaCount || 0 }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
       }.width('100%')
       if (pin.title) { Text(PinmonyI18n.render(pin.title, this.uiLanguage)).fontSize(14).fontColor($r('app.color.primary_text')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
-    }.width('100%').onClick(() => this.onPin(pin.id)).accessibilityText(pin.title || this.text('pm_profile_search_your_pins'))
+    }.width('100%').onClick(() => this.openSourcePin(pin)).accessibilityText(pin.title || this.text('pm_profile_search_your_pins'))
   }
   @Builder private destination() {
     HdsNavDestination() {
@@ -70,7 +95,7 @@ export struct PinmonyProfileSearchPage {
                   if (item.pins.length) {
                     Row({ space: 8 }) {
                       ForEach(item.pins, (pin: PinmonyProfileSearchPin) => {
-                        Image(pin.image).width(70).height(90).borderRadius(12).objectFit(ImageFit.Cover).onClick(() => this.onPin(pin.id))
+                        Image(pin.image).id(this.sourceCardId(pin.id, item.query)).width(70).height(90).borderRadius(12).objectFit(ImageFit.Cover).onClick(() => this.openSourcePin(pin, item.query))
                       }, (pin: PinmonyProfileSearchPin) => pin.id)
                     }.width('100%')
                   }

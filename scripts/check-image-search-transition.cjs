@@ -145,13 +145,18 @@ assert(source.includes('this.sourceSelectionBorder ? 2 * (1 - this.chrome) : 0')
 const selectionSource=fs.readFileSync('common_ui/src/main/ets/components/PinmonyImageSearchSelection.ets','utf8');
 const selectionAst=ts.createSourceFile('selection.ts',selectionSource.replace(/\bstruct\b/g,'class'),99,true);
 const selectionMethods=[];
-function findSelectionMethods(n){if(ts.isMethodDeclaration(n)&&['selectionRadius','cornerSize','cornerX','cornerY','maskCommands'].includes(n.name.getText(selectionAst)))selectionMethods.push(n.getText(selectionAst));ts.forEachChild(n,findSelectionMethods);}
+function findSelectionMethods(n){if(ts.isMethodDeclaration(n)&&['selectionRadius','selectionBorderWidth','cornerSize','cornerX','cornerY','maskCommands'].includes(n.name.getText(selectionAst)))selectionMethods.push(n.getText(selectionAst));ts.forEachChild(n,findSelectionMethods);}
 findSelectionMethods(selectionAst);
 const Selection=vm.runInNewContext(ts.transpileModule('class Selection {'+selectionMethods.join('\n')+'} Selection;',{compilerOptions:{target:99}}).outputText);
 const artwork=new Selection();Object.assign(artwork,{photoWidth:300,photoHeight:450,crop:{x:.1,y:.1,w:.8,h:.8}});
 let selectionDensity=1;
 artwork.getUIContext=()=>({vp2px:n=>n*selectionDensity});
 assert.equal(artwork.selectionRadius(),12);
+const cornerSvg=fs.readFileSync('common_ui/src/main/resources/base/media/image_crop_corner.svg','utf8');
+const cornerStroke=Number(cornerSvg.match(/stroke-width="([\d.]+)"/)[1]);
+const cornerViewBoxWidth=Number(cornerSvg.match(/viewBox="0 0 ([\d.]+) [\d.]+"/)[1]);
+assert.equal(artwork.selectionBorderWidth(),cornerStroke,'normal-width border matches the actual SVG corner stroke');
+assert.match(selectionSource,/\.border\(\{ width: this.selectionBorderWidth\(\), color: Color.White \}\)/,'visible border binds to adaptive thickness');
 assert.equal(artwork.maskCommands(),'M 0 0 H 300 V 450 H 0 Z M 42 45 A 12 12 0 0 0 30 57 V 393 A 12 12 0 0 0 42 405 H 258 A 12 12 0 0 0 270 393 V 57 A 12 12 0 0 0 258 45 Z','four counter-clockwise arcs cut the rounded aperture from the clockwise outer mask');
 for(const density of [1.5,2,3,3.5]) {
  selectionDensity=density;
@@ -165,32 +170,124 @@ for(const density of [1.5,2,3,3.5]) {
  assert.equal(numbers[6],45*density,'aperture y follows the full-size selection');
 }
 selectionDensity=1;
+for(const width of [1,24,84,150,240,300,600]) {
+ Object.assign(artwork,{photoWidth:width,photoHeight:800,crop:{x:0,y:0,w:1,h:1}});
+ assert.equal(artwork.cornerSize(),Math.min(28,width*28/300),'corner artwork scales with actual displayed photo width and retains its wide-photo maximum');
+ assert.equal(artwork.selectionRadius(),artwork.cornerSize()*12/28,'rounded aperture follows width-adaptive corners');
+ assert.equal(artwork.selectionBorderWidth(),artwork.cornerSize()*cornerStroke/cornerViewBoxWidth,'border thickness equals the scaled corner stroke');
+}
 artwork.crop={x:0,y:0,w:.08,h:1};artwork.photoWidth=100;
 assert.equal(artwork.selectionRadius(),4*12/28,'small selections scale their aperture with the handles');
 for(const [width,height,crop] of [
  [300,450,{x:.1,y:.1,w:.8,h:.8}],
  [24,800,{x:.1,y:.1,w:.8,h:.8}],
  [800,24,{x:.1,y:.1,w:.8,h:.8}],
+ [84,406,{x:0,y:0,w:1,h:1}],
+ [84,406,{x:.1,y:.1,w:.8,h:.8}],
  [100,100,{x:0,y:0,w:.08,h:.08}],
  [100,100,{x:.92,y:.92,w:.08,h:.08}]
 ]) {
  Object.assign(artwork,{photoWidth:width,photoHeight:height,crop});
  const size=artwork.cornerSize();
+ assert(artwork.selectionBorderWidth()>0&&artwork.selectionBorderWidth()<=cornerStroke,'narrow photos and tiny crops retain a positive scaled border');
+ for(const density of [1,1.5,2,3,3.5])assert(Math.abs(artwork.selectionBorderWidth()*density-size*cornerStroke/cornerViewBoxWidth*density)<1e-9,'border and corner have identical physical stroke thickness at every density');
  assert(size<=28 && size<=crop.w*width/2 && size<=crop.h*height/2,'opposing handles never overlap');
  for(let index=0;index<4;index++) {
   const right=index===1||index===3,bottom=index>1;
-  assert(Math.abs(artwork.cornerX(index)+size*(right?25:3)/28-(crop.x+(right?crop.w:0))*width)<1e-9,'rotated SVG vertical stroke stays on selection edge');
-  assert(Math.abs(artwork.cornerY(index)+size*(bottom?25:3)/28-(crop.y+(bottom?crop.h:0))*height)<1e-9,'rotated SVG horizontal stroke stays on selection edge');
+  const inset=size*1.5/28;
+  const gapX=Math.min(size*8/28,(right?Math.max(0,1-crop.x-crop.w):crop.x)*width);
+  const gapY=Math.min(size*8/28,(bottom?Math.max(0,1-crop.y-crop.h):crop.y)*height);
+  const outerX=artwork.cornerX(index)+(right?size-inset:inset);
+  const outerY=artwork.cornerY(index)+(bottom?size-inset:inset);
+  assert(Math.abs(outerX-((crop.x+(right?crop.w:0))*width+(right?gapX:-gapX)))<1e-9,'corner vertical strokes are outside the crop, never shifted inward');
+  assert(Math.abs(outerY-((crop.y+(bottom?crop.h:0))*height+(bottom?gapY:-gapY)))<1e-9,'corner horizontal strokes are outside the crop, never shifted inward');
+  if(crop.x===.1&&crop.y===.1&&crop.w===.8&&crop.h===.8){
+   assert(gapX>size*3/28&&gapY>size*3/28,'outside stroke remains visibly separated from border by more than its thickness');
+  }
+  assert(outerX>=-1e-9&&outerX<=width+1e-9&&outerY>=-1e-9&&outerY<=height+1e-9,'edge and full-photo selections keep visible corners inside the photo');
  }
 }
-const hitBody=source.match(/const cornerX: number = ([\s\S]*?)\n      \}\)/)[0].replace(/\n      \}\)$/,'');
-const hit= new Function('x','y','left','top','right','bottom',ts.transpile(hitBody));
-for(const [x,y,expected] of [[0,0,0],[8,0,1],[0,8,2],[8,8,3],[4,4,0]]) {
- const target={dragCorner:-2};hit.call(target,x,y,0,0,8,8);
- assert.equal(target.dragCorner,expected,'overlapping 44vp hit targets choose the nearest corner');
+const cropMethods=[];
+function findCropMethods(n){if(ts.isMethodDeclaration(n)&&['canAdjustCrop','cropTouchWidth','cropTouchHeight','cropTouchX','cropTouchY','startDrag','finishDrag','drag','cropTouchTarget','photoWidth','photoHeight','photoX','photoY'].includes(n.name.getText(sf)))cropMethods.push(n.getText(sf).replace(/@Builder\s*/g,''));ts.forEachChild(n,findCropMethods);}
+findCropMethods(sf);
+const nativeTargets=[],cropTrace=[];
+function Row(){
+ const target={};nativeTargets.push(target);
+ const chain={};for(const key of ['width','height','position','backgroundColor','hitTestBehavior','onTouch','gesture','accessibilityLevel'])
+  chain[key]=arg=>{target[key]=arg;return chain;};
+ return chain;
 }
-const interior={dragCorner:-2};hit.call(interior,50,50,0,0,100,100);assert.equal(interior.dragCorner,-1);
-const outside={dragCorner:-2};hit.call(outside,150,150,0,0,100,100);assert.equal(outside.dragCorner,-2);
+function PanGesture(options){const gesture={options};for(const key of ['onActionStart','onActionUpdate','onActionEnd','onActionCancel'])gesture[key]=fn=>{gesture[key+'Callback']=fn;return gesture;};return gesture;}
+const CropHost=vm.runInNewContext(ts.transpileModule('class CropHost {'+cropMethods.join('\n')+'} CropHost;',{compilerOptions:{target:99}}).outputText,
+ {Row,PanGesture,Color:{Transparent:'transparent'},HitTestMode:{Block:'block',None:'none'},TouchType:{Down:0},PinmonyRuntimeLog:{info:line=>cropTrace.push(line)}});
+const mountTargets=node=>{
+ nativeTargets.length=0;
+ for(const corner of [-1,0,1,2,3])node.cropTouchTarget(corner);
+ return nativeTargets.slice();
+};
+// Hit testing must traverse the canvas before looking at its children. SDK Block
+// accepts the parent itself but excludes children, even when their rectangles hit.
+const canvasModeMatch=source.match(/\.id\('pinmony-search-flight-' \+ this.pin\)\s*\.backgroundColor\(Color.Transparent\)\.hitTestBehavior\(HitTestMode\.(\w+)\)/);
+assert(canvasModeMatch,'locate the actual crop canvas hit-test mode');
+const canvasMode=canvasModeMatch[1].toLowerCase();
+const targetAt=(targets,x,y,ancestorModes=[canvasMode])=>{
+ if(ancestorModes.some(mode=>mode==='block'||mode==='block_descendants'))return undefined;
+ return targets.filter(t=>t.hitTestBehavior==='block'&&x>=t.position.x&&x<t.position.x+t.width&&y>=t.position.y&&y<t.position.y+t.height).at(-1);
+};
+const probe=[{hitTestBehavior:'block',position:{x:0,y:0},width:44,height:44}];
+assert.equal(targetAt(probe,22,22,['block']),undefined,'reproduce parent Block swallowing a valid child target');
+assert.equal(targetAt(probe,22,22,['default','none']),probe[0],'SDK None still traverses children, even for transparent artwork');
+assert.equal(targetAt(probe,22,22,['default','block_descendants']),undefined,'BLOCK_DESCENDANTS excludes the entire passive subtree');
+const detailSource=fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets','utf8');
+const flightPlane=detailSource.slice(detailSource.indexOf('// Clip in display coordinates'),detailSource.indexOf('if (this.shuffleSelectedImage && !this.shuffleFullDetail)'));
+const flightMode=flightPlane.replace(/\/\/[^\n]*/g,'').match(/\.opacity\(this.searchImageReady && this.searchPhotoFlying \? 1 : 0\)\s*\.hitTestBehavior\(HitTestMode\.(\w+)\)/)?.[1].toLowerCase();
+assert(flightMode,'locate the actual host flight plane mode');
+assert.equal(targetAt(probe,22,22,[flightMode,'default']),undefined,'invisible host flight artwork must not swallow touches before the search destination');
+assert.match(selectionSource,/\.height\(this.photoHeight\)\.hitTestBehavior\(HitTestMode.BLOCK_DESCENDANTS\)/,'shared selection artwork excludes its Path, border and corner descendants');
+assert.match(source,/\.opacity\(this.animatePhoto && !this.started \|\| this.onPhotoFrame && this.photoFlightActive \? 0 : 1\)\s*\.hitTestBehavior\(HitTestMode.BLOCK_DESCENDANTS\)/,'search photo artwork is a passive subtree');
+assert.equal(targetAt(probe,22,22,['default','default']),probe[0],'Default ancestors preserve child touch delivery');
+for(const uploadedPhoto of [false,true]) for(const animatePhoto of [false,true]) for(const ratio of [1,20,.05]) for(const corner of [0,1,2,3,-1]) {
+ const node=new CropHost();let searches=0,selections=0;
+ Object.assign(node,{alive:true,presentationActive:true,closing:false,closeRequested:false,relatedOpening:false,photoFlightActive:false,
+  animatePhoto,started:animatePhoto,uploadedPhoto,widthValue:360,heightValue:720,imageWidth:400,imageHeight:400*ratio,
+  intrinsicWidth:400,intrinsicHeight:400*ratio,crop:{x:.1,y:.1,w:.8,h:.8},queueSearch(){searches++;},onPhotoSelection(){selections++;}});
+ const right=corner===1||corner===3,bottom=corner>1;
+ const x=node.photoX()+node.photoWidth()*(corner<0?.5:right?.9:.1);
+ const y=node.photoY()+node.photoHeight()*(corner<0?.5:bottom?.9:.1);
+ const before={...node.crop};const targets=mountTargets(node),target=targetAt(targets,x,y);
+ assert(target,'visible corner/interior has a native touch target');
+ assert.equal(targets.indexOf(target),corner+1,'actual target ordering distinguishes every corner and the move region');
+ assert.equal(target.gesture.options.fingers,1);
+ target.onTouch({type:0});target.gesture.onActionStartCallback();
+ assert.equal(node.dragCorner,corner,'native gesture callback owns its fixed corner without fingerList coordinates');
+ const dx=node.photoWidth()*.02,dy=node.photoHeight()*.02;
+ target.gesture.onActionUpdateCallback({offsetX:dx,offsetY:dy});
+ assert.equal(searches,1);assert.notDeepEqual({...node.crop},before,'real corner drag changes crop');
+ assert.equal(selections,1,'flight selection receives the adjusted crop');
+ assert(node.crop.x>=0&&node.crop.y>=0&&node.crop.x+node.crop.w<=1.000001&&node.crop.y+node.crop.h<=1.000001);
+ if(corner<0){assert(Math.abs(node.crop.w-before.w)<1e-9);assert(Math.abs(node.crop.h-before.h)<1e-9);}
+ else {assert(Math.abs(node.crop.w-before.w)>1e-9);assert(Math.abs(node.crop.h-before.h)>1e-9);}
+ target.gesture.onActionEndCallback();assert.equal(node.dragCorner,-2);
+ target.gesture.onActionUpdateCallback({offsetX:100,offsetY:100});assert.equal(searches,1,'late updates after release cannot move crop');
+ node.startDrag(corner);target.gesture.onActionCancelCallback();assert.equal(node.dragCorner,-2);
+ for(const flag of ['closing','closeRequested','relatedOpening','photoFlightActive']) {
+  node[flag]=true;assert(mountTargets(node).every(t=>t.hitTestBehavior==='none'));node.startDrag(corner);assert.equal(node.dragCorner,-2);node.drag({offsetX:100,offsetY:100},0);assert.equal(searches,1);node[flag]=false;
+ }
+ node.presentationActive=false;node.startDrag(corner);assert.equal(node.dragCorner,-2);
+ node.presentationActive=true;node.alive=false;node.startDrag(corner);assert.equal(node.dragCorner,-2);
+ node.alive=true;node.startDrag(-2);assert.equal(node.dragCorner,-2,'invalid target cannot reuse previous ownership');
+}
+for(const size of [1,8,20,44,100]){
+ const node=new CropHost();Object.assign(node,{canAdjustCrop:()=>true,photoX:()=>50,photoY:()=>70,photoWidth:()=>size,photoHeight:()=>size,crop:{x:0,y:0,w:1,h:1}});
+ const targets=mountTargets(node);
+ for(const [x,y,corner] of [[50,70,0],[50+size,70,1],[50,70+size,2],[50+size,70+size,3]])assert.equal(targets.indexOf(targetAt(targets,x,y)),corner+1,'narrow targets remain individually reachable without overlap');
+ assert.equal(targetAt(targets,0,0),undefined,'outside canvas is not a crop target');
+}
+assert.equal(canvasMode,'default','canvas must allow its child corner and move targets to receive touches');
+assert(!source.includes('fingerList'),'handle recognition must not depend on inferred finger coordinates');
+for(const corner of [-1,0,1,2,3])assert(source.includes('this.cropTouchTarget('+corner+')'),'native target is mounted above artwork');
+assert(cropTrace.some(line=>line.includes('phase=down'))&&cropTrace.some(line=>line.includes('phase=end changed=true')),'touch/start/end diagnostics distinguish delivery from crop mutation');
+console.log('Crop interaction: native target builders and gesture callbacks, every corner/move region, narrow targets, uploaded images, cancellation, isolation and live crop handoff passed');
 assert.match(selectionSource,/Path\(\).commands\(this.maskCommands\(\)\)/);
 assert.match(selectionSource,/borderRadius\(this.selectionRadius\(\)\)/,'mask and border share one radius');
 assert(!selectionSource.includes('Rect().fill'),'rectangular mask pieces must not leave square transparent corners');

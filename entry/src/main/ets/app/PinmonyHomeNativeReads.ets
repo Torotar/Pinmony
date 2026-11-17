@@ -1,4 +1,4 @@
-import { PinmonyCardCarouselData } from 'common_ui';
+import { PinmonyCardCarouselData, pinmonyCardCarouselImages } from 'common_ui';
 import { PinmonyI18n } from 'common_foundation';
 import { PinmonyHomeStore, PinmonyHomeSnapshot, PinmonyHomePin, PinmonyHomeTab, PinmonyHomeBoard } from 'feature_home';
 import { PinmonyBusinessSessionContext } from 'common_session';
@@ -315,7 +315,7 @@ export class PinmonyHomeNativeReads {
       const info: HomeVideoSource | undefined = list['V_HLSV4'] || list['V_720P'];
       const video: PinmonyVideo | undefined = sources.length && info ? { pinId: String(item.id), sources: sources, width: info.width || 0,
         height: info.height || 0, duration: Math.max(0, Math.min(86400000, info.duration || 0)) } : undefined;
-      pins.push({ id: String(item.id), pinUrl: this.origin + '/pin/' + item.id + '/', imageUrl: image.url, imageWidth: image.width, imageHeight: image.height,
+      pins.push({ carouselImages: pinmonyCardCarouselImages(item.carousel_data), id: String(item.id), pinUrl: this.origin + '/pin/' + item.id + '/', imageUrl: image.url, imageWidth: image.width, imageHeight: image.height,
         mediaCount: (Array.isArray(item.carousel_data?.carousel_slots) ? item.carousel_data?.carousel_slots?.length || 0 : 0), video: video, isVideo: item.is_video === true || !!item.videos, title: title.trim().slice(0,160), hasMore: false, saved: this.ports.saved(String(item.id)) });
     }); return pins;
   }

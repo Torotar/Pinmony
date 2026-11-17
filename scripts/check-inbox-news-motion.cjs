@@ -47,13 +47,16 @@ host.inboxStore.retainedChat = {screen: 'chat'};
 assert.equal(slide.call(host), false, 'normal Pin photo geometry is unaffected');
 const effects = {translate: value => ({animation: options => ({value, options})}),
   asymmetric: (enter, leave) => ({enter, leave})};
+let nativeEffect;
 for (const name of ['NATIVE_PAGE_TRANSITION', 'BOARD_PAGE_TRANSITION']) {
   const start = source.indexOf('const ' + name + ':');
-  const declaration = source.slice(start, source.indexOf('\n);', start) + 3);
+  const semicolon = source.indexOf(';', start);
+  const declaration = source.slice(start, semicolon + 1);
   const out = {};
   vm.runInNewContext(ts.transpileModule(declaration + '\nexports.effect=' + name + ';', {
     compilerOptions: {target: ts.ScriptTarget.ES2021}
-  }).outputText, {exports: out, TransitionEffect: effects, Curve: {EaseOut: 'easeOut'}});
+  }).outputText, {exports: out, TransitionEffect: effects, NATIVE_PAGE_TRANSITION: nativeEffect, Curve: {EaseOut: 'easeOut'}});
+  if (name === 'NATIVE_PAGE_TRANSITION') nativeEffect = out.effect;
   assert.deepEqual(out.effect.enter, out.effect.leave, 'entry and back must match');
   assert.equal(out.effect.enter.value.x, '100%');
 }

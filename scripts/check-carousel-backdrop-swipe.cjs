@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const ts = require(process.argv[2] || 'typescript');
+const { carouselEntryIndex } = require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('feature_pin/src/main/ets/services/PinmonyCarouselEntry.ets');
 const carousel = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyCarouselView.ets', 'utf8');
 const page = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
 assert(carousel.includes('private slotNeedsBackdrop('), 'each slide must own its backdrop instead of replacing one shared image');
@@ -49,7 +50,7 @@ const AuditHost = vm.runInNewContext(ts.transpileModule(`class AuditHost { ${met
 const audit = new AuditHost();
 const items = Array.from({ length: 7 }, (_, index) => ({ id: 'slot-' + index, imageUrl: 'image-' + index }));
 Object.assign(audit, { alive: true, identity: 'pin', carousel: { pinId: 'pin', items }, active: true,
-  page: 0, failed: ['slot-2'], revision: 0, uiLanguage: 'zh', backdropRetryVersions: new Map() });
+  page: 0, entryPage: 0, failed: ['slot-2'], revision: 0, uiLanguage: 'zh', backdropRetryVersions: new Map() });
 const initialKeys = items.map(item => audit.backdropRenderKey(item));
 for (const language of ['en', 'zh']) {
   audit.uiLanguage = language;
@@ -102,7 +103,7 @@ function findPageMethods(n) {
 }
 findPageMethods(pageAst);
 assert.equal(pageMethods.length, pageNames.length);
-const PageHost = vm.runInNewContext(ts.transpileModule(`class PageHost { ${pageMethods.join('\n')} } PageHost`, { compilerOptions: { target: 99 } }).outputText);
+const PageHost = vm.runInNewContext(ts.transpileModule(`class PageHost { ${pageMethods.join('\n')} } PageHost`, { compilerOptions: { target: 99 } }).outputText, { carouselEntryIndex });
 const p = new PageHost();
 const detail = { imageWidth: 300, imageHeight: 1000, imageUrl: 'cover' };
 Object.assign(p, { displayedDetail: () => detail, detailMediaWidth: () => 400, heroHeight: () => 500,

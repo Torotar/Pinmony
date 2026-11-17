@@ -78,6 +78,7 @@ export struct PinmonyHomePage {
   @State private suppressSwipeClick: boolean = false;
   @State private homeChromeCollapsed: boolean = false;
   @State private backToTopVisible: boolean = false;
+  @State private backToTopOffset: number = 0;
   private feedScroller: Scroller = new Scroller();
   @State private scrollerRevision: number = 0;
   private readonly categorySwiper: SwiperController = new SwiperController();
@@ -217,7 +218,10 @@ export struct PinmonyHomePage {
   private rememberPosition(id: string, pageKey: string, offset: number, epoch: number = this.presentationEpoch): void {
     if (epoch !== this.presentationEpoch) return;
     this.paneOffsets.set(pageKey + '|' + id, offset);
-    if (pageKey === this.home.pageKey && id === this.selectedId) this.backToTopVisible = offset > 180;
+    if (pageKey === this.home.pageKey && id === this.selectedId) {
+      this.backToTopOffset = offset;
+      this.backToTopVisible = this.backToTopOffset > 0;
+    }
     if (this.onScrollPosition) this.onScrollPosition(pageKey, offset, id);
   }
 
@@ -245,7 +249,7 @@ export struct PinmonyHomePage {
     this.paneScrollers.set(this.paneKey(id), scroller);
     if (id === this.selectedId) {
       this.feedScroller = scroller;
-      try { this.backToTopVisible = scroller.currentOffset().yOffset > 180; }
+      try { this.backToTopOffset = scroller.currentOffset().yOffset; this.backToTopVisible = this.backToTopOffset > 0; }
       catch (_) { this.backToTopVisible = false; }
     }
     this.scrollerRevision++;
@@ -255,7 +259,7 @@ export struct PinmonyHomePage {
     const scroller: Scroller | undefined = this.paneScrollers.get(this.paneKey(this.selectedId));
     if (scroller) { this.feedScroller = scroller; this.scrollerRevision++; }
     this.homeChromeCollapsed = this.paneChrome.get(this.paneKey(this.selectedId)) || false;
-    try { this.backToTopVisible = (scroller?.currentOffset().yOffset || 0) > 180; }
+    try { this.backToTopOffset = (scroller?.currentOffset().yOffset || 0); this.backToTopVisible = this.backToTopOffset > 0; }
     catch (_) { this.backToTopVisible = false; }
   }
 
@@ -543,7 +547,7 @@ export struct PinmonyHomePage {
         .bindToScrollable(this.scrollBinding())
         .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
         .clip(false)
-      PinmonyBackToTopButton({ showButton: this.backToTopVisible && this.presentationActive && !this.pagerMoving &&
+      PinmonyBackToTopButton({ scrollOffsetVp: this.backToTopOffset, showButton: this.backToTopVisible && this.presentationActive && !this.pagerMoving &&
         (this.interactionReady || this.offlinePreview), onBackToTop: () => this.backToTop() })
     }.width('100%').height('100%').clip(true)
       .backgroundColor($r('app.color.page_background'))

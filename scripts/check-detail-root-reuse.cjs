@@ -30,6 +30,7 @@ const routeMethods = ['detailRootIdentity','detailPresentationIdentities','detai
 const Routes = vm.runInNewContext(ts.transpileModule('class Routes {'+routeMethods+'} Routes;',
   {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText);
 const routes = new Routes();
+Object.assign(routes, { detailSiblings: { context: () => undefined }, nativeBusinessSessionContext: () => ({ generation: 1 }) });
 const parent = {pinUrl:'https://www.pinterest.com/pin/101/'}, child = {pinUrl:'https://www.pinterest.com/pin/102/'};
 Object.assign(routes,{pinStore:{detail:parent},detailSearchParents:[],pinIdentity:v=>v.match(/\/pin\/(\d+)/)?.[1] || '',homeEntryCardId:'',homeEntryPhoto:undefined});
 assert.equal(routes.detailPresentationIdentities().join(','),'101');
@@ -50,7 +51,7 @@ require('./product-coordination-harness.cjs').run(ts,ts.transpileModule(`class P
   ${method('viewerOwner')}
 } globalThis.Page = Page;`, { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, context);
 const page = new context.Page();
-Object.assign(page, { detail: { pinUrl: 'https://www.pinterest.com/pin/101/', imageUrl: 'https://i.pinimg.com/1.jpg', kind: 'cached', session: 0 },
+Object.assign(page, { siblingMotion: { present() {} }, siblingSwipe: { cancel() {} }, detail: { pinUrl: 'https://www.pinterest.com/pin/101/', imageUrl: 'https://i.pinimg.com/1.jpg', kind: 'cached', session: 0 },
   traceId: 7, heroIdentityKey: '', heroRenderRevision: 0, heroLoadedUrl: '', activePin: '', heroVisible: true,
   stopHeroDeadline() {}, syncHeroDeadline() {}, auditHeroImage() {},
   uiCommits: { post(_key, action) { action(); } }, syncDetailFlow() {}, queuePhotoFitAudit() {},

@@ -80,5 +80,5 @@ for (const root of fs.readdirSync('.')) {
 }
 assert.equal(constructors, 7, 'audit every official snackbar owner');
 assert.equal(direct, 5, 'board saved feedback and four settings error callers');
-assert.equal(shared, 10, 'common action notice plus nine Index action entry points');
-console.log('Snackbar background blur: 7 owners, 15 show sites, official blur options, theme preservation, timed/persistent notices and action/back callbacks passed');
+assert.equal(shared, 11, 'common action notice plus ten Index action entry points including detail boundary feedback');
+console.log('Snackbar background blur: 7 owners, 16 show sites, official blur options, theme preservation, timed/persistent notices and action/back callbacks passed');

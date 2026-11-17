@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const ts = require(process.argv[2] || 'typescript');
+const { carouselEntryIndex } = require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('feature_pin/src/main/ets/services/PinmonyCarouselEntry.ets');
 const path = 'feature_pin/src/main/ets/components/PinmonyCarouselView.ets';
 const source = fs.readFileSync(path, 'utf8');
 const sf = ts.createSourceFile('carousel.ts', source.replace(/\bstruct\b/g, 'class'), 99, true);
@@ -13,7 +14,7 @@ function visit(node) {
 }
 visit(sf);
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + methods.join('\n') + '} Host;',
-  { compilerOptions: { target: 99 } }).outputText);
+  { compilerOptions: { target: 99 } }).outputText, { carouselEntryIndex });
 const first = { id: 'slot-1', imageUrl: 'https://i.pinimg.com/first.jpg' };
 const second = { id: 'slot-2', imageUrl: 'https://i.pinimg.com/second.jpg' };
 const host = new Host(), events = [];
@@ -41,7 +42,7 @@ assert.equal(host.firstRenderedKey, '', 'changing Pin clears the readiness state
 host.aboutToDisappear();
 host.settleFirstImage(second, 0, 1);
 assert.equal(events.length, 2, 'departed carousel cannot update the detail');
-assert(source.includes('Image(this.previewUrl)') && source.includes('.syncLoad(index === 0)'), 'first slot reuses the decoded cover synchronously');
+assert(source.includes('Image(this.entryPreviewUrl())') && source.includes('.syncLoad(index === this.entryPage)'), 'entry slot reuses the decoded cover synchronously');
 assert.equal((source.match(/event\?\.loadingStatus \?\? -1/g) || []).length, 2, 'both carousel modes gate on actual rendered status');
 const parent = fs.readFileSync('feature_pin/src/main/ets/components/PinmonyDetailPage.ets', 'utf8');
 assert(parent.includes('previewUrl: this.displayedDetail().imageUrl'), 'detail passes its displayed cover into the carousel');
@@ -58,7 +59,7 @@ assert(singleVideo.includes('entryPreview: this.displayedDetail().imageUrl'),
   'single-video entry must reuse its decoded hero just like the first carousel video');
 assert(singleVideo.includes('active: this.videoActive') && singleVideo.includes('sessionReady: this.actionsReady || this.readsReady'),
   'single-video entry preview preserves playback activation and session gates');
-assert(source.includes("entryPreview: index === 0 ? this.previewUrl : ''"),
+assert(source.includes("entryPreview: index === this.entryPage ? this.entryPreviewUrl() : ''"),
   'only the entry slot receives the decoded cover, never adjacent videos');
 const previewLayer = video.match(/if \(!this\.state\.rendered\) \{([\s\S]*?)this\.posterImage\(this\.poster\)/)[1];
 assert(previewLayer.includes("Image(this.entryPreview).width('100%').height('100%').objectFit(ImageFit.Contain).syncLoad(true)"),

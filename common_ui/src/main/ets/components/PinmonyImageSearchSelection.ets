@@ -11,21 +11,36 @@ export struct PinmonyImageSearchSelection {
     return this.cornerSize() * 12 / 28;
   }
 
+  private selectionBorderWidth(): number {
+    // Match image_crop_corner.svg: 3-unit stroke in a 28-unit viewBox.
+    return this.cornerSize() * 3 / 28;
+  }
+
   private cornerSize(): number {
-    // Reserve half the short edge per handle, including very narrow crops.
-    return Math.min(28, this.crop.w * this.photoWidth / 2, this.crop.h * this.photoHeight / 2);
+    // Keep the existing 28vp artwork at 300vp; narrow photos shrink proportionally.
+    // Reserve half the crop's short edge for each handle.
+    return Math.min(28, this.photoWidth * 28 / 300,
+      this.crop.w * this.photoWidth / 2, this.crop.h * this.photoHeight / 2);
   }
 
   private cornerX(index: number): number {
-    // The 28-unit SVG stroke sits at 3 (25 after rotation), not its center.
+    // Place the corner stroke outside the crop. Bound its gap by the photo margin.
     const right: boolean = index === 1 || index === 3;
+    const size: number = this.cornerSize();
+    const inset: number = size * 1.5 / 28;
+    const margin: number = (right ? Math.max(0, 1 - this.crop.x - this.crop.w) : this.crop.x) * this.photoWidth;
+    const gap: number = Math.min(size * 8 / 28, margin);
     return (this.crop.x + (right ? this.crop.w : 0)) * this.photoWidth -
-      this.cornerSize() * (right ? 25 : 3) / 28;
+      (right ? size - inset - gap : inset + gap);
   }
 
   private cornerY(index: number): number {
+    const size: number = this.cornerSize();
+    const inset: number = size * 1.5 / 28;
+    const margin: number = (index > 1 ? Math.max(0, 1 - this.crop.y - this.crop.h) : this.crop.y) * this.photoHeight;
+    const gap: number = Math.min(size * 8 / 28, margin);
     return (this.crop.y + (index > 1 ? this.crop.h : 0)) * this.photoHeight -
-      this.cornerSize() * (index > 1 ? 25 : 3) / 28;
+      (index > 1 ? size - inset - gap : inset + gap);
   }
 
   private maskCommands(): string {
@@ -58,12 +73,12 @@ export struct PinmonyImageSearchSelection {
       Path().commands(this.maskCommands()).fill('#77000000').stroke(Color.Transparent)
         .width(this.photoWidth).height(this.photoHeight)
       Row().width(this.crop.w * this.photoWidth).height(this.crop.h * this.photoHeight)
-        .border({ width: 1, color: Color.White }).borderRadius(this.selectionRadius()).backgroundColor(Color.Transparent)
+        .border({ width: this.selectionBorderWidth(), color: Color.White }).borderRadius(this.selectionRadius()).backgroundColor(Color.Transparent)
         .position({ x: this.crop.x * this.photoWidth, y: this.crop.y * this.photoHeight })
       this.corner(0)
       this.corner(1)
       this.corner(2)
       this.corner(3)
-    }.width(this.photoWidth).height(this.photoHeight).hitTestBehavior(HitTestMode.None)
+    }.width(this.photoWidth).height(this.photoHeight).hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
   }
 }

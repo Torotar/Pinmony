@@ -1,4 +1,5 @@
 export { PinmonyStatusPage } from './src/main/ets/components/PinmonyStatusPage';
+export { PinmonyDetailSource, PinmonyDetailSourceCard, PinmonyDetailSources } from './src/main/ets/services/PinmonyDetailSource';
 export { PinmonyUiCommitQueue } from './src/main/ets/services/PinmonyUiCommitQueue';
 export { PinmonyListDataSource } from './src/main/ets/services/PinmonyListDataSource';
 export { PinmonyActionNotice } from './src/main/ets/components/PinmonyActionNotice';
@@ -51,3 +52,5 @@ export { PinmonySearchControlMaterial, PinmonySearchControlModifier } from './sr
 export { PinmonyPinCountBadge, PinmonyCardCarouselData } from './src/main/ets/components/PinmonyPinCountBadge';
 
 export { PinmonyCardMediaBadge } from './src/main/ets/components/PinmonyCardMediaBadge';
+export { PinmonyCardCarousel } from './src/main/ets/components/PinmonyCardCarousel';
+export { PinmonyCardImage, pinmonyCardCarouselImages, normalizeCardCarouselImages } from './src/main/ets/models/PinmonyCardCarousel';

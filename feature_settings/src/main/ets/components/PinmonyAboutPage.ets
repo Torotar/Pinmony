@@ -124,7 +124,7 @@ export struct PinmonyAboutPage {
     catch (_) { PinmonyRuntimeLog.warn('About: copy feedback unavailable'); }
   }
   private async openUpdateDownload(): Promise<void> {
-    await this.openLink('https://appgallery.huawei.com/apptest/CfRhJnKdQS');
+    await this.openLink('https://github.com/Torotar/Pinmony/releases');
   }
 
   @Builder

@@ -1,3 +1,4 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonySearchCategoryBar, PinmonySearchCategoryBarController } from './PinmonySearchCategoryBar';
 import { PinmonySearchImagePrefetch } from '../services/PinmonySearchImagePrefetch';
@@ -33,6 +34,30 @@ interface PinmonySearchResultRow {
 
 @Component
 export struct PinmonySearchPage {
+  private sourceLifetime: number = 0;
+  private sourceIdentity(): string { return 'search:' + this.snapshot.pageKey + ':' + this.snapshot.session; }
+  private stageDetailSource(): void {
+    const identity: string = this.sourceIdentity();
+    const lifetime: number = this.sourceLifetime;
+    PinmonyDetailSources.stage({ identity: identity, pageUrl: this.snapshot.pageKey, session: this.snapshot.session,
+      cards: (): PinmonyDetailSourceCard[] => {
+        if (lifetime !== this.sourceLifetime || identity !== this.sourceIdentity()) return [];
+        return this.snapshot.results.filter((pin: PinmonySearchResult): boolean => pin.enabled && /\/pin\/\d+/.test(pin.targetUrl)).map((pin: PinmonySearchResult): PinmonyDetailSourceCard => ({
+          pinUrl: pin.targetUrl, cardId: 'pinmony-search-photo-' + pin.targetUrl, imageUrl: pin.imageUrl,
+          imageWidth: pin.imageWidth, imageHeight: pin.imageHeight }));
+      },
+      locate: (card: PinmonyDetailSourceCard): void => {
+        const index: number = this.snapshot.results.findIndex((pin: PinmonySearchResult): boolean => pin.targetUrl === card.pinUrl);
+        this.scrollRestoreRevision++; this.restoringResultsScroll = false;
+        if (index >= 0) this.resultsScroller.scrollToIndex(index, false, ScrollAlign.CENTER);
+      }, didLocate: (): void => {
+        try {
+          this.resultsOffset = Math.max(0, this.resultsScroller.currentOffset().yOffset);
+          this.onResultsScrollPosition?.(this.snapshot.pageKey, this.resultsOffset);
+        } catch (_) {}
+      } });
+  }
+
   @StorageLink('pinmonyRecoveryScrollRevision') @Watch('applyRecoveredPosition') private recoveryScrollRevision: number = 0;
   private applyRecoveredPosition(): void {
     if (AppStorage.get<string>('pinmonyRecoveryScrollKind') !== 'search' || AppStorage.get<string>('pinmonyRecoveryScrollPage') !== this.snapshot.pageKey) return;
@@ -349,6 +374,7 @@ export struct PinmonySearchPage {
   private readonly searchPathStack: NavPathStack = new NavPathStack();
   private pagePresent: boolean = false;
   @State private backToTopVisible: boolean = false;
+  @State private backToTopOffset: number = 0;
   private presentationTrace: string = '';
 
   private ensureSearchDestination(): void {
@@ -504,7 +530,7 @@ export struct PinmonySearchPage {
       try {
         const scroller: Scroller = this.snapshot.query ? this.resultsScroller : this.discoveryScroller;
         scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
-        this.backToTopVisible = (scroller.offset()?.yOffset || 0) > 180;
+        this.backToTopOffset = (scroller.offset()?.yOffset || 0); this.backToTopVisible = this.backToTopOffset > 0;
         this.updateSearchHeaderSurface(offset);
       } catch (error) {
         this.backToTopVisible = false;
@@ -522,7 +548,7 @@ export struct PinmonySearchPage {
       const position = scroller.offset();
       if (!position) return;
       this.resultsOffset = Math.max(0, position.yOffset);
-      this.backToTopVisible = this.resultsOffset > 180;
+      this.backToTopOffset = this.resultsOffset; this.backToTopVisible = this.backToTopOffset > 0;
       if (!force && this.lastReportedResultsOffset >= 0 && Math.abs(this.resultsOffset - this.lastReportedResultsOffset) < 1) return;
       this.lastReportedResultsOffset = this.resultsOffset;
       this.updateSearchHeaderSurface(this.resultsOffset);
@@ -532,7 +558,7 @@ export struct PinmonySearchPage {
     }
   }
 
-  aboutToDisappear(): void {
+  aboutToDisappear(): void { this.sourceLifetime++;
     this.backToTopVisible = false;
     this.imagePrefetch.clear();
     this.upcomingImageUrls = [];
@@ -1301,7 +1327,7 @@ export struct PinmonySearchPage {
           .id('pinmony-search-photo-' + result.targetUrl)
           .overlay(this.pinCountBadge(result.mediaCount || 0), { align: Alignment.TopStart })
           .onClick(() => {
-            if (this.interactionReady && result.enabled && this.onResult) this.onResult(result.targetUrl);
+            if (this.interactionReady && result.enabled && this.onResult) { this.stageDetailSource(); this.onResult(result.targetUrl); }
           })
       } else if (this.failedImages.indexOf(result.imageUrl) >= 0 || !result.imageUrl) {
         Column() {
@@ -1372,7 +1398,7 @@ export struct PinmonySearchPage {
     .height(this.pinCardHeight(result))
     .alignItems(HorizontalAlign.Start)
     .accessibilityText(result.title + this.uiText("pm_open_search_result_143231c5"))
-    .onClick(() => { if (result.enabled && this.onResult) this.onResult(result.targetUrl); })
+    .onClick(() => { if (result.enabled && this.onResult) { this.stageDetailSource(); this.onResult(result.targetUrl); } })
   }
 
   @Builder
@@ -1406,7 +1432,7 @@ export struct PinmonySearchPage {
         .accessibilityText(result.followBusy ? this.uiText("pm_submitting_board_follow_action_882403f9") : result.following ? this.uiText("pm_unfollow_board_ac069feb") : this.uiText("pm_follow_board_3813420f"))
         .onClick(() => { if (this.interactionReady && result.canFollow && this.onFollowBoard) this.onFollowBoard(result.id); })
     }.width('100%').alignItems(HorizontalAlign.Start)
-      .onClick(() => { if (this.interactionReady && result.enabled && this.onResult) this.onResult(result.targetUrl); })
+      .onClick(() => { if (this.interactionReady && result.enabled && this.onResult) { this.stageDetailSource(); this.onResult(result.targetUrl); } })
   }
 
   @Builder
@@ -1469,7 +1495,7 @@ export struct PinmonySearchPage {
     .padding({ left: 18, right: 18, top: 10, bottom: 10 })
     .opacity(result.enabled ? 1 : 0.45)
     .accessibilityText(result.title + (result.subtitle ? '，' + result.subtitle : ''))
-    .onClick(() => { if (result.enabled && this.onResult) this.onResult(result.targetUrl); })
+    .onClick(() => { if (result.enabled && this.onResult) { this.stageDetailSource(); this.onResult(result.targetUrl); } })
   }
 
   private hasProductFilter(kind: string): boolean {
@@ -1843,7 +1869,7 @@ export struct PinmonySearchPage {
                 TransitionEffect.translate({ x: '100%' }).animation({ duration: 180, curve: Curve.EaseOut }) :
                 TransitionEffect.IDENTITY)
           }
-          PinmonyBackToTopButton({ showButton: this.backToTopVisible && this.canBackToTop(name),
+          PinmonyBackToTopButton({ scrollOffsetVp: this.backToTopOffset, showButton: this.backToTopVisible && this.canBackToTop(name),
             onBackToTop: () => this.backToTop(name) })
         }.width('100%').height('100%')
       }

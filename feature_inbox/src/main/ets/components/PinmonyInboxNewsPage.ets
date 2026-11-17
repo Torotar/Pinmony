@@ -1,3 +1,4 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { HdsNavigation, HdsNavDestination, HdsNavDestinationTitleMode, HdsNavigationTitleBarOptions, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { PinmonyI18n, PinmonyRuntimeLog } from 'common_foundation';
@@ -16,6 +17,24 @@ export struct PinmonyInboxNewsPage {
   onMenu?: (url: string) => void;
   onCoveredBack?: () => boolean;
   private readonly scroller: Scroller = new Scroller();
+
+  private sourceLifetime: number = 0;
+  private stageDetailSource(): void {
+    const lifetime: number = this.sourceLifetime;
+    const page: string = this.snapshot.pageUrl;
+    const session: number = this.snapshot.session;
+    PinmonyDetailSources.stage({ identity: 'news:' + page + ':' + session, pageUrl: page, session: session,
+      cards: (): PinmonyDetailSourceCard[] => lifetime === this.sourceLifetime && page === this.snapshot.pageUrl && session === this.snapshot.session ?
+        (this.snapshot.newsCards || []).filter((item: PinmonyInboxNewsCard): boolean => /\/pin\/\d+/.test(item.target)).map((item: PinmonyInboxNewsCard): PinmonyDetailSourceCard => ({
+          pinUrl: item.target, cardId: 'pinmony-news-photo-' + item.id, imageUrl: item.image,
+          imageWidth: item.imageWidth, imageHeight: item.imageHeight })) : [],
+      locate: (card: PinmonyDetailSourceCard): void => {
+        const ui = this.getUIContext(); const rect = ui.getComponentUtils().getRectangleById(card.cardId);
+        this.scroller.scrollTo({ xOffset: 0, yOffset: Math.max(0, this.scroller.currentOffset().yOffset + ui.px2vp(rect.windowOffset.y) - 160), animation: false });
+      } });
+  }
+  aboutToDisappear(): void { this.sourceLifetime++; }
+
   private restorePending: boolean = true;
   private readonly paths: NavPathStack = new NavPathStack();
   private text(key: string): string { return PinmonyI18n.text(key,this.uiLanguage); }
@@ -32,6 +51,7 @@ export struct PinmonyInboxNewsPage {
     PinmonyRuntimeLog.info('InboxNewsTrace: phase=ui-action action=' + action + ' active=' + this.active.toString());
     if (!this.active) return;
     this.saveScroll();
+    if (action === 'newsOpen') this.stageDetailSource();
     this.onAction(action, value);
   }
   private column(left: boolean): PinmonyInboxNewsCard[] {

@@ -14,6 +14,7 @@ function method(text, name) {
 const Host = vm.runInNewContext(ts.transpileModule(`class Host {
   ${method(source, 'selectDetailEntryMotion')}
   ${method(source, 'backFromDetail')}
+  ${method(source, 'prepareSiblingCardReturn')}
   ${method(source, 'inboxNewsPinSlide')}
 } Host;`, { compilerOptions: { target: 99 } }).outputText, {
   PinmonyRuntimeLog: { info() {} }, display: { getDefaultDisplaySync: () => ({ width: 400, height: 900 }) }
@@ -21,6 +22,7 @@ const Host = vm.runInNewContext(ts.transpileModule(`class Host {
 const home = 'https://www.pinterest.com/', pin = id => home + 'pin/' + id + '/';
 const id = value => String(value || '').match(/\/pin\/(\d+)/)?.[1] || '';
 const n = new Host(), parents = new Map([[pin(1), home], [pin(2), pin(1)], [pin(3), pin(2)]]);
+Object.assign(n, { detailSiblings: { context: () => undefined } });
 const cache = new Map([['1', { detail: { pinUrl: pin(1), kind: 'cached' }, scrollOffset: 120 }],
   ['2', { detail: { pinUrl: pin(2), kind: 'cached' }, scrollOffset: 240 }]]);
 let generation = 1;

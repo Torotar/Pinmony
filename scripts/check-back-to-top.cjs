@@ -63,7 +63,7 @@ results.y = 0; search.reportResultsScroll(); assert.equal(search.backToTopVisibl
 
 const board = host('board', ['canBackToTop', 'backToTop']);
 const parent = scroller(), section = scroller(); let phase = '';
-Object.assign(board, { headerScrolled: true, snapshot: {}, phase: () => phase,
+Object.assign(board, { headerScrolled: true, backToTopOffset: 500, snapshot: {}, phase: () => phase,
   contentScroll: () => phase === 'section' ? section : parent });
 board.backToTop(); topOnly(parent); phase = 'section'; board.backToTop(); topOnly(section);
 for (const blocked of ['edit', 'targets', 'organize', 'archive']) {
@@ -93,7 +93,7 @@ assert.deepEqual(offsets.at(-1), ['pin', 0], 'Existing return-position persisten
 const component = fs.readFileSync('common_ui/src/main/ets/components/PinmonyBackToTopButton.ets', 'utf8');
 assert(component.includes("@StorageLink('pinmonyLanguage')"));
 assert(component.includes("PinmonyI18n.text('pm_back_to_top', this.uiLanguage)"));
-assert(component.includes('.enabled(this.showButton)'));
+assert(component.includes('.enabled(this.shouldShow())'));
 assert(component.includes('Visibility.Hidden'));
 for (const locale of ['base', 'zh_CN', 'zh_TW', 'en_US', 'en_GB', 'ja', 'ko', 'ru', 'pt_BR', 'ar']) {
   const rows = JSON.parse(fs.readFileSync(`common_foundation/src/main/resources/${locale}/element/string.json`, 'utf8')).string;

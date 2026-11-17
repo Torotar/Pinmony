@@ -13,7 +13,7 @@ function member(name) {
 }
 let creates = 0, updates = 0, disposals = 0;
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + [
-  'hubTopTitleContent', 'hubTopTitleKey', 'hubTitleSettings', 'hubTitleTabSelected', 'hubControlMaterials', 'hubMaterialConfiguration',
+  'hubTopTitleContent', 'hubTopTitleKey', 'hubTitleSettings', 'hubTitleTabSelected', 'hubControlMaterials', 'hubMaterialConfiguration', 'legacyPendingSnapshots',
   'hubTitleColor', 'updateHubTitleContent', 'aboutToDisappear'
 ].map(member).join('\n') + '} Host;', { compilerOptions: { target: ts.ScriptTarget.ES2021 } }).outputText, {
   ComponentContent: class {
@@ -72,7 +72,9 @@ retained.options.onTabSelected('pins'); retained.options.onSettings();
 assert.equal(changedIndex, -1); assert.equal(settings, 0, 'covered title callbacks cannot act');
 page.interactionReady = true; page.updateHubTitleContent(); retained.options.onSettings(); assert.equal(settings, 1);
 page.hubControlMaterials.set('publish',{});page.hubMaterialConfiguration='immersive:false';
+page.legacyPendingSnapshots.set('created', {});
 page.aboutToDisappear(); assert.equal(disposals, 1); assert.equal(stopped, 1);
+assert.equal(page.legacyPendingSnapshots.size, 0, 'disposed pages release pending section snapshots');
 assert.equal(page.hubControlMaterials.size,0);assert.equal(page.hubMaterialConfiguration,'','disposed pages release retained material objects');
 assert.equal(page.hubTopTitleContent, undefined); assert.equal(page.hubTopTitleKey, '');
 page.updateHubTitleContent(); assert.equal(creates, 2, 'new lifetime creates fresh content after disposal');

@@ -1,4 +1,5 @@
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab } from '../models/PinmonyHome';
+import { normalizeCardCarouselImages } from 'common_ui';
 import { ApiCache, buildCacheKey, CACHE_TTL, PinmonyRuntimeLog } from 'common_foundation';
 export interface PinmonyHomeCacheRecord { snapshot: PinmonyHomeSnapshot; }
 interface PinmonyHomeCacheKeyParams { pageKey: string; }
@@ -52,6 +53,7 @@ export function normalizeHomeCacheRecord(record: PinmonyHomeCacheRecord, pageKey
       Number.isFinite(pin.imageWidth) && pin.imageWidth > 0 && Number.isFinite(pin.imageHeight) && pin.imageHeight > 0)
       .slice(0, 60).map((pin: PinmonyHomePin): PinmonyHomePin => ({
         id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
+        carouselImages: normalizeCardCarouselImages(pin.carouselImages),
         imageWidth: pin.imageWidth, imageHeight: pin.imageHeight,
         mediaCount: Number.isInteger(pin.mediaCount) && (pin.mediaCount || 0) > 1 ? pin.mediaCount : undefined,
         isVideo: pin.isVideo === true || !!pin.video,

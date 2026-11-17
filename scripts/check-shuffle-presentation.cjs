@@ -121,10 +121,10 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  assert.doesNotMatch(canvas,/\.gesture\(/,'item clicks must yield to the parent scroll recognizer');
  const root=method('entry/src/main/ets/pages/Index.ets','detailRootIdentity');
  const Identity=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Identity {'+root+'} Identity;',{compilerOptions:{target:99}}).outputText);
- const retained=new Identity();Object.assign(retained,{pinStore:{detail:{pinUrl:pin}},pinIdentity:s=>s,shuffleParentDetail:{pinUrl:'parent'},shuffleSelectedImage:image.url,collageDetailPinUrl:pin});
+ const retained=new Identity();Object.assign(retained,{pinStore:{detail:{pinUrl:pin}},pinIdentity:s=>s,shuffleParentDetail:{pinUrl:'parent'},shuffleSelectedImage:image.url,collageDetailPinUrl:pin,detailSiblings:{context:()=>undefined},nativeBusinessSessionContext:()=>({generation:1})});
  const before=retained.detailRootIdentity();retained.pinStore.detail={pinUrl:'child2'};retained.collageDetailPinUrl='child2';
  assert.equal(retained.detailRootIdentity(),before,'sibling selection must not remount the carousel');
- const parentRoot=new Identity();Object.assign(parentRoot,{pinStore:{detail:{pinUrl:'parent',shuffleId:'303'}},pinIdentity:s=>s});assert.equal(parentRoot.detailRootIdentity(),before,'thumbnail opening reuses the original collage destination');
+ const parentRoot=new Identity();Object.assign(parentRoot,{pinStore:{detail:{pinUrl:'parent',shuffleId:'303'}},pinIdentity:s=>s,detailSiblings:{context:()=>undefined},nativeBusinessSessionContext:()=>({generation:1})});assert.equal(parentRoot.detailRootIdentity(),before,'thumbnail opening reuses the original collage destination');
  owner.pinStore.detail={pinUrl:'https://www.pinterest.com/pin/505/'};owner.pinStore.detailPin=owner.pinStore.detail.pinUrl;owner.currentPinUrl=()=>pin;owner.pinStore.detailNativeReadsReady=false;owner.pinStore.detailPreparing=true;owner.detailNativeReads.owned=()=>false;
  owner.openShufflePin('item-1');assert.equal(opens.length,3,'rapid sibling swipe must not await previous Pin metadata');
  assert.equal(opens[2][0],'https://www.pinterest.com/pin/202/');
@@ -134,7 +134,8 @@ const job={id:'native_detail_aux_shuffle_1',page:pin,epoch:1,method:'GET',body:'
  const Full=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Full {'+fullMethod+'} Full;',{compilerOptions:{target:99}}).outputText);
  const full=new Full();Object.assign(full,{shuffleSelectedImage:image.url,shuffleSelectedPin:pin,shuffleSelectedIndex:2,shuffleSiblingItems:[second],shuffleParentDetail:{pinUrl:'parent'},pinStore:{detail:{pinUrl:pin},videoForeground:true,detailNativeReadsReady:true,detailPreparing:false},currentPinUrl:()=>pin,authStatus:'authenticated',businessSuspended:false,detailNativeReads:{owned:()=>true},activeSheetKind:''});
  full.openShuffleDetail(pin);assert.equal(full.shuffleFullDetail,true);assert.equal(full.shuffleSelectedIndex,2);assert.equal(full.shuffleParentDetail.pinUrl,'parent');assert.equal(full.shuffleSelectedImage,image.url);
- const back=method('entry/src/main/ets/pages/Index.ets','backFromDetail');
+ Object.assign(full,{detailSiblings:{context:()=>undefined},nativeBusinessSessionContext:()=>({generation:1})});
+ const back=method('entry/src/main/ets/pages/Index.ets','backFromDetail')+method('entry/src/main/ets/pages/Index.ets','prepareSiblingCardReturn');
  const Back=vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Back {'+back+'} Back;',{compilerOptions:{target:99}}).outputText,{PinmonyRuntimeLog:{info:()=>{}},Date});
  Object.setPrototypeOf(full,Back.prototype);full.pageHistory={isPending:()=>false};full.pinStore.shareBackHandledUntil=0;await full.backFromDetail();assert.equal(full.shuffleFullDetail,false);assert.equal(full.shuffleSelectedIndex,2,'back restores the same selected content');
  const layoutFile='feature_pin/src/main/ets/components/PinmonyDetailPage.ets';

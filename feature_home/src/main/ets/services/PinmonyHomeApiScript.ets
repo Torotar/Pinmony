@@ -111,6 +111,25 @@ export const PIN_HOME_API_SCRIPT: string = `
     if (!active) attempted = false;
     lastRequestKey = ''; lastRequestAt = 0;
   }
+  function cardCarouselImages(data) {
+    var slots = data && data.carousel_slots;
+    if (!Array.isArray(slots) || slots.length < 2 || slots.length > 100) return [];
+    var images = [];
+    for (var i = 0; i < slots.length; i++) {
+      var slot = slots[i], image = null;
+      ['474x', '736x', '564x', 'orig', '236x'].some(function (size) {
+        var value = slot && slot.images && slot.images[size], url;
+        try { url = new URL(value && value.url); } catch (_) { return false; }
+        if (typeof value.url !== 'string' || value.url.length > 2000 || url.protocol !== 'https:' ||
+            !(url.hostname === 'pinimg.com' || url.hostname.endsWith('.pinimg.com')) ||
+            !Number.isFinite(value.width) || value.width <= 0 || !Number.isFinite(value.height) || value.height <= 0) return false;
+        image = value; return true;
+      });
+      if (!image) return [];
+      images.push({ id: String(slot.id || slot.slot_id || i), url: image.url, width: image.width, height: image.height });
+    }
+    return images;
+  }
   function mapPins(data) {
     var result = [], seen = {};
     data.forEach(function (pin) {
@@ -142,7 +161,7 @@ export const PIN_HOME_API_SCRIPT: string = `
         width: Number(info.width) || 0, height: Number(info.height) || 0,
         duration: Math.max(0, Math.min(86400000, Number(info.duration) || 0)) } : undefined;
       seen[pin.id] = true;
-      result.push({ id: String(pin.id), pinUrl: location.origin + '/pin/' + pin.id + '/',
+      result.push({ carouselImages: cardCarouselImages(pin.carousel_data), id: String(pin.id), pinUrl: location.origin + '/pin/' + pin.id + '/',
         mediaCount: Array.isArray(pin.carousel_data && pin.carousel_data.carousel_slots) ? pin.carousel_data.carousel_slots.length : 0, imageUrl: image.url, video: video, isVideo: pin.is_video === true || !!pin.videos, imageWidth: image.width, imageHeight: image.height,
         title: title.trim().slice(0, 160), hasMore: false });
     });

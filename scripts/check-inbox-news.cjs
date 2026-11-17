@@ -31,7 +31,7 @@ assert(uiBegin>=0 && uiEnd>uiBegin && dispatchBegin>=0 && dispatchEnd>dispatchBe
 const callbacks={};vm.runInNewContext(require('./native-network-test-fixture.cjs').transpile(ts, 'class Ui {'+uiSource.slice(uiBegin,uiEnd)+'} class Host {'+hostSource.slice(dispatchBegin,dispatchEnd)+'} exports.Ui=Ui;exports.Host=Host;',{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{exports:callbacks,PinmonyRuntimeLog:{info(){}}});
 const ui=new callbacks.Ui(),clickHost=new callbacks.Host(),inFlight=[];let covered=false;
 clickHost.inboxNewsInteractive=()=>!covered;clickHost.inboxNewsNativeReads=click.reader;
-ui.active=true;ui.scroller={currentOffset(){throw Error('scroller not bound during transition');}};
+ui.stageDetailSource=()=>{};ui.active=true;ui.scroller={currentOffset(){throw Error('scroller not bound during transition');}};
 ui.onAction=(action,value)=>inFlight.push(clickHost.dispatchInboxNewsAction(action,value));
 ui.act('newsOpen','search:fixture search');await Promise.all(inFlight.splice(0));assert.equal(click.searches.length,1,'unavailable scroll cannot swallow card navigation');
 ui.scroller={currentOffset:()=>({yOffset:420})};ui.act('newsOpen','pin:7');await Promise.all(inFlight.splice(0));assert.equal(click.pins.length,1);assert.equal(click.store.inboxFlow.newsScrollOffset,420);
@@ -68,7 +68,7 @@ for(const previous of ['landing','results','uncached','same-query','evicted']){
  const old={kind:'state',session:0,pageKey:previousPage,query:previous==='same-query'?'fixture search':previous==='results'?'previous':'',placeholder:'',selectedCategory:'',categories:[],suggestions:[],heroes:[],ideaSections:[],results:previous==='results'?[{id:'fixture-old'}]:[]};
  if(previous!=='uncached'){store.search=old;store.searchScrollOffset=317;store.searchCache.put(old,317);}
  const root=new Map([[1,previousPage]]);const newsParent={...parent};let pauses=0,navigations=0;
- const integration={inboxStore:{inboxFlow:newsParent},searchStore:store,rootTabAddresses:root,activeTab:2,authStatus:'authenticated',topicSearchReturns:[],nativeBusinessSessionContext:()=>({origin,generation:1}),searchController:runtime.controller,
+ const integration={inboxStore:Object.assign(new Store(),{inboxFlow:newsParent}),searchStore:store,rootTabAddresses:root,activeTab:2,authStatus:'authenticated',topicSearchReturns:[],nativeBusinessSessionContext:()=>({origin,generation:1}),searchController:runtime.controller,
   restoreRetainedSearch:page=>runtime.controller.restoreRetainedSearch(page),restoreInboxNewsSearchRoot:restoreRoot,
   currentSearchPageKey:()=>root.get(1),searchNativeReads:{pause(){pauses++},navigate(target){navigations++;root.set(1,target);store.search={...old,pageKey:target,query:'temporary',results:[{id:'fixture-temporary'}]};return true}},searchDiscoveryNativeReads:{pause(){pauses++}},
   navigationCoordinator:{selectNativeRootTab(i){integration.activeTab=i;integration.inboxStore.inboxFlow=undefined;}},selectNativeRootTab:selectTab};

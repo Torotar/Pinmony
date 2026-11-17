@@ -1,3 +1,5 @@
+import { PinmonyDetailSourceCard, PinmonyCardImage } from 'common_ui';
+import { PinmonyDetailSiblingNavigation, PinmonyDetailSiblingContext, PinmonyDetailReturnRect } from '../app/PinmonyDetailSiblingNavigation';
 import { PinmonyLoggedOutAccounts, PinmonyLoggedOutAccountPorts } from 'feature_settings';
 import { PinmonyAccountEntryMemory, PinmonySessionAccount, PinmonySessionAccounts, PinmonySessionAccountsPorts } from 'feature_settings';
 import { PinmonySessionVerificationResult } from 'common_session';
@@ -324,6 +326,7 @@ struct Index {
   @State private settingsStore: PinmonySettingsStore = new PinmonySettingsStore();
   @State private chatSettingsUnderlay: PinmonyInboxFlowSnapshot | undefined = undefined;
   @State private profileChatActive: boolean = false;
+  @State private profileRootViewportHeightVp: number = 0;
   private profileChatOpening: boolean = false;
   @State private boardRecoveryVisible: boolean = false;
   @State private profileStore: PinmonyProfileStore = new PinmonyProfileStore();
@@ -559,6 +562,8 @@ struct Index {
   private postSnack: HdsSnackBar | undefined = undefined;
   private postSnackToken: number = 0;
   private postSnackExpiresAt: number = 0;
+  private siblingBoundarySnackToken: number = 0;
+  private siblingBoundarySnackStep: number = 0;
   private systemShareLoadingToken: number = 0;
   @State private loadFailed: boolean = false;
   @State private failureDetails: string = '';
@@ -2677,7 +2682,7 @@ struct Index {
     };
   }
 
-  aboutToDisappear(): void {
+  aboutToDisappear(): void { this.detailSiblings.clear();
     this.pageRecovery.cancel(); PinmonyPageRecovery.unbind();
     this.homeCacheIoEpoch++;
     this.homeImageWarmup.dispose();
@@ -2966,7 +2971,7 @@ struct Index {
 
   private cancelNativeNetwork(id: string): void { return this.networkBridgeCoordinator.cancelNativeNetwork(id); }
 
-  private resetAuthenticatedContent(): void { this.inboxBackgroundSync.stop(); this.chatProfileTransition = false; this.chatProfileVisible = false; this.chatProfileDepth = -1; this.chatProfileParentActive = false; this.profileChatActive = false; this.profileChatOpening = false; this.retainedProfilePanel = undefined; this.panelProfileVisible = false; this.panelProfileDepth = -1; this.detailEntryPhotos.clear(); this.detailEntryCards.clear(); this.detailSearchParents = []; this.homeEntryResumed = false; this.boardRecoveryVisible = false; this.controllerLifecycle().resetHost(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
+  private resetAuthenticatedContent(): void { this.detailSiblings.clear(); this.siblingReturnPending = false; this.siblingReturnPrepared = '';  this.inboxBackgroundSync.stop(); this.chatProfileTransition = false; this.chatProfileVisible = false; this.chatProfileDepth = -1; this.chatProfileParentActive = false; this.profileChatActive = false; this.profileChatOpening = false; this.retainedProfilePanel = undefined; this.panelProfileVisible = false; this.panelProfileDepth = -1; this.detailEntryPhotos.clear(); this.detailEntryCards.clear(); this.detailSearchParents = []; this.homeEntryResumed = false; this.boardRecoveryVisible = false; this.controllerLifecycle().resetHost(); this.profileBoardOrigins.clear(); this.followingBoardReturn = undefined; this.boardNativeReads.reset(); this.profileNativeReads.reset(); this.inboxUpdatesNativeReads.reset(); this.inboxMessagesNativeReads.reset(); this.inboxUnreadNativeReads.reset(); this.inboxMessageNotice.reset(); this.resetNoticeChats(); this.searchNativeReads.reset(); this.searchDiscoveryNativeReads.reset(); return this.sessionCoordinator.resetAuthenticatedContent(); }
 
   private updateAuthState(value: string): void {
     if(this.nativeLoginEnabled && (!this.loginHostMounted || this.loadFailed))return;
@@ -4527,6 +4532,7 @@ struct Index {
     const home: PinmonyHomeSnapshot | undefined = this.homeStore.homeForPresentation(
       this.homePresentationPageKey() || this.retainedHomeRootPageKey());
     const pin: PinmonyHomePin | undefined = home?.pins.find((item: PinmonyHomePin): boolean => item.id === id);
+    const entryImage: PinmonyCardImage | undefined = pin?.carouselImages?.find((photo: PinmonyCardImage): boolean => photo.url === displayedImageUrl);
     if (pin && this.authStatus === 'authenticated' && !this.businessSuspended && this.activeTab === 0) {
       try {
         const ui = this.getUIContext();
@@ -4534,11 +4540,95 @@ struct Index {
         const width: number = ui.px2vp(rect.size.width), height: number = ui.px2vp(rect.size.height);
         if (width > 0 && height > 0) this.homeEntryPhoto = { pinUrl: pin.pinUrl, imageUrl: displayedImageUrl || pin.imageUrl,
           x: ui.px2vp(rect.windowOffset.x), y: ui.px2vp(rect.windowOffset.y), width: width, height: height,
-          imageWidth: pin.imageWidth, imageHeight: pin.imageHeight };
+          imageWidth: entryImage?.width || pin.imageWidth, imageHeight: entryImage?.height || pin.imageHeight };
       } catch (_) {}
     }
     return this.homeController.openHomePin(id);
   }
+
+  private readonly detailSiblings: PinmonyDetailSiblingNavigation = new PinmonyDetailSiblingNavigation();
+  @State private siblingReturnPending: boolean = false;
+  private siblingReturnPrepared: string = '';
+  @State private siblingSwitching: boolean = false;
+
+  private canSwitchDetailSibling(trace: boolean = false, step: number = 0): boolean {
+    const pin: string = this.pinStore.detail?.pinUrl || '';
+    const generation: number = this.nativeBusinessSessionContext().generation;
+    const hasTarget: boolean = step === 0 ? this.detailSiblings.available(pin, generation) :
+      !!this.detailSiblings.next(pin, generation, step);
+    const allowed: boolean = !!pin && this.authStatus === 'authenticated' && !this.businessSuspended && this.pinStore.videoForeground &&
+      !this.showNativeSheet && !this.activeSheetKind && !this.pinStore.imageLayer && !this.pinStore.detailWebFlow &&
+      !this.homeEntryClosing && !this.siblingReturnPending && !this.pinStore.detailPreparing &&
+      (this.pinStore.detail?.kind !== 'opening' || !!this.pinStore.detailApiError) && !this.siblingSwitching &&
+      hasTarget;
+    if (trace && !allowed) PinmonyRuntimeLog.info('DetailSiblingTrace: phase=host-blocked source=' +
+      hasTarget + ' step=' + step +
+      ' auth=' + (this.authStatus === 'authenticated') + ' suspended=' + this.businessSuspended +
+      ' foreground=' + this.pinStore.videoForeground + ' sheet=' + (!!this.showNativeSheet || !!this.activeSheetKind) +
+      ' layer=' + (!!this.pinStore.imageLayer || !!this.pinStore.detailWebFlow) +
+      ' transition=' + (this.homeEntryClosing || this.siblingReturnPending || this.siblingSwitching) +
+      ' preparing=' + this.pinStore.detailPreparing + ' opening=' + (this.pinStore.detail?.kind === 'opening'));
+    return allowed;
+  }
+
+  private switchDetailSibling(step: number = 1): void {
+    if (!this.canSwitchDetailSibling(false, step)) return;
+    const pin: string = this.pinStore.detail?.pinUrl || '';
+    const generation: number = this.nativeBusinessSessionContext().generation;
+    const context: PinmonyDetailSiblingContext | undefined = this.detailSiblings.context(pin, generation);
+    const next: PinmonyDetailSourceCard | undefined = this.detailSiblings.next(pin, generation, step);
+    if (!context || !next || !this.pageHistory.replaceSibling(pin, next.pinUrl)) return;
+    if (!this.detailSiblings.advance(pin, generation, step)) return;
+    if (this.pinStore.detail) this.pinStore.detailCache.put(this.pinIdentity(pin), this.pinStore.detail, this.pinStore.detailScrollOffset);
+    const origin: string = this.pinStore.detailOrigin(this.pinIdentity(pin)) || context.source.pageUrl;
+    this.siblingSwitching = true;
+    this.coordinatorTasks.timeout((): void => { this.siblingSwitching = false; }, 350);
+    this.homeEntryCardId = next.cardId;
+    // This is a page-only presentation until the source supplies a real measured card.
+    this.homeEntryPhoto = { pinUrl: next.pinUrl, imageUrl: next.imageUrl, imageWidth: next.imageWidth,
+      imageHeight: next.imageHeight, x: 0, y: 0, width: 1, height: 1, returnPageOnly: true };
+    this.homeEntryClosing = false; this.homeEntryBackCommitted = false;
+    this.beginDetailOpening(next.pinUrl, origin, false, false, true);
+    if (!this.nativeBusinessRoutesEnabled) this.loadSessionDocument(next.pinUrl);
+  }
+
+  private measureSiblingCard(cardId: string): PinmonyDetailReturnRect | undefined {
+    try {
+      const ui = this.getUIContext();
+      const rect = ui.getComponentUtils().getRectangleById(cardId);
+      const screen = display.getDefaultDisplaySync();
+      const x: number = ui.px2vp(rect.windowOffset.x), y: number = ui.px2vp(rect.windowOffset.y);
+      const width: number = ui.px2vp(rect.size.width), height: number = ui.px2vp(rect.size.height);
+      if (width > 0 && height > 0 && x >= 0 && x + width <= ui.px2vp(screen.width) + 1 &&
+        y >= ui.px2vp(this.statusBarHeightPx) + 56 && y < ui.px2vp(screen.height) - 48) return { x: x, y: y, width: width, height: height };
+    } catch (_) {}
+    return undefined;
+  }
+
+  private async prepareSiblingCardReturn(pin: string): Promise<boolean> {
+    const generation: number = this.nativeBusinessSessionContext().generation;
+    const context: PinmonyDetailSiblingContext | undefined = this.detailSiblings.context(pin, generation);
+    if (!context?.switched || this.siblingReturnPrepared === pin) return true;
+    if (this.siblingReturnPending) return false;
+    this.siblingReturnPending = true;
+    this.searchEntryReturnPreparing = true;
+    const rect: PinmonyDetailReturnRect | undefined = await this.detailSiblings.prepareReturn(pin, generation,
+      (id: string): PinmonyDetailReturnRect | undefined => this.measureSiblingCard(id),
+      (): Promise<void> => new Promise<void>((resolve: () => void): void => { setTimeout(resolve, 16); }));
+    if (generation !== this.nativeBusinessSessionContext().generation || this.detailSiblings.context(pin, generation) !== context ||
+      pin !== this.pinStore.detail?.pinUrl) return false;
+    this.siblingReturnPending = false;
+    this.siblingReturnPrepared = pin;
+    this.homeEntryCardId = context.current.cardId;
+    this.homeEntryPhoto = { pinUrl: pin, imageUrl: context.current.imageUrl,
+      imageWidth: context.current.imageWidth, imageHeight: context.current.imageHeight,
+      x: rect?.x || 0, y: rect?.y || 0, width: rect?.width || 1, height: rect?.height || 1, returnPageOnly: !rect };
+    // Commit precisely this measured target; skip the old A-card remeasurement/fallback.
+    if (this.inboxNewsPinSlide()) { this.homeEntryBackCommitted = true; return true; }
+    this.homeEntryClosing = true;
+    return false;
+  }
+
   @State private homeEntryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
   @State private homeEntryResumed: boolean = false;
   private readonly detailEntryPhotos: Map<string, PinmonyDetailEntryPhoto> = new Map<string, PinmonyDetailEntryPhoto>();
@@ -4961,6 +5051,7 @@ struct Index {
   }
 
   private async backFromDetail(): Promise<void> {
+    if (this.siblingBoundarySnackToken) this.dismissPostSnack('detail-boundary-back');
     PinmonyRuntimeLog.info('PinmonyReturn: detail back sheet=' + this.activeSheetKind +
       ' pending=' + this.pageHistory.isPending().toString());
     if (Date.now() < this.pinStore.shareBackHandledUntil) return;
@@ -4968,6 +5059,8 @@ struct Index {
       this.onBackPress();
       return;
     }
+    if (!this.pinStore.imageLayer && !this.homeEntryBackCommitted &&
+      !await this.prepareSiblingCardReturn(this.pinStore.detail?.pinUrl || '')) return;
     if (this.shuffleFullDetail && this.shuffleSelectedPin === this.pinStore.detail?.pinUrl) {
       this.shuffleFullDetail = false;
       this.pinStore.detailScrollOffset = 0;
@@ -6386,9 +6479,19 @@ struct Index {
     return true;
   }
 
-  private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false, collageItem: boolean = false): void {
+  private beginDetailOpening(pinUrl: string, returnUrl: string = '', returning: boolean = false, collageItem: boolean = false, sibling: boolean = false): void {
     if (this.nativeBusinessRoutesEnabled && !PIN_NATIVE_DETAIL_READS_ENABLED) return;
+    // ArkWeb can confirm the same route after the native card already opened it.
+    // Do not consume its source or reset the active presentation on that callback.
+    if (this.pinStore.detailOpeningPin === pinUrl) return;
+    if (this.siblingBoundarySnackToken) this.dismissPostSnack('detail-boundary-navigation');
+    if (!sibling) this.detailSiblings.enter(pinUrl, this.homeEntryCardId, this.nativeBusinessSessionContext().generation, returning);
+    PinmonyRuntimeLog.info('DetailSiblingTrace: phase=source ready=' +
+      !!this.detailSiblings.context(pinUrl, this.nativeBusinessSessionContext().generation) + ' next=' +
+      !!this.detailSiblings.next(pinUrl, this.nativeBusinessSessionContext().generation));
+    this.siblingReturnPrepared = ''; this.siblingReturnPending = false;
     this.selectDetailEntryMotion(pinUrl, returning, returnUrl);
+    if (sibling) this.homeEntryResumed = true;
     if (!returning && !collageItem) {
       this.shuffleFullDetail = false;
       this.shuffleReturnParent = ''; this.shuffleReturnItem = '';
@@ -6406,7 +6509,6 @@ struct Index {
     if (!this.pinIdentity(pinUrl)) return;
     this.collageDetailPinUrl = collageItem ? pinUrl : '';
     this.clearRootTabGuard('detail-open');
-    if (this.pinStore.detailOpeningPin === pinUrl) return;
     this.supersedeRootPreparationForDetail();
     const identity: string = this.pinIdentity(pinUrl);
     if (returnUrl && this.detailReadCache.getPin() !== identity) this.detailReadCache.clear();
@@ -6428,7 +6530,7 @@ struct Index {
       PinmonyRuntimeLog.info('PinmonyReturn: reopen superseded pending return');
     }
     // Record the native child immediately, before ArkWeb has a completed history entry.
-    this.pageHistory.visit(pinUrl, 'push');
+    if (!sibling) this.pageHistory.visit(pinUrl, 'push');
     this.clearDetail(true);
     this.pagePerformance.beginSecondary('detail', pinUrl);
     this.pinStore.detailOpeningPin = pinUrl;
@@ -6876,6 +6978,8 @@ struct Index {
     this.postSnackToken++;
     this.postSnack = undefined;
     this.postSnackExpiresAt = 0;
+    this.siblingBoundarySnackToken = 0;
+    this.siblingBoundarySnackStep = 0;
     PinmonyRuntimeLog.info('PostSnack: released snackSeq=' + token + ' reason=' + reason);
     return true;
   }
@@ -6944,7 +7048,35 @@ struct Index {
   }
 
   private refreshSystemShareLoadingLanguage(): void {
+    this.syncSiblingBoundarySnack();
     if (this.postSnack && PinmonySnackBarLifecycle.isCurrent(this.postSnack)) this.syncSystemShareLoading();
+  }
+
+  private dismissSiblingBoundarySnack(): void {
+    if (this.siblingBoundarySnackToken) this.dismissPostSnack('detail-boundary-cleanup');
+  }
+
+  private showSiblingBoundarySnack(step: number): void {
+    if ((step !== 1 && step !== -1) || !this.canSwitchDetailSibling() || this.canSwitchDetailSibling(false, step)) return;
+    this.preparePostSnack(4000);
+    this.siblingBoundarySnackToken = this.postSnackToken;
+    this.siblingBoundarySnackStep = step;
+    this.syncSiblingBoundarySnack();
+  }
+
+  private syncSiblingBoundarySnack(): void {
+    const token: number = this.siblingBoundarySnackToken;
+    if (!token || !this.isCurrentPostSnack(token) || !this.postSnack) return;
+    if (!this.canSwitchDetailSibling() || this.canSwitchDetailSibling(false, this.siblingBoundarySnackStep)) {
+      this.dismissSiblingBoundarySnack(); return;
+    }
+    const duration: number = Math.max(1, this.postSnackExpiresAt - Date.now());
+    PinmonySnackBarLifecycle.show(this.postSnack, { icon: $r('sys.symbol.info_circle'), iconType: SnackBarIconType.NORMAL },
+      { title: this.uiText(this.siblingBoundarySnackStep < 0 ? 'pm_detail_source_first' : 'pm_detail_source_last') }, {
+        operationType: SnackBarOperationType.CLOSE_BUTTON_ONLY,
+        closeButtonAccessibilityText: this.uiText('pm_dismiss_notice_d301bc12'),
+        onCloseButtonClick: () => this.handlePostSnackClose(token)
+      }, { duration: duration, pressBackCallback: () => this.handlePostSnackBack(token) });
   }
 
   private syncSystemShareLoading(): void {
@@ -7180,14 +7312,22 @@ struct Index {
     // Sibling Pin reads update props on one retained carousel destination.
     if (this.shuffleParentDetail && this.shuffleSelectedImage &&
         this.collageDetailPinUrl === (detail?.pinUrl || this.pinStore.detailOpeningPin)) {
-      return this.pinIdentity(this.shuffleParentDetail.pinUrl);
+      const parentContext: PinmonyDetailSiblingContext | undefined = this.detailSiblings.context(this.shuffleParentDetail.pinUrl,
+        this.nativeBusinessSessionContext().generation);
+      return parentContext?.presentationIdentity || this.pinIdentity(this.shuffleParentDetail.pinUrl);
     }
-    return this.pinIdentity(detail?.pinUrl || this.pinStore.detailOpeningPin);
+    const pin: string = detail?.pinUrl || this.pinStore.detailOpeningPin;
+    const context: PinmonyDetailSiblingContext | undefined = this.detailSiblings.context(pin,
+      this.nativeBusinessSessionContext().generation);
+    return context?.presentationIdentity || this.pinIdentity(pin);
   }
 
   private detailPresentationIdentities(): string[] {
     const current: string = this.detailRootIdentity();
-    const parent: string = this.pinIdentity(this.relatedEntryParent?.pinUrl || '');
+    const parentPin: string = this.relatedEntryParent?.pinUrl || '';
+    const parentContext: PinmonyDetailSiblingContext | undefined = this.detailSiblings.context(parentPin,
+      this.nativeBusinessSessionContext().generation);
+    const parent: string = parentContext?.presentationIdentity || this.pinIdentity(parentPin);
     const identities: string[] = this.detailSearchParents.map((saved: PinmonyDetailSearchPresentation): string => saved.identity).filter((identity: string): boolean => identity !== current);
     if (parent && parent !== current && !identities.includes(parent) && !!this.homeEntryPhoto && this.homeEntryCardId.startsWith('pinmony-related-photo-')) identities.push(parent);
     return identities.concat([current]);
@@ -7505,6 +7645,7 @@ struct Index {
   private rootExitBackAt: number = 0;
   private rootExitBackHandled: boolean = false;
   onBackPress(): boolean {
+    if (this.siblingBoundarySnackToken) this.dismissPostSnack('detail-boundary-back');
     if (this.accountSwitchPending && this.profileSettingsVisible) return true;
     if (this.nativeAddAccountFlow && this.authStatus !== 'authenticated') {
       this.loginHostMounted = false; this.loginPageVisible = false;
@@ -7926,6 +8067,7 @@ struct Index {
   @Builder
   private buildProfileContent() {
     PinmonyBuildProfileRootContent({
+      rootViewportHeightVp: this.profileRootViewportHeightVp,
       coveredByBoard: this.retainProfileBoardParent(),
       coveredByPin: this.retainProfilePinParent(),
       coveredBack: (): boolean => this.onBackPress(),
@@ -8051,6 +8193,12 @@ struct Index {
           this.buildRootError(3)
         }
         .width('100%').height('100%')
+        .onAreaChange((_old: Area, area: Area): void => {
+          const height: number = Number(area.height);
+          if (!Number.isFinite(height) || height <= 0 || Math.abs(height - this.profileRootViewportHeightVp) <= 1) return;
+          this.profileRootViewportHeightVp = height;
+          PinmonyRuntimeLog.info('ProfileViewportTrace: phase=root-host heightVp=' + height.toFixed(1));
+        })
         .onVisibleAreaChange([0.01], (visible: boolean) => this.onRootPageVisible(3, visible))
         .backgroundColor($r('app.color.page_background'))
       }.tabBar(this.buildNativeTab("pm_profile_7f1d9dd0", $r('sys.symbol.person'), 3))
@@ -8375,7 +8523,7 @@ struct Index {
           }
           if (this.activeTab === 3 && this.profileStore.searchVisible && this.profileStore.contentSearch &&
               !this.pinStore.detail && !this.pinStore.detailOpeningPin && !this.nativeBoardVisible() && this.profileStore.origins.length === 0) {
-            PinmonyProfileSearchPage({ snapshot: this.profileStore.contentSearch,
+            PinmonyProfileSearchPage({ sourcePageUrl: this.currentProfileUrl(), snapshot: this.profileStore.contentSearch,
               onResume: () => this.profileSearchReads.resume(),
               onPause: () => this.profileSearchReads.pause(),
               onInput: (query: string) => this.profileSearchReads.input(query),
@@ -8383,10 +8531,11 @@ struct Index {
               onDeleteHistory: (query: string) => this.profileSearchReads.deleteHistory(query),
               onMore: () => this.profileSearchReads.more(), onRetry: () => this.profileSearchReads.retry(),
               onBack: () => { this.nativeChildBackUntil = Date.now() + 300; this.profileSearchReads.close(); this.syncFloatingTabsMotion(); },
-              onPin: (id: string) => {
+              onPin: (id: string, sourceId: string) => {
                 const pin: PinmonyProfileSearchPin | undefined = this.profileStore.contentSearch?.pins.find((p: PinmonyProfileSearchPin): boolean => p.id === id) ||
                   this.profileStore.contentSearch?.suggestions.flatMap((s) => s.pins).find((p: PinmonyProfileSearchPin): boolean => p.id === id);
                 if (!pin || this.authStatus !== 'authenticated' || this.businessSuspended || this.activeSheetKind) return;
+                this.capturePinEntryPhoto(this.nativeBusinessSessionContext().origin + '/pin/' + pin.id + '/', pin.image, sourceId, 0, 0);
                 this.profileSearchReads.pause(); this.beginDetailOpening(this.nativeBusinessSessionContext().origin + '/pin/' + pin.id + '/', this.currentProfileUrl());
               } }).width('100%').height('100%')
           }
@@ -8541,6 +8690,9 @@ struct Index {
                   saveBusy: this.pinStore.viewerSaveBusy,
                   mediaReadBusy: this.pinStore.detailMediaRetryBusy,
                   initialScrollOffset: _identity === this.detailRootIdentity() ? this.pinStore.detailScrollOffset : this.detailSearchParents.find((saved: PinmonyDetailSearchPresentation): boolean => saved.identity === _identity)?.scrollOffset ?? this.relatedEntryParentOffset,
+                  siblingSwipeAllowed: (step: number): boolean => _identity === this.detailRootIdentity() && this.canSwitchDetailSibling(true, step),
+                  onSwitchSibling: (step: number) => { if (_identity === this.detailRootIdentity()) this.switchDetailSibling(step); },
+                  onSiblingBoundary: (step: number) => { if (_identity === this.detailRootIdentity()) this.showSiblingBoundarySnack(step); },
                   onBack: () => this.backFromDetail(),
                   onAction: (id: string, kind: string) => this.performDetailAction(id, kind),
                   onRelated: (id: string) => { this.traceAction('related.pin.open'); this.openImageRelated(id); },

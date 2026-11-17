@@ -93,7 +93,7 @@ async function main() {
   const targets = [], events = [];
   let pending = false;
   const n = new context.Native();
-  Object.assign(n, { pinStore: store, activeSheetKind: '', nativeBackTarget: '', pageBackToken: 0,
+  Object.assign(n, { prepareSiblingCardReturn: async () => true, pinStore: store, activeSheetKind: '', nativeBackTarget: '', pageBackToken: 0,
     searchStore: { searchReturnPageKey: home + 'search/' }, pinIdentity: identity,
     extractPinUrl: value => identity(value) ? pin(identity(value)) : '', searchUrlFromAddress: () => '',
     profileUrlFromAddress: () => '', inboxUrlFromAddress: () => '', boardUrlFromAddress: () => '', isHomeRootAddress: value => value === home,

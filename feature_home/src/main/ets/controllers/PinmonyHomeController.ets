@@ -1,4 +1,5 @@
 import { PinmonyI18n } from 'common_foundation';
+import { normalizeCardCarouselImages } from 'common_ui';
 import { PinmonyHomeBoard, PinmonyHomePin, PinmonyHomeSnapshot, PinmonyHomeTab } from '../models/PinmonyHome';
 import { PinmonyHomePorts } from '../models/PinmonyHomePorts';
 import { PinmonyHomeStore } from '../stores/PinmonyHomeStore';
@@ -220,6 +221,7 @@ export class PinmonyHomeController {
         !!pin.id && !!this.ports.pinIdentity(pin.pinUrl) && /^https:\/\//i.test(pin.imageUrl))
         .map((pin: PinmonyHomePin): PinmonyHomePin => {
           return { id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
+            carouselImages: normalizeCardCarouselImages(pin.carouselImages), mediaCount: pin.mediaCount,
             imageWidth: pin.imageWidth, imageHeight: pin.imageHeight, video: pin.video, isVideo: pin.isVideo === true || !!pin.video,
             title: this.ports.knownPinTitle(this.ports.pinIdentity(pin.pinUrl)) || pin.title || '', hasMore: pin.hasMore,
             saved: this.ports.isSaved(this.ports.pinIdentity(pin.pinUrl)) };
@@ -518,6 +520,7 @@ export class PinmonyHomeController {
     if (!saved || saved.dataSource === 'api') return;
     const pins: PinmonyHomePin[] = saved.pins.map((pin: PinmonyHomePin): PinmonyHomePin => {
       return { id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
+        carouselImages: pin.carouselImages, mediaCount: pin.mediaCount,
         imageWidth: pin.imageWidth, imageHeight: pin.imageHeight, video: pin.video, isVideo: pin.isVideo === true || !!pin.video,
         title: this.ports.pinIdentity(pin.pinUrl) === identity ? title : pin.title, hasMore: pin.hasMore, saved: pin.saved };
     });

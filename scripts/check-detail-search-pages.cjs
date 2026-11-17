@@ -20,6 +20,7 @@ const Host = host(index, ['openDetailSearchResult', 'restoreDetailSearchPresenta
 const root = 'https://www.pinterest.com', url = id => root + '/pin/' + id + '/';
 const card = id => ({ id: 'api:' + id, pinUrl: url(id), imageUrl: 'image-' + id, imageWidth: 400, imageHeight: 800 });
 const n = new Host(), cache = new Map(); let current = '1', continuation;
+Object.assign(n, { detailSiblings: { context: () => undefined }, nativeBusinessSessionContext: () => ({ generation: 1 }) });
 Object.assign(n, { detailSearchParents: [], detailEntryCards: new Map(),
   pinIdentity: pin => pin.match(/\/pin\/(\d+)/)?.[1] || '', detailRootIdentity: () => current,
   detailRenderIdentity: () => 'render-' + current, relatedEntryParent: undefined,
@@ -61,7 +62,7 @@ assert(!page.slice(page.indexOf('onRelated: (id: string) => {'), page.indexOf('o
 
 const Sheet = host(shared, ['openRelated', 'resultSheetAppeared', 'presentationChanged', 'resultSheetDisappeared']);
 const sheet = new Sheet(), crop = { x: .2, y: .1, w: .5, h: .6 }; let restoredOffset = -1, opens = 0;
-Object.assign(sheet, { alive: true, presentationActive: true, relatedOpening: false, result: { loading: false }, pin: url(1),
+Object.assign(sheet, { stageDetailSource() {}, restoreSourceCard() {}, reportResultsPosition() {}, alive: true, presentationActive: true, relatedOpening: false, result: { loading: false }, pin: url(1),
   closing: false, sheetVisible: true, sheetHeight: 'large', resultSheetMounted: true, crop,
   resultScroller: { offset: () => ({ yOffset: 730 }), scrollTo: options => restoredOffset = options.yOffset },
   onRelated: () => { opens++; sheet.presentationActive = false; sheet.presentationChanged(); return true; }

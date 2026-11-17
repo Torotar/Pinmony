@@ -1,3 +1,4 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyPinCountBadge, PinmonyCardMediaBadge } from 'common_ui';
 import { PinmonyModalNavigation } from 'common_ui';
 import { PinmonyHdsTitleBar } from 'common_ui';
@@ -206,6 +207,36 @@ export struct PinmonyBoardPage {
 
 @Component
 struct PinmonyBoardSurface {
+  private sourceLifetime: number = 0;
+  private sourceIdentity(): string { return 'board:' + this.snapshot.pageKey + ':' + this.snapshot.session + ':' + this.phase() + ':' + (this.snapshot.flow?.sectionId || ''); }
+  private stageDetailSource(selected: PinmonyBoardPin): void {
+    const identity: string = this.sourceIdentity();
+    const section: PinmonyBoardSection | undefined = !this.phase() ? this.snapshot.sections?.find((item: PinmonyBoardSection): boolean => !!item.pins?.some((pin: PinmonyBoardPin): boolean => pin.id === selected.id)) : undefined;
+    const sectionId: string = section?.id || '';
+    const lifetime: number = this.sourceLifetime;
+    PinmonyDetailSources.stage({ identity: identity + ':' + sectionId, pageUrl: this.snapshot.pageKey, session: this.snapshot.session,
+      cards: (): PinmonyDetailSourceCard[] => {
+        if (lifetime !== this.sourceLifetime || identity !== this.sourceIdentity()) return [];
+        return this.sourcePins(sectionId).filter((pin: PinmonyBoardPin): boolean => !!pin.pinUrl).map((pin: PinmonyBoardPin): PinmonyDetailSourceCard => ({
+          pinUrl: pin.pinUrl, cardId: 'pinmony-board-photo-' + pin.id, imageUrl: pin.imageUrl,
+          imageWidth: pin.imageWidth, imageHeight: pin.imageHeight }));
+      },
+      locate: (card: PinmonyDetailSourceCard): void => {
+        this.scrollRestoreToken++; this.restoringScroll = false;
+        const ui = this.getUIContext();
+        const rect = ui.getComponentUtils().getRectangleById(card.cardId);
+        const offset: number = this.contentScroll().currentOffset().yOffset;
+        this.contentScroll().scrollTo({ xOffset: 0, yOffset: Math.max(0, offset + ui.px2vp(rect.windowOffset.y) - 160), animation: false });
+      }, didLocate: (): void => {
+        try { this.scrollOffsets.set(this.scrollScope(), Math.max(0, this.contentScroll().currentOffset().yOffset)); } catch (_) {}
+      } });
+  }
+  private sourcePins(sectionId: string = ''): PinmonyBoardPin[] {
+    if (sectionId) return this.snapshot.sections?.find((item: PinmonyBoardSection): boolean => item.id === sectionId)?.pins || [];
+    if (this.phase() === 'section' || this.phase() === 'ideas') return this.snapshot.flow?.pins || [];
+    return this.snapshot.pins;
+  }
+
   @StorageProp('pinmonySheetWindowWidthVp') private sheetWindowWidthVp: number = 0;
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @StorageLink('profileLegacyLayout') private legacyProfile: boolean = false;
@@ -330,8 +361,9 @@ struct PinmonyBoardSurface {
   @State private restoringScroll: boolean = false;
 
   private scrollScope(): string {return this.snapshot.pageKey + ':' + (this.snapshot.nativeAccountGeneration ?? this.snapshot.session).toString() + ':' + (this.snapshot.flow?.cover ? 'cover' : this.phase() === 'section' ? 'section:' + (this.snapshot.flow?.sectionId || '') : this.phase() || 'parent');}
+  @State private backToTopOffset: number = 0;
   private canBackToTop(): boolean {
-    return this.headerScrolled && !this.restoringScroll && !this.snapshot.flow?.cover &&
+    return this.backToTopOffset > 0 && !this.restoringScroll && !this.snapshot.flow?.cover &&
       (!this.phase() || this.phase() === 'section' || this.phase() === 'ideas');
   }
 
@@ -347,11 +379,12 @@ struct PinmonyBoardSurface {
     const token: number = ++this.scrollRestoreToken;
     if(this.snapshot.flow?.loading || this.snapshot.loading)return;
     const offset: number = this.scrollOffsets.get(scope) ?? (!this.phase() ? this.initialContentOffset : 0);
-    this.headerScrolled = offset > 180;
+    this.backToTopOffset = offset; this.headerScrolled = offset > 180;
     setTimeout((): void => {
       if(token !== this.scrollRestoreToken || scope !== this.scrollScope())return;
       this.contentScroll().scrollTo({xOffset:0,yOffset:offset,animation:false});
-      this.headerScrolled = this.contentScroll().currentOffset().yOffset > 180;
+      this.backToTopOffset = this.contentScroll().currentOffset().yOffset;
+      this.headerScrolled = this.backToTopOffset > 180;
       this.restoringScroll = false;
     }, 16);
   }
@@ -427,7 +460,7 @@ struct PinmonyBoardSurface {
     if (this.phase() !== 'edit') this.editingSession = '';
   }
 
-  aboutToDisappear(): void { this.scrollRestoreToken++;this.sectionMotionEpoch++;this.savedSnack?.dismiss(); }
+  aboutToDisappear(): void { this.sourceLifetime++; this.scrollRestoreToken++;this.sectionMotionEpoch++;this.savedSnack?.dismiss(); }
 
   private updateSavedFeedback(): void {
     const session: string = this.snapshot.pageKey + ':' + (this.snapshot.nativeAccountGeneration === undefined ? this.snapshot.session.toString() : 'native-' + this.snapshot.nativeAccountGeneration.toString());
@@ -668,6 +701,7 @@ struct PinmonyBoardSurface {
           label: this.phase() === 'edit' ? this.uiText("pm_close_editor_64280f04") : this.uiText("pm_close_organizer_a3fa0809"), isEnabled: !this.snapshot.flow?.busy, action: () => this.back()
         } : { isEnabled: !this.snapshot.flow?.busy, action: () => this.back() },
         menu: { value: this.snapshot.flow?.createdBoardIdeas ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.uiText('pm_done_c0b3fbff'),isEnabled:!this.snapshot.flow.busy && !this.snapshot.flow.uncertain && this.snapshot.ready,action:() => this.act('createdIdeasDone')}}] : this.snapshot.flow?.cover ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.uiText('pm_done_c0b3fbff'),isEnabled:this.coverPreviewReady && !!this.snapshot.flow.cover.selected && !this.snapshot.flow.busy && !this.snapshot.flow.uncertain && !this.snapshot.flow.cover.loading,action:() => this.act('coverSave')}}] : this.phase() === 'sectionEdit' ? [{content:{icon:new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontColor([$r('app.color.primary_text')]),label:this.uiText("pm_done_c0b3fbff"),isEnabled:!!this.sectionEditName.trim() && !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain,action:() => this.act('sectionRename',this.sectionEditName.trim())}}] : this.creatingBoardTarget || this.creatingTarget ? [] : this.phase() === 'sectionSelect' ? [{ content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.checkmark')).fontSize(24).fontWeight(FontWeight.Medium).fontColor([$r('app.color.primary_text')]),
           label: this.selectedIds.length ? this.uiText("pm_done_c0b3fbff") : this.uiText("pm_skip_fc50a99c"), isEnabled: !this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && !this.snapshot.loadingMore,
           action: () => { if(!this.snapshot.flow?.busy && !this.snapshot.flow?.uncertain && this.onAction)this.onAction(JSON.stringify({action:'sectionCreate',value:this.selectedIds})); }
         } }] : this.selectingPins() ? [{ content: {
@@ -715,7 +749,7 @@ struct PinmonyBoardSurface {
 
   private coverPinsScrolled(offset: number): void {
     if(this.restoringScroll || !this.splitCoverScrolling() || !Number.isFinite(offset))return;
-    this.scrollOffsets.set(this.scrollScope(),offset);this.headerScrolled = offset > 180;
+    this.scrollOffsets.set(this.scrollScope(),offset);this.backToTopOffset = offset; this.headerScrolled = offset > 180;
   }
 
   private contentColumns(): number {
@@ -812,7 +846,7 @@ struct PinmonyBoardSurface {
       .onClick(() => {
         if (pin.cancelled) return;
         if (this.selectingPins()) this.toggle(pin.id);
-        else if ((!this.phase() || this.phase() === 'section') && this.onPin) this.onPin(pin.id);
+        else if ((!this.phase() || this.phase() === 'section') && this.onPin) { this.stageDetailSource(pin); this.onPin(pin.id); }
       })
       if ((!this.phase() || this.phase() === 'ideas' || this.phase() === 'section') && !(this.modernBoardActions() && this.density === 2)) {
         Row() {
@@ -1849,7 +1883,7 @@ struct PinmonyBoardSurface {
       .onDidScroll(() => {
         if(this.restoringScroll || this.splitCoverScrolling())return;
         const offset: number = this.contentScroll().currentOffset().yOffset;
-        this.scrollOffsets.set(this.scrollScope(),offset);this.headerScrolled = offset > 180;
+        this.scrollOffsets.set(this.scrollScope(),offset);this.backToTopOffset = offset; this.headerScrolled = offset > 180;
         if (!this.phase()) this.onContentPosition?.(offset);
       })
       .align(Alignment.TopStart)
@@ -1882,7 +1916,7 @@ struct PinmonyBoardSurface {
           onPublish: () => { if ((!this.phase() || this.phase() === 'section') && this.onPublish) this.onPublish(); } })
       }
       if (this.modernBoardActions()) { this.boardActionTabs() }
-      PinmonyBackToTopButton({ showButton: this.canBackToTop(),
+      PinmonyBackToTopButton({ scrollOffsetVp: this.backToTopOffset, showButton: this.canBackToTop(),
         bottomInset: this.modernBoardActions() ? 44 + this.boardActionBarHeight() : 96,
         onBackToTop: () => this.backToTop() })
       }.width('100%').height('100%')

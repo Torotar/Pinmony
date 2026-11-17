@@ -1,4 +1,4 @@
-import { PinmonyVideo } from 'common_ui';
+import { PinmonyVideo, PinmonyCardImage } from 'common_ui';
 export interface PinmonyHomeImageRecovery { pinUrl: string; imageUrl: string; revision: number; }
 export interface PinmonyHomeTab {
   id: string;
@@ -16,6 +16,7 @@ export interface PinmonyHomeBoard {
 }
 
 export interface PinmonyHomePin {
+  carouselImages?: PinmonyCardImage[];
   mediaCount?: number;
   id: string;
   pinUrl: string;

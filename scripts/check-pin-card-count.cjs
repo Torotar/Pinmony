@@ -6,9 +6,10 @@ function load(file) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 }
-  }).outputText, { exports, require: () => ({}), console });
+  }).outputText, { exports, require: name => name === 'common_ui' ? carousel : {}, console });
   return exports;
 }
+const carousel = load('common_ui/src/main/ets/models/PinmonyCardCarousel.ets');
 const home = Object.create(load('entry/src/main/ets/app/PinmonyHomeNativeReads.ets').PinmonyHomeNativeReads.prototype);
 home.origin = 'https://www.pinterest.com'; home.ports = { saved: () => false };
 const search = Object.create(load('entry/src/main/ets/app/PinmonySearchNativeReads.ets').PinmonySearchNativeReads.prototype);

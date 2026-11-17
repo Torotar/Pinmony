@@ -6,7 +6,7 @@ let now = 1000;
 const context = { exports: {}, Date: { now: () => now }, TouchType: { Down: 0, Up: 1, Cancel: 2, Move: 3 } };
 vm.runInNewContext(ts.transpileModule(plain, {compilerOptions: {target: ts.ScriptTarget.ES2021, module: ts.ModuleKind.CommonJS}}).outputText, context);
 const Host = context.exports.PinmonyBackToTopButton;
-const h = new Host(); h.showButton = true; h.aboutToAppear();
+const h = new Host(); h.showButton = true; h.hostWidth = 400; h.hostHeight = 800; h.scrollOffsetVp = 1600; h.aboutToAppear();
 let clicks=0; h.onBackToTop=()=>clicks++;
 let stopped=0;
 const touch=(type,x=100,y=100,id=1)=>h.touch({type,touches:[{windowX:x,windowY:y,id}],stopPropagation(){stopped++;}});

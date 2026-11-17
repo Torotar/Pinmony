@@ -14,12 +14,12 @@ visit(ast);
 const Host = vm.runInNewContext(ts.transpileModule('class Host {' + methods.join('\n') + '\nback = ' + back + ';} Host;', { compilerOptions: { target: 99 } }).outputText);
 async function main() {
 const paths = [{ name: 'pin-web-search' }], destination = paths[0];
-let detailBack = 0, searchBack = 0;
+let detailBack = 0, searchBack = 0, rootBack = 0;
 const h = new Host(); h.uiCommits = new commits.Queue();
 const prefetchActivity = []; h.imagePrefetch = { setActive: active => prefetchActivity.push(active) };
 Object.assign(h, { active: true, mediaActive: true, automaticLoadingEnabled: true, detailReturnPreview: false, pagePresent: true, resultsOffset: 1420, categoriesCollapsed: true,
   searchPathStack: { size: () => paths.length, pushPath: p => paths.push(p), clear: () => { paths.length = 0; } },
-  closePhotoSearch() {}, restoreHeroPosition() {}, tracePresentation() {}, onBack: () => detailBack++, handleSearchBack: () => searchBack++ });
+  closePhotoSearch() {}, restoreHeroPosition() {}, tracePresentation() {}, onBack: () => detailBack++, onRootBack: () => rootBack++, handleSearchBack: () => searchBack++ });
 for (let i = 0; i < 3; i++) {
   h.detailReturnPreview = true; h.active = false; h.activeChanged(); commits.flush();
   assert.equal(paths[0], destination, 'detail entry retains the original destination');
@@ -32,10 +32,12 @@ assert.equal(detailBack, 3); assert.equal(searchBack, 0);
 assert.deepEqual(prefetchActivity, [false, true, false, true, false, true], 'retained detail cover pauses and resumes image prefetch without dropping page state');
 h.active = false; h.detailReturnPreview = false; h.activeChanged(); commits.flush();
 await Promise.resolve();
-assert.equal(paths.length, 0, 'ordinary inactive roots still release navigation');
-assert.equal(h.back(), false);
+assert.equal(paths[0], destination, 'covered roots retain source navigation and Scroller ownership');
+assert.equal(h.back(), true);
+assert.equal(rootBack, 1, 'hidden destination delegates root back to its host');
+assert.equal(detailBack, 3, 'hidden source does not pop a stale detail');
 const index = fs.readFileSync('entry/src/main/ets/pages/Index.ets', 'utf8');
 assert(index.includes('preparingDetailReturn: this.preservingSearchForPin() ||'), 'retain from entry through return, rather than reconstructing only on back');
-console.log('Search detail retention: repeated entry/return preserves destination, offset and header; system back delegates to detail; inactive roots release navigation');
+console.log('Search detail retention: repeated entry/return preserves destination, offset and header; system back delegates to detail; covered roots preserve navigation and delegate back');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

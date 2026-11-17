@@ -2,7 +2,7 @@
   "string": [
     {"name": "pm_login_other_account", "value": "Entrar em outra conta"},
     {"name": "pm_logout_current_account", "value": "Sair da conta atual"},
-    {"name": "pm_logout_stay_on_login", "value": "Você permanecerá na página de login. Outras contas não serão conectadas automaticamente."},
+    {"name": "pm_logout_stay_on_login", "value": "Sair da conta atual?"},
 
     {"name": "pm_switch_accounts", "value": "Trocar de conta"},
     {"name": "pm_add_account", "value": "Adicionar conta"},
@@ -1784,7 +1784,7 @@
     },
     {
       "name": "pm_open_releases_in_browser_5cb655da",
-      "value": "Abrir a página de testes na Huawei AppGallery"
+      "value": "Abrir a página de versões no GitHub"
     },
     {
       "name": "pm_release_notes_e0b4bf83",
@@ -6069,6 +6069,14 @@
     {
       "name": "pm_board_invite_link_copy_failed",
       "value": "Não foi possível copiar o link de convite. Tente novamente."
+    },
+    {
+      "name": "pm_detail_source_first",
+      "value": "Você chegou ao primeiro Pin"
+    },
+    {
+      "name": "pm_detail_source_last",
+      "value": "Você chegou ao último Pin"
     }
   ]
 }

@@ -13,6 +13,7 @@ export struct PinmonyCdnImage {
   @Prop @Watch('reload') url: string = '';
   @Prop @Watch('reload') useSharedDecode: boolean = true;
   @Prop fit: ImageFit = ImageFit.Cover;
+  @Prop allowImageDrag: boolean = true;
   @Prop @Watch('loadingChanged') loadingActive: boolean = true;
   @Prop @Watch('loadingChanged') viewportOnly: boolean = false;
   @Prop @Watch('loadingChanged') loadPriority: number = 1;
@@ -122,6 +123,7 @@ export struct PinmonyCdnImage {
   private imageBody(generation: number) {
       if (this.canRenderImage()) {
         Image(this.bitmap || this.url).width('100%').height('100%').objectFit(this.fit)
+          .draggable(this.allowImageDrag)
           .onAppear(() => { if (this.visible && generation === this.generation) this.auditImage('node-mounted'); })
           .onDisAppear(() => { if (this.visible && generation === this.generation) this.auditImage('node-unmounted'); })
           .onComplete((event) => {

@@ -1,3 +1,6 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
+import { PinmonyDetailSwipe } from '../services/PinmonyDetailSwipe';
+import { PinmonyDetailSiblingMotion, PinmonyDetailSiblingCover } from '../services/PinmonyDetailSiblingMotion';
 import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyScrollRecovery } from 'common_foundation';
 import { common } from '@kit.AbilityKit';
@@ -5,7 +8,7 @@ import { PinmonyViewerSystemBars } from '../services/PinmonyViewerSystemBars';
 import { PinmonyHdsTitleBar } from 'common_ui';
 import { PinmonyUiCommitQueue } from 'common_ui';
 import { PinmonyCdnImage } from 'common_ui';
-import { LengthMetrics } from '@kit.ArkUI';
+import { LengthMetrics, curves } from '@kit.ArkUI';
 import { PinmonyActionNotice } from 'common_ui';
 import { PinmonyImageSearchSelection } from 'common_ui';
 import { ImageFlightRect, imageContainRect, measureImageFlightOrigin } from '../services/PinmonyImageTransition';
@@ -23,6 +26,7 @@ import { PinmonyImageCrop, PinmonyVisualResult, emptyVisualResult } from '../mod
 import { PinmonyRuntimeLog } from 'common_foundation';
 import { PinmonyDetailAction, PinmonyDetailSnapshot, PinmonyRelatedPin, PinmonyRelatedTopic, PinmonyCarouselItem } from '../models/PinmonyDetail';
 import { PinmonyCarouselView } from './PinmonyCarouselView';
+import { carouselEntryIndex } from '../services/PinmonyCarouselEntry';
 import { PinmonyVideoPlayer } from './PinmonyVideoPlayer';
 import { PinmonyDetailHero, DetailHeroSource } from './PinmonyDetailHero';
 import { PinmonyDetailEntryPhoto } from '../services/PinmonyImageTransition';
@@ -196,6 +200,157 @@ export struct PinmonyDetailPage {
   @Prop traceId: number = 0;
   @Prop entryPhoto: PinmonyDetailEntryPhoto | undefined = undefined;
   @Prop entryResumed: boolean = false;
+
+  // Query the product coordinator at gesture time. The retained destination
+  // must not keep the opening frame's disabled value in a Builder prop.
+  siblingSwipeAllowed?: (step: number) => boolean;
+  onSwitchSibling?: (step: number) => void;
+  onSiblingBoundary?: (step: number) => void;
+  private readonly siblingSwipe: PinmonyDetailSwipe = new PinmonyDetailSwipe();
+  @State private siblingMotionOffset: number = 0;
+  @State private siblingPreviousOffset: number = 0;
+  @State private siblingMotionCovers: PinmonyDetailSiblingCover[] = [];
+  @State private siblingMotionActive: boolean = false;
+  private readonly siblingMotion: PinmonyDetailSiblingMotion = new PinmonyDetailSiblingMotion({
+    ready: (step: number): boolean => this.siblingSwipeReady(step, true),
+    visible: (): boolean => this.heroVisible && this.pageActive && this.videoActive && !this.entryClosing,
+    pin: (): string => this.displayedDetail().pinUrl,
+    width: (): number => this.viewportWidth,
+    capture: () => this.getUIContext().getComponentSnapshot().get('pinmony-sibling-body-' + this.traceId),
+    cover: (cover: PinmonyDetailSiblingCover | undefined): void => { this.siblingMotionCovers = cover ? [cover] : []; },
+    frame: (current: number, previous: number): void => {
+      this.siblingMotionOffset = current; this.siblingPreviousOffset = previous; this.siblingMotionActive = this.siblingMotion.busy;
+    },
+    animate: (duration: number, update: () => void, finish: () => void): void => {
+      this.getUIContext().animateTo({ duration: duration, curve: curves.interpolatingSpring(-1, 1, 328, 34), onFinish: finish }, update);
+    },
+    commit: (step: number): void => this.onSwitchSibling?.(step)
+  });
+  @State private siblingBoundaryOffset: number = 0;
+  private siblingBoundaryVersion: number = 0;
+  private siblingCarouselAtStart: number = -1;
+  private siblingProductAtStart: number = -1;
+  private siblingOnMedia: boolean = false;
+  private siblingForwardAtStart: boolean = false;
+  private siblingBackwardAtStart: boolean = false;
+  private productGalleryAtStart: boolean = false;
+  private productGalleryAtEnd: boolean = false;
+  private selectedDetailText: boolean = false;
+  private sourceLifetime: number = 0;
+
+  private siblingSwipeReady(step: number = 0, duringMotion: boolean = false): boolean {
+    return (duringMotion || !this.siblingMotion.busy) && !!this.siblingSwipeAllowed?.(step) && this.pageActive && this.videoActive && !this.imageLayer &&
+      !this.viewerMounted && !this.searchMounted && !this.shuffleOverlayVisible() && !this.shuffleFlightActive &&
+      !this.entryClosing && (!this.entryPhoto || this.entryMotionComplete) && !this.selectedDetailText;
+  }
+
+  private siblingCarouselBoundary(step: number): boolean {
+    const carousel = this.displayedDetail().carousel;
+    if (!carousel) return true;
+    const towardStart: boolean = PinmonyI18n.isRtl(this.uiLanguage) ? step > 0 : step < 0;
+    return carousel.freeScroll ? (towardStart ? this.productGalleryAtStart : this.productGalleryAtEnd) :
+      this.carouselBackdropIndex === (towardStart ? 0 : carousel.items.length - 1);
+  }
+
+  private siblingTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Cancel || event.touches.length > 1) {
+      PinmonyRuntimeLog.info('DetailSiblingTrace: phase=touch-cancel multi=' + (event.touches.length > 1));
+      this.siblingSwipe.cancel(); return;
+    }
+    if (event.type === TouchType.Up) {
+      // Up may have an empty changedTouches list. It must not disarm Pan End.
+      PinmonyRuntimeLog.info('DetailSiblingTrace: phase=touch-up');
+      return;
+    }
+    const point: TouchObject | undefined = event.changedTouches[0];
+    if (!point) { this.siblingSwipe.cancel(); return; }
+    const identity: string = this.displayedDetail().pinUrl + ':' + this.traceId;
+    if (event.type === TouchType.Down) {
+      const ready: boolean = this.siblingSwipeReady();
+      let allowed: boolean = ready;
+      this.siblingOnMedia = false;
+      try {
+        const ui = this.getUIContext();
+        const root = ui.getComponentUtils().getRectangleById('pinmony-photo-root-' + this.traceId);
+        const x: number = point.windowX - ui.px2vp(root.windowOffset.x);
+        const y: number = point.windowY - ui.px2vp(root.windowOffset.y);
+        // Both physical screen edges belong to system navigation gestures.
+        allowed = allowed && x >= 24 && x <= this.viewportWidth - 24 && y >= this.titleContentInset();
+        const media = ui.getComponentUtils().getRectangleById('pinmony-entry-target-' + this.traceId);
+        this.siblingOnMedia = point.windowY >= ui.px2vp(media.windowOffset.y) &&
+          point.windowY < ui.px2vp(media.windowOffset.y + media.size.height);
+      } catch (_) { allowed = false; }
+      this.siblingCarouselAtStart = this.carouselBackdropIndex;
+      this.siblingProductAtStart = this.productGalleryOffset;
+      this.siblingForwardAtStart = this.siblingCarouselBoundary(1);
+      this.siblingBackwardAtStart = this.siblingCarouselBoundary(-1);
+      const detail: PinmonyDetailSnapshot = this.displayedDetail();
+      const slide: PinmonyCarouselItem | undefined = detail.carousel?.items[this.carouselBackdropIndex];
+      if (this.siblingOnMedia) {
+        if (detail.isVideo || !!detail.video || !!slide?.video) allowed = false;
+      }
+      this.siblingSwipe.start(point.windowX, point.windowY, identity, allowed, Date.now());
+      PinmonyRuntimeLog.info('DetailSiblingTrace: phase=touch-start enabled=' + ready +
+        ' allowed=' + allowed + ' active=' + this.pageActive + ' media=' + this.siblingOnMedia +
+        ' entryReady=' + (!this.entryPhoto || this.entryMotionComplete));
+    } else if (event.type === TouchType.Move) {
+      this.siblingSwipe.move(point.windowX, point.windowY, Date.now());
+    }
+  }
+
+  private siblingPanEnd(event: GestureEvent): void {
+    const step: number = event.offsetX < 0 ? 1 : -1;
+    const carouselUnchanged: boolean = !this.siblingOnMedia || this.siblingCarouselAtStart === this.carouselBackdropIndex &&
+      Math.abs(this.siblingProductAtStart - this.productGalleryOffset) < 0.5;
+    const atBoundary: boolean = !this.siblingOnMedia || (step === 1 ? this.siblingForwardAtStart : this.siblingBackwardAtStart);
+    const accepted: boolean = this.siblingSwipe.endOffset(event.offsetX, event.offsetY,
+      this.displayedDetail().pinUrl + ':' + this.traceId, this.siblingSwipeReady() && carouselUnchanged && atBoundary, Date.now());
+    PinmonyRuntimeLog.info('DetailSiblingTrace: phase=pan-end accepted=' + accepted +
+      ' dx=' + event.offsetX.toFixed(1) + ' dy=' + event.offsetY.toFixed(1) + ' carousel=' + carouselUnchanged);
+    if (accepted) {
+      if (!this.siblingSwipeReady(step)) {
+        PinmonyRuntimeLog.info('DetailSiblingTrace: phase=boundary step=' + step);
+        this.animateSiblingBoundary(step, 0, ++this.siblingBoundaryVersion);
+        return;
+      }
+      PinmonyRuntimeLog.info('DetailSiblingTrace: phase=pan-accepted');
+      this.siblingBoundaryVersion++; this.siblingBoundaryOffset = 0;
+      this.siblingMotion.start(step);
+    }
+  }
+
+  private siblingPanCancel(): void {
+    PinmonyRuntimeLog.info('DetailSiblingTrace: phase=pan-cancel');
+    this.siblingSwipe.cancel();
+  }
+
+  private animateSiblingBoundary(step: number, phase: number, version: number): void {
+    if (version !== this.siblingBoundaryVersion) return;
+    if (!this.heroVisible || !this.siblingSwipeReady()) { this.siblingBoundaryOffset = 0; return; }
+    if (phase === 0) this.onSiblingBoundary?.(step);
+    const distance: number = phase === 0 ? -step * 8 : phase === 1 ? step * 4 : 0;
+    this.getUIContext().animateTo({ duration: phase === 2 ? 90 : 60, curve: Curve.EaseOut,
+      onFinish: (): void => {
+        if (phase < 2) this.animateSiblingBoundary(step, phase + 1, version);
+      } }, (): void => { this.siblingBoundaryOffset = distance; });
+  }
+
+  private stageRelatedSource(): void {
+    const pinUrl: string = this.displayedDetail().pinUrl;
+    const session: number = this.displayedDetail().session;
+    const lifetime: number = this.sourceLifetime;
+    PinmonyDetailSources.stage({ identity: 'related:' + pinUrl + ':' + session, pageUrl: pinUrl, session: session,
+      cards: (): PinmonyDetailSourceCard[] => lifetime === this.sourceLifetime && this.displayedDetail().pinUrl === pinUrl &&
+        this.displayedDetail().session === session ? this.displayedDetail().related.filter((pin: PinmonyRelatedPin): boolean =>
+          pin.kind !== 'topics' && !!pin.pinUrl && pin.pinUrl !== pinUrl).map((pin: PinmonyRelatedPin): PinmonyDetailSourceCard => ({
+            pinUrl: pin.pinUrl, cardId: 'pinmony-related-photo-' + pinUrl + '-' + pin.pinUrl,
+            imageUrl: pin.imageUrl, imageWidth: pin.imageWidth, imageHeight: pin.imageHeight })) : [],
+      locate: (card: PinmonyDetailSourceCard): void => {
+        const index: number = this.displayedDetail().related.findIndex((pin: PinmonyRelatedPin): boolean => pin.pinUrl === card.pinUrl);
+        if (index >= 0) this.detailScroller.scrollToIndex(index + 1, false, ScrollAlign.CENTER);
+      } });
+  }
+
   @Prop entryClosing: boolean = false;
   @Prop disableImageZoom: boolean = false;
   @Prop @Watch('onShuffleStatusSelectionChanged') shuffleSelectedImage: string = '';
@@ -695,6 +850,7 @@ export struct PinmonyDetailPage {
   @Prop visualResult: PinmonyVisualResult = emptyVisualResult();
   @Prop @Watch('onViewerPageActiveChanged') pageActive: boolean = true;
   private onViewerPageActiveChanged(): void {
+    if (!this.pageActive) this.siblingMotion.cancel();
     const owner: string = this.viewerOwner();
     this.uiCommits.post('viewer-active', (): void => {
       if (!this.pageActive && owner === this.viewerOwner()) this.onViewerCancel?.(owner);
@@ -770,6 +926,7 @@ export struct PinmonyDetailPage {
   private readonly detailPathStack: NavPathStack = new NavPathStack();
   private lastReportedScrollOffset: number = 0;
   @State private backToTopVisible: boolean = false;
+  @State private backToTopOffset: number = 0;
   private measuredHeaderHeight: number = 0;
   private lastRecommendAuditKey: string = '';
   private activePin: string = '';
@@ -807,7 +964,10 @@ export struct PinmonyDetailPage {
       this.viewerMounted = false; this.viewerClosing = false;
       this.viewerBackdropProgress = 0;
       this.searchMounted = false; this.searchImageReady = false; this.searchClosing = false;
+      this.siblingSwipe.cancel(); this.selectedDetailText = false;
+      this.siblingBoundaryVersion++; this.siblingBoundaryOffset = 0;
       this.activePin = this.displayedDetail().pinUrl;
+      this.siblingMotion.present();
       // A reused page must not inherit the previous Pin's completed flight.
       // Returning to a retained parent keeps its reading position and skips entry.
       this.resetEntryMotion();
@@ -815,6 +975,7 @@ export struct PinmonyDetailPage {
       this.expanded = false;
       this.zoomImageUrl = '';
       this.productGalleryOffset = 0;
+      this.productGalleryAtStart = false; this.productGalleryAtEnd = false;
       this.textOverflowing = false;
       this.videoFailure = ''; this.videoRetryRevision = 0;
       this.restoreScrollPosition();
@@ -875,7 +1036,9 @@ export struct PinmonyDetailPage {
     clearTimeout(this.searchLabelTimer); this.searchLabelVisible = true;
     this.searchLabelTimer = setTimeout(() => { this.searchLabelVisible = false; }, 2500);
   }
-  aboutToDisappear(): void {
+  aboutToDisappear(): void { this.sourceLifetime++; this.siblingSwipe.cancel();
+    this.siblingMotion.cancel();
+    this.siblingBoundaryVersion++; this.siblingBoundaryOffset = 0;
     this.uiCommits.dispose();
     const owner: string = this.viewerOwner();
     const cancel: ((owner: string) => void) | undefined = this.onViewerCancel;
@@ -988,7 +1151,7 @@ export struct PinmonyDetailPage {
       if (this.displayedDetail().pinUrl !== pin) return;
       try {
         this.detailScroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false });
-        this.backToTopVisible = (this.detailScroller.offset()?.yOffset || 0) > 180;
+        this.backToTopOffset = (this.detailScroller.offset()?.yOffset || 0); this.backToTopVisible = this.backToTopOffset > 0;
         this.lastReportedScrollOffset = offset;
         this.shuffleRevealedKey = '';
         this.revealShuffleReturn();
@@ -1016,7 +1179,7 @@ export struct PinmonyDetailPage {
       const position = this.detailScroller.offset();
       if (!position) return;
       const offset: number = Math.max(0, position.yOffset);
-      this.backToTopVisible = offset > 180;
+      this.backToTopOffset = offset; this.backToTopVisible = this.backToTopOffset > 0;
       if (!force && Math.abs(offset - this.lastReportedScrollOffset) < 8) return;
       this.lastReportedScrollOffset = offset;
       if (this.onScrollPosition) this.onScrollPosition(this.displayedDetail().pinUrl, offset);
@@ -1179,7 +1342,9 @@ export struct PinmonyDetailPage {
   }
 
   private backdropImageUrl(): string {
-    return this.displayedDetail().imageUrl;
+    const detail: PinmonyDetailSnapshot = this.displayedDetail();
+    return this.entryPhoto && this.entryPhoto.pinUrl === detail.pinUrl && (detail.mediaKind === 'carousel' || !!detail.carousel) ?
+      this.entryPhoto.imageUrl : detail.imageUrl;
   }
 
   private needsCoverBackdrop(): boolean {
@@ -1190,7 +1355,9 @@ export struct PinmonyDetailPage {
 
   private coverBackdropVisible(): boolean {
     return !this.displayedDetail().carousel ||
-      this.carouselBackdropIndex === 0 && !this.carouselBackdropReady && this.needsPhotoBackdrop();
+      this.carouselBackdropIndex === Math.max(0, carouselEntryIndex(this.displayedDetail().carousel,
+        this.entryPhoto?.pinUrl || '', this.entryPhoto?.imageUrl || '')) &&
+      !this.carouselBackdropReady && this.needsPhotoBackdrop();
   }
 
   private heroHeight(): number {
@@ -1331,7 +1498,7 @@ export struct PinmonyDetailPage {
     .stateEffect(true)
     .onClick(() => {
       if (((this.readsReady || this.actionsReady && this.displayedDetail().kind !== 'cached' && !this.displayedDetail().relatedRetained) || this.deferredActions) && this.onRelated)
-        this.onRelated(pin.pinUrl);
+        { this.stageRelatedSource(); this.onRelated(pin.pinUrl); }
     })
     .accessibilityText(pin.title.length > 0 ? pin.title : this.uiText("pm_open_related_pin_e1e5dfc7"))
   }
@@ -1432,6 +1599,8 @@ export struct PinmonyDetailPage {
             PinmonyCarouselView({ carousel: this.displayedDetail().carousel, contentWidth: this.detailMediaWidth(), mediaHeightVp: this.heroHeight(),
               maxMediaHeightVp: this.fitPhotoToScreen() ? this.heroHeight() : 0,
               previewUrl: this.displayedDetail().imageUrl,
+              entryPinUrl: this.entryPhoto?.pinUrl || '',
+              entryImageUrl: this.entryPhoto?.imageUrl || '',
               entryPhotoHidden: this.entryPhotoHidden,
               entryBackdropProgress: this.entryBackdropProgress,
               viewerBackdropProgress: this.viewerBackdropProgress,
@@ -1439,6 +1608,9 @@ export struct PinmonyDetailPage {
               onPageChanged: (index: number) => { this.carouselBackdropIndex = index; },
               productOffset: this.productGalleryOffset,
               onProductOffset: (offset: number) => { this.productGalleryOffset = offset; },
+              onProductEdges: (atStart: boolean, atEnd: boolean) => {
+                this.productGalleryAtStart = atStart; this.productGalleryAtEnd = atEnd;
+              },
               sourceId: 'pinmony-photo-source-' + this.traceId.toString(),
               imageHidden: this.viewerMounted && this.viewerImageReady || this.searchMounted && this.searchImageReady,
               hiddenImageUrl: this.zoomImageUrl,
@@ -1648,11 +1820,12 @@ export struct PinmonyDetailPage {
               .onClick(() => {
                 PinmonyRuntimeLog.info('DetailCreatorTrace: click target=' + (this.displayedDetail().creatorUrl ? 'ready' : 'missing'));
                 if (this.displayedDetail().creatorUrl && this.onUser) this.onUser(this.displayedDetail().creatorUrl || '');
-              })
+              }, 8)
             }
             if (this.displayedDetail().title.length > 0) {
               Text(PinmonyI18n.render(this.displayedDetail().title, this.uiLanguage))
                 .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+                .onTextSelectionChange((start: number, end: number) => { this.selectedDetailText = start !== end; if (this.selectedDetailText) this.siblingSwipe.cancel(); })
                 .copyOption(CopyOptions.LocalDevice)
                 .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
                 .fontSize(22)
@@ -1684,6 +1857,7 @@ export struct PinmonyDetailPage {
                 })
               }
                 .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+                .onTextSelectionChange((start: number, end: number) => { this.selectedDetailText = start !== end; if (this.selectedDetailText) this.siblingSwipe.cancel(); })
                 .copyOption(CopyOptions.LocalDevice)
                 .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
                 .fontSize(16)
@@ -1708,6 +1882,7 @@ export struct PinmonyDetailPage {
             if (this.displayedDetail().richDescription && this.displayedDetail().richDescription !== this.displayedDetail().description) {
               Text(this.displayedDetail().richDescription).fontSize(16).lineHeight(24)
                 .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
+                .onTextSelectionChange((start: number, end: number) => { this.selectedDetailText = start !== end; if (this.selectedDetailText) this.siblingSwipe.cancel(); })
                 .copyOption(CopyOptions.LocalDevice)
                 .onCopy(() => { if (this.onTextCopied) this.onTextCopied(); })
                 .fontColor($r('app.color.secondary_text')).width('100%')
@@ -1840,6 +2015,10 @@ export struct PinmonyDetailPage {
   }
 
   private heroImageSources(url: string, pinUrl: string): DetailHeroSource[] {
+    if (this.displayedDetail().mediaKind === 'carousel' && this.entryPhoto?.pinUrl === pinUrl && this.entryPhoto.imageUrl) {
+      return [{ key: this.heroRenderKey(this.entryPhoto.imageUrl, pinUrl), url: this.entryPhoto.imageUrl,
+        pinUrl: pinUrl, revision: this.heroRenderRevision }];
+    }
     const next: DetailHeroSource = { key: this.heroRenderKey(url, pinUrl), url: url, pinUrl: pinUrl, revision: this.heroRenderRevision };
     if (this.decodedHeroSource?.pinUrl === pinUrl) {
       return this.decodedHeroSource.key !== next.key ? [this.decodedHeroSource, next] : [next];
@@ -2122,9 +2301,25 @@ export struct PinmonyDetailPage {
   private detailDestination(_name?: string, _param?: Object) {
     HdsNavDestination() {
       Stack() {
+        Stack() {
         Column() { this.detailContent() }.width('100%').height('100%')
-          .hitTestBehavior(this.searchMounted ? HitTestMode.None : HitTestMode.Default)
-        PinmonyBackToTopButton({ showButton: this.backToTopVisible && this.canBackToTop(),
+          .id('pinmony-sibling-body-' + this.traceId)
+          .backgroundColor($r('app.color.page_background'))
+          .translate({ x: this.siblingBoundaryOffset + this.siblingMotionOffset })
+          .onTouch((event: TouchEvent) => this.siblingTouch(event))
+          .parallelGesture(PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 48 })
+            .onActionStart(() => PinmonyRuntimeLog.info('DetailSiblingTrace: phase=pan-start'))
+            .onActionEnd((event: GestureEvent) => this.siblingPanEnd(event))
+            .onActionCancel(() => this.siblingPanCancel()))
+          .hitTestBehavior(this.searchMounted || this.siblingMotionActive ? HitTestMode.None : HitTestMode.Default)
+        ForEach(this.siblingMotionCovers, (cover: PinmonyDetailSiblingCover) => {
+          Image(cover.bitmap).width('100%').height('100%').objectFit(ImageFit.Fill).syncLoad(true)
+            .translate({ x: this.siblingPreviousOffset })
+            .onComplete(() => this.siblingMotion.covered(cover.identity))
+            .hitTestBehavior(HitTestMode.None).accessibilityLevel('no').draggable(false)
+        }, (cover: PinmonyDetailSiblingCover): string => cover.identity.toString())
+        }.width('100%').height('100%').clip(true)
+        PinmonyBackToTopButton({ scrollOffsetVp: this.backToTopOffset, showButton: this.backToTopVisible && this.canBackToTop(),
           bottomInset: Math.max(80, this.getUIContext().px2vp(this.gestureBarHeightPx) + 64),
           onBackToTop: () => this.backToTop() })
       if (this.searchMounted) {
@@ -2213,7 +2408,8 @@ export struct PinmonyDetailPage {
           .position({ x: 0, y: 0 })
           .translate({ x: this.searchFlightFrame.x, y: this.searchFlightFrame.y })
           .opacity(this.searchImageReady && this.searchPhotoFlying ? 1 : 0)
-          .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+          // None only skips this node; the nested Stacks would still cover search touches.
+          .hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS).accessibilityLevel('no-hide-descendants')
       }
       if (this.shuffleSelectedImage && !this.shuffleFullDetail) {
         this.shuffleOverlay()

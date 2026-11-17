@@ -56,7 +56,11 @@ export struct PinmonySettingsPage {
     this.restoringRootScroll = true;
     const revision: number = ++this.restoreRevision;
     setTimeout((): void => {
-      if (revision !== this.restoreRevision || !this.pageVisible || this.store.screen !== 'root') return;
+      if (revision !== this.restoreRevision) return;
+      if (!this.pageVisible || this.store.screen !== 'root') {
+        this.restoringRootScroll = false;
+        return;
+      }
       try { this.contentScroller.scrollTo({ xOffset: 0, yOffset: this.store.rootScrollOffset, animation: false }); } catch (_) {}
       this.restoringRootScroll = false;
     }, 0);
@@ -119,7 +123,11 @@ export struct PinmonySettingsPage {
     this.pathStack.clear();
     this.pathStack.pushPath({ name: 'pin-web-settings' }, false);
   }
-  aboutToDisappear(): void { this.pageVisible = false; }
+  aboutToDisappear(): void {
+    this.pageVisible = false;
+    ++this.restoreRevision;
+    this.restoringRootScroll = false;
+  }
   private confirmLogout(): void {
     if (this.logoutConfirmOpen || this.store.busy || this.store.loading || this.store.sessionAccountsLoading || !this.onRequest) return;
     const token: number = this.store.token;
@@ -181,7 +189,7 @@ export struct PinmonySettingsPage {
             PinmonyActionNotice({ message: PinmonyI18n.render(this.store.error, this.uiLanguage) })
           }
         }
-        if (!this.store.loading) { ForEach(this.options, (id: string) => {
+        ForEach(this.options, (id: string) => {
           ListItem() {
             Button({ type: ButtonType.Normal, stateEffect: true }) {
               Row({ space: 16 }) {
@@ -222,7 +230,7 @@ export struct PinmonySettingsPage {
               if (id === 'about') this.store.screen = 'about'; })
             .accessibilityText(id === 'logs' && this.exportingLog ? this.uiText("pm_exporting_logs_2a89f720") : this.optionLabel(id))
           }
-        }, (id: string) => id + this.uiLanguage) }
+        }, (id: string) => id + this.uiLanguage)
       }
       .width('100%').height('100%')
       .scrollBarMargin({ start: LengthMetrics.vp(this.getUIContext().px2vp(this.statusBarHeightPx) + 56) })

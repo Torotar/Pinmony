@@ -1,3 +1,4 @@
+import { PinmonyDetailSources, PinmonyDetailSourceCard } from '../services/PinmonyDetailSource';
 import { PinmonyModalNavigation } from './PinmonyModalNavigation';
 import { PinmonyBackToTopButton } from './PinmonyBackToTopButton';
 import { PinmonyImmersiveLight } from '../services/PinmonyImmersiveLight';
@@ -25,6 +26,7 @@ export struct PinmonyImageSearchView {
   @State private sheetAppearing: boolean = false;
   private resultScrollOffset: number = 0;
   @State private backToTopVisible: boolean = false;
+  @State private backToTopOffset: number = 0;
   @StorageProp('gestureBarHeightPx') private gestureBarHeightPx: number = 0;
 
   private canBackToTop(): boolean {
@@ -41,11 +43,54 @@ export struct PinmonyImageSearchView {
     if (!this.canBackToTop()) return;
     try {
       this.resultScrollOffset = Math.max(0, this.resultScroller.offset()?.yOffset || 0);
-      this.backToTopVisible = this.resultScrollOffset > 180;
+      this.backToTopOffset = this.resultScrollOffset; this.backToTopVisible = this.backToTopOffset > 0;
     } catch (_) { this.backToTopVisible = false; }
   }
+
+  private sourceLifetime: number = 0;
+  private sourceReturnPin: string = '';
+  private sourceReturnAttempts: number = 0;
+  private sourceIdentity(): string { return this.pin + ':' + this.imageUrl + ':' + this.crop.x + ':' + this.crop.y + ':' + this.crop.w + ':' + this.crop.h; }
+  private sourceCardId(pin: PinmonyRelatedPin): string {
+    return (this.uploadedPhoto ? 'pinmony-photo-result-' : 'pinmony-visual-result-' + this.pin + '-') + pin.id;
+  }
+  private stageDetailSource(): void {
+    const identity: string = this.sourceIdentity();
+    const lifetime: number = this.sourceLifetime;
+    PinmonyDetailSources.stage({ identity: 'image-search:' + identity, pageUrl: this.pin, session: lifetime, pageOnly: true,
+      cards: (): PinmonyDetailSourceCard[] => lifetime === this.sourceLifetime && identity === this.sourceIdentity() ?
+        this.result.items.filter((item: PinmonyRelatedPin): boolean => item.pinUrl !== this.pin).map((item: PinmonyRelatedPin): PinmonyDetailSourceCard => ({ pinUrl: item.pinUrl,
+          cardId: this.sourceCardId(item), entryCardId: 'pinmony-photo-result-' + item.id,
+          imageUrl: item.imageUrl, imageWidth: item.imageWidth, imageHeight: item.imageHeight })) : [],
+      locate: (card: PinmonyDetailSourceCard): void => {
+        this.sourceReturnPin = card.pinUrl; this.sourceReturnAttempts = 0;
+        this.restoreSourceCard();
+      } });
+  }
+  private restoreSourceCard(): void {
+    if (!this.sourceReturnPin || !this.alive || !this.presentationActive || !this.sheetVisible || !this.resultSheetMounted) return;
+    const pin: PinmonyRelatedPin | undefined = this.result.items.find((item: PinmonyRelatedPin): boolean => item.pinUrl === this.sourceReturnPin);
+    if (!pin) { this.sourceReturnPin = ''; return; }
+    try {
+      const ui = this.getUIContext();
+      const rect = ui.getComponentUtils().getRectangleById(this.sourceCardId(pin));
+      const host = ui.getComponentUtils().getRectangleById('pinmony-image-result-scroll-' + this.pin + '-' + this.uploadedPhoto);
+      if (rect.size.width <= 0 || host.size.height <= 0) {
+        if (++this.sourceReturnAttempts < 12) this.initial = setTimeout((): void => this.restoreSourceCard(), 16);
+        return;
+      }
+      const target: number = Math.max(0, this.resultScroller.currentOffset().yOffset + ui.px2vp(rect.windowOffset.y - host.windowOffset.y) - 16);
+      this.resultScrollOffset = target;
+      this.resultScroller.scrollTo({ xOffset: 0, yOffset: target, animation: false });
+      this.sourceReturnPin = '';
+    } catch (_) {
+      if (++this.sourceReturnAttempts < 12) this.initial = setTimeout((): void => this.restoreSourceCard(), 16);
+    }
+  }
+
   private openRelated(pin: PinmonyRelatedPin): void {
     if (!this.alive || this.presentationActive === false || this.relatedOpening || this.result.loading || pin.pinUrl === this.pin) return;
+    this.stageDetailSource();
     this.relatedOpening = true;
     try { this.resultScrollOffset = Math.max(0, this.resultScroller.offset()?.yOffset || 0); } catch (_) {}
     this.sheetVisible = false;
@@ -56,6 +101,7 @@ export struct PinmonyImageSearchView {
     }
   }
   private resultSheetAppeared(): void {
+    this.restoreSourceCard();
     if (this.presentationActive && !this.closing && this.sheetVisible) {
       try { this.resultScroller.scrollTo({ xOffset: 0, yOffset: this.resultScrollOffset, animation: false }); } catch (_) {}
     }
@@ -154,7 +200,7 @@ export struct PinmonyImageSearchView {
       if (!this.uploadedPhoto && this.onSearch) this.onSearch(this.crop, false, true);
     }, 0);
   }
-  aboutToDisappear(): void { this.alive = false; this.transitionVersion++; clearTimeout(this.transitionTimer); clearTimeout(this.debounce); clearTimeout(this.initial); }
+  aboutToDisappear(): void { this.sourceLifetime++; this.sourceReturnPin = ''; this.alive = false; this.transitionVersion++; clearTimeout(this.transitionTimer); clearTimeout(this.debounce); clearTimeout(this.initial); }
   private beginTransition(): void {
     if (!this.animatePhoto || this.started || !this.measured || !this.decoded || !this.alive) return;
     this.started = true;
@@ -289,8 +335,47 @@ export struct PinmonyImageSearchView {
       if (this.alive && this.onSearch) this.onSearch(this.crop, false, false);
     }, 280);
   }
-  private startDrag(): void { this.base = { x: this.crop.x, y: this.crop.y, w: this.crop.w, h: this.crop.h }; }
+  private canAdjustCrop(): boolean {
+    return this.alive && this.presentationActive && !this.closing && !this.closeRequested &&
+      !this.relatedOpening && !this.photoFlightActive && (!this.animatePhoto || this.started) &&
+      this.photoWidth() > 0 && this.photoHeight() > 0;
+  }
+  private cropTouchWidth(corner: number): number {
+    const width: number = this.crop.w * this.photoWidth();
+    return corner < 0 ? width : 22 + Math.min(22, width / 2);
+  }
+  private cropTouchHeight(corner: number): number {
+    const height: number = this.crop.h * this.photoHeight();
+    return corner < 0 ? height : 22 + Math.min(22, height / 2);
+  }
+  private cropTouchX(corner: number): number {
+    const left: number = this.photoX() + this.crop.x * this.photoWidth();
+    if (corner < 0) return left;
+    return corner === 1 || corner === 3 ? left + this.crop.w * this.photoWidth() -
+      Math.min(22, this.crop.w * this.photoWidth() / 2) : left - 22;
+  }
+  private cropTouchY(corner: number): number {
+    const top: number = this.photoY() + this.crop.y * this.photoHeight();
+    if (corner < 0) return top;
+    return corner > 1 ? top + this.crop.h * this.photoHeight() -
+      Math.min(22, this.crop.h * this.photoHeight() / 2) : top - 22;
+  }
+  private startDrag(corner: number): void {
+    this.dragCorner = -2;
+    const allowed: boolean = this.canAdjustCrop() && corner >= -1 && corner <= 3;
+    PinmonyRuntimeLog.info('ImageSearchCropTrace: phase=start corner=' + corner.toString() + ' allowed=' + allowed.toString());
+    if (!allowed) return;
+    this.dragCorner = corner;
+    this.base = { x: this.crop.x, y: this.crop.y, w: this.crop.w, h: this.crop.h };
+  }
+  private finishDrag(cancelled: boolean): void {
+    if (this.dragCorner >= -1) PinmonyRuntimeLog.info('ImageSearchCropTrace: phase=' +
+      (cancelled ? 'cancel' : 'end') + ' changed=' + (this.crop.x !== this.base.x ||
+        this.crop.y !== this.base.y || this.crop.w !== this.base.w || this.crop.h !== this.base.h).toString());
+    this.dragCorner = -2;
+  }
   private drag(e: GestureEvent, corner: number): void {
+    if (!this.canAdjustCrop() || corner < -1) return;
     const dx: number = e.offsetX / this.photoWidth();
     const dy: number = e.offsetY / this.photoHeight();
     let left: number = this.base.x;
@@ -308,7 +393,24 @@ export struct PinmonyImageSearchView {
       else bottom = Math.min(1, Math.max(top + 0.08, bottom + dy));
     }
     this.crop = { x: left, y: top, w: right - left, h: bottom - top };
+    this.onPhotoSelection?.(this.crop);
     this.queueSearch();
+  }
+  @Builder
+  private cropTouchTarget(corner: number) {
+    // These are real native hit targets above the passive photo/selection plane.
+    // Opposite targets split at the center of narrow crops instead of overlapping.
+    Row().width(this.cropTouchWidth(corner)).height(this.cropTouchHeight(corner))
+      .position({ x: this.cropTouchX(corner), y: this.cropTouchY(corner) })
+      .backgroundColor(Color.Transparent)
+      .hitTestBehavior(this.canAdjustCrop() ? HitTestMode.Block : HitTestMode.None)
+      .onTouch((event: TouchEvent) => {
+        if (event.type === TouchType.Down) PinmonyRuntimeLog.info('ImageSearchCropTrace: phase=down corner=' + corner.toString());
+      })
+      .gesture(PanGesture({ fingers: 1, distance: 1 }).onActionStart(() => this.startDrag(corner))
+        .onActionUpdate((event: GestureEvent) => { if (this.dragCorner === corner) this.drag(event, corner); })
+        .onActionEnd(() => this.finishDrag(false)).onActionCancel(() => this.finishDrag(true)))
+      .accessibilityLevel('no')
   }
   @StorageLink('immersiveLightMode') private sheetMaterialMode: string = 'immersive';
 
@@ -351,6 +453,7 @@ export struct PinmonyImageSearchView {
           }
         }.width('100%').padding({ top: 72, bottom: 16 })
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
+        .id('pinmony-image-result-scroll-' + this.pin + '-' + this.uploadedPhoto)
         .onDidScroll(() => this.reportResultsPosition())
         .onScrollStop(() => this.reportResultsPosition())
         .onReachEnd(() => {
@@ -360,7 +463,7 @@ export struct PinmonyImageSearchView {
         })
     }.padding({ left: 10, right: 10 }).width('100%').height('100%').backgroundColor($r('app.color.page_background'))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
-      PinmonyBackToTopButton({ showButton: this.backToTopVisible && this.canBackToTop(),
+      PinmonyBackToTopButton({ scrollOffsetVp: this.backToTopOffset, showButton: this.backToTopVisible && this.canBackToTop(),
         bottomInset: 16 + this.getUIContext().px2vp(this.gestureBarHeightPx),
         onBackToTop: () => this.backToTop() })
     }.width('100%').height('100%')
@@ -398,31 +501,23 @@ export struct PinmonyImageSearchView {
           y: this.animatePhoto ? this.frameHeight / this.photoHeight() : 1, centerX: 0, centerY: 0 })
         .translate({ x: this.animatePhoto ? this.frameX : this.photoX(), y: this.animatePhoto ? this.frameY : this.photoY() })
         .opacity(this.animatePhoto && !this.started || this.onPhotoFrame && this.photoFlightActive ? 0 : 1)
-        .hitTestBehavior(HitTestMode.None)
+        .hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS)
+      this.cropTouchTarget(-1)
+      this.cropTouchTarget(0)
+      this.cropTouchTarget(1)
+      this.cropTouchTarget(2)
+      this.cropTouchTarget(3)
     }.width('100%').height('100%').id('pinmony-search-flight-' + this.pin)
+      .backgroundColor(Color.Transparent).hitTestBehavior(HitTestMode.Default)
+      .onTouch((event: TouchEvent) => {
+        if (event.type === TouchType.Down) PinmonyRuntimeLog.info('ImageSearchCropTrace: phase=canvas-down allowed=' +
+          this.canAdjustCrop().toString() + ' flight=' + this.photoFlightActive.toString() +
+          ' active=' + this.presentationActive.toString());
+      })
       .onAreaChange((_old: Area, area: Area) => {
         this.widthValue = Number(area.width); this.heightValue = Number(area.height);
         this.measured = this.widthValue > 0 && this.heightValue > 0; this.beginTransition();
       })
-      .onTouch((event: TouchEvent) => {
-        if (event.type !== TouchType.Down || !event.touches.length) return;
-        const x: number = event.touches[0].x;
-        const y: number = event.touches[0].y;
-        const left: number = this.photoX() + this.crop.x * this.photoWidth();
-        const top: number = this.photoY() + this.crop.y * this.photoHeight();
-        const right: number = left + this.crop.w * this.photoWidth();
-        const bottom: number = top + this.crop.h * this.photoHeight();
-        this.dragCorner = -2;
-        const cornerX: number = Math.abs(x - left) <= Math.abs(x - right) ? left : right;
-        const cornerY: number = Math.abs(y - top) <= Math.abs(y - bottom) ? top : bottom;
-        if (Math.abs(x - cornerX) <= 22 && Math.abs(y - cornerY) <= 22) {
-          this.dragCorner = (cornerX === right ? 1 : 0) + (cornerY === bottom ? 2 : 0);
-        }
-        else if (x >= left && x <= right && y >= top && y <= bottom) this.dragCorner = -1;
-      })
-      .gesture(PanGesture().onActionStart(() => this.startDrag()).onActionUpdate((event: GestureEvent) => {
-        if (this.dragCorner >= -1) this.drag(event, this.dragCorner);
-      }))
   }
   @Builder
   private presentedResultsPanel() {

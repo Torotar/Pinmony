@@ -3,6 +3,12 @@ const HOME_URL: string = 'https://www.pinterest.com/';
 // Native back navigation confirms the destination before removing its child.
 export class PinmonyNavigationHistory {
   snapshot(): string[] { return this.pages.slice(); }
+  replaceSibling(current: string, next: string): boolean {
+    if (this.pendingTarget || this.pages[this.pages.length - 1] !== this.key(current) ||
+      !/^https:\/\/(?:[^/]+\.)?pinterest\.com\/pin\/\d+\/$/i.test(this.key(next))) return false;
+    this.pages[this.pages.length - 1] = this.key(next);
+    return true;
+  }
   private pages: string[] = [HOME_URL];
   private pendingTarget: string = '';
 

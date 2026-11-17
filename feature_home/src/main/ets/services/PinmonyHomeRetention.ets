@@ -5,6 +5,7 @@ export function retainHomePins(saved: PinmonyHomePin[], live: PinmonyHomePin[], 
   const merged: PinmonyHomePin[] = saved.map((pin: PinmonyHomePin): PinmonyHomePin => {
     const current: PinmonyHomePin | undefined = live.find((item: PinmonyHomePin): boolean => item.pinUrl === pin.pinUrl);
     return { id: pin.id, pinUrl: pin.pinUrl, imageUrl: pin.imageUrl,
+      carouselImages: pin.carouselImages, mediaCount: pin.mediaCount, video: pin.video, isVideo: pin.isVideo,
       imageWidth: pin.imageWidth, imageHeight: pin.imageHeight,
       title: current?.title || pin.title, hasMore: current?.hasMore || false, saved: pin.saved === true };
   });
