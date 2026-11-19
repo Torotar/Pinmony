@@ -54,3 +54,4 @@ export { PinmonyPinCountBadge, PinmonyCardCarouselData } from './src/main/ets/co
 export { PinmonyCardMediaBadge } from './src/main/ets/components/PinmonyCardMediaBadge';
 export { PinmonyCardCarousel } from './src/main/ets/components/PinmonyCardCarousel';
 export { PinmonyCardImage, pinmonyCardCarouselImages, normalizeCardCarouselImages } from './src/main/ets/models/PinmonyCardCarousel';
+export { PinmonyPinHoldFrame, PinmonyPinHoldPreview } from './src/main/ets/components/PinmonyPinHoldPreview';

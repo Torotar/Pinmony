@@ -5,9 +5,10 @@ export interface PinmonyBoardInviteLink {
 }
 
 export interface PinmonySubmittedLinkTarget {
-  kind: 'pin' | 'profile' | 'board-invite';
+  kind: 'pin' | 'profile' | 'board' | 'own-shared-board' | 'board-invite';
   pinId?: string;
   profileUrl?: string;
+  boardUrl?: string;
   invitation?: PinmonyBoardInviteLink;
 }
 
@@ -43,4 +44,27 @@ export function parseBoardInviteLink(value: string): PinmonyBoardInviteLink | un
     if (!/^[A-Za-z0-9_-]{1,256}$/.test(code) || !/^\d{1,30}$/.test(inviter) || (params.get('board_collab_inviter') || '').toLowerCase() !== 'true') return undefined;
     return { boardUrl: 'https://www.pinterest.com/' + match[1] + '/' + encodeURIComponent(slug) + '/', inviteCode: code, inviterUserId: inviter };
   } catch (_) { return undefined; }
+}
+
+// Accept only a complete board permalink; strip sharing/tracking parameters.
+export function parseBoardPermalink(value: string): string {
+  if (value.length > 2048 || hasBoardInviteLinkContext(value)) return '';
+  const match: RegExpMatchArray | null = value.trim().match(
+    /^https?:\/\/(?:(?:www|uk|m)\.)?pinterest\.com\/([a-z0-9_]{1,64})\/([a-z0-9%-][a-z0-9_%.-]{0,255})\/?(?:[?#][^\s\\]*)?$/i);
+  if (!match || /^(pin|search|messages|inbox|updates|notifications|login|logout|signup|ideas|today|settings|edit|business|explore|users|help|about|privacy|terms|resource|resources|oauth|api|board|boards|_.*)$/i.test(match[1])) return '';
+  try {
+    const slug: string = decodeURIComponent(match[2]);
+    if (/[\/\\%?#\s\x00-\x1f\x7f]/.test(slug) || slug.startsWith('_') || slug === '.' || slug === '..' || /^(followers|following)$/i.test(slug)) return '';
+  } catch (_) { return ''; }
+  return 'https://www.pinterest.com/' + match[1] + '/' + match[2] + '/';
+}
+
+// An observed board share redirect, distinct from a collaboration invitation.
+// Drop both contextual parameters; only the authenticated owner may open the result.
+export function parseOwnSharedBoardRedirect(value: string): string {
+  if (value.length > 4096) return '';
+  const parts: RegExpMatchArray | null = value.match(/^(https:\/\/[a-z.]+\/[^?#\s]+)\?([^#\s]+)$/i);
+  if (!parts) return '';
+  if (!/^(?:invite_code=[A-Za-z0-9_-]{1,256}&sender=[A-Za-z0-9_-]{1,256}|sender=[A-Za-z0-9_-]{1,256}&invite_code=[A-Za-z0-9_-]{1,256})$/.test(parts[2])) return '';
+  return parseBoardPermalink(parts[1]);
 }

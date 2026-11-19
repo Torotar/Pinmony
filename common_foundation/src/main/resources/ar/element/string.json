@@ -3373,6 +3373,10 @@
       "value": "مشاركة الرابط"
     },
     {
+      "name": "pm_board_organizer_move_to",
+      "value": "نقل إلى"
+    },
+    {
       "name": "pm_move_to_another_board_62574b0d",
       "value": "النقل إلى لوحة أخرى"
     },
@@ -5115,6 +5119,10 @@
     {
       "name": "pm_profile_content_search",
       "value": "البحث في منشوراتك"
+    },
+    {
+      "name": "pm_profile_board_hold_reorder",
+      "value": "إعادة الترتيب"
     },
     {
       "name": "pm_profile_board_sort",

@@ -11,6 +11,7 @@ export struct PinmonyShareSheet {
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @StorageLink('systemDarkMode') private hdsDarkMode: boolean = false;
   @Prop titleText: string = '';
+  @Prop cardLinkFooter: boolean = false;
   onClose: () => void = (): void => {};
   @ObjectLink pinStore: PinmonyPinStore;
   onAction: (id: string) => void = (): void => {};
@@ -202,8 +203,9 @@ export struct PinmonyShareSheet {
           .margin({ left: 20, right: 20, top: 12, bottom: 10 })
         }
         ForEach(this.pinStore.shareActions.filter((option: ShareSheetOption) =>
-          !this.pinStore.shareOnPinDetail || !this.hasCopyLink() ||
-          !this.isCopyLink(option.label)), (option: ShareSheetOption) => {
+          (!this.cardLinkFooter || option.id !== 'native-system-share') &&
+          (!this.pinStore.shareOnPinDetail || !this.hasCopyLink() ||
+            !this.isCopyLink(option.label))), (option: ShareSheetOption) => {
           this.buildShareActionRow(option)
         }, (option: ShareSheetOption) => this.shareActionKey(option))
       }
@@ -217,6 +219,12 @@ export struct PinmonyShareSheet {
       if (this.pinStore.shareOnPinDetail && !(this.pinStore.shareSearchActive && PinmonyI18n.isText(this.pinStore.shareFeedback, "正在加载联系人…")) &&
           ['正在加载联系人…', '没有可用的联系人'].some((source: string): boolean => PinmonyI18n.isText(this.pinStore.shareFeedback, source))) {
         Text(PinmonyI18n.render(this.pinStore.shareFeedback, this.uiLanguage)).fontSize(14).fontColor($r('app.color.secondary_text'))
+      }
+      if (this.cardLinkFooter) {
+        if (this.pinStore.shareLoading) { Blank().layoutWeight(1) }
+        ForEach(this.pinStore.shareActions.filter((option: ShareSheetOption) => option.id === 'native-system-share'),
+          (option: ShareSheetOption) => { this.buildShareActionRow(option) },
+          (option: ShareSheetOption) => this.shareActionKey(option))
       }
       if (this.pinStore.shareBoardInviteVisible) {
         if (this.pinStore.shareLoading || !this.pinStore.shareSearchActive) {

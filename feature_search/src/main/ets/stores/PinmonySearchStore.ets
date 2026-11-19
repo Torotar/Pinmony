@@ -21,6 +21,7 @@ export class PinmonySearchStore {
   }
   searchLoading: boolean = false;
   submittedPinLoading: boolean = false;
+  failedSubmittedLinkPage: string = '';
   searchError: string = '';
   searchFilterOptions: PinmonySearchFilterOption[] = [];
   searchFilterLoading: boolean = false;

@@ -35,6 +35,7 @@ export interface PinmonySearchPorts {
   navigateFilterAfterClose?: (target: string, source: string) => void;
   navigateResult: (target: string, source: string) => void;
   openSubmittedPin?: (pinId: string, source: string) => void;
+  openSubmittedBoard?: (url: string, source: string, ownShare?: boolean) => boolean;
   openSubmittedProfile?: (url: string, source: string) => void;
   resolveSubmittedPin?: (link: string, current: () => boolean) => Promise<string>;
   resolveSubmittedLink?: (link: string, current: () => boolean) => Promise<PinmonySubmittedLinkTarget>;

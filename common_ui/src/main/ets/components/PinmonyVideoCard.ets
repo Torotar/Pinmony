@@ -9,6 +9,7 @@ export struct PinmonyVideoCard {
   @StorageLink('pinmonyLanguage') private uiLanguage: string = 'zh';
   private uiText(source: string): string { return PinmonyI18n.text(source, this.uiLanguage); }
   @Prop @Watch('sourceChanged') video: PinmonyVideo = { pinId: '', sources: [], width: 0, height: 0, duration: 0 };
+  @Prop allowImageDrag: boolean = true;
   @Prop poster: string = '';
   @Prop loadingActive: boolean = true;
   @Prop @Watch('activeChanged') active: boolean = false;
@@ -55,7 +56,7 @@ export struct PinmonyVideoCard {
         .onLoad(() => this.playback.setSurface(this.surface.getXComponentSurfaceId()))
       if (!this.rendered) {
         PinmonyCdnImage({ url: this.poster, fit: ImageFit.Cover, loadingActive: this.loadingActive,
-          useSharedDecode: false, viewportOnly: false }).width('100%').height('100%').accessibilityLevel('no')
+          useSharedDecode: false, viewportOnly: false, allowImageDrag: this.allowImageDrag }).width('100%').height('100%').accessibilityLevel('no')
       }
       PinmonyCardMediaBadge({
         caption: this.video.duration > 0 ? this.durationText() : this.uiText('pm_videos_c20f7618'),

@@ -2,9 +2,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function method(name){const start=source.search(new RegExp('  private (?:async )?'+name+'\\('));assert(start>=0,name);return source.slice(start,source.indexOf('\n  private ',start+1));}
 function field(name){const start=source.indexOf('  private readonly '+name+':'),end=source.indexOf('\n  private ',start+1);assert(start>=0);return source.slice(start,end).trim().replace(/^private readonly /,'this.').replace(/: [A-Za-z]+ = /,' = ');}
-const flag={PinmonyRouteParser:require('./product-coordination-harness.cjs').runtime(ts).loadFile('entry/src/main/ets/app/PinmonyRouteParser.ets').PinmonyRouteParser,PIN_NATIVE_DETAIL_READS_ENABLED:true,PIN_NATIVE_BOARD_READS_ENABLED:true,PIN_NATIVE_PROFILE_READS_ENABLED:true,PIN_NATIVE_SEARCH_READS_ENABLED:true,PIN_NATIVE_HOME_READS_ENABLED:true,PIN_NATIVE_SEARCH_DISCOVERY_ENABLED:true,PIN_NATIVE_INBOX_UPDATES_ENABLED:true,PIN_BOARD_API_ENABLED:true,PIN_POST_API_ENABLED:true,PINTEREST_URL:'https://www.pinterest.com/',PinmonyRuntimeLog:{info(){},warn(){}}};
+const flag={searchProfileLink:require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('feature_search/src/main/ets/services/PinmonySearchPinLink.ets').searchProfileLink,parseBoardPermalink:require('./arkts-module-loader.cjs').createArktsLoader(ts).loadFile('common_network/src/main/ets/PinmonyBoardInviteLink.ets').parseBoardPermalink,PinmonyRouteParser:require('./product-coordination-harness.cjs').runtime(ts).loadFile('entry/src/main/ets/app/PinmonyRouteParser.ets').PinmonyRouteParser,PIN_NATIVE_DETAIL_READS_ENABLED:true,PIN_NATIVE_BOARD_READS_ENABLED:true,PIN_NATIVE_PROFILE_READS_ENABLED:true,PIN_NATIVE_SEARCH_READS_ENABLED:true,PIN_NATIVE_HOME_READS_ENABLED:true,PIN_NATIVE_SEARCH_DISCOVERY_ENABLED:true,PIN_NATIVE_INBOX_UPDATES_ENABLED:true,PIN_BOARD_API_ENABLED:true,PIN_POST_API_ENABLED:true,PINTEREST_URL:'https://www.pinterest.com/',PinmonyRuntimeLog:{info(){},warn(){}}};
 const ports={};class Home{constructor(store,p){ports.home=p;}}class Search{constructor(store,p){ports.search=p;}}
-const output={};vm.runInNewContext(ts.transpileModule('export class Host{'+['searchUrlFromAddress','commitNativeSearchReturn','completeNativeBack','openNativeSearchResult','openInboxBoard','previewBoardInvitation','performSearchQuizAction','openDetailTagSearch','openImageRelated'].map(method).join('\n')+'} export function bind(){'+['homeController','searchController'].map(field).join('\n')+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:output,...flag,PinmonyHomeController:Home,PinmonySearchController:Search});
+const output={};vm.runInNewContext(ts.transpileModule('export class Host{'+['searchUrlFromAddress','commitNativeSearchReturn','completeNativeBack','openNativeSearchResult','openNativeSearchBoard','backFromBoard','backFromFailedSearchLink','returnSearchResultsToRoot','openInboxBoard','previewBoardInvitation','performSearchQuizAction','openDetailTagSearch','openImageRelated'].map(method).join('\n')+'} export function bind(){'+['homeController','searchController'].map(field).join('\n')+'}',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{exports:output,...flag,PinmonyHomeController:Home,PinmonySearchController:Search});
 const origin='https://www.pinterest.com',home=origin+'/',search=origin+'/search/pins/?q=art',pin=origin+'/pin/11/',board=origin+'/peer/board/',profile=origin+'/peer/',inbox=origin+'/inbox/';
 function fixture(){const h=new output.Host(),events=[];Object.assign(h,{nativeBusinessRoutesEnabled:true,authStatus:'authenticated',activeTab:1,businessSuspended:false,activeSheetKind:'',nativeBackTarget:'',nativeRootOnly:true,pageBackToken:0,
  shouldKeepSearchRootMounted:()=>true,nativeSearchPageVisible:()=>true,nativeBusinessSessionContext:()=>({authenticated:true,accountId:'synthetic',generation:1,origin}),rootTabAddresses:new Map(),homeStore:{},profileStore:{origins:[]},searchStore:{searchLoading:false,search:{pageKey:search,results:[{targetUrl:pin,enabled:true},{targetUrl:board,enabled:true},{targetUrl:profile,enabled:true}],quiz:{mode:'entry',cards:[]}},searchCache:{put(){}},searchScrollOffset:67},pinStore:{detailPrefetch:{pause(){}}},inboxStore:{inboxSession:0},boardStore:{boardOpeningToken:0},
@@ -13,13 +13,49 @@ function fixture(){const h=new output.Host(),events=[];Object.assign(h,{nativeBu
  returnToNativeProfile:url=>{if(url===profile){events.push(['profile-back',url]);return true;}return false;},clearDetail(){h.pinStore.detail=undefined;h.pinStore.detailOpeningPin='';h.pinStore.detailPin='';},
  capturePinEntryPhoto(){},beginDetailOpening:(url,parent)=>events.push(['pin',url,parent]),openUserProfile:url=>events.push(['user',url]),syncBoardRoute:url=>events.push(['board-route',url]),boardNativeReads:{demand:()=>events.push(['board-read']),pause(){}},syncFloatingTabsMotion(){},
  presentNativeBackTarget:url=>{h.clearDetail();events.push(['present',url]);},inboxMessagesNativeReads:{ownsFlow:()=>true,demand:()=>events.push(['chat-read'])},inboxUpdatesNativeReads:{},
- currentInboxUrl:()=>inbox,currentBoardUrl:()=>h.boardStore.boardDetail?.pageKey||'',nativeBoardVisible:()=>false,clearRootTabGuard(){},rejectOfflineAction:()=>false,traceAction(){},coordinatorTasks:{timeout(){throw Error('legacy timeout');}},
+ currentSearchPageKey:()=>search,currentInboxUrl:()=>inbox,currentBoardUrl:()=>h.boardStore.boardDetail?.pageKey||'',nativeBoardVisible:()=>false,clearRootTabGuard(){},rejectOfflineAction:()=>false,traceAction(){},coordinatorTasks:{timeout(){throw Error('legacy timeout');}},
  searchNativeReads:{demand(){events.push(['search-read']);},pause(){},eligible:()=>true,quizAction:async(k,id)=>events.push(['quiz',k,id]),navigate:url=>events.push(['search',url])},
  controller:{loadUrl(){throw Error('hidden navigation');},getUrl(){throw Error('hidden route read');},runJavaScript(){throw Error('hidden script');}},readBoardInvitations:preview=>events.push(['invitation',preview]),boardInvitationController:{preparePreview:item=>{h.inboxStore.boardInvitationPreview=item;return true;}},showMessage:m=>events.push(['message',m])
 });output.bind.call(h);return {h,events};}
 async function main(){
  const f=fixture();ports.home.openPin(pin,home);assert.deepEqual(f.events.find(e=>e[0]==='pin'),['pin',pin,home]);
  ports.search.navigateResult(board,search);assert.equal(f.h.nativeBackTarget,board);assert.equal(f.h.boardStore.boardReturnUrl,search);assert(f.events.some(e=>e[0]==='board-read'));
+ const submitted=fixture();
+ assert.equal(ports.search.openSubmittedBoard(board,search+'-stale'),false);
+ assert.equal(ports.search.openSubmittedBoard(board+'?tracking=example',search),true);
+ const landing = origin+'/search/';
+ assert.equal(submitted.h.boardStore.boardReturnUrl,landing);
+ assert.equal(submitted.h.boardStore.pendingBoardSource,landing);
+ assert.equal(submitted.h.nativeBackTarget,board);
+ assert(submitted.events.some(e=>e[0]==='board-read'));
+ for (const pending of [true,false]) {
+   const opened = fixture();
+   opened.h.authenticatedProfileUrl = profile;
+   assert.equal(ports.search.openSubmittedBoard(board,search,true),true);
+   if (!pending) { opened.h.boardStore.pendingBoardUrl=''; opened.h.boardStore.pendingBoardSource=''; }
+   Object.assign(opened.h,{cancelledBoardPins:new Set(),boardInvitationController:{clearPreview(){}},
+     loadSessionDocument(){assert.fail('native search back must not load a Web document');},
+     handleBack(){assert.fail('board back must not fall through to the exit handler');}});
+   opened.h.backFromBoard();
+   assert.equal(opened.h.navigationAddress,landing);
+   assert.equal(opened.h.rootTabAddresses.get(1),landing);
+   assert.equal(opened.h.boardStore.boardDetail,undefined);
+ }
+ for (const failureOrigin of [landing,search]) {
+   const failed = fixture();
+   let remaining = true, discovery = 0;
+   Object.assign(failed.h, {rootExitBackAt: 55,currentSearchPageKey:()=>failureOrigin,
+     searchController:{consumeFailedSubmittedLinkBack(){const current=remaining; remaining=false; return current;}},
+     clearSearch(){failed.h.searchStore.search=undefined;},restoreRetainedSearch:()=>false});
+   failed.h.pageHistory.prepareBackTo=()=>{};
+   failed.h.searchDiscoveryNativeReads.apply=()=>{discovery++;};
+   assert.equal(failed.h.backFromFailedSearchLink(),true);
+   assert.equal(failed.h.rootExitBackAt,0);
+   if(failureOrigin===landing) assert.equal(discovery,1);
+   else assert.equal(failed.h.navigationAddress,landing);
+   assert.equal(failed.h.backFromFailedSearchLink(),false);
+ }
+ output.bind.call(f.h);
  ports.search.navigateResult(profile,search);assert(f.events.some(e=>e[0]==='user'));
  ports.search.navigateResult(pin,search);assert(f.events.some(e=>e[0]==='pin'&&e[2]===search));
  const n=f.events.length;ports.search.navigateResult(origin+'/pin/99/',search);assert.equal(f.events.length,n,'unknown target must not navigate');

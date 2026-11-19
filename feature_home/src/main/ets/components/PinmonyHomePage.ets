@@ -90,6 +90,7 @@ export struct PinmonyHomePage {
   onPrefetchMore?: () => void;
   onPin?: (id: string, imageUrl?: string) => void;
   onMore?: (id: string) => void;
+  onHoldAction?: (id: string, selection: number) => void;
   onLoadMore?: () => void;
   onRetry?: () => void;
   onRefresh?: () => void;
@@ -479,7 +480,7 @@ export struct PinmonyHomePage {
           onContentScroll: (offset: number, state: ScrollState) => {
             if (this.activePane(tab.id) && this.onContentScroll) this.onContentScroll(offset, state);
           },
-          onPin: this.onPin, onMore: this.onMore, onBoard: this.onBoard,
+          onPin: this.onPin, onMore: this.onMore, onHoldAction: this.onHoldAction, onBoard: this.onBoard,
           onLoadMore: this.onLoadMore, onPrefetchMore: this.onPrefetchMore,
           onRefresh: this.onRefresh, onRetry: this.onRetry,
           onVisiblePins: (first: number, last: number) => {

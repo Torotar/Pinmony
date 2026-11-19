@@ -57,6 +57,7 @@ interface BoardPreparedContext { session: number; page: string; version: number;
 interface BoardPermissionValue { permission: number; invites: boolean; }
 interface BoardReadEnvelope { options: BoardReadOptions; context: Record<string, string>; }
 interface BoardSectionFields { fields: string[]; }
+interface BoardReorderIntent { kind: string; moved: string; target: string; revision: number; }
 interface BoardReadAction { action: string; value?: string | string[]; }
 interface BoardBridgeState extends PinmonyBoardDetail { contextEpoch?: number; nativeVersion?: number; nativeReload?: number; nativeSectionsReload?: number; }
 export interface PinmonyBoardNativeReadsPorts {
@@ -85,6 +86,10 @@ export class PinmonyBoardNativeReads {
   private bridgeEpoch: number = -1; private bridgeSession: number = 0; private adoptedVersion: number = -1;
   private reload: number = 0; private sectionsReload: number = 0; private refreshQueued: boolean = false;
   private readonly requests: Set<string> = new Set<string>();
+  private reorderJob: string = '';
+  private reorderCursorStale: boolean = false;
+  private organizerSectionReturn: boolean = false;
+  private organizerSectionCreation: boolean = false;
   private preparing: boolean = false; private flowEpoch: number = 0; private collabEpoch: number = 0;
   private targetCursor: string = ''; private ideaCursor: string = ''; private selectedIds: string[] = []; private sources: BoardSourcePin[] = [];
   private readonly flowRequests: Set<string> = new Set<string>(); private readonly collabRequests: Set<string> = new Set<string>();
@@ -170,6 +175,12 @@ export class PinmonyBoardNativeReads {
     this.coverFlow?.pause();
     this.followWrites.pause();
     this.sectionWrites.pause();this.contentWrites.pause();this.managementWrites.pause();this.pinWrites.pause();this.collaboratorWrites.pause();
+    if (this.reorderJob && this.flow?.phase === 'select') {
+      this.flow.busy = false;
+      this.flow.uncertain = true;
+      this.flow.error = PinmonyI18n.message('pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27');
+    }
+    this.reorderJob = '';
     this.preparing = false; this.revision++; this.version++; this.sectionEpoch++; this.flowEpoch++; this.collabEpoch++;
     this.requests.forEach((id: string): void => this.ports.network().cancel(id)); this.requests.clear(); this.sectionRequests.clear(); this.flowRequests.clear(); this.collabRequests.clear();
     this.busy = false; this.sectionsBusy = false; this.sectionsQueued = false; this.refreshing = false; this.postOperationLoading = false; if(!this.ready)this.attempted = false; if(this.flow?.phase === 'section')this.flow = undefined;
@@ -178,7 +189,7 @@ export class PinmonyBoardNativeReads {
     this.refreshQueued = false;
     if(this.store.boardDetail) {this.store.boardDetail.session = 0; this.store.boardDetail.loadingMore = false; this.store.boardDetail.refreshing = false; this.store.boardDetail.postOperationLoading = false; if(this.store.boardDetail.flow?.phase === 'section')this.store.boardDetail.flow = undefined;}
   }
-  reset(): void { this.favoriteOnly = false;this.pause();this.cancelledCards.clear();this.cancelledPositions.clear();this.refreshedCancelledIds.clear();this.cancelledDisplayCount = undefined; this.sectionSource = undefined;this.sectionComplete = false;this.page = ''; this.account = ''; this.generation = -1; this.board = undefined; this.viewer = ''; this.verified = false; this.pins = []; this.sections = []; this.ready = false; this.attempted = false; this.error = ''; this.sectionsReady = false; this.sectionsError = ''; this.cursor = ''; this.ended = false; this.targetCursor = ''; this.selectedIds = []; this.sources = []; this.flow = undefined; this.store.collaborators = undefined; }
+  reset(): void { this.organizerSectionCreation = false; this.organizerSectionReturn = false; this.reorderCursorStale = false; this.favoriteOnly = false;this.pause();this.cancelledCards.clear();this.cancelledPositions.clear();this.refreshedCancelledIds.clear();this.cancelledDisplayCount = undefined; this.sectionSource = undefined;this.sectionComplete = false;this.page = ''; this.account = ''; this.generation = -1; this.board = undefined; this.viewer = ''; this.verified = false; this.pins = []; this.sections = []; this.ready = false; this.attempted = false; this.error = ''; this.sectionsReady = false; this.sectionsError = ''; this.cursor = ''; this.ended = false; this.targetCursor = ''; this.selectedIds = []; this.sources = []; this.flow = undefined; this.store.collaborators = undefined; }
   private bind(): boolean {
     if(!PIN_NATIVE_BOARD_READS_ENABLED)return false;
     const s: PinmonyBusinessSessionContext = this.ports.session(), page: string = this.store.boardDetail?.pageKey || '';
@@ -269,7 +280,7 @@ export class PinmonyBoardNativeReads {
     if(snapshot?.pageKey === this.page){snapshot.pins = this.pins.slice();snapshot.sections = this.favoriteOnly ? [] : this.sections.slice();}
     this.apply();
   }
-  async more(): Promise<void> { if(this.store.boardDetail?.flow?.busy || !this.bind() || !this.verified || !this.ready || this.busy || this.ended || !this.cursor)return; await this.read(true,false); }
+  async more(): Promise<void> { if(this.store.boardDetail?.flow?.busy || !this.bind() || !this.verified || !this.ready || this.busy || this.ended || !this.cursor)return; if(this.reorderCursorStale){await this.refresh();return;} await this.read(true,false); }
   async handle(method: string, encoded: string = ''): Promise<boolean> {
     if(!PIN_NATIVE_BOARD_READS_ENABLED)return false;
     if(['refresh','retry','more','open'].includes(method)) {
@@ -281,6 +292,10 @@ export class PinmonyBoardNativeReads {
     }
     if(method !== 'flow')return false;
     let a: BoardReadAction; try {a = JSON.parse(encoded) as BoardReadAction;} catch (_) {return true;}
+    if(a.action === 'organizerReorder') {
+      if (typeof a.value === 'string') await this.reorderOrganizer(a.value);
+      return true;
+    }
     if(a.action.startsWith('cover') || a.action === 'close' && this.flow?.cover) {
       if(!this.bind())return true;
       if(!this.coverFlow)this.coverFlow = new PinmonyBoardCoverNativeFlow({
@@ -330,8 +345,13 @@ export class PinmonyBoardNativeReads {
     if(a.action === 'sectionSingleMove') {
       if(!this.bind() || this.board?.owner.id !== this.viewer || this.flow?.phase !== 'section' || typeof a.value !== 'string' || !this.flow.pins.some((pin: PinmonyBoardPin): boolean => pin.id === a.value))return true;
       const id: string = a.value;
-      await this.sectionAction({action:'sectionOrganize'});
-      if(this.store.boardDetail?.flow?.phase === 'select' && this.sectionSource && !this.flow.error && !this.flow.loading && !this.flow.busy)await this.auxiliaryAction({action:'targets',value:[id]});
+      const section = this.flow;
+      await this.sectionAction({action:'sectionOrganize'}, false);
+      if(this.flow === section && String(this.flow.phase) === 'select' && this.sectionSource && !this.flow.error && !this.flow.loading && !this.flow.busy) {
+        await this.auxiliaryAction({action:'targets',value:[id]});
+        if(this.current() && this.flow === section) await this.sectionAction({action:'sectionReturn'});
+      }
+      if(this.current() && this.flow === section && this.ports.movePage?.() === this.page) this.ports.clearMovePage?.();
       return true;
     }
     if(['sectionTargetOpen','sectionTargetBack'].includes(a.action) && !this.sectionSource) {await this.auxiliaryAction(a);return true;}
@@ -350,8 +370,23 @@ export class PinmonyBoardNativeReads {
     if(a.action === 'section' || a.action === 'sectionsRetry' || section && ['close','sectionMore','retry'].includes(a.action)) {
       if(!this.bind() || !this.verified)return true;
       if(a.action === 'sectionsRetry')await this.readSections(true);
-      else if(a.action === 'close') {this.sectionSource = undefined;this.cancelSection(); this.version++; this.flow = this.emptyFlow(); if(this.store.boardDetail)this.store.boardDetail.flow = undefined; this.apply(); this.ports.install(this.installScript());}
-      else await this.readSection(a.action === 'section' && typeof a.value === 'string' ? a.value : this.flow?.sectionId || '',a.action === 'sectionMore');
+      else if(a.action === 'close') {
+        const restoreOrganizer: boolean = this.organizerSectionReturn;
+        this.organizerSectionReturn = false;
+        this.sectionSource = undefined; this.cancelSection(); this.version++; this.flow = this.emptyFlow();
+        if (restoreOrganizer && this.contributes()) this.flow.phase = 'select';
+        if(this.store.boardDetail)this.store.boardDetail.flow = undefined;
+        this.apply(); this.ports.install(this.installScript());
+      }
+      else {
+        const id: string = a.action === 'section' && typeof a.value === 'string' ? a.value : this.flow?.sectionId || '';
+        if (a.action === 'section' && this.flow?.phase !== 'section') this.organizerSectionReturn = false;
+        if (a.action === 'section' && this.flow?.phase === 'select' && !this.flow.sectionId) {
+          if (this.flow.busy || this.flow.uncertain || !this.sections.some((item: PinmonyBoardSection): boolean => item.id === id)) return true;
+          this.organizerSectionReturn = true;
+        }
+        await this.readSection(id, a.action === 'sectionMore');
+      }
       return true;
     }
     const phase: string = this.store.boardDetail?.flow?.phase || '';
@@ -376,17 +411,19 @@ export class PinmonyBoardNativeReads {
     if(['editSave','archive','delete','leave','unfollow','merge'].includes(a.action)){if(this.bind()){if(!this.store.boardDetail?.flow){this.flow = this.emptyFlow();this.apply();}await this.managementWrites.submit(encoded);}return true;}
     return false;
   }
-  contentReady(): boolean {
+  contentReady(fromOrganizer: boolean = false): boolean {
     return this.bind() && this.verified && this.ready && this.contributes() && !this.busy && !this.store.collaborators?.busy &&
-      !this.store.boardDetail?.flow?.busy && !this.store.boardDetail?.flow?.loading && !this.store.boardDetail?.flow?.uncertain && !this.store.boardDetail?.flow?.phase;
+      !this.store.boardDetail?.flow?.busy && !this.store.boardDetail?.flow?.loading && !this.store.boardDetail?.flow?.uncertain &&
+      (fromOrganizer ? this.flow?.phase === 'select' && !this.flow.sectionId : !this.store.boardDetail?.flow?.phase);
   }
   async createSection(name: string, current: () => boolean): Promise<string> {
     if(!this.contentReady())return PinmonyI18n.message("pm_board_not_ready_close_this_panel_and_retry_337e96bd");
     if(!this.flow){this.flow = this.emptyFlow();this.apply();}
     return this.contentWrites.submit('section',name,current);
   }
-  beginSectionSelection(name: string): string {
-    if(!this.contentReady() || !name.trim() || name.trim().length > 100)return PinmonyI18n.message("pm_board_not_ready_or_invalid_section_name_ce4d4aa7");
+  beginSectionSelection(name: string, fromOrganizer: boolean = false): string {
+    if(!this.contentReady(fromOrganizer) || !name.trim() || name.trim().length > 100)return PinmonyI18n.message("pm_board_not_ready_or_invalid_section_name_ce4d4aa7");
+    this.organizerSectionCreation = fromOrganizer;
     this.cancelFlow();this.flow = this.emptyFlow();this.flow.phase = 'sectionSelect';this.flow.sectionTitle = name.trim();
     this.sectionDraftPins = [];
     this.apply();return '';
@@ -400,6 +437,7 @@ export class PinmonyBoardNativeReads {
   private contentConfirmed(action: string, value: string, raw: string): void {
     if(!this.current() || !this.board)return;
     const openCreated: boolean = action === 'section' && this.flow?.phase === 'sectionSelect';
+    if (openCreated && this.organizerSectionCreation) { this.organizerSectionCreation = false; this.organizerSectionReturn = true; }
     const sectionFlow: PinmonyBoardFlow | undefined = action === 'cancel' && this.flow?.phase === 'section' ? JSON.parse(JSON.stringify(this.flow)) as PinmonyBoardFlow : undefined;
     this.pause();this.flow = sectionFlow || this.emptyFlow();
     if(this.ports.invalidateProfile)this.ports.invalidateProfile();
@@ -492,7 +530,7 @@ export class PinmonyBoardNativeReads {
       allIds:source.pins.map((p: PinmonyBoardPin): string => p.id),selectedIds:this.selectedIds.slice(),complete:this.sectionComplete,
       targets:(this.flow?.targets || []).filter((t: PinmonyBoardTarget): boolean => t.enabled).map((t: PinmonyBoardTarget): string => t.id).concat(this.flow?.targetBoardId && this.flow.targets.some((t: PinmonyBoardTarget): boolean => t.id === this.flow?.targetBoardId && t.enabled) ? (this.flow.targetSections || []).map((s: PinmonyBoardSection): string => 'section:' + this.flow!.targetBoardId + ':' + s.id) : [])};
   }
-  private async sectionAction(a: BoardReadAction): Promise<void> {
+  private async sectionAction(a: BoardReadAction, present: boolean = true): Promise<void> {
     if(!this.bind() || !this.verified || !this.board || this.board.owner.id !== this.viewer || !this.flow || this.flow.busy || this.flow.uncertain)return;
     if(a.action === 'sectionReturn' && this.sectionSource){this.cancelFlow();this.flow = this.sectionSource;this.flow.phase = 'section';this.sectionSource = undefined;this.selectedIds = [];this.syncAuxiliary();return;}
     if(a.action === 'sectionTargetBack' && this.flow.phase === 'targets'){this.cancelFlow();this.flow.targetBoardId = undefined;this.flow.targetSections = undefined;this.flow.loading = false;this.flow.error = '';this.syncAuxiliary();return;}
@@ -512,7 +550,7 @@ export class PinmonyBoardNativeReads {
       if(!this.sectionComplete){f.error = PinmonyI18n.message("pm_section_content_has_not_fully_loaded_organizing_is_temporarily_u_8d3b8bfa");this.syncAuxiliary();return;}
     }
     this.sectionSource = JSON.parse(JSON.stringify(f)) as PinmonyBoardFlow;this.cancelFlow();
-    f.phase = a.action === 'sectionEdit' ? 'sectionEdit' : 'select';this.selectedIds = [];this.syncAuxiliary();
+    f.phase = a.action === 'sectionEdit' ? 'sectionEdit' : 'select';this.selectedIds = [];if(present)this.syncAuxiliary();
   }
   private sectionWriteConfirmed(action: string, renamed?: string): void {
     if(!this.current() || !this.board)return;
@@ -520,7 +558,10 @@ export class PinmonyBoardNativeReads {
     if(action === 'rename' && source && renamed){this.pause();source.sectionTitle = renamed;source.phase = 'section';source.busy = false;source.error = '';this.flow = source;this.sectionSource = undefined;const section: PinmonyBoardSection | undefined = this.sections.find((s: PinmonyBoardSection): boolean => s.id === id);if(section)section.title = renamed;this.ports.invalidateProfile?.();this.syncAuxiliary();this.readSections(true);this.ports.feedback?.(PinmonyI18n.message("pm_section_name_updated_373a284b"));return;}
     const movedIds: string[] = this.selectedIds.slice();
     if(action === 'move' && this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
+    const restoreOrganizer: boolean = action === 'delete' && this.organizerSectionReturn;
+    if (restoreOrganizer) this.organizerSectionReturn = false;
     this.pause();this.sectionSource = undefined;this.selectedIds = [];this.flow = this.emptyFlow();
+    if (restoreOrganizer) this.flow.phase = 'select';
     if(this.ports.invalidateProfile)this.ports.invalidateProfile();
     if(action === 'delete'){this.sections = this.sections.filter((s: PinmonyBoardSection): boolean => s.id !== id);if(this.ports.feedback)this.ports.feedback(title + PinmonyI18n.message("pm_section_deleted_73959940"));}
     else if(this.ports.feedback)this.ports.feedback(PinmonyI18n.message("pm_selected_pins_moved_ddba8b7a"));
@@ -549,18 +590,74 @@ export class PinmonyBoardNativeReads {
     }
     await this.read(false,true,true);
   }
+  private async reorderOrganizer(encoded: string): Promise<void> {
+    const flow: PinmonyBoardFlow | undefined = this.flow;
+    const board: BoardData | undefined = this.board;
+    if (!flow || !board || !this.current() || !this.ready || !this.verified || this.busy || this.reorderJob ||
+        this.favoriteOnly || this.collection() || board.owner.id !== this.viewer || flow.phase !== 'select' || flow.sectionId ||
+        flow.busy || flow.loading || flow.uncertain || this.store.collaborators || encoded.length > 256) return;
+    let intent: BoardReorderIntent;
+    try { intent = JSON.parse(encoded) as BoardReorderIntent; } catch (_) { return; }
+    if (!intent || intent.revision !== this.version || (intent.kind !== 'pin' && intent.kind !== 'section') ||
+        !this.digits(intent.moved) || !this.digits(intent.target) || intent.moved === intent.target) return;
+    const section: boolean = intent.kind === 'section';
+    if (section ? !this.sectionsReady || this.sectionsBusy || !!this.sectionsError : !!this.error || this.pins.some((p: PinmonyBoardPin): boolean => !!p.cancelled)) return;
+    const ids: string[] = section ? this.sections.map((item: PinmonyBoardSection): string => item.id) : this.pins.map((pin: PinmonyBoardPin): string => pin.id);
+    const from: number = ids.indexOf(intent.moved), to: number = ids.indexOf(intent.target);
+    if (from < 0 || to < 0 || new Set<string>(ids).size !== ids.length) return;
+    const original: string = ids.join(',');
+    ids.splice(from, 1); ids.splice(to, 0, intent.moved);
+    const revision: number = this.revision, phase: number = this.flowEpoch;
+    const id: string = 'native_board_reorder_' + (++this.sequence).toString();
+    const live = (): boolean => this.current() && this.revision === revision && this.flowEpoch === phase &&
+      this.flow === flow && this.board === board && board.owner.id === this.viewer && this.reorderJob === id;
+    this.reorderJob = id; this.requests.add(id); flow.busy = true; flow.error = ''; this.apply();
+    try {
+      const reply: PinmonyNetworkReply = await this.ports.network().requestBusinessBoardReorder(id, this.page,
+        (): PinmonyBusinessSessionContext => this.ports.session(), board.id, intent.kind, intent.moved, ids[to - 1] || '', ids[to + 1] || '', live);
+      if (!live()) return;
+      if (reply.error || reply.status !== 200 || !reply.body || reply.body.length > 6000000) throw new Error('board-reorder-reply');
+      const response: BoardResponse = JSON.parse(reply.body) as BoardResponse, result: BoardResource = response.resource_response;
+      if (result?.status !== 'success' || result.code !== 0 || result.error || result.data !== null ||
+          result.endpoint_name !== (section ? 'v3_reorder_section' : 'v3_board_reorder_pin_handler') ||
+          (response.client_context?.user && response.client_context.user.id !== this.viewer)) throw new Error('board-reorder-response');
+      const actual: string[] = section ? this.sections.map((item: PinmonyBoardSection): string => item.id) : this.pins.map((pin: PinmonyBoardPin): string => pin.id);
+      if (actual.join(',') !== original) throw new Error('board-reorder-stale-order');
+      if (section) this.sections.splice(to, 0, this.sections.splice(from, 1)[0]);
+      else { this.pins.splice(to, 0, this.pins.splice(from, 1)[0]); this.reorderCursorStale = !this.ended; }
+      this.ports.invalidateProfile?.();
+    } catch (_) {
+      if (live()) {
+        flow.uncertain = true;
+        flow.error = PinmonyI18n.message('pm_result_not_confirmed_refresh_to_check_it_will_not_be_resubmitted_e8e4eb27');
+      }
+    } finally {
+      this.requests.delete(id);
+      if (this.reorderJob === id) {
+        this.reorderJob = ''; flow.busy = false;
+        if (this.current() && this.flow === flow) this.syncAuxiliary();
+      }
+    }
+  }
+
   private async auxiliaryAction(a: BoardReadAction): Promise<void> {
     if(!this.bind() || this.store.boardDetail?.flow?.busy)return;
     const old: PinmonyBoardFlow | undefined = this.store.boardDetail?.flow;
     if(this.ports.movePage?.() === this.page && a.action === 'select')a.action = 'close';
     const createdExit: boolean = (a.action === 'createdIdeasBack' || a.action === 'createdIdeasDone') && old?.createdBoardIdeas === true;
     if((a.action === 'createdIdeasBack' || a.action === 'createdIdeasDone') && !createdExit)return;
+    if (a.action === 'close' && old?.phase === 'sectionSelect' && this.organizerSectionCreation && !old.uncertain) {
+      this.organizerSectionCreation = false; this.sectionDraftPins = []; this.cancelFlow();
+      this.flow = this.emptyFlow(); this.flow.phase = 'select'; this.syncAuxiliary(); return;
+    }
     if(createdExit || a.action === 'close') {
+      this.organizerSectionCreation = false;
       if(this.sectionSource && !old?.uncertain) {
         if(this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
         await this.sectionAction({action:'sectionReturn'});return;
       }
       if(this.ports.movePage?.() === this.page)this.ports.clearMovePage?.();
+      // Keep the confirmed order on return. A stale cursor only requires revalidation when loading more.
       const recover: boolean = old?.uncertain === true || old?.phase === 'archived';this.cancelFlow();this.cancelSection();this.flow = this.emptyFlow();this.sectionSource = undefined;this.targetCursor = '';this.selectedIds = [];this.sources = [];this.syncAuxiliary();if(createdExit && a.action === 'createdIdeasBack'){this.ports.exited?.('createdIdeasBack');return;}if(recover || createdExit)await this.refresh();return;
     }
     if(a.action === 'retry' && old?.createdBoardIdeas && (!this.ready || this.error)){await this.openCreatedIdeas(old.createdBoardId || '');return;}
@@ -882,6 +979,7 @@ export class PinmonyBoardNativeReads {
         if(index >= 0)pins[index] = pin;else pins.splice(Math.min(this.cancelledPositions.get(id) || 0,pins.length),0,pin);
       });
       if(this.cancelledDisplayCount !== undefined && this.board)this.board.pin_count = this.cancelledDisplayCount;
+      if (!append) this.reorderCursorStale = false;
       this.pins = pins.slice(0,2000); this.cursor = next; this.ended = !next || next === '-end-' || next === previous || !mapped.length || pins.length >= 2000; this.ready = true; this.version++; if(!append)this.recoveryVersion = this.version;
       PinmonyRuntimeLog.info('BoardNativeTrace: committed append=' + append.toString() + ' count=' + this.pins.length.toString());
     } catch (_) {if(live()){this.error = append ? PinmonyI18n.message("pm_unable_to_load_more_pins_please_retry_e4cd3927") : PinmonyI18n.message(stage === '区块资料' ? 'pm_board_load_section_details_failed' : stage === '区块工具' ? 'pm_board_load_section_tools_failed' : stage === '推荐内容' ? 'pm_board_load_recommendations_failed' : stage === '图板资料' ? 'pm_board_load_board_details_failed' : 'pm_board_load_board_content_failed');PinmonyRuntimeLog.info('BoardNativeTrace: failed stage=' + (stage === '图板资料' ? 'metadata' : 'feed'));}}

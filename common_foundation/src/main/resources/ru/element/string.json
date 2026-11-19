@@ -3331,6 +3331,10 @@
       "value": "Поделиться ссылкой"
     },
     {
+      "name": "pm_board_organizer_move_to",
+      "value": "Переместить"
+    },
+    {
       "name": "pm_move_to_another_board_62574b0d",
       "value": "Переместить на другую доску"
     },
@@ -5073,6 +5077,10 @@
     {
       "name": "pm_profile_content_search",
       "value": "Найдите свои пины"
+    },
+    {
+      "name": "pm_profile_board_hold_reorder",
+      "value": "Изменить порядок"
     },
     {
       "name": "pm_profile_board_sort",

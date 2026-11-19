@@ -32,6 +32,7 @@ export interface PinmonyProfileRootView {
   openProfilePinMenu: (id: string) => Promise<void>;
   openProfileSearch: () => void;
   openProfilePublish: () => void;
+  openProfileBoardHoldAction: (id: string, choice: number) => void;
   sortProfileBoards: (value: string) => void;
   loadBoardVisibility: (value?: boolean) => void;
   openBoardRecovery: () => void;
@@ -80,6 +81,7 @@ export function PinmonyBuildProfileRootContent(view: PinmonyProfileRootView) {
                   onTab: (section: string) => view.changeProfileTab(section),
                   onAction: (id: string, kind: string) => { if (kind === 'edit' || kind === 'followers' || kind === 'following') view.openProfilePanel(kind); else if (kind === 'follow') view.followProfileUser(); else view.performProfileAction(id); },
                   onBoard: (id: string) => view.openProfileBoard(id),
+                  onBoardHoldAction: (id: string, choice: number) => view.openProfileBoardHoldAction(id, choice),
                   onPin: (id: string) => { view.traceAction('profile.pin.open'); view.performProfileAction(id); },
                   onPinMore: (id: string) => view.openProfilePinMenu(id),
                   onSearch: () => view.openProfileSearch(),

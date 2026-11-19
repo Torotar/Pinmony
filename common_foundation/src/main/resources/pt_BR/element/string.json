@@ -3331,6 +3331,10 @@
       "value": "Compartilhar link"
     },
     {
+      "name": "pm_board_organizer_move_to",
+      "value": "Mover para"
+    },
+    {
       "name": "pm_move_to_another_board_62574b0d",
       "value": "Mover para outra pasta"
     },
@@ -5073,6 +5077,10 @@
     {
       "name": "pm_profile_content_search",
       "value": "Pesquisar seus Pins"
+    },
+    {
+      "name": "pm_profile_board_hold_reorder",
+      "value": "Reordenar"
     },
     {
       "name": "pm_profile_board_sort",

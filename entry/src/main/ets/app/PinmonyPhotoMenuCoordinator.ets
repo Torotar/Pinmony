@@ -57,6 +57,17 @@ export interface PinmonyPhotoMenuCoordinatorPorts {
   webJsonText: (value: string) => string;
 }
 export class PinmonyPhotoMenuCoordinator {
+  openSinglePinMove(pinUrl: string, board: PinmonyBoardDetail): void {
+    if (!board.editable || this.boardStore.boardDetail !== board || this.ports.showNativeSheet() ||
+        (board.flow?.phase && board.flow.phase !== 'section') || board.flow?.busy || board.flow?.uncertain ||
+        !this.ports.isCurrentBoardMenuPin(pinUrl, board.pageKey)) return;
+    const pin = boardVisiblePins(board).find((item: PinmonyBoardPin): boolean => item.pinUrl === pinUrl && !item.cancelled);
+    if (!pin) return;
+    this.ports.setSinglePinMovePage(board.pageKey);
+    this.ports.boardOperation('flow', JSON.stringify(board.flow?.phase === 'section' ?
+      { action: 'sectionSingleMove', value: pin.id } : { action: 'targets', value: [pin.id] }));
+  }
+
   private readonly detailReady: PinmonyReadinessGate = new PinmonyReadinessGate();
   private readonly menuReady: PinmonyReadinessGate = new PinmonyReadinessGate();
   private menuRevision: number = 0;
@@ -292,8 +303,7 @@ async performCustomHomeAction(id: string): Promise<void> {
         else this.ports.dismissShareSheet();
         if (this.ports.authStatus() !== 'authenticated' || this.ports.currentBoardUrl() !== board.pageKey ||
             this.ports.boardStore().boardDetail !== board || this.ports.showNativeSheet()) return;
-        this.ports.setSinglePinMovePage(board.pageKey);
-        this.ports.boardOperation('flow', JSON.stringify(board.flow?.phase === 'section' ? {action:'sectionSingleMove',value:pin.id} : { action: 'targets', value: [pin.id] }));
+        this.openSinglePinMove(pin.pinUrl, board);
         return;
     }
     if (id === 'home-system-share') {

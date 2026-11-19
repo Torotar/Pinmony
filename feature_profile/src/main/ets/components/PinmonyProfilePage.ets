@@ -1,3 +1,4 @@
+import { PinmonyPinHoldFrame, PinmonyPinHoldPreview } from 'common_ui';
 import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonyScrollRecovery } from 'common_foundation';
@@ -24,6 +25,21 @@ interface PinmonyProfileBoardGroupArgs {
 
 @Component
 export struct PinmonyProfilePage {
+  @State private heldBoard: PinmonyBoard | undefined = undefined;
+  @State private boardHoldChoice: number = -1;
+  @State private boardHoldCoverDimmed: boolean = false;
+  @State private boardHoldPointerX: number = 0;
+  @State private boardHoldPointerY: number = 0;
+  private boardHoldDownX: number = 0;
+  private boardHoldDownY: number = 0;
+  @State private boardHoldTracking: boolean = false;
+  private boardHoldBlockClickUntil: number = 0;
+  @State private boardHoldFrame: PinmonyPinHoldFrame | undefined = undefined;
+  onBoardHoldBegin?: (board: PinmonyBoard, x: number, y: number) => boolean;
+  onBoardHoldMove?: (x: number, y: number) => void;
+  onBoardHoldEnd?: () => void;
+  onBoardHoldRelease?: (x: number, y: number) => void;
+  onBoardHoldAction?: (id: string, choice: number) => void;
   private sourceLifetime: number = 0;
   private sourceIdentity(): string { return 'profile:' + this.profile.profileUrl + ':' + this.profile.session + ':' + this.profile.section + ':' + this.hubTab; }
   private stageDetailSource(selected: PinmonyCreatedPin): void {
@@ -539,6 +555,10 @@ export struct PinmonyProfilePage {
             readsReady:this.readsReady && this.hubTab === tab,actionsReady:this.actionsReady && this.hubTab === tab,
             automaticLoadingEnabled:this.automaticLoadingEnabled && this.hubTab === tab,
             refreshing:this.refreshing && this.hubTab === tab,initialScrollOffset:this.hubInitialScrollOffset(tab),
+            onBoardHoldBegin: (board: PinmonyBoard, x: number, y: number): boolean => this.beginBoardHold(board, x, y),
+            onBoardHoldMove: (x: number, y: number): void => this.moveBoardHold(x, y),
+            onBoardHoldEnd: (): void => this.clearBoardHold(),
+            onBoardHoldRelease: (x: number, y: number): void => this.releaseBoardHold(x, y),
             onBoard:this.onBoard,onPin:this.onPin,onPinMore:this.onPinMore,onOrganize:this.onOrganize,onSearch:this.onSearch,onPublish:this.onPublish,
             onRetry:this.onRetry,onRefresh:this.onRefresh,onLoadMore:this.onLoadMore,
             onContentScroll:this.onContentScroll,
@@ -562,7 +582,7 @@ export struct PinmonyProfilePage {
         }, (tab: string): string => tab)
       }.index(['pins','boards','collages'].indexOf(this.hubTab))
         .loop(false).indicator(false).itemSpace(16).duration(280).cachedCount(2)
-        .disableSwipe(!this.interactionReady || this.profile.suggestionWriting || this.sortVisible)
+        .disableSwipe(!this.interactionReady || this.profile.suggestionWriting || this.sortVisible || this.heldBoard !== undefined)
         .onGestureRecognizerJudgeBegin((event: BaseGestureEvent, current: GestureRecognizer): GestureJudgeResult => {
           return this.judgeHubSwipe(event, current);
         })
@@ -633,6 +653,8 @@ export struct PinmonyProfilePage {
   }
 
   aboutToDisappear(): void { this.sourceLifetime++;
+    this.endBoardHold();
+    this.clearBoardHold();
     this.legacyPendingSnapshots.clear();
     this.stopHubChromeAnimation();
     this.hubControlMaterials.clear();this.hubMaterialConfiguration = '';
@@ -642,6 +664,8 @@ export struct PinmonyProfilePage {
 
   private interactionChanged(): void {
     if (!this.interactionReady) {
+      this.endBoardHold();
+      this.clearBoardHold();
       this.stopHubChromeAnimation();
       this.sortVisible = false;this.pinViewOpen = false;this.recoveryRequested = false;this.legacyPaging = false;
       this.legacyPagingHeight = 0;
@@ -649,6 +673,8 @@ export struct PinmonyProfilePage {
     }
   }
   private onProfileChanged(): void {
+    this.endBoardHold();
+    this.clearBoardHold();
     this.pinRenderKeys.clear();
     if (this.legacyContentPane) return;
     this.retainLegacySnapshot();
@@ -1104,8 +1130,121 @@ export struct PinmonyProfilePage {
     .clip(true)
   }
 
+  private canPreviewBoardHold(): boolean {
+    return this.hubPane && this.hubTab === 'boards' && this.interactionReady && this.profile.isOwn === true;
+  }
+
+  private boardHoldCardId(board: PinmonyBoard): string {
+    return 'pinmony-profile-board-hold-' + board.id;
+  }
+
+  private beginBoardHold(board: PinmonyBoard, x: number, y: number): boolean {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || this.onBack || !this.modern() || this.hubTab !== 'boards' || this.profile.isOwn !== true ||
+      !this.interactionReady || this.sortVisible || this.profile.organize || this.refreshing || this.heldBoard) return false;
+    const frame = PinmonyPinHoldFrame.measure(this.getUIContext(), 'pinmony-profile-board-hold-root',
+      this.boardHoldCardId(board), x, y, false, true);
+    if (!frame) return false;
+    this.boardHoldChoice = -1;
+    this.boardHoldCoverDimmed = false;
+    this.boardHoldPointerX = frame.anchorX;
+    this.boardHoldPointerY = frame.anchorY;
+    this.boardHoldFrame = frame;
+    this.heldBoard = board;
+    return true;
+  }
+
+  private moveBoardHold(x: number, y: number): void {
+    const frame = this.boardHoldFrame;
+    if (!this.heldBoard || !frame || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    this.boardHoldPointerX = x - frame.originX;
+    this.boardHoldPointerY = y - frame.originY;
+    const choice = frame.choice(this.boardHoldPointerX, this.boardHoldPointerY);
+    // Crossing the gaps between buttons clears only the hover, not the cover dimming.
+    if (choice >= 0 && !this.boardHoldCoverDimmed) this.boardHoldCoverDimmed = true;
+    if (choice !== this.boardHoldChoice) this.boardHoldChoice = choice;
+  }
+
+  private trackBoardHold(event: TouchEvent): void {
+    if (event.type === TouchType.Down && !this.boardHoldTracking && event.touches.length === 1) {
+      this.boardHoldBlockClickUntil = 0;
+      this.boardHoldDownX = event.touches[0].windowX;
+      this.boardHoldDownY = event.touches[0].windowY;
+    }
+    if (!this.boardHoldTracking) return;
+    if (event.type === TouchType.Up) {
+      const touch = event.changedTouches[0];
+      if (touch && event.changedTouches.length === 1 && event.touches.length <= 1) {
+        this.finishBoardHold(touch.windowX, touch.windowY);
+      } else this.endBoardHold();
+    } else if (event.type === TouchType.Cancel || event.touches.length !== 1) {
+      this.endBoardHold();
+    } else if (event.type === TouchType.Move) {
+      this.onBoardHoldMove?.(event.touches[0].windowX, event.touches[0].windowY);
+    }
+  }
+
+  private finishBoardHold(x: number, y: number): void {
+    if (!this.boardHoldTracking) return;
+    this.boardHoldTracking = false;
+    this.boardHoldBlockClickUntil = Date.now() + 250;
+    this.onBoardHoldRelease?.(x, y);
+  }
+
+  private releaseBoardHold(x: number, y: number): void {
+    const board = this.heldBoard;
+    const frame = this.boardHoldFrame;
+    const choice = frame ? frame.choice(x - frame.originX, y - frame.originY) : -1;
+    this.clearBoardHold();
+    if (!board || choice < 0 || !this.interactionReady || this.profile.isOwn !== true || this.hubTab !== 'boards' ||
+      !this.profile.boards.some((item: PinmonyBoard): boolean => item.id === board.id)) return;
+    if (choice === 0) {
+      if (board.sortable !== false && !board.protectedBoard) this.customOrderVisible = true;
+    } else this.onBoardHoldAction?.(board.id, choice);
+  }
+
+  private endBoardHold(): void {
+    if (!this.boardHoldTracking) return;
+    this.boardHoldTracking = false;
+    this.boardHoldBlockClickUntil = Date.now() + 250;
+    this.onBoardHoldEnd?.();
+  }
+
+  private clearBoardHold(): void {
+    this.heldBoard = undefined;
+    this.boardHoldFrame = undefined;
+    this.boardHoldChoice = -1;
+    this.boardHoldCoverDimmed = false;
+  }
+
   @Builder
   private boardCard(board: PinmonyBoard) {
+    Column() { this.boardCardContent(board) }
+      .layoutWeight(1)
+      .id(this.canPreviewBoardHold() ? this.boardHoldCardId(board) : '')
+      .enabled(this.boardReady(board))
+      .onClick(() => {
+        if (this.boardHoldTracking || Date.now() < this.boardHoldBlockClickUntil) return;
+        if (this.boardReady(board) && this.onBoard) this.onBoard(board.id);
+      })
+      .onTouch((event: TouchEvent) => this.trackBoardHold(event))
+      .onGestureRecognizerJudgeBegin((_event: BaseGestureEvent, recognizer: GestureRecognizer): GestureJudgeResult =>
+        recognizer instanceof LongPressRecognizer && !this.canPreviewBoardHold() ?
+          GestureJudgeResult.REJECT : GestureJudgeResult.CONTINUE)
+      .priorityGesture(LongPressGesture({ duration: 450, repeat: false })
+        .onAction(() => {
+          if (!this.canPreviewBoardHold() || !this.boardReady(board) || !this.onBoardHoldBegin) return;
+          this.boardHoldTracking = this.onBoardHoldBegin(board, this.boardHoldDownX, this.boardHoldDownY);
+        })
+        .onActionEnd((event: GestureEvent) => {
+          const finger = event.fingerList[0];
+          if (finger && event.fingerList.length === 1) this.finishBoardHold(finger.globalX, finger.globalY);
+        })
+        .onActionCancel(() => this.endBoardHold()))
+      .accessibilityText(board.title + (board.pinCount ? '，' + PinmonyI18n.render(board.pinCount, this.uiLanguage) : ''))
+  }
+
+  @Builder
+  private boardCardContent(board: PinmonyBoard) {
     Column({ space: 7 }) {
       this.boardCover(board)
       Row({ space: 6 }) {
@@ -1134,13 +1273,8 @@ export struct PinmonyProfilePage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
     }
-    .layoutWeight(1)
+    .width('100%')
     .alignItems(HorizontalAlign.Start)
-    // A validated board route remains actionable while the profile content
-    // refresh is still settling. Profile write actions have a separate gate.
-    .enabled(this.boardReady(board))
-    .onClick(() => { if (this.boardReady(board) && this.onBoard) this.onBoard(board.id); })
-    .accessibilityText(board.title + (board.pinCount ? '，' + PinmonyI18n.render(board.pinCount, this.uiLanguage) : ''))
   }
 
   @Builder
@@ -1439,8 +1573,15 @@ export struct PinmonyProfilePage {
           TransitionEffect.translate({x:'100%'}).animation({duration:150,curve:Curve.EaseIn})))
     }
     }
+    if (this.boardHoldFrame) {
+      PinmonyPinHoldPreview({ frame: this.boardHoldFrame, selectedIndex: this.boardHoldChoice,
+        coverDimmed: this.boardHoldCoverDimmed, cursorX: this.boardHoldPointerX, cursorY: this.boardHoldPointerY })
+    }
     }.width('100%').height(this.legacyContentPane ? 'auto' : '100%')
+      .id(!this.hubPane && !this.legacyContentPane && this.profile.isOwn === true && !this.onBack ? 'pinmony-profile-board-hold-root' : '')
       .onAreaChange((_old: Area, area: Area) => {
+        if (this.boardHoldFrame && (Math.abs(Number(area.width) - this.boardHoldFrame.hostWidth) > 1 ||
+          Math.abs(Number(area.height) - this.boardHoldFrame.hostHeight) > 1)) this.clearBoardHold();
         this.updateProfileViewport(Number(area.height));
       })
   }
@@ -2103,6 +2244,7 @@ export struct PinmonyProfilePage {
       .height('100%')
       .width('100%')
       .scrollBar(BarState.Off)
+      .enableScrollInteraction(!this.boardHoldTracking)
       .align(Alignment.TopStart)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
       .clipContent(ContentClipMode.BOUNDARY)

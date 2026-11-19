@@ -134,6 +134,7 @@ export class PinmonyShareNativeFlow {
     private tracking: string = '';
     private viewer: string = '';
     private link: string = '';
+    private cardLinkFooter: boolean = false;
     private users: User[] = [];
     private busy: boolean = false;
     private pending: string = '';
@@ -178,7 +179,7 @@ export class PinmonyShareNativeFlow {
         }
         return p;
     }
-    async open(mode: string, page: string, id: string): Promise<boolean> {
+    async open(mode: string, page: string, id: string, cardLinkFooter: boolean = false): Promise<boolean> {
         if (!PIN_NATIVE_SHARE_PUBLISH_ENABLED) return false;
         this.close();
         const s: PinmonyBusinessSessionContext = this.ports.session();
@@ -190,6 +191,7 @@ export class PinmonyShareNativeFlow {
         this.generation = s.generation;
         this.origin = s.origin;
         this.mode = mode;
+        this.cardLinkFooter = mode === 'pin' && cardLinkFooter;
         this.page = page;
         this.id = id;
         this.session = Math.max(this.session + 1, this.store.shareSession + 1, 1);
@@ -209,7 +211,7 @@ export class PinmonyShareNativeFlow {
         this.store.shareError = '';
         this.store.shareLoading = true;
         this.store.shareOptions = mode === 'user' ? ['Messenger', 'WhatsApp', '短信', 'Facebook', 'X'].map((v: string): ShareSheetOption => ({ id: 'native-share:' + v, label: v === '短信' ? PinmonyI18n.message('pm_messages_4da199fa') : v, icon: '', enabled: false })) : [];
-        this.store.shareActions = mode === 'user' || mode === 'pin' ? [{ id: 'native-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), icon: '', enabled: false }] : [];
+        this.store.shareActions = mode === 'user' || mode === 'pin' ? [{ id: 'native-system-share', label: PinmonyI18n.message("pm_system_share_13a1c63f"), icon: '', enabled: this.cardLinkFooter }] : [];
         this.ports.show(mode !== 'pin');
         const revision: number = this.revision;
         try {
@@ -299,7 +301,7 @@ export class PinmonyShareNativeFlow {
     async refresh(): Promise<void> { if (!this.current(this.revision) || this.busy)
         return; this.store.shareBoardInviteVisible = this.mode === 'board' && this.ports.canInviteBoard?.(this.page, this.id) === true; if (this.timer >= 0)
         clearTimeout(this.timer); this.timer = -1; if (!this.id || this.mode === 'pin' && !this.tracking) {
-        await this.open(this.mode, this.page, this.id);
+        await this.open(this.mode, this.page, this.id, this.cardLinkFooter);
         return;
     } const tasks: Promise<void>[] = [this.load(this.store.shareQuery.trim(), this.revision)]; if (this.mode !== 'pin' && !this.link)
         tasks.push(this.invite(this.revision)); await Promise.allSettled(tasks); }

@@ -91,6 +91,8 @@ export function PinmonyBuildSearchRootContent(view: PinmonySearchRootView) {
               },
               loading: view.searchStore.searchLoading,
               submittedLinkLoading: view.searchStore.submittedPinLoading,
+              submittedLinkFailed: !!view.searchStore.failedSubmittedLinkPage &&
+                view.searchStore.failedSubmittedLinkPage === view.searchPlaceholder().pageKey,
               error: view.searchStore.searchError,
               onQueryChange: (value: string, refreshSuggestions?: boolean) => view.updateSearchQuery(value, refreshSuggestions === true),
               onSubmit: (value: string) => view.submitSearch(value),

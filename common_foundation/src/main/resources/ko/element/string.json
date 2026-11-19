@@ -3331,6 +3331,10 @@
       "value": "공유 링크"
     },
     {
+      "name": "pm_board_organizer_move_to",
+      "value": "이동 위치"
+    },
+    {
       "name": "pm_move_to_another_board_62574b0d",
       "value": "다른 보드로 이동"
     },
@@ -5069,6 +5073,10 @@
     {
       "name": "pm_profile_content_search",
       "value": "내 핀 검색"
+    },
+    {
+      "name": "pm_profile_board_hold_reorder",
+      "value": "순서 변경"
     },
     {
       "name": "pm_profile_board_sort",

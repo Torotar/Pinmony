@@ -26,6 +26,7 @@ export interface PinmonyHomeRootView {
   openHomePin: (id: string, imageUrl?: string) => Promise<void>;
   openHomeBoard: (id: string) => void;
   openHomeMore: (id: string) => Promise<void>;
+  openHomeHoldAction: (id: string, selection: number) => void;
   loadMoreHome: () => Promise<void>;
   refreshHome: () => void;
   retryHome: () => void;
@@ -77,6 +78,7 @@ export function PinmonyBuildHomeRootContent(view: PinmonyHomeRootView) {
               onPin: (id: string, imageUrl?: string) => view.openHomePin(id, imageUrl),
               onBoard: (id: string) => view.openHomeBoard(id),
               onMore: (id: string) => view.openHomeMore(id),
+              onHoldAction: (id: string, selection: number) => view.openHomeHoldAction(id, selection),
               onLoadMore: () => view.loadMoreHome(),
               onPrefetchMore: () => {
                 if (NetworkManager.allowsSpeculativeRequests()) view.loadMoreHome();

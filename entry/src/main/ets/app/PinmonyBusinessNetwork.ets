@@ -53,6 +53,10 @@ export class PinmonyBusinessNetwork extends PinmonyNativeNetwork {
       owner: () => boolean, id: string, crop?: PhotoSearchRegion): Promise<string>{ return this.searchClient.searchUploadedPhoto(bytes, page, session, owner, id, crop); }
   async saveUploadedPhotoHistory(bytes: ArrayBuffer, page: string, session: () => PinmonyBusinessSessionContext,
       owner: () => boolean, id: string): Promise<void>{ return this.searchClient.saveUploadedPhotoHistory(bytes, page, session, owner, id); }
+  async requestBusinessBoardReorder(id: string, page: string, session: () => PinmonyBusinessSessionContext,
+    board: string, kind: string, moved: string, before: string, after: string, current: () => boolean): Promise<PinmonyNetworkReply> {
+    return this.boardClient.requestBusinessBoardReorder(id, page, session, board, kind, moved, before, after, current);
+  }
   async requestBusinessBoardFollow(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
       page: string, board: string, viewer: string, owner: () => boolean): Promise<PinmonyNetworkReply>{ return this.boardClient.requestBusinessBoardFollow(job, session, page, board, viewer, owner); }
   async requestBusinessBoardSectionRead(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext, board: string, section: string, sectionPath: string, current: () => boolean): Promise<PinmonyNetworkReply>{ return this.boardClient.requestBusinessBoardSectionRead(job, session, board, section, sectionPath, current); }

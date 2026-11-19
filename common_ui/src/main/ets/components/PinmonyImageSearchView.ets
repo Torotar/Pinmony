@@ -135,6 +135,7 @@ export struct PinmonyImageSearchView {
     }
   }
   @Prop animatePhoto: boolean = false;
+  @Prop pageEntryDelay: number = 0;
   @Prop sourceSelectionBorder: boolean = false;
   @Prop originX: number = 0;
   @Prop originY: number = 0;
@@ -195,10 +196,10 @@ export struct PinmonyImageSearchView {
     if (this.uploadedPhoto) this.crop = { x: 0, y: 0, w: 1, h: 1 };
     // Network work does not depend on the photo transition or Sheet delay.
     this.initial = setTimeout(() => {
-      if (!this.alive || this.presentationActive === false) return;
+      if (!this.alive || this.presentationActive === false || this.closing) return;
       if (!this.animatePhoto) this.sheetVisible = true;
       if (!this.uploadedPhoto && this.onSearch) this.onSearch(this.crop, false, true);
-    }, 0);
+    }, this.pageEntryDelay);
   }
   aboutToDisappear(): void { this.sourceLifetime++; this.sourceReturnPin = ''; this.alive = false; this.transitionVersion++; clearTimeout(this.transitionTimer); clearTimeout(this.debounce); clearTimeout(this.initial); }
   private beginTransition(): void {
@@ -228,7 +229,17 @@ export struct PinmonyImageSearchView {
     this.transitionTimer = setTimeout(() => { if (this.alive) this.runTransition(this.closing); }, 32);
   }
   private closeTransition(): void {
-    if (!this.animatePhoto || !this.alive) return;
+    if (!this.alive) return;
+    if (!this.animatePhoto) {
+      if (this.closing) {
+        clearTimeout(this.initial); clearTimeout(this.debounce);
+        this.closeRequested = true;
+        this.returnPhotoFinished = true;
+        this.sheetVisible = false;
+        this.finishReturn();
+      }
+      return;
+    }
     if (!this.closing) {
       this.transitionVersion++;
       this.reopenAfterSheet = this.resultSheetMounted && this.closeRequested;

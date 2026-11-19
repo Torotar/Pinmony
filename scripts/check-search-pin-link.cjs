@@ -107,16 +107,35 @@ async function main() {
   assert.equal(edits,0,'restoring an inactive input must not cancel link resolution');
   finishRestore('456'); await restoredPending;
   assert.equal(restored.h.store.submittedPinLoading,false,'success releases loading mask');
-  const maskSource = fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
-  const mask = maskSource.slice(maskSource.indexOf('        if (this.searchStore.submittedPinLoading'));
-  assert(mask.includes(".backgroundColor('#66808080').hitTestBehavior(HitTestMode.Block).zIndex(100)"),
-    'pending link mask is grey, intercepts touches and covers sibling overlays');
-  assert(mask.includes("Text(this.uiText('pm_loading_please_wait_b6aaac70')).fontSize(14).fontColor($r('app.color.detail_on_accent'))"),
-    'the text beneath the loading indicator uses the white foreground');
-  for (const theme of ['base','dark']) {
-    const colors=JSON.parse(fs.readFileSync('common_ui/src/main/resources/'+theme+'/element/color.json','utf8'));
-    assert.equal(colors.color.find(item=>item.name==='detail_on_accent').value.toUpperCase(),'#FFFFFF',theme);
-  }
+  const presentationHost = fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
+  assert.doesNotMatch(presentationHost, /if \(this.searchStore.submittedPinLoading &&/,
+    'no app-level overlay may cover the result back button');
+  assert.match(ui, /if \(this.showingSubmittedLinkResult\(\) && !this.inputEditing\) \{\s*Column\(\) \{\s*if \(this.submittedLinkLoading\) \{\s*this.searchLoadingState\(\)/);
+  const methods = ['submitSearchInput','closeSearchHistoryDestination','showingSubmittedLinkResult','handleSearchBack'].map(name => {
+    const start = ui.indexOf('  private '+name+'(');
+    assert(start>=0,name); return ui.slice(start,ui.indexOf('\n  private ',start+1)).replace(/\s+@Builder\s*$/,'');
+  });
+  const isShort = value => value.startsWith('https://pin.it/');
+  const ignore = () => '';
+  const LinkView = vm.runInNewContext(ts.transpileModule('class LinkView {'+methods.join('\n')+'}\nLinkView;', {
+    compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,
+    {searchShortPinLink:isShort,searchPinLinkIdentity:ignore,searchProfileLink:ignore,parseBoardPermalink:ignore,hasBoardInviteLinkContext:ignore});
+  const paths = ['search-root','search-history'];
+  const linkView = Object.assign(new LinkView(),{active:true,interactionReady:true,inputEditing:true,historyDestinationRetained:true,
+    snapshot:{pageKey:page,session:1},closeInputPanel(){this.inputEditing=false;},
+    searchPathStack:{getAllPathName:()=>paths,pop(animated){assert.equal(animated,false);paths.pop();}},
+    onSubmit(){assert.deepEqual(paths,['search-root'],'close retained input before opening the board');},
+    onRootBack(){this.backCount=(this.backCount||0)+1;}});
+  linkView.submitSearchInput('https://pin.it/Example');
+  assert.equal(linkView.historyDestinationRetained,false);
+  linkView.submittedLinkLoading=true;
+  linkView.handleSearchBack();
+  assert.equal(linkView.backCount,1,'loading header uses app search back');
+  linkView.submittedLinkLoading=false; linkView.submittedLinkFailed=true;
+  linkView.handleSearchBack();
+  assert.equal(linkView.backCount,2,'failed header uses same back');
+  linkView.submittedLinkFailed=false;
+  assert.equal(linkView.showingSubmittedLinkResult(),false);
   assert.equal(restored.h.events.filter(e=>e[0]==='notice').length,0,'loading and success do not display a duplicate snackbar');
   assert.deepEqual(restored.calls,[['456',page]],'restored input still opens resolved detail');
   view.inputEditing=true; onChange.call(view,'edited');
@@ -162,7 +181,13 @@ async function main() {
   busyHost.pageRecovery={cancel(){}};
   busyHost.imageViewer={visible:false};
   busyHost.searchController={cancelSubmittedPin:()=>true};
+  let restoredRoot = 0;
+  busyHost.currentSearchPageKey=()=> 'https://www.pinterest.com/search/';
+  busyHost.searchDiscoveryNativeReads={apply(){restoredRoot++;}};
+  busyHost.rootExitBackAt=150;
   assert.equal(busyHost.onBackPress(),true,'host consumes pending-link back before underlying navigation');
+  assert.equal(busyHost.rootExitBackAt,0);
+  assert.equal(restoredRoot,1);
   for(const action of ['edit','submit','page','inactive','invalidate']) {
     let finish;let cancelled=0;
     const stale=fixture({resolveSubmittedPin:()=>new Promise(resolve=>finish=resolve),cancelSubmittedPin:()=>cancelled++});

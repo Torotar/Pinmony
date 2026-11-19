@@ -599,6 +599,10 @@ onBackPress(): boolean {
     else if (this.ports.activeSheetKind() === 'searchFilter') {
         this.ports.dismissSearchFilters();
     }
+    else if (this.ports.authStatus() === 'authenticated' && this.ports.activeTab() === 1 &&
+        this.ports.nativeSearchPageVisible() && this.searchStore.searchInputFocused) {
+        this.ports.backFromSearch();
+    }
     else if (this.ports.authStatus() === 'authenticated' && this.ports.activeTab() === 1 && this.ports.nativeRootTabsVisible() &&
         /[?&]q=[^&#]+/.test(this.ports.currentSearchPageKey())) {
         this.ports.backFromSearch();
@@ -612,10 +616,6 @@ onBackPress(): boolean {
     }
     else if (this.searchStore.search && this.ports.nativeSearchPageVisible() && this.searchStore.search.quiz && this.searchStore.search.quiz.mode !== 'entry') {
         this.handleBack();
-    }
-    else if (this.searchStore.searchInputFocused && !!this.ports.currentSearchPageKey() &&
-        !this.pinStore.detail && !this.ports.currentPinUrl()) {
-        this.ports.backFromSearch();
     }
     else if (this.pinStore.detailWebFlow) {
         this.ports.returnFromDetailWebFlow();
@@ -631,6 +631,12 @@ onBackPress(): boolean {
     }
     else if (this.ports.currentPinUrl()) {
         this.ports.backFromDetail();
+    }
+    else if (this.ports.activeTab() === 1 && this.ports.nativeSearchPageVisible() && !this.ports.activeSheetKind() &&
+        /^https:\/\/[^/]+\/search\/?(?:[?#]|$)/i.test(this.ports.currentSearchPageKey()) &&
+        !/[?&]q=[^&#]+/i.test(this.ports.currentSearchPageKey())) {
+        // The mounted search landing may outlive the display address while the root is restored.
+        return this.ports.rootBack ? this.ports.rootBack() : false;
     }
     else if (this.ports.currentSearchPageKey()) {
         this.ports.backFromSearch();

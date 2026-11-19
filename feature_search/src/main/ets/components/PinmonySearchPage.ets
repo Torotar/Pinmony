@@ -1,3 +1,5 @@
+import { parseBoardPermalink, hasBoardInviteLinkContext } from 'common_network';
+import { searchPinLinkIdentity, searchShortPinLink, searchProfileLink } from '../services/PinmonySearchPinLink';
 import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyPinCountBadge } from 'common_ui';
 import { PinmonySearchCategoryBar, PinmonySearchCategoryBarController } from './PinmonySearchCategoryBar';
@@ -312,6 +314,7 @@ export struct PinmonySearchPage {
   @Prop @Watch('syncImagePrefetchActivity') mediaActive: boolean = false;
   @Prop loading: boolean = false;
   @Prop submittedLinkLoading: boolean = false;
+  @Prop submittedLinkFailed: boolean = false;
   @Prop refreshing: boolean = false;
   onRefresh?: () => void;
   @Prop error: string = '';
@@ -1601,6 +1604,10 @@ export struct PinmonySearchPage {
     }
   }
 
+  private showingSubmittedLinkResult(): boolean {
+    return this.submittedLinkLoading || this.submittedLinkFailed;
+  }
+
   private searchControlBackground(): ResourceColor {
     if (PinmonySearchHeaderMaterial.active(this.immersiveLightMode)) return Color.Transparent;
     return !this.inputEditing && this.searchHeaderScrolled ?
@@ -1610,7 +1617,7 @@ export struct PinmonySearchPage {
   @Builder
   private searchHeaderContent(editing: boolean, historyPage: boolean = false) {
     Row({ space: 8 }) {
-        if (editing || !!this.committedQuery() && (historyPage || !this.historyDestinationRetained)) {
+        if (editing || this.showingSubmittedLinkResult() || !!this.committedQuery() && (historyPage || !this.historyDestinationRetained)) {
           Button({ type: ButtonType.Circle }) {
             Stack() {
               SymbolGlyph(PinmonyI18n.isRtl(this.uiLanguage) ? $r('sys.symbol.chevron_right') : $r('sys.symbol.chevron_left')).fontSize(24).fontColor([$r('app.color.primary_text')])
@@ -1670,7 +1677,7 @@ export struct PinmonySearchPage {
           .enabled(this.active && this.interactionReady && !!this.onSubmit && this.query.trim().length > 0)
           .onClick(() => this.submitSearchInput(this.query))
         }
-        if (!editing && (!this.committedQuery() || !historyPage && this.historyDestinationRetained)) {
+        if (!editing && !this.showingSubmittedLinkResult() && (!this.committedQuery() || !historyPage && this.historyDestinationRetained)) {
           Button({ type: ButtonType.Circle }) {
             SymbolGlyph($r('sys.symbol.camera')).fontSize(24)
               .fontColor([$r('app.color.primary_text')])
@@ -1686,7 +1693,7 @@ export struct PinmonySearchPage {
           .enabled(this.interactionReady && !this.photoBusy)
           .onClick(() => { this.photoMenu(); })
         }
-        if (!editing && !!this.committedQuery() && (historyPage || !this.historyDestinationRetained)) {
+        if (!editing && !this.showingSubmittedLinkResult() && !!this.committedQuery() && (historyPage || !this.historyDestinationRetained)) {
           Button({ type: ButtonType.Circle }) {
             Stack() {
               SymbolGlyph($r('sys.symbol.slider_horizontal_2')).fontSize(24).fontColor([$r('app.color.primary_text')])
@@ -1854,10 +1861,20 @@ export struct PinmonySearchPage {
               this.searchMaterialContent('discovery')
             }.width('100%').height('100%')
               .visibility(this.rootDiscoveryVisible() ? Visibility.Visible : Visibility.Hidden)
-              .hitTestBehavior(this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? HitTestMode.None : HitTestMode.Default)
-              .accessibilityLevel(this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? 'no-hide-descendants' : 'auto')
+              .hitTestBehavior(this.showingSubmittedLinkResult() || this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? HitTestMode.None : HitTestMode.Default)
+              .accessibilityLevel(this.showingSubmittedLinkResult() || this.inputEditing || !!this.committedQuery() || !this.rootDiscoveryVisible() ? 'no-hide-descendants' : 'auto')
           }
-          if (this.showingSearchHistory(name)) {
+          if (this.showingSubmittedLinkResult() && !this.inputEditing) {
+            Column() {
+              if (this.submittedLinkLoading) {
+                this.searchLoadingState()
+              } else {
+                Text(this.uiText('pm_unable_to_open_link_please_retry_99322633'))
+                  .fontSize(16).fontColor($r('app.color.primary_text')).textAlign(TextAlign.Center)
+              }
+            }.width('100%').height('100%').padding({ top: this.searchHeaderInset(), bottom: this.getUIContext().px2vp(this.gestureBarHeightPx) + 84, left: 24, right: 24 })
+              .justifyContent(FlexAlign.Center).backgroundColor($r('app.color.page_background'))
+          } else if (this.showingSearchHistory(name)) {
             this.searchMaterialContent('history')
           } else if (name === 'search-history' && !this.committedQuery()) {
             this.searchStatus()
@@ -1983,8 +2000,8 @@ export struct PinmonySearchPage {
       },
       content: {
         stackBuilder: (): void => { this.searchHeader(this.showingSearchHistory(name), name === 'search-history'); },
-        bottomBuilder: { builder: this.showingSearchHistory(name) || name !== 'search-history' && this.historyDestinationRetained ? this.emptyCategoriesTitleBuilder : this.categoriesTitleBuilder,
-          height: !this.showingSearchHistory(name) && !(name !== 'search-history' && this.historyDestinationRetained) && this.visibleCategories().length > 0 ? 54 : 0 }
+        bottomBuilder: { builder: this.showingSubmittedLinkResult() || this.showingSearchHistory(name) || name !== 'search-history' && this.historyDestinationRetained ? this.emptyCategoriesTitleBuilder : this.categoriesTitleBuilder,
+          height: !this.showingSubmittedLinkResult() && !this.showingSearchHistory(name) && !(name !== 'search-history' && this.historyDestinationRetained) && this.visibleCategories().length > 0 ? 54 : 0 }
       }
     };
   }
@@ -2001,7 +2018,7 @@ export struct PinmonySearchPage {
     if (!this.pagePresent || !this.active || this.inputEditing || this.restoringResultsScroll ||
       this.activePage !== this.snapshot.pageKey || this.activeSession !== this.snapshot.session ||
       this.photoHistoryVisible || this.photoPreview || this.quizSheetOpen ||
-      this.historyDestinationClosing || this.showingSearchHistory(name)) return false;
+      this.showingSubmittedLinkResult() || this.historyDestinationClosing || this.showingSearchHistory(name)) return false;
     return name === 'search-history' ? !!this.committedQuery() : !this.historyDestinationRetained;
   }
 
@@ -2078,6 +2095,10 @@ export struct PinmonySearchPage {
 
   private handleSearchBack(): void {
     if (this.historyDestinationClosing) return;
+    if (this.showingSubmittedLinkResult() && !this.inputEditing) {
+      this.onRootBack?.();
+      return;
+    }
     if (this.inputEditing) {
       if (this.committedQuery() && this.onBack) {
         const paths: string[] = this.searchPathStack.getAllPathName();
@@ -2129,6 +2150,11 @@ export struct PinmonySearchPage {
     this.discoveryResultTransition = false;
     // closeInputPanel restores the committed query, so capture the draft first.
     this.closeInputPanel(false);
+    if (searchShortPinLink(submittedQuery) || searchPinLinkIdentity(submittedQuery) || searchProfileLink(submittedQuery) ||
+      parseBoardPermalink(submittedQuery) || hasBoardInviteLinkContext(submittedQuery)) {
+      // A link opens another destination or an inline result, never the retained input/history page.
+      this.closeSearchHistoryDestination(false);
+    }
     this.onSubmit(submittedQuery);
   }
 
@@ -2213,7 +2239,7 @@ export struct PinmonySearchPage {
   }
 
   private beginSearchInput(): void {
-    if (!this.active || this.inputEditing || this.historyDestinationClosing) return;
+    if (!this.active || this.inputEditing || this.historyDestinationClosing || this.showingSubmittedLinkResult()) return;
     PinmonyRuntimeLog.info('SearchInputTrace: event=user-edit');
     this.pendingInputFocus = true; this.inputFocusRevision++;
     this.onInputFocus(true);

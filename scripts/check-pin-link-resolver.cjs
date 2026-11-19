@@ -34,6 +34,22 @@ async function main() {
   const ambiguous = fixture([reply(302,inviteUrl+'&invite_code=other')]);
   await assert.rejects(ambiguous.reader.resolveNavigationTarget('https://pin.it/Example',()=>true));
   const profile = 'https://www.pinterest.com/sample_user/';
+  const board = 'https://www.pinterest.com/sample_user/my-board/';
+  const boards = fixture([reply(308,middle),reply(302,board + '?tracking=example')]);
+  const resolvedBoard = await boards.reader.resolveNavigationTarget('https://pin.it/Example',()=>true);
+  assert.equal(resolvedBoard.kind, 'board');
+  assert.equal(resolvedBoard.boardUrl, board);
+  assert.equal(boards.requests.length, 2, 'board destination must not be fetched by public resolver');
+  const shared = fixture([reply(308,middle), reply(302,board+'?invite_code=synthetic&sender=example')]);
+  const ownBoard = await shared.reader.resolveNavigationTarget('https://pin.it/Example',()=>true);
+  assert.equal(ownBoard.kind, 'own-shared-board');
+  assert.equal(ownBoard.boardUrl, board, 'do not carry sharing context into board read');
+  assert.equal(shared.requests.length, 2, 'never fetch the destination during resolution');
+  for (const query of ['invite_code=example', 'invite_code=example&sender=one&sender=two',
+    'invite_code=example&sender=one&board_collab_inviter=false']) {
+    const bad = fixture([reply(302,board+'?'+query)]);
+    await assert.rejects(bad.reader.resolveNavigationTarget('https://pin.it/Example',()=>true));
+  }
   const profiles=fixture([reply(308,middle),reply(302,profile+'?tracking=example')]);
   assert.equal(await profiles.reader.resolveTarget('https://pin.it/Example',()=>true),profile);
   assert.equal(profiles.requests.length,2,'profile shortener uses the same bounded public redirect chain');

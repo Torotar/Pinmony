@@ -2,8 +2,8 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('nod
 const ts=require(process.argv[2]||'typescript');
 const source=fs.readFileSync('entry/src/main/ets/pages/Index.ets','utf8');
 function method(name){const match=new RegExp('^  private (?:async )?'+name+'\\(','m').exec(source);assert(match,name);const start=match.index;const end=source.indexOf('\n  private ',start+1);return source.slice(start,end);}
-const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('openPhotoMenuSave')+method('finishPhotoMenuSave')+method('dismissShareSheet')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PinmonyRuntimeLog:{info(){}}});
-function context(){const h=new Host(),menu={pinUrl:'pin',actions:[]},events=[];Object.assign(h,{homeStore:{customHomeMenu:menu},activeSheetKind:'share',showNativeSheet:true,authStatus:'authenticated',businessSuspended:false,authEpoch:1,nativeDisplayAddress:()=> 'home',dismissShareSheet(){events.push('dismiss');this.homeStore.customHomeMenu=undefined;this.activeSheetKind='';},async openApiBoards(pin){assert.equal(this.homeStore.customHomeMenu,menu,'card permission context retained');assert.equal(this.activeSheetKind,'','old host is closed before save starts');events.push(pin);this.activeSheetKind='save';this.showNativeSheet=true;}});return {h,menu,events};}
+const Host=vm.runInNewContext(ts.transpileModule('class Host {'+method('openPhotoMenuSave')+method('finishPhotoMenuSave')+method('openCardContactShare')+method('dismissShareSheet')+'} Host;', {compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,{PIN_NATIVE_SHARE_PUBLISH_ENABLED:true,PinmonyRuntimeLog:{info(){}}});
+function context(){const h=new Host(),menu={pinUrl:'pin',actions:[]},events=[];Object.assign(h,{homeStore:{customHomeMenu:menu},activeSheetKind:'share',showNativeSheet:true,authStatus:'authenticated',businessSuspended:false,authEpoch:1,activeTab:0,isCurrentBoardMenuPin:()=>false,nativeBoardVisible:()=>false,currentHomePageKey:()=> 'home',isCurrentMorePin:()=>true,nativeDisplayAddress:()=> 'home',dismissShareSheet(){events.push('dismiss');this.homeStore.customHomeMenu=undefined;this.activeSheetKind='';},async openApiBoards(pin){assert.equal(this.homeStore.customHomeMenu,menu,'card permission context retained');assert.equal(this.activeSheetKind,'','old host is closed before save starts');events.push(pin);this.activeSheetKind='save';this.showNativeSheet=true;}});return {h,menu,events};}
 (async()=>{
  let {h,menu,events}=context();await h.openPhotoMenuSave('pin');await h.openPhotoMenuSave('pin');
  assert.equal(h.showNativeSheet,false);assert.equal(h.activeSheetKind,'share');assert.equal(h.homeStore.customHomeMenu,menu);assert.equal(events.length,0,'do not replace builder while options Sheet remains mounted');
@@ -18,8 +18,19 @@ function context(){const h=new Host(),menu={pinUrl:'pin',actions:[]},events=[];O
  }
  ({h,events}=context());await h.openPhotoMenuSave('wrong');assert.equal(h.showNativeSheet,true);assert.equal(events.length,0);
  ({h,events}=context());h.openApiBoards=async()=>{};await h.openPhotoMenuSave('pin');await h.finishPhotoMenuSave();assert.deepEqual(events,['dismiss'],'rejected opening cleans ownership context');
- ({h,events}=context());Object.assign(h,{pinIdentity:p=>p,shareNativeFlow:{async open(kind,pin,id){assert.equal(kind,'pin');assert.equal(pin,'pin');assert.equal(id,'pin');assert.equal(h.homeStore.customHomeMenu,undefined);assert.equal(h.homeStore.homeMenuPin,'pin');events.push('contacts');h.activeSheetKind='share';h.showNativeSheet=true;}}});
- await h.openPhotoMenuSave('pin',true);assert.equal(events.length,0);await h.finishPhotoMenuSave();await h.finishPhotoMenuSave();assert.deepEqual(events,['dismiss','contacts'],'card share opens existing contacts flow once after menu exit');
+ for(const page of ['home','board','search']){
+  ({h,events}=context());Object.assign(h,{activeTab:page==='home'?0:1,nativeDisplayAddress:()=> 'staged-route',
+   isCurrentBoardMenuPin:(pin,source)=>page==='board'&&pin==='pin'&&source===page,
+   nativeBoardVisible:()=>page==='board',pinIdentity:p=>p,shareNativeFlow:{async open(kind,pin,id,footer){
+    assert.equal(kind,'pin');assert.equal(pin,'pin');assert.equal(id,'pin');assert.equal(h.homeStore.customHomeMenu,undefined);
+    assert.equal(h.homeStore.homeMenuPage,page,'ownership retains the source rather than the current display address');
+    assert.equal(h.homeStore.homeMenuPin,'pin');assert.equal(footer,page==='search'?undefined:true);
+    events.push('contacts');h.activeSheetKind='share';h.showNativeSheet=true;return true;
+   }}});
+  h.homeStore.homeMenuPage=page;
+  await h.openPhotoMenuSave('pin',true);assert.equal(events.length,0);await h.finishPhotoMenuSave();await h.finishPhotoMenuSave();
+  assert.deepEqual(events,['dismiss','contacts'],'opens contacts once after card menu exits');
+ }
  assert(source.includes('shareBoardPinAfterMenu: (pin: string, page: string): Promise<void> => this.openPhotoMenuSave(pin, true)'));
  ({h,events}=context());await h.openPhotoMenuSave('pin');Object.assign(h,{sharePanelsController:{pause(){}},nativeBusinessRoutesEnabled:true,shareNativeFlow:{close(){}},pinStore:{},dismissPostSnack(){},rootContextCoordinator:{notify(){}}});
  Host.prototype.dismissShareSheet.call(h);assert.equal(h.pendingPhotoSaveMenu,undefined,'forced close cancels pending reopen');await h.finishPhotoMenuSave();assert.equal(events.length,0);

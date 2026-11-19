@@ -1,3 +1,4 @@
+import { PinmonyPinHoldFrame, PinmonyPinHoldPreview } from 'common_ui';
 import { PinmonyDetailSources, PinmonyDetailSourceCard } from 'common_ui';
 import { PinmonyCardCarousel, PinmonyCardImage } from 'common_ui';
 import { PinmonyPinCountBadge, PinmonyCardMediaBadge } from 'common_ui';
@@ -212,7 +213,7 @@ export struct PinmonyHomeFeedPane {
   @Prop @Watch('onPrefetchAvailabilityChanged') actionsReady: boolean = true;
   @Prop menuReady: boolean = true;
   @Prop navigationReady: boolean = true;
-  @Prop interactionReady: boolean = true;
+  @Prop @Watch('onHoldAvailabilityChanged') interactionReady: boolean = true;
   @Prop initialScrollOffset: number = 0;
   @Prop menuLoadingId: string = '';
   @Prop error: string = '';
@@ -331,6 +332,7 @@ export struct PinmonyHomeFeedPane {
   onPrefetchMore?: () => void;
   onPin?: (id: string, imageUrl?: string) => void;
   onMore?: (id: string) => void;
+  onHoldAction?: (id: string, selection: number) => void;
   onLoadMore?: () => void;
   onRetry?: () => void;
   onRefresh?: () => void;
@@ -360,7 +362,7 @@ export struct PinmonyHomeFeedPane {
     }
   }
 
-  aboutToDisappear(): void { this.sourceLifetime++;
+  aboutToDisappear(): void { this.endPinHold(); this.sourceLifetime++;
     this.cancelRefreshStateUpdate();
     // The framework may already have detached the Scroller here. Persist the
     // last attached measurement rather than replacing the category offset with 0.
@@ -398,6 +400,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private onPaneActiveChanged(): void {
+    this.endPinHold();
     if (!this.paneActive) this.reportScrollPosition(true);
     this.imageNetworkVisible = this.paneActive;
     if (this.paneActive) {
@@ -508,6 +511,7 @@ export struct PinmonyHomeFeedPane {
   }
 
   private onHomeChanged(): void {
+    this.endPinHold();
     this.syncFirstImagePriority();
     if (this.lastHomePinCount > 0 && this.home.pins.length === 0) {
       this.reportScrollPosition(true);
@@ -803,98 +807,198 @@ export struct PinmonyHomeFeedPane {
     .accessibilityText(this.uiFormat("pm_open_board_value_value_pins_134006a7", [board.name, board.pinCount]))
   }
 
+  @State private pinHoldFrame: PinmonyPinHoldFrame | undefined = undefined;
+  @State private pinHoldSearchEnabled: boolean = true;
+  @State private pinHoldSelection: number = -1;
+  @State private pinHoldCoverDimmed: boolean = false;
+  @State private pinHoldX: number = 0;
+  @State private pinHoldY: number = 0;
+  private pinHoldDown: boolean = false;
+  private pinHoldDownX: number = 0;
+  private pinHoldDownY: number = 0;
+  private pinHoldClickUntil: number = 0;
+
+  private onHoldAvailabilityChanged(): void { if (!this.interactionReady) this.endPinHold(); }
+
+  private canPreviewPinHold(_pin: PinmonyHomePin): boolean {
+    return this.paneActive && this.feedActive && this.interactionReady && !this.suppressPinClick;
+  }
+
+  private pinHoldChromeBottom(): number {
+    return this.homeTopInset() + 48 + (this.home.board ? 68 * this.chromeOpacity : 0);
+  }
+
+  private beginPinHold(pin: PinmonyHomePin): void {
+    if (!this.pinHoldDown || !this.canPreviewPinHold(pin)) return;
+    const frame = PinmonyPinHoldFrame.measure(this.getUIContext(), 'pinmony-home-hold-' + this.categoryId,
+      'pinmony-home-hold-photo-' + this.categoryId + '-' + pin.id, this.pinHoldDownX, this.pinHoldDownY, false, false, this.pinHoldChromeBottom());
+    if (!frame) return;
+    this.pinHoldSearchEnabled = !pin.video;
+    this.pinHoldSelection = -1;
+    this.pinHoldCoverDimmed = false;
+    this.pinHoldX = frame.anchorX;
+    this.pinHoldY = frame.anchorY;
+    this.pinHoldFrame = frame;
+  }
+
+  private endPinHold(): void {
+    this.pinHoldDown = false;
+    if (!this.pinHoldFrame) return;
+    this.pinHoldClickUntil = Date.now() + 300;
+    this.pinHoldFrame = undefined;
+    this.pinHoldSelection = -1;
+    this.pinHoldCoverDimmed = false;
+  }
+
+  private pinHoldActionAllowed(pin: PinmonyHomePin, index: number): number {
+    if (!this.canPreviewPinHold(pin) || !this.onHoldAction) return -1;
+    if (index === 2 && !!pin.video) return -1;
+    return index;
+  }
+
+  private releasePinHold(pin: PinmonyHomePin, x: number, y: number): void {
+    const frame = this.pinHoldFrame;
+    const selected = frame ? this.pinHoldActionAllowed(pin, frame.choice(x - frame.originX, y - frame.originY)) : -1;
+    this.endPinHold();
+    if (selected >= 0) this.onHoldAction?.(pin.id, selected);
+  }
+
+  private trackPinHold(event: TouchEvent, pin: PinmonyHomePin): void {
+    if (event.type === TouchType.Up) {
+      const touch = event.changedTouches[0];
+      if (touch && event.changedTouches.length === 1 && event.touches.length <= 1) {
+        this.releasePinHold(pin, touch.windowX, touch.windowY);
+      } else this.endPinHold();
+      return;
+    }
+    if (event.type === TouchType.Cancel || event.touches.length !== 1) {
+      this.endPinHold();
+      return;
+    }
+    const touch = event.touches[0];
+    if (event.type === TouchType.Down) {
+      this.pinHoldClickUntil = 0;
+      this.pinHoldDown = true;
+      this.pinHoldDownX = touch.windowX;
+      this.pinHoldDownY = touch.windowY;
+    } else if (this.pinHoldFrame && event.type === TouchType.Move) {
+      this.pinHoldX = touch.windowX - this.pinHoldFrame.originX;
+      this.pinHoldY = touch.windowY - this.pinHoldFrame.originY;
+      const selection = this.pinHoldActionAllowed(pin, this.pinHoldFrame.choice(this.pinHoldX, this.pinHoldY));
+      if (selection >= 0) this.pinHoldCoverDimmed = true;
+      this.pinHoldSelection = selection;
+    }
+  }
+
+  private pinHoldBlocksClick(): boolean {
+    return !!this.pinHoldFrame || Date.now() < this.pinHoldClickUntil;
+  }
+
   @Builder
   private pinCard(pin: PinmonyHomePin, imageRevision: number = 0, session: number = 0, pageKey: string = '') {
     Column({ space: 8 }) {
-      if (!pin.video && (pin.carouselImages?.length || 0) > 1) {
-        PinmonyCardCarousel({ images: pin.carouselImages || [], photoHeight: this.imageHeight(pin),
-          initialIndex: Math.max(0, (pin.carouselImages || []).findIndex((photo: PinmonyCardImage): boolean => photo.url === this.carouselSources.get(pin.id))),
-          savedCaption: pin.saved === true ? this.uiText('pm_saved_471dd4d7') : '',
-          errorText: this.uiText('pm_image_failed_to_load_572993f5'), retryText: this.uiText('pm_retry_b8784c8d'), retryAllowed: !this.offlinePreview,
-          photoId: this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id,
-          loadingActive: this.imageLoadingActive && this.paneActive, interactionActive: this.interactionReady,
-          onDecoded: () => {
-            if (session !== this.home.session || pageKey !== this.home.pageKey || imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
-            this.settleFirstImage(pin);
-          },
-          onFailure: () => {
-            if (session !== this.home.session || pageKey !== this.home.pageKey || imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
-            this.settleFirstImage(pin);
-          },
-          onSelect: (url: string) => {
-            if (session === this.home.session && pageKey === this.home.pageKey) this.carouselSources.set(pin.id, url);
-          },
-          onOpen: (url: string) => { if (!this.suppressPinClick && this.onPin) { this.carouselSources.set(pin.id, url); this.stageDetailSource(); this.onPin(pin.id, url); } } })
-      } else if (pin.video) {
-        PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady,
-          loadingActive: this.imageLoadingActive && this.paneActive })
-          .width('100%').height(this.imageHeight(pin))
-          .overlay(this.pinCountBadge(this.pinMediaCount(pin)), { align: Alignment.TopStart })
-          .id(this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id)
-          .onClick(() => { if (!this.suppressPinClick && this.onPin) { this.stageDetailSource(); this.onPin(pin.id); } })
-      } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
-        Column() {
-          Text(this.uiText("pm_image_failed_to_load_572993f5"))
-            .fontSize(14)
-            .fontColor($r('app.color.secondary_text'))
-          if (!this.offlinePreview) {
-            PinmonyActionNotice({ active: this.interactionReady, message: this.uiText("pm_retry_b8784c8d"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.retryImage(pin.imageUrl) })
-          }
-        }
-        .width('100%')
-        .height(this.imageHeight(pin))
-        .borderRadius(18)
-        .backgroundColor($r('app.color.surface_muted'))
-        .justifyContent(FlexAlign.Center)
-        .accessibilityText((pin.title || this.uiText("pm_pin_234ff540")) + this.uiText("pm_image_failed_to_load_open_details_8406e8c5"))
-        .overlay(this.pinCountBadge(this.pinMediaCount(pin)), { align: Alignment.TopStart })
-        .onClick(() => { if (!this.suppressPinClick && this.onPin) { this.stageDetailSource(); this.onPin(pin.id); } })
-      } else {
-        Stack({ alignContent: Alignment.TopStart }) {
-          PinmonyCdnImage({ url: this.recoveredSources[pin.imageUrl] || pin.imageUrl, fit: ImageFit.Cover,
-            allowImageDrag: false,
-            traceLoading: true, traceIndex: this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id),
-            // Match search results: mounted WaterFlow cache items may load offscreen.
-            loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false,
+      Stack({ alignContent: Alignment.TopStart }) {
+        if (!pin.video && (pin.carouselImages?.length || 0) > 1) {
+          PinmonyCardCarousel({ images: pin.carouselImages || [], photoHeight: this.imageHeight(pin),
+            initialIndex: Math.max(0, (pin.carouselImages || []).findIndex((photo: PinmonyCardImage): boolean => photo.url === this.carouselSources.get(pin.id))),
+            savedCaption: pin.saved === true ? this.uiText('pm_saved_471dd4d7') : '',
+            errorText: this.uiText('pm_image_failed_to_load_572993f5'), retryText: this.uiText('pm_retry_b8784c8d'), retryAllowed: !this.offlinePreview,
+            photoId: this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id,
+            loadingActive: this.imageLoadingActive && this.paneActive, interactionActive: this.interactionReady,
             onDecoded: () => {
-              if (session !== this.home.session || pageKey !== this.home.pageKey ||
-                imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
+              if (session !== this.home.session || pageKey !== this.home.pageKey || imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
               this.settleFirstImage(pin);
-              if (this.imageTraceCount++ < 40) PinmonyRuntimeLog.info('HomeImageTrace: phase=complete index=' +
-                this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
-                ' sincePageMs=' + (Date.now() - this.imageTraceStartedAt));
             },
-            onFailure: (code: number) => {
-              if (session !== this.home.session || pageKey !== this.home.pageKey) return;
-              if (imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
+            onFailure: () => {
+              if (session !== this.home.session || pageKey !== this.home.pageKey || imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
               this.settleFirstImage(pin);
-              if (this.failedImages.indexOf(pin.imageUrl) < 0) {
-                PinmonyRuntimeLog.warn('HomeImageError: revision=' + imageRevision.toString() +
-                  ' index=' + this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
-                  ' code=' + code.toString());
-                this.failedImages = [...this.failedImages, pin.imageUrl];
-                this.onImageRecovery();
-                this.retryRecoveredImages();
-              }
-            } })
-            .width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
-            .accessibilityLevel('no')
-            .onClick(() => { if (!this.suppressPinClick && this.onPin) { this.stageDetailSource(); this.onPin(pin.id, this.recoveredSources[pin.imageUrl] || pin.imageUrl); } })
-          PinmonyPinCountBadge({ mediaCount: this.pinMediaCount(pin) }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
-          if (pin.isVideo === true) {
-            PinmonyCardMediaBadge({ caption: this.uiText('pm_videos_c20f7618') }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+            },
+            onSelect: (url: string) => {
+              if (session === this.home.session && pageKey === this.home.pageKey) this.carouselSources.set(pin.id, url);
+            },
+            onOpen: (url: string) => { if (!this.suppressPinClick && !this.pinHoldBlocksClick() && this.onPin) { this.carouselSources.set(pin.id, url); this.stageDetailSource(); this.onPin(pin.id, url); } } })
+        } else if (pin.video) {
+          PinmonyVideoCard({ video: pin.video, poster: pin.imageUrl, active: this.mediaActive && this.actionsReady,
+            loadingActive: this.imageLoadingActive && this.paneActive, allowImageDrag: false })
+            .width('100%').height(this.imageHeight(pin))
+            .overlay(this.pinCountBadge(this.pinMediaCount(pin)), { align: Alignment.TopStart })
+            .id(this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id)
+            .onClick(() => { if (!this.suppressPinClick && !this.pinHoldBlocksClick() && this.onPin) { this.stageDetailSource(); this.onPin(pin.id); } })
+        } else if (this.failedImages.indexOf(pin.imageUrl) >= 0) {
+          Column() {
+            Text(this.uiText("pm_image_failed_to_load_572993f5"))
+              .fontSize(14)
+              .fontColor($r('app.color.secondary_text'))
+            if (!this.offlinePreview) {
+              PinmonyActionNotice({ active: this.interactionReady, message: this.uiText("pm_retry_b8784c8d"), actionText: this.uiText("pm_retry_b8784c8d"), onAction: () => this.retryImage(pin.imageUrl) })
+            }
           }
-          if (pin.saved === true) {
-            Column() {
-              Text(this.uiText("pm_saved_471dd4d7")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
-                .padding({ left: 14, right: 14, top: 16 })
-              Blank()
-            }.width('100%').height(this.imageHeight(pin)).backgroundColor('#55000000')
-              .borderRadius(18).clip(true).hitTestBehavior(HitTestMode.None)
-          }
-        }.width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
-          .id(this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id)
-      }
+          .width('100%')
+          .height(this.imageHeight(pin))
+          .borderRadius(18)
+          .backgroundColor($r('app.color.surface_muted'))
+          .justifyContent(FlexAlign.Center)
+          .accessibilityText((pin.title || this.uiText("pm_pin_234ff540")) + this.uiText("pm_image_failed_to_load_open_details_8406e8c5"))
+          .overlay(this.pinCountBadge(this.pinMediaCount(pin)), { align: Alignment.TopStart })
+          .onClick(() => { if (!this.suppressPinClick && !this.pinHoldBlocksClick() && this.onPin) { this.stageDetailSource(); this.onPin(pin.id); } })
+        } else {
+          Stack({ alignContent: Alignment.TopStart }) {
+            PinmonyCdnImage({ url: this.recoveredSources[pin.imageUrl] || pin.imageUrl, fit: ImageFit.Cover,
+              allowImageDrag: false,
+              traceLoading: true, traceIndex: this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id),
+              // Match search results: mounted WaterFlow cache items may load offscreen.
+              loadingActive: this.imageLoadingActive && this.paneActive, useSharedDecode: false, viewportOnly: false,
+              onDecoded: () => {
+                if (session !== this.home.session || pageKey !== this.home.pageKey ||
+                  imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
+                this.settleFirstImage(pin);
+                if (this.imageTraceCount++ < 40) PinmonyRuntimeLog.info('HomeImageTrace: phase=complete index=' +
+                  this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
+                  ' sincePageMs=' + (Date.now() - this.imageTraceStartedAt));
+              },
+              onFailure: (code: number) => {
+                if (session !== this.home.session || pageKey !== this.home.pageKey) return;
+                if (imageRevision !== (this.recoveredRevisions[pin.imageUrl] || 0)) return;
+                this.settleFirstImage(pin);
+                if (this.failedImages.indexOf(pin.imageUrl) < 0) {
+                  PinmonyRuntimeLog.warn('HomeImageError: revision=' + imageRevision.toString() +
+                    ' index=' + this.home.pins.findIndex((item: PinmonyHomePin): boolean => item.id === pin.id) +
+                    ' code=' + code.toString());
+                  this.failedImages = [...this.failedImages, pin.imageUrl];
+                  this.onImageRecovery();
+                  this.retryRecoveredImages();
+                }
+              } })
+              .width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
+              .accessibilityLevel('no')
+              .onClick(() => { if (!this.suppressPinClick && !this.pinHoldBlocksClick() && this.onPin) { this.stageDetailSource(); this.onPin(pin.id, this.recoveredSources[pin.imageUrl] || pin.imageUrl); } })
+            PinmonyPinCountBadge({ mediaCount: this.pinMediaCount(pin) }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+            if (pin.isVideo === true) {
+              PinmonyCardMediaBadge({ caption: this.uiText('pm_videos_c20f7618') }).align(Alignment.TopStart).hitTestBehavior(HitTestMode.None)
+            }
+            if (pin.saved === true) {
+              Column() {
+                Text(this.uiText("pm_saved_471dd4d7")).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Color.White)
+                  .padding({ left: 14, right: 14, top: 16 })
+                Blank()
+              }.width('100%').height(this.imageHeight(pin)).backgroundColor('#55000000')
+                .borderRadius(18).clip(true).hitTestBehavior(HitTestMode.None)
+            }
+          }.width('100%').height(this.imageHeight(pin)).borderRadius(18).clip(true)
+            .id(this.paneActive ? 'pinmony-home-photo-' + pin.id : 'pinmony-home-photo-' + this.categoryId + '-' + pin.id)
+        }
+      }.width('100%').id('pinmony-home-hold-photo-' + this.categoryId + '-' + pin.id)
+      .onTouch((event: TouchEvent) => this.trackPinHold(event, pin))
+      .onGestureRecognizerJudgeBegin((_event: BaseGestureEvent, recognizer: GestureRecognizer): GestureJudgeResult =>
+        recognizer instanceof LongPressRecognizer && !this.canPreviewPinHold(pin) ?
+          GestureJudgeResult.REJECT : GestureJudgeResult.CONTINUE)
+      .priorityGesture(LongPressGesture({ duration: 450, repeat: false })
+        .onAction(() => this.beginPinHold(pin))
+        .onActionEnd((event: GestureEvent) => {
+          const finger = event.fingerList[0];
+          if (finger && event.fingerList.length === 1) this.releasePinHold(pin, finger.globalX, finger.globalY);
+        })
+        .onActionCancel(() => this.endPinHold()))
       Row({ space: 4 }) {
         if (pin.title.trim().length > 0) {
           Text(PinmonyI18n.render(pin.title, this.uiLanguage))
@@ -1150,6 +1254,11 @@ export struct PinmonyHomeFeedPane {
           .hitTestBehavior(this.homeChromeCollapsed ? HitTestMode.None : HitTestMode.Default)
           .accessibilityLevel(this.homeChromeCollapsed ? 'no-hide-descendants' : 'auto')
       }
-    }.width('100%').height('100%').clip(true)
+      if (this.pinHoldFrame) {
+        PinmonyPinHoldPreview({ frame: this.pinHoldFrame, cursorX: this.pinHoldX, cursorY: this.pinHoldY,
+          selectedIndex: this.pinHoldSelection, coverDimmed: this.pinHoldCoverDimmed, searchEnabled: this.pinHoldSearchEnabled,
+          chromeBottom: this.pinHoldChromeBottom() })
+      }
+    }.width('100%').height('100%').clip(true).id('pinmony-home-hold-' + this.categoryId)
   }
 }

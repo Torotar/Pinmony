@@ -2,6 +2,9 @@ import { PinmonyNativeNetwork, PinmonyNetworkJob, PinmonyNetworkReply, PinmonyNe
 import { PinmonyBusinessSessionContext } from 'common_session';
 import { PinmonyRuntimeLog } from 'common_foundation';
 interface NativeSearchEnvelope { options: Record<string, Object | null>; context: Record<string,string>; }
+interface BoardReorderData { pin?: string; before_pin?: string; after_pin?: string; section_before?: string; section_after?: string; }
+interface BoardReorderOptions { url: string; data: BoardReorderData; }
+interface BoardReorderEnvelope { options: BoardReorderOptions; context: Record<string, string>; }
 interface PinmonyGraphQuery {
   queryHash: string;
   variables: Object;
@@ -10,6 +13,39 @@ interface PinmonyGraphQuery {
 export class PinmonyBoardNetwork {
   private readonly transport: PinmonyNativeNetwork;
   constructor(transport: PinmonyNativeNetwork) { this.transport = transport; }
+  async requestBusinessBoardReorder(id: string, page: string, session: () => PinmonyBusinessSessionContext,
+    board: string, kind: string, moved: string, before: string, after: string, ownerCurrent: () => boolean): Promise<PinmonyNetworkReply> {
+    const captured: PinmonyBusinessSessionContext = session();
+    const source: string = page.slice(captured.origin.length);
+    const digits = (value: string): boolean => /^\d{1,30}$/.test(value);
+    if (!PIN_BUSINESS_PIN_READ_ENABLED || !captured.authenticated || !captured.accountId || !ownerCurrent() ||
+        !/^native_board_reorder_\d+$/.test(id) || !/^https:\/\/(?:www|uk)\.pinterest\.com$/.test(captured.origin) ||
+        !page.startsWith(captured.origin + '/') || !/^\/[^/?#\s\\]+\/[^/?#\s\\]+\/$/.test(source) ||
+        !digits(board) || !digits(moved) || (!before && !after) || (before && !digits(before)) || (after && !digits(after)) ||
+        moved === before || moved === after || before === after || (kind !== 'pin' && kind !== 'section')) throw new Error('board-reorder-contract');
+    const fields: BoardReorderData = {};
+    if (kind === 'pin') {
+      fields.pin = moved;
+      if (before) fields.before_pin = before;
+      if (after) fields.after_pin = after;
+    } else {
+      if (before) fields.section_before = before;
+      if (after) fields.section_after = after;
+    }
+    const envelope: BoardReorderEnvelope = { options: { url: kind === 'pin' ? '/v3/boards/' + board + '/reorder_pin/' :
+      '/v3/board/sections/' + moved + '/reorder/', data: fields }, context: {} };
+    const job: PinmonyNetworkJob = { id: id, epoch: captured.generation, page: page,
+      url: captured.origin + '/resource/ApiResource/create/', method: 'POST',
+      body: 'source_url=' + encodeURIComponent(source) + '&data=' + encodeURIComponent(JSON.stringify(envelope)),
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest',
+        'X-Pinterest-Pws-Handler': 'www/[username]/[slug].js', 'X-Pinterest-Source-Url': source } };
+    return this.transport.request(job, (): PinmonyNetworkContext => {
+      const actual: PinmonyBusinessSessionContext = session();
+      return { authenticated: ownerCurrent() && actual.authenticated && actual.accountId === captured.accountId &&
+        actual.generation === captured.generation && actual.origin === captured.origin, epoch: captured.generation, page: page, userAgent: actual.userAgent };
+    });
+  }
+
 async requestBusinessBoardFollow(job: PinmonyNetworkJob, session: () => PinmonyBusinessSessionContext,
       page: string, board: string, viewer: string, owner: () => boolean): Promise<PinmonyNetworkReply> {
     const captured: PinmonyBusinessSessionContext = session(); let permitted: boolean = false;

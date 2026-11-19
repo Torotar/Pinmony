@@ -3331,6 +3331,10 @@
       "value": "共有リンク"
     },
     {
+      "name": "pm_board_organizer_move_to",
+      "value": "移動先"
+    },
+    {
       "name": "pm_move_to_another_board_62574b0d",
       "value": "別のボードに移動"
     },
@@ -5069,6 +5073,10 @@
     {
       "name": "pm_profile_content_search",
       "value": "自分のピンを検索"
+    },
+    {
+      "name": "pm_profile_board_hold_reorder",
+      "value": "並べ替え"
     },
     {
       "name": "pm_profile_board_sort",

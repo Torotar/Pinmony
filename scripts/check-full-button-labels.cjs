@@ -104,7 +104,7 @@ assert(ih.segmentBarMinWidth() > 448, 'wide labels must expand beyond the old ca
 const tabs = block(board, 'private boardActionTab(', 'private actionTile(');
 assert(!/Ellipsis|maxLines|\.height\(14\)/.test(tabs));
 assert(tabs.includes('barMode(BarMode.Fixed)') && !tabs.includes('barMode(BarMode.Scrollable)'));
-assert(tabs.includes("}.width('100%').height(this.boardActionBarHeight())") && !board.includes('boardActionTabWidth('));
+assert(tabs.includes("}.width('100%').height(this.boardActionBarHeight(organizer))") && !board.includes('boardActionTabWidth('));
 assert(tabs.includes('.wordBreak(WordBreak.BREAK_WORD).flexShrink(0)') && tabs.includes('.onSizeChange('));
 assert(tabs.includes('Number(newSize.width) * 3'), 'measure the actual floating bar, not just the screen width');
 assert(tabs.includes('.scrollable(false)') && tabs.includes('.onContentWillChange((): boolean => false)'));

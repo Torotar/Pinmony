@@ -1,7 +1,7 @@
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { NetworkManager, Priority } from './PinmonyNativeNetwork';
 import { PinmonyRuntimeLog } from 'common_foundation';
-import { PinmonySubmittedLinkTarget, PinmonyBoardInviteLink, parseBoardInviteLink } from './PinmonyBoardInviteLink';
+import { PinmonySubmittedLinkTarget, PinmonyBoardInviteLink, parseBoardInviteLink, parseBoardPermalink, parseOwnSharedBoardRedirect } from './PinmonyBoardInviteLink';
 
 export function shortPinToken(value: string): string {
   if (value.length > 128) return '';
@@ -100,6 +100,10 @@ export class PinmonyPinLinkResolver {
         if (profile) { PinmonyRuntimeLog.info('PinLinkTrace: resolve-ready kind=profile'); return { kind: 'profile', profileUrl: profile }; }
         const invitation: PinmonyBoardInviteLink | undefined = parseBoardInviteLink(header);
         if (invitation) return { kind: 'board-invite', invitation: invitation };
+        const board: string = header.startsWith('https://') ? parseBoardPermalink(header) : '';
+        if (board) return { kind: 'board', boardUrl: board };
+        const ownBoard: string = parseOwnSharedBoardRedirect(header);
+        if (ownBoard) return { kind: 'own-shared-board', boardUrl: ownBoard };
         // This exact intermediate path was observed for Pinterest shared links.
         // Never follow arbitrary hosts, relative links, query strings or redirects.
         const intermediate: string = 'https://api.pinterest.com/url_shortener/' + token + '/redirect/';

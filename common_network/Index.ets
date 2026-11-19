@@ -7,5 +7,5 @@ export { readNativeSearchProductRoute, PinmonySearchProductRoute, PinmonyPublish
 export { PinmonyMediaFile, PinmonyMediaFileLease, acceptsMediaFileUrl } from './src/main/ets/PinmonyMediaFile';
 export { PIN_REQUEST_PROTECTION_ENABLED, PIN_RATE_LIMIT_BASE_MS, PinmonyRequestPolicy } from './src/main/ets/PinmonyRequestPolicy';
 export { PinmonyPinLinkResolver } from './src/main/ets/PinmonyPinLinkResolver';
-export { PinmonyBoardInviteLink, PinmonySubmittedLinkTarget, parseBoardInviteLink, hasBoardInviteLinkContext } from './src/main/ets/PinmonyBoardInviteLink';
+export { PinmonyBoardInviteLink, PinmonySubmittedLinkTarget, parseBoardInviteLink, hasBoardInviteLinkContext, parseBoardPermalink } from './src/main/ets/PinmonyBoardInviteLink';
 export { PinmonyTransferJob, PinmonyTransferReply, PinmonyTransferFile } from './src/main/ets/PinmonyNativeNetwork';

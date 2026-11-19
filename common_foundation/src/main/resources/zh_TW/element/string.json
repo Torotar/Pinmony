@@ -3319,6 +3319,10 @@
       "value": "分享 Pin 圖鏈接"
     },
     {
+      "name": "pm_board_organizer_move_to",
+      "value": "移動至"
+    },
+    {
       "name": "pm_move_to_another_board_62574b0d",
       "value": "移至其他圖板"
     },
@@ -5057,6 +5061,10 @@
     {
       "name": "pm_profile_content_search",
       "value": "搜索你的 Pin 圖"
+    },
+    {
+      "name": "pm_profile_board_hold_reorder",
+      "value": "重新排序"
     },
     {
       "name": "pm_profile_board_sort",
