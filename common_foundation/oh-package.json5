@@ -1,7 +1,0 @@
-{
-  "name": "common_foundation",
-  "version": "1.0.0",
-  "description": "Pinmony common_foundation",
-  "main": "Index.ets",
-  "dependencies": {}
-}

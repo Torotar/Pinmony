@@ -1,9 +1,0 @@
-{
-  "module": {
-    "name": "feature_home",
-    "type": "har",
-    "deviceTypes": [
-      "phone"
-    ]
-  }
-}

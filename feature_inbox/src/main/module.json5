@@ -1,9 +1,0 @@
-{
-  "module": {
-    "name": "feature_inbox",
-    "type": "har",
-    "deviceTypes": [
-      "phone"
-    ]
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "module": {
-    "name": "common_ui",
-    "type": "har",
-    "deviceTypes": [
-      "phone"
-    ]
-  }
-}

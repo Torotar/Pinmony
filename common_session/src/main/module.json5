@@ -1,9 +1,0 @@
-{
-  "module": {
-    "name": "common_session",
-    "type": "har",
-    "deviceTypes": [
-      "phone"
-    ]
-  }
-}
