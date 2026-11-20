@@ -42,53 +42,6 @@ Layouts have been adapted for tablets and wide-screen foldable devices. Please r
 - **Adjust photo display and screen orientation**: enable “Show full photos in Pin details” under Settings → Display Settings to fit detail photos within the available area.
 - **Check for updates**: check the version under Settings → About, then use the update option to open the Huawei AppGallery testing page.
 
-## Architecture
-
-- `entry`: app entry, window lifecycle, login gate, root pages, routing, and cross-page coordination
-- `feature_home`: home content, categories, pagination, caching, and home state
-- `feature_search`: search discovery, image search and history, content link recognition, filters, results, categories, topics, and search state
-- `feature_pin`: details, comments, related recommendations, media, saving, and sharing
-- `feature_board`: board pages, board details, and board content
-- `feature_profile`: profiles, saved content, personal content search, recent searches, publishing, and organization flows
-- `feature_inbox`: inbox updates, notification details, messages, contacts, following activity, and chat list state
-- `feature_settings`: settings, account information, language, notifications, social permissions, autoplay, display preferences, and sign-out flow
-- `common_session`: login evidence, session, and credential adaptation
-- `common_network`: native RCP transport, request admission, scheduling, cancellation, and lifecycle
-- `common_ui`: reusable UI components and shared presentation state
-- `common_foundation`: multilingual resources and preferences, caching, logging, task registration, and base runtime capabilities
-
-## Language Resources and Preferences
-
-App-owned copy uses stable resource names in `common_foundation/src/main/resources/{base,zh_CN,zh_TW,en_US,en_GB,ja,ko,ru,pt_BR}/element/string.json`. UI resources are provided for Simplified Chinese, Traditional Chinese, US English, UK English, Japanese, Korean, Russian, and Brazilian Portuguese. Preferences are restored after restart, and account language synchronization is integrated. Website and user content remains in its original form; only confirmed fixed controls use localized copy based on semantic identifiers.
-
-Choose a language or follow the system under Settings → Display Settings. When a supported account language is read, the app synchronizes its UI language.
-
-Some translations may be inaccurate or unnatural. Please report translation, text truncation, or display issues through [GitHub Issues](https://github.com/Torotar/Pinmony/issues), including the language and affected page.
-
-## Build and Validation
-
-### Release Build
-
-Run this PowerShell command from the project root:
-
-```powershell
-./build-release.ps1 -DevEcoHome '<DevEco Studio installation directory>'
-```
-
-If the SDK is installed elsewhere, add `-SdkHome '<HarmonyOS SDK directory>'`. The script also accepts the `DEVECO_STUDIO_HOME` and `DEVECO_SDK_HOME` environment variables.
-
-The output is `release/Pinmony-release-unsigned.hap`. The script verifies Release mode, `debug=false`, and the absence of Debug source maps. Signing and physical-device testing are separate steps.
-
-### Debug Module Build
-
-```powershell
-$env:DEVECO_SDK_HOME = '<HarmonyOS SDK directory>'
-$env:JAVA_HOME = '<DevEco Studio installation directory>\jbr'
-& '<DevEco Studio installation directory>\tools\hvigor\bin\hvigorw.bat' --mode module -p module=entry assembleHap --no-daemon
-```
-
-Local regression checks use the relevant scripts under `scripts/check-*.cjs`. Some scripts require the path to the TypeScript module bundled with DevEco Studio. Record local checks, HAP builds, signing, installation, physical-device interaction, and Pinterest online service validation separately; a successful build does not establish that actual usage has been verified.
-
 ## Privacy and Sessions
 
 Pinmony uses ArkWeb to retain the current website login session. Native networking reads the required Cookies temporarily for each request and synchronizes Set-Cookie values back to the current ArkWeb session when needed. Cookies, CSRF values, account identifiers, access tokens, and response credentials are not written to source code, the repository, or persistent logs.
@@ -107,7 +60,3 @@ This project is not affiliated with, partnered with, or authorized by Pinterest 
 - Users are responsible for any account, data, device, or other consequences arising from use of this project.
 
 Pinterest's name, trademarks, web design, images, videos, text, and resource responses belong to their respective rights holders and are not covered by this project's license. The project logo, third-party dependencies, and example resources may be subject to their own copyright or license terms.
-
-## License
-
-Pinmony source code is licensed under the Apache License 2.0; see [`LICENSE`](LICENSE) for the full text. Apache-2.0 applies only to the parts explicitly identified as project code and does not grant rights to Pinterest branding, website content, resource data, or third-party resources.

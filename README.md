@@ -43,54 +43,6 @@ Pinmony 是个人为了兴趣开发的 HarmonyOS 应用，主要用于学习、�
 - **检查更新**：在“设置 → 关于”中检查版本，通过更新入口打开华为应用市场测试页面。
 
 
-## 技术架构
-
-- `entry`：应用入口、窗口生命周期、登录门禁、根页面、路由和跨页面协调
-- `feature_home`：首页内容、分类、分页、缓存和首页状态
-- `feature_search`：搜索发现、图片搜索与历史、内容链接识别、筛选、结果、分类、主题和搜索状态
-- `feature_pin`：详情、评论、相关推荐、媒体、收藏和分享
-- `feature_board`：图板页面、图板详情和图板内容
-- `feature_profile`：个人资料、已保存内容、个人内容搜索、最近搜索、发布和整理流程
-- `feature_inbox`：收件箱更新、通知详情、消息、联系人、关注动态及聊天列表状态
-- `feature_settings`：设置、账号信息、语言、通知、社交权限、自动播放、显示偏好和退出登录流程
-- `common_session`：登录证据、会话和凭据适配
-- `common_network`：原生 RCP 网络传输、请求准入、调度、取消和生命周期
-- `common_ui`：跨特性复用的 UI 组件和公共展示状态
-- `common_foundation`：多语言资源与偏好、缓存、日志、任务登记和基础运行时能力
-
-
-## 语言资源与偏好
-
-应用自有文案统一维护在 `common_foundation/src/main/resources/{base,zh_CN,zh_TW,en_US,en_GB,ja,ko,ru,pt_BR}/element/string.json`，使用稳定资源名。目前提供简体中文、繁体中文、英语（美国）、英语（英国）、日语、韩语、俄语和葡萄牙语（巴西）界面资源，语言偏好会在重启后恢复，并接入账号语言同步。网站和用户内容保持原文，仅对已确认的固定控件按语义标识显示本地文案。
-
-语言选择入口位于“设置 → 显示设置”，支持跟随系统或手动选择语言。读取到受支持的账号语言时，应用会同步界面语言。
-
-部分译文可能存在不准确或不自然的表达。如遇翻译、文字截断或显示问题，欢迎通过 [GitHub Issues](https://github.com/Torotar/Pinmony/issues) 反馈，并注明所用语言及对应页面。
-
-## 构建与验证
-
-### Release 构建
-
-在项目根目录运行 PowerShell 命令：
-
-```powershell
-./build-release.ps1 -DevEcoHome '<DevEco Studio 安装目录>'
-```
-
-SDK 不在默认位置时，可通过 `-SdkHome '<HarmonyOS SDK 目录>'` 指定。脚本也支持读取 `DEVECO_STUDIO_HOME` 和 `DEVECO_SDK_HOME` 环境变量。
-
-输出文件为 `release/Pinmony-release-unsigned.hap`。脚本会验证包内为 Release 模式、`debug=false`，且不含 Debug 源码映射；签名和真机测试仍需另行完成。
-
-### debug模块构建
-
-```powershell
-$env:DEVECO_SDK_HOME = '<HarmonyOS SDK 目录>'
-$env:JAVA_HOME = '<DevEco Studio 安装目录>\jbr'
-& '<DevEco Studio 安装目录>\tools\hvigor\bin\hvigorw.bat' --mode module -p module=entry assembleHap --no-daemon
-```
-
-本地回归使用 `scripts/check-*.cjs` 中对应功能的检查脚本；部分脚本需传入 DevEco Studio 自带的 TypeScript 模块路径。本地检查、HAP 构建、签名、安装、真机交互和 Pinterest 线上服务验证分别记录，不能用编译成功代替实际使用验收。
-
 ## 隐私与会话
 
 Pinmony 使用 ArkWeb 保留当前网站登录会话。原生网络按请求临时读取必要的 Cookie，并在需要时将 Set-Cookie 同步回当前 ArkWeb 会话。Cookie、CSRF、账号标识、访问令牌和响应凭据不会写入源码、仓库或持久化日志。
@@ -109,7 +61,3 @@ Pinmony 使用 ArkWeb 保留当前网站登录会话。原生网络按请求临�
 - 使用本项目产生的账号、数据、设备或其他后果由使用者自行承担。
 
 Pinterest 的名称、商标、网页设计、图片、视频、文本和接口返回内容归其各自权利人所有，不属于本项目许可证的授权范围。项目 Logo、第三方依赖和示例资源可能适用各自独立的版权或许可证条款。
-
-## 许可
-
-Pinmony 源代码采用 Apache License 2.0，许可证全文见 [`LICENSE`](LICENSE)。Apache-2.0 仅适用于本项目明确声明为项目代码的部分，不授权 Pinterest 的品牌、网站内容、接口数据或第三方资源。
